@@ -355,8 +355,6 @@ class MAPPOTrainer(mava.Trainer):
                     observations_trans[agent],
                 )
 
-                print("termination: ", termination.shape)
-
                 loss_mask = tf.concat(
                     (tf.ones((1, termination.shape[1])), termination[:-1]), 0
                 )
