@@ -309,9 +309,12 @@ class MADQN:
         # Check that all agent_net_keys are in trainer_networks
         assert unique_net_keys == unique_trainer_net_keys
         # Setup specs for each network
-        self._net_spec_keys = net_spec_keys
-        for i in range(len(unique_net_keys)):
-            self._net_spec_keys[unique_net_keys[i]] = agents[i % len(agents)]
+        if net_spec_keys:
+            self._net_spec_keys = net_spec_keys
+        else:
+            self._net_spec_keys={}
+            for i in range(len(unique_net_keys)):
+                self._net_spec_keys[unique_net_keys[i]] = agents[i % len(agents)]
 
         # Setup table_network_config
         table_network_config = {}

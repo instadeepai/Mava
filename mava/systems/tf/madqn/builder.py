@@ -171,14 +171,14 @@ class MADQNBuilder:
         self._trainer_fn = trainer_fn
         self._executor_fn = executor_fn
 
-    def covert_specs(
+    def convert_specs(
         self, spec: Dict[str, Any], list_of_networks: List
     ) -> Dict[str, Any]:
         """Convert specs.
 
         Args:
             spec: agent specs
-            num_networks: the number of networks
+            list_of_networks: the list of networks each trainer uses.
 
         Returns:
             converted specs
@@ -198,7 +198,7 @@ class MADQNBuilder:
         else:
             # For the extras
             for key in spec.keys():
-                converted_spec[key] = self.covert_specs(spec[key], list_of_networks)
+                converted_spec[key] = self.convert_specs(spec[key], list_of_networks)
         return converted_spec
 
     def make_replay_tables(
@@ -264,14 +264,14 @@ class MADQNBuilder:
             # Convert a Mava spec
             list_of_networks = self._config.table_network_config[table_key]
             env_spec = copy.deepcopy(environment_spec)
-            env_spec._specs = self.covert_specs(env_spec._specs, list_of_networks)
+            env_spec._specs = self.convert_specs(env_spec._specs, list_of_networks)
 
             env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
             if env_spec.extra_specs is not None:
-                env_spec.extra_specs = self.covert_specs(
+                env_spec.extra_specs = self.convert_specs(
                     env_spec.extra_specs, list_of_networks
                 )
-            extra_specs = self.covert_specs(
+            extra_specs = self.convert_specs(
                 self._extra_specs,
                 list_of_networks,
             )
