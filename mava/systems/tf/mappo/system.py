@@ -70,7 +70,7 @@ class MAPPO:
             snt.Optimizer, Dict[str, snt.Optimizer]
         ] = snt.optimizers.Adam(learning_rate=5e-4),
         critic_optimizer: Optional[snt.Optimizer] = snt.optimizers.Adam(
-            learning_rate=5e-4
+            learning_rate=1e-3
         ),
         discount: float = 0.99,
         lambda_gae: float = 0.95,
@@ -80,10 +80,10 @@ class MAPPO:
         max_gradient_norm: Optional[float] = 0.5,
         max_queue_size: Optional[int] = None,
         batch_size: int = 512,
-        minibatch_size: int = None,
-        num_epochs: int = 10,
+        minibatch_size: int = 128,
+        num_epochs: int = 5,
         sequence_length: int = 20,
-        sequence_period: Optional[int] = None,
+        sequence_period: Optional[int] = 10,
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
@@ -191,6 +191,14 @@ class MAPPO:
             normalize_advantage: whether to normalize the advantage estimate. This can
                 hurt peformance when shared weights are used.
         """
+
+        if num_epochs > 5:
+            raise ValueError(
+                "Epoch must be smaller than 5. For epoch values large than 5"
+                + " the client update should be moved to inside the epoch loop"
+                + "instead of inside the step function."
+            )
+
         # minibatch size defaults to train batch size
         if minibatch_size:
             self._minibatch_size = minibatch_size
