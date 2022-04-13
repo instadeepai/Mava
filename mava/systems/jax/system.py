@@ -108,7 +108,7 @@ class System(BaseSystem):
             raise Exception("System already built.")
 
         # Add the system defaults, but allow the kwargs to overwrite them.
-        parameter = copy.copy(self._default_params)
+        parameter = copy.copy(self._default_params.__dict__)
         parameter.update(kwargs)
 
         self.config.build()

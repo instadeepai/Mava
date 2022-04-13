@@ -22,6 +22,7 @@ import acme
 import numpy as np
 import pytest
 
+from mava.components.jax import building, executing
 from mava.components.jax.building.adders import (
     ParallelSequenceAdder,
     ParallelSequenceAdderSignature,
@@ -33,11 +34,19 @@ from mava.components.jax.building.parameter_client import ExecutorParameterClien
 from mava.components.jax.updating.parameter_server import DefaultParameterServer
 from mava.specs import DesignSpec
 from mava.systems.jax import mappo
-from mava.systems.jax.mappo import EXECUTOR_SPEC
 from mava.systems.jax.mappo.components import ExtrasLogProbSpec
 from mava.systems.jax.system import System
 from mava.testing.building import mocks
 from mava.utils.environments import debugging_utils
+
+executor = DesignSpec(
+    executor_init=executing.ExecutorInit,
+    executor_observe=executing.FeedforwardExecutorObserve,
+    executor_select_action=executing.FeedforwardExecutorSelectAction,
+    executor_adder=building.ParallelSequenceAdder,
+    executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
+    networks=building.DefaultNetworks,
+).get()
 
 
 #########################################################################
@@ -49,7 +58,6 @@ class TestSystemExecutor(System):
         Returns:
             system callback components
         """
-        executor = EXECUTOR_SPEC.get()
         components = DesignSpec(
             data_server=mocks.MockDataServer,
             data_server_adder=mocks.MockAdderSignature,
@@ -117,7 +125,6 @@ class TestSystemExecutorAndParameterSever(System):
         Returns:
             system callback components
         """
-        executor = EXECUTOR_SPEC.get()
         components = DesignSpec(
             data_server=mocks.MockDataServer,
             data_server_adder=mocks.MockAdderSignature,
@@ -201,7 +208,6 @@ class TestSystemExceptTrainer(System):
         Returns:
             system callback components
         """
-        executor = EXECUTOR_SPEC.get()
         components = DesignSpec(
             data_server=OnPolicyDataServer,
             data_server_adder_signature=ParallelSequenceAdderSignature,

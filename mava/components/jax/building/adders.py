@@ -136,7 +136,7 @@ class ParallelTransitionAdder(Adder):
 
         adder = reverb_adders.ParallelNStepTransitionAdder(
             priority_fns=builder.store.adder_priority_fn,
-            client=builder.store.system_data_server,
+            client=builder.store.data_server_client,
             net_ids_to_keys=builder.store.unique_net_keys,
             n_step=self.config.n_step,
             table_network_config=builder.store.table_network_config,

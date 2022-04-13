@@ -13,16 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Jax MAPPO system executor."""
-from mava.components.jax.executing.executor import (
-    ExecutorInit,
-    FeedforwardExecutorObserve,
-    FeedforwardExecutorSelectAction,
-)
-from mava.specs import DesignSpec
+"""Default hyperparameters for MAPPO system."""
+from dataclasses import dataclass
 
-EXECUTOR_SPEC = DesignSpec(
-    executor_init=ExecutorInit,
-    executor_observe=FeedforwardExecutorObserve,
-    executor_select_action=FeedforwardExecutorSelectAction,
-)
+
+@dataclass
+class MAPPODefaultConfig:
+    sample_batch_size: int = 512
+    sequence_length: int = 20
+    period: int = 10
+    use_next_extras: bool = False

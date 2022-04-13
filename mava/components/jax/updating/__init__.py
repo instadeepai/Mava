@@ -15,4 +15,4 @@
 
 """Updating components for Mava systems."""
 
-# TODO (Arnu): components for parameter server
+from mava.components.jax.updating.parameter_server import DefaultParameterServer
