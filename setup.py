@@ -38,6 +38,16 @@ tf_requirements = [
     "trfl",
 ]
 
+jax_requirements = [
+    "chex",
+    "jax",
+    "jaxlib",
+    "dm-haiku",
+    "flax",
+    "optax",
+    "rlax",
+] + tf_requirements
+
 pettingzoo_requirements = [
     "pettingzoo~=1.13.1",
     "multi_agent_ale_py",
@@ -117,6 +127,7 @@ setup(
         "record_episode": record_episode_requirements,
         "sc2": smac_requirements,
         "envs": pettingzoo_requirements + open_spiel_requirements + smac_requirements,
+        "jax": jax_requirements,
     },
     classifiers=[
         "Development Status :: 3 - Alpha",
