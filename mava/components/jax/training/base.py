@@ -14,10 +14,10 @@
 # limitations under the License.
 
 """Base Trainer components."""
-import abc
-from typing import Any, NamedTuple
 
-import jax.numpy as jnp
+import abc
+from typing import Any, Dict, NamedTuple
+
 import optax
 
 from mava.components.jax import Component
@@ -28,23 +28,23 @@ class Batch(NamedTuple):
     """A batch of data; all shapes are expected to be [B, ...]."""
 
     observations: Any
-    actions: jnp.ndarray
-    advantages: jnp.ndarray
+    actions: Any
+    advantages: Any
 
     # Target value estimate used to bootstrap the value function.
-    target_values: jnp.ndarray
+    target_values: Any
 
     # Value estimate and action log-prob at behavior time.
-    behavior_values: jnp.ndarray
-    behavior_log_probs: jnp.ndarray
+    behavior_values: Any
+    behavior_log_probs: Any
 
 
 class TrainingState(NamedTuple):
     """Training state consists of network parameters and optimiser state."""
 
     params: Any
-    opt_state: optax.OptState
-    random_key: jnp.ndarray
+    opt_states: Dict[str, optax.OptState]
+    random_key: Any
 
 
 class Utility(Component):

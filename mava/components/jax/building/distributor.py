@@ -54,32 +54,6 @@ class Distributor(Component):
             name=self.config.distributor_name,
         )
 
-        # data_server = builder.data_server()
-        # parameter_server = builder.parameter_server()
-
-        # trainer = builder.trainer(
-        #     trainer_id="trainer",
-        #     data_server_client=data_server,
-        #     parameter_server_client=parameter_server,
-        # )
-        # executor = builder.executor(
-        #     executor_id="executor",
-        #     data_server_client=data_server,
-        #     parameter_server_client=parameter_server,
-        # )
-        # evaluator = builder.executor(
-        #     executor_id="evaluator",
-        #     data_server_client=None,
-        #     parameter_server_client=parameter_server,
-        # )
-        # builder.store.system_build = (
-        #     data_server,
-        #     parameter_server,
-        #     executor,
-        #     evaluator,
-        #     trainer,
-        # )
-
         # tables node
         data_server = builder.store.program.add(
             builder.data_server,
@@ -98,7 +72,7 @@ class Distributor(Component):
         for executor_id in range(self.config.num_executors):
             builder.store.program.add(
                 builder.executor,
-                [executor_id, data_server, parameter_server],
+                [f"executor_{executor_id}", data_server, parameter_server],
                 node_type=NodeType.corrier,
                 name="executor",
             )
@@ -124,7 +98,7 @@ class Distributor(Component):
         if not self.config.multi_process:
             builder.store.system_build = builder.store.program.get_nodes()
 
-    def on_building_launch_distributor(self, builder: SystemBuilder) -> None:
+    def on_building_launch(self, builder: SystemBuilder) -> None:
         """_summary_
 
         Args:

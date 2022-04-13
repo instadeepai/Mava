@@ -15,7 +15,8 @@
 
 """Jax-based Mava system implementation."""
 import abc
-from typing import Any, List
+import copy
+from typing import Any, Dict, List, Tuple
 
 from mava.core_jax import BaseSystem
 from mava.specs import DesignSpec
@@ -28,7 +29,7 @@ class System(BaseSystem):
 
     def __init__(self) -> None:
         """System Initialisation"""
-        self._design = self.design()
+        self._design, self._default_params = self.design()
         self.config = Config()  # Mava config
         self.components: List = []
         self._built = False
@@ -44,7 +45,7 @@ class System(BaseSystem):
             self.config.add(**input)
 
     @abc.abstractmethod
-    def design(self) -> DesignSpec:
+    def design(self) -> Tuple[DesignSpec, Dict]:
         """System design specifying the list of components to use.
 
         Returns:
@@ -65,6 +66,7 @@ class System(BaseSystem):
             )
         comp = component()
         name = comp.name
+
         if name in list(self._design.get().keys()):
             self._design.get()[name] = component
             config_feed = {name: comp.config}
@@ -105,8 +107,13 @@ class System(BaseSystem):
         if self._built:
             raise Exception("System already built.")
 
+        # Add the system defaults, but allow the kwargs to overwrite them.
+        parameter = copy.copy(self._default_params)
+        parameter.update(kwargs)
+
         self.config.build()
-        self.config.set_parameters(**kwargs)
+
+        self.config.set_parameters(**parameter)
 
         # get system config to feed to component list to update hyperparameter settings
         system_config = self.config.get()

@@ -13,25 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Trainer components for system builders"""
+"""Trainer components for system builders."""
+
 from dataclasses import dataclass
-from typing import Any, Dict, List, Union
+from typing import Dict, List, Union
 
 from mava.components.jax import Component
-from mava.core_jax import SystemBuilder
+from mava.core_jax import SystemBuilder, SystemTrainer
 from mava.utils import enums
 from mava.utils.sort_utils import sort_str_num
 
 
 @dataclass
-class TrainerProcessConfig:
+class TrainerInitConfig:
     trainer_networks: Union[
         Dict[str, List], enums.Trainer
     ] = enums.Trainer.single_trainer
 
 
-class TrainerProcess(Component):
-    def __init__(self, config: TrainerProcessConfig = TrainerProcessConfig()):
+class TrainerInit(Component):
+    def __init__(self, config: TrainerInitConfig = TrainerInitConfig()):
         """_summary_
 
         Args:
@@ -75,7 +76,7 @@ class TrainerProcess(Component):
         # Check that all agent_net_keys are in trainer_networks
         assert unique_net_keys == unique_trainer_net_keys
         # Setup specs for each network
-        self._net_spec_keys: Dict[str, Any] = {}
+        builder.store.net_spec_keys = {}
         for i in range(len(unique_net_keys)):
             builder.store.net_spec_keys[unique_net_keys[i]] = builder.store.agents[
                 i % len(builder.store.agents)
@@ -95,14 +96,23 @@ class TrainerProcess(Component):
                     matches = most_matches
                     builder.store.table_network_config[trainer_key] = sample
 
-    def on_building_trainer_start(self, builder: SystemBuilder) -> None:
-        """_summary_"""
-        builder.store.networks = builder.store.network_factory(
-            environment_spec=builder.store.environment_spec,
-            agent_net_keys=builder.store.agent_net_keys,
-            net_spec_keys=builder.store.net_spec_keys,
-        )
+        builder.store.networks = builder.store.network_factory()
 
+    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
+        """_summary_"""
+        # Convert network keys for the trainer.
+        trainer.store.trainer_table_entry = trainer.store.table_network_config[
+            trainer.store.trainer_id
+        ]
+        trainer.store.trainer_agents = trainer.store.agents[
+            : len(trainer.store.trainer_table_entry)
+        ]
+        trainer.store.trainer_agent_net_keys = {
+            agent: trainer.store.trainer_table_entry[a_i]
+            for a_i, agent in enumerate(trainer.store.trainer_agents)
+        }
+
+    @property
     def name(self) -> str:
         """_summary_"""
         return "trainer"

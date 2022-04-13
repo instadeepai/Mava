@@ -62,6 +62,11 @@ class ExecutorEnvironmentLoop(Component):
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
         """[summary]"""
 
+    @property
+    def name(self) -> str:
+        """_summary_"""
+        return "environment_loop"
+
 
 class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
@@ -72,11 +77,10 @@ class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
         """
         executor_environment_loop = ParallelEnvironmentLoop(
             environment=builder.store.executor_environment,
-            executor=builder.store.executor_fn,
+            executor=builder.store.executor,
             logger=builder.store.executor_logger,
             should_update=self.config.should_update,
         )
-        if builder.store.executor_id == "evaluator":
-            builder.store.system_evaluator = executor_environment_loop
-        else:
-            builder.store.system_executor = executor_environment_loop
+        del builder.store.executor_logger
+
+        builder.store.system_executor = executor_environment_loop

@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Trainer components for advantage calculations."""
+
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -48,8 +49,8 @@ class GAE(Utility):
         """_summary_"""
 
         def gae_advantages(
-            rewards: jnp.array, discounts: jnp.array, values: jnp.array
-        ) -> Tuple[jnp.ndarray, jnp.array]:
+            rewards: jnp.ndarray, discounts: jnp.ndarray, values: jnp.ndarray
+        ) -> Tuple[jnp.ndarray, jnp.ndarray]:
             """Uses truncated GAE to compute advantages."""
 
             # Apply reward clipping.

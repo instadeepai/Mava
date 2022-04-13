@@ -14,5 +14,3 @@
 # limitations under the License.
 
 """Tests for trainer class for Jax-based Mava systems"""
-
-# TODO (Arnu)

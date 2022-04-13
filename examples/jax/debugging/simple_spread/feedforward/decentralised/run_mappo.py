@@ -13,22 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running feedforward MADDPG on debug MPE environments. \
-    NB: Using multiple trainers with non-shared weights is still in its \
-    experimental phase of development. This feature will become faster and \
-    more stable in future Mava updates."""
-
+"""Example running MAPPO on debug MPE environments."""
 import functools
 from datetime import datetime
 from typing import Any
 
-import launchpad as lp
-import sonnet as snt
+import optax
 from absl import app, flags
 
-from mava.systems.tf import maddpg
-from mava.systems.tf.maddpg import make_default_networks
-from mava.utils import enums, lp_utils
+from mava.systems.jax import mappo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
@@ -40,15 +33,16 @@ flags.DEFINE_string(
 )
 flags.DEFINE_string(
     "action_space",
-    "continuous",
+    "discrete",
     "Environment action space type (str).",
 )
+
 flags.DEFINE_string(
     "mava_id",
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
@@ -57,19 +51,24 @@ def main(_: Any) -> None:
     Args:
         _ : _
     """
-
-    # environment
+    # Environment.
     environment_factory = functools.partial(
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
     )
 
-    # networks
-    network_factory = lp_utils.partial_kwargs(make_default_networks)
+    # Networks.
+    def network_factory(*args: Any, **kwargs: Any) -> Any:
+        return mappo.make_default_networks(  # type: ignore
+            policy_layer_sizes=(254, 254, 254),
+            critic_layer_sizes=(512, 512, 256),
+            *args,
+            **kwargs,
+        )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
-    checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+    checkpoint_subpath = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
     log_every = 10
@@ -82,35 +81,30 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # distributed program
-    """NB: Using multiple trainers with non-shared weights is still in its
-    experimental phase of development. This feature will become faster and
-    more stable in future Mava updates."""
-    program = maddpg.MADDPG(
+    # Optimizer.
+    optimizer = optax.chain(
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+    )
+
+    # Create the system.
+    system = mappo.PPOSystem()
+
+    # Build the system.
+    system.build(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=2,
-        shared_weights=False,
-        trainer_networks={"trainer1": ["network1"], "trainer2": ["network2"]},
-        network_sampling_setup=enums.NetworkSampler.fixed_agent_networks,
-        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
-        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
-        checkpoint_subpath=checkpoint_dir,
-        max_gradient_norm=40.0,
-    ).build()
-
-    # Ensure only trainer runs on gpu, while other processes run on cpu.
-    local_resources = lp_utils.to_device(
-        program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
+        checkpoint_subpath=checkpoint_subpath,
+        optimizer=optimizer,
+        run_evaluator=True,
+        sample_batch_size=5,
+        num_epochs=15,
+        num_executors=1,
+        multi_process=True,
     )
 
-    lp.launch(
-        program,
-        lp.LaunchType.LOCAL_MULTI_PROCESSING,
-        terminal="current_terminal",
-        local_resources=local_resources,
-    )
+    # Launch the system.
+    system.launch()
 
 
 if __name__ == "__main__":

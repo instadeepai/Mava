@@ -62,11 +62,11 @@ class DefaultParameterServer(Callback):
 
         # Network parameters
         for net_type_key in networks.keys():
-            for net_key in networks[net_type_key].keys():
+            for agent_net_key in networks[net_type_key].keys():
                 # Ensure obs and target networks are sonnet modules
-                server.store.parameters[f"{net_key}_{net_type_key}"] = networks[
+                server.store.parameters[f"{net_type_key}-{agent_net_key}"] = networks[
                     net_type_key
-                ][net_key].params
+                ][agent_net_key].params
 
         # Create the checkpointer
         if self.config.checkpoint:

@@ -29,12 +29,12 @@ class BaseParameterClient(Component):
         self, params: Dict[str, Any]
     ) -> Tuple[List[str], Dict[str, Any]]:
         add_params = {
-            "trainer_steps": np.zeros(1, dtype=np.int32),
-            "trainer_walltime": np.zeros(1, dtype=np.float32),
-            "evaluator_steps": np.zeros(1, dtype=np.int32),
-            "evaluator_episodes": np.zeros(1, dtype=np.int32),
-            "executor_episodes": np.zeros(1, dtype=np.int32),
-            "executor_steps": np.zeros(1, dtype=np.int32),
+            "trainer_steps": np.array(0, dtype=np.int32),
+            "trainer_walltime": np.array(0, dtype=np.float32),
+            "evaluator_steps": np.array(0, dtype=np.int32),
+            "evaluator_episodes": np.array(0, dtype=np.int32),
+            "executor_episodes": np.array(0, dtype=np.int32),
+            "executor_steps": np.array(0, dtype=np.int32),
         }
         params.update(add_params)
         return list(add_params.keys()), params
@@ -67,10 +67,12 @@ class ExecutorParameterClient(BaseParameterClient):
         # Create policy parameters
         params = {}
         get_keys = []
-        net_type_key = "policy_networks"
-        for net_key in builder.store.policy_networks.keys():
-            param_key = f"{net_key}_{net_type_key}"
-            params[param_key] = builder.store.policy_networks[net_key].params
+        net_type_key = "networks"
+        for agent_net_key in builder.store.networks[net_type_key].keys():
+            param_key = f"{net_type_key}-{agent_net_key}"
+            params[param_key] = builder.store.networks[net_type_key][
+                agent_net_key
+            ].params
             get_keys.append(param_key)
 
         count_names, params = self._set_up_count_parameters(params=params)
@@ -79,12 +81,13 @@ class ExecutorParameterClient(BaseParameterClient):
         builder.store.executor_counts = {name: params[name] for name in count_names}
 
         parameter_client = None
-        if builder.store.system_parameter_server:
+        if builder.store.parameter_server_client:
             # Create parameter client
             parameter_client = ParameterClient(
-                client=builder.store.system_parameter_server,
+                client=builder.store.parameter_server_client,
                 parameters=params,
                 get_keys=get_keys,
+                set_keys=[],
                 update_period=self.config.executor_parameter_update_period,
             )
 
@@ -130,15 +133,24 @@ class TrainerParameterClient(BaseParameterClient):
         get_keys = []
         # TODO (dries): Only add the networks this trainer is working with.
         # Not all of them.
+        trainer_networks = builder.store.trainer_networks[builder.store.trainer_id]
         for net_type_key in builder.store.networks.keys():
             for net_key in builder.store.networks[net_type_key].keys():
-                params[f"{net_key}_{net_type_key}"] = builder.store.networks[
+                params[f"{net_type_key}-{net_key}"] = builder.store.networks[
                     net_type_key
-                ][net_key].parameters
-                if net_key in set(builder.store.trainer_networks):
-                    set_keys.append(f"{net_key}_{net_type_key}")
+                ][net_key].params
+                if net_key in set(trainer_networks):
+                    set_keys.append(f"{net_type_key}-{net_key}")
                 else:
-                    get_keys.append(f"{net_key}_{net_type_key}")
+                    get_keys.append(f"{net_type_key}-{net_key}")
+
+        # Add the optimizers to the variable server.
+        # TODO (dries): Adjust this if using policy and critic optimizers.
+        # TODO (dries): Add this back if we want the optimizer_state to
+        # be store in the variable source. However some code might
+        # need to be moved around as the builder currently does not
+        # have access to the opt_states yet.
+        # params["optimizer_state"] = trainer.store.opt_states
 
         count_names, params = self._set_up_count_parameters(params=params)
 
@@ -146,15 +158,17 @@ class TrainerParameterClient(BaseParameterClient):
         builder.store.trainer_counts = {name: params[name] for name in count_names}
 
         # Create parameter client
-        parameter_client = ParameterClient(
-            client=builder.store.system_parameter_server,
-            parameters=params,
-            get_keys=get_keys,
-            set_keys=set_keys,
-        )
+        parameter_client = None
+        if builder.store.parameter_server_client:
+            parameter_client = ParameterClient(
+                client=builder.store.parameter_server_client,
+                parameters=params,
+                get_keys=get_keys,
+                set_keys=set_keys,
+            )
 
-        # Get all the initial parameters
-        parameter_client.get_all_and_wait()
+            # Get all the initial parameters
+            parameter_client.get_all_and_wait()
 
         builder.store.trainer_parameter_client = parameter_client
 

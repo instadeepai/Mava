@@ -16,7 +16,7 @@
 """Execution components for system builders"""
 
 from dataclasses import dataclass
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Optional
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
@@ -26,7 +26,7 @@ from mava.utils.loggers import MavaLogger
 @dataclass
 class LoggerConfig:
     logger_factory: Optional[Callable[[str], MavaLogger]] = None
-    logger_config: Dict = {}
+    logger_config: Optional[Any] = None
 
 
 class Logger(Component):
@@ -39,25 +39,28 @@ class Logger(Component):
 
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
         """[summary]"""
-        name = "executor" if builder._executor_id != "evaluator" else "evaluator"
+        logger_config = self.config.logger_config if self.config.logger_config else {}
+        name = "executor" if not builder.store.is_evaluator else "evaluator"
+
         if self.config.logger_config and name in self.config.logger_config:
             logger_config = self.config.logger_config[name]
 
-        builder.executor_logger = self.config.logger_factory(  # type: ignore
-            f"{name}_{builder._executor_id}", **logger_config
+        builder.store.executor_logger = self.config.logger_factory(  # type: ignore
+            f"{builder.store.executor_id}", **logger_config
         )
 
     def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
         """[summary]"""
+        logger_config = self.config.logger_config if self.config.logger_config else {}
         name = "trainer"
         if self.config.logger_config and name in self.config.logger_config:
             logger_config = self.config.logger_config[name]
 
-        builder.trainer_logger = self.config.logger_factory(  # type: ignore
-            f"{name}_{builder._trainer_id}", **logger_config
+        builder.store.trainer_logger = self.config.logger_factory(  # type: ignore
+            f"{builder.store.trainer_id}", **logger_config
         )
 
     @property
     def name(self) -> str:
         """_summary_"""
-        return "executor"
+        return "logger"

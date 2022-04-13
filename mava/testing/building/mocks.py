@@ -157,6 +157,16 @@ class MockLoggerConfig:
     logger_param_1: int = 2
 
 
+class MockLogerClass:
+    def __init__(self) -> None:
+        """Mock logger component."""
+        pass
+
+    def write(self, data: Dict) -> None:
+        """_summary_"""
+        pass
+
+
 class MockLogger(Callback):
     def __init__(
         self,
@@ -167,11 +177,11 @@ class MockLogger(Callback):
 
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.store.executor_logger = self.config.logger_param_0
+        builder.store.executor_logger = MockLogerClass()
 
     def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.store.trainer_logger = self.config.logger_param_0
+        builder.store.trainer_logger = MockLogerClass()
 
     @property
     def name(self) -> str:
@@ -293,6 +303,8 @@ class MockExecutorEnvironmentLoop(Callback):
             logger=builder.store.executor_logger,
             should_update=self.config.should_update,
         )
+        del builder.store.executor_logger
+
         if builder.store.executor_id == "evaluator":
             builder.store.system_evaluator = executor_environment_loop
         else:
