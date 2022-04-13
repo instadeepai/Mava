@@ -82,7 +82,7 @@ class PPONetworks:
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
         """TODO: Add description here."""
-        value, _ = self.network.apply(self.params, observations)
+        _, value = self.network.apply(self.params, observations)
         return value
 
 
