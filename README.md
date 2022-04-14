@@ -272,6 +272,8 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
     pip install git+https://github.com/instadeepai/Mava#egg=id-mava[reverb,tf,launchpad]
     ```
 
+    **For the jax version of mava, please replace `tf` with `jax`, e.g. `pip install id-mava[jax,reverb,launchpad]`**
+
     1.2 For **optional** environments:
     * PettingZoo:
 
