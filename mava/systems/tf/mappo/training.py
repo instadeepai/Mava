@@ -437,8 +437,12 @@ class MAPPOTrainer(mava.Trainer):
                     advantages = train_utils._normalize_advantages(
                         advantages, variance_epsilon=1e-8
                     )
+                    raise NotImplementedError(
+                        "Confirm that this is working."
+                        + "It gave zeros when we tried it out."
+                    )
 
-                    advantages = tf.stop_gradient(advantages)
+                advantages = tf.stop_gradient(advantages)
 
                 # td_lambda_returns
                 returns = advantages + value_pred
