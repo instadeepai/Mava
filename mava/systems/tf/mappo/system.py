@@ -211,14 +211,6 @@ class MAPPO:
             normalize_advantage: whether to normalize the advantage estimate. This can
                 hurt peformance when shared weights are used.
         """
-
-        if num_epochs > 5:
-            raise ValueError(
-                "Epoch must be smaller than 5. For epoch values large than 5"
-                + " the client update should be moved to inside the epoch loop"
-                + "instead of inside the step function."
-            )
-
         # minibatch size defaults to train batch size
         if minibatch_size:
             self._minibatch_size = minibatch_size

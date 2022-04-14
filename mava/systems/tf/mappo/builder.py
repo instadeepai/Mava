@@ -330,7 +330,6 @@ class MAPPOBuilder:
             table_network_config=self._config.table_network_config,
             period=self._config.sequence_period,
             sequence_length=self._config.sequence_length,
-            use_next_extras=False,
             # end_of_episode_behavior=EndBehavior.CONTINUE,
         )
         # Note (dries): Using end_of_episode_behavior=EndBehavior.CONTINUE can

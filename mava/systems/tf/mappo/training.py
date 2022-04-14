@@ -284,6 +284,9 @@ class MAPPOTrainer(mava.Trainer):
         batch_size = inputs.data.observations[self._agents[0]].observation.shape[0]
         dataset = tf.data.Dataset.from_tensor_slices(inputs.data)
         for _ in range(self._num_epochs):
+            # Update the variable source and the trainer
+            self._variable_client.set_and_get_async()
+
             # Split for possible minibatches
             dataset = dataset.shuffle(batch_size)
             minibatch_dataset = dataset.batch(self._minibatch_size)
@@ -633,7 +636,7 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         agent_net_keys: Dict[str, str],
         minibatch_size: Optional[int] = None,
         num_epochs: int = 10,
-        discount: float = 0.999,
+        discount: float = 0.99,
         lambda_gae: float = 0.95,
         entropy_cost: float = 0.01,
         baseline_cost: float = 0.5,
