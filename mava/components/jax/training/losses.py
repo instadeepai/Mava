@@ -146,15 +146,15 @@ class MAPGWithTrustRegionClippingLoss(Loss):
 
 
 @dataclass
-class AlphaZeroLossConfig:
+class MAMCTSLossConfig:
     L2_regularisation_coeff: float = 0.0001
     value_cost: float = 1.0
 
 
-class AlphaZeroLoss(Loss):
+class MAMCTSLoss(Loss):
     def __init__(
         self,
-        config: AlphaZeroLossConfig = AlphaZeroLossConfig(),
+        config: MAMCTSLossConfig = MAMCTSLossConfig(),
     ):
         """_summary_
 

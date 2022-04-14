@@ -17,18 +17,21 @@
 
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
 import optax
 import reverb
+import rlax
 import tree
 from acme.jax import utils
+from chex import Array, Scalar
 from jax import jit
 
 from mava.components.jax import Component
 from mava.components.jax.training import Batch, Step, TrainingState
+from mava.components.jax.training.base import MCTSBatch
 from mava.core_jax import SystemTrainer
 
 
@@ -281,9 +284,12 @@ class MAPGWithTrustRegionStep(Step):
         return "step_fn"
 
 
+# TODO Implement
 @dataclass
 class MAMCTSStepConfig:
     discount: float = 0.99
+    n_step: int = 10
+    lambda_t: Union[Array, Scalar] = 1.0
 
 
 class MAMCTSStep(Step):
@@ -306,16 +312,147 @@ class MAMCTSStep(Step):
             states: TrainingState, sample: reverb.ReplaySample
         ) -> Tuple[TrainingState, Dict[str, jnp.ndarray]]:
             """Performs a minibatch SGD step, returning new state and metrics."""
-            pass
+
+            # Extract the data.
+            data = sample.data
+
+            observations, actions, rewards, termination, extra = (
+                data.observations,
+                data.actions,
+                data.rewards,
+                data.discounts,
+                data.extras,
+            )
+
+            discounts = tree.map_structure(
+                lambda x: x * self.config.discount, termination
+            )
+
+            search_policies = extra["policy_info"]
+
+            networks = trainer.store.networks["networks"]
+
+            def get_boostrap_values(
+                net_key: Any, reward: Any, observation: Any
+            ) -> jnp.ndarray:
+                # TODO
+                return bootstrap_values
+
+            agent_nets = trainer.store.trainer_agent_net_keys
+            behavior_values = {
+                key: get_boostrap_values(
+                    agent_nets[key], rewards[key], observations[key].observation
+                )
+                for key in agent_nets.keys()
+            }
+
+            # Vmap over batch dimension
+            batch_n_step_returns = jax.vmap(
+                rlax.n_step_bootstrapped_returns, in_axes=(0, 0, 0, None, None, None)
+            )
+
+            target_values = {}
+            for key in rewards.keys():
+                target_values[key] = batch_n_step_returns(
+                    rewards[key],
+                    discounts[key],
+                    behavior_values[key],
+                    self.config.n_step,
+                    self.config.lambda_t,
+                    True,
+                )
+
+            trajectories = MCTSBatch(
+                observations=observations,
+                actions=actions,
+                search_policies=search_policies,
+                target_values=target_values,
+            )
+
+            # Concatenate all trajectories. Reshape from [num_sequences, num_steps,..]
+            # to [num_sequences * num_steps,..]
+            agent_0_t_vals = list(target_values.values())[0]
+            assert len(agent_0_t_vals) > 1
+            num_sequences = agent_0_t_vals.shape[0]
+            num_steps = agent_0_t_vals.shape[1]
+            batch_size = num_sequences * num_steps
+            assert batch_size % trainer.store.num_minibatches == 0, (
+                "Num minibatches must divide batch size. Got batch_size={}"
+                " num_minibatches={}."
+            ).format(batch_size, trainer.store.num_minibatches)
+            batch = jax.tree_map(
+                lambda x: x.reshape((batch_size,) + x.shape[2:]), trajectories
+            )
+
+            (new_key, new_params, new_opt_states, _,), metrics = jax.lax.scan(
+                trainer.store.epoch_update_fn,
+                (states.random_key, states.params, states.opt_states, batch),
+                (),
+                length=trainer.store.num_epochs,
+            )
+
+            # Set the metrics
+            metrics = jax.tree_map(jnp.mean, metrics)
+            metrics["norm_params"] = optax.global_norm(states.params)
+            metrics["observations_mean"] = jnp.mean(
+                utils.batch_concat(
+                    jax.tree_map(
+                        lambda x: jnp.abs(jnp.mean(x, axis=(0, 1))), observations
+                    ),
+                    num_batch_dims=0,
+                )
+            )
+            metrics["observations_std"] = jnp.mean(
+                utils.batch_concat(
+                    jax.tree_map(lambda x: jnp.std(x, axis=(0, 1)), observations),
+                    num_batch_dims=0,
+                )
+            )
+            metrics["rewards_mean"] = jax.tree_map(
+                lambda x: jnp.mean(jnp.abs(jnp.mean(x, axis=(0, 1)))), rewards
+            )
+            metrics["rewards_std"] = jax.tree_map(
+                lambda x: jnp.std(x, axis=(0, 1)), rewards
+            )
+
+            new_states = TrainingState(
+                params=new_params, opt_states=new_opt_states, random_key=new_key
+            )
+            return new_states, metrics
 
         def step(sample: reverb.ReplaySample) -> Tuple[Dict[str, jnp.ndarray]]:
-            pass
 
-    @property
-    def name(self) -> str:
-        """_summary_
+            # Repeat training for the given number of epoch, taking a random
+            # permutation for every epoch.
+            networks = trainer.store.networks["networks"]
+            params = {net_key: networks[net_key].params for net_key in networks.keys()}
+            opt_states = trainer.store.opt_states
+            random_key, _ = jax.random.split(trainer.store.key)
 
-        Returns:
-            _description_
-        """
-        return "step_fn"
+            states = TrainingState(
+                params=params, opt_states=opt_states, random_key=random_key
+            )
+            new_states, metrics = sgd_step(states, sample)
+
+            # Set the new variables
+            # TODO (dries): key is probably not being store correctly.
+            # The variable client might lose reference to it when checkpointing.
+            # We also need to add the optimizer and random_key to the variable
+            # server.
+            trainer.store.key = new_states.random_key
+
+            networks = trainer.store.networks["networks"]
+            params = {net_key: networks[net_key].params for net_key in networks.keys()}
+            for net_key in params.keys():
+                # This below forloop is needed to not lose the param reference.
+                net_params = trainer.store.networks["networks"][net_key].params
+                for param_key in net_params.keys():
+                    net_params[param_key] = new_states.params[net_key][param_key]
+
+                # Update the optimizer
+                # This needs to be in the loop to not lose the reference.
+                trainer.store.opt_states[net_key] = new_states.opt_states[net_key]
+
+            return metrics
+
+        trainer.store.step_fn = step

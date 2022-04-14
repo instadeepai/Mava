@@ -13,10 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Executor components for Mava systems."""
-from mava.components.jax.executing.action_selection import (
-    FeedforwardExecutorSelectAction,
-    MAMCTSFeedforwardExecutorSelectAction,
-)
-from mava.components.jax.executing.base import ExecutorInit
-from mava.components.jax.executing.observing import FeedforwardExecutorObserve
+"""Custom components for MAMCTS system."""
+from dataclasses import dataclass
+
+import numpy as np
+from dm_env import specs
+
+from mava.components.jax import Component
+from mava.core_jax import SystemBuilder

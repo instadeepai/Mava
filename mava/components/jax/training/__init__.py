@@ -16,10 +16,19 @@
 """Trainer components for Mava systems."""
 from mava.components.jax.training.advantage_estimation import GAE
 from mava.components.jax.training.base import Batch, Loss, Step, TrainingState, Utility
-from mava.components.jax.training.losses import MAPGWithTrustRegionClippingLoss
+from mava.components.jax.training.losses import (
+    MAMCTSLoss,
+    MAPGWithTrustRegionClippingLoss,
+)
 from mava.components.jax.training.model_updating import (
+    MAMCTSEpochUpdate,
+    MAMCTSMinibatchUpdate,
     MAPGEpochUpdate,
     MAPGMinibatchUpdate,
 )
-from mava.components.jax.training.step import DefaultStep, MAPGWithTrustRegionStep
+from mava.components.jax.training.step import (
+    DefaultStep,
+    MAMCTSStep,
+    MAPGWithTrustRegionStep,
+)
 from mava.components.jax.training.trainer import TrainerInit
