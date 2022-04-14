@@ -28,6 +28,7 @@ from dm_env import specs as dm_specs
 from jax import jit
 
 from mava import specs as mava_specs
+from mava.systems.jax.mamcts.mcts import MCTS, MCTSConfig
 
 Array = dm_specs.Array
 BoundedArray = dm_specs.BoundedArray
@@ -43,10 +44,18 @@ class MAMCTSNetworks:
         self,
         network: networks_lib.FeedForwardNetwork,
         params: networks_lib.Params,
+        root_fn,
+        recurrent_fn,
+        search_algorithm,
     ) -> None:
         """TODO: Add description here."""
         self.network = network
         self.params = params
+        self.mcts = MCTS(
+            MCTSConfig(
+                root_fn=root_fn, recurrent_fn=recurrent_fn, search=search_algorithm
+            )
+        )
 
         @jit
         def forward_fn(
@@ -61,6 +70,15 @@ class MAMCTSNetworks:
             return logits, value
 
         self.forward_fn = forward_fn
+
+    def get_action(self, observation, rng_key):
+        """TODO: Add description here."""
+
+        search_out = self.mcts.search(self.params, rng_key, observation)
+
+        return np.squeeze(np.array(search_out.action, np.int64)), {
+            "search_policies": np.squeeze(np.array(search_out.action_weights))
+        }
 
     def get_logits(self, observations: networks_lib.Observation) -> jnp.ndarray:
         """TODO: Add description here."""
@@ -82,18 +100,28 @@ class MAMCTSNetworks:
 
 
 def make_mcts_network(
-    network: networks_lib.FeedForwardNetwork, params: Dict[str, jnp.ndarray]
+    network: networks_lib.FeedForwardNetwork,
+    params: Dict[str, jnp.ndarray],
+    root_fn,
+    recurrent_fn,
+    search_algorithm,
 ) -> MAMCTSNetworks:
     """TODO: Add description here."""
     return MAMCTSNetworks(
         network=network,
         params=params,
+        root_fn=root_fn,
+        recurrent_fn=recurrent_fn,
+        search_algorithm=search_algorithm,
     )
 
 
 def make_networks(
     spec: specs.EnvironmentSpec,
     key: networks_lib.PRNGKey,
+    root_fn,
+    recurrent_fn,
+    search_algorithm,
     policy_layer_sizes: Sequence[int] = (
         256,
         256,
@@ -108,6 +136,9 @@ def make_networks(
             key=key,
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
+            root_fn=root_fn,
+            recurrent_fn=recurrent_fn,
+            search_algorithm=search_algorithm,
         )
     else:
         raise NotImplementedError(
@@ -122,6 +153,9 @@ def make_discrete_networks(
     key: networks_lib.PRNGKey,
     policy_layer_sizes: Sequence[int],
     critic_layer_sizes: Sequence[int],
+    root_fn,
+    recurrent_fn,
+    search_algorithm,
 ) -> MAMCTSNetworks:
     """TODO: Add description here."""
 
@@ -151,13 +185,22 @@ def make_discrete_networks(
     params = forward_fn.init(network_key, dummy_obs)  # type: ignore
 
     # Create PPONetworks to add functionality required by the agent.
-    return make_mcts_network(network=forward_fn, params=params)
+    return make_mcts_network(
+        network=forward_fn,
+        params=params,
+        root_fn=root_fn,
+        recurrent_fn=recurrent_fn,
+        search_algorithm=search_algorithm,
+    )
 
 
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     agent_net_keys: Dict[str, str],
     rng_key: List[int],
+    root_fn,
+    recurrent_fn,
+    search_algorithm,
     net_spec_keys: Dict[str, str] = {},
     policy_layer_sizes: Sequence[int] = (
         256,
@@ -182,6 +225,9 @@ def make_default_networks(
             key=rng_key,
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
+            root_fn=root_fn,
+            recurrent_fn=recurrent_fn,
+            search_algorithm=search_algorithm,
         )
 
     return {

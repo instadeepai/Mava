@@ -26,6 +26,9 @@ from mava.components.jax.training.model_updating import (
     MAPGEpochUpdate,
     MAPGMinibatchUpdate,
 )
+from mava.components.jax.training.n_step_bootstrapped_returns import (
+    NStepBootStrappedReturns,
+)
 from mava.components.jax.training.step import (
     DefaultStep,
     MAMCTSStep,

@@ -191,7 +191,9 @@ class MAMCTSLoss(Loss):
                     logits, values = network.network.apply(params, observations)
 
                     policy_loss = jnp.mean(
-                        rlax.categorical_cross_entropy(search_policies, logits)
+                        jax.vmap(rlax.categorical_cross_entropy, in_axes=(0, 0))(
+                            search_policies, logits.logits
+                        )
                     )
 
                     value_loss = jnp.mean(rlax.l2_loss(values, target_values))

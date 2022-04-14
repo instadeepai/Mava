@@ -29,7 +29,7 @@ from mava.components.jax.training import Batch, Utility
 from mava.components.jax.training.base import MCTSBatch
 from mava.core_jax import SystemTrainer
 
-# TODO Lot of duplicate code that could be solved
+# TODO(Edan) Lot of duplicate code that could be solved
 
 
 @dataclass

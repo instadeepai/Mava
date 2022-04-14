@@ -23,10 +23,10 @@ import jax
 import jax.numpy as jnp
 import optax
 import reverb
-import rlax
 import tree
 from acme.jax import utils
 from chex import Array, Scalar
+from haiku._src.basic import merge_leading_dims
 from jax import jit
 
 from mava.components.jax import Component
@@ -284,12 +284,10 @@ class MAPGWithTrustRegionStep(Step):
         return "step_fn"
 
 
-# TODO Implement
+# TODO(Edan) Implement
 @dataclass
 class MAMCTSStepConfig:
     discount: float = 0.99
-    n_step: int = 10
-    lambda_t: Union[Array, Scalar] = 1.0
 
 
 class MAMCTSStep(Step):
@@ -332,15 +330,24 @@ class MAMCTSStep(Step):
 
             networks = trainer.store.networks["networks"]
 
-            def get_boostrap_values(
+            # TODO shift obs by 1
+            def get_bootstrap_values(
                 net_key: Any, reward: Any, observation: Any
             ) -> jnp.ndarray:
-                # TODO
+                merged_obs = jax.tree_map(
+                    lambda x: merge_leading_dims(x, 2), observation
+                )
+
+                _, bootstrap_values = networks[net_key].network.apply(
+                    states.params[net_key], merged_obs
+                )
+
+                bootstrap_values = jnp.reshape(bootstrap_values, reward.shape[0:2])
                 return bootstrap_values
 
             agent_nets = trainer.store.trainer_agent_net_keys
-            behavior_values = {
-                key: get_boostrap_values(
+            bootstrap_values = {
+                key: get_bootstrap_values(
                     agent_nets[key], rewards[key], observations[key].observation
                 )
                 for key in agent_nets.keys()
@@ -348,23 +355,28 @@ class MAMCTSStep(Step):
 
             # Vmap over batch dimension
             batch_n_step_returns = jax.vmap(
-                rlax.n_step_bootstrapped_returns, in_axes=(0, 0, 0, None, None, None)
+                trainer.store.n_step_fn, in_axes=(0, 0, 0, None, None)
             )
+
+            # TODO (Edan) check correctness - maybe dont remove last reward but add a zero to the end of bootstrapped values
+
+            observations, search_policies, rewards, discounts = jax.tree_map(
+                lambda x: x[:, :-1], (observations, search_policies, rewards, discounts)
+            )
+            bootstrap_values = jax.tree_map(lambda x: x[:, 1:], bootstrap_values)
 
             target_values = {}
             for key in rewards.keys():
                 target_values[key] = batch_n_step_returns(
                     rewards[key],
                     discounts[key],
-                    behavior_values[key],
+                    bootstrap_values[key],
                     self.config.n_step,
                     self.config.lambda_t,
-                    True,
                 )
 
             trajectories = MCTSBatch(
                 observations=observations,
-                actions=actions,
                 search_policies=search_policies,
                 target_values=target_values,
             )
@@ -380,6 +392,7 @@ class MAMCTSStep(Step):
                 "Num minibatches must divide batch size. Got batch_size={}"
                 " num_minibatches={}."
             ).format(batch_size, trainer.store.num_minibatches)
+
             batch = jax.tree_map(
                 lambda x: x.reshape((batch_size,) + x.shape[2:]), trajectories
             )

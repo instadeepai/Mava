@@ -19,9 +19,10 @@ from typing import Any, Tuple
 from mava.components.jax import building, executing, training, updating
 from mava.specs import DesignSpec
 from mava.systems.jax import System
+from mava.systems.jax.mamcts.components import ExtraSearchPolicySpec
 from mava.systems.jax.mamcts.config import MAMCTSDefaultConfig
 
-# TODO
+# TODO(Edan)
 
 
 class MAMCTSSystem(System):
@@ -31,6 +32,7 @@ class MAMCTSSystem(System):
         Returns:
             system callback components
         """
+
         # Set the default configs
         default_params = MAMCTSDefaultConfig()
 
@@ -39,7 +41,7 @@ class MAMCTSSystem(System):
         executor_process = DesignSpec(
             executor_init=executing.ExecutorInit,
             executor_observe=executing.FeedforwardExecutorObserve,
-            executor_select_action=executing.MAMCTSFeedforwardExecutorSelectAction,
+            executor_select_action=executing.FeedforwardExecutorSelectAction,
             executor_adder=building.ParallelSequenceAdder,
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
             networks=building.DefaultNetworks,
@@ -48,6 +50,7 @@ class MAMCTSSystem(System):
         # Trainer
         trainer_process = DesignSpec(
             trainer_init=training.TrainerInit,
+            n_step_fn=training.NStepBootStrappedReturns,
             loss=training.MAMCTSLoss,
             epoch_update=training.MAMCTSEpochUpdate,
             minibatch_update=training.MAMCTSMinibatchUpdate,
@@ -60,6 +63,7 @@ class MAMCTSSystem(System):
         data_server_process = DesignSpec(
             data_server=building.OnPolicyDataServer,
             data_server_adder_signature=building.ParallelSequenceAdderSignature,
+            extras_spec=ExtraSearchPolicySpec,
         ).get()
 
         # Parameter Server
