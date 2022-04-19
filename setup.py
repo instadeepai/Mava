@@ -27,8 +27,6 @@ spec.loader.exec_module(_metadata)  # type: ignore
 
 reverb_requirements = [
     "dm-reverb~=0.6.1",
-    "jax",
-    "jaxlib",
 ]
 
 tf_requirements = [
