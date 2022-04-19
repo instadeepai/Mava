@@ -47,9 +47,9 @@ jax_requirements = [
 ] + tf_requirements
 
 pettingzoo_requirements = [
-    "pettingzoo~=1.13.1",
+    "pettingzoo~=1.17.0",
     "multi_agent_ale_py",
-    "supersuit==3.3.1",
+    "supersuit==3.3.4",
     "pygame",
     "pysc2",
 ]
