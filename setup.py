@@ -27,8 +27,6 @@ spec.loader.exec_module(_metadata)  # type: ignore
 
 reverb_requirements = [
     "dm-reverb~=0.6.1",
-    "jax",
-    "jaxlib",
 ]
 
 tf_requirements = [
@@ -38,10 +36,20 @@ tf_requirements = [
     "trfl",
 ]
 
+jax_requirements = [
+    "chex",
+    "jax",
+    "jaxlib",
+    "dm-haiku",
+    "flax",
+    "optax",
+    "rlax",
+] + tf_requirements
+
 pettingzoo_requirements = [
-    "pettingzoo~=1.13.1",
+    "pettingzoo~=1.17.0",
     "multi_agent_ale_py",
-    "supersuit==3.3.1",
+    "supersuit==3.3.4",
     "pygame",
     "pysc2",
 ]
@@ -117,6 +125,7 @@ setup(
         "record_episode": record_episode_requirements,
         "sc2": smac_requirements,
         "envs": pettingzoo_requirements + open_spiel_requirements + smac_requirements,
+        "jax": jax_requirements,
     },
     classifiers=[
         "Development Status :: 3 - Alpha",
