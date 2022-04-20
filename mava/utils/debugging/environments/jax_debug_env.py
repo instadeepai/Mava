@@ -20,10 +20,10 @@ import copy
 from typing import Any, Callable, Dict, List, Tuple, Union
 
 import gym
+import jax
+import jax.numpy as jnp
 import numpy as np
 from gym import spaces
-
-import jax.numpy as jnp
 
 from mava.utils.debugging.environments.jax.core import Agent, JaxWorld, step
 
@@ -47,6 +47,7 @@ class MultiAgentJaxEnv(gym.Env):
         shared_viewer: bool = True,
     ) -> None:
 
+        self.dim_p = world.dim_p
         # Generate IDs and convert agent list to dictionary format.
         agent_dict = {}
         self.env_done = False
@@ -92,12 +93,12 @@ class MultiAgentJaxEnv(gym.Env):
             total_action_space = []
             # physical action space
             if self.discrete_action_space:
-                u_action_space = spaces.Discrete(world.dim_p * 2 + 1)
+                u_action_space = spaces.Discrete(self.dim_p * 2 + 1)
             else:
                 u_action_space = spaces.Box(
                     low=-agent.u_range,
                     high=+agent.u_range,
-                    shape=(world.dim_p,),
+                    shape=(self.dim_p,),
                     dtype=np.float32,
                 )
             if agent.movable:
@@ -149,7 +150,9 @@ class MultiAgentJaxEnv(gym.Env):
         for agent_id in self.agent_ids:
             agent = self.agents[agent_id]
             agent_action = copy.deepcopy(action_n[agent_id])
-            self._set_action(world, agent_action, agent, self.action_spaces[agent_id])
+            world = self._set_action(
+                world, agent_action, agent_id, self.action_spaces[agent_id]
+            )
         # advance world state
         world = step(world)
         # record observation for each agent
@@ -224,7 +227,10 @@ class MultiAgentJaxEnv(gym.Env):
 
         return jnp.array(
             jnp.concatenate(
-                [jnp.array([world.current_step / 50])] + entity_pos + agent_pos + agent_vel
+                [jnp.array([world.current_step / 50])]
+                + entity_pos
+                + agent_pos
+                + agent_vel
             ),
             dtype=np.float32,
         )
@@ -234,10 +240,11 @@ class MultiAgentJaxEnv(gym.Env):
         self,
         world: JaxWorld,
         action: np.ndarray,
-        agent: Agent,
+        agent_id: int,
         action_space: spaces,
     ) -> None:
-        agent.action.u = jnp.zeros(world.dim_p)
+        agent = world.agents[agent_id]
+        agent.action.u = jnp.zeros(self.dim_p)
         # process action
         if isinstance(action_space, MultiDiscrete):
             act = []
@@ -253,16 +260,16 @@ class MultiAgentJaxEnv(gym.Env):
         if agent.movable:
             # physical action
             if self.discrete_action_input:
-                agent.action.u = np.zeros(world.dim_p)
+                agent.action.u = jnp.zeros(self.dim_p)
                 # process discrete action
-                if action[0] == 1:
-                    agent.action.u[0] = -1.0
-                if action[0] == 2:
-                    agent.action.u[0] = +1.0
-                if action[0] == 3:
-                    agent.action.u[1] = -1.0
-                if action[0] == 4:
-                    agent.action.u[1] = +1.0
+                agent.action.u = agent.action.u.at[0].set(
+                    jax.lax.switch(
+                        action[0] - 1,
+                        [lambda x: -1.0, lambda x: 1.0, lambda x: -1.0, lambda x: 1.0],
+                        None,
+                    )
+                )
+
             else:
                 # if self.force_discrete_action:
                 #     d = np.argmax(action[0])
@@ -279,7 +286,11 @@ class MultiAgentJaxEnv(gym.Env):
             agent.action.u *= sensitivity
             action = action[1:]
         # make sure we used all elements of action
+        new_agents = world.agents
+        new_agents[agent_id] = agent
+        world.replace(agents=new_agents)
         assert len(action) == 0
+        return world
 
     # reset rendering assets
     def _reset_render(self) -> None:
@@ -333,7 +344,7 @@ class MultiAgentJaxEnv(gym.Env):
             # update bounds to center around agent
             cam_range = 1
             if self.shared_viewer:
-                pos = np.zeros(self.world.dim_p)
+                pos = np.zeros(self.self.dim_p)
             else:
                 pos = self.agents[self.agent_ids[i]].state.p_pos
             self.viewers[i].set_bounds(

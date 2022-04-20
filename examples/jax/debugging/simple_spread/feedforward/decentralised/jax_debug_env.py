@@ -1,12 +1,10 @@
-import jax
-
 from typing import Optional
 
+import jax
 from gym import Space
 
 from mava.utils.debugging.environments.jax.simple_spread import Scenario, make_world
 from mava.utils.debugging.environments.jax_debug_env import MultiAgentJaxEnv
-
 
 scenario_name = "simple_spread"
 action_space = "discrete"
@@ -34,5 +32,4 @@ env = MultiAgentJaxEnv(
 jitted_reset = jax.jit(env.reset)
 jitted_step = jax.jit(env.step)
 jitted_reset(world)
-# jitted_step(world, {"agent_0": 0, "agent_1": 0})
-
+jitted_step(world, {"agent_0": 0, "agent_1": 0})

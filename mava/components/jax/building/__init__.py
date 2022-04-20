@@ -21,7 +21,7 @@ from mava.components.jax.building.adders import (
 )
 from mava.components.jax.building.data_server import OnPolicyDataServer
 from mava.components.jax.building.datasets import TrajectoryDataset
-from mava.components.jax.building.distributor import Distributor
+from mava.components.jax.building.distributor import Distributor, JaxDistributor
 from mava.components.jax.building.environments import ParallelExecutorEnvironmentLoop
 from mava.components.jax.building.loggers import Logger
 from mava.components.jax.building.networks import DefaultNetworks

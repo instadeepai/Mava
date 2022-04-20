@@ -78,7 +78,7 @@ class MAMCTSSystem(System):
             **parameter_server_process,
             **executor_process,
             **trainer_process,
-            distributor=building.Distributor,
+            distributor=building.JaxDistributor,
             logger=building.Logger,
         )
         return system, default_params

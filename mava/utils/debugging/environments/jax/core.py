@@ -1,11 +1,10 @@
 import abc
 import copy
-
-import chex
-
 import typing
 from typing import List, Optional, Union
 
+import chex
+import jax
 import jax.random
 import numpy as np
 
@@ -119,7 +118,7 @@ class JaxWorld:
 
 def step(world: JaxWorld) -> JaxWorld:
     # set actions for scripted agents
-    world.current_step += 1
+    world.replace(current_step=world.current_step + 1)
     # apply agent physical controls
     p_force = apply_action_force(world)
     # apply environment forces
@@ -133,14 +132,20 @@ def step(world: JaxWorld) -> JaxWorld:
 def apply_action_force(world: JaxWorld) -> List[float]:
     # set applied forces
     p_force = []
+
     for i, agent in enumerate(world.agents):
-        if agent.movable:
-            noise = (
-                np.random.randn(*agent.action.u.shape) * agent.u_noise
-                if agent.u_noise
-                else 0.0
-            )
-            p_force.append(agent.action.u + noise)
+
+        noise = jax.lax.cond(
+            agent.u_noise,
+            lambda agent: np.random.randn(*agent.action.u.shape) * agent.u_noise,
+            lambda x: 0.0,
+            agent,
+        )
+        p_force_val = jax.lax.cond(
+            agent.movable, lambda agent: agent.action.u + noise, lambda x: 0.0, agent
+        )
+
+        p_force.append(p_force_val)
     return p_force
 
 

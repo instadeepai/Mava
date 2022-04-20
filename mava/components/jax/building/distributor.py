@@ -17,9 +17,11 @@
 from dataclasses import dataclass
 from typing import List, Union
 
+from chex import PRNGKey
+
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
-from mava.systems.jax.launcher import Launcher, NodeType
+from mava.systems.jax.launcher import JaxLauncher, Launcher, NodeType
 
 
 @dataclass
@@ -110,3 +112,87 @@ class Distributor(Component):
     def name(self) -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "distributor"
+
+
+@dataclass
+class JaxDistributorConfig:
+    num_executors: int = 1
+    multi_process: bool = True
+    nodes_on_gpu: Union[List[str], str] = "trainer"
+    run_evaluator: bool = True
+    distributor_name: str = "System"
+    rng_key: PRNGKey = None
+
+
+class JaxDistributor(Distributor):
+    def __init__(self, config: DistributorConfig = DistributorConfig()):
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        if isinstance(config.nodes_on_gpu, str):
+            config.nodes_on_gpu = [config.nodes_on_gpu]
+        self.config = config
+
+    def on_building_program_nodes(self, builder: SystemBuilder) -> None:
+        """_summary_
+
+        Args:
+            builder : _description_
+        """
+        builder.store.program = JaxLauncher(
+            rng_key=self.config.rng_key,
+            multi_process=self.config.multi_process,
+            nodes_on_gpu=self.config.nodes_on_gpu,
+            name=self.config.distributor_name,
+        )
+
+        # tables node
+        data_server = builder.store.program.add(
+            builder.data_server,
+            node_type=NodeType.reverb,
+            name="data_server",
+        )
+
+        # variable server node
+        parameter_server = builder.store.program.add(
+            builder.parameter_server,
+            node_type=NodeType.corrier,
+            name="parameter_server",
+        )
+
+        # executor nodes
+        for executor_id in range(self.config.num_executors):
+            builder.store.program.add(
+                builder.executor,
+                [f"executor_{executor_id}", data_server, parameter_server],
+                node_type=NodeType.corrier,
+                name="executor",
+            )
+
+        if self.config.run_evaluator:
+            # evaluator node
+            builder.store.program.add(
+                builder.executor,
+                ["evaluator", data_server, parameter_server],
+                node_type=NodeType.corrier,
+                name="evaluator",
+            )
+
+        # trainer nodes
+        for trainer_id in builder.store.trainer_networks.keys():
+            builder.store.program.add(
+                builder.trainer,
+                [trainer_id, data_server, parameter_server],
+                node_type=NodeType.corrier,
+                name="trainer",
+            )
+
+        if not self.config.multi_process:
+            builder.store.system_build = builder.store.program.get_nodes()
+
+    @property
+    def name(self) -> str:
+        """Component type name, e.g. 'dataset' or 'executor'."""
+        return "jax distributor"
