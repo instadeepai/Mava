@@ -96,8 +96,8 @@ class MockTestSetup(Component):
         builder.store.unique_net_keys = ["network_0"]
         builder.store.table_network_config = {"table_0": "network_0"}
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_"""
         return "setup"
 
@@ -121,8 +121,8 @@ class MockDistributor(Component):
         """
         self.config = config
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'.
 
         Returns:

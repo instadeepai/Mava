@@ -62,10 +62,14 @@ class ExecutorEnvironmentLoop(Component):
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
         """[summary]"""
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_"""
         return "environment_loop"
+
+    @staticmethod
+    def config_class() -> Callable:
+        return ExecutorEnvironmentLoopConfig
 
 
 class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):

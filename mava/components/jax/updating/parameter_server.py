@@ -16,6 +16,7 @@
 """Parameter server component for Mava systems."""
 import time
 from dataclasses import dataclass
+from typing import Callable
 
 import numpy as np
 from acme.jax import savers
@@ -153,7 +154,11 @@ class DefaultParameterServer(Callback):
             server.store.last_checkpoint_time = time.time()
             print("Updated variables checkpoint.")
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "parameter_server"
+
+    @staticmethod
+    def config_class() -> Callable:
+        return ParameterServerConfig
