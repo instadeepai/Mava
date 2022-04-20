@@ -71,7 +71,6 @@ class MADDPGBaseTrainer(mava.Trainer):
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
-        update_obs_once: bool = False,
     ):
         """Initialise MADDPG trainer
 
@@ -109,15 +108,12 @@ class MADDPGBaseTrainer(mava.Trainer):
             learning_rate_scheduler_fn: dict with two functions (one for the policy and
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
-            update_obs_once: bool = use only critic gradients to update shared
-                observation network
         """
 
         self._agents = agents
         self._agent_net_keys = agent_net_keys
         self._variable_client = variable_client
         self._learning_rate_scheduler_fn = learning_rate_scheduler_fn
-        self._update_obs_once = update_obs_once
 
         # Setup counts
         self._counts = counts
@@ -461,13 +457,8 @@ class MADDPGBaseTrainer(mava.Trainer):
             agent_key = self._agent_net_keys[agent]
 
             # Get trainable variables.
-            if self._update_obs_once:
-                policy_variables = self._policy_networks[agent_key].trainable_variables
-            else:
-                policy_variables = (
-                    self._observation_networks[agent_key].trainable_variables
-                    + self._policy_networks[agent_key].trainable_variables
-                )
+            # Note: policy does not update the shared obs network
+            policy_variables = self._policy_networks[agent_key].trainable_variables
             critic_variables = (
                 # In this agent, the critic loss trains the observation network.
                 self._observation_networks[agent_key].trainable_variables
@@ -582,7 +573,6 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
-        update_obs_once: bool = False,
     ):
         """Initialise the decentralised MADDPG trainer."""
         super().__init__(
@@ -607,7 +597,6 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
             variable_client=variable_client,
             counts=counts,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
-            update_obs_once=update_obs_once,
         )
 
 
@@ -637,7 +626,6 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
-        update_obs_once: bool = False,
     ):
         """Initialise the centralised MADDPG trainer."""
 
@@ -663,7 +651,6 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
             variable_client=variable_client,
             counts=counts,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
-            update_obs_once=update_obs_once,
         )
 
     def _get_critic_feed(
@@ -735,7 +722,6 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
-        update_obs_once: bool = False,
     ):
         """Initialise the networked MADDPG trainer."""
 
@@ -761,7 +747,6 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
             variable_client=variable_client,
             counts=counts,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
-            update_obs_once=update_obs_once,
         )
         self._connection_spec = connection_spec
 
@@ -949,7 +934,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
-        update_obs_once: bool = False,
     ):
         """Initialise Recurrent MADDPG trainer
 
@@ -987,8 +971,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             learning_rate_scheduler_fn: dict with two functions (one for the policy and
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
-            update_obs_once: bool = use only critic gradients to update shared
-                observation network
         """
         self._bootstrap_n = bootstrap_n
 
@@ -996,7 +978,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         self._agent_net_keys = agent_net_keys
         self._variable_client = variable_client
         self._learning_rate_scheduler_fn = learning_rate_scheduler_fn
-        self._update_obs_once = update_obs_once
 
         # Setup counts
         self._counts = counts
@@ -1435,14 +1416,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             agent_key = self._agent_net_keys[agent]
 
             # Get trainable variables.
-
-            if self._update_obs_once:
-                policy_variables = self._policy_networks[agent_key].trainable_variables
-            else:
-                policy_variables = (
-                    self._observation_networks[agent_key].trainable_variables
-                    + self._policy_networks[agent_key].trainable_variables
-                )
+            # Note: policy does not update the shared obs network
+            policy_variables = self._policy_networks[agent_key].trainable_variables
 
             critic_variables = (
                 # In this agent, the critic loss trains the observation network.
@@ -1581,7 +1556,6 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
-        update_obs_once: bool = False,
     ):
 
         super().__init__(
@@ -1607,7 +1581,6 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             counts=counts,
             bootstrap_n=bootstrap_n,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
-            update_obs_once=update_obs_once,
         )
 
 
@@ -1642,7 +1615,6 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
-        update_obs_once: bool = False,
     ):
 
         super().__init__(
@@ -1668,7 +1640,6 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             counts=counts,
             bootstrap_n=bootstrap_n,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
-            update_obs_once=update_obs_once,
         )
 
     def _get_critic_feed(

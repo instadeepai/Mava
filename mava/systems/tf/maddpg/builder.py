@@ -130,7 +130,6 @@ class MADDPGConfig:
     termination_condition: Optional[Dict[str, int]] = None
     evaluator_interval: Optional[dict] = None
     learning_rate_scheduler_fn: Optional[Any] = None
-    update_obs_once: bool = False
 
 
 class MADDPGBuilder:

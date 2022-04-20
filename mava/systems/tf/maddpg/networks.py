@@ -108,6 +108,10 @@ def make_default_networks(
     policy_networks = {}
     critic_networks = {}
     for key in specs.keys():
+        # Create the shared observation network if not already defined,
+        # as a state-less operation.
+        if observation_network is None:
+            observation_network = tf2_utils.to_sonnet_module(tf.identity)
         # TODO (dries): Make specs[key].actions
         #  return a list of specs for hybrid action space
         # Get total number of action dimensions from action spec.

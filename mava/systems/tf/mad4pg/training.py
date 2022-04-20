@@ -74,7 +74,6 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
-        update_obs_once: bool = False,
     ):
         """Initialise MAD4PG trainer
 
@@ -110,8 +109,6 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
             learning_rate_scheduler_fn: dict with two functions (one for the policy and
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
-            update_obs_once: bool = use only critic gradients to update shared
-                observation network
         """
 
         super().__init__(
@@ -136,7 +133,6 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
             max_gradient_norm=max_gradient_norm,
             logger=logger,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
-            update_obs_once=update_obs_once,
         )
 
     # Forward pass that calculates loss.
@@ -254,7 +250,6 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
-        update_obs_once: bool = False,
     ):
         """Initialise decentralised MAD4PG trainer
 
@@ -290,8 +285,6 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
             learning_rate_scheduler_fn: dict with two functions (one for the policy and
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
-            update_obs_once: bool = use only critic gradients to update shared
-                observation network
         """
 
         super().__init__(
@@ -316,7 +309,6 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
             variable_client=variable_client,
             counts=counts,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
-            update_obs_once=update_obs_once,
         )
 
 
@@ -346,7 +338,6 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
-        update_obs_once: bool = False,
     ):
         """Initialise centralised MAD4PG trainer
 
@@ -382,8 +373,6 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
             learning_rate_scheduler_fn: dict with two functions (one for the policy and
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
-            update_obs_once: bool = use only critic gradients to update shared
-                observation network
         """
 
         super().__init__(
@@ -408,7 +397,6 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
             variable_client=variable_client,
             counts=counts,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
-            update_obs_once=update_obs_once,
         )
 
 
@@ -438,7 +426,6 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
-        update_obs_once: bool = False,
     ):
         """Initialise state-based MAD4PG trainer
 
@@ -474,8 +461,6 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
             learning_rate_scheduler_fn: dict with two functions (one for the policy and
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
-            update_obs_once: bool = use only critic gradients to update shared
-                observation network
         """
 
         super().__init__(
@@ -500,7 +485,6 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
             variable_client=variable_client,
             counts=counts,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
-            update_obs_once=update_obs_once,
         )
 
 
@@ -535,7 +519,6 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
-        update_obs_once: bool = False,
     ):
         """Initialise Recurrent MAD4PG trainer
 
@@ -572,8 +555,6 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             learning_rate_scheduler_fn: dict with two functions (one for the policy and
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
-            update_obs_once: bool = use only critic gradients to update shared
-                observation network
         """
 
         super().__init__(
@@ -599,7 +580,6 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             counts=counts,
             bootstrap_n=bootstrap_n,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
-            update_obs_once=update_obs_once,
         )
 
     # Forward pass that calculates loss.
@@ -780,7 +760,6 @@ class MAD4PGDecentralisedRecurrentTrainer(
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
-        update_obs_once: bool = False,
     ):
         """Initialise Recurrent MAD4PG trainer
 
@@ -817,8 +796,6 @@ class MAD4PGDecentralisedRecurrentTrainer(
             learning_rate_scheduler_fn: dict with two functions (one for the policy and
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
-            update_obs_once: bool = use only critic gradients to update shared
-                observation network
         """
 
         super().__init__(
@@ -844,7 +821,6 @@ class MAD4PGDecentralisedRecurrentTrainer(
             counts=counts,
             bootstrap_n=bootstrap_n,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
-            update_obs_once=update_obs_once,
         )
 
 
@@ -877,7 +853,6 @@ class MAD4PGCentralisedRecurrentTrainer(
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
-        update_obs_once: bool = False,
     ):
         """Initialise Recurrent MAD4PG trainer
 
@@ -914,8 +889,6 @@ class MAD4PGCentralisedRecurrentTrainer(
             learning_rate_scheduler_fn: dict with two functions (one for the policy and
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
-            update_obs_once: bool = use only critic gradients to update shared
-                observation network
         """
 
         super().__init__(
@@ -941,7 +914,6 @@ class MAD4PGCentralisedRecurrentTrainer(
             counts=counts,
             bootstrap_n=bootstrap_n,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
-            update_obs_once=update_obs_once,
         )
 
 
@@ -974,7 +946,6 @@ class MAD4PGStateBasedRecurrentTrainer(
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
-        update_obs_once: bool = False,
     ):
         """Initialise Recurrent MAD4PG trainer
 
@@ -1011,8 +982,6 @@ class MAD4PGStateBasedRecurrentTrainer(
             learning_rate_scheduler_fn: dict with two functions (one for the policy and
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
-            update_obs_once: bool = use only critic gradients to update shared
-                observation network
         """
 
         super().__init__(
@@ -1038,7 +1007,6 @@ class MAD4PGStateBasedRecurrentTrainer(
             counts=counts,
             bootstrap_n=bootstrap_n,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
-            update_obs_once=update_obs_once,
         )
 
 
@@ -1106,8 +1074,6 @@ class MAD4PGStateBasedSingleActionCriticRecurrentTrainer(
             learning_rate_scheduler_fn: dict with two functions (one for the policy and
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
-            update_obs_once: bool = use only critic gradients to update shared
-                observation network
         """
 
         super().__init__(
