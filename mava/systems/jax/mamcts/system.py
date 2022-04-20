@@ -41,7 +41,7 @@ class MAMCTSSystem(System):
         executor_process = DesignSpec(
             executor_init=executing.ExecutorInit,
             executor_observe=executing.FeedforwardExecutorObserve,
-            executor_select_action=executing.FeedforwardExecutorSelectAction,
+            executor_select_action=executing.MCTSFeedforwardExecutorSelectAction,
             executor_adder=building.ParallelSequenceAdder,
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
             networks=building.DefaultNetworks,

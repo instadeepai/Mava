@@ -20,8 +20,11 @@ from typing import Any
 
 import jax.numpy as jnp
 import mctx
+import numpy as np
 import optax
 from absl import app, flags
+from acme.agents.tf.mcts.models.simulator import Simulator
+from jumanji.jax.pcb_grid.env import PcbGridEnv
 from mctx import RecurrentFnOutput, RootFnOutput
 
 from mava.systems.jax import mamcts
@@ -61,31 +64,40 @@ def main(_: Any) -> None:
         action_space=FLAGS.action_space,
     )
 
-    def root_fn(params, key, observation):
+    def root_fn(forward_fn, key, state):
+
+        prior_logits, values = forward_fn(observations=state)
+
         return RootFnOutput(
-            prior_logits=jnp.zeros((1, 5)),
-            value=jnp.array([1]),
-            embedding=jnp.zeros((1, 5)),
+            prior_logits=prior_logits.logits,
+            value=values,
+            embedding=state,
         )
 
-    def recurrent_fn(params, rng_key, action, observations):
+    def recurrent_fn(
+        environment_model, forward_fn, rng_key, action, state
+    ) -> RecurrentFnOutput:
+
+        # next_state, timestep, _ = environment_model.step(state, action)
+        next_state = state
+        prior_logits, values = forward_fn(observations=state)
+
+        reward = jnp.array([0])  # timestep.reward,
+        discount = jnp.array([0])  # timestep.discount,
 
         return (
             RecurrentFnOutput(
-                reward=jnp.array([0]),
-                discount=jnp.array([1]),
-                prior_logits=jnp.zeros((1, 5)),
-                value=jnp.array([1]),
+                reward=reward,
+                discount=discount,
+                prior_logits=prior_logits.logits,
+                value=values,
             ),
-            observations,
+            next_state,
         )
 
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return mamcts.make_default_networks(
-            root_fn=root_fn,
-            recurrent_fn=recurrent_fn,
-            search_algorithm=mctx.gumbel_muzero_policy,  # type: ignore
             policy_layer_sizes=(254, 254, 254),
             critic_layer_sizes=(512, 512, 256),
             *args,
@@ -96,7 +108,7 @@ def main(_: Any) -> None:
     checkpoint_subpath = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
-    log_every = 10
+    log_every = 1
     logger_factory = functools.partial(
         logger_utils.make_logger,
         directory=FLAGS.base_dir,
@@ -123,9 +135,14 @@ def main(_: Any) -> None:
         optimizer=optimizer,
         run_evaluator=True,
         sample_batch_size=5,
-        num_epochs=15,
+        num_epochs=1,
         num_executors=1,
         multi_process=True,
+        root_fn=root_fn,
+        recurrent_fn=recurrent_fn,
+        search=mctx.gumbel_muzero_policy,
+        environment_model=environment_factory(),
+        num_simulations=1,
     )
 
     # Launch the system.

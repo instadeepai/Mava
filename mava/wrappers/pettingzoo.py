@@ -704,6 +704,9 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         Returns:
             Any: return attribute from env or underlying env.
         """
+        if name == "_environment":
+            return self.__getattribute__(name)
+
         if hasattr(self.__class__, name):
             return self.__getattribute__(name)
         else:
