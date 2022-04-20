@@ -48,7 +48,6 @@ def make_debugging_env(
     world = scenario.make_world(num_agents)
 
     # create multiagent environment
-
     env = MultiAgentEnv(
         world,
         action_space,

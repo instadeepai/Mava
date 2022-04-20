@@ -1,9 +1,11 @@
 # Adapted from https://github.com/openai/multiagent-particle-envs.
 # TODO (dries): Try using this class directly from PettingZoo and delete this file.
+import copy
 import typing
 from typing import List, Optional, Union
 
 import numpy as np
+import jax.numpy as jnp
 
 
 # physical/external base state of all entites
@@ -206,3 +208,4 @@ class World(object):
         force_a = +force if entity_a.movable else None
         force_b = -force if entity_b.movable else None
         return [force_a, force_b]
+
