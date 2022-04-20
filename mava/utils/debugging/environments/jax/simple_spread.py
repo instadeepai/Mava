@@ -15,52 +15,51 @@ from mava.utils.debugging.scenario import BaseScenario
 RNG = jax.random.PRNGKey
 
 
+def make_world(num_agents: int, key: RNG) -> JaxWorld:
+    # set any world properties first
+    num_landmarks = num_agents
+    # add agents
+    agents = [Agent(name=i, collide=True, size=0.15) for i in range(num_agents)]
+    # add landmarks
+    landmarks = [
+        Landmark(name=i, collide=False, movable=False) for i in range(num_landmarks)
+    ]
+
+    world = JaxWorld(key=key, agents=agents, landmarks=landmarks)
+
+    # make initial conditions
+    return world
+
+
 class Scenario(BaseScenario):
-    def __init__(self) -> None:
+    def __init__(self, world: JaxWorld) -> None:
         super().__init__()
+        self.world = world
+        self.dim_p = world.dim_p
 
-    def make_world(self, num_agents: int, key: RNG) -> JaxWorld:
-
-        # set any world properties first
-        num_landmarks = num_agents
-        # add agents
-        agents = [
-            Agent(name=f"agent {i}", collide=True, size=0.15) for i in range(num_agents)
-        ]
-        # for i, agent in enumerate(agents):
-        #     agent.name = "agent %d" % i
-        #     agent.collide = True
-        #     agent.size = 0.15
-        # add landmarks
-        landmarks = [
-            Landmark(name=f"landmark {i}", collide=False, moveable=False)
-            for i in range(num_landmarks)
-        ]
-
-        world = JaxWorld(agents=agents, landmarks=landmarks)
-
+    def make_world(self, num_agents: int) -> JaxWorld:
         # make initial conditions
-        return self.reset_world(world, key)
+        return self.reset_world(self.world)
 
     # @typing.no_type_check
-    def reset_world(self, world: JaxWorld, key: RNG) -> JaxWorld:
+    def reset_world(self, world: JaxWorld) -> JaxWorld:
         agents = copy.deepcopy(world.agents)
         landmarks = copy.deepcopy(world.landmarks)
 
         # random properties for agents
         for i, agent in enumerate(world.agents):
-            agents[i].color = jnp.array([0.35, 0.35, 0.85])
+            agents[i].color = (0.35, 0.35, 0.85)
             agents[i].state.p_pos = jax.random.uniform(
-                key, (world.dim_p,), minval=-1.0, maxval=1.0
+                world.key, (self.dim_p,), minval=-1.0, maxval=1.0
             )
-            agents[i].state.p_vel = jnp.zeros(world.dim_p)
+            agents[i].state.p_vel = jnp.zeros(self.dim_p)
         # random properties for landmarks
         for i, landmark in enumerate(world.landmarks):
-            landmarks[i].color = jnp.array([0.25, 0.25, 0.25])
+            landmarks[i].color = (0.25, 0.25, 0.25)
             landmarks[i].state.p_pos = jax.random.uniform(
-                key, (world.dim_p,), minval=-1, maxval=1
+                world.key, (self.dim_p,), minval=-1, maxval=1
             )
-            landmarks[i].state.p_vel = jnp.zeros(world.dim_p)
+            landmarks[i].state.p_vel = jnp.zeros(self.dim_p)
 
         # Reset step counter
         return world.replace(agents=agents, landmarks=landmarks, current_step=0)
@@ -113,15 +112,15 @@ class Scenario(BaseScenario):
                 world.landmarks[i].state.p_pos - agent.state.p_pos
             )
 
-        return jnp.array(
-            np.concatenate(
+        return jnp.concatenate(
+            (
                 [agent.state.p_vel]
                 + [agent.state.p_pos]
-                + [[world.current_step / 50]]
+                + [jnp.array([world.current_step / 50])]
                 + [target_landmark]
                 + other_agents_pos
-                + other_landmarks_pos  # + comm
-            )
+                + other_landmarks_pos
+            )  # + comm
         )
 
     def done(self, agent: Agent, world: JaxWorld) -> bool:

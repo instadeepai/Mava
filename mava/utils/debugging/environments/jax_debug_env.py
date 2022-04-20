@@ -23,6 +23,8 @@ import gym
 import numpy as np
 from gym import spaces
 
+import jax.numpy as jnp
+
 from mava.utils.debugging.environments.jax.core import Agent, JaxWorld, step
 
 from ..multi_discrete import MultiDiscrete
@@ -164,14 +166,14 @@ class MultiAgentJaxEnv(gym.Env):
 
         return world, (obs_n, reward_n, done_n, state_n)
 
-    def reset(self, world: JaxWorld) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    def reset(self, world: JaxWorld) -> Tuple[JaxWorld, Dict[str, Any], Dict[str, Any]]:
         # reset world
         if self.reset_callback is not None:
             self.reset_callback(world)
         else:
             raise ValueError("self.reset_callback is still None!")
         # reset renderer
-        self._reset_render()
+        # self._reset_render()
         self.env_done = False
         # record observations for each agent
         obs_n = {}
@@ -190,7 +192,7 @@ class MultiAgentJaxEnv(gym.Env):
     # get observation for a particular agent
     def _get_obs(self, world: JaxWorld, a_i: int, agent: Agent) -> np.ndarray:
         if self.observation_callback is None:
-            return np.zeros(0)
+            return jnp.zeros(0)
         else:
             return self.observation_callback(agent, a_i, world)
 
@@ -220,9 +222,9 @@ class MultiAgentJaxEnv(gym.Env):
             agent_pos.append(agent.state.p_pos)
             agent_vel.append(agent.state.p_vel)
 
-        return np.array(
-            np.concatenate(
-                [[world.current_step / 50]] + entity_pos + agent_pos + agent_vel
+        return jnp.array(
+            jnp.concatenate(
+                [jnp.array([world.current_step / 50])] + entity_pos + agent_pos + agent_vel
             ),
             dtype=np.float32,
         )
@@ -235,7 +237,7 @@ class MultiAgentJaxEnv(gym.Env):
         agent: Agent,
         action_space: spaces,
     ) -> None:
-        agent.action.u = np.zeros(world.dim_p)
+        agent.action.u = jnp.zeros(world.dim_p)
         # process action
         if isinstance(action_space, MultiDiscrete):
             act = []

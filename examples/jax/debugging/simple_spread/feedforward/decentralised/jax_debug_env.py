@@ -4,7 +4,7 @@ from typing import Optional
 
 from gym import Space
 
-from mava.utils.debugging.environments.jax.simple_spread import Scenario
+from mava.utils.debugging.environments.jax.simple_spread import Scenario, make_world
 from mava.utils.debugging.environments.jax_debug_env import MultiAgentJaxEnv
 
 
@@ -12,13 +12,13 @@ scenario_name = "simple_spread"
 action_space = "discrete"
 num_agents = 2
 
-scenario = Scenario()
 key = jax.random.PRNGKey(42)
+scenario = Scenario(make_world(2, key))
 # if seed:
 #     scenario.seed(seed)
 
 # create world
-world = scenario.make_world(num_agents, key)
+world = scenario.make_world(num_agents)
 
 # create multiagent environment
 env = MultiAgentJaxEnv(
@@ -32,8 +32,7 @@ env = MultiAgentJaxEnv(
 
 
 jitted_reset = jax.jit(env.reset)
-# jitted_step = jax.jit(env.step)
+jitted_step = jax.jit(env.step)
 jitted_reset(world)
-# jitted_step(env, world, {"agent_0": 0, "agent_1": 0})
-# env.step(world, {"agent_0": 0, "agent_1": 0})
+# jitted_step(world, {"agent_0": 0, "agent_1": 0})
 

@@ -6,10 +6,12 @@ import chex
 import typing
 from typing import List, Optional, Union
 
+import jax.random
 import numpy as np
 
 
-class EntityState(abc.ABC):
+@chex.dataclass
+class EntityState:
     p_pos: Optional[np.ndarray] = None
     # physical velocity
     p_vel: Optional[np.ndarray] = None
@@ -31,24 +33,24 @@ class Action:
 @chex.dataclass
 class Entity:
     # name
-    name = ""
+    name: int = -1
     # properties:
-    size = 0.050
+    size: float = 0.050
     # entity can move / be pushed
-    movable = False
+    movable: bool = False
     # entity collides with others
-    collide = True
+    collide: bool = True
     # material density (affects mass)
-    density = 25.0
+    density: float = 25.0
     # color
-    color = None
+    color: typing.Tuple[float, float, float] = None
     # max speed and accel
-    max_speed = None
-    accel = None
+    max_speed: Optional[float] = None
+    accel: Optional[float] = None
     # state
-    state = EntityState()
+    state: EntityState = EntityState()
     # mass
-    initial_mass = 1.0
+    initial_mass: float = 1.0
 
     @property
     def mass(self) -> float:
@@ -65,21 +67,22 @@ class Landmark(Entity):
 @chex.dataclass
 class Agent(Entity):
     # agents are movable by default
-    movable = True
+    movable: bool = True
     # cannot observe the world
-    blind = False
+    blind: bool = False
     # physical motor noise amount
-    u_noise = None
+    u_noise: Union[float, None] = None
     # control range
-    u_range = 1.0
+    u_range: float = 1.0
     # state
-    state = AgentState()
+    state: AgentState = AgentState()
     # action
-    action = Action()
+    action: Action = Action()
 
 
-@chex.dataclass
+@chex.dataclass(frozen=True)
 class JaxWorld:
+    key: jax.random.PRNGKey
     agents: List[Agent]
     landmarks: List[Landmark]
     current_step: int = 0
