@@ -604,7 +604,6 @@ class MADDPGBuilder:
             "counts": counts,
             "logger": logger,
             "learning_rate_scheduler_fn": self._config.learning_rate_scheduler_fn,
-            "update_obs_once": self._config.update_obs_once,
         }
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec
