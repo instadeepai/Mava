@@ -23,7 +23,7 @@ import acme
 from mava import specs
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
-from mava.environment_loop import ParallelEnvironmentLoop
+from mava.environment_loop import JAXParallelEnvironmentLoop, ParallelEnvironmentLoop
 
 
 @dataclass
@@ -76,6 +76,24 @@ class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
             builder : _description_
         """
         executor_environment_loop = ParallelEnvironmentLoop(
+            environment=builder.store.executor_environment,
+            executor=builder.store.executor,
+            logger=builder.store.executor_logger,
+            should_update=self.config.should_update,
+        )
+        del builder.store.executor_logger
+
+        builder.store.system_executor = executor_environment_loop
+
+
+class JAXParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
+    def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
+        """_summary_
+
+        Args:
+            builder : _description_
+        """
+        executor_environment_loop = JAXParallelEnvironmentLoop(
             environment=builder.store.executor_environment,
             executor=builder.store.executor,
             logger=builder.store.executor_logger,
