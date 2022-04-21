@@ -115,7 +115,8 @@ class StateBasedQValueCritic(DecentralisedQValueActorCritic):
                 )
             )
 
-        # TODO (dries): Fix this
+        # TODO (dries): Fix the line below and remove the assert.
+        # Don't assume len(critic_obs_spec) == 1.
         assert len(critic_obs_spec) == 1
         critic_obs_spec = critic_obs_spec[0]
 
@@ -208,7 +209,8 @@ class StateBasedValueActorCritic(DecentralisedValueActorCritic):  # type: ignore
                 )
             )
 
-        # TODO (dries): Fix this
+        # TODO (dries): Fix the line below and remove the assert.
+        # Don't assume len(critic_obs_spec) == 1.
         assert len(critic_obs_spec) == 1
         critic_obs_spec = critic_obs_spec[0]
 

@@ -51,25 +51,19 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-
-    recurrent_test = False
-    recurrent_ppo = True
-
     # Environment.
     environment_factory = functools.partial(
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
         return_state_info=True,
-        recurrent_test=recurrent_test,
+        recurrent_test=True,
     )
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
         mappo.make_default_networks,
-        architecture_type=ArchitectureType.recurrent
-        if recurrent_ppo
-        else ArchitectureType.feedforward,
+        architecture_type=ArchitectureType.recurrent,
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -96,9 +90,7 @@ def main(_: Any) -> None:
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         max_gradient_norm=40.0,
-        executor_fn=mappo.MAPPORecurrentExecutor
-        if recurrent_ppo
-        else mappo.MAPPOFeedForwardExecutor,
+        executor_fn=mappo.MAPPORecurrentExecutor,
         architecture=architectures.StateBasedValueActorCritic,
         trainer_fn=mappo.StateBasedMAPPOTrainer,
     ).build()

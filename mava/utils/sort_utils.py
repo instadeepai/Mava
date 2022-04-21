@@ -37,6 +37,8 @@ def sample_new_agent_keys(
             sampled from by the executors at the start of an environment run.
             shared_weights: whether agents should share weights or not.
         net_keys_to_ids: Dictionary mapping network keys to network ids.
+        fix_sampler: Optional list that can fix the executor sampler to sample
+            in a specific way.
     Returns:
         Tuple of dictionaries mapping network keys to ids.
     """
