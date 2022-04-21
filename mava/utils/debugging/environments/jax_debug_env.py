@@ -25,7 +25,7 @@ import jax.numpy as jnp
 import numpy as np
 from gym import spaces
 
-from mava.utils.debugging.environments.jax.core import Agent, JaxWorld, step
+from mava.utils.debugging.environments.jax.core import Agent, JaxWorld, step, Action
 
 from ..multi_discrete import MultiDiscrete
 
@@ -146,13 +146,17 @@ class MultiAgentJaxEnv(gym.Env):
         obs_n = {}
         reward_n = {}
         done_n = {}
+
+        processed_agents = []
         # set action for each agent
         for agent_id in self.agent_ids:
             agent = self.agents[agent_id]
             agent_action = copy.deepcopy(action_n[agent_id])
-            world = self._set_action(
-                world, agent_action, agent_id, self.action_spaces[agent_id]
-            )
+            action = self._process_action(agent_action, agent)
+            processed_agents.append(agent.replace(action=action))
+
+        # update world's agents with new actions
+        world = world.replace(agents=processed_agents)
         # advance world state
         world = step(world)
         # record observation for each agent
@@ -236,61 +240,37 @@ class MultiAgentJaxEnv(gym.Env):
         )
 
     # set env action for a particular agent
-    def _set_action(
+    def _process_action(
         self,
-        world: JaxWorld,
-        action: np.ndarray,
-        agent_id: int,
-        action_space: spaces,
-    ) -> None:
-        agent = world.agents[agent_id]
-        agent.action.u = jnp.zeros(self.dim_p)
-        # process action
-        if isinstance(action_space, MultiDiscrete):
-            act = []
-            size = action_space.high - action_space.low + 1
-            index = 0
-            for s in size:
-                act.append(action[index : (index + s)])
-                index += s
-            action = act
-        else:
-            action = [action]
+        action: int,
+        agent: Agent,
+    ) -> Action:
 
-        if agent.movable:
-            # physical action
-            if self.discrete_action_input:
-                agent.action.u = jnp.zeros(self.dim_p)
-                # process discrete action
-                agent.action.u = agent.action.u.at[0].set(
+        agent.action.u = jnp.zeros(self.dim_p)
+
+        def on_movable(act: Action):
+            sensitivity = jax.lax.cond(
+                jnp.isnan(agent.accel), lambda: 5.0, lambda: agent.accel
+            )
+
+            return Action(
+                u=jnp.array(
                     jax.lax.switch(
-                        action[0] - 1,
-                        [lambda x: -1.0, lambda x: 1.0, lambda x: -1.0, lambda x: 1.0],
+                        act - 1,
+                        [
+                            lambda x: [-1.0, 0.0],
+                            lambda x: [1.0, 0.0],
+                            lambda x: [0.0, -1.0],
+                            lambda x: [0.0, 1.0],
+                        ],
                         None,
                     )
                 )
+                * sensitivity
+            )
 
-            else:
-                # if self.force_discrete_action:
-                #     d = np.argmax(action[0])
-                #     action[0][:] = 0.0
-                #     action[0][d] = 1.0
-                if self.discrete_action_space:
-                    agent.action.u[0] += action[0][1] - action[0][2]
-                    agent.action.u[1] += action[0][3] - action[0][4]
-                else:
-                    agent.action.u = action[0]
-            sensitivity = 5.0
-            if agent.accel is not None:
-                sensitivity = agent.accel
-            agent.action.u *= sensitivity
-            action = action[1:]
-        # make sure we used all elements of action
-        new_agents = world.agents
-        new_agents[agent_id] = agent
-        world.replace(agents=new_agents)
-        assert len(action) == 0
-        return world
+        return jax.lax.cond(agent.movable, on_movable, lambda act: agent.action, action)
+        # assert len(action) == 0
 
     # reset rendering assets
     def _reset_render(self) -> None:
