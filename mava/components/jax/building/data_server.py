@@ -17,7 +17,7 @@
 import abc
 import copy
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List
 
 import reverb
 from reverb import rate_limiters, reverb_types
@@ -81,8 +81,8 @@ class DataServer(Component):
         """[summary]"""
         builder.store.data_tables = self._create_table_per_trainer(builder)
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "data_server"
 
@@ -181,3 +181,7 @@ class OnPolicyDataServer(DataServer):
             ),
         )
         return table
+
+    @staticmethod
+    def config_class() -> Callable:
+        return OnPolicyDataServerConfig

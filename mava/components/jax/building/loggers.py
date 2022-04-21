@@ -60,7 +60,11 @@ class Logger(Component):
             f"{builder.store.trainer_id}", **logger_config
         )
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_"""
         return "logger"
+
+    @staticmethod
+    def config_class() -> Callable:
+        return LoggerConfig
