@@ -44,7 +44,7 @@ class DataServer(Component):
 
     def _create_table_per_trainer(self, builder: SystemBuilder) -> List[reverb.Table]:
         data_tables = []
-        # Default table network config
+        # Default table network config - often overwritten by TrainerInit.
         if not hasattr(builder.store, "table_network_config"):
             builder.store.table_network_config = {"table_0": "network_0"}
 
