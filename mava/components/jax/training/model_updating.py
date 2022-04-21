@@ -16,7 +16,7 @@
 """Trainer components for system updating."""
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -114,14 +114,18 @@ class MAPGMinibatchUpdate(Utility):
 
         trainer.store.minibatch_update_fn = model_update_minibatch
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_
 
         Returns:
             _description_
         """
         return "minibatch_update_fn"
+
+    @staticmethod
+    def config_class() -> Callable:
+        return MAPGMinibatchUpdateConfig
 
 
 @dataclass
@@ -181,11 +185,15 @@ class MAPGEpochUpdate(Utility):
 
         trainer.store.epoch_update_fn = model_update_epoch
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_
 
         Returns:
             _description_
         """
         return "epoch_update_fn"
+
+    @staticmethod
+    def config_class() -> Callable:
+        return MAPGEpochUpdateConfig

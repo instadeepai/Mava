@@ -67,6 +67,10 @@ class TransitionDataset(Component):
 
         builder.store.dataset = iter(dataset)
 
+    @staticmethod
+    def config_class() -> Callable:
+        return TransitionDatasetConfig
+
 
 @dataclass
 class TrajectoryDatasetConfig:
@@ -114,11 +118,15 @@ class TrajectoryDataset(Component):
 
         builder.store.dataset_iterator = dataset.as_numpy_iterator()
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_
 
         Returns:
             _description_
         """
         return "trainer_dataset"
+
+    @staticmethod
+    def config_class() -> Callable:
+        return TrajectoryDatasetConfig
