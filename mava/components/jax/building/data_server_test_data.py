@@ -21,16 +21,17 @@ from typing import Dict, List
 import reverb
 
 from mava.components.jax.building import adders
+from mava.components.jax.building.base import SystemInit
 from mava.components.jax.building.data_server import (
     OffPolicyDataServer,
     OnPolicyDataServer,
 )
+from mava.components.jax.building.environments import EnvironmentSpec
 from mava.components.jax.building.rate_limiters import (
     MinSizeRateLimiter,
     SampleToInsertRateLimiter,
 )
-from mava.testing.building.mocks import (
-    MockedEnvSpec,
+from mava.testing.building.mocks import (  # MockedEnvSpec,
     MockOffPolicyDataServer,
     MockOnPolicyDataServer,
     make_fake_environment_factory,
@@ -39,7 +40,8 @@ from mava.testing.building.mocks import (
 transition_adder_data_server_test_cases: List[Dict] = [
     {
         "component": {
-            "environment_spec": MockedEnvSpec,
+            "environment_spec": EnvironmentSpec,
+            "system_init": SystemInit,
             "rate_limiter": MinSizeRateLimiter,
             "data_server_adder_signature": adders.ParallelTransitionAdderSignature,
             "data_server": MockOffPolicyDataServer,
@@ -50,25 +52,25 @@ transition_adder_data_server_test_cases: List[Dict] = [
             "max_size": 500,
             "min_data_server_size": 100,
             "max_times_sampled": 12,
-            "data_server_name": "test_offpolicy_mock",
             "environment_factory": make_fake_environment_factory(),
         },
     },
     {
         "component": {
-            "environment_spec": MockedEnvSpec,
+            "environment_spec": EnvironmentSpec,
+            "system_init": SystemInit,
             "data_server_adder_signature": adders.ParallelTransitionAdderSignature,
             "data_server": MockOnPolicyDataServer,
         },
         "system_config": {
             "max_queue_size": 50,
-            "data_server_name": "test_onpolicy_mock",
             "environment_factory": make_fake_environment_factory(),
         },
     },
     {
         "component": {
-            "environment_spec": MockedEnvSpec,
+            "environment_spec": EnvironmentSpec,
+            "system_init": SystemInit,
             "rate_limiter": SampleToInsertRateLimiter,
             "data_server_adder_signature": adders.ParallelTransitionAdderSignature,
             "data_server": OffPolicyDataServer,
@@ -79,19 +81,18 @@ transition_adder_data_server_test_cases: List[Dict] = [
             "max_size": 500,
             "min_data_server_size": 100,
             "max_times_sampled": 12,
-            "data_server_name": "test_offpolicy",
             "environment_factory": make_fake_environment_factory(),
         },
     },
     {
         "component": {
-            "environment_spec": MockedEnvSpec,
+            "environment_spec": EnvironmentSpec,
+            "system_init": SystemInit,
             "data_server_adder_signature": adders.ParallelTransitionAdderSignature,
             "data_server": OnPolicyDataServer,
         },
         "system_config": {
             "max_queue_size": 50,
-            "data_server_name": "test_onpolicy_table",
             "environment_factory": make_fake_environment_factory(),
         },
     },

@@ -67,8 +67,10 @@ class TestDataServer:
         # Testing table is set correctly
         assert (
             table_info.name
-            == f"{system_config['data_server_name']}_{list(test_system._builder.store.table_network_config.keys())[0]}"  # noqa:E501
-        )
+            == list(test_system._builder.store.table_network_config.keys())[
+                0
+            ]  # noqa:E501
+        ), f"{table_info.name} {list(test_system._builder.store.table_network_config.keys())[0]}"  # noqa: E501
 
         # Off policy params
         assert_if_value_is_not_none(system_config.get("max_size"), table_info.max_size)

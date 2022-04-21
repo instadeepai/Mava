@@ -98,7 +98,6 @@ class OffPolicyDataServerConfig:
     max_size: int = 100000
     rate_limiter: rate_limiters.RateLimiter = None
     max_times_sampled: int = 0
-    data_server_name: str = "off_policy_table"
 
 
 class OffPolicyDataServer(DataServer):
@@ -131,7 +130,7 @@ class OffPolicyDataServer(DataServer):
             _description_
         """
         table = reverb.Table(
-            name=f"{self.config.data_server_name}_{table_key}",
+            name=table_key,
             sampler=self.config.sampler,
             remover=self.config.remover,
             max_size=self.config.max_size,
@@ -154,7 +153,6 @@ class OffPolicyDataServer(DataServer):
 @dataclass
 class OnPolicyDataServerConfig:
     max_queue_size: int = 1000
-    data_server_name: str = "on_policy_table"
 
 
 class OnPolicyDataServer(DataServer):
@@ -194,7 +192,7 @@ class OnPolicyDataServer(DataServer):
         else:
             signature = builder.store.adder_signature_fn(environment_spec, extras_spec)
         table = reverb.Table.queue(
-            name=f"{self.config.data_server_name}_{table_key}",
+            name=table_key,
             max_size=self.config.max_queue_size,
             signature=signature,
         )

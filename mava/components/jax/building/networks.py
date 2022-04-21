@@ -28,7 +28,6 @@ from mava.core_jax import SystemBuilder
 @dataclass
 class NetworksConfig:
     network_factory: Optional[Callable[[str], dm_env.Environment]] = None
-    shared_weights: bool = True
     seed: int = 1234
 
 

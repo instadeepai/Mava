@@ -21,7 +21,6 @@ import functools
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-import acme
 import dm_env
 import jax
 import numpy as np
@@ -42,7 +41,6 @@ from mava.environment_loop import ParallelEnvironmentLoop
 from mava.specs import DesignSpec, MAEnvironmentSpec
 from mava.systems.jax.system import System
 from mava.utils.builder_utils import covert_specs
-from mava.utils.sort_utils import sort_str_num
 from tests.enums import EnvType, MockedEnvironments
 from tests.mocks import (
     ParallelMAContinuousEnvironment,
@@ -382,7 +380,7 @@ class MockOnPolicyDataServer(MockDataServer):
             mock reverb table.
         """
         return mock_queue(
-            name=f"{self.config.data_server_name}_{table_key}",
+            name=table_key,
             max_queue_size=self.config.max_queue_size,
             signature=builder.store.adder_signature_fn(environment_spec, extras_spec),
         )
@@ -441,7 +439,7 @@ class MockOffPolicyDataServer(MockDataServer):
             mock reverb table.
         """
         return mock_table(
-            name=f"{self.config.data_server_name}_{table_key}",
+            name=table_key,
             sampler=self.config.sampler,
             remover=self.config.remover,
             max_size=self.config.max_size,
@@ -801,46 +799,6 @@ class MockDistributor(Callback):
             Component type name
         """
         return "distributor"
-
-
-@dataclass
-class MockedEnvSpecConfig:
-    environment_factory: Optional[Callable[[bool], acme.core.Worker]] = None
-
-
-class MockedEnvSpec(Component):
-    def __init__(self, config: MockedEnvSpecConfig = MockedEnvSpecConfig()):
-        """[summary]"""
-        self.config = config
-
-    def on_building_init_start(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-
-        builder.store.environment_spec = specs.MAEnvironmentSpec(
-            self.config.environment_factory()
-        )
-
-        builder.store.agents = sort_str_num(
-            builder.store.environment_spec.get_agent_ids()
-        )
-        builder.store.agent_net_keys = {
-            agent: f"network_{agent.split('_')[0]}" for agent in builder.store.agents
-        }
-        builder.store.extras_spec = {}
-
-    @staticmethod
-    def name() -> str:
-        """_summary_"""
-        return "environment_spec"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MockedEnvSpecConfig
 
 
 def return_test_system(components: Dict) -> System:
