@@ -17,7 +17,7 @@
 import abc
 import copy
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 import reverb
 from reverb import rate_limiters, reverb_types
@@ -44,6 +44,10 @@ class DataServer(Component):
 
     def _create_table_per_trainer(self, builder: SystemBuilder) -> List[reverb.Table]:
         data_tables = []
+        # Default table network config
+        if not hasattr(builder.store, "table_network_config"):
+            builder.store.table_network_config = {"table_0": "network_0"}
+
         for table_key in builder.store.table_network_config.keys():
             # TODO (dries): Clean the below coverter code up.
             # Convert a Mava spec
@@ -99,8 +103,7 @@ class OffPolicyDataServerConfig:
 
 class OffPolicyDataServer(DataServer):
     def __init__(
-        self,
-        config: OffPolicyDataServerConfig = OffPolicyDataServerConfig(),
+        self, config: OffPolicyDataServerConfig = OffPolicyDataServerConfig()
     ) -> None:
         """_summary_
 
@@ -134,13 +137,24 @@ class OffPolicyDataServer(DataServer):
             max_size=self.config.max_size,
             rate_limiter=builder.store.rate_limiter_fn(),
             signature=builder.store.adder_signature_fn(environment_spec, extras_spec),
+            max_times_sampled=self.config.max_times_sampled,
         )
         return table
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return OffPolicyDataServerConfig
 
 
 @dataclass
 class OnPolicyDataServerConfig:
     max_queue_size: int = 1000
+    data_server_name: str = "on_policy_table"
 
 
 class OnPolicyDataServer(DataServer):
@@ -173,15 +187,24 @@ class OnPolicyDataServer(DataServer):
         Returns:
             _description_
         """
-        table = reverb.Table.queue(
-            name=table_key,
-            max_size=self.config.max_queue_size,
-            signature=builder.store.adder_signature_fn(
+        if builder.store.__dict__.get("sequence_length"):
+            signature = builder.store.adder_signature_fn(
                 environment_spec, builder.store.sequence_length, extras_spec
-            ),
+            )
+        else:
+            signature = builder.store.adder_signature_fn(environment_spec, extras_spec)
+        table = reverb.Table.queue(
+            name=f"{self.config.data_server_name}_{table_key}",
+            max_size=self.config.max_queue_size,
+            signature=signature,
         )
         return table
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return OnPolicyDataServerConfig
