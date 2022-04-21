@@ -38,14 +38,11 @@ from mava.components.tf.architectures import (
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import builder, training
-from mava.systems.tf.maddpg.execution import (
-    MADDPGFeedForwardExecutor,
-    sample_new_agent_keys,
-)
+from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 from mava.utils import enums
 from mava.utils.loggers import MavaLogger, logger_utils
-from mava.utils.sort_utils import sort_str_num
+from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 from mava.wrappers import DetailedPerAgentStatistics
 
 

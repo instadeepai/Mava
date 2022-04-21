@@ -85,7 +85,6 @@ def main(_: Any) -> None:
         logger_factory=logger_factory,
         num_executors=1,
         checkpoint_subpath=checkpoint_dir,
-        num_epochs=15,
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.
