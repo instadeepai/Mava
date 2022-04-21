@@ -132,9 +132,6 @@ def make_default_networks(
         # Get total number of action dimensions from action spec.
         num_dimensions = np.prod(agent_act_spec.shape, dtype=int)
 
-        # Create the shared observation network; here simply a state-less operation.
-        if observation_network is None:
-            observation_network = tf2_utils.to_sonnet_module(tf.identity)
         # Create the policy network.
         if architecture_type == ArchitectureType.feedforward:
             policy_network = [
