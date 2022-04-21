@@ -63,5 +63,10 @@ class DefaultNetworks(Component):
         return "networks"
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return NetworksConfig

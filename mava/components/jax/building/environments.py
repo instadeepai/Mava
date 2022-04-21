@@ -68,7 +68,12 @@ class ExecutorEnvironmentLoop(Component):
         return "environment_loop"
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return ExecutorEnvironmentLoopConfig
 
 

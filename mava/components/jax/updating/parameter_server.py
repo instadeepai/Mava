@@ -16,7 +16,7 @@
 """Parameter server component for Mava systems."""
 import time
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Optional
 
 import numpy as np
 from acme.jax import savers
@@ -160,5 +160,10 @@ class DefaultParameterServer(Callback):
         return "parameter_server"
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return ParameterServerConfig

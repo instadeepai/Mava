@@ -16,7 +16,7 @@
 """Commonly used adder components for system builders"""
 import abc
 from dataclasses import dataclass
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
 from mava import specs
 from mava.adders import reverb as reverb_adders
@@ -76,7 +76,12 @@ class AdderPriority(Component):
         return "adder_priority"
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return AdderPriorityConfig
 
 
@@ -111,7 +116,12 @@ class AdderSignature(Component):
         return "adder_signature"
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return AdderSignatureConfig
 
 
@@ -154,7 +164,12 @@ class ParallelTransitionAdder(Adder):
         builder.store.adder = adder
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return ParallelTransitionAdderConfig
 
 
@@ -242,7 +257,12 @@ class ParallelSequenceAdder(Adder):
         builder.store.adder = adder
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return ParallelSequenceAdderConfig
 
 
