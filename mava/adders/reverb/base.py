@@ -382,7 +382,6 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
 
         if self._use_next_extras:
             add_dict["extras"] = extras
-
         self._writer.append(
             add_dict,
             partial_step=True,
@@ -421,7 +420,6 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
 
         if self._use_next_extras:
             next_step["extras"] = next_extras
-
         self._writer.append(
             next_step,
             partial_step=True,

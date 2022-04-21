@@ -161,7 +161,6 @@ class MADDPGBuilder:
         self._config = config
         self._extra_specs = extra_specs
         self._agents = self._config.environment_spec.get_agent_ids()
-        self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
         self._executor_fn = executor_fn
 
@@ -530,7 +529,6 @@ class MADDPGBuilder:
                 executors to update the parameters of the agent networks in the system.
         """
         # This assumes agents are sort_str_num in the other methods
-        agent_types = self._agent_types
         max_gradient_norm = self._config.max_gradient_norm
         discount = self._config.discount
         target_update_period = self._config.target_update_period
@@ -584,7 +582,6 @@ class MADDPGBuilder:
 
         trainer_config: Dict[str, Any] = {
             "agents": trainer_agents,
-            "agent_types": agent_types,
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
             "observation_networks": networks["observations"],

@@ -20,10 +20,13 @@ from datetime import datetime
 from typing import Any
 
 import launchpad as lp
+import sonnet as snt
 from absl import app, flags
 
+from mava.components.tf import architectures
 from mava.systems.tf import mappo
 from mava.utils import lp_utils
+from mava.utils.enums import ArchitectureType
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
@@ -48,21 +51,20 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Run main script
-
-    Args:
-        _ : _
-    """
-
     # Environment.
     environment_factory = functools.partial(
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
+        return_state_info=True,
+        recurrent_test=True,
     )
 
     # Networks.
-    network_factory = lp_utils.partial_kwargs(mappo.make_default_networks)
+    network_factory = lp_utils.partial_kwargs(
+        mappo.make_default_networks,
+        architecture_type=ArchitectureType.recurrent,
+    )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
@@ -84,7 +86,13 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
+        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
+        max_gradient_norm=40.0,
+        executor_fn=mappo.MAPPORecurrentExecutor,
+        architecture=architectures.StateBasedValueActorCritic,
+        trainer_fn=mappo.StateBasedMAPPOTrainer,
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.
