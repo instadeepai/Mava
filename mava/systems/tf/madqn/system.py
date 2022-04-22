@@ -72,6 +72,8 @@ class MADQN:
         network_sampling_setup: Union[
             List, enums.NetworkSampler
         ] = enums.NetworkSampler.fixed_agent_networks,
+        fix_sampler: Optional[List] = None,
+        net_spec_keys: Dict = {},
         shared_weights: bool = True,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         discount: float = 0.99,
@@ -134,6 +136,10 @@ class MADQN:
                 Custom list: Alternatively one can specify a custom nested list,
                 with network keys in, that will be used by the executors at
                 the start of each episode to sample networks for each agent.
+            fix_sampler: Optional list that can fix the executor sampler to sample
+                in a specific way.
+            net_spec_keys: Optional network to agent mapping used to get the environment
+                specs for each network.
             shared_weights: whether agents should share weights or not.
                 When network_sampling_setup are provided the value of shared_weights is
                 ignored.
@@ -257,6 +263,7 @@ class MADQN:
             _, self._agent_net_keys = sample_new_agent_keys(
                 agents,
                 self._network_sampling_setup,  # type: ignore
+                fix_sampler=fix_sampler,
             )
         # Check that the environment and agent_net_keys has the same amount of agents
         sample_length = len(self._network_sampling_setup[0])  # type: ignore
@@ -302,9 +309,12 @@ class MADQN:
         # Check that all agent_net_keys are in trainer_networks
         assert unique_net_keys == unique_trainer_net_keys
         # Setup specs for each network
-        self._net_spec_keys = {}
-        for i in range(len(unique_net_keys)):
-            self._net_spec_keys[unique_net_keys[i]] = agents[i % len(agents)]
+        if net_spec_keys:
+            self._net_spec_keys = net_spec_keys
+        else:
+            self._net_spec_keys = {}
+            for i in range(len(unique_net_keys)):
+                self._net_spec_keys[unique_net_keys[i]] = agents[i % len(agents)]
 
         # Setup table_network_config
         table_network_config = {}
@@ -384,6 +394,8 @@ class MADQN:
                 table_network_config=table_network_config,
                 num_executors=num_executors,
                 network_sampling_setup=self._network_sampling_setup,  # type: ignore
+                fix_sampler=fix_sampler,
+                net_spec_keys=self._net_spec_keys,
                 net_keys_to_ids=net_keys_to_ids,
                 unique_net_keys=unique_net_keys,
                 discount=discount,
