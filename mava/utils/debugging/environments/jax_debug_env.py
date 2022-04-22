@@ -271,8 +271,7 @@ class MultiAgentJaxEnv(gym.Env):
                 * sensitivity
             )
 
-        return jax.lax.cond(agent.movable, on_movable, lambda act: agent.action, action)
-        # assert len(action) == 0
+        return jax.lax.cond(agent.movable, on_movable, lambda _: agent.action, action)
 
     # reset rendering assets
     def _reset_render(self) -> None:
@@ -280,15 +279,14 @@ class MultiAgentJaxEnv(gym.Env):
         self.render_geoms_xform = None
 
     # render environment
-    def render(self, mode: str = "human") -> List[np.ndarray]:
-
+    def render(self, world: JaxWorld, mode: str = "human") -> List[np.ndarray]:
         for i in range(len(self.viewers)):
             # create viewers (if necessary)
             if self.viewers[i] is None:
                 # import rendering only if we need it (and don't
                 # import for headless machines)
                 # from gym.envs.classic_control import rendering
-                from . import rendering
+                from mava.utils.debugging import rendering
 
                 self.viewers[i] = rendering.Viewer(700, 700)
 
@@ -297,17 +295,17 @@ class MultiAgentJaxEnv(gym.Env):
             # import rendering only if we need it (and don't import
             # for headless machines)
             # from gym.envs.classic_control import rendering
-            from . import rendering
+            from mava.utils.debugging import rendering
 
             self.render_geoms = []
             self.render_geoms_xform = []
-            for entity in self.world.entities:
+            for entity in world.entities:
                 geom = rendering.make_circle(entity.size)
                 xform = rendering.Transform()
 
                 if entity.color is not None:
                     r, g, b = entity.color
-                    if "agent" in entity.name:
+                    if isinstance(entity, Agent):
                         geom.set_color(r, g, b, alpha=0.5)
                     else:
                         geom.set_color(r, g, b)
@@ -326,7 +324,7 @@ class MultiAgentJaxEnv(gym.Env):
             # update bounds to center around agent
             cam_range = 1
             if self.shared_viewer:
-                pos = np.zeros(self.self.dim_p)
+                pos = np.zeros(world.dim_p)
             else:
                 pos = self.agents[self.agent_ids[i]].state.p_pos
             self.viewers[i].set_bounds(
@@ -337,7 +335,7 @@ class MultiAgentJaxEnv(gym.Env):
             )
             # update geometry positions
             if self.render_geoms_xform is not None:
-                for e, entity in enumerate(self.world.entities):
+                for e, entity in enumerate(world.entities):
                     self.render_geoms_xform[e].set_translation(*entity.state.p_pos)
             else:
                 raise ValueError("self.render_geoms_xform is still None!")

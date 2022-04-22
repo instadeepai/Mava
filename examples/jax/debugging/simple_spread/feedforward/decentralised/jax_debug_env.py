@@ -15,7 +15,7 @@ num_agents = 2
 
 # make_debugging_env(scenario_name, )
 
-key = jax.random.PRNGKey(42)
+key = jax.random.PRNGKey(1)
 scenario = Scenario(make_world(2, key))
 # if seed:
 #     scenario.seed(seed)
@@ -38,6 +38,7 @@ print(env)
 
 jitted_reset = jax.jit(env.reset)
 jitted_step = jax.jit(env.step)
-jitted_reset(world)
-jitted_step(world, {"agent_0": 0, "agent_1": 0})
-# env.step(world, {"agent_0": 0, "agent_1": 0})
+for i in range(50):
+    world, *_ = jitted_reset(world)
+    world, _, jitted_step(world, {"agent_0": 0, "agent_1": 0})
+    env.render(world)
