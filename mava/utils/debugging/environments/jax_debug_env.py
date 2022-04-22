@@ -166,8 +166,10 @@ class MultiAgentJaxEnv(gym.Env):
             reward_n[agent_id] = self._get_reward(world, a_i, agent)
             done_n[agent_id] = self._get_done(world, agent)
 
-            if done_n[agent_id]:
-                self.env_done = True
+        # this means that env is done when any agent is done?
+        # if done_n[agent_id]:
+        #     self.env_done = True
+        self.env_done = jnp.any(jnp.array(list(done_n.values())))
 
         state_n = self._get_state(world)
 

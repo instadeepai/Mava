@@ -46,7 +46,7 @@ class Entity:
     # color
     color: typing.Tuple[float, float, float] = None
     # max speed and accel
-    max_speed: Optional[float] = None
+    max_speed: float = jnp.nan
     accel: float = jnp.nan
     # state
     state: EntityState = EntityState()
@@ -179,20 +179,13 @@ def apply_environment_force(world: JaxWorld, p_force: List[float]) -> List[float
 
 
 def move_entity(world: JaxWorld, entity: Entity, p_force: float) -> Entity:
-    entity = jax.lax.cond(entity.movable, None, lambda *_: entity)
-    # if not entity.movable:
-    #     return entity
+    def clamp_vel(vel, max_speed):
+        speed = jnp.sqrt(jnp.sum(jnp.square(vel)))
 
-    def reduce_vel(vel, max_vel):
-        return vel / jnp.sqrt(jnp.square(vel[0]) + jnp.square(vel[1])) * max_vel
-
-    def clamp_vel(vel):
         return jax.lax.cond(
-            vel > entity.max_speed,
-            reduce_vel,
-            lambda *_: entity.state.p_vel,
-            entity.state.p_vel,
-            entity.max_speed,
+            speed > max_speed,
+            lambda: (vel / speed) * max_speed,
+            lambda: entity.state.p_vel,
         )
 
     def calc_vel(entity):
@@ -200,30 +193,23 @@ def move_entity(world: JaxWorld, entity: Entity, p_force: float) -> Entity:
             entity.state.p_vel * (1 - world.damping)
             + (p_force / entity.mass) * world.dt
         )
+
         return jax.lax.cond(
             entity.max_speed is None,
             lambda *_: vel,
-            lambda *_: clamp_vel,
+            lambda vel, max_speed: clamp_vel(vel, max_speed),
             vel,
             entity.max_speed,
         )
 
-    # if entity.max_speed is not None:
-    #     speed = jnp.sqrt(
-    #         jnp.square(entity.state.p_vel[0]) + jnp.square(entity.state.p_vel[1])
-    #     )
-    #     if speed > entity.max_speed:
-    #         entity.state.p_vel = (
-    #             entity.state.p_vel
-    #             / jnp.sqrt(
-    #                 jnp.square(entity.state.p_vel[0])
-    #                 + jnp.square(entity.state.p_vel[1])
-    #             )
-    #             * entity.max_speed
-    #         )
-    entity.state.p_pos += entity.state.p_vel * world.dt
-
-    return entity
+    vel = jax.lax.cond(
+        entity.movable & (entity.max_speed is not None),
+        calc_vel,
+        lambda *_: jnp.zeros(entity.state.p_vel.shape),
+        entity,
+    )
+    pos = entity.state.p_pos + vel * world.dt
+    return entity.replace(state=entity.state.replace(p_pos=pos, p_vel=vel))
 
 
 # integrate physical state

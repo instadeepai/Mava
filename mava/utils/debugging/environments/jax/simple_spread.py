@@ -85,15 +85,17 @@ class Scenario(BaseScenario):
         distance = self.dist(other_agent.state.p_pos, landmark.state.p_pos)
 
         # Cap distance
-        distance = min(distance, 1.0)
+        distance = jnp.min(jnp.array([distance, 1.0]))
         rew += 1 - distance
 
         if agent.collide:
             for other in world.agents:
                 if other is agent:
                     continue
-                if self.is_collision(other, agent):
-                    rew -= 1
+
+                rew = jax.lax.cond(
+                    self.is_collision(other, agent), lambda: rew - 1, lambda: rew
+                )
 
         return rew
 
