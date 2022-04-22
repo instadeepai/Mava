@@ -14,6 +14,7 @@
 # limitations under the License.
 from typing import Dict, Mapping, Optional, Sequence, Union
 
+import sonnet as snt
 from acme import types
 from dm_env import specs
 
@@ -36,6 +37,7 @@ def make_default_networks(
     net_spec_keys: Dict[str, str] = {},
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
+    observation_network: snt.Module = None,
     sigma: float = 0.3,
     architecture_type: ArchitectureType = ArchitectureType.feedforward,
     num_atoms: int = 51,
@@ -76,6 +78,7 @@ def make_default_networks(
         net_spec_keys=net_spec_keys,
         policy_networks_layer_sizes=policy_networks_layer_sizes,
         critic_networks_layer_sizes=critic_networks_layer_sizes,
+        observation_network=observation_network,
         sigma=sigma,
         architecture_type=architecture_type,
         vmin=vmin,
