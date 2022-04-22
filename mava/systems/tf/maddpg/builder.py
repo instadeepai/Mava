@@ -206,13 +206,13 @@ class MADDPGBuilder:
         return env_adder_spec
 
     def covert_specs(
-        self, spec: Dict[str, Any], networks_used_by_trainer: List
+        self, spec: Dict[str, Any], trainer_network_names: List
     ) -> Dict[str, Any]:
         if type(spec) is not dict:
             return spec
 
         agents = []
-        for network in networks_used_by_trainer:
+        for network in trainer_network_names:
             agents.append(self._config.net_spec_keys[network])
 
         agents = sort_str_num(agents)
@@ -225,7 +225,7 @@ class MADDPGBuilder:
             # For the extras
             for key in spec.keys():
                 converted_spec[key] = self.covert_specs(
-                    spec[key], networks_used_by_trainer
+                    spec[key], trainer_network_names
                 )
         return converted_spec
 
@@ -293,20 +293,18 @@ class MADDPGBuilder:
             # TODO (dries): Clean the below coverter code up.
             # Convert a Mava spec
 
-            networks_used_by_trainer = self._config.table_network_config[table_key]
+            trainer_network_names = self._config.table_network_config[table_key]
             env_spec = copy.deepcopy(env_adder_spec)
-            env_spec._specs = self.covert_specs(
-                env_spec._specs, networks_used_by_trainer
-            )
+            env_spec._specs = self.covert_specs(env_spec._specs, trainer_network_names)
 
             env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
             if env_spec.extra_specs is not None:
                 env_spec.extra_specs = self.covert_specs(
-                    env_spec.extra_specs, networks_used_by_trainer
+                    env_spec.extra_specs, trainer_network_names
                 )
             extra_specs = self.covert_specs(
                 self._extra_specs,
-                networks_used_by_trainer,
+                trainer_network_names,
             )
 
             replay_tables.append(
