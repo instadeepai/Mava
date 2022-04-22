@@ -435,12 +435,11 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             self._fix_sampler,
         )
 
-        if self._store_recurrent_state:
-            numpy_states = {
-                agent: tf2_utils.to_numpy_squeeze(_state)
-                for agent, _state in self._states.items()
-            }
-            extras.update({"core_states": numpy_states})
+        numpy_states = {
+            agent: tf2_utils.to_numpy_squeeze(_state)
+            for agent, _state in self._states.items()
+        }
+        extras.update({"core_states": numpy_states})
         extras["network_int_keys"] = self._network_int_keys_extras
         self._adder.add_first(timestep, extras)
 
@@ -463,12 +462,11 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             return
         _, policy = actions
 
-        if self._store_recurrent_state:
-            numpy_states = {
-                agent: tf2_utils.to_numpy_squeeze(_state)
-                for agent, _state in self._states.items()
-            }
-            next_extras.update({"core_states": numpy_states})
+        numpy_states = {
+            agent: tf2_utils.to_numpy_squeeze(_state)
+            for agent, _state in self._states.items()
+        }
+        next_extras.update({"core_states": numpy_states})
         next_extras["network_int_keys"] = self._network_int_keys_extras
         self._adder.add(policy, next_timestep, next_extras)  # type: ignore
 
