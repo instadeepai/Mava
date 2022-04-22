@@ -16,6 +16,7 @@
 """Abstract base class used to build new system components."""
 
 from abc import ABC
+from typing import Callable, Optional
 
 from mava.core_jax import (
     SystemBuilder,
@@ -391,4 +392,9 @@ class Callback(ABC):
 
     def on_parameter_server_run_loop_end(self, server: SystemParameterServer) -> None:
         """[summary]"""
+        pass
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Optional class which specifies the dataclass/config object for the component."""  # noqa: E501
         pass

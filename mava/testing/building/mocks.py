@@ -49,29 +49,7 @@ from tests.mocks import (
     SequentialMADiscreteEnvironment,
 )
 
-
 # Mock components to feed to the builder
-@dataclass
-class MockAdderSignatureConfig:
-    adder_signature_param: int = 1
-
-
-class MockAdderSignature(Callback):
-    def __init__(
-        self,
-        config: MockAdderSignatureConfig = MockAdderSignatureConfig(),
-    ) -> None:
-        """Mock system component."""
-        self.config = config
-
-    def on_building_data_server_adder_signature(self, builder: SystemBuilder) -> None:
-        """_summary_"""
-        builder.store.adder_signature_fn = self.config.adder_signature_param
-
-    @staticmethod
-    def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
-        return "adder_signature"
 
 
 @dataclass
@@ -155,12 +133,15 @@ def make_fake_env_specs() -> MAEnvironmentSpec:
 def make_fake_env(
     env_name: MockedEnvironments = MockedEnvironments.Mocked_Dicrete,
     env_type: EnvType = EnvType.Parallel,
+    evaluation: bool = False,
 ) -> Any:
     """Func that creates a fake env.
 
     Args:
         env_name : env name.
         env_type : type of env.
+        evaluation: whether env is used for eval or not.
+            Not sure we should use this in spec.
 
     Raises:
         Exception: no matching env.
@@ -168,6 +149,7 @@ def make_fake_env(
     Returns:
         mock env.
     """
+    del evaluation
     if env_name is MockedEnvironments.Mocked_Dicrete:
         if env_type == EnvType.Parallel:
             env = ParallelMADiscreteEnvironment(
@@ -379,10 +361,16 @@ class MockOnPolicyDataServer(MockDataServer):
         Returns:
             mock reverb table.
         """
+        if builder.store.__dict__.get("sequence_length"):
+            signature = builder.store.adder_signature_fn(
+                environment_spec, builder.store.sequence_length, extras_spec
+            )
+        else:
+            signature = builder.store.adder_signature_fn(environment_spec, extras_spec)
         return mock_queue(
             name=table_key,
             max_queue_size=self.config.max_queue_size,
-            signature=builder.store.adder_signature_fn(environment_spec, extras_spec),
+            signature=signature,
         )
 
     @staticmethod
@@ -565,6 +553,15 @@ class MockTrainerParameterClient(Callback):
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "trainer_parameter_client"
 
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return MockTrainerParameterClientConfig
+
 
 @dataclass
 class MockExecutorDefaultConfig:
@@ -595,7 +592,6 @@ class MockExecutor(Callback):
 
 @dataclass
 class MockExecutorEnvironmentLoopConfig:
-    environment_factory: str = "param"
     should_update: bool = True
 
 
@@ -609,19 +605,13 @@ class MockExecutorEnvironmentLoop(Callback):
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
-        if not isinstance(self.config.environment_factory, str):
-            builder.store.executor_environment = self.config.environment_factory(
-                evaluation=False
-            )  # type: ignore
-            builder.store.environment_spec = specs.MAEnvironmentSpec(
-                builder.store.executor_environment
-            )
-        else:
-            # Just assign a None for the environment for testing.
-            builder.store.executor_environment = None
+        pass
 
     def on_building_executor_environment(self, builder: SystemBuilder) -> None:
         """_summary_"""
+        builder.store.executor_environment = self.config.environment_factory(  # type: ignore # noqa: E501
+            evaluation=False
+        )
 
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
         """_summary_"""
@@ -643,11 +633,19 @@ class MockExecutorEnvironmentLoop(Callback):
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "executor_environment_loop"
 
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return MockExecutorEnvironmentLoopConfig
+
 
 @dataclass
 class MockNetworksConfig:
     network_factory: Optional[Callable[[str], dm_env.Environment]] = None
-    shared_weights: bool = True
     seed: int = 1234
 
 
@@ -661,8 +659,6 @@ class MockNetworks(Callback):
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """Summary"""
-        # Set the shared weights
-        builder.store.shared_networks = self.config.shared_weights
 
         # Setup the jax key for network initialisations
         builder.store.key = jax.random.PRNGKey(self.config.seed)
@@ -681,6 +677,15 @@ class MockNetworks(Callback):
     def name() -> str:
         """_summary_"""
         return "networks"
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return MockNetworksConfig
 
 
 @dataclass
@@ -708,6 +713,15 @@ class MockTrainerDataset(Callback):
     def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "trainer_dataset"
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return MockTrainerDatasetConfig
 
 
 @dataclass
