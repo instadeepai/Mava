@@ -455,10 +455,8 @@ class MADDPGBaseTrainer(mava.Trainer):
             agent_key = self._agent_net_keys[agent]
 
             # Get trainable variables.
-            policy_variables = (
-                self._observation_networks[agent_key].trainable_variables
-                + self._policy_networks[agent_key].trainable_variables
-            )
+            # Note: policy does not update the shared obs network
+            policy_variables = self._policy_networks[agent_key].trainable_variables
             critic_variables = (
                 # In this agent, the critic loss trains the observation network.
                 self._observation_networks[agent_key].trainable_variables
@@ -1406,10 +1404,9 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             agent_key = self._agent_net_keys[agent]
 
             # Get trainable variables.
-            policy_variables = (
-                self._observation_networks[agent_key].trainable_variables
-                + self._policy_networks[agent_key].trainable_variables
-            )
+            # Note: policy does not update the shared obs network
+            policy_variables = self._policy_networks[agent_key].trainable_variables
+
             critic_variables = (
                 # In this agent, the critic loss trains the observation network.
                 self._observation_networks[agent_key].trainable_variables
