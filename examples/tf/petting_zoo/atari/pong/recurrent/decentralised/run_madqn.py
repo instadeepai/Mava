@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Example running recurrent MADQN on Atari Pong."""
+# You will need to install AutoRom, follow instructions in OPTIONAL_INSTALL.md.
 
 import functools
 from datetime import datetime

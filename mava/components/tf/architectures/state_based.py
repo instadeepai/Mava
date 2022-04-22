@@ -26,6 +26,7 @@ from mava import specs as mava_specs
 from mava.components.tf.architectures.decentralised import (
     DecentralisedPolicyActor,
     DecentralisedQValueActorCritic,
+    DecentralisedValueActorCritic,
 )
 
 
@@ -55,7 +56,7 @@ class StateBasedPolicyActor(DecentralisedPolicyActor):
         agents_by_type = self._env_spec.get_agents_by_type()
 
         for agent_type, agents in agents_by_type.items():
-            actor_state_shape = self._env_spec.get_extra_specs()["s_t"].shape
+            actor_state_shape = self._env_spec.get_extra_specs()["env_states"].shape
             obs_specs_per_type[agent_type] = tf.TensorSpec(
                 shape=actor_state_shape,
                 dtype=tf.dtypes.float32,
@@ -98,11 +99,27 @@ class StateBasedQValueCritic(DecentralisedQValueActorCritic):
 
         # Create one critic per agent. Each critic gets
         # absolute state information of the environment.
-        critic_state_shape = self._env_spec.get_extra_specs()["s_t"].shape
-        critic_obs_spec = tf.TensorSpec(
-            shape=critic_state_shape,
-            dtype=tf.dtypes.float32,
-        )
+        critic_env_state_spec = self._env_spec.get_extra_specs()["env_states"]
+        if type(critic_env_state_spec) == dict:
+            critic_env_state_spec = list(critic_env_state_spec.values())[0]
+
+        if type(critic_env_state_spec) != list:
+            critic_env_state_spec = [critic_env_state_spec]
+
+        critic_obs_spec = []
+        for spec in critic_env_state_spec:
+            critic_obs_spec.append(
+                tf.TensorSpec(
+                    shape=spec.shape,
+                    dtype=tf.dtypes.float32,
+                )
+            )
+
+        # TODO (dries): Fix the line below and remove the assert.
+        # Don't assume len(critic_obs_spec) == 1.
+        assert len(critic_obs_spec) == 1
+        critic_obs_spec = critic_obs_spec[0]
+
         for agent_type, agents in agents_by_type.items():
             critic_act_shape = list(
                 copy.copy(self._agent_specs[agents[0]].actions.shape)
@@ -117,9 +134,10 @@ class StateBasedQValueCritic(DecentralisedQValueActorCritic):
         critic_act_specs = {}
         for agent_key in self._agents:
             agent_type = agent_key.split("_")[0]
+            net_key = self._agent_net_keys[agent_key]
             # Get observation and action spec for critic.
-            critic_obs_specs[agent_key] = critic_obs_spec
-            critic_act_specs[agent_key] = action_specs_per_type[agent_type]
+            critic_obs_specs[net_key] = critic_obs_spec
+            critic_act_specs[net_key] = action_specs_per_type[agent_type]
         return critic_obs_specs, critic_act_specs
 
 
@@ -146,6 +164,62 @@ class StateBasedQValueActorCritic(  # type: ignore
             critic_networks=critic_networks,
             agent_net_keys=agent_net_keys,
         )
+
+
+class StateBasedValueActorCritic(DecentralisedValueActorCritic):  # type: ignore
+    """Multi-agent actor critic architecture where both actor policies
+    and critics use environment state information"""
+
+    def __init__(
+        self,
+        environment_spec: mava_specs.MAEnvironmentSpec,
+        observation_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
+        critic_networks: Dict[str, snt.Module],
+        agent_net_keys: Dict[str, str],
+    ):
+        DecentralisedValueActorCritic.__init__(
+            self,
+            environment_spec=environment_spec,
+            observation_networks=observation_networks,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            agent_net_keys=agent_net_keys,
+        )
+
+    def _get_critic_specs(
+        self,
+    ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
+        # Create one critic per agent. Each critic gets
+        # absolute state information of the environment.
+
+        critic_env_state_spec = self._env_spec.get_extra_specs()["env_states"]
+        if type(critic_env_state_spec) == dict:
+            critic_env_state_spec = list(critic_env_state_spec.values())[0]
+
+        if type(critic_env_state_spec) != list:
+            critic_env_state_spec = [critic_env_state_spec]
+
+        critic_obs_spec = []
+        for spec in critic_env_state_spec:
+            critic_obs_spec.append(
+                tf.TensorSpec(
+                    shape=spec.shape,
+                    dtype=tf.dtypes.float32,
+                )
+            )
+
+        # TODO (dries): Fix the line below and remove the assert.
+        # Don't assume len(critic_obs_spec) == 1.
+        assert len(critic_obs_spec) == 1
+        critic_obs_spec = critic_obs_spec[0]
+
+        critic_obs_specs = {}
+        for agent_key in self._agents:
+            # Get observation spec for critic.
+            net_key = self._agent_net_keys[agent_key]
+            critic_obs_specs[net_key] = critic_obs_spec
+        return critic_obs_specs, None  # type: ignore
 
 
 class StateBasedQValueSingleActionCritic(DecentralisedQValueActorCritic):
@@ -211,7 +285,8 @@ class StateBasedQValueSingleActionCritic(DecentralisedQValueActorCritic):
         critic_act_specs = {}
         for agent_key in self._agents:
             agent_type = agent_key.split("_")[0]
+            net_key = self._agent_net_keys[agent_key]
             # Get observation and action spec for critic.
-            critic_obs_specs[agent_key] = critic_obs_spec
-            critic_act_specs[agent_key] = action_specs_per_type[agent_type]
+            critic_obs_specs[net_key] = critic_obs_spec
+            critic_act_specs[net_key] = action_specs_per_type[agent_type]
         return critic_obs_specs, critic_act_specs
