@@ -172,13 +172,13 @@ class MADQNBuilder:
         self._executor_fn = executor_fn
 
     def convert_specs(
-        self, spec: Dict[str, Any], list_of_networks: List
+        self, spec: Dict[str, Any], trainer_network_names: List
     ) -> Dict[str, Any]:
         """Convert specs.
 
         Args:
             spec: agent specs
-            list_of_networks: the list of networks each trainer uses.
+            trainer_network_names: the list of networks each trainer uses.
 
         Returns:
             converted specs
@@ -187,7 +187,7 @@ class MADQNBuilder:
             return spec
 
         agents = []
-        for network in list_of_networks:
+        for network in trainer_network_names:
             agents.append(self._config.net_spec_keys[network])
 
         agents = sort_str_num(agents)
@@ -198,7 +198,9 @@ class MADQNBuilder:
         else:
             # For the extras
             for key in spec.keys():
-                converted_spec[key] = self.convert_specs(spec[key], list_of_networks)
+                converted_spec[key] = self.convert_specs(
+                    spec[key], trainer_network_names
+                )
         return converted_spec
 
     def make_replay_tables(
@@ -262,18 +264,18 @@ class MADQNBuilder:
         for table_key in self._config.table_network_config.keys():
             # TODO (dries): Clean the below coverter code up.
             # Convert a Mava spec
-            list_of_networks = self._config.table_network_config[table_key]
+            trainer_network_names = self._config.table_network_config[table_key]
             env_spec = copy.deepcopy(environment_spec)
-            env_spec._specs = self.convert_specs(env_spec._specs, list_of_networks)
+            env_spec._specs = self.convert_specs(env_spec._specs, trainer_network_names)
 
             env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
             if env_spec.extra_specs is not None:
                 env_spec.extra_specs = self.convert_specs(
-                    env_spec.extra_specs, list_of_networks
+                    env_spec.extra_specs, trainer_network_names
                 )
             extra_specs = self.convert_specs(
                 self._extra_specs,
-                list_of_networks,
+                trainer_network_names,
             )
 
             replay_tables.append(
