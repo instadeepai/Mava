@@ -135,6 +135,8 @@ ENV SC2PATH /home/app/mava/3rdparty/StarCraftII
 # Flatland Image
 FROM jax-core AS flatland-jax
 RUN pip install -e .[flatland]
+# To fix module 'jaxlib.xla_extension' has no attribute '__path__'
+RUN pip install cloudpickle -U
 ##########################################################
 
 #########################################################
