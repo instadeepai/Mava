@@ -55,9 +55,9 @@ class ExecutorInit(Component):
                 # to all agents of the same type if weights are shared
                 # else assign seperate networks to each agent
                 builder.store.agent_net_keys = {
-                    agent: f"network_{agent.split('_')[0]}"
+                    agent: f"network_{agent.type}"
                     if self.config.shared_weights
-                    else f"network_{agent}"
+                    else f"network_{agent.id}"
                     for agent in builder.store.agents
                 }
                 builder.store.network_sampling_setup = [
