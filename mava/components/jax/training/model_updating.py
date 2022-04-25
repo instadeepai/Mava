@@ -132,7 +132,6 @@ class MAPGMinibatchUpdate(Utility):
 class MAPGEpochUpdateConfig:
     num_epochs: int = 4
     num_minibatches: int = 1
-    batch_size: int = 256
 
 
 class MAPGEpochUpdate(Utility):
@@ -161,8 +160,14 @@ class MAPGEpochUpdate(Utility):
         ]:
             """Performs model updates based on one epoch of data."""
             key, params, opt_states, batch = carry
+
+            # Note (dries): Assuming the batch and sequence dimensions are flattened.
+            full_batch_size = trainer.store.sample_batch_size * (
+                trainer.store.sequence_length - 1
+            )
+
             new_key, subkey = jax.random.split(key)
-            permutation = jax.random.permutation(subkey, self.config.batch_size)
+            permutation = jax.random.permutation(subkey, full_batch_size)
 
             shuffled_batch = jax.tree_map(
                 lambda x: jnp.take(x, permutation, axis=0), batch
