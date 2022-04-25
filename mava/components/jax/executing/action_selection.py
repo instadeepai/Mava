@@ -127,6 +127,7 @@ class MCTSFeedforwardExecutorSelectAction(Component):
         ]
 
         observation = executor.store.observation.observation.reshape((1, -1))
+
         rng_key, executor.store.key = jax.random.split(executor.store.key)
 
         # TODO (dries): We are currently using jit in the networks per agent.
@@ -134,7 +135,11 @@ class MCTSFeedforwardExecutorSelectAction(Component):
         # allow the jit function to save us even more time.
 
         executor.store.action_info, executor.store.policy_info = self.mcts.get_action(
-            network.forward_fn, network.params, rng_key, observation
+            network.forward_fn,
+            network.params,
+            rng_key,
+            observation,
+            executor.store.observation.legal_actions,
         )
 
     @property

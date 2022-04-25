@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Optional, Tuple, Union
 
 import chex
+import jax.numpy as jnp
 import mctx
 import numpy as np
 from haiku import Params
@@ -22,7 +23,6 @@ TreeSearch = Callable[
 ]
 
 
-@dataclass
 class MCTS:
     """TODO: Add description here."""
 
@@ -30,45 +30,43 @@ class MCTS:
         """TODO: Add description here."""
         self.config = config
 
-    def get_action(self, forward_fn, params, rng_key, observation, **kwargs):
+    def get_action(self, forward_fn, params, rng_key, observation, action_mask):
         """TODO: Add description here."""
-        search_out = self.search(forward_fn, params, rng_key, observation, **kwargs)
+
+        search_out = self.search(forward_fn, params, rng_key, observation, action_mask)
 
         return (
-            np.squeeze(np.array(search_out.action, np.int64)),
-            {"search_policies": np.squeeze(np.array(search_out.action_weights))},
+            jnp.squeeze(search_out.action),
+            {"search_policies": jnp.squeeze(search_out.action_weights)},
         )
 
-    def search(self, forward_fn, params, rng_key, observation, **kwargs):
+    @functools.partial(jit, static_argnums=(0, 1))
+    @chex.assert_max_traces(n=1)
+    def search(self, forward_fn, params, rng_key, observation, action_mask):
         """TODO: Add description here."""
 
-        def perform_search(params, rng_key, observation):
-            forward_w_params = functools.partial(forward_fn, params=params)
+        root = self.config.root_fn(forward_fn, params, rng_key, observation)
 
-            def search_recurrent_fn(params, rng_key, action, observation):
-                return self.config.recurrent_fn(
-                    self.config.environment_model,
-                    forward_w_params,
-                    rng_key,
-                    action,
-                    observation,
-                    **kwargs,
-                )
+        def recurrent_fn(params, rng_key, action, embedding):
 
-            root_output = self.config.root_fn(forward_w_params, rng_key, observation)
-
-            search_output = self.config.search(
+            return self.config.recurrent_fn(
+                self.config.environment_model,
+                forward_fn,
                 params,
                 rng_key,
-                root_output,
-                search_recurrent_fn,
-                self.config.num_simulations,
-                self.config.max_depth,
+                action,
+                embedding,
             )
-            return search_output
 
-        jitted_perform_search = jit(perform_search)
-
-        search_output = jitted_perform_search(params, rng_key, observation)
+        print(action_mask)
+        search_output = self.config.search(
+            params=params,
+            rng_key=rng_key,
+            root=root,
+            recurrent_fn=recurrent_fn,
+            num_simulations=self.config.num_simulations,
+            invalid_actions=1 - action_mask.reshape(1, -1),
+            max_depth=self.config.max_depth,
+        )
 
         return search_output

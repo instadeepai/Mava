@@ -620,6 +620,7 @@ class JAXParallelEnvironmentLoop(acme.core.Worker):
         logger: loggers.Logger = None,
         should_update: bool = True,
         label: str = "parallel_environment_loop",
+        rng_seed: int = 0,
     ):
         """Parallel environment loop init
 
@@ -633,6 +634,10 @@ class JAXParallelEnvironmentLoop(acme.core.Worker):
         """
         # Internalize agent and environment.
         self._environment = environment
+
+        self.jitted_reset_fn = jax.jit(self._environment.reset)
+        self.jitted_step_fn = jax.jit(self._environment.step)
+
         self._executor = executor
         self._counter = counter or counting.Counter()
         self._logger = logger or loggers.make_default_logger(label)
@@ -642,6 +647,8 @@ class JAXParallelEnvironmentLoop(acme.core.Worker):
 
         # We need this to schedule evaluation/test runs
         self._last_evaluator_run_t = -1
+
+        self.rng_key = jax.random.PRNGKey(rng_seed)
 
     def _get_actions(self, timestep: dm_env.TimeStep) -> Any:
         return self._executor.select_actions(timestep.observation)
@@ -692,7 +699,7 @@ class JAXParallelEnvironmentLoop(acme.core.Worker):
 
         return counts
 
-    def run_episode(self, rng_key: PRNGKey) -> loggers.LoggingData:
+    def run_episode(self) -> loggers.LoggingData:
         """Run one episode.
 
         Each episode is a loop which interacts first with the environment to get a
@@ -707,9 +714,9 @@ class JAXParallelEnvironmentLoop(acme.core.Worker):
         start_time = time.time()
         episode_steps = 0
 
-        rng_key, reset_key = random.split(rng_key)
+        self.rng_key, reset_key = random.split(self.rng_key)
 
-        state, timestep, extras = self._environment.reset(reset_key)
+        state, timestep, extras = self.jitted_reset_fn(reset_key)
 
         if type(timestep) == tuple:
             timestep, env_extras = timestep
@@ -740,7 +747,7 @@ class JAXParallelEnvironmentLoop(acme.core.Worker):
             else:
                 env_actions = actions
 
-            state, timestep, extras = self._environment.step(state, env_actions)
+            state, timestep, extras = self.jitted_step_fn(state, env_actions)
 
             if type(timestep) == tuple:
                 timestep, env_extras = timestep
@@ -799,16 +806,15 @@ class JAXParallelEnvironmentLoop(acme.core.Worker):
             result.update(counts)
             return result
 
-    def run_episode_and_log(self, rng_key: PRNGKey) -> loggers.LoggingData:
+    def run_episode_and_log(self) -> loggers.LoggingData:
         """_summary_"""
 
-        results = self.run_episode(rng_key)
+        results = self.run_episode()
         self._logger.write(results)
         return results
 
     def run(
         self,
-        rng_key: PRNGKey,
         num_episodes: Optional[int] = None,
         num_steps: Optional[int] = None,
     ) -> None:
@@ -876,8 +882,7 @@ class JAXParallelEnvironmentLoop(acme.core.Worker):
 
         while not should_terminate(episode_count, step_count):
             if (not environment_loop_schedule) or should_run_loop(eval_condition):
-                rng_key, episode_key = random.split(rng_key)
-                result = self.run_episode(episode_key)
+                result = self.run_episode()
                 episode_count += 1
                 step_count += result["episode_length"]
                 # Log the given results.

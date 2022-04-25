@@ -94,6 +94,7 @@ class Launcher:
         if self._multi_process:
             with self._program.group(name):
                 node = self._program.add_node(node_type(node_fn, *arguments))
+
             return node
         else:
             if name not in self._node_dict:
@@ -139,7 +140,7 @@ class Launcher:
             lp.launch(
                 self._program,
                 lp.LaunchType.LOCAL_MULTI_PROCESSING,
-                terminal="current_terminal",
+                # terminal="current_terminal",
                 local_resources=local_resources,
             )
         else:
@@ -160,67 +161,6 @@ class Launcher:
                     print("Performed trainer step.")
                 if episode % self._sp_evaluator_period == 0:
                     _ = evaluator.run_episode_and_log()
-                    print("Performed evaluator run.")
-
-                print(f"Episode {episode} completed.")
-                episode += 1
-                executor_steps += executor_stats["episode_length"]
-
-
-class JaxLauncher(Launcher):
-    def __init__(
-        self,
-        multi_process: bool,
-        rng_key: PRNGKey,
-        nodes_on_gpu: List = [],
-        sp_trainer_period: int = 10,
-        sp_evaluator_period: int = 10,
-        name: str = "System",
-    ) -> None:
-        super().__init__(
-            multi_process, nodes_on_gpu, sp_trainer_period, sp_evaluator_period, name
-        )
-        self.rng_key = rng_key
-
-    def launch(self) -> None:
-        """_summary_
-
-        Raises:
-            NotImplementedError: _description_
-        """
-        if self._multi_process:
-            local_resources = lp_utils.to_device(
-                program_nodes=self._program.groups.keys(),
-                nodes_on_gpu=self._nodes_on_gpu,
-            )
-
-            lp.launch(
-                self._program,
-                lp.LaunchType.LOCAL_MULTI_PROCESSING,
-                terminal="current_terminal",
-                local_resources=local_resources,
-            )
-        else:
-            episode = 1
-            executor_steps = 0
-
-            _ = self._node_dict["data_server"]
-            _ = self._node_dict["parameter_server"]
-            executor = self._node_dict["executor"]
-            evaluator = self._node_dict["evaluator"]
-            trainer = self._node_dict["trainer"]
-
-            while True:
-                self.rng_key, executor_key, evaluator_key = random.split(
-                    self.rng_key, 3
-                )
-                executor_stats = executor.run_episode_and_log(executor_key)
-
-                if episode % self._sp_trainer_period == 0:
-                    _ = trainer.step()  # logging done in trainer
-                    print("Performed trainer step.")
-                if episode % self._sp_evaluator_period == 0:
-                    _ = evaluator.run_episode_and_log(evaluator_key)
                     print("Performed evaluator run.")
 
                 print(f"Episode {episode} completed.")

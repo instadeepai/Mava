@@ -43,7 +43,7 @@ class MAMCTSSystem(System):
             executor_observe=executing.FeedforwardExecutorObserve,
             executor_select_action=executing.MCTSFeedforwardExecutorSelectAction,
             executor_adder=building.ParallelSequenceAdder,
-            executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
+            executor_environment_loop=building.JAXParallelExecutorEnvironmentLoop,
             networks=building.DefaultNetworks,
         ).get()
 
@@ -78,7 +78,7 @@ class MAMCTSSystem(System):
             **parameter_server_process,
             **executor_process,
             **trainer_process,
-            distributor=building.JaxDistributor,
+            distributor=building.Distributor,
             logger=building.Logger,
         )
         return system, default_params

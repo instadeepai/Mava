@@ -23,7 +23,7 @@ from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 
 
-# TODO remove mcts hardcodedness - sasha is a knob
+# TODO remove mcts hardcodedness
 @dataclass
 class ExtraSearchPolicySpecConfig:
     num_actions: int = 5

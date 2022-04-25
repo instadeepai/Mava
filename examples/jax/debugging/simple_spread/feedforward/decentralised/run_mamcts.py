@@ -18,18 +18,21 @@ import functools
 from datetime import datetime
 from typing import Any
 
+import chex
+import jax
 import jax.numpy as jnp
 import mctx
 import numpy as np
 import optax
 from absl import app, flags
-from acme.agents.tf.mcts.models.simulator import Simulator
 from jumanji.jax.pcb_grid.env import PcbGridEnv
+from jumanji.jax.pcb_grid.types import State
 from mctx import RecurrentFnOutput, RootFnOutput
 
 from mava.systems.jax import mamcts
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
+from mava.wrappers.JaxPCBGridEnvMavaWrapper import PcbGridEnvWrapper
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -51,6 +54,25 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
+def make_environment(
+    rows=3,
+    cols=3,
+    evaluation: bool = None,
+    num_agents: int = 1,
+):
+
+    return PcbGridEnvWrapper(
+        PcbGridEnv(
+            rows,
+            cols,
+            num_agents,
+            reward_for_connection=1.0,
+            reward_for_blocked=-1.0,
+            reward_per_timestep=-1.0 / 10,
+        )
+    )
+
+
 def main(_: Any) -> None:
     """Run main script
 
@@ -59,31 +81,50 @@ def main(_: Any) -> None:
     """
     # Environment.
     environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
+        make_environment,
     )
 
-    def root_fn(forward_fn, key, state):
+    @chex.assert_max_traces(n=1)
+    def root_fn(forward_fn, params, key, embedding):
 
-        prior_logits, values = forward_fn(observations=state)
+        prior_logits, values = forward_fn(observations=embedding, params=params)
 
         return RootFnOutput(
             prior_logits=prior_logits.logits,
             value=values,
-            embedding=state,
+            embedding=embedding,
         )
 
+    @chex.assert_max_traces(n=1)
     def recurrent_fn(
-        environment_model, forward_fn, rng_key, action, state
+        environment_model: PcbGridEnvWrapper,
+        forward_fn,
+        params,
+        rng_key,
+        action,
+        observation,
     ) -> RecurrentFnOutput:
 
-        # next_state, timestep, _ = environment_model.step(state, action)
-        next_state = state
-        prior_logits, values = forward_fn(observations=state)
+        state = State(
+            key=rng_key,
+            grid=observation.reshape(environment_model.rows, environment_model.cols),
+            step=0,
+            finished_agents=environment_model.get_finished_agents(
+                observation.reshape(environment_model.rows, environment_model.cols)
+            ),
+        )
+        actions = {f"agent_{0}": action}
 
-        reward = jnp.array([0])  # timestep.reward,
-        discount = jnp.array([0])  # timestep.discount,
+        next_state, timestep, _ = environment_model.step(state, actions)
+
+        prior_logits, values = forward_fn(observations=observation, params=params)
+
+        reward = timestep.reward["agent_0"].reshape(
+            1,
+        )
+        discount = timestep.discount["agent_0"].reshape(
+            1,
+        )
 
         return (
             RecurrentFnOutput(
@@ -92,7 +133,7 @@ def main(_: Any) -> None:
                 prior_logits=prior_logits.logits,
                 value=values,
             ),
-            next_state,
+            next_state.grid.reshape(1, -1),
         )
 
     # Networks.
@@ -134,15 +175,20 @@ def main(_: Any) -> None:
         checkpoint_subpath=checkpoint_subpath,
         optimizer=optimizer,
         run_evaluator=True,
-        sample_batch_size=5,
-        num_epochs=1,
+        sample_batch_size=256,
+        batch_size=256,
+        num_minibatches=2,
+        num_epochs=2,
         num_executors=1,
         multi_process=True,
         root_fn=root_fn,
         recurrent_fn=recurrent_fn,
         search=mctx.gumbel_muzero_policy,
         environment_model=environment_factory(),
-        num_simulations=1,
+        num_simulations=20,
+        rng_seed=0,
+        learning_rate=0.001,
+        n_step=5,
     )
 
     # Launch the system.

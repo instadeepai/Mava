@@ -283,7 +283,7 @@ class MAMCTSMinibatchUpdate(Utility):
 
 @dataclass
 class MAMCTSEpochUpdateConfig:
-    num_epochs: int = 4
+    num_epochs: int = 1
     num_minibatches: int = 1
     batch_size: int = 256
 
@@ -313,8 +313,10 @@ class MAMCTSEpochUpdate(Utility):
             Tuple[KeyArray, Any, optax.OptState, MCTSBatch],
             Dict[str, jnp.ndarray],
         ]:
+
             """Performs model updates based on one epoch of data."""
             key, params, opt_states, batch = carry
+
             new_key, subkey = jax.random.split(key)
             permutation = jax.random.permutation(subkey, self.config.batch_size)
 
