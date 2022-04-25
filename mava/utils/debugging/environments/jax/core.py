@@ -9,14 +9,7 @@ import jax
 import jax.random as jrand
 import jax.numpy as jnp
 
-
-@chex.dataclass(frozen=True)
-class EntityId:
-    id: int
-    type: int
-
-    def __lt__(self, other):
-        return self.id * self.type < other.id * other.type
+from mava.utils.id_utils import EntityId
 
 
 @chex.dataclass

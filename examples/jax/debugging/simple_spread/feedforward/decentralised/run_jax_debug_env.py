@@ -1,16 +1,10 @@
-import random
 import time
-from typing import Optional
 
 import jax
-from gym import Space
 
 from mava.utils.debugging.environments.jax.core import JaxWorld, EntityId
 from mava.utils.debugging.environments.jax.simple_spread import Scenario, make_world
-from mava.utils.debugging.environments.jax_debug_env import MultiAgentJaxEnv
-
-from mava.utils.debugging.make_env import make_debugging_env
-
+from mava.utils.debugging.environments.jax.debug_env_base import MultiAgentJaxEnv
 
 scenario_name = "simple_spread"
 action_space = "discrete"

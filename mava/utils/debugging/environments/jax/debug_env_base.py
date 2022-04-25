@@ -17,6 +17,7 @@
 # TODO (dries): Try using this class directly from PettingZoo and delete this file.
 # type: ignore
 import copy
+from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Tuple, Union
 
 import gym
@@ -34,12 +35,12 @@ from mava.utils.debugging.environments.jax.core import (
     EntityId,
 )
 
-from ..multi_discrete import MultiDiscrete
+from mava.utils.debugging.multi_discrete import MultiDiscrete
 
 
 # environment for all agents in the multiagent world
 # currently code assumes that no agents will be created/destroyed at runtime!
-class MultiAgentJaxEnv(gym.Env):
+class MultiAgentJaxEnvBase(gym.Env, ABC):
     metadata = {"render.modes": ["human", "rgb_array"]}
 
     def __init__(
@@ -225,12 +226,8 @@ class MultiAgentJaxEnv(gym.Env):
         )
 
     # set env action for a particular agent
-    def _process_action(
-        self,
-        action: int,
-        agent: Agent,
-    ) -> Action:
-
+    @abstractmethod
+    def _process_action(self, action: int, agent: Agent) -> Action:
         agent.action.u = jnp.zeros(self.dim_p)
 
         def on_movable(act: Action):
