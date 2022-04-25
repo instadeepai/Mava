@@ -6,7 +6,7 @@ import typing
 import chex
 import jax.random
 
-from mava.utils.debugging.environments.jax.core import Agent, Landmark, Entity
+from mava.utils.debugging.environments.jax.core import Agent, Landmark, Entity, EntityId
 from mava.utils.debugging.environments.jax.core import JaxWorld
 import jax.numpy as jnp
 from functools import partial
@@ -20,16 +20,18 @@ def make_world(num_agents: int, key: RNG) -> JaxWorld:
     # set any world properties first
     num_landmarks = num_agents
     # add agents
-    agents = [Agent(name=i, collide=True, size=0.15) for i in range(num_agents)]
+    agents = [
+        Agent(name=EntityId(id=i, type=0), collide=True, size=0.15)
+        for i in range(num_agents)
+    ]
     # add landmarks
     landmarks = [
-        Landmark(name=i, collide=False, movable=False) for i in range(num_landmarks)
+        Landmark(name=EntityId(id=i, type=1), collide=False, movable=False)
+        for i in range(num_landmarks)
     ]
 
-    world = JaxWorld(key=key, agents=agents, landmarks=landmarks)
-
     # make initial conditions
-    return world
+    return JaxWorld(key=key, agents=agents, landmarks=landmarks)
 
 
 class Scenario(BaseScenario):

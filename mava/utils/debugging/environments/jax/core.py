@@ -1,13 +1,22 @@
 import abc
 import copy
 import typing
+from functools import partial
 from typing import List, Tuple, Union
 
 import chex
 import jax
 import jax.random as jrand
 import jax.numpy as jnp
-import numpy as np
+
+
+@chex.dataclass(frozen=True)
+class EntityId:
+    id: int
+    type: int
+
+    def __lt__(self, other):
+        return self.id * self.type < other.id * other.type
 
 
 @chex.dataclass
@@ -34,7 +43,7 @@ class Action:
 @chex.dataclass
 class Entity:
     # name
-    name: int = -1
+    name: EntityId
     # properties:
     size: float = 0.050
     # entity can move / be pushed
@@ -163,19 +172,16 @@ def apply_environment_force(world: JaxWorld, p_force: List[float]) -> List[float
     new_p_force = copy.deepcopy(p_force)
     for a, entity_a in enumerate(world.entities):
         for b, entity_b in enumerate(world.entities):
-            if b <= a:
-                f_a, f_b = get_collision_force(world, entity_a, entity_b)
-            else:
-                f_a, f_b = jnp.array([[0.0, 0.0], [0.0, 0.0]])
-            # f_a, f_b = jax.lax.cond(
-            #     b <= a,
-            #     lambda *_: jnp.array([[0.0, 0.0], [0.0, 0.0]]),
-            #     get_collision_force,
-            #     world,
-            #     entity_a,
-            #     entity_b,
-            # )
+            f_a, f_b = jax.lax.cond(
+                b <= a,
+                lambda *_: jnp.array([[0.0, 0.0], [0.0, 0.0]]),
+                get_collision_force,
+                world,
+                entity_a,
+                entity_b,
+            )
 
+            # ideally this should check if entity is movable, but that is not jittable
             if isinstance(entity_a, Agent):
                 new_p_force[a] += f_a
             if isinstance(entity_b, Agent):
@@ -221,18 +227,11 @@ def move_entity(world: JaxWorld, entity: Entity, p_force: float) -> Entity:
 # integrate physical state
 @typing.no_type_check
 def integrate_state(world: JaxWorld, p_force: List[float]) -> JaxWorld:
-    landmarks = []
-    agents = []
+    partial_move_entity = partial(move_entity, world)
+    # only calc movement for agent as landmarks aren't movable and don't receive p_forces
+    agents = list(map(partial_move_entity, world.agents, p_force))
 
-    for i, entity in enumerate(world.landmarks):
-        landmarks.append(move_entity(world, entity, p_force[i]))
-
-    for i, entity in enumerate(world.agents):
-        print(f"before:{entity.state.p_pos}")
-        agents.append(move_entity(world, entity, p_force[i]))
-        print(f"after:{agents[-1].state.p_pos}")
-
-    return world.replace(agents=agents, landmarks=landmarks)
+    return world.replace(agents=agents)
 
 
 # get collision forces for any contact between two entities
@@ -261,7 +260,3 @@ def get_collision_force(
         lambda: jnp.zeros((2, 2)),
         get_force,
     )
-    # if (not entity_a.collide) or (not entity_b.collide) or (entity_a is entity_b):
-    #     return jnp.zeros((2, 2))
-    # else:
-    #     return get_force()

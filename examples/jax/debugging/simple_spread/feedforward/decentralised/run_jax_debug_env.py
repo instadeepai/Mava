@@ -5,7 +5,7 @@ from typing import Optional
 import jax
 from gym import Space
 
-from mava.utils.debugging.environments.jax.core import JaxWorld
+from mava.utils.debugging.environments.jax.core import JaxWorld, EntityId
 from mava.utils.debugging.environments.jax.simple_spread import Scenario, make_world
 from mava.utils.debugging.environments.jax_debug_env import MultiAgentJaxEnv
 
@@ -14,10 +14,10 @@ from mava.utils.debugging.make_env import make_debugging_env
 
 scenario_name = "simple_spread"
 action_space = "discrete"
-num_agents = 2
+num_agents = 5
 
 # #--------------------------------------------------------------
-key = jax.random.PRNGKey(455)
+key = jax.random.PRNGKey(42)
 scenario = Scenario(make_world(num_agents, key))
 # if seed:
 #     scenario.seed(seed)
@@ -41,23 +41,15 @@ jitted_step = jax.jit(env.step)
 
 world, *_ = jitted_reset(world)
 for i in range(50):
-    # for j, agent in enumerate(world.agents):
-    #     print(f"[env loop] agent {j} {agent.state.p_pos}")
-
-    # world, *_ = env.reset(world)
-    act = {f"agent_{i}": jax.random.randint(key, (), 0, 5) for i in range(num_agents)}
-    world, *_ = jitted_step(
-        world,
-        act
-    )
-    # world, *_ = env.step(world, act)
-
-    # print('\n'.join(map(str, world.agents)))
-    # print()
-    # print()
+    key, *agent_keys = jax.random.split(key, num_agents + 1)
+    act = {
+        EntityId(id=i, type=0): jax.random.randint(agent_keys[i], (), 0, 5)
+        for i in range(num_agents)
+    }
+    world, *_ = jitted_step(world, act)
 
     env.render(world)
-    time.sleep(0.01)
+    time.sleep(0.1)
 
 # env = make_debugging_env("simple_spread", "discrete", 2)
 # env.reset()
