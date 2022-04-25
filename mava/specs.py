@@ -19,6 +19,7 @@ from typing import Any, Dict, List
 import dm_env
 from acme.specs import EnvironmentSpec
 
+from mava.utils.id_utils import EntityId
 from mava.utils.sort_utils import sort_str_num
 
 
@@ -91,9 +92,11 @@ class MAEnvironmentSpec:
             _description_
         """
         specs = {}
-        agent_types = list({agent.split("_")[0] for agent in self._keys})
+
+        agent_types = list({agent.type for agent in self._keys})
         for agent_type in agent_types:
-            specs[agent_type] = self._specs[f"{agent_type}_0"]
+            agent_id = EntityId(id=0, type=agent_type)
+            specs[agent_type] = self._specs[agent_id]
         return specs
 
     def get_agent_ids(self) -> List[str]:
@@ -110,7 +113,7 @@ class MAEnvironmentSpec:
         Returns:
             _description_
         """
-        return list({agent.split("_")[0] for agent in self._keys})
+        return list({agent.type for agent in self._keys})
 
     def get_agents_by_type(self) -> Dict[str, List[str]]:
         """_summary_
