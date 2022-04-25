@@ -72,8 +72,8 @@ class FeedforwardExecutorSelectAction(Component):
             observation, rng_key
         )
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_"""
         return "action_selector"
 

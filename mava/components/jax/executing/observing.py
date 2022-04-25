@@ -98,7 +98,7 @@ class FeedforwardExecutorObserve(Component):
         if executor.store.executor_parameter_client:
             executor.store.executor_parameter_client.get_async()
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_"""
         return "executor_observe"

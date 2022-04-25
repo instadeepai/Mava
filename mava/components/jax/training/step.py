@@ -17,7 +17,7 @@
 
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -85,8 +85,8 @@ class DefaultStep(Component):
         # Write to the loggers.
         trainer.store.trainer_logger.write({**results})
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_
 
         Returns:
@@ -274,14 +274,18 @@ class MAPGWithTrustRegionStep(Step):
 
         trainer.store.step_fn = step
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_
 
         Returns:
             _description_
         """
         return "step_fn"
+
+    @staticmethod
+    def config_class() -> Callable:
+        return MAPGWithTrustRegionStepConfig
 
 
 # TODO(Edan) Implement
@@ -469,3 +473,7 @@ class MAMCTSStep(Step):
             return metrics
 
         trainer.store.step_fn = step
+
+    @staticmethod
+    def config_class() -> Callable:
+        return MAMCTSStepConfig

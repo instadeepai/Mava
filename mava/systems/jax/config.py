@@ -144,9 +144,13 @@ class Config:
                 self._built_config[name] = param_value
             else:
                 raise Exception(
-                    f"The given parameter ({name}) is not part of the current system. \
-                    This should have been added first via a component .add() \
-                    during system building."
+                    f"""
+                    The given parameter ({name}) is not part of the current system.
+                    This should have been added first via a component .add() during
+                    system building or ensure you have defined func `config_class`
+                    for your components with config. Current parameters:
+                    {list(self._built_config.keys())}.
+                    """
                 )
 
     def get(self) -> SimpleNamespace:

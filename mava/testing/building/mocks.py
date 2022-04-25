@@ -46,8 +46,8 @@ class MockAdderSignature(Callback):
         """_summary_"""
         builder.store.adder_signature_fn = self.config.adder_signature_param
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "adder_signature"
 
@@ -100,8 +100,8 @@ class MockAdder(Callback):
         """_summary_"""
         builder.store.adder = MockAdderClass()
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "adder"
 
@@ -123,8 +123,8 @@ class MockDataServer(Callback):
         """_summary_"""
         builder.store.data_tables = self.config.data_server_param
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "data_server"
 
@@ -145,8 +145,8 @@ class MockParameterServer(Callback):
     def on_building_parameter_server(self, builder: SystemBuilder) -> None:
         """_summary_"""
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "parameter_server"
 
@@ -183,8 +183,8 @@ class MockLogger(Callback):
         """_summary_"""
         builder.store.trainer_logger = MockLogerClass()
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "logger"
 
@@ -207,8 +207,8 @@ class MockExecutorParameterClient(Callback):
         """_summary_"""
         builder.store.executor_parameter_client = None
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "executor_parameter_client"
 
@@ -231,8 +231,8 @@ class MockTrainerParameterClient(Callback):
         """_summary_"""
         builder.store.trainer_parameter_client = None
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "trainer_parameter_client"
 
@@ -258,8 +258,8 @@ class MockExecutor(Callback):
             "agent_2": "network_agent",
         }
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "executor"
 
@@ -310,8 +310,8 @@ class MockExecutorEnvironmentLoop(Callback):
         else:
             builder.store.system_executor = executor_environment_loop
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "executor_environment_loop"
 
@@ -349,8 +349,8 @@ class MockNetworks(Callback):
             )
         )
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_"""
         return "networks"
 
@@ -376,8 +376,8 @@ class MockTrainerDataset(Callback):
         """_summary_"""
         builder.store.dataset = self.config.trainer_dataset_param
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "trainer_dataset"
 
@@ -412,8 +412,8 @@ class MockTrainer(Callback):
             builder.store.trainer_parameter_client,
         )
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "trainer"
 
@@ -463,8 +463,8 @@ class MockDistributor(Callback):
             trainer,
         )
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'.
 
         Returns:

@@ -15,7 +15,7 @@
 
 """Commonly used distributor components for system builders"""
 from dataclasses import dataclass
-from typing import List, Union
+from typing import Callable, List, Union
 
 from chex import PRNGKey
 
@@ -108,7 +108,11 @@ class Distributor(Component):
         """
         builder.store.program.launch()
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "distributor"
+
+    @staticmethod
+    def config_class() -> Callable:
+        return DistributorConfig
