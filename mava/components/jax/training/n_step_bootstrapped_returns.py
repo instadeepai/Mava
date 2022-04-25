@@ -16,7 +16,7 @@
 """Trainer components for advantage calculations."""
 
 from dataclasses import dataclass
-from typing import Tuple, Union
+from typing import Callable, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -66,11 +66,15 @@ class NStepBootStrappedReturns(Utility):
 
         trainer.store.n_step_fn = n_step_bootstrapped_returns
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_
 
         Returns:
             _description_
         """
         return "advantage_estimator"
+
+    @staticmethod
+    def config_class() -> Callable:
+        return NStepBootStrappedReturnsConfig

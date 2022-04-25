@@ -58,11 +58,15 @@ class ExtraSearchPolicySpec(Component):
         net_spec = {"network_keys": {agent: int_spec for agent in agents}}
         builder.store.extras_spec.update(net_spec)
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_
 
         Returns:
             _description_
         """
         return "extras_search_policy"
+
+    @staticmethod
+    def config_class():
+        return ExtraSearchPolicySpecConfig

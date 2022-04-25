@@ -16,7 +16,7 @@
 """Execution components for system builders"""
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 import jax
 import numpy as np
@@ -142,7 +142,11 @@ class MCTSFeedforwardExecutorSelectAction(Component):
             executor.store.observation.legal_actions,
         )
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_"""
         return "action_selector"
+
+    @staticmethod
+    def config_class() -> Callable:
+        return MCTSConfig

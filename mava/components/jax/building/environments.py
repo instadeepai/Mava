@@ -100,7 +100,7 @@ class JAXParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
         self,
         config: JAXParallelExecutorEnvironmentLoopConfig = JAXParallelExecutorEnvironmentLoopConfig(),
     ):
-        super().__init__(config)
+        self.config = config
 
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
         """_summary_
@@ -118,3 +118,7 @@ class JAXParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
         del builder.store.executor_logger
 
         builder.store.system_executor = executor_environment_loop
+
+    @staticmethod
+    def config_class() -> Callable:
+        return JAXParallelExecutorEnvironmentLoopConfig

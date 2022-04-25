@@ -55,8 +55,8 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def make_environment(
-    rows=3,
-    cols=3,
+    rows=5,
+    cols=5,
     evaluation: bool = None,
     num_agents: int = 1,
 ):
@@ -68,7 +68,7 @@ def make_environment(
             num_agents,
             reward_for_connection=1.0,
             reward_for_blocked=-1.0,
-            reward_per_timestep=-1.0 / 10,
+            reward_per_timestep=-1.0 / (rows + cols),
         )
     )
 

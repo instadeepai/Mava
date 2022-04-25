@@ -162,6 +162,7 @@ class MAPGEpochUpdate(Utility):
             Tuple[KeyArray, Any, optax.OptState, Batch],
             Dict[str, jnp.ndarray],
         ]:
+
             """Performs model updates based on one epoch of data."""
             key, params, opt_states, batch = carry
             new_key, subkey = jax.random.split(key)
@@ -279,8 +280,8 @@ class MAMCTSMinibatchUpdate(Utility):
 
         trainer.store.minibatch_update_fn = model_update_minibatch
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_
 
         Returns:
@@ -328,7 +329,7 @@ class MAMCTSEpochUpdate(Utility):
 
             """Performs model updates based on one epoch of data."""
             key, params, opt_states, batch = carry
-
+            print(batch.observations)
             new_key, subkey = jax.random.split(key)
             permutation = jax.random.permutation(subkey, self.config.batch_size)
 
@@ -353,8 +354,8 @@ class MAMCTSEpochUpdate(Utility):
 
         trainer.store.epoch_update_fn = model_update_epoch
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_
 
         Returns:
