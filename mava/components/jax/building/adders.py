@@ -16,7 +16,7 @@
 """Commonly used adder components for system builders"""
 import abc
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Callable, Dict
 
 from mava import specs
 from mava.adders import reverb as reverb_adders
@@ -29,8 +29,8 @@ class Adder(Component):
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """[summary]"""
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_
 
         Returns:
@@ -66,14 +66,18 @@ class AdderPriority(Component):
             _description_
         """
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_
 
         Returns:
             _description_
         """
         return "adder_priority"
+
+    @staticmethod
+    def config_class() -> Callable:
+        return AdderPriorityConfig
 
 
 @dataclass
@@ -97,14 +101,18 @@ class AdderSignature(Component):
     def on_building_data_server_adder_signature(self, builder: SystemBuilder) -> None:
         """[summary]"""
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_
 
         Returns:
             _description_
         """
         return "adder_signature"
+
+    @staticmethod
+    def config_class() -> Callable:
+        return AdderSignatureConfig
 
 
 @dataclass
@@ -144,6 +152,10 @@ class ParallelTransitionAdder(Adder):
         )
 
         builder.store.adder = adder
+
+    @staticmethod
+    def config_class() -> Callable:
+        return ParallelTransitionAdderConfig
 
 
 class UniformAdderPriority(AdderPriority):
@@ -228,6 +240,10 @@ class ParallelSequenceAdder(Adder):
         )
 
         builder.store.adder = adder
+
+    @staticmethod
+    def config_class() -> Callable:
+        return ParallelSequenceAdderConfig
 
 
 class ParallelSequenceAdderSignature(AdderSignature):

@@ -57,7 +57,11 @@ class DefaultNetworks(Component):
             rng_key=network_key,
         )
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_"""
         return "networks"
+
+    @staticmethod
+    def config_class() -> Callable:
+        return NetworksConfig

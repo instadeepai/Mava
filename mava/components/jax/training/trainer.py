@@ -16,7 +16,7 @@
 """Trainer components for system builders."""
 
 from dataclasses import dataclass
-from typing import Dict, List, Union
+from typing import Callable, Dict, List, Union
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder, SystemTrainer
@@ -112,7 +112,11 @@ class TrainerInit(Component):
             for a_i, agent in enumerate(trainer.store.trainer_agents)
         }
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_"""
         return "trainer"
+
+    @staticmethod
+    def config_class() -> Callable:
+        return TrainerInitConfig

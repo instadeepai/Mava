@@ -16,7 +16,7 @@
 """Execution components for system builders"""
 
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import Callable, List, Optional, Union
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder, SystemExecutor
@@ -125,7 +125,11 @@ class ExecutorInit(Component):
         """_summary_"""
         executor._interval = self.config.interval  # type: ignore
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_"""
         return "executor_init"
+
+    @staticmethod
+    def config_class() -> Callable:
+        return ExecutorInitConfig

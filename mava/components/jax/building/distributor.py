@@ -15,7 +15,7 @@
 
 """Commonly used distributor components for system builders"""
 from dataclasses import dataclass
-from typing import List, Union
+from typing import Callable, List, Union
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
@@ -106,7 +106,11 @@ class Distributor(Component):
         """
         builder.store.program.launch()
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "distributor"
+
+    @staticmethod
+    def config_class() -> Callable:
+        return DistributorConfig

@@ -14,7 +14,7 @@
 # limitations under the License.
 """Tests for Jax-based Mava system implementation."""
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple
 
 import pytest
 
@@ -26,8 +26,8 @@ from mava.systems.jax.system import System
 
 # Mock components
 class MainComponent(Component):
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'.
 
         Returns:
@@ -37,8 +37,8 @@ class MainComponent(Component):
 
 
 class SubComponent(Component):
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'.
 
         Returns:
@@ -72,6 +72,10 @@ class ComponentZero(MainComponent):
         """
         builder.store.int_plus_str = self.config.param_0 + int(self.config.param_1)
 
+    @staticmethod
+    def config_class() -> Callable:
+        return ComponentZeroDefaultConfig
+
 
 @dataclass
 class ComponentOneDefaultConfig:
@@ -97,6 +101,10 @@ class ComponentOne(SubComponent):
             float plus boolean cast as float
         """
         builder.store.float_plus_bool = self.config.param_2 + float(self.config.param_3)
+
+    @staticmethod
+    def config_class() -> Callable:
+        return ComponentOneDefaultConfig
 
 
 @dataclass
@@ -126,6 +134,10 @@ class ComponentTwo(MainComponent):
             self.config.param_5
         )
 
+    @staticmethod
+    def config_class() -> Callable:
+        return ComponentTwoDefaultConfig
+
 
 @dataclass
 class DistributorDefaultConfig:
@@ -146,14 +158,18 @@ class MockDistributorComponent(Component):
         """
         self.config = config
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'.
 
         Returns:
             Component type name
         """
         return "distributor"
+
+    @staticmethod
+    def config_class() -> Callable:
+        return DistributorDefaultConfig
 
 
 class TestSystemWithZeroComponents(System):

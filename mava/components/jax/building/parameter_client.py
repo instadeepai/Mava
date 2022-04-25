@@ -15,7 +15,7 @@
 
 """Parameter client for system builders"""
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 import numpy as np
 
@@ -97,10 +97,14 @@ class ExecutorParameterClient(BaseParameterClient):
 
         builder.store.executor_parameter_client = parameter_client
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "executor_parameter_client"
+
+    @staticmethod
+    def config_class() -> Callable:
+        return ExecutorParameterClientConfig
 
 
 @dataclass
@@ -172,7 +176,7 @@ class TrainerParameterClient(BaseParameterClient):
 
         builder.store.trainer_parameter_client = parameter_client
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "trainer_parameter_client"
