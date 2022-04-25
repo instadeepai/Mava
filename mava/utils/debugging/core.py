@@ -199,12 +199,17 @@ class World(object):
         # compute actual distance between entities
         delta_pos = entity_a.state.p_pos - entity_b.state.p_pos
         dist = np.sqrt(np.sum(np.square(delta_pos)))
+        print("dp", delta_pos)
+        print("dist", dist)
         # minimum allowable distance
         dist_min = entity_a.size + entity_b.size
         # softmax penetration
         k = self.contact_margin
+        print("NORMAL",-(dist - dist_min) / k)
         penetration = np.logaddexp(0, -(dist - dist_min) / k) * k
+        print("pen", penetration)
         force = self.contact_force * delta_pos / dist * penetration
+        print("force",force)
         force_a = +force if entity_a.movable else None
         force_b = -force if entity_b.movable else None
         return [force_a, force_b]
