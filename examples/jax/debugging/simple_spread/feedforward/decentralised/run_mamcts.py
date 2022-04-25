@@ -54,12 +54,7 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
-def make_environment(
-    rows=5,
-    cols=5,
-    evaluation: bool = None,
-    num_agents: int = 1,
-):
+def make_environment(rows=5, cols=5, evaluation: bool = None, num_agents: int = 2):
 
     return PcbGridEnvWrapper(
         PcbGridEnv(
@@ -84,7 +79,7 @@ def main(_: Any) -> None:
         make_environment,
     )
 
-    @chex.assert_max_traces(n=1)
+    @chex.assert_max_traces(n=2)
     def root_fn(forward_fn, params, key, embedding):
 
         prior_logits, values = forward_fn(observations=embedding, params=params)
@@ -95,7 +90,7 @@ def main(_: Any) -> None:
             embedding=embedding,
         )
 
-    @chex.assert_max_traces(n=1)
+    @chex.assert_max_traces(n=2)
     def recurrent_fn(
         environment_model: PcbGridEnvWrapper,
         forward_fn,
@@ -103,6 +98,7 @@ def main(_: Any) -> None:
         rng_key,
         action,
         observation,
+        agent_info,
     ) -> RecurrentFnOutput:
 
         state = State(
@@ -113,16 +109,19 @@ def main(_: Any) -> None:
                 observation.reshape(environment_model.rows, environment_model.cols)
             ),
         )
-        actions = {f"agent_{0}": action}
 
-        next_state, timestep, _ = environment_model.step(state, actions)
+        actions = jnp.zeros(environment_model.num_agents, int)
+
+        actions = actions.at[agent_info].set(jnp.squeeze(action))
+
+        next_state, timestep, _ = environment_model.search_step(state, actions)
 
         prior_logits, values = forward_fn(observations=observation, params=params)
 
-        reward = timestep.reward["agent_0"].reshape(
+        reward = timestep.reward[agent_info].reshape(
             1,
         )
-        discount = timestep.discount["agent_0"].reshape(
+        discount = timestep.discount[agent_info].reshape(
             1,
         )
 
@@ -176,7 +175,7 @@ def main(_: Any) -> None:
         optimizer=optimizer,
         run_evaluator=True,
         sample_batch_size=256,
-        batch_size=256,
+        batch_size=256 * 19,
         num_minibatches=2,
         num_epochs=2,
         num_executors=1,

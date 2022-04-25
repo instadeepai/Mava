@@ -30,10 +30,14 @@ class MCTS:
         """TODO: Add description here."""
         self.config = config
 
-    def get_action(self, forward_fn, params, rng_key, observation, action_mask):
+    def get_action(
+        self, forward_fn, params, rng_key, observation, action_mask, agent_info
+    ):
         """TODO: Add description here."""
 
-        search_out = self.search(forward_fn, params, rng_key, observation, action_mask)
+        search_out = self.search(
+            forward_fn, params, rng_key, observation, action_mask, agent_info
+        )
 
         return (
             jnp.squeeze(search_out.action),
@@ -41,8 +45,8 @@ class MCTS:
         )
 
     @functools.partial(jit, static_argnums=(0, 1))
-    @chex.assert_max_traces(n=1)
-    def search(self, forward_fn, params, rng_key, observation, action_mask):
+    @chex.assert_max_traces(n=2)
+    def search(self, forward_fn, params, rng_key, observation, action_mask, agent_info):
         """TODO: Add description here."""
 
         root = self.config.root_fn(forward_fn, params, rng_key, observation)
@@ -56,9 +60,9 @@ class MCTS:
                 rng_key,
                 action,
                 embedding,
+                agent_info,
             )
 
-        print(action_mask)
         search_output = self.config.search(
             params=params,
             rng_key=rng_key,

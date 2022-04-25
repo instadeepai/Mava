@@ -26,7 +26,7 @@ from mava.core_jax import SystemBuilder
 # TODO remove mcts hardcodedness
 @dataclass
 class ExtraSearchPolicySpecConfig:
-    num_actions: int = 5
+    pass
 
 
 class ExtraSearchPolicySpec(Component):
@@ -44,12 +44,13 @@ class ExtraSearchPolicySpec(Component):
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """[summary]"""
         agent_specs = builder.store.environment_spec.get_agent_specs()
+
         builder.store.extras_spec = {"policy_info": {}}
 
         for agent, spec in agent_specs.items():
             # Make dummy log_probs
             builder.store.extras_spec["policy_info"][agent] = np.ones(
-                shape=(self.config.num_actions), dtype=np.float32
+                shape=(spec.actions.num_values,), dtype=np.float32
             )
 
         # Add the networks keys to extras.

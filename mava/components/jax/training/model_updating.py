@@ -329,7 +329,6 @@ class MAMCTSEpochUpdate(Utility):
 
             """Performs model updates based on one epoch of data."""
             key, params, opt_states, batch = carry
-            print(batch.observations)
             new_key, subkey = jax.random.split(key)
             permutation = jax.random.permutation(subkey, self.config.batch_size)
 

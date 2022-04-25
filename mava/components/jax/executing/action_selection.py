@@ -117,6 +117,7 @@ class MCTSFeedforwardExecutorSelectAction(Component):
             executor.store.actions_info[agent] = action_info
             executor.store.policies_info[agent] = policy_info
 
+    # TODO figure out how to pass agent ids since it is a string
     # Select action
     def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
         """Summary"""
@@ -140,6 +141,7 @@ class MCTSFeedforwardExecutorSelectAction(Component):
             rng_key,
             observation,
             executor.store.observation.legal_actions,
+            agent,
         )
 
     @staticmethod
