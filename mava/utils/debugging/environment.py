@@ -24,6 +24,7 @@ import numpy as np
 from gym import spaces
 
 from mava.utils.debugging.core import Agent, World
+from mava.utils.id_utils import EntityId
 
 from .multi_discrete import MultiDiscrete
 
@@ -53,7 +54,7 @@ class MultiAgentEnv(gym.Env):
 
         agent_list = self.world.policy_agents
         for a_i in range(len(agent_list)):
-            agent_id = "agent_" + str(a_i)
+            agent_id = EntityId(id=a_i, type=0)
             self.agent_ids.append(agent_id)
             agent_dict[agent_id] = agent_list[a_i]
 
