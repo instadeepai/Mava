@@ -109,6 +109,12 @@ class MAPGWithTrustRegionStep(Step):
         """
         self.config = config
 
+    def on_training_init_start(self, trainer: SystemTrainer) -> None:
+        # Note (dries): Assuming the batch and sequence dimensions are flattened.
+        trainer.store.full_batch_size = trainer.store.sample_batch_size * (
+            trainer.store.sequence_length - 1
+        )
+
     def on_training_step_fn(self, trainer: SystemTrainer) -> None:
         """_summary_"""
 
@@ -246,6 +252,7 @@ class MAPGWithTrustRegionStep(Step):
             states = TrainingState(
                 params=params, opt_states=opt_states, random_key=random_key
             )
+
             new_states, metrics = sgd_step(states, sample)
 
             # Set the new variables

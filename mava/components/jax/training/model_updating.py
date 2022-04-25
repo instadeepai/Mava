@@ -161,13 +161,20 @@ class MAPGEpochUpdate(Utility):
             """Performs model updates based on one epoch of data."""
             key, params, opt_states, batch = carry
 
-            # Note (dries): Assuming the batch and sequence dimensions are flattened.
-            full_batch_size = trainer.store.sample_batch_size * (
-                trainer.store.sequence_length - 1
+            new_key, subkey = jax.random.split(key)
+
+            # TODO (dries): This assert is ugly. Is there a better way to do this check?
+            # Maybe using a tree map of some sort?
+            # shapes = jax.tree_map(
+            #         lambda x: x.shape[0]==trainer.store.full_batch_size, batch
+            #     )
+            # assert ...
+            assert (
+                list(batch.observations.values())[0].observation.shape[0]
+                == trainer.store.full_batch_size
             )
 
-            new_key, subkey = jax.random.split(key)
-            permutation = jax.random.permutation(subkey, full_batch_size)
+            permutation = jax.random.permutation(subkey, trainer.store.full_batch_size)
 
             shuffled_batch = jax.tree_map(
                 lambda x: jnp.take(x, permutation, axis=0), batch
