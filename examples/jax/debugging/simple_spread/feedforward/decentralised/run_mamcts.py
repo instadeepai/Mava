@@ -112,16 +112,16 @@ def main(_: Any) -> None:
 
         actions = jnp.zeros(environment_model.num_agents, int)
 
-        actions = actions.at[agent_info].set(jnp.squeeze(action))
+        actions = actions.at[agent_info.id].set(jnp.squeeze(action))
 
         next_state, timestep, _ = environment_model.search_step(state, actions)
 
         prior_logits, values = forward_fn(observations=observation, params=params)
 
-        reward = timestep.reward[agent_info].reshape(
+        reward = timestep.reward[agent_info.id].reshape(
             1,
         )
-        discount = timestep.discount[agent_info].reshape(
+        discount = timestep.discount[agent_info.id].reshape(
             1,
         )
 
