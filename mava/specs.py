@@ -41,7 +41,7 @@ class MAEnvironmentSpec:
             specs = self._make_ma_environment_spec(environment)
         else:
             self.extra_specs = extra_specs
-        self._keys = list(map(str, sort_str_num(specs.keys())))
+        self._keys = sort_str_num(list(map(str, specs.keys())))
         self._specs = {key: specs[key] for key in self._keys}
 
     def _make_ma_environment_spec(

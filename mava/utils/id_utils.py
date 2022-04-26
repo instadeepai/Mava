@@ -1,6 +1,9 @@
+from typing import Union
+
 import chex
 
 
+# should we make a default for type?
 @chex.dataclass(frozen=True)
 class EntityId:
     type: int
@@ -17,7 +20,7 @@ class EntityId:
         string_rep = ""
         for attribute, value in self.__dict__.items():
             string_rep = f"{string_rep}-{attribute}-{value}"
-        return string_rep
+        return string_rep[1:]
 
     def __hash__(self) -> int:
         return hash(str(self))
@@ -26,10 +29,17 @@ class EntityId:
         return str(self) == str(__o)
 
     @staticmethod
-    def from_string(other: str):
-        split_string = other.split("-")
-        attributes = {}
-        for attribute, value in zip(split_string[1::2], split_string[2::2]):
-            attributes[attribute] = value
+    def from_string(entity_str: Union[str, "EntityId"]):
+        if isinstance(entity_str, str):
+            split_string = entity_str.split("-")
+            attributes = {}
+            for attribute, value in zip(split_string[0::2], split_string[1::2]):
+                attributes[attribute] = value
 
-        return EntityId(**attributes)
+            return EntityId(**attributes)
+        elif isinstance(entity_str, EntityId):
+            return entity_str
+        else:
+            raise TypeError(
+                f"Attempted to convert a non-string type: {type(entity_str)}"
+            )
