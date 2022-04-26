@@ -26,10 +26,15 @@ class EntityId:
         return str(self) == str(__o)
 
     @staticmethod
-    def from_string(other: str):
-        split_string = other.split("-")
-        attributes = {}
-        for attribute, value in zip(split_string[1::2], split_string[2::2]):
-            attributes[attribute] = value
+    def from_string(entity_str: str):
+        if isinstance(entity_str, str):
+            split_string = entity_str.split("-")
+            attributes = {}
+            for attribute, value in zip(split_string[1::2], split_string[2::2]):
+                attributes[attribute] = value
 
-        return EntityId(**attributes)
+            return EntityId(**attributes)
+        else:
+            raise TypeError(
+                f"Attempted to convert a non-string type: {type(entity_str)}"
+            )

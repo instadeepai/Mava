@@ -58,7 +58,7 @@ class ExecutorInit(Component):
                 builder.store.agent_net_keys = {
                     agent: f"network_{EntityId.from_string(agent).type}"
                     if self.config.shared_weights
-                    else f"network_{EntityId.from_string(agent).id}"
+                    else f"network_{agent}"
                     for agent in builder.store.agents
                 }
                 builder.store.network_sampling_setup = [
