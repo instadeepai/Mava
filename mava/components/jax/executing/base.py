@@ -21,6 +21,7 @@ from typing import Callable, List, Optional, Union
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder, SystemExecutor
 from mava.utils import enums
+from mava.utils.id_utils import EntityId
 from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 
 
@@ -55,9 +56,9 @@ class ExecutorInit(Component):
                 # to all agents of the same type if weights are shared
                 # else assign seperate networks to each agent
                 builder.store.agent_net_keys = {
-                    agent: f"network_{agent.type}"
+                    agent: f"network_{EntityId.from_string(agent).type}"
                     if self.config.shared_weights
-                    else f"network_{agent.id}"
+                    else f"network_{EntityId.from_string(agent).id}"
                     for agent in builder.store.agents
                 }
                 builder.store.network_sampling_setup = [
