@@ -9,6 +9,8 @@ import numpy as np
 from haiku import Params
 from jax import jit
 
+from mava.utils.id_utils import EntityId
+
 RecurrentState = Any
 RootFn = Callable[[Params, chex.PRNGKey, Any], mctx.RootFnOutput]
 RecurrentState = Any
@@ -34,7 +36,7 @@ class MCTS:
         self, forward_fn, params, rng_key, observation, action_mask, agent_info
     ):
         """TODO: Add description here."""
-
+        agent_info = EntityId.from_string(agent_info)
         search_out = self.search(
             forward_fn, params, rng_key, observation, action_mask, agent_info
         )
