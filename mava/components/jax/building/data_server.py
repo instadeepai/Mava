@@ -173,9 +173,6 @@ class OnPolicyDataServer(DataServer):
         Returns:
             _description_
         """
-        # environment_spec._specs = {str(agent):spec for (agent, spec) in environment_spec._specs.items()}
-        # environment_spec._keys = [str(agent_key) for agent_key in environment_spec._keys]
-        # extras_spec = {key : {str(agent_id) : spec for agent_id, spec in value.items()} for key, value in extras_spec.items()}
         table = reverb.Table.queue(
             name=table_key,
             max_size=self.config.max_queue_size,
