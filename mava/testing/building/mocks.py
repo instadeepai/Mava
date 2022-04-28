@@ -30,7 +30,6 @@ from acme import types
 from reverb import rate_limiters, reverb_types
 
 from mava import specs
-from mava.callbacks import Callback
 from mava.components.jax import Component
 from mava.components.jax.building.data_server import (
     OffPolicyDataServerConfig,
@@ -91,7 +90,7 @@ class MockAdderClass:
         pass
 
 
-class MockAdder(Callback):
+class MockAdder(Component):
     def __init__(self, config: MockAdderConfig = MockAdderConfig()) -> None:
         """Mock system component."""
         self.config = config
@@ -451,7 +450,7 @@ class MockParameterServerConfig:
     parameter_server_param: int = 2
 
 
-class MockParameterServer(Callback):
+class MockParameterServer(Component):
     def __init__(
         self,
         config: MockParameterServerConfig = MockParameterServerConfig(),
@@ -484,7 +483,7 @@ class MockLogerClass:
         pass
 
 
-class MockLogger(Callback):
+class MockLogger(Component):
     def __init__(
         self,
         config: MockLoggerConfig = MockLoggerConfig(),
@@ -512,7 +511,7 @@ class MockExecutorParameterClientConfig:
     executor_parameter_client_param_1: str = "param"
 
 
-class MockExecutorParameterClient(Callback):
+class MockExecutorParameterClient(Component):
     def __init__(
         self,
         config: MockExecutorParameterClientConfig = MockExecutorParameterClientConfig(),
@@ -536,7 +535,7 @@ class MockTrainerParameterClientConfig:
     trainer_parameter_client_param_1: str = "param"
 
 
-class MockTrainerParameterClient(Callback):
+class MockTrainerParameterClient(Component):
     def __init__(
         self,
         config: MockTrainerParameterClientConfig = MockTrainerParameterClientConfig(),
@@ -568,7 +567,7 @@ class MockExecutorDefaultConfig:
     executor_param: int = 1
 
 
-class MockExecutor(Callback):
+class MockExecutor(Component):
     def __init__(
         self,
         config: MockExecutorDefaultConfig = MockExecutorDefaultConfig(),
@@ -595,7 +594,7 @@ class MockExecutorEnvironmentLoopConfig:
     should_update: bool = True
 
 
-class MockExecutorEnvironmentLoop(Callback):
+class MockExecutorEnvironmentLoop(Component):
     def __init__(
         self,
         config: MockExecutorEnvironmentLoopConfig = MockExecutorEnvironmentLoopConfig(),
@@ -649,7 +648,7 @@ class MockNetworksConfig:
     seed: int = 1234
 
 
-class MockNetworks(Callback):
+class MockNetworks(Component):
     def __init__(
         self,
         config: MockNetworksConfig = MockNetworksConfig(),
@@ -693,7 +692,7 @@ class MockTrainerDatasetConfig:
     trainer_dataset_param: int = 5
 
 
-class MockTrainerDataset(Callback):
+class MockTrainerDataset(Component):
     def __init__(
         self,
         config: MockTrainerDatasetConfig = MockTrainerDatasetConfig(),
@@ -730,7 +729,7 @@ class MockTrainerConfig:
     trainer_param_1: str = "train"
 
 
-class MockTrainer(Callback):
+class MockTrainer(Component):
     def __init__(
         self,
         config: MockTrainerConfig = MockTrainerConfig(),
@@ -768,7 +767,7 @@ class DistributorConfig:
     name: str = "system"
 
 
-class MockDistributor(Callback):
+class MockDistributor(Component):
     def __init__(self, config: DistributorConfig = DistributorConfig()) -> None:
         """Mock system distributor component.
 
