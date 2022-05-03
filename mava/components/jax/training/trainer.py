@@ -16,7 +16,7 @@
 """Trainer components for system builders."""
 
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Union
+from typing import Callable, Dict, List, Optional, Union
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder, SystemTrainer
@@ -118,5 +118,10 @@ class TrainerInit(Component):
         return "trainer"
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return TrainerInitConfig

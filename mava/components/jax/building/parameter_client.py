@@ -15,7 +15,7 @@
 
 """Parameter client for system builders"""
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -103,7 +103,12 @@ class ExecutorParameterClient(BaseParameterClient):
         return "executor_parameter_client"
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return ExecutorParameterClientConfig
 
 

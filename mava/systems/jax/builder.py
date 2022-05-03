@@ -167,7 +167,6 @@ class Builder(SystemBuilder, BuilderHookMixin):
 
         self.store.trainer_id = trainer_id
         self.store.data_server_client = data_server_client
-        self.store.table_name = f"table_{trainer_id}"
         self.store.parameter_server_client = parameter_server_client
 
         # start of making the trainer

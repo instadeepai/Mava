@@ -68,7 +68,12 @@ class TransitionDataset(Component):
         builder.store.dataset = iter(dataset)
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return TransitionDatasetConfig
 
 
@@ -129,5 +134,10 @@ class TrajectoryDataset(Component):
         return "trainer_dataset"
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return TrajectoryDatasetConfig

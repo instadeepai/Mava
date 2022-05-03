@@ -56,15 +56,23 @@ class Config:
                     new_param_names = list(dataclass.__dict__.keys())
                     if set(self._current_params) & set(new_param_names):
                         raise Exception(
-                            "Component configs share a common parameter name. \
-                            This is not allowed, please ensure config \
-                            parameter names are unique."
+                            f"""
+                            Component configs share a common parameter name -
+                            {set(self._current_params).intersection(set(new_param_names))}.
+                            This is not allowed, please ensure config parameter names
+                            are unique.
+                            """
                         )
                     else:
                         self._current_params.extend(new_param_names)
                     self._config[name] = dataclass
             else:
-                raise Exception("Component configs must be a dataclass.")
+                raise Exception(
+                    f"""
+                    Component configs must be a dataclass.
+                    It is type: {type(dataclass)} value: {dataclass}.
+                    """
+                )
 
     def update(self, **kwargs: Any) -> None:
         """Update a component config dataclass.

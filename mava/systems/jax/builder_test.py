@@ -20,6 +20,9 @@ from typing import Dict, Tuple
 import acme
 import pytest
 
+from mava.components.jax.building.adders import ParallelTransitionAdderSignature
+from mava.components.jax.building.base import SystemInit
+from mava.components.jax.building.environments import EnvironmentSpec
 from mava.specs import DesignSpec
 from mava.systems.jax import ParameterServer, Trainer
 from mava.systems.jax.system import System
@@ -34,8 +37,10 @@ class TestSystem(System):
             system callback components
         """
         components = DesignSpec(
-            data_server=mocks.MockDataServer,
-            data_server_adder=mocks.MockAdderSignature,
+            system_init=SystemInit,
+            environment_spec=EnvironmentSpec,
+            data_server=mocks.MockOnPolicyDataServer,
+            data_server_signature=ParallelTransitionAdderSignature,
             parameter_server=mocks.MockParameterServer,
             executor_parameter_client=mocks.MockExecutorParameterClient,
             trainer_parameter_client=mocks.MockTrainerParameterClient,
@@ -56,11 +61,12 @@ def test_system() -> System:
     return TestSystem()
 
 
+# TODO Rewrite test
 def test_builder(
     test_system: System,
 ) -> None:
     """Test if system builder instantiates processes as expected."""
-    test_system.build()
+    test_system.build(environment_factory=mocks.make_fake_environment_factory())
     (
         data_server,
         parameter_server,
@@ -68,7 +74,6 @@ def test_builder(
         evaluator,
         trainer,
     ) = test_system._builder.store.system_build
-    assert data_server == 2
 
     assert isinstance(parameter_server, ParameterServer)
 

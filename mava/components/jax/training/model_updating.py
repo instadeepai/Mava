@@ -124,7 +124,12 @@ class MAPGMinibatchUpdate(Utility):
         return "minibatch_update_fn"
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return MAPGMinibatchUpdateConfig
 
 
@@ -207,5 +212,10 @@ class MAPGEpochUpdate(Utility):
         return "epoch_update_fn"
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return MAPGEpochUpdateConfig
