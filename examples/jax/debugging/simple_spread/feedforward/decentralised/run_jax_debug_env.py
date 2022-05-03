@@ -22,7 +22,6 @@ world: JaxWorld = scenario.make_world(num_agents)
 # create multiagent environment
 env = MAJaxDiscreteDebugEnv(
     world,
-    action_space,
     reset_callback=scenario.reset_world,
     reward_callback=scenario.reward,
     observation_callback=scenario.observation,

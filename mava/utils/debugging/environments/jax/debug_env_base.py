@@ -46,7 +46,6 @@ class MultiAgentJaxEnvBase(gym.Env, ABC):
     def __init__(
         self,
         world: JaxWorld,
-        action_space: str,
         reset_callback: Callable = None,
         reward_callback: Callable = None,
         observation_callback: Callable = None,
