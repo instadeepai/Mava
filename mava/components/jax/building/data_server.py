@@ -25,6 +25,7 @@ from reverb import rate_limiters, reverb_types
 from mava import specs
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
+from mava.utils import enums
 from mava.utils.builder_utils import covert_specs
 from mava.utils.sort_utils import sort_str_num
 
@@ -46,7 +47,14 @@ class DataServer(Component):
         data_tables = []
         # Default table network config - often overwritten by TrainerInit.
         if not hasattr(builder.store, "table_network_config"):
-            builder.store.table_network_config = {"table_0": "network_0"}
+            builder.store.table_network_config = {
+                "table_0": sort_str_num(builder.store.agent_net_keys.values())
+            }
+            assert (
+                builder.store.network_sampling_setup_type
+                == enums.NetworkSampler.fixed_agent_networks
+            ), f"We only have a default config for the fixed_agent_networks sampler setting setting, \
+            not the {builder.store.network_sampling_setup_type} setting."
 
         for table_key in builder.store.table_network_config.keys():
             # TODO (dries): Clean the below coverter code up.

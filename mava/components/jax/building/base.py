@@ -27,9 +27,12 @@ class SystemInit(Component):
     def on_building_init(self, builder: SystemBuilder) -> None:
         """Summary"""
         # Setup agent networks and network sampling setup
-        network_sampling_setup = self.config.network_sampling_setup
-        if not isinstance(network_sampling_setup, list):
-            if network_sampling_setup == enums.NetworkSampler.fixed_agent_networks:
+        builder.store.network_sampling_setup_type = self.config.network_sampling_setup
+        if not isinstance(builder.store.network_sampling_setup_type, list):
+            if (
+                builder.store.network_sampling_setup_type
+                == enums.NetworkSampler.fixed_agent_networks
+            ):
                 # if no network_sampling_setup is specified, assign a single network
                 # to all agents of the same type if weights are shared
                 # else assign seperate networks to each agent
@@ -45,7 +48,10 @@ class SystemInit(Component):
                         for key in sort_str_num(builder.store.agent_net_keys.keys())
                     ]
                 ]
-            elif network_sampling_setup == enums.NetworkSampler.random_agent_networks:
+            elif (
+                builder.store.network_sampling_setup_type
+                == enums.NetworkSampler.random_agent_networks
+            ):
                 """Create N network policies, where N is the number of agents. Randomly
                 select policies from this sets for each agent at the start of a
                 episode. This sampling is done with replacement so the same policy
