@@ -30,4 +30,4 @@ class MAJaxDiscreteDebugEnv(MultiAgentJaxEnvBase):
                 * sensitivity
             )
 
-        return jax.lax.cond(agent.movable, on_movable, lambda _: agent.action, action)
+        return lax.cond(agent.movable, on_movable, lambda _: agent.action, action)

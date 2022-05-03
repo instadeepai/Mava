@@ -129,8 +129,8 @@ class MultiAgentJaxEnvBase(gym.Env, ABC):
         JaxWorld,
         Tuple[
             Dict[EntityId, ndarray],
-            dict[EntityId, float],
-            dict[EntityId, bool],
+            Dict[EntityId, float],
+            Dict[EntityId, bool],
             ndarray,
         ],
     ]:

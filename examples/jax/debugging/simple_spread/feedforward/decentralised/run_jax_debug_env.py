@@ -4,7 +4,7 @@ import jax
 
 from mava.utils.debugging.environments.jax.core import JaxWorld, EntityId
 from mava.utils.debugging.environments.jax.simple_spread import Scenario, make_world
-from mava.utils.debugging.environments.jax.debug_env_base import MultiAgentJaxEnv
+from mava.utils.debugging.environments.jax.debug_env import MAJaxDiscreteDebugEnv
 
 scenario_name = "simple_spread"
 action_space = "discrete"
@@ -20,7 +20,7 @@ scenario = Scenario(make_world(num_agents, key))
 world: JaxWorld = scenario.make_world(num_agents)
 
 # create multiagent environment
-env = MultiAgentJaxEnv(
+env = MAJaxDiscreteDebugEnv(
     world,
     action_space,
     reset_callback=scenario.reset_world,
