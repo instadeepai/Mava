@@ -53,7 +53,7 @@ class DataServer(Component):
             assert (
                 builder.store.network_sampling_setup_type
                 == enums.NetworkSampler.fixed_agent_networks
-            ), f"We only have a default config for the fixed_agent_networks sampler setting setting, \
+            ), f"We only have a default config for the fixed_agent_networks sampler setting, \
             not the {builder.store.network_sampling_setup_type} setting."
 
         for table_key in builder.store.table_network_config.keys():
