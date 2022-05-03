@@ -5,34 +5,38 @@ import jax
 from mava.utils.debugging.environments.jax.core import JaxWorld, EntityId
 from mava.utils.debugging.environments.jax.simple_spread import Scenario, make_world
 from mava.utils.debugging.environments.jax.debug_env import MAJaxDiscreteDebugEnv
+from mava.utils.debugging.environments.jax.debug_env_utils import make_environment
 
 scenario_name = "simple_spread"
 action_space = "discrete"
-num_agents = 5
+num_agents = 10
+seed = 1
+key = jax.random.PRNGKey(seed)
 
 # #--------------------------------------------------------------
-key = jax.random.PRNGKey(42)
-scenario = Scenario(make_world(num_agents, key))
-# if seed:
-#     scenario.seed(seed)
+# scenario = Scenario(make_world(num_agents, key))
+# # if seed:
+# #     scenario.seed(seed)
+#
+# # create world
+# world: JaxWorld = scenario.make_world(num_agents)
+#
+# # create multiagent environment
+# env = MAJaxDiscreteDebugEnv(
+#     world,
+#     reset_callback=scenario.reset_world,
+#     reward_callback=scenario.reward,
+#     observation_callback=scenario.observation,
+#     done_callback=scenario.done,
+#     # shared_viewer=False
+# )
 
-# create world
-world: JaxWorld = scenario.make_world(num_agents)
-
-# create multiagent environment
-env = MAJaxDiscreteDebugEnv(
-    world,
-    reset_callback=scenario.reset_world,
-    reward_callback=scenario.reward,
-    observation_callback=scenario.observation,
-    done_callback=scenario.done,
-    # shared_viewer=False
-)
+env = make_environment(num_agents, key)
 
 jitted_reset = jax.jit(env.reset)
 jitted_step = jax.jit(env.step)
 
-world, *_ = jitted_reset(world)
+world, *_ = jitted_reset(key)
 for i in range(50):
     key, *agent_keys = jax.random.split(key, num_agents + 1)
     act = {

@@ -20,6 +20,7 @@ import copy
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Tuple, Union
 
+from jax.random import PRNGKey
 import gym
 import jax
 import jax.numpy as jnp
@@ -159,10 +160,10 @@ class MultiAgentJaxEnvBase(gym.Env, ABC):
 
         return world, (obs_n, reward_n, done_n, state_n)
 
-    def reset(self, world: JaxWorld) -> Tuple[JaxWorld, Dict[str, Any], Dict[str, Any]]:
+    def reset(self, key: PRNGKey) -> Tuple[JaxWorld, Dict[str, Any], Dict[str, Any]]:
         # reset world
         if self.reset_callback is not None:
-            world = self.reset_callback(world)
+            world = self.reset_callback(key)
         else:
             raise ValueError("self.reset_callback is still None!")
         # reset renderer

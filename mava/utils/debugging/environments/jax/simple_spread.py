@@ -1,10 +1,9 @@
 import copy
-from typing import Optional
-
-import typing
+from typing import Optional, Sequence, no_type_check
 
 import chex
 import jax.random
+from jax.random import PRNGKey
 
 from mava.utils.debugging.environments.jax.core import Agent, Landmark, Entity, EntityId
 from mava.utils.debugging.environments.jax.core import JaxWorld
@@ -37,15 +36,15 @@ def make_world(num_agents: int, key: RNG) -> JaxWorld:
 class Scenario(BaseScenario):
     def __init__(self, world: JaxWorld) -> None:
         super().__init__()
+        # the first world kept so that world params don't change
         self.world = world
         self.dim_p = world.dim_p
 
     def make_world(self, num_agents: int) -> JaxWorld:
-        # make initial conditions
-        return self.reset_world(self.world)
+        # cannot make world inside here because self.world must be immutable
+        return self.reset_world(self.world.key)
 
-    # @typing.no_type_check
-    def reset_world(self, world: JaxWorld) -> JaxWorld:
+    def reset_world(self, key: PRNGKey) -> JaxWorld:
         def reset_entity(entity: Entity, key: RNG, color):
             pos = jax.random.uniform(key, (self.dim_p,), minval=-1.0, maxval=1.0)
             return entity.replace(
@@ -53,17 +52,16 @@ class Scenario(BaseScenario):
                 state=entity.state.replace(p_pos=pos, p_vel=jnp.zeros(self.dim_p)),
             )
 
-        key, *agent_keys = jax.random.split(world.key, len(world.agents) + 1)
-        key, *landmark_keys = jax.random.split(key, len(world.landmarks) + 1)
+        key, *agent_keys = jax.random.split(key, len(self.world.agents) + 1)
+        key, *landmark_keys = jax.random.split(key, len(self.world.landmarks) + 1)
 
         reset_agent = partial(reset_entity, color=(0.35, 0.35, 0.85))
         reset_landmark = partial(reset_entity, color=(0.25, 0.25, 0.25))
 
-        agents = list(map(reset_agent, world.agents, agent_keys))
-        landmarks = list(map(reset_landmark, world.landmarks, landmark_keys))
+        agents = list(map(reset_agent, self.world.agents, agent_keys))
+        landmarks = list(map(reset_landmark, self.world.landmarks, landmark_keys))
 
-        # Reset step counter
-        return world.replace(
+        return self.world.replace(
             key=key, agents=agents, landmarks=landmarks, current_step=0
         )
 
@@ -77,7 +75,7 @@ class Scenario(BaseScenario):
     def dist(pt1: jnp.ndarray, pt2: jnp.ndarray) -> float:
         return jnp.sqrt(jnp.sum(jnp.square(pt1 - pt2)))
 
-    @typing.no_type_check
+    @no_type_check
     def reward(self, agent: Agent, a_i: int, world: JaxWorld) -> float:
         # Agents are rewarded based on agent distance to its corresponding
         # landmark, penalized for collisions
