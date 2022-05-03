@@ -149,10 +149,10 @@ class ParameterClient:
         if self._add_future is not None and self._add_future.done():
             self._add_future = None
 
+        names = params.keys()
         if self._add_future is None:
             # The update period has been reached and no request has been sent yet, so
             # making an asynchronous request now.
-            names = params.keys()
             if not self._async_add_buffer:
                 self._add_future = self._async_add(params)
             else:

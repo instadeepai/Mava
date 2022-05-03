@@ -54,7 +54,6 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
     def __init__(
         self,
         agents: List[str],
-        agent_types: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -79,7 +78,6 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
 
         Args:
             agents: agent ids, e.g. "agent_0".
-            agent_types: agent types, e.g. "speaker" or "listener".
             policy_networks: policy networks for each agent in
                 the system.
             critic_networks: critic network(s), shared or for
@@ -113,7 +111,6 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
 
         super().__init__(
             agents=agents,
-            agent_types=agent_types,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -230,7 +227,6 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
     def __init__(
         self,
         agents: List[str],
-        agent_types: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -289,7 +285,6 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
 
         super().__init__(
             agents=agents,
-            agent_types=agent_types,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -318,7 +313,6 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
     def __init__(
         self,
         agents: List[str],
-        agent_types: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -377,7 +371,6 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
 
         super().__init__(
             agents=agents,
-            agent_types=agent_types,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -406,7 +399,6 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
     def __init__(
         self,
         agents: List[str],
-        agent_types: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -465,7 +457,6 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
 
         super().__init__(
             agents=agents,
-            agent_types=agent_types,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -498,7 +489,6 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
     def __init__(
         self,
         agents: List[str],
-        agent_types: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -524,7 +514,6 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
 
         Args:
             agents: agent ids, e.g. "agent_0".
-            agent_types: agent types, e.g. "speaker" or "listener".
             policy_networks: policy networks for each agent in
                 the system.
             critic_networks: critic network(s), shared or for
@@ -559,7 +548,6 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
 
         super().__init__(
             agents=agents,
-            agent_types=agent_types,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -739,7 +727,6 @@ class MAD4PGDecentralisedRecurrentTrainer(
     def __init__(
         self,
         agents: List[str],
-        agent_types: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -800,7 +787,6 @@ class MAD4PGDecentralisedRecurrentTrainer(
 
         super().__init__(
             agents=agents,
-            agent_types=agent_types,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -832,7 +818,6 @@ class MAD4PGCentralisedRecurrentTrainer(
     def __init__(
         self,
         agents: List[str],
-        agent_types: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -893,7 +878,6 @@ class MAD4PGCentralisedRecurrentTrainer(
 
         super().__init__(
             agents=agents,
-            agent_types=agent_types,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -925,7 +909,6 @@ class MAD4PGStateBasedRecurrentTrainer(
     def __init__(
         self,
         agents: List[str],
-        agent_types: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -986,7 +969,6 @@ class MAD4PGStateBasedRecurrentTrainer(
 
         super().__init__(
             agents=agents,
-            agent_types=agent_types,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -1018,7 +1000,6 @@ class MAD4PGStateBasedSingleActionCriticRecurrentTrainer(
     def __init__(
         self,
         agents: List[str],
-        agent_types: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -1078,7 +1059,6 @@ class MAD4PGStateBasedSingleActionCriticRecurrentTrainer(
 
         super().__init__(
             agents=agents,
-            agent_types=agent_types,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
