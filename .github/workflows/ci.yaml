@@ -2,9 +2,9 @@ name: format_and_test
 
 on:
   push:
-    branches: [develop]
+    branches: [develop, feature/jax-systems]
   pull_request:
-    branches: [develop]
+    branches: [develop, feature/jax-systems]
 
 # TODO(Kale-ab) Specify mava container to run tests on.
 jobs:
