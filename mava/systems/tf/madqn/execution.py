@@ -115,6 +115,7 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
         network_sampling_setup: List,
+        fix_sampler: Optional[List],
         net_keys_to_ids: Dict[str, int],
         evaluator: bool = False,
         adder: Optional[adders.ReverbParallelAdder] = None,
@@ -135,6 +136,8 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
             agent_net_keys: specifies what network each agent uses.
             network_sampling_setup: List of networks that are randomly
                 sampled from by the executors at the start of an environment run.
+            fix_sampler: Optional list that can fix the executor sampler to sample
+                in a specific way.
             net_keys_to_ids: Specifies a mapping from network keys to their integer id.
             adder: adder which sends data
                 to a replay buffer. Defaults to None.
@@ -148,6 +151,7 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
         # Store these for later use.
         self._agent_specs = agent_specs
         self._network_sampling_setup = network_sampling_setup
+        self._fix_sampler = fix_sampler
         self._counts = counts
         self._network_int_keys_extras: Dict[str, np.ndarray] = {}
         self._net_keys_to_ids = net_keys_to_ids
@@ -257,6 +261,7 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
             agents,
             self._network_sampling_setup,
             self._net_keys_to_ids,
+            self._fix_sampler,
         )
 
         extras["network_int_keys"] = self._network_int_keys_extras
@@ -308,6 +313,7 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
         network_sampling_setup: List,
+        fix_sampler: Optional[List],
         net_keys_to_ids: Dict[str, int],
         evaluator: bool = False,
         adder: Optional[adders.ReverbParallelAdder] = None,
@@ -330,6 +336,8 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
             agent_net_keys: specifies what network each agent uses.
             network_sampling_setup: List of networks that are randomly
                 sampled from by the executors at the start of an environment run.
+            fix_sampler: Optional list that can fix the executor sampler to sample
+                in a specific way.
             net_keys_to_ids: Specifies a mapping from network keys to their integer id.
             adder: adder which sends data
                 to a replay buffer. Defaults to None.
@@ -346,6 +354,7 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
         # Store these for later use.
         self._agent_specs = agent_specs
         self._network_sampling_setup = network_sampling_setup
+        self._fix_sampler = fix_sampler
         self._counts = counts
         self._net_keys_to_ids = net_keys_to_ids
         self._network_int_keys_extras: Dict[str, np.ndarray] = {}
@@ -483,6 +492,7 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
             agents,
             self._network_sampling_setup,
             self._net_keys_to_ids,
+            self._fix_sampler,
         )
 
         if self._store_recurrent_state:

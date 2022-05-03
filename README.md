@@ -150,11 +150,20 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
 
     1.1 Only Mava core:
 
+    Tensorflow version:
     ```bash
-    make build
+    make build version=tf-core
+    ```
+
+    Jax version:
+    ```bash
+    make build version=jax-core
     ```
 
     1.2 For **optional** environments:
+
+    **Note for jax images, append `-jax` to the build command, e.g. `make build version=pz-jax`.**
+
     * PettingZoo:
 
         ```
@@ -262,6 +271,8 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
     ```bash
     pip install git+https://github.com/instadeepai/Mava#egg=id-mava[reverb,tf,launchpad]
     ```
+
+    **For the jax version of mava, please replace `tf` with `jax`, e.g. `pip install id-mava[jax,reverb,launchpad]`**
 
     1.2 For **optional** environments:
     * PettingZoo:

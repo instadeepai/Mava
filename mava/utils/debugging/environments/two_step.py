@@ -62,7 +62,7 @@ class TwoStepEnv(gym.Env):
             "agent_0": np.array([0.0], dtype=np.float32),
             "agent_1": np.array([0.0], dtype=np.float32),
         }
-        return self.obs_n, {"s_t": np.array(self.state, dtype=np.int64)}
+        return self.obs_n, {"env_states": np.array(self.state, dtype=np.int64)}
 
     def step(
         self, action_n: Dict[str, int]
@@ -83,7 +83,7 @@ class TwoStepEnv(gym.Env):
                     self.obs_n,
                     self.reward_n,
                     self.done_n,
-                    {"s_t": np.array(self.state, dtype=np.int64)},
+                    {"env_states": np.array(self.state, dtype=np.int64)},
                 )  # Go to 2A
             else:
                 self.state = 2
@@ -95,7 +95,7 @@ class TwoStepEnv(gym.Env):
                     self.obs_n,
                     self.reward_n,
                     self.done_n,
-                    {"s_t": np.array(self.state, dtype=np.int64)},
+                    {"env_states": np.array(self.state, dtype=np.int64)},
                 )  # Go to 2B
 
         elif self.state == 1:  # State 2A
@@ -110,7 +110,7 @@ class TwoStepEnv(gym.Env):
                 self.obs_n,
                 self.reward_n,
                 self.done_n,
-                {"s_t": np.array(self.state, dtype=np.int64)},
+                {"env_states": np.array(self.state, dtype=np.int64)},
             )
 
         elif self.state == 2:  # State 2B
@@ -141,7 +141,7 @@ class TwoStepEnv(gym.Env):
                 self.obs_n,
                 self.reward_n,
                 self.done_n,
-                {"s_t": np.array(self.state, dtype=np.int64)},
+                {"env_states": np.array(self.state, dtype=np.int64)},
             )
 
         else:
