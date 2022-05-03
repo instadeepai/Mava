@@ -184,12 +184,12 @@ class MAPPOBuilder:
         return env_adder_spec
 
     def get_nets_specific_specs(
-        self, spec: Dict[str, Any], network_names: List
+        self, spec: Dict[str, Any], trainer_network_names: List
     ) -> Dict[str, Any]:
         """Convert specs.
         Args:
             spec: agent specs
-            network_names: names of the networks in the desired reverb table
+            trainer_network_names: names of the networks in the desired reverb table
             (to get specs for)
         Returns:
             distilled version of agent specs containing only specs related to
@@ -199,7 +199,7 @@ class MAPPOBuilder:
             return spec
 
         agents = []
-        for network in network_names:
+        for network in trainer_network_names:
             agents.append(self._config.net_spec_keys[network])
 
         agents = sort_str_num(agents)
@@ -211,7 +211,7 @@ class MAPPOBuilder:
             # For the extras
             for key in spec.keys():
                 converted_spec[key] = self.get_nets_specific_specs(
-                    spec[key], network_names
+                    spec[key], trainer_network_names
                 )
         return converted_spec
 
@@ -236,20 +236,20 @@ class MAPPOBuilder:
         for table_key in self._config.table_network_config.keys():
             # TODO (dries): Clean the below converter code up.
             # Convert a Mava spec
-            tables_network_names = self._config.table_network_config[table_key]
+            trainer_network_names = self._config.table_network_config[table_key]
             env_spec = copy.deepcopy(adder_env_spec)
             env_spec._specs = self.get_nets_specific_specs(
-                env_spec._specs, tables_network_names
+                env_spec._specs, trainer_network_names
             )
 
             env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
             if env_spec.extra_specs is not None:
                 env_spec.extra_specs = self.get_nets_specific_specs(
-                    env_spec.extra_specs, tables_network_names
+                    env_spec.extra_specs, trainer_network_names
                 )
             extra_specs = self.get_nets_specific_specs(
                 self._extra_specs,
-                tables_network_names,
+                trainer_network_names,
             )
 
             signature = reverb_adders.ParallelSequenceAdder.signature(
