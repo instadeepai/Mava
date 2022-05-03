@@ -9,7 +9,7 @@ from mava.utils.debugging.environments.jax.simple_spread import Scenario, make_w
 
 
 def make_environment(
-    num_agents: int, key: PRNGKey, action_space="discrete"
+    num_agents: int, key: PRNGKey, action_space="discrete", evaluation=False
 ) -> MultiAgentJaxEnvBase:
     if action_space != "discrete":
         raise NotImplementedError(

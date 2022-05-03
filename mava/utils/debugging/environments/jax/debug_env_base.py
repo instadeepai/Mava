@@ -20,6 +20,7 @@ import copy
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Tuple, Union
 
+from acme import specs
 from jax.random import PRNGKey
 import gym
 import jax
@@ -91,6 +92,8 @@ class MultiAgentJaxEnvBase(gym.Env, ABC):
 
             if agent.movable:
                 total_action_space.append(u_action_space)
+
+            print(total_action_space)
             # total action space
             if len(total_action_space) > 1:
                 # all action spaces are discrete, so simplify to
@@ -99,10 +102,12 @@ class MultiAgentJaxEnvBase(gym.Env, ABC):
                     isinstance(act_space, spaces.Discrete)
                     for act_space in total_action_space
                 ):
+                    print("DISCRETE!")
                     act_space = MultiDiscrete(
                         [[0, act_space.n - 1] for act_space in total_action_space]
                     )
                 else:
+                    print("CONT!")
                     act_space = spaces.Tuple(total_action_space)
                 self.action_spaces[agent_id] = act_space
             else:
@@ -116,6 +121,9 @@ class MultiAgentJaxEnvBase(gym.Env, ABC):
                 low=-np.inf, high=+np.inf, shape=(obs_dim,), dtype=np.float32
             )
 
+        print(self.action_spaces)
+        print(self.observation_spaces)
+
         # rendering
         self.shared_viewer = shared_viewer
         self.viewers: List = [None]
@@ -123,8 +131,28 @@ class MultiAgentJaxEnvBase(gym.Env, ABC):
             self.viewers = [None] * self.n
         self._reset_render()
 
-        self.action_spec = self.action_spaces
-        self.observation_spec = self.observation_spaces
+        # self.action_spec = self.action_spaces
+        # self.observation_spec = self.observation_spaces
+
+    def observation_spec(self):
+        return self.observation_spaces
+
+    def action_spec(self):
+        return self.action_spaces
+
+    def reward_spec(self):
+        return {
+            agent_id: specs.Array((), np.float32) for agent_id in self.possible_agents
+        }
+
+    def discount_spec(self):
+        return {
+            agent_id: specs.BoundedArray((), np.float32, minimum=0, maximum=1.0)
+            for agent_id in self.possible_agents
+        }
+
+    def extra_spec(self):
+        return {}
 
     def step(
         self, world: JaxWorld, action_n: Dict[str, Union[int, List[float]]]
