@@ -127,33 +127,6 @@ class MultiAgentJaxEnvBase(gym.Env, ABC):
             self.viewers = [None] * self.n
         self._reset_render()
 
-        # self.action_spec = self.action_spaces
-        # self.observation_spec = self.observation_spaces
-
-    def observation_spec(self):
-        return self.observation_spaces
-
-    def action_spec(self):
-        action_specs = {}
-        for a_i in range(self.n):
-            agent_id = EntityId(id=a_i, type=0)
-            action_specs[agent_id] = _convert_to_spec(self.action_spaces[agent_id])
-        return action_specs
-
-    def reward_spec(self):
-        return {
-            agent_id: specs.Array((), np.float32) for agent_id in self.possible_agents
-        }
-
-    def discount_spec(self):
-        return {
-            agent_id: specs.BoundedArray((), np.float32, minimum=0, maximum=1.0)
-            for agent_id in self.possible_agents
-        }
-
-    def extra_spec(self):
-        return {}
-
     def step(
         self, world: JaxWorld, action_n: Dict[str, Union[int, List[float]]]
     ) -> Tuple[

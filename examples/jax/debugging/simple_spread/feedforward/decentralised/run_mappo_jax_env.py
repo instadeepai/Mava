@@ -23,8 +23,8 @@ import optax
 from absl import app, flags
 
 from mava.systems.jax import mappo
-from mava.utils.loggers import logger_utils
 from mava.utils.debugging.environments.jax.debug_env_utils import make_environment
+from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
