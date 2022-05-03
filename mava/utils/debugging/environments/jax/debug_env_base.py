@@ -20,23 +20,23 @@ import copy
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Tuple, Union
 
-from acme import specs
-from jax.random import PRNGKey
 import gym
 import jax
 import jax.numpy as jnp
 import numpy as np
+from acme import specs
+from acme.wrappers.gym_wrapper import _convert_to_spec
 from gym import spaces
+from jax.random import PRNGKey
 from numpy import ndarray
 
 from mava.utils.debugging.environments.jax.core import (
+    Action,
     Agent,
+    EntityId,
     JaxWorld,
     step,
-    Action,
-    EntityId,
 )
-
 from mava.utils.debugging.multi_discrete import MultiDiscrete
 
 
@@ -93,7 +93,6 @@ class MultiAgentJaxEnvBase(gym.Env, ABC):
             if agent.movable:
                 total_action_space.append(u_action_space)
 
-            print(total_action_space)
             # total action space
             if len(total_action_space) > 1:
                 # all action spaces are discrete, so simplify to
@@ -102,12 +101,12 @@ class MultiAgentJaxEnvBase(gym.Env, ABC):
                     isinstance(act_space, spaces.Discrete)
                     for act_space in total_action_space
                 ):
-                    print("DISCRETE!")
+
                     act_space = MultiDiscrete(
                         [[0, act_space.n - 1] for act_space in total_action_space]
                     )
                 else:
-                    print("CONT!")
+
                     act_space = spaces.Tuple(total_action_space)
                 self.action_spaces[agent_id] = act_space
             else:
@@ -120,9 +119,6 @@ class MultiAgentJaxEnvBase(gym.Env, ABC):
             self.observation_spaces[agent_id] = spaces.Box(
                 low=-np.inf, high=+np.inf, shape=(obs_dim,), dtype=np.float32
             )
-
-        print(self.action_spaces)
-        print(self.observation_spaces)
 
         # rendering
         self.shared_viewer = shared_viewer
@@ -138,7 +134,11 @@ class MultiAgentJaxEnvBase(gym.Env, ABC):
         return self.observation_spaces
 
     def action_spec(self):
-        return self.action_spaces
+        action_specs = {}
+        for a_i in range(self.n):
+            agent_id = EntityId(id=a_i, type=0)
+            action_specs[agent_id] = _convert_to_spec(self.action_spaces[agent_id])
+        return action_specs
 
     def reward_spec(self):
         return {
