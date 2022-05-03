@@ -123,6 +123,9 @@ class MultiAgentJaxEnvBase(gym.Env, ABC):
             self.viewers = [None] * self.n
         self._reset_render()
 
+        self.action_spec = self.action_spaces
+        self.observation_spec = self.observation_spaces
+
     def step(
         self, world: JaxWorld, action_n: Dict[str, Union[int, List[float]]]
     ) -> Tuple[
