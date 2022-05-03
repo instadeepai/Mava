@@ -1,13 +1,15 @@
 import abc
 import copy
 import typing
-from typing import List, Optional, Union
+from functools import partial
+from typing import List, Tuple, Union
 
 import chex
 import jax
 import jax.random as jrand
 import jax.numpy as jnp
-import numpy as np
+
+from mava.utils.id_utils import EntityId
 
 
 @chex.dataclass
@@ -34,7 +36,7 @@ class Action:
 @chex.dataclass
 class Entity:
     # name
-    name: int = -1
+    name: EntityId
     # properties:
     size: float = 0.050
     # entity can move / be pushed
@@ -72,7 +74,7 @@ class Agent(Entity):
     # cannot observe the world
     blind: bool = False
     # physical motor noise amount
-    u_noise: float = jnp.nan
+    u_noise: jnp.ndarray = jnp.array([jnp.nan, jnp.nan])
     # control range
     u_range: float = 1.0
     # state
@@ -120,7 +122,7 @@ class JaxWorld:
 
 def step(world: JaxWorld) -> JaxWorld:
     # set actions for scripted agents
-    world.replace(current_step=world.current_step + 1)
+    world = world.replace(current_step=world.current_step + 1)
     # apply agent physical controls
     p_force = apply_action_force(world)
     # apply environment forces
@@ -135,13 +137,16 @@ def apply_action_force(world: JaxWorld) -> List[float]:
     # set applied forces
     p_force = []
 
+    key, *agent_keys = jrand.split(world.key, len(world.agents) + 1)
     for i, agent in enumerate(world.agents):
         noise = jax.lax.cond(
-            jnp.isnan(agent.u_noise),
+            jnp.all(jnp.isnan(agent.u_noise)),
             lambda x: jnp.array([0.0, 0.0]),
-            lambda agent: jrand.normal(world.key, agent.action.u.shape) * agent.u_noise,
+            lambda agent: jrand.normal(agent_keys[i], agent.action.u.shape)
+            * agent.u_noise,
             agent,
         )
+
         p_force_val = jax.lax.cond(
             agent.movable,
             lambda agent: agent.action.u + noise,
@@ -150,17 +155,16 @@ def apply_action_force(world: JaxWorld) -> List[float]:
         )
 
         p_force.append(p_force_val)
+
     return p_force
 
 
 # gather physical forces acting on entities
 def apply_environment_force(world: JaxWorld, p_force: List[float]) -> List[float]:
     # simple (but inefficient) collision response
-
     new_p_force = copy.deepcopy(p_force)
-    # TODO WHY DOES world.entities not work here???
-    for a, entity_a in enumerate(world.agents):
-        for b, entity_b in enumerate(world.agents):
+    for a, entity_a in enumerate(world.entities):
+        for b, entity_b in enumerate(world.entities):
             f_a, f_b = jax.lax.cond(
                 b <= a,
                 lambda *_: jnp.array([[0.0, 0.0], [0.0, 0.0]]),
@@ -170,15 +174,18 @@ def apply_environment_force(world: JaxWorld, p_force: List[float]) -> List[float
                 entity_b,
             )
 
-            new_p_force[a] = f_a
-            new_p_force[b] = f_b
-            # if b <= a:
-            #     continue
+            # ideally this should check if entity is movable, but that is not jittable
+            if isinstance(entity_a, Agent):
+                new_p_force[a] += f_a
+            if isinstance(entity_b, Agent):
+                new_p_force[b] += f_b
 
     return new_p_force
 
 
 def move_entity(world: JaxWorld, entity: Entity, p_force: float) -> Entity:
+    """Calculates the velocity of an entity given its force"""
+
     def clamp_vel(vel, max_speed):
         speed = jnp.sqrt(jnp.sum(jnp.square(vel)))
 
@@ -188,26 +195,24 @@ def move_entity(world: JaxWorld, entity: Entity, p_force: float) -> Entity:
             lambda: entity.state.p_vel,
         )
 
-    def calc_vel(entity):
-        vel = (
-            entity.state.p_vel * (1 - world.damping)
-            + (p_force / entity.mass) * world.dt
-        )
+    def calc_vel(ent):
+        vel = ent.state.p_vel * (1 - world.damping) + (p_force / ent.mass) * world.dt
 
         return jax.lax.cond(
-            entity.max_speed is None,
+            jnp.isnan(ent.max_speed),
             lambda *_: vel,
             lambda vel, max_speed: clamp_vel(vel, max_speed),
             vel,
-            entity.max_speed,
+            ent.max_speed,
         )
 
     vel = jax.lax.cond(
-        entity.movable & (entity.max_speed is not None),
+        entity.movable,
         calc_vel,
         lambda *_: jnp.zeros(entity.state.p_vel.shape),
         entity,
     )
+
     pos = entity.state.p_pos + vel * world.dt
     return entity.replace(state=entity.state.replace(p_pos=pos, p_vel=vel))
 
@@ -215,22 +220,17 @@ def move_entity(world: JaxWorld, entity: Entity, p_force: float) -> Entity:
 # integrate physical state
 @typing.no_type_check
 def integrate_state(world: JaxWorld, p_force: List[float]) -> JaxWorld:
-    landmarks = copy.deepcopy(world.landmarks)
-    agents = copy.deepcopy(world.agents)
+    partial_move_entity = partial(move_entity, world)
+    # only calc movement for agent as landmarks aren't movable and don't receive p_forces
+    agents = list(map(partial_move_entity, world.agents, p_force))
 
-    for i, entity in enumerate(landmarks):
-        landmarks[i] = move_entity(world, entity, p_force[i])
-
-    for i, entity in enumerate(agents):
-        agents[i] = move_entity(world, entity, p_force[i])
-
-    return world.replace(agents=agents, landmarks=landmarks)
+    return world.replace(agents=agents)
 
 
 # get collision forces for any contact between two entities
 @typing.no_type_check
 def get_collision_force(
-    self: JaxWorld, entity_a: Entity, entity_b: Entity
+    world: JaxWorld, entity_a: Entity, entity_b: Entity
 ) -> List[Union[float, None]]:
     def get_force():
         delta_pos = entity_a.state.p_pos - entity_b.state.p_pos
@@ -238,20 +238,18 @@ def get_collision_force(
         # minimum allowable distance
         dist_min = entity_a.size + entity_b.size
         # softmax penetration
-        k = self.contact_margin
+        k = world.contact_margin
         penetration = jnp.logaddexp(0, -(dist - dist_min) / k) * k
-        force = jnp.array(self.contact_force * delta_pos / dist * penetration)
+        force = world.contact_force * delta_pos / dist * penetration
 
         force_a = jax.lax.cond(entity_a.movable, lambda: force, lambda: jnp.zeros(2))
         force_b = jax.lax.cond(entity_b.movable, lambda: force, lambda: jnp.zeros(2))
-        # force_a = +force if entity_a.movable else [jnp.nan, jnp.nan]
-        # force_b = -force if entity_b.movable else [jnp.nan, jnp.nan]
 
         return jnp.array([force_a, force_b])
 
     return jax.lax.cond(
         # not a collider and don't collide against itself
         jnp.logical_not(entity_a.collide | entity_b.collide) | (entity_a is entity_b),
-        lambda: jnp.array([[jnp.nan, jnp.nan], [jnp.nan, jnp.nan]]),
+        lambda: jnp.zeros((2, 2)),
         get_force,
     )

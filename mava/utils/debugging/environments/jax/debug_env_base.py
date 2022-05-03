@@ -17,28 +17,36 @@
 # TODO (dries): Try using this class directly from PettingZoo and delete this file.
 # type: ignore
 import copy
+from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Tuple, Union
 
+from jax.random import PRNGKey
 import gym
 import jax
 import jax.numpy as jnp
 import numpy as np
 from gym import spaces
+from numpy import ndarray
 
-from mava.utils.debugging.environments.jax.core import Agent, JaxWorld, step, Action
+from mava.utils.debugging.environments.jax.core import (
+    Agent,
+    JaxWorld,
+    step,
+    Action,
+    EntityId,
+)
 
-from ..multi_discrete import MultiDiscrete
+from mava.utils.debugging.multi_discrete import MultiDiscrete
 
 
 # environment for all agents in the multiagent world
 # currently code assumes that no agents will be created/destroyed at runtime!
-class MultiAgentJaxEnv(gym.Env):
+class MultiAgentJaxEnvBase(gym.Env, ABC):
     metadata = {"render.modes": ["human", "rgb_array"]}
 
     def __init__(
         self,
         world: JaxWorld,
-        action_space: str,
         reset_callback: Callable = None,
         reward_callback: Callable = None,
         observation_callback: Callable = None,
@@ -48,21 +56,16 @@ class MultiAgentJaxEnv(gym.Env):
     ) -> None:
 
         self.dim_p = world.dim_p
+        # I don't see where this was being used, but it would be static here so no point in having it
+        # self.env_done = False
+
         # Generate IDs and convert agent list to dictionary format.
-        agent_dict = {}
-        self.env_done = False
         self.agent_ids = []
 
         agent_list = world.policy_agents
-        for a_i in range(len(agent_list)):
-            agent_id = "agent_" + str(a_i)
-            self.agent_ids.append(agent_id)
-            agent_dict[agent_id] = agent_list[a_i]
-
+        self.agent_ids = [EntityId(id=a_i, type=0) for a_i in range(len(agent_list))]
         self.possible_agents = self.agent_ids
-
         self.num_agents = len(self.agent_ids)
-        self.agents = agent_dict
 
         # set required vectorized gym env property
         self.n = len(world.policy_agents)
@@ -72,15 +75,6 @@ class MultiAgentJaxEnv(gym.Env):
         self.observation_callback = observation_callback
         self.info_callback = info_callback
         self.done_callback = done_callback
-        # environment parameters
-        assert action_space in ["continuous", "discrete"]
-
-        self.discrete_action_space = action_space == "discrete"
-
-        # if true, action is a number 0...N, otherwise
-        # action is a one-hot N-dimensional vector
-        self.discrete_action_input = action_space == "discrete"
-        self.time = 0
 
         self.render_geoms: Union[List, None] = None
         self.render_geoms_xform: Union[List, None] = None
@@ -88,19 +82,13 @@ class MultiAgentJaxEnv(gym.Env):
         # configure spaces
         self.action_spaces = {}
         self.observation_spaces = {}
-        for a_i, agent_id in enumerate(self.agent_ids):
-            agent = self.agents[agent_id]
+        for a_i in range(self.n):
+            agent_id = EntityId(id=a_i, type=0)
+            agent = world.agents[a_i]
             total_action_space = []
             # physical action space
-            if self.discrete_action_space:
-                u_action_space = spaces.Discrete(self.dim_p * 2 + 1)
-            else:
-                u_action_space = spaces.Box(
-                    low=-agent.u_range,
-                    high=+agent.u_range,
-                    shape=(self.dim_p,),
-                    dtype=np.float32,
-                )
+            u_action_space = spaces.Discrete(self.dim_p * 2 + 1)
+
             if agent.movable:
                 total_action_space.append(u_action_space)
             # total action space
@@ -135,13 +123,19 @@ class MultiAgentJaxEnv(gym.Env):
             self.viewers = [None] * self.n
         self._reset_render()
 
+        self.action_spec = self.action_spaces
+        self.observation_spec = self.observation_spaces
+
     def step(
         self, world: JaxWorld, action_n: Dict[str, Union[int, List[float]]]
     ) -> Tuple[
-        Dict[str, Union[np.ndarray, Any]],
-        Union[dict, Dict[str, Union[float, Any]]],
-        Dict[str, Any],
-        Dict[str, dict],
+        JaxWorld,
+        Tuple[
+            Dict[EntityId, ndarray],
+            Dict[EntityId, float],
+            Dict[EntityId, bool],
+            ndarray,
+        ],
     ]:
         obs_n = {}
         reward_n = {}
@@ -150,10 +144,9 @@ class MultiAgentJaxEnv(gym.Env):
         processed_agents = []
         # set action for each agent
         for agent_id in self.agent_ids:
-            agent = self.agents[agent_id]
-            agent_action = copy.deepcopy(action_n[agent_id])
-            action = self._process_action(agent_action, agent)
-            processed_agents.append(agent.replace(action=action))
+            agent = world.agents[agent_id.id]
+            agent_action = self._process_action(action_n[agent_id], agent)
+            processed_agents.append(agent.replace(action=agent_action))
 
         # update world's agents with new actions
         world = world.replace(agents=processed_agents)
@@ -161,33 +154,27 @@ class MultiAgentJaxEnv(gym.Env):
         world = step(world)
         # record observation for each agent
         for a_i, agent_id in enumerate(self.agent_ids):
-            agent = self.agents[agent_id]
+            agent = world.agents[agent_id.id]
             obs_n[agent_id] = self._get_obs(world, a_i, agent)
             reward_n[agent_id] = self._get_reward(world, a_i, agent)
             done_n[agent_id] = self._get_done(world, agent)
-
-        # this means that env is done when any agent is done?
-        # if done_n[agent_id]:
-        #     self.env_done = True
-        self.env_done = jnp.any(jnp.array(list(done_n.values())))
 
         state_n = self._get_state(world)
 
         return world, (obs_n, reward_n, done_n, state_n)
 
-    def reset(self, world: JaxWorld) -> Tuple[JaxWorld, Dict[str, Any], Dict[str, Any]]:
+    def reset(self, key: PRNGKey) -> Tuple[JaxWorld, Dict[str, Any], Dict[str, Any]]:
         # reset world
         if self.reset_callback is not None:
-            self.reset_callback(world)
+            world = self.reset_callback(key)
         else:
             raise ValueError("self.reset_callback is still None!")
         # reset renderer
-        # self._reset_render()
-        self.env_done = False
+        self._reset_render()
         # record observations for each agent
         obs_n = {}
         for a_i, agent_id in enumerate(self.agent_ids):
-            agent = self.agents[agent_id]
+            agent = world.agents[agent_id.id]
             obs_n[agent_id] = self._get_obs(world, a_i, agent)
         state_n = self._get_state(world)
         return world, obs_n, {"s_t": state_n}
@@ -242,12 +229,8 @@ class MultiAgentJaxEnv(gym.Env):
         )
 
     # set env action for a particular agent
-    def _process_action(
-        self,
-        action: int,
-        agent: Agent,
-    ) -> Action:
-
+    @abstractmethod
+    def _process_action(self, action: int, agent: Agent) -> Action:
         agent.action.u = jnp.zeros(self.dim_p)
 
         def on_movable(act: Action):
@@ -326,7 +309,10 @@ class MultiAgentJaxEnv(gym.Env):
             if self.shared_viewer:
                 pos = np.zeros(world.dim_p)
             else:
-                pos = self.agents[self.agent_ids[i]].state.p_pos
+                agent_id = self.agent_ids[i]
+                pos = world.agents[
+                    int(agent_id.split("_")[1])
+                ]  # self.agents[self.agent_ids[i]].state.p_pos
             self.viewers[i].set_bounds(
                 pos[0] - cam_range,
                 pos[0] + cam_range,

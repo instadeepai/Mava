@@ -1,15 +1,14 @@
 import copy
-from typing import Optional
-
-import typing
+from typing import Optional, Sequence, no_type_check
 
 import chex
 import jax.random
+from jax.random import PRNGKey
 
-from mava.utils.debugging.environments.jax.core import Agent, Landmark
+from mava.utils.debugging.environments.jax.core import Agent, Landmark, Entity, EntityId
 from mava.utils.debugging.environments.jax.core import JaxWorld
 import jax.numpy as jnp
-import numpy as np
+from functools import partial
 
 from mava.utils.debugging.scenario import BaseScenario
 
@@ -20,54 +19,51 @@ def make_world(num_agents: int, key: RNG) -> JaxWorld:
     # set any world properties first
     num_landmarks = num_agents
     # add agents
-    agents = [Agent(name=i, collide=True, size=0.15) for i in range(num_agents)]
+    agents = [
+        Agent(name=EntityId(id=i, type=0), collide=True, size=0.15)
+        for i in range(num_agents)
+    ]
     # add landmarks
     landmarks = [
-        Landmark(name=i, collide=False, movable=False) for i in range(num_landmarks)
+        Landmark(name=EntityId(id=i, type=1), collide=False, movable=False)
+        for i in range(num_landmarks)
     ]
 
-    world = JaxWorld(key=key, agents=agents, landmarks=landmarks)
-
     # make initial conditions
-    return world
+    return JaxWorld(key=key, agents=agents, landmarks=landmarks)
 
 
 class Scenario(BaseScenario):
     def __init__(self, world: JaxWorld) -> None:
         super().__init__()
+        # the first world kept so that world params don't change
         self.world = world
         self.dim_p = world.dim_p
 
     def make_world(self, num_agents: int) -> JaxWorld:
-        # make initial conditions
-        return self.reset_world(self.world)
+        # cannot make world inside here because self.world must be immutable
+        return self.reset_world(self.world.key)
 
-    # @typing.no_type_check
-    def reset_world(self, world: JaxWorld) -> JaxWorld:
-        agents = copy.deepcopy(world.agents)
-        landmarks = copy.deepcopy(world.landmarks)
-
-        key, *agent_keys = jax.random.split(world.key,len(world.agents)+1)
-
-        # random properties for agents
-        for i, agent in enumerate(world.agents):
-            agents[i].color = (0.35, 0.35, 0.85)
-            agents[i].state.p_pos = jax.random.uniform(
-               agent_keys[i], (self.dim_p,), minval=-1.0, maxval=1.0
+    def reset_world(self, key: PRNGKey) -> JaxWorld:
+        def reset_entity(entity: Entity, key: RNG, color):
+            pos = jax.random.uniform(key, (self.dim_p,), minval=-1.0, maxval=1.0)
+            return entity.replace(
+                color=color,
+                state=entity.state.replace(p_pos=pos, p_vel=jnp.zeros(self.dim_p)),
             )
-            agents[i].state.p_vel = jnp.zeros(self.dim_p)
 
-        # random properties for landmarks
-        key, *landmark_keys = jax.random.split(key, len(world.landmarks)+1)
-        for i, landmark in enumerate(world.landmarks):
-            landmarks[i].color = (0.25, 0.25, 0.25)
-            landmarks[i].state.p_pos = jax.random.uniform(
-                landmark_keys[i], (self.dim_p,), minval=-1, maxval=1
-            )
-            landmarks[i].state.p_vel = jnp.zeros(self.dim_p)
+        key, *agent_keys = jax.random.split(key, len(self.world.agents) + 1)
+        key, *landmark_keys = jax.random.split(key, len(self.world.landmarks) + 1)
 
-        # Reset step counter
-        return world.replace(key=key,agents=agents, landmarks=landmarks, current_step=0)
+        reset_agent = partial(reset_entity, color=(0.35, 0.35, 0.85))
+        reset_landmark = partial(reset_entity, color=(0.25, 0.25, 0.25))
+
+        agents = list(map(reset_agent, self.world.agents, agent_keys))
+        landmarks = list(map(reset_landmark, self.world.landmarks, landmark_keys))
+
+        return self.world.replace(
+            key=key, agents=agents, landmarks=landmarks, current_step=0
+        )
 
     def is_collision(self, agent1: Agent, agent2: Agent) -> bool:
         delta_pos = agent1.state.p_pos - agent2.state.p_pos
@@ -79,7 +75,7 @@ class Scenario(BaseScenario):
     def dist(pt1: jnp.ndarray, pt2: jnp.ndarray) -> float:
         return jnp.sqrt(jnp.sum(jnp.square(pt1 - pt2)))
 
-    @typing.no_type_check
+    @no_type_check
     def reward(self, agent: Agent, a_i: int, world: JaxWorld) -> float:
         # Agents are rewarded based on agent distance to its corresponding
         # landmark, penalized for collisions
@@ -93,14 +89,28 @@ class Scenario(BaseScenario):
         distance = jnp.min(jnp.array([distance, 1.0]))
         rew += 1 - distance
 
-        if agent.collide:
+        def collision_reward():
+            rew = 0
             for other in world.agents:
                 if other is agent:
                     continue
 
-                rew = jax.lax.cond(
-                    self.is_collision(other, agent), lambda: rew - 1, lambda: rew
-                )
+                rew += -(self.is_collision(other, agent).astype(int))
+                # jax.lax.cond(
+                #     self.is_collision(other, agent), lambda: - 1, lambda: 0
+                # )
+            return rew
+
+        rew += jax.lax.cond(agent.collide, collision_reward, lambda: 0)
+
+        # if agent.collide:
+        #     for other in world.agents:
+        #         if other is agent:
+        #             continue
+        #
+        #         rew = jax.lax.cond(
+        #             self.is_collision(other, agent), lambda: rew - 1, lambda: rew
+        #         )
 
         return rew
 
