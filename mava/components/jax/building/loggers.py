@@ -46,7 +46,7 @@ class Logger(Component):
             logger_config = self.config.logger_config[name]
 
         builder.store.executor_logger = self.config.logger_factory(  # type: ignore
-            f"executor_{builder.store.executor_id}", **logger_config
+            builder.store.executor_id, **logger_config
         )
 
     def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
@@ -57,7 +57,7 @@ class Logger(Component):
             logger_config = self.config.logger_config[name]
 
         builder.store.trainer_logger = self.config.logger_factory(  # type: ignore
-            f"trainer_{builder.store.trainer_id}", **logger_config
+            builder.store.trainer_id, **logger_config
         )
 
     @staticmethod
