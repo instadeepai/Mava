@@ -17,6 +17,7 @@ from abc import abstractmethod
 from typing import Any, Iterator, List
 
 import dm_env
+from chex import Array
 
 
 class ParallelEnvWrapper(dm_env.Environment):
@@ -59,3 +60,11 @@ class SequentialEnvWrapper(ParallelEnvWrapper):
         """
         Returns the current selected agent.
         """
+
+
+class EnvironmentModelWrapper:
+    """Abstract class for environment models used in MAMCTS"""
+
+    @abstractmethod
+    def get_observation(self, environment_state, agent_info) -> Array:
+        """Returns an agent's observation given the environment state and an agents indentifying information"""

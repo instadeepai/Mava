@@ -21,11 +21,12 @@ from typing import Any
 import jax
 import optax
 from absl import app, flags
-from mava.components.jax.building.environments import JAXParallelExecutorEnvironmentLoop
 
+from mava.components.jax.building.environments import JAXParallelExecutorEnvironmentLoop
 from mava.systems.jax import mappo
-from mava.utils.debugging.environments.jax.debug_env_utils import make_environment
+from mava.utils.debugging.environments.jax.debug_env.new_debug_env import DebugEnv
 from mava.utils.loggers import logger_utils
+from mava.wrappers.JaxPCBGridEnvMavaWrapper import PcbGridEnvWrapper
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -47,6 +48,20 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
+def make_environment(rows=5, cols=5, evaluation: bool = None, num_agents: int = 1):
+
+    return PcbGridEnvWrapper(
+        DebugEnv(
+            rows,
+            cols,
+            num_agents,
+            reward_for_connection=1.0,
+            reward_for_blocked=-1.0,
+            reward_per_timestep=-1.0 / (rows + cols),
+        )
+    )
+
+
 def main(_: Any) -> None:
     """Run main script
 
@@ -55,7 +70,8 @@ def main(_: Any) -> None:
     """
 
     environment_factory = functools.partial(
-        make_environment, num_agents=1, key=jax.random.PRNGKey(0)
+        make_environment,
+        num_agents=1,
     )
 
     # Networks.
@@ -88,7 +104,7 @@ def main(_: Any) -> None:
 
     # Create the system.
     system = mappo.MAPPOSystem()
-    
+
     system.update(JAXParallelExecutorEnvironmentLoop)
 
     # Build the system.
@@ -99,8 +115,10 @@ def main(_: Any) -> None:
         checkpoint_subpath=checkpoint_subpath,
         optimizer=optimizer,
         run_evaluator=True,
-        sample_batch_size=5,
-        num_epochs=15,
+        sample_batch_size=256,
+        batch_size=256 * 19,
+        num_minibatches=4,
+        num_epochs=5,
         num_executors=1,
         multi_process=True,
     )
