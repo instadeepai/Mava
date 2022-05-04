@@ -145,13 +145,13 @@ class Scenario(BaseScenario):
             )
 
         return jnp.concatenate(
-                [agent.state.p_vel]
-                + [agent.state.p_pos]
-                + [jnp.array([world.current_step / 50])]
-                + [target_landmark]
-                + other_agents_pos
-                + other_landmarks_pos
-              # + comm
+            [agent.state.p_vel]
+            + [agent.state.p_pos]
+            + [jnp.array([world.current_step / 50])]
+            + [target_landmark]
+            + other_agents_pos
+            + other_landmarks_pos
+            # + comm
         )
 
     def done(self, agent: Agent, world: JaxWorld) -> bool:
