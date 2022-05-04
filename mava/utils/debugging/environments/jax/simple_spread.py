@@ -23,11 +23,14 @@ def make_world(num_agents: int, key: RNG) -> JaxWorld:
         Agent(name=EntityId(id=i, type=0), collide=True, size=0.15)
         for i in range(num_agents)
     ]
+    agents = jax.tree_map(lambda *x: jnp.stack(x), *agents)
+    # jax.tree_map(lambda x: x[index], agents)
     # add landmarks
     landmarks = [
         Landmark(name=EntityId(id=i, type=1), collide=False, movable=False)
         for i in range(num_landmarks)
     ]
+    landmarks = jax.tree_map(lambda *x: jnp.stack(x), *landmarks)
 
     # make initial conditions
     return JaxWorld(key=key, agents=agents, landmarks=landmarks)
@@ -51,15 +54,17 @@ class Scenario(BaseScenario):
                 color=color,
                 state=entity.state.replace(p_pos=pos, p_vel=jnp.zeros(self.dim_p)),
             )
+        n_agents = len(self.world.agents.size)
+        n_landmarks = len(self.world.landmarks.size)
 
-        key, *agent_keys = jax.random.split(key, len(self.world.agents) + 1)
-        key, *landmark_keys = jax.random.split(key, len(self.world.landmarks) + 1)
+        key, *agent_keys = jax.random.split(key, n_agents + 1)
+        key, *landmark_keys = jax.random.split(key, n_landmarks + 1)
 
         reset_agent = partial(reset_entity, color=(0.35, 0.35, 0.85))
         reset_landmark = partial(reset_entity, color=(0.25, 0.25, 0.25))
 
-        agents = list(map(reset_agent, self.world.agents, agent_keys))
-        landmarks = list(map(reset_landmark, self.world.landmarks, landmark_keys))
+        agents = jax.vmap(reset_agent)(self.world.agents, jnp.asarray(agent_keys))
+        landmarks = jax.vmap(reset_agent)(self.world.landmarks, jnp.asarray(agent_keys))
 
         return self.world.replace(
             key=key, agents=agents, landmarks=landmarks, current_step=0
@@ -80,9 +85,8 @@ class Scenario(BaseScenario):
         # Agents are rewarded based on agent distance to its corresponding
         # landmark, penalized for collisions
         rew = 0.0
-        # for i in range(len(world.agents)):
-        other_agent = world.agents[a_i]
-        landmark = world.landmarks[a_i]
+        other_agent = jax.tree_map(lambda x: x[a_i], world.agents)
+        landmark = jax.tree_map(lambda x: x[a_i], world.landmarks)
         distance = self.dist(other_agent.state.p_pos, landmark.state.p_pos)
 
         # Cap distance
@@ -91,7 +95,8 @@ class Scenario(BaseScenario):
 
         def collision_reward():
             rew = 0
-            for other in world.agents:
+            for i in range(len(world.agents.size)):
+                other = jax.tree_map(lambda x: x[i], world.agents)
                 if other is agent:
                     continue
 
@@ -116,17 +121,18 @@ class Scenario(BaseScenario):
 
     def observation(self, agent: Agent, a_i: int, world: JaxWorld) -> jnp.ndarray:
         # get the position of the agent's target landmark
-        target_landmark = world.landmarks[a_i].state.p_pos - agent.state.p_pos
-
+        # target_landmark = world.landmarks[a_i].state.p_pos - agent.state.p_pos
+        target_landmark = jax.tree_map(lambda x: x[a_i], world.landmarks).state.p_pos - agent.state.p_pos
         # Get the other agent and landmark positions
         other_agents_pos = []
         other_landmarks_pos = []
-        for i, other_agent in enumerate(world.agents):
+        for i in range(len(world.agents.size)):
+            other_agent = jax.tree_map(lambda x: x[i], world.agents)
             if other_agent is agent:
                 continue
             other_agents_pos.append(other_agent.state.p_pos - agent.state.p_pos)
             other_landmarks_pos.append(
-                world.landmarks[i].state.p_pos - agent.state.p_pos
+                jax.tree_map(lambda x: x[i], world.landmarks).state.p_pos - agent.state.p_pos
             )
 
         return jnp.concatenate(

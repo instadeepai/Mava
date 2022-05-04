@@ -86,8 +86,8 @@ class Agent(Entity):
 @chex.dataclass(frozen=True)
 class JaxWorld:
     key: jax.random.PRNGKey
-    agents: List[Agent]
-    landmarks: List[Landmark]
+    agents: jnp.ndarray
+    landmarks: jnp.ndarray
     current_step: int = 0
     # position dimensionality
     dim_p: int = 2
@@ -102,22 +102,22 @@ class JaxWorld:
     contact_margin: float = 1e-3
 
     # return all entities in the world
-    @property
-    def entities(self) -> List[Entity]:
-        entity_list: List[Entity] = []
-        entity_list.extend(self.agents)
-        entity_list.extend(self.landmarks)
-        return entity_list
+    # @property
+    # def entities(self) -> List[Entity]:
+    #     entity_list: List[Entity] = []
+    #     entity_list.extend(self.agents)
+    #     entity_list.extend(self.landmarks)
+    #     return entity_list
 
     # return all agents controllable by external policies
-    @property
-    def policy_agents(self) -> List[Agent]:
-        return [agent for agent in self.agents]
+    # @property
+    # def policy_agents(self) -> List[Agent]:
+    #     return [agent for agent in self.agents]
 
     # return all agents controlled by world scripts
-    @property
-    def scripted_agents(self) -> List[Agent]:
-        return [agent for agent in self.agents]
+    # @property
+    # def scripted_agents(self) -> List[Agent]:
+    #     return [agent for agent in self.agents]
 
 
 def step(world: JaxWorld) -> JaxWorld:
@@ -126,7 +126,7 @@ def step(world: JaxWorld) -> JaxWorld:
     # apply agent physical controls
     p_force = apply_action_force(world)
     # apply environment forces
-    p_force = apply_environment_force(world, p_force)
+    p_force =  apply_environment_force(world, p_force)
     # integrate physical state
     return integrate_state(world, p_force)
 
@@ -138,7 +138,8 @@ def apply_action_force(world: JaxWorld) -> List[float]:
     p_force = []
 
     key, *agent_keys = jrand.split(world.key, len(world.agents) + 1)
-    for i, agent in enumerate(world.agents):
+    for i in range(len(world.agents.size)):
+        agent = jax.tree_map(lambda x: x[i], world.agents)
         noise = jax.lax.cond(
             jnp.all(jnp.isnan(agent.u_noise)),
             lambda x: jnp.array([0.0, 0.0]),
@@ -163,10 +164,14 @@ def apply_action_force(world: JaxWorld) -> List[float]:
 def apply_environment_force(world: JaxWorld, p_force: List[float]) -> List[float]:
     # simple (but inefficient) collision response
     new_p_force = copy.deepcopy(p_force)
-    for a, entity_a in enumerate(world.entities):
-        for b, entity_b in enumerate(world.entities):
+    # Checking agents colliding with agents
+    for a_i in range(len(world.agents.size)):
+        for b_i in range(len(world.agents.size)):
+            entity_a = jax.tree_map(lambda x: x[a_i], world.agents)
+            entity_b = jax.tree_map(lambda x: x[b_i], world.agents)
+
             f_a, f_b = jax.lax.cond(
-                b <= a,
+                b_i <= a_i,
                 lambda *_: jnp.array([[0.0, 0.0], [0.0, 0.0]]),
                 get_collision_force,
                 world,
@@ -176,9 +181,29 @@ def apply_environment_force(world: JaxWorld, p_force: List[float]) -> List[float
 
             # ideally this should check if entity is movable, but that is not jittable
             if isinstance(entity_a, Agent):
-                new_p_force[a] += f_a
+                new_p_force[a_i] += f_a
             if isinstance(entity_b, Agent):
-                new_p_force[b] += f_b
+                new_p_force[b_i] += f_b
+
+    # checking entities colliding with entitites
+    for a_i in range(len(world.agents.size)):
+        for b_i in range(len(world.landmarks.size)):
+            entity_a = jax.tree_map(lambda x: x[a_i], world.agents)
+            entity_b = jax.tree_map(lambda x: x[b_i], world.landmarks)
+
+            f_a, f_b = get_collision_force(world, entity_a, entity_b)
+
+            # f_a, f_b = jax.lax.cond(
+            #     b_i <= a_i,
+            #     lambda *_: jnp.array([[0.0, 0.0], [0.0, 0.0]]),
+            #     get_collision_force,
+            #     world,
+            #     entity_a,
+            #     entity_b,
+            # )
+
+            if isinstance(entity_a, Agent):
+                new_p_force[a_i] += f_a
 
     return new_p_force
 
@@ -222,7 +247,7 @@ def move_entity(world: JaxWorld, entity: Entity, p_force: float) -> Entity:
 def integrate_state(world: JaxWorld, p_force: List[float]) -> JaxWorld:
     partial_move_entity = partial(move_entity, world)
     # only calc movement for agent as landmarks aren't movable and don't receive p_forces
-    agents = list(map(partial_move_entity, world.agents, p_force))
+    agents = jax.vmap(partial_move_entity)(world.agents, jnp.asarray(p_force))
 
     return world.replace(agents=agents)
 

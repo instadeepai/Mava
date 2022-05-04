@@ -63,13 +63,12 @@ class MultiAgentJaxEnvBase(gym.Env, ABC):
         # Generate IDs and convert agent list to dictionary format.
         self.agent_ids = []
 
-        agent_list = world.policy_agents
-        self.agent_ids = [EntityId(id=a_i, type=0) for a_i in range(len(agent_list))]
+        self.agent_ids = [EntityId(id=a_i, type=0) for a_i in range(len(world.agents.size))]
         self.possible_agents = self.agent_ids
         self.num_agents = len(self.agent_ids)
 
         # set required vectorized gym env property
-        self.n = len(world.policy_agents)
+        self.n = len(world.agents.size)
         # scenario callbacks
         self.reset_callback = reset_callback
         self.reward_callback = reward_callback
@@ -85,7 +84,7 @@ class MultiAgentJaxEnvBase(gym.Env, ABC):
         self.observation_spaces = {}
         for a_i in range(self.n):
             agent_id = EntityId(id=a_i, type=0)
-            agent = world.agents[a_i]
+            agent = jax.tree_map(lambda x: x[a_i], world.agents)
             total_action_space = []
             # physical action space
             u_action_space = spaces.Discrete(self.dim_p * 2 + 1)
@@ -145,17 +144,20 @@ class MultiAgentJaxEnvBase(gym.Env, ABC):
         processed_agents = []
         # set action for each agent
         for agent_id in self.agent_ids:
-            agent = world.agents[agent_id.id]
+            agent = jax.tree_map(lambda x: x[agent_id.id], world.agents)
+            # agent = world.agents[agent_id.id]
             agent_action = self._process_action(action_n[agent_id], agent)
             processed_agents.append(agent.replace(action=agent_action))
 
+        # stack pytrees
+        processed_agents = jax.tree_map(lambda *x: jnp.stack(x), *processed_agents)
         # update world's agents with new actions
         world = world.replace(agents=processed_agents)
         # advance world state
         world = step(world)
         # record observation for each agent
         for a_i, agent_id in enumerate(self.agent_ids):
-            agent = world.agents[agent_id.id]
+            agent = jax.tree_map(lambda x: x[agent_id.id], world.agents)
             obs_n[agent_id] = self._get_obs(world, a_i, agent)
             reward_n[agent_id] = self._get_reward(world, a_i, agent)
             done_n[agent_id] = self._get_done(world, agent)
@@ -175,7 +177,7 @@ class MultiAgentJaxEnvBase(gym.Env, ABC):
         # record observations for each agent
         obs_n = {}
         for a_i, agent_id in enumerate(self.agent_ids):
-            agent = world.agents[agent_id.id]
+            agent = jax.tree_map(lambda x: x[agent_id.id], world.agents)
             obs_n[agent_id] = self._get_obs(world, a_i, agent)
         state_n = self._get_state(world)
         return world, obs_n, {"s_t": state_n}
@@ -209,15 +211,24 @@ class MultiAgentJaxEnvBase(gym.Env, ABC):
     def _get_state(self, world: JaxWorld) -> np.ndarray:
         # get positions of all entities in this agent's reference frame
         entity_pos = []
-        for entity in world.landmarks:  # world.entities:
+        # for entity in world.landmarks:  # world.entities:
+        #     entity_pos.append(entity.state.p_pos)
+
+        for i in range(len(world.landmarks.size)):
+            entity = jax.tree_map(lambda x: x[i], world.landmarks)
             entity_pos.append(entity.state.p_pos)
         # entity colors
 
         agent_pos = []
         agent_vel = []
-        for i, agent in enumerate(world.agents):
+        for i in range(len(world.agents.size)):
+            agent = jax.tree_map(lambda x: x[i], world.agents)
             agent_pos.append(agent.state.p_pos)
             agent_vel.append(agent.state.p_vel)
+
+        # for i, agent in enumerate(world.agents):
+        #     agent_pos.append(agent.state.p_pos)
+        #     agent_vel.append(agent.state.p_vel)
 
         return jnp.array(
             jnp.concatenate(
