@@ -28,6 +28,7 @@ from dm_env import specs as dm_specs
 from jax import jit
 
 from mava import specs as mava_specs
+from mava.systems.jax.mamcts.embedding_net import EmbeddingGridModel
 
 Array = dm_specs.Array
 BoundedArray = dm_specs.BoundedArray
@@ -191,3 +192,53 @@ def make_default_networks(
     return {
         "networks": networks,
     }
+
+
+def make_discrete_embedding_networks(
+    environment_spec: specs.EnvironmentSpec,
+    key: networks_lib.PRNGKey,
+    policy_layer_sizes: Sequence[int],
+    critic_layer_sizes: Sequence[int],
+    vocab_size: int = 128,
+    embedding_dim: Optional[int] = None,
+    num_channels: Sequence[int] = [16, 32, 32],
+    num_blocks: Sequence[int] = [2, 2, 2],
+) -> MAMCTSNetworks:
+    """TODO: Add description here."""
+
+    num_actions = environment_spec.actions.num_values
+
+    # TODO (dries): Investigate if one forward_fn function is slower
+    # than having a policy_fn and critic_fn. Maybe jit solves
+    # this issue. Having one function makes obs network calculations
+    # easier.
+    def forward_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+        policy_value_network = hk.Sequential(
+            [
+                utils.batch_concat,
+                EmbeddingGridModel(
+                    "EmbeddingGridModel",
+                    vocab_size,
+                    embedding_dim,
+                    num_channels,
+                    num_blocks,
+                ),
+                networks_lib.CategoricalValueHead(num_values=num_actions),
+            ]
+        )
+        return policy_value_network(inputs)
+
+    # Transform into pure functions.
+    forward_fn = hk.without_apply_rng(hk.transform(forward_fn))
+
+    dummy_obs = utils.zeros_like(environment_spec.observations.observation)
+    dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
+
+    network_key, key = jax.random.split(key)
+    params = forward_fn.init(network_key, dummy_obs)  # type: ignore
+
+    # Create PPONetworks to add functionality required by the agent.
+    return make_mcts_network(
+        network=forward_fn,
+        params=params,
+    )
