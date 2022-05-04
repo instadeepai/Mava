@@ -31,7 +31,7 @@ from mava.utils.debugging.environments.switch_game import MultiAgentSwitchGame
 from mava.utils.debugging.environments.two_step import TwoStepEnv
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
-
+from mava.utils.id_utils import EntityId
 
 class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
     """Environment wrapper for Debugging MARL environments."""
@@ -258,6 +258,49 @@ class JAXDebuggingEnvWrapper(PettingZooParallelEnvWrapper):
             step_type=step_type,
         )
 
+        return state, timestep, None
+
+    def search_step(
+        self, state, actions: Dict[str, np.ndarray]
+    ) -> Union[dm_env.TimeStep, Tuple[dm_env.TimeStep, Dict[str, np.ndarray]]]:
+        """Steps the environment."""
+
+        actions = {f"type-0-id-{i}": actions[i] for i in range(len(actions))}
+
+        state, (observations, rewards, dones, _) = self._environment.step(
+            state, actions
+        )
+
+        rewards_spec = self.reward_spec()
+        #  Handle empty rewards
+        rewards_arr = jnp.zeros(len(actions),int)
+        if rewards:
+            for agent, reward in rewards.items():
+                agent_index = EntityId.from_string(agent).id
+                rewards_arr = rewards_arr.at[agent_index].set(reward)
+
+        if observations:
+            observations = self._convert_observations(observations, dones)
+        _discounts = jnp.zeros(len(actions),float)
+        for agent in self._environment.possible_agents:
+            agent_index = EntityId.from_string(agent).id
+            _discounts = _discounts.at[agent_index].set(jax.lax.cond(dones[agent], lambda: jnp.float32(0), lambda: jnp.float32(1)))
+
+
+        # TODO Step type should be all but original is any
+        step_type = jax.lax.cond(
+            jnp.any(jnp.asarray(list(dones.values()))),
+            lambda: dm_env.StepType.LAST,
+            lambda: dm_env.StepType.MID,
+        )
+
+        timestep = dm_env.TimeStep(
+            observation=observations,
+            reward=rewards_arr,
+            discount=_discounts,
+            step_type=step_type,
+        )
+        
         return state, timestep, None
 
     # Convert Debugging environment observation so it's dm_env compatible.

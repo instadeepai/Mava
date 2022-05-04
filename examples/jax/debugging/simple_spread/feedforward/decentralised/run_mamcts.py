@@ -54,7 +54,7 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
-def make_environment(rows=5, cols=5, evaluation: bool = None, num_agents: int = 2):
+def make_environment(rows=5, cols=5, evaluation: bool = None, num_agents: int = 1):
 
     return PcbGridEnvWrapper(
         PcbGridEnv(
@@ -80,14 +80,14 @@ def main(_: Any) -> None:
     )
 
     @chex.assert_max_traces(n=2)
-    def root_fn(forward_fn, params, key, embedding):
+    def root_fn(forward_fn, params, key, env_state):
 
-        prior_logits, values = forward_fn(observations=embedding, params=params)
-
+        prior_logits, values = forward_fn(observations=env_state.grid.reshape(1,-1), params=params)
+        
         return RootFnOutput(
             prior_logits=prior_logits.logits,
             value=values,
-            embedding=embedding,
+            embedding=jax.tree_map(lambda x: jnp.expand_dims(x,0),env_state),
         )
 
     @chex.assert_max_traces(n=2)
@@ -97,26 +97,19 @@ def main(_: Any) -> None:
         params,
         rng_key,
         action,
-        observation,
+        env_state,
         agent_info,
     ) -> RecurrentFnOutput:
-
-        state = State(
-            key=rng_key,
-            grid=observation.reshape(environment_model.rows, environment_model.cols),
-            step=0,
-            finished_agents=environment_model.get_finished_agents(
-                observation.reshape(environment_model.rows, environment_model.cols)
-            ),
-        )
+        
+        env_state = jax.tree_map(lambda x : jnp.squeeze(x,0),env_state)
 
         actions = jnp.zeros(environment_model.num_agents, int)
 
         actions = actions.at[agent_info.id].set(jnp.squeeze(action))
 
-        next_state, timestep, _ = environment_model.search_step(state, actions)
+        next_state, timestep, _ = environment_model.search_step(env_state, actions)
 
-        prior_logits, values = forward_fn(observations=observation, params=params)
+        prior_logits, values = forward_fn(observations=next_state.grid.reshape(1,-1), params=params)
 
         reward = timestep.reward[agent_info.id].reshape(
             1,
@@ -132,7 +125,7 @@ def main(_: Any) -> None:
                 prior_logits=prior_logits.logits,
                 value=values,
             ),
-            next_state.grid.reshape(1, -1),
+            jax.tree_map(lambda x: jnp.expand_dims(x,0),next_state),
         )
 
     # Networks.

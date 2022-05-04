@@ -21,6 +21,7 @@ from typing import Any
 import jax
 import optax
 from absl import app, flags
+from mava.components.jax.building.environments import JAXParallelExecutorEnvironmentLoop
 
 from mava.systems.jax import mappo
 from mava.utils.debugging.environments.jax.debug_env_utils import make_environment
@@ -87,6 +88,8 @@ def main(_: Any) -> None:
 
     # Create the system.
     system = mappo.MAPPOSystem()
+    
+    system.update(JAXParallelExecutorEnvironmentLoop)
 
     # Build the system.
     system.build(

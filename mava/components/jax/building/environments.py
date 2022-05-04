@@ -65,7 +65,7 @@ class ExecutorEnvironmentLoop(Component):
     @staticmethod
     def name() -> str:
         """_summary_"""
-        return "environment_loop"
+        return "executor_environment_loop"
 
     @staticmethod
     def config_class() -> Callable:
