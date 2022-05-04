@@ -13,16 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Package metadata for mava.
+"""Tests utils for Jax-based Mava systems"""
 
-This is kept in a separate module so that it can be imported from setup.py, at
-a time when mava's dependencies may not have been installed yet.
-"""
 
-# We follow Semantic Versioning (https://semver.org/)
-_MAJOR_VERSION = "0"
-_MINOR_VERSION = "1"
-_PATCH_VERSION = "3"
+from typing import Any
 
-# Example: '0.4.2'
-__version__ = ".".join([_MAJOR_VERSION, _MINOR_VERSION, _PATCH_VERSION])
+
+def assert_if_value_is_not_none(value1: Any, value2: Any) -> None:
+    """Func that compares value1 and value2, if value1 isn't none.
+
+    Args:
+        value1 : value1 to compare.
+        value2 : value2 to compare.
+    """
+    if value1:
+        assert value1 == value2

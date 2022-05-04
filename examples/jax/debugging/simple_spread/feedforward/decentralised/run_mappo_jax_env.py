@@ -26,7 +26,7 @@ from mava.components.jax.building.environments import JAXParallelExecutorEnviron
 from mava.systems.jax import mappo
 from mava.utils.debugging.environments.jax.debug_env.new_debug_env import DebugEnv
 from mava.utils.loggers import logger_utils
-from mava.wrappers.JaxPCBGridEnvMavaWrapper import PcbGridEnvWrapper
+from mava.wrappers.JaxDebugEnvWrapper import DebugEnvWrapper
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -48,9 +48,9 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
-def make_environment(rows=5, cols=5, evaluation: bool = None, num_agents: int = 1):
+def make_environment(rows=5, cols=5, evaluation: bool = None, num_agents: int = 2):
 
-    return PcbGridEnvWrapper(
+    return DebugEnvWrapper(
         DebugEnv(
             rows,
             cols,
@@ -71,7 +71,6 @@ def main(_: Any) -> None:
 
     environment_factory = functools.partial(
         make_environment,
-        num_agents=1,
     )
 
     # Networks.

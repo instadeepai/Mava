@@ -16,7 +16,7 @@
 """Trainer components for calculating losses."""
 
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -145,7 +145,12 @@ class MAPGWithTrustRegionClippingLoss(Loss):
         trainer.store.grad_fn = loss_grad_fn
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return MAPGTrustRegionClippingLossConfig
 
 

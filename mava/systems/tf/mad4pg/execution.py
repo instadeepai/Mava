@@ -39,6 +39,7 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
         network_sampling_setup: List,
+        fix_sampler: Optional[List],
         net_keys_to_ids: Dict[str, int],
         evaluator: bool = False,
         adder: Optional[adders.ReverbParallelAdder] = None,
@@ -57,6 +58,8 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
             agent_net_keys: specifies what network each agent uses.
             network_sampling_setup: List of networks that are randomly
                 sampled from by the executors at the start of an environment run.
+            fix_sampler: Optional list that can fix the executor sampler to sample
+                in a specific way.
             net_keys_to_ids: Specifies a mapping from network keys to their integer id.
             adder: adder which sends data
                 to a replay buffer. Defaults to None.
@@ -76,6 +79,7 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
             counts=counts,
             agent_net_keys=agent_net_keys,
             network_sampling_setup=network_sampling_setup,
+            fix_sampler=fix_sampler,
             net_keys_to_ids=net_keys_to_ids,
             evaluator=evaluator,
             interval=interval,
@@ -94,6 +98,7 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
         network_sampling_setup: List,
+        fix_sampler: Optional[List],
         net_keys_to_ids: Dict[str, int],
         evaluator: bool = False,
         adder: Optional[adders.ReverbParallelAdder] = None,
@@ -111,6 +116,8 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
             agent_net_keys: specifies what network each agent uses.
             network_sampling_setup: List of networks that are randomly
                 sampled from by the executors at the start of an environment run.
+            fix_sampler: Optional list that can fix the executor sampler to sample
+                in a specific way.
             net_keys_to_ids: Specifies a mapping from network keys to their integer id.
             adder: adder which sends data
                 to a replay buffer. Defaults to None.
@@ -132,6 +139,7 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
             counts=counts,
             agent_net_keys=agent_net_keys,
             network_sampling_setup=network_sampling_setup,
+            fix_sampler=fix_sampler,
             net_keys_to_ids=net_keys_to_ids,
             evaluator=evaluator,
             interval=interval,

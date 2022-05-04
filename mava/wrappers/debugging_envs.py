@@ -29,9 +29,10 @@ from mava.types import OLT
 from mava.utils.debugging.environment import MultiAgentEnv  # type: ignore
 from mava.utils.debugging.environments.switch_game import MultiAgentSwitchGame
 from mava.utils.debugging.environments.two_step import TwoStepEnv
+from mava.utils.id_utils import EntityId
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
-from mava.utils.id_utils import EntityId
+
 
 class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
     """Environment wrapper for Debugging MARL environments."""
@@ -189,7 +190,7 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
         return extras
 
 
-class JAXDebuggingEnvWrapper(PettingZooParallelEnvWrapper):
+class JAXSimpleSpreadEnvWrapper(PettingZooParallelEnvWrapper):
     """Environment wrapper for Debugging MARL environments."""
 
     def __init__(
@@ -273,7 +274,7 @@ class JAXDebuggingEnvWrapper(PettingZooParallelEnvWrapper):
 
         rewards_spec = self.reward_spec()
         #  Handle empty rewards
-        rewards_arr = jnp.zeros(len(actions),int)
+        rewards_arr = jnp.zeros(len(actions), int)
         if rewards:
             for agent, reward in rewards.items():
                 agent_index = EntityId.from_string(agent).id
@@ -281,11 +282,14 @@ class JAXDebuggingEnvWrapper(PettingZooParallelEnvWrapper):
 
         if observations:
             observations = self._convert_observations(observations, dones)
-        _discounts = jnp.zeros(len(actions),float)
+        _discounts = jnp.zeros(len(actions), float)
         for agent in self._environment.possible_agents:
             agent_index = EntityId.from_string(agent).id
-            _discounts = _discounts.at[agent_index].set(jax.lax.cond(dones[agent], lambda: jnp.float32(0), lambda: jnp.float32(1)))
-
+            _discounts = _discounts.at[agent_index].set(
+                jax.lax.cond(
+                    dones[agent], lambda: jnp.float32(0), lambda: jnp.float32(1)
+                )
+            )
 
         # TODO Step type should be all but original is any
         step_type = jax.lax.cond(
@@ -300,7 +304,7 @@ class JAXDebuggingEnvWrapper(PettingZooParallelEnvWrapper):
             discount=_discounts,
             step_type=step_type,
         )
-        
+
         return state, timestep, None
 
     # Convert Debugging environment observation so it's dm_env compatible.

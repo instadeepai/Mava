@@ -32,6 +32,7 @@ from mctx import RecurrentFnOutput, RootFnOutput
 from mava.systems.jax import mamcts
 from mava.utils.debugging.environments.jax.debug_env.new_debug_env import DebugEnv
 from mava.utils.environments import debugging_utils
+from mava.utils.id_utils import EntityId
 from mava.utils.loggers import logger_utils
 from mava.wrappers.JaxDebugEnvWrapper import DebugEnvWrapper
 
@@ -80,12 +81,9 @@ def main(_: Any) -> None:
         make_environment,
     )
 
-    @chex.assert_max_traces(n=2)
-    def root_fn(forward_fn, params, key, env_state):
+    def root_fn(forward_fn, params, key, env_state, observation):
 
-        prior_logits, values = forward_fn(
-            observations=env_state.grid.reshape(1, -1), params=params
-        )
+        prior_logits, values = forward_fn(observations=observation, params=params)
 
         return RootFnOutput(
             prior_logits=prior_logits.logits,
@@ -93,9 +91,8 @@ def main(_: Any) -> None:
             embedding=jax.tree_map(lambda x: jnp.expand_dims(x, 0), env_state),
         )
 
-    @chex.assert_max_traces(n=2)
     def recurrent_fn(
-        environment_model: PcbGridEnvWrapper,
+        environment_model: DebugEnvWrapper,
         forward_fn,
         params,
         rng_key,
@@ -104,22 +101,26 @@ def main(_: Any) -> None:
         agent_info,
     ) -> RecurrentFnOutput:
 
+        agent_index = EntityId.from_string(agent_info).id
+
+        actions = {f"type-0-id-{i}": 0 for i in range(environment_model.num_agents)}
+
+        actions[agent_info] = jnp.squeeze(action)
+
         env_state = jax.tree_map(lambda x: jnp.squeeze(x, 0), env_state)
 
-        actions = jnp.zeros(environment_model.num_agents, int)
+        next_state, timestep, _ = environment_model.step(env_state, actions)
 
-        actions = actions.at[agent_info.id].set(jnp.squeeze(action))
-
-        next_state, timestep, _ = environment_model.search_step(env_state, actions)
+        observation = environment_model.get_obs(next_state.grid)
 
         prior_logits, values = forward_fn(
-            observations=next_state.grid.reshape(1, -1), params=params
+            observations=observation[agent_index].reshape(1, -1), params=params
         )
 
-        reward = timestep.reward[agent_info.id].reshape(
+        reward = timestep.reward[agent_info].reshape(
             1,
         )
-        discount = timestep.discount[agent_info.id].reshape(
+        discount = timestep.discount[agent_info].reshape(
             1,
         )
 
@@ -174,8 +175,8 @@ def main(_: Any) -> None:
         run_evaluator=True,
         sample_batch_size=256,
         batch_size=256 * 19,
-        num_minibatches=2,
-        num_epochs=2,
+        num_minibatches=4,
+        num_epochs=5,
         num_executors=1,
         multi_process=True,
         root_fn=root_fn,
@@ -184,7 +185,7 @@ def main(_: Any) -> None:
         environment_model=environment_factory(),
         num_simulations=20,
         rng_seed=0,
-        learning_rate=0.001,
+        learning_rate=0.01,
         n_step=5,
     )
 

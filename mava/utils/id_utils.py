@@ -34,7 +34,8 @@ class EntityId:
             split_string = entity_str.split("-")
             attributes = {}
             for attribute, value in zip(split_string[0::2], split_string[1::2]):
-                attributes[attribute] = value
+                # TODO is eval slow?
+                attributes[attribute] = eval(value)
 
             return EntityId(**attributes)
         elif isinstance(entity_str, EntityId):

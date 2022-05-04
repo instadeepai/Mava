@@ -30,7 +30,7 @@ from gym import spaces
 from jax.random import PRNGKey
 from numpy import ndarray
 
-from mava.utils.debugging.environments.jax.core import (
+from mava.utils.debugging.environments.jax.simple_spread.core import (
     Action,
     Agent,
     EntityId,

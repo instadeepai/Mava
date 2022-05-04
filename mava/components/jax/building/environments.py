@@ -24,11 +24,48 @@ from mava import specs
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 from mava.environment_loop import JAXParallelEnvironmentLoop, ParallelEnvironmentLoop
+from mava.utils.sort_utils import sort_str_num
+
+
+@dataclass
+class EnvironmentSpecConfig:
+    environment_factory: Optional[Callable[[bool], acme.core.Worker]] = None
+
+
+class EnvironmentSpec(Component):
+    def __init__(self, config: EnvironmentSpecConfig = EnvironmentSpecConfig()):
+        """[summary]"""
+        self.config = config
+
+    def on_building_init_start(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+
+        builder.store.environment_spec = specs.MAEnvironmentSpec(
+            self.config.environment_factory()
+        )
+
+        builder.store.agents = sort_str_num(
+            builder.store.environment_spec.get_agent_ids()
+        )
+        builder.store.extras_spec = {}
+
+    @staticmethod
+    def name() -> str:
+        """_summary_"""
+        return "environment_spec"
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return EnvironmentSpecConfig
 
 
 @dataclass
 class ExecutorEnvironmentLoopConfig:
-    environment_factory: Optional[Callable[[bool], acme.core.Worker]] = None
     should_update: bool = True
 
 
@@ -41,9 +78,7 @@ class ExecutorEnvironmentLoop(Component):
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
-        builder.store.environment_spec = specs.MAEnvironmentSpec(
-            self.config.environment_factory(evaluation=False)  # type: ignore
-        )
+        pass
 
     def on_building_executor_environment(self, builder: SystemBuilder) -> None:
         """_summary_
@@ -54,9 +89,6 @@ class ExecutorEnvironmentLoop(Component):
         builder.store.executor_environment = self.config.environment_factory(
             evaluation=False
         )  # type: ignore
-        builder.store.environment_spec = specs.MAEnvironmentSpec(
-            builder.store.executor_environment
-        )
 
     @abc.abstractmethod
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
@@ -68,7 +100,12 @@ class ExecutorEnvironmentLoop(Component):
         return "executor_environment_loop"
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return ExecutorEnvironmentLoopConfig
 
 

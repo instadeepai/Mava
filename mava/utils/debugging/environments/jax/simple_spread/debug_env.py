@@ -7,8 +7,10 @@ from acme.wrappers.gym_wrapper import _convert_to_spec
 from gym import spaces
 
 from mava.types import OLT
-from mava.utils.debugging.environments.jax.core import Action, Agent
-from mava.utils.debugging.environments.jax.debug_env_base import MultiAgentJaxEnvBase
+from mava.utils.debugging.environments.jax.simple_spread.core import Action, Agent
+from mava.utils.debugging.environments.jax.simple_spread.debug_env_base import (
+    MultiAgentJaxEnvBase,
+)
 
 
 class MAJaxDiscreteDebugEnv(MultiAgentJaxEnvBase):

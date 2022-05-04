@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import jax.random
 from jax.random import PRNGKey
 
-from mava.utils.debugging.environments.jax.core import (
+from mava.utils.debugging.environments.jax.simple_spread.core import (
     Agent,
     Entity,
     EntityId,

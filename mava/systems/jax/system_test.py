@@ -14,7 +14,7 @@
 # limitations under the License.
 """Tests for Jax-based Mava system implementation."""
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 import pytest
 
@@ -73,7 +73,12 @@ class ComponentZero(MainComponent):
         builder.store.int_plus_str = self.config.param_0 + int(self.config.param_1)
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return ComponentZeroDefaultConfig
 
 
@@ -103,7 +108,12 @@ class ComponentOne(SubComponent):
         builder.store.float_plus_bool = self.config.param_2 + float(self.config.param_3)
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return ComponentOneDefaultConfig
 
 
@@ -135,7 +145,12 @@ class ComponentTwo(MainComponent):
         )
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return ComponentTwoDefaultConfig
 
 
@@ -168,7 +183,12 @@ class MockDistributorComponent(Component):
         return "distributor"
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return DistributorDefaultConfig
 
 

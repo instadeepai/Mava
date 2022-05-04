@@ -33,22 +33,43 @@ class MCTS:
         self.config = config
 
     def get_action(
-        self, forward_fn, params, rng_key, env_state,observation, action_mask, agent_info
+        self,
+        forward_fn,
+        params,
+        rng_key,
+        env_state,
+        observation,
+        action_mask,
+        agent_info,
     ):
         """TODO: Add description here."""
-        agent_info = EntityId.from_string(agent_info)
+        # agent_info = EntityId.from_string(agent_info)
         search_out = self.search(
-            forward_fn, params, rng_key, env_state, observation, action_mask, agent_info
+            forward_fn,
+            params,
+            rng_key,
+            env_state,
+            observation,
+            action_mask,
+            str(agent_info),
         )
 
         return (
-            jnp.squeeze(search_out.action),
+            jnp.squeeze(search_out.action.astype(jnp.int64)),
             {"search_policies": jnp.squeeze(search_out.action_weights)},
         )
 
-    @functools.partial(jit, static_argnums=(0, 1))
-    @chex.assert_max_traces(n=2)
-    def search(self, forward_fn, params, rng_key, env_state, observation, action_mask, agent_info):
+    @functools.partial(jit, static_argnums=(0, 1, 7))
+    def search(
+        self,
+        forward_fn,
+        params,
+        rng_key,
+        env_state,
+        observation,
+        action_mask,
+        agent_info,
+    ):
         """TODO: Add description here."""
 
         root = self.config.root_fn(forward_fn, params, rng_key, env_state, observation)

@@ -2,11 +2,18 @@ from typing import Tuple
 
 from jax.random import PRNGKey
 
-from mava.utils.debugging.environments.jax.core import JaxWorld
-from mava.utils.debugging.environments.jax.debug_env import MAJaxDiscreteDebugEnv
-from mava.utils.debugging.environments.jax.debug_env_base import MultiAgentJaxEnvBase
-from mava.utils.debugging.environments.jax.simple_spread import Scenario, make_world
-from mava.wrappers.debugging_envs import JAXDebuggingEnvWrapper
+from mava.utils.debugging.environments.jax.simple_spread.core import JaxWorld
+from mava.utils.debugging.environments.jax.simple_spread.debug_env import (
+    MAJaxDiscreteDebugEnv,
+)
+from mava.utils.debugging.environments.jax.simple_spread.debug_env_base import (
+    MultiAgentJaxEnvBase,
+)
+from mava.utils.debugging.environments.jax.simple_spread.simple_spread import (
+    Scenario,
+    make_world,
+)
+from mava.wrappers.debugging_envs import JAXSimpleSpreadEnvWrapper
 
 
 def make_environment(
@@ -23,7 +30,7 @@ def make_environment(
     world: JaxWorld = scenario.make_world(num_agents)
 
     # create multiagent environment
-    return JAXDebuggingEnvWrapper(
+    return JAXSimpleSpreadEnvWrapper(
         MAJaxDiscreteDebugEnv(
             world,
             reset_callback=scenario.reset_world,
