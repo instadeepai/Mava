@@ -621,7 +621,6 @@ class JAXParallelEnvironmentLoop(acme.core.Worker):
         logger: loggers.Logger = None,
         should_update: bool = True,
         label: str = "parallel_environment_loop",
-        rng_seed: int = 0,
     ):
         """Parallel environment loop init
 
@@ -649,7 +648,7 @@ class JAXParallelEnvironmentLoop(acme.core.Worker):
         # We need this to schedule evaluation/test runs
         self._last_evaluator_run_t = -1
 
-        self.rng_key = jax.random.PRNGKey(rng_seed)
+        self.rng_key = jax.random.PRNGKey(executor.store.rng_seed)
 
     def _get_actions(self, timestep: dm_env.TimeStep) -> Any:
         return self._executor.select_actions(timestep.observation)

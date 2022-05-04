@@ -17,6 +17,7 @@
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Union
 
+import jax
 from chex import PRNGKey
 
 from mava.components.jax import Component
@@ -31,6 +32,7 @@ class DistributorConfig:
     nodes_on_gpu: Union[List[str], str] = "trainer"
     run_evaluator: bool = True
     distributor_name: str = "System"
+    rng_seed: int = 0
 
 
 class Distributor(Component):
@@ -69,21 +71,39 @@ class Distributor(Component):
             node_type=NodeType.corrier,
             name="parameter_server",
         )
+        distributor_key = jax.random.PRNGKey(self.config.rng_seed)
+        distributor_key, executor_seed_key, evaluator_seed_key = jax.random.split(
+            distributor_key, 3
+        )
+        executor_seeds = jax.random.randint(
+            executor_seed_key,
+            (self.config.num_executors,),
+            minval=-jax.numpy.inf,
+            maxval=jax.numpy.inf,
+        )
 
         # executor nodes
         for executor_id in range(self.config.num_executors):
             builder.store.program.add(
                 builder.executor,
-                [f"executor_{executor_id}", data_server, parameter_server],
+                [
+                    f"executor_{executor_id}",
+                    data_server,
+                    parameter_server,
+                    executor_seeds[executor_id],
+                ],
                 node_type=NodeType.corrier,
                 name="executor",
             )
 
         if self.config.run_evaluator:
+            evaluator_seed = jax.random.randint(
+                evaluator_seed_key, (), minval=-jax.numpy.inf, maxval=jax.numpy.inf
+            )
             # evaluator node
             builder.store.program.add(
                 builder.executor,
-                ["evaluator", data_server, parameter_server],
+                ["evaluator", data_server, parameter_server, evaluator_seed],
                 node_type=NodeType.corrier,
                 name="evaluator",
             )

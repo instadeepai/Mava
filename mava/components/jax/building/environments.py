@@ -129,7 +129,7 @@ class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
 
 @dataclass
 class JAXParallelExecutorEnvironmentLoopConfig(ExecutorEnvironmentLoopConfig):
-    rng_seed: int = 0
+    pass
 
 
 class JAXParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
@@ -150,7 +150,6 @@ class JAXParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
             executor=builder.store.executor,
             logger=builder.store.executor_logger,
             should_update=self.config.should_update,
-            rng_seed=self.config.rng_seed,
         )
         del builder.store.executor_logger
 

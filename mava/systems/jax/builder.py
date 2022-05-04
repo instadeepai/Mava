@@ -95,7 +95,11 @@ class Builder(SystemBuilder, BuilderHookMixin):
         )
 
     def executor(
-        self, executor_id: str, data_server_client: Any, parameter_server_client: Any
+        self,
+        executor_id: str,
+        data_server_client: Any,
+        parameter_server_client: Any,
+        rng_seed: int,
     ) -> Any:
         """Executor, a collection of agents in an environment to gather experience.
 
@@ -111,6 +115,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
         self.store.data_server_client = data_server_client
         self.store.parameter_server_client = parameter_server_client
         self.store.is_evaluator = self.store.executor_id == "evaluator"
+        self.store.rng_seed = rng_seed
 
         # start of making the executor
         self.on_building_executor_start()

@@ -174,7 +174,6 @@ def main(_: Any) -> None:
         optimizer=optimizer,
         run_evaluator=True,
         sample_batch_size=256,
-        batch_size=256 * 19,
         num_minibatches=4,
         num_epochs=5,
         num_executors=1,
