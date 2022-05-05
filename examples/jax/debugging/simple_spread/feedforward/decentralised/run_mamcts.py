@@ -138,7 +138,7 @@ def main(_: Any) -> None:
 
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
-        return mamcts.make_default_networks(
+        return mamcts.make_embedding_networks(
             policy_layer_sizes=(254, 254, 254),
             critic_layer_sizes=(512, 512, 256),
             *args,
