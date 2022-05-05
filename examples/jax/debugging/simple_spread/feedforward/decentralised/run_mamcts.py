@@ -61,7 +61,7 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
-def make_environment(rows=6, cols=6, evaluation: bool = None, num_agents: int = 2):
+def make_environment(rows=6, cols=6, evaluation: bool = None, num_agents: int = 5):
 
     return DebugEnvWrapper(
         DebugEnv(
@@ -129,10 +129,10 @@ def main(_: Any) -> None:
         num_executors=6,
         multi_process=True,
         root_fn=generic_root_fn(),
-        recurrent_fn=greedy_policy_recurrent_fn(),
+        recurrent_fn=default_action_recurrent_fn(0),
         search=mctx.gumbel_muzero_policy,
         environment_model=environment_factory(),
-        num_simulations=30,
+        num_simulations=15,
         rng_seed=0,
         learning_rate=0.01,
         n_step=10,
