@@ -1,12 +1,12 @@
-from typing import Callable, Dict, Any, Sequence, Optional
+from typing import Any, Callable, Dict, Optional, Sequence
 
+import haiku as hk
 import jax
 import jax.numpy as jnp
-import haiku as hk
+from acme.jax import networks as networks_lib
 from acme.jax import utils
 
 from mava import specs
-from acme.jax import networks as networks_lib
 
 
 class ResidualBlock(hk.Module):
@@ -95,6 +95,7 @@ class EmbeddingGridModel(hk.Module):
         self.embed_dim = embedding_dim
 
     def __call__(self, x):
+        x = x.astype(int)
         embed = hk.Embed(self.vocab_size, self.embed_dim)
         atari = AtariDeepTorso(
             num_channels=self.num_channels, num_blocks=self.num_blocks
@@ -129,7 +130,6 @@ def make_discrete_embedding_networks(
         # inputs = inputs.astype(jnp.int32)
         policy_value_network = hk.Sequential(
             [
-                utils.batch_concat,
                 EmbeddingGridModel(
                     "EmbeddingGridModel",
                     vocab_size,
