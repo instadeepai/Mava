@@ -14,5 +14,5 @@
 # limitations under the License.
 
 """Jax MAPPO system."""
-from mava.systems.jax.mappo.networks import make_default_networks
+from mava.systems.jax.mappo.networks import make_default_networks, make_embedding_networks
 from mava.systems.jax.mappo.system import MAPPOSystem

@@ -15,6 +15,7 @@
 
 """Jax MAMCTS system networks."""
 import dataclasses
+import functools
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import haiku as hk  # type: ignore
@@ -28,7 +29,10 @@ from dm_env import specs as dm_specs
 from jax import jit
 
 from mava import specs as mava_specs
-from mava.systems.jax.mamcts.embedding_net import EmbeddingGridModel
+from mava.systems.jax.mamcts.embedding_net import (
+    EmbeddingGridModel,
+    make_discrete_embedding_networks,
+)
 
 Array = dm_specs.Array
 BoundedArray = dm_specs.BoundedArray
@@ -102,6 +106,7 @@ def make_networks(
         256,
     ),
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
+    make_net_fn=make_discrete_embedding_networks,
 ) -> MAMCTSNetworks:
     """TODO: Add description here."""
     if isinstance(spec.actions, specs.DiscreteArray):
@@ -194,51 +199,39 @@ def make_default_networks(
     }
 
 
-def make_discrete_embedding_networks(
-    environment_spec: specs.EnvironmentSpec,
-    key: networks_lib.PRNGKey,
-    policy_layer_sizes: Sequence[int],
-    critic_layer_sizes: Sequence[int],
-    vocab_size: int = 128,
-    embedding_dim: Optional[int] = None,
-    num_channels: Sequence[int] = [16, 32, 32],
-    num_blocks: Sequence[int] = [2, 2, 2],
-) -> MAMCTSNetworks:
-    """TODO: Add description here."""
+def make_embedding_networks(
+    environment_spec: mava_specs.MAEnvironmentSpec,
+    agent_net_keys: Dict[str, str],
+    rng_key: List[int],
+    net_spec_keys: Dict[str, str] = {},
+    policy_layer_sizes: Sequence[int] = (
+        256,
+        256,
+        256,
+    ),
+    critic_layer_sizes: Sequence[int] = (512, 512, 256),
+):
+    """Description here"""
 
-    num_actions = environment_spec.actions.num_values
+    # Create agent_type specs.
+    specs = environment_spec.get_agent_specs()
+    if not net_spec_keys:
+        specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
+    else:
+        specs = {net_key: specs[value] for net_key, value in net_spec_keys.items()}
 
-    # TODO (dries): Investigate if one forward_fn function is slower
-    # than having a policy_fn and critic_fn. Maybe jit solves
-    # this issue. Having one function makes obs network calculations
-    # easier.
-    def forward_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
-        policy_value_network = hk.Sequential(
-            [
-                utils.batch_concat,
-                EmbeddingGridModel(
-                    "EmbeddingGridModel",
-                    vocab_size,
-                    embedding_dim,
-                    num_channels,
-                    num_blocks,
-                ),
-                networks_lib.CategoricalValueHead(num_values=num_actions),
-            ]
+    networks: Dict[str, Any] = {}
+    for net_key in specs.keys():
+        networks[net_key] = make_networks(
+            specs[net_key],
+            key=rng_key,
+            policy_layer_sizes=policy_layer_sizes,
+            critic_layer_sizes=critic_layer_sizes,
+            make_net_fn=functools.partial(
+                make_discrete_embedding_networks, network_wrapper_fn=make_mcts_network
+            ),
         )
-        return policy_value_network(inputs)
 
-    # Transform into pure functions.
-    forward_fn = hk.without_apply_rng(hk.transform(forward_fn))
-
-    dummy_obs = utils.zeros_like(environment_spec.observations.observation)
-    dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
-
-    network_key, key = jax.random.split(key)
-    params = forward_fn.init(network_key, dummy_obs)  # type: ignore
-
-    # Create PPONetworks to add functionality required by the agent.
-    return make_mcts_network(
-        network=forward_fn,
-        params=params,
-    )
+    return {
+        "networks": networks,
+    }
