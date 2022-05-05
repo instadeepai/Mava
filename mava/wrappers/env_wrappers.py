@@ -74,4 +74,4 @@ class EnvironmentModelWrapper(ParallelEnvWrapper):
 
     @abstractmethod
     def get_possible_agents(self) -> List[EntityId]:
-        """Returns a list of all agent entity IDs - this can be in string form or EntityID objects"""
+        """Returns a list of all agent EntityID objects"""
