@@ -142,7 +142,7 @@ def make_discrete_networks(
     def forward_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
         policy_value_network = hk.Sequential(
             [
-                utils.batch_concat,
+                # utils.batch_concat,
                 hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
                 networks_lib.CategoricalValueHead(num_values=num_actions),
             ]

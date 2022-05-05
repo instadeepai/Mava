@@ -62,9 +62,11 @@ class FeedforwardExecutorSelectAction(Component):
             executor.store.agent_net_keys[agent]
         ]
 
-        observation = executor.store.observation.observation.reshape((1, -1))
+        # observation = executor.store.observation.observation.reshape((1, -1))
+        observation = executor.store.observation.observation
+        print(observation.shape)
         rng_key, executor.store.key = jax.random.split(executor.store.key)
-        
+
         # TODO (dries): We are currently using jit in the networks per agent.
         # We can also try jit over all the agents in a for loop. This would
         # allow the jit function to save us even more time.
@@ -88,7 +90,7 @@ class MCTSConfig:
     max_depth: MaxDepth = None
 
 
-class MCTSFeedforwardExecutorSelectAction(Component):
+class MCTSFeedforwardExecutorSelectAction(FeedforwardExecutorSelectAction):
     def __init__(
         self,
         config: MCTSConfig = MCTSConfig(),
@@ -98,7 +100,7 @@ class MCTSFeedforwardExecutorSelectAction(Component):
         Args:
             config : _description_.
         """
-        self.config = config
+        super().__init__(config)
 
     def on_execution_init_start(self, executor: SystemExecutor) -> None:
 
@@ -106,16 +108,6 @@ class MCTSFeedforwardExecutorSelectAction(Component):
             raise ValueError("Required arguments for MCTS config have not been given")
 
         self.mcts = MCTS(self.config)
-
-    # Select actions
-    def on_execution_select_actions(self, executor: SystemExecutor) -> None:
-        """Summary"""
-        executor.store.actions_info = {}
-        executor.store.policies_info = {}
-        for agent, observation in executor.store.observations.items():
-            action_info, policy_info = executor.select_action(agent, observation)
-            executor.store.actions_info[agent] = action_info
-            executor.store.policies_info[agent] = policy_info
 
     # TODO figure out how to pass agent ids since it is a string
     # Select action
@@ -127,28 +119,21 @@ class MCTSFeedforwardExecutorSelectAction(Component):
             executor.store.agent_net_keys[agent]
         ]
 
-        observation = executor.store.observation.observation.reshape((1, -1))
-
         rng_key, executor.store.key = jax.random.split(executor.store.key)
 
         # TODO (dries): We are currently using jit in the networks per agent.
         # We can also try jit over all the agents in a for loop. This would
         # allow the jit function to save us even more time.
-        
+
         executor.store.action_info, executor.store.policy_info = self.mcts.get_action(
             network.forward_fn,
             network.params,
             rng_key,
             executor.store.environment_state,
-            observation,
+            executor.store.observation.observation,
             executor.store.observation.legal_actions,
             agent,
         )
-
-    @staticmethod
-    def name() -> str:
-        """_summary_"""
-        return "action_selector"
 
     @staticmethod
     def config_class() -> Callable:

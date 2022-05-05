@@ -48,7 +48,7 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
-def make_environment(rows=5, cols=5, evaluation: bool = None, num_agents: int = 2):
+def make_environment(rows=5, cols=5, evaluation: bool = None, num_agents: int = 1):
 
     return DebugEnvWrapper(
         DebugEnv(
