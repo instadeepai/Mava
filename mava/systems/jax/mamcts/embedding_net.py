@@ -1,5 +1,12 @@
+from typing import Callable, Dict, Any, Sequence, Optional
+
 import jax
+import jax.numpy as jnp
 import haiku as hk
+from acme.jax import utils
+
+from mava import specs
+from acme.jax import networks as networks_lib
 
 
 class ResidualBlock(hk.Module):
@@ -62,9 +69,7 @@ class AtariDeepTorso(hk.Module):
                 padding="SAME",
             )
             for j in range(num_blocks):
-                block = ResidualBlock(
-                    nurelum_channels, name="residual_{}_{}".format(i, j)
-                )
+                block = ResidualBlock(num_channels, name="residual_{}_{}".format(i, j))
                 torso_out = block(torso_out)
 
         torso_out = jax.nn.relu(torso_out)
@@ -79,7 +84,7 @@ class EmbeddingGridModel(hk.Module):
         self,
         name=None,
         vocab_size=128,
-        embedding_dim=None,
+        embedding_dim=8,
         num_channels=[16, 32, 32],
         num_blocks=[2, 2, 2],
     ):
@@ -91,8 +96,63 @@ class EmbeddingGridModel(hk.Module):
 
     def __call__(self, x):
         embed = hk.Embed(self.vocab_size, self.embed_dim)
-        atari = AtariDeepTorso(num_channels=self.num_channels, num_blocks=self.num_blocks)
+        atari = AtariDeepTorso(
+            num_channels=self.num_channels, num_blocks=self.num_blocks
+        )
 
         x = embed(x)
         return atari(x)
 
+
+def make_discrete_embedding_networks(
+    environment_spec: specs.EnvironmentSpec,
+    key: networks_lib.PRNGKey,
+    network_wrapper_fn: Callable[
+        [networks_lib.FeedForwardNetwork, Dict[str, jnp.ndarray]], Any
+    ],
+    policy_layer_sizes: Sequence[int],
+    critic_layer_sizes: Sequence[int],
+    vocab_size: int = 128,
+    embedding_dim: Optional[int] = 8,
+    num_channels: Sequence[int] = [16, 32, 32],
+    num_blocks: Sequence[int] = [2, 2, 2],
+):
+    """TODO: Add description here."""
+
+    num_actions = environment_spec.actions.num_values
+
+    # TODO (dries): Investigate if one forward_fn function is slower
+    # than having a policy_fn and critic_fn. Maybe jit solves
+    # this issue. Having one function makes obs network calculations
+    # easier.
+    def forward_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+        # inputs = inputs.astype(jnp.int32)
+        policy_value_network = hk.Sequential(
+            [
+                utils.batch_concat,
+                EmbeddingGridModel(
+                    "EmbeddingGridModel",
+                    vocab_size,
+                    embedding_dim,
+                    num_channels,
+                    num_blocks,
+                ),
+                networks_lib.CategoricalValueHead(num_values=num_actions),
+            ]
+        )
+        return policy_value_network(inputs)
+
+    # Transform into pure functions.
+    forward_fn = hk.without_apply_rng(hk.transform(forward_fn))
+
+    dummy_obs = utils.zeros_like(environment_spec.observations.observation)
+    dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
+
+    network_key, key = jax.random.split(key)
+    params = forward_fn.init(network_key, dummy_obs)  # type: ignore
+
+    # Create PPONetworks to add functionality required by the agent.
+    return network_wrapper_fn(
+        network=forward_fn,
+        params=params,
+    )
