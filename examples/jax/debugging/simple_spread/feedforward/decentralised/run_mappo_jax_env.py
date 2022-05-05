@@ -48,7 +48,7 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
-def make_environment(rows=5, cols=5, evaluation: bool = None, num_agents: int = 1):
+def make_environment(rows=6, cols=6, evaluation: bool = None, num_agents: int = 1):
 
     return DebugEnvWrapper(
         DebugEnv(
@@ -86,7 +86,7 @@ def main(_: Any) -> None:
     checkpoint_subpath = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
-    log_every = 10
+    log_every = 5
     logger_factory = functools.partial(
         logger_utils.make_logger,
         directory=FLAGS.base_dir,
@@ -115,10 +115,11 @@ def main(_: Any) -> None:
         optimizer=optimizer,
         run_evaluator=True,
         sample_batch_size=256,
-        num_minibatches=4,
-        num_epochs=5,
-        num_executors=5,
+        num_minibatches=8,
+        num_epochs=4,
+        num_executors=6,
         multi_process=True,
+        learning_rate=0.001,
     )
 
     # Launch the system.

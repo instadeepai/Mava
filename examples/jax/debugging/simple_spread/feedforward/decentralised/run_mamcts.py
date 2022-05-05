@@ -57,7 +57,7 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
-def make_environment(rows=12, cols=12, evaluation: bool = None, num_agents: int = 1):
+def make_environment(rows=6, cols=6, evaluation: bool = None, num_agents: int = 1):
 
     return DebugEnvWrapper(
         DebugEnv(
@@ -79,7 +79,7 @@ def main(_: Any) -> None:
     """
     # Environment.
     environment_factory = functools.partial(
-        make_environment,
+        make_environment
     )
 
     def root_fn(forward_fn, params, key, env_state, observation):
@@ -121,6 +121,7 @@ def main(_: Any) -> None:
         reward = timestep.reward[agent_info].reshape(
             1,
         )
+
         discount = timestep.discount[agent_info].reshape(
             1,
         )
@@ -148,7 +149,7 @@ def main(_: Any) -> None:
     checkpoint_subpath = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
-    log_every = 1
+    log_every = 5
     logger_factory = functools.partial(
         logger_utils.make_logger,
         directory=FLAGS.base_dir,
@@ -175,18 +176,18 @@ def main(_: Any) -> None:
         optimizer=optimizer,
         run_evaluator=True,
         sample_batch_size=256,
-        num_minibatches=4,
-        num_epochs=5,
-        num_executors=1,
+        num_minibatches=8,
+        num_epochs=4,
+        num_executors=6,
         multi_process=True,
         root_fn=root_fn,
         recurrent_fn=recurrent_fn,
         search=mctx.gumbel_muzero_policy,
         environment_model=environment_factory(),
-        num_simulations=20,
+        num_simulations=30,
         rng_seed=0,
-        learning_rate=0.01,
-        n_step=5,
+        learning_rate=0.001,
+        n_step=10,
     )
 
     # Launch the system.

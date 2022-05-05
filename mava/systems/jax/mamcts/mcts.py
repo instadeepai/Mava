@@ -10,6 +10,8 @@ from haiku import Params
 from jax import jit
 
 from mava.utils.id_utils import EntityId
+from mava.utils.tree_utils import add_batch_dim_tree, remove_batch_dim_tree
+from mava.wrappers.env_wrappers import EnvironmentModelWrapper
 
 RecurrentState = Any
 RootFn = Callable[[Params, chex.PRNGKey, Any], mctx.RootFnOutput]
@@ -24,6 +26,59 @@ TreeSearch = Callable[
     [Params, chex.PRNGKey, mctx.RootFnOutput, RecurrentFn, int, MaxDepth], SearchOutput
 ]
 
+def generic_root_fn(forward_fn, params, key, env_state, observation):
+
+        prior_logits, values = forward_fn(observations=observation, params=params)
+
+        return mctx.RootFnOutput(
+            prior_logits=prior_logits.logits,
+            value=values,
+            embedding=add_batch_dim_tree(env_state),
+        )
+
+def generic_recurrent_fn(
+        environment_model : EnvironmentModelWrapper,
+        forward_fn,
+        params,
+        rng_key,
+        action,
+        env_state,
+        agent_info,
+    ) -> mctx.RecurrentFnOutput:
+
+        agent_index = EntityId.from_string(agent_info).id
+
+        actions = {agent_id : 0 for agent_id in environment_model.get_possible_agents()}
+
+        actions[agent_info] = jnp.squeeze(action)
+
+        env_state = remove_batch_dim_tree(env_state)
+
+        next_state, timestep, _ = environment_model.step(env_state, actions)
+
+        observation = environment_model.get_observation(next_state, agent_info)
+
+        prior_logits, values = forward_fn(
+            observations=observation, params=params
+        )
+
+        reward = timestep.reward[agent_info].reshape(
+            1,
+        )
+
+        discount = timestep.discount[agent_info].reshape(
+            1,
+        )
+
+        return (
+            mctx.RecurrentFnOutput(
+                reward=reward,
+                discount=discount,
+                prior_logits=prior_logits.logits,
+                value=values,
+            ),
+            add_batch_dim_tree(next_state),
+        )
 
 class MCTS:
     """TODO: Add description here."""

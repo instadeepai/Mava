@@ -19,6 +19,8 @@ from typing import Any, Iterator, List
 import dm_env
 from chex import Array
 
+from mava.utils.id_utils import EntityId
+
 
 class ParallelEnvWrapper(dm_env.Environment):
     """Abstract class for parallel environment wrappers"""
@@ -62,9 +64,14 @@ class SequentialEnvWrapper(ParallelEnvWrapper):
         """
 
 
-class EnvironmentModelWrapper:
+class EnvironmentModelWrapper(ParallelEnvWrapper):
     """Abstract class for environment models used in MAMCTS"""
 
+    
     @abstractmethod
     def get_observation(self, environment_state, agent_info) -> Array:
         """Returns an agent's observation given the environment state and an agents indentifying information"""
+
+    @abstractmethod
+    def get_possible_agents(self) -> List[EntityId]:
+        """Returns a list of all agent entity IDs - this can be in string form or EntityID objects"""

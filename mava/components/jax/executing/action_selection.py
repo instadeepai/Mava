@@ -62,9 +62,9 @@ class FeedforwardExecutorSelectAction(Component):
         network = executor.store.networks["networks"][
             executor.store.agent_net_keys[agent]
         ]
-
+        
         observation = utils.add_batch_dim(executor.store.observation.observation)
-
+        
         rng_key, executor.store.key = jax.random.split(executor.store.key)
 
         # TODO (dries): We are currently using jit in the networks per agent.
