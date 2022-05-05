@@ -20,15 +20,21 @@ from typing import Any
 
 import chex
 import jax
-from acme.jax import utils
 import jax.numpy as jnp
 import mctx
 import numpy as np
 import optax
 from absl import app, flags
+from acme.jax import utils
 from mctx import RecurrentFnOutput, RootFnOutput
 
 from mava.systems.jax import mamcts
+from mava.systems.jax.mamcts.mcts_utils import (
+    default_action_recurrent_fn,
+    generic_root_fn,
+    greedy_policy_recurrent_fn,
+    random_action_recurrent_fn,
+)
 from mava.utils.debugging.environments.jax.debug_env.new_debug_env import DebugEnv
 from mava.utils.id_utils import EntityId
 from mava.utils.loggers import logger_utils
@@ -76,63 +82,7 @@ def main(_: Any) -> None:
         _ : _
     """
     # Environment.
-    environment_factory = functools.partial(
-        make_environment
-    )
-
-    def root_fn(forward_fn, params, key, env_state, observation):
-
-        prior_logits, values = forward_fn(observations=observation, params=params)
-
-        return RootFnOutput(
-            prior_logits=prior_logits.logits,
-            value=values,
-            embedding=add_batch_dim_tree(env_state),
-        )
-
-    def recurrent_fn(
-        environment_model: DebugEnvWrapper,
-        forward_fn,
-        params,
-        rng_key,
-        action,
-        env_state,
-        agent_info,
-    ) -> RecurrentFnOutput:
-
-        agent_index = EntityId.from_string(agent_info).id
-
-        actions = {f"type-0-id-{i}": 0 for i in range(environment_model.num_agents)}
-
-        actions[agent_info] = jnp.squeeze(action)
-
-        env_state = remove_batch_dim_tree(env_state)
-
-        next_state, timestep, _ = environment_model.step(env_state, actions)
-
-        observation = environment_model.get_obs(next_state.grid)
-
-        prior_logits, values = forward_fn(
-            observations=utils.add_batch_dim(observation[agent_index]), params=params
-        )
-
-        reward = timestep.reward[agent_info].reshape(
-            1,
-        )
-
-        discount = timestep.discount[agent_info].reshape(
-            1,
-        )
-
-        return (
-            RecurrentFnOutput(
-                reward=reward,
-                discount=discount,
-                prior_logits=prior_logits.logits,
-                value=values,
-            ),
-            add_batch_dim_tree(next_state),
-        )
+    environment_factory = functools.partial(make_environment)
 
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
@@ -178,8 +128,8 @@ def main(_: Any) -> None:
         num_epochs=4,
         num_executors=6,
         multi_process=True,
-        root_fn=root_fn,
-        recurrent_fn=recurrent_fn,
+        root_fn=generic_root_fn(),
+        recurrent_fn=greedy_policy_recurrent_fn(),
         search=mctx.gumbel_muzero_policy,
         environment_model=environment_factory(),
         num_simulations=30,
