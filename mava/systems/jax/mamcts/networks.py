@@ -110,7 +110,7 @@ def make_networks(
 ) -> MAMCTSNetworks:
     """TODO: Add description here."""
     if isinstance(spec.actions, specs.DiscreteArray):
-        return make_discrete_networks(
+        return make_net_fn(
             environment_spec=spec,
             key=key,
             policy_layer_sizes=policy_layer_sizes,

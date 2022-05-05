@@ -20,18 +20,16 @@ from typing import Any
 
 import chex
 import jax
+from acme.jax import utils
 import jax.numpy as jnp
 import mctx
 import numpy as np
 import optax
 from absl import app, flags
-from jumanji.jax.pcb_grid.env import PcbGridEnv
-from jumanji.jax.pcb_grid.types import State
 from mctx import RecurrentFnOutput, RootFnOutput
 
 from mava.systems.jax import mamcts
 from mava.utils.debugging.environments.jax.debug_env.new_debug_env import DebugEnv
-from mava.utils.environments import debugging_utils
 from mava.utils.id_utils import EntityId
 from mava.utils.loggers import logger_utils
 from mava.utils.tree_utils import add_batch_dim_tree, remove_batch_dim_tree
@@ -57,7 +55,7 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
-def make_environment(rows=6, cols=6, evaluation: bool = None, num_agents: int = 1):
+def make_environment(rows=6, cols=6, evaluation: bool = None, num_agents: int = 2):
 
     return DebugEnvWrapper(
         DebugEnv(
@@ -115,7 +113,7 @@ def main(_: Any) -> None:
         observation = environment_model.get_obs(next_state.grid)
 
         prior_logits, values = forward_fn(
-            observations=observation[agent_index].reshape(1, -1), params=params
+            observations=utils.add_batch_dim(observation[agent_index]), params=params
         )
 
         reward = timestep.reward[agent_info].reshape(
@@ -186,7 +184,7 @@ def main(_: Any) -> None:
         environment_model=environment_factory(),
         num_simulations=30,
         rng_seed=0,
-        learning_rate=0.001,
+        learning_rate=0.01,
         n_step=10,
     )
 

@@ -46,8 +46,6 @@ def generic_recurrent_fn(
         agent_info,
     ) -> mctx.RecurrentFnOutput:
 
-        agent_index = EntityId.from_string(agent_info).id
-
         actions = {agent_id : 0 for agent_id in environment_model.get_possible_agents()}
 
         actions[agent_info] = jnp.squeeze(action)
