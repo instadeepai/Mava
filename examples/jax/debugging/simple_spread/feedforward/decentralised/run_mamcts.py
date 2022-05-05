@@ -34,6 +34,7 @@ from mava.utils.debugging.environments.jax.debug_env.new_debug_env import DebugE
 from mava.utils.environments import debugging_utils
 from mava.utils.id_utils import EntityId
 from mava.utils.loggers import logger_utils
+from mava.utils.tree_utils import add_batch_dim_tree, remove_batch_dim_tree
 from mava.wrappers.JaxDebugEnvWrapper import DebugEnvWrapper
 
 FLAGS = flags.FLAGS
@@ -56,7 +57,7 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
-def make_environment(rows=5, cols=5, evaluation: bool = None, num_agents: int = 2):
+def make_environment(rows=12, cols=12, evaluation: bool = None, num_agents: int = 1):
 
     return DebugEnvWrapper(
         DebugEnv(
@@ -88,7 +89,7 @@ def main(_: Any) -> None:
         return RootFnOutput(
             prior_logits=prior_logits.logits,
             value=values,
-            embedding=jax.tree_map(lambda x: jnp.expand_dims(x, 0), env_state),
+            embedding=add_batch_dim_tree(env_state),
         )
 
     def recurrent_fn(
@@ -107,7 +108,7 @@ def main(_: Any) -> None:
 
         actions[agent_info] = jnp.squeeze(action)
 
-        env_state = jax.tree_map(lambda x: jnp.squeeze(x, 0), env_state)
+        env_state = remove_batch_dim_tree(env_state)
 
         next_state, timestep, _ = environment_model.step(env_state, actions)
 
@@ -131,7 +132,7 @@ def main(_: Any) -> None:
                 prior_logits=prior_logits.logits,
                 value=values,
             ),
-            jax.tree_map(lambda x: jnp.expand_dims(x, 0), next_state),
+            add_batch_dim_tree(next_state),
         )
 
     # Networks.
