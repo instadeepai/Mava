@@ -20,6 +20,7 @@ from typing import Any, Callable
 
 import jax
 import numpy as np
+from acme.jax import utils
 
 from mava.components.jax import Component
 from mava.core_jax import SystemExecutor
@@ -62,9 +63,8 @@ class FeedforwardExecutorSelectAction(Component):
             executor.store.agent_net_keys[agent]
         ]
 
-        # observation = executor.store.observation.observation.reshape((1, -1))
-        observation = executor.store.observation.observation
-        print(observation.shape)
+        observation = utils.add_batch_dim(executor.store.observation.observation)
+
         rng_key, executor.store.key = jax.random.split(executor.store.key)
 
         # TODO (dries): We are currently using jit in the networks per agent.
@@ -121,6 +121,8 @@ class MCTSFeedforwardExecutorSelectAction(FeedforwardExecutorSelectAction):
 
         rng_key, executor.store.key = jax.random.split(executor.store.key)
 
+        observation = utils.add_batch_dim(executor.store.observation.observation)
+
         # TODO (dries): We are currently using jit in the networks per agent.
         # We can also try jit over all the agents in a for loop. This would
         # allow the jit function to save us even more time.
@@ -130,7 +132,7 @@ class MCTSFeedforwardExecutorSelectAction(FeedforwardExecutorSelectAction):
             network.params,
             rng_key,
             executor.store.environment_state,
-            executor.store.observation.observation,
+            observation,
             executor.store.observation.legal_actions,
             agent,
         )

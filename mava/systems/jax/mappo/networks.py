@@ -75,6 +75,7 @@ class PPONetworks:
         self, observations: networks_lib.Observation, key: networks_lib.PRNGKey
     ) -> Tuple[np.ndarray, Dict]:
         """TODO: Add description here."""
+
         actions, log_prob = self.forward_fn(self.params, observations, key)
         actions = np.array(actions, dtype=np.int32)
         log_prob = np.squeeze(np.array(log_prob, dtype=np.float32))
@@ -142,7 +143,7 @@ def make_discrete_networks(
     def forward_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
         policy_value_network = hk.Sequential(
             [
-                # utils.batch_concat,
+                utils.batch_concat,
                 hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
                 networks_lib.CategoricalValueHead(num_values=num_actions),
             ]
@@ -153,6 +154,7 @@ def make_discrete_networks(
     forward_fn = hk.without_apply_rng(hk.transform(forward_fn))
 
     dummy_obs = utils.zeros_like(environment_spec.observations.observation)
+
     dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
 
     network_key, key = jax.random.split(key)
