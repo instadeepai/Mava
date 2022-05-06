@@ -13,11 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Executor components for Mava systems."""
-from mava.components.jax.executing.action_selection import (
-    FeedforwardExecutorSelectAction,
-    FeedforwardExecutorSelectActionValueBased,
-)
-from mava.components.jax.executing.base import ExecutorInit
-from mava.components.jax.executing.epsilon_scheduler import EpsilonScheduler
-from mava.components.jax.executing.observing import FeedforwardExecutorObserve
+"""Default hyperparameters for MAPPO system."""
+from dataclasses import dataclass
+
+
+@dataclass
+class MADQNDefaultConfig:
+    """Configs for the MADQN agent."""
+
+    sample_batch_size: int = 512
+    sequence_length: int = 20
+    period: int = 10
+    use_next_extras: bool = False
