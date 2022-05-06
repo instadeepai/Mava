@@ -17,19 +17,15 @@
 from typing import Dict, Tuple, Union
 
 import dm_env
-import jax
-import jax.numpy as jnp
 import numpy as np
 from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
-from chex import PRNGKey
 from gym import spaces
 
 from mava.types import OLT
 from mava.utils.debugging.environment import MultiAgentEnv  # type: ignore
 from mava.utils.debugging.environments.switch_game import MultiAgentSwitchGame
 from mava.utils.debugging.environments.two_step import TwoStepEnv
-from mava.utils.id_utils import EntityId
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
@@ -188,185 +184,6 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
             )
             extras.update({"env_states": ex_spec})
         return extras
-
-
-class JAXSimpleSpreadEnvWrapper(PettingZooParallelEnvWrapper):
-    """Environment wrapper for Debugging MARL environments."""
-
-    def __init__(
-        self,
-        environment: MultiAgentEnv,
-    ):
-        super().__init__(environment=environment)
-
-    def reset(self, key: PRNGKey) -> dm_env.TimeStep:
-        """Resets the episode."""
-
-        discount_spec = self.discount_spec()
-
-        _discounts = {
-            agent: jnp.float32(1) for agent in self._environment.possible_agents
-        }
-
-        state, observe, _ = self._environment.reset(key)
-
-        observations = self._convert_observations(
-            observe, {agent: False for agent in self.possible_agents}
-        )
-        rewards_spec = self.reward_spec()
-        rewards = {agent: jnp.float32(0) for agent in self.possible_agents}
-
-        return state, parameterized_restart(rewards, _discounts, observations), None
-
-    def step(
-        self, state, actions: Dict[str, np.ndarray]
-    ) -> Union[dm_env.TimeStep, Tuple[dm_env.TimeStep, Dict[str, np.ndarray]]]:
-        """Steps the environment."""
-
-        state, (observations, rewards, dones, _) = self._environment.step(
-            state, actions
-        )
-
-        rewards_spec = self.reward_spec()
-        #  Handle empty rewards
-
-        if not rewards:
-            rewards = {agent: jnp.float32(0) for agent in self.agent_ids}
-        else:
-            rewards = {agent: jnp.float32(reward) for agent, reward in rewards.items()}
-
-        if observations:
-            observations = self._convert_observations(observations, dones)
-
-        _discounts = {
-            agent: jax.lax.cond(
-                dones[agent], lambda: jnp.float32(0), lambda: jnp.float32(1)
-            )
-            for agent in self._environment.possible_agents
-        }
-
-        # TODO Step type should be all but original is any
-        step_type = jax.lax.cond(
-            jnp.any(jnp.asarray(list(dones.values()))),
-            lambda: dm_env.StepType.LAST,
-            lambda: dm_env.StepType.MID,
-        )
-
-        timestep = dm_env.TimeStep(
-            observation=observations,
-            reward=rewards,
-            discount=_discounts,
-            step_type=step_type,
-        )
-
-        return state, timestep, None
-
-    def search_step(
-        self, state, actions: Dict[str, np.ndarray]
-    ) -> Union[dm_env.TimeStep, Tuple[dm_env.TimeStep, Dict[str, np.ndarray]]]:
-        """Steps the environment."""
-
-        actions = {f"type-0-id-{i}": actions[i] for i in range(len(actions))}
-
-        state, (observations, rewards, dones, _) = self._environment.step(
-            state, actions
-        )
-
-        rewards_spec = self.reward_spec()
-        #  Handle empty rewards
-        rewards_arr = jnp.zeros(len(actions), int)
-        if rewards:
-            for agent, reward in rewards.items():
-                agent_index = EntityId.from_string(agent).id
-                rewards_arr = rewards_arr.at[agent_index].set(reward)
-
-        if observations:
-            observations = self._convert_observations(observations, dones)
-        _discounts = jnp.zeros(len(actions), float)
-        for agent in self._environment.possible_agents:
-            agent_index = EntityId.from_string(agent).id
-            _discounts = _discounts.at[agent_index].set(
-                jax.lax.cond(
-                    dones[agent], lambda: jnp.float32(0), lambda: jnp.float32(1)
-                )
-            )
-
-        # TODO Step type should be all but original is any
-        step_type = jax.lax.cond(
-            jnp.any(jnp.asarray(list(dones.values()))),
-            lambda: dm_env.StepType.LAST,
-            lambda: dm_env.StepType.MID,
-        )
-
-        timestep = dm_env.TimeStep(
-            observation=observations,
-            reward=rewards_arr,
-            discount=_discounts,
-            step_type=step_type,
-        )
-
-        return state, timestep, None
-
-    # Convert Debugging environment observation so it's dm_env compatible.
-    # Also, the list of legal actions must be converted to a legal actions mask.
-    def _convert_observations(
-        self, observes: Dict[str, np.ndarray], dones: Dict[str, bool]
-    ) -> Dict[str, OLT]:
-        observations: Dict[str, OLT] = {}
-        for agent, observation in observes.items():
-            if isinstance(observation, dict) and "action_mask" in observation:
-                legals = observation["action_mask"]
-                observation = observation["observation"]
-            else:
-                # TODO Handle legal actions better for continuous envs,
-                #  maybe have min and max for each action and clip the agents actions
-                #  accordingly
-                if isinstance(self._environment.action_spaces[agent], spaces.Discrete):
-                    legals = jnp.ones(
-                        _convert_to_spec(
-                            self._environment.action_spaces[agent]
-                        ).num_values,
-                        dtype=self._environment.action_spaces[agent].dtype,
-                    )
-                else:
-                    legals = jnp.ones(
-                        _convert_to_spec(self._environment.action_spaces[agent]).shape,
-                        dtype=self._environment.action_spaces[agent].dtype,
-                    )
-
-            observation = jnp.array(observation, dtype=jnp.float32)
-            observations[agent] = OLT(
-                observation=observation,
-                legal_actions=legals,
-                terminal=jnp.asarray([dones[agent]], dtype=jnp.float32),
-            )
-
-        return observations
-
-    def observation_spec(self) -> Dict[str, OLT]:
-        observation_specs = {}
-        for agent in self._environment.agent_ids:
-
-            # Legals spec
-            if isinstance(self._environment.action_spaces[agent], spaces.Discrete):
-                legals = jnp.ones(
-                    _convert_to_spec(self._environment.action_spaces[agent]).num_values,
-                    dtype=self._environment.action_spaces[agent].dtype,
-                )
-            else:
-                legals = jnp.ones(
-                    _convert_to_spec(self._environment.action_spaces[agent]).shape,
-                    dtype=self._environment.action_spaces[agent].dtype,
-                )
-
-            observation_specs[agent] = OLT(
-                observation=_convert_to_spec(
-                    self._environment.observation_spaces[agent]
-                ),
-                legal_actions=legals,
-                terminal=specs.Array((1,), jnp.float32),
-            )
-        return observation_specs
 
 
 class SwitchGameWrapper(PettingZooParallelEnvWrapper):

@@ -16,15 +16,12 @@
 """Execution components for system builders"""
 
 from dataclasses import dataclass
-from typing import Any, Callable
 
 import jax
-import numpy as np
 from acme.jax import utils
 
 from mava.components.jax import Component
 from mava.core_jax import SystemExecutor
-from mava.systems.jax.mamcts.mcts import MCTS, MaxDepth, RecurrentFn, RootFn, TreeSearch
 
 
 @dataclass
@@ -62,9 +59,9 @@ class FeedforwardExecutorSelectAction(Component):
         network = executor.store.networks["networks"][
             executor.store.agent_net_keys[agent]
         ]
-        
-        observation = utils.add_batch_dim(executor.store.observation.observation)
-        
+
+        observation = executor.store.observation.observation.reshape((1, -1))
+
         rng_key, executor.store.key = jax.random.split(executor.store.key)
 
         # TODO (dries): We are currently using jit in the networks per agent.
@@ -78,65 +75,3 @@ class FeedforwardExecutorSelectAction(Component):
     def name() -> str:
         """_summary_"""
         return "action_selector"
-
-
-@dataclass
-class MCTSConfig:
-    root_fn: RootFn = None
-    recurrent_fn: RecurrentFn = None
-    search: TreeSearch = None
-    environment_model: Any = None
-    num_simulations: int = 10
-    max_depth: MaxDepth = None
-
-
-class MCTSFeedforwardExecutorSelectAction(FeedforwardExecutorSelectAction):
-    def __init__(
-        self,
-        config: MCTSConfig = MCTSConfig(),
-    ):
-        """_summary_
-
-        Args:
-            config : _description_.
-        """
-        super().__init__(config)
-
-    def on_execution_init_start(self, executor: SystemExecutor) -> None:
-
-        if None in [self.config.root_fn, self.config.recurrent_fn, self.config.search]:
-            raise ValueError("Required arguments for MCTS config have not been given")
-
-        self.mcts = MCTS(self.config)
-
-    # TODO figure out how to pass agent ids since it is a string
-    # Select action
-    def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
-        """Summary"""
-
-        agent = executor.store.agent
-        network = executor.store.networks["networks"][
-            executor.store.agent_net_keys[agent]
-        ]
-
-        rng_key, executor.store.key = jax.random.split(executor.store.key)
-
-        observation = utils.add_batch_dim(executor.store.observation.observation)
-
-        # TODO (dries): We are currently using jit in the networks per agent.
-        # We can also try jit over all the agents in a for loop. This would
-        # allow the jit function to save us even more time.
-
-        executor.store.action_info, executor.store.policy_info = self.mcts.get_action(
-            network.forward_fn,
-            network.params,
-            rng_key,
-            executor.store.environment_state,
-            observation,
-            executor.store.observation.legal_actions,
-            agent,
-        )
-
-    @staticmethod
-    def config_class() -> Callable:
-        return MCTSConfig
