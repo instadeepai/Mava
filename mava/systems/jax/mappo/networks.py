@@ -76,7 +76,7 @@ class PPONetworks:
     ) -> Tuple[np.ndarray, Dict]:
         """TODO: Add description here."""
         actions, log_prob = self.forward_fn(self.params, observations, key)
-        actions = np.array(actions, dtype=np.int64)
+        actions = np.array(actions, dtype=np.int32)
         log_prob = np.squeeze(np.array(log_prob, dtype=np.float32))
         return actions, {"log_prob": log_prob}
 
@@ -99,37 +99,12 @@ def make_ppo_network(
     )
 
 
-def make_networks(
-    spec: specs.EnvironmentSpec,
-    key: networks_lib.PRNGKey,
-    policy_layer_sizes: Sequence[int] = (
-        256,
-        256,
-        256,
-    ),
-    critic_layer_sizes: Sequence[int] = (512, 512, 256),
-) -> PPONetworks:
-    """TODO: Add description here."""
-    if isinstance(spec.actions, specs.DiscreteArray):
-        return make_discrete_networks(
-            environment_spec=spec,
-            key=key,
-            policy_layer_sizes=policy_layer_sizes,
-            critic_layer_sizes=critic_layer_sizes,
-        )
-    else:
-        raise NotImplementedError(
-            "Continuous networks not implemented yet."
-            + "See: https://github.com/deepmind/acme/blob/"
-            + "master/acme/agents/jax/ppo/networks.py"
-        )
-
-
 def make_discrete_networks(
     environment_spec: specs.EnvironmentSpec,
     key: networks_lib.PRNGKey,
     policy_layer_sizes: Sequence[int],
     critic_layer_sizes: Sequence[int],
+    observation_network: Callable = utils.batch_concat,  # default behaviour is to flatten observations
 ) -> PPONetworks:
     """TODO: Add description here."""
 
@@ -142,7 +117,7 @@ def make_discrete_networks(
     def forward_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
         policy_value_network = hk.Sequential(
             [
-                utils.batch_concat,
+                observation_network,
                 hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
                 networks_lib.CategoricalValueHead(num_values=num_actions),
             ]
@@ -162,6 +137,35 @@ def make_discrete_networks(
     return make_ppo_network(network=forward_fn, params=params)
 
 
+def make_networks(
+    spec: specs.EnvironmentSpec,
+    key: networks_lib.PRNGKey,
+    policy_layer_sizes: Sequence[int] = (
+        256,
+        256,
+        256,
+    ),
+    critic_layer_sizes: Sequence[int] = (512, 512, 256),
+    observation_network: Callable = utils.batch_concat,
+) -> PPONetworks:
+    """TODO: Add description here."""
+    if isinstance(spec.actions, specs.DiscreteArray):
+        return make_discrete_networks(
+            environment_spec=spec,
+            key=key,
+            policy_layer_sizes=policy_layer_sizes,
+            critic_layer_sizes=critic_layer_sizes,
+            observation_network=observation_network,
+        )
+
+    else:
+        raise NotImplementedError(
+            "Continuous networks not implemented yet."
+            + "See: https://github.com/deepmind/acme/blob/"
+            + "master/acme/agents/jax/ppo/networks.py"
+        )
+
+
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     agent_net_keys: Dict[str, str],
@@ -173,6 +177,7 @@ def make_default_networks(
         256,
     ),
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
+    observation_network: Callable = utils.batch_concat,
 ) -> Dict[str, Any]:
     """Description here"""
 
@@ -190,6 +195,7 @@ def make_default_networks(
             key=rng_key,
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
+            observation_network=observation_network,
         )
 
     return {
