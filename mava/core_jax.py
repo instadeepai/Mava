@@ -18,14 +18,16 @@
 
 import abc
 from types import SimpleNamespace
-from typing import Any, List
+from typing import Any, Dict, List, Sequence, Tuple, Union
+
+from mava.specs import DesignSpec
 
 
 class BaseSystem(abc.ABC):
     """Abstract system object."""
 
     @abc.abstractmethod
-    def design(self) -> SimpleNamespace:
+    def design(self) -> Tuple[DesignSpec, Dict]:
         """System design specifying the list of components to use.
 
         Returns:
@@ -49,30 +51,32 @@ class BaseSystem(abc.ABC):
         """
 
     @abc.abstractmethod
-    def configure(self, **kwargs: Any) -> None:
-        """Configure system hyperparameters."""
+    def build(self, **kwargs: Any) -> None:
+        """Configure system hyperparameters and build."""
 
     @abc.abstractmethod
-    def launch(
-        self,
-        num_executors: int,
-        nodes_on_gpu: List[str],
-        multi_process: bool = True,
-        name: str = "system",
-    ) -> None:
-        """Run the system.
-
-        Args:
-            num_executors : number of executor processes to run in parallel
-            nodes_on_gpu : which processes to run on gpu
-            multi_process : whether to run single or multi process, single process runs
-                are primarily for debugging
-            name : name of the system
-        """
+    def launch(self) -> None:
+        """Run the system."""
 
 
 class SystemBuilder(abc.ABC):
     """Abstract system builder."""
+
+    def __init__(
+        self,
+    ) -> None:
+        """System building init"""
+
+        # Simple namespace for assigning system builder attributes dynamically
+        self.store = SimpleNamespace()
+
+        self.callbacks: Any
+
+        self._executor_id: str
+        self._trainer_id: str
+        self._data_server_client: Any
+        self._parameter_server_client: Any
+        self._evaluator: bool
 
     @abc.abstractmethod
     def data_server(self) -> List[Any]:
@@ -125,3 +129,156 @@ class SystemBuilder(abc.ABC):
     @abc.abstractmethod
     def launch(self) -> None:
         """Run the graph program."""
+
+
+class SystemExecutor(abc.ABC):
+    """Abstract system executor."""
+
+    def __init__(
+        self,
+    ) -> None:
+        """System executor init"""
+
+        # Simple namespace for assigning system executor attributes dynamically
+        self.store = SimpleNamespace()
+
+        self._agent: str
+        self._observation: Any
+        self._timestep: Any
+        self._state: Any
+        self._observations: Dict[str, Any]
+        self._actions: Dict[str, Any]
+        self._extras: Dict[str, Any]
+
+    @abc.abstractmethod
+    def select_action(
+        self, agent: str, observation: Any
+    ) -> Union[Any, Tuple[Any, Any]]:
+        """Select an action for a single agent in the system."""
+
+    @abc.abstractmethod
+    def select_actions(
+        self, observations: Dict[str, Any]
+    ) -> Union[Dict[str, Any], Tuple[Dict[str, Any], Dict[str, Any]]]:
+        """Select the actions for all agents in the system."""
+
+    @abc.abstractmethod
+    def observe(
+        self,
+        actions: Dict[str, Any],
+        timestep: Any,
+        extras: Dict[str, Any] = {},
+    ) -> None:
+        """Record observed timestep from the environment."""
+
+    @abc.abstractmethod
+    def update(self, wait: bool = False) -> None:
+        """Update executor parameters."""
+
+
+class SystemTrainer(abc.ABC):
+    """Abstract system trainer."""
+
+    def __init__(
+        self,
+    ) -> None:
+        """System trainer init"""
+
+        # Simple namespace for assigning system executor attributes dynamically
+        self.store = SimpleNamespace()
+
+        self._inputs: Any
+
+    @abc.abstractmethod
+    def step(self) -> None:
+        """Trainer forward and backward passes."""
+
+
+class SystemParameterServer(abc.ABC):
+    def __init__(
+        self,
+    ) -> None:
+        """System parameter server init"""
+
+        # Simple namespace for assigning parameter server attributes dynamically
+        self.store = SimpleNamespace()
+
+    @abc.abstractmethod
+    def get_parameters(
+        self, names: Union[str, Sequence[str]]
+    ) -> Dict[str, Dict[str, Any]]:
+        """Get parameters from the parameter server.
+
+        Args:
+            names : Names of the parameters to get
+        Returns:
+            The parameters that were requested
+        """
+
+    @abc.abstractmethod
+    def set_parameters(self, set_params: Dict[str, Any]) -> None:
+        """Set parameters in the parameter server.
+
+        Args:
+            set_params : The values to set the parameters to
+        """
+
+    @abc.abstractmethod
+    def add_to_parameters(self, add_to_params: Dict[str, Any]) -> None:
+        """Add to the parameters in the parameter server.
+
+        Args:
+            add_to_params : values to add to the parameters
+        """
+
+    def run(self) -> None:
+        """Run the parameter server. This function allows for checkpointing and other \
+        centralised computations to be performed by the parameter server."""
+
+
+class SystemParameterClient(abc.ABC):
+    """A variable client for updating variables from a remote source."""
+
+    def __init__(
+        self,
+    ) -> None:
+        """System parameter server init"""
+
+        # Simple namespace for assigning parameter client attributes dynamically
+        self.store = SimpleNamespace()
+
+    @abc.abstractmethod
+    def get_async(self) -> None:
+        """Asynchronously updates the get variables with the latest copy from source."""
+
+    @abc.abstractmethod
+    def set_async(self) -> None:
+        """Asynchronously updates source with the set variables."""
+
+    @abc.abstractmethod
+    def set_and_get_async(self) -> None:
+        """Asynchronously updates source and gets from source."""
+
+    @abc.abstractmethod
+    def add_async(self, names: List[str], vars: Dict[str, Any]) -> None:
+        """Asynchronously adds to source variables."""
+
+    @abc.abstractmethod
+    def add_and_wait(self, names: List[str], vars: Dict[str, Any]) -> None:
+        """Adds the specified variables to the corresponding variables in source \
+        and waits for the process to complete before continuing."""
+
+    @abc.abstractmethod
+    def get_and_wait(self) -> None:
+        """Updates the get variables with the latest copy from source \
+        and waits for the process to complete before continuing."""
+
+    @abc.abstractmethod
+    def get_all_and_wait(self) -> None:
+        """Updates all the variables with the latest copy from source \
+        and waits for the process to complete before continuing."""
+
+    @abc.abstractmethod
+    def set_and_wait(self) -> None:
+        """Updates source with the set variables \
+        and waits for the process to complete before continuing."""

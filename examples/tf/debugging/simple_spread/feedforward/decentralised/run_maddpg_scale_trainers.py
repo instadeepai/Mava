@@ -92,7 +92,7 @@ def main(_: Any) -> None:
         logger_factory=logger_factory,
         num_executors=2,
         shared_weights=False,
-        trainer_networks=enums.Trainer.one_trainer_per_network,
+        trainer_networks={"trainer1": ["network1"], "trainer2": ["network2"]},
         network_sampling_setup=enums.NetworkSampler.fixed_agent_networks,
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),

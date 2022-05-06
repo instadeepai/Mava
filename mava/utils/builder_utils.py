@@ -12,13 +12,41 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     BaseExplorationScheduler,
     BaseExplorationTimestepScheduler,
     ConstantScheduler,
 )
+from mava.utils.sort_utils import sort_str_num
+
+
+def covert_specs(
+    agent_net_keys: Dict[str, Any], spec: Dict[str, Any], num_networks: int
+) -> Dict[str, Any]:
+    """_summary_
+
+    Args:
+        agent_net_keys : _description_
+        spec : _description_
+        num_networks : _description_
+    Returns:
+        _description_
+    """
+    if not isinstance(spec, dict):
+        return spec
+
+    agents = sort_str_num(agent_net_keys.keys())[:num_networks]
+    converted_spec: Dict[str, Any] = {}
+    if agents[0] in spec.keys():
+        for agent in agents:
+            converted_spec[agent] = spec[agent]
+    else:
+        # For the extras
+        for key in spec.keys():
+            converted_spec[key] = covert_specs(agent_net_keys, spec[key], num_networks)
+    return converted_spec
 
 
 def initialize_epsilon_schedulers(

@@ -1,11 +1,20 @@
-"""Objects which specify the input/output spaces of an environment from the perspective
-of each agent in a multi-agent environment.
-This module exposes the same spec classes as `dm_env` as well as providing an
-additional `EnvironmentSpec` class which collects all of the specs for a given
-environment. An `EnvironmentSpec` instance can be created directly or by using
-the `make_environment_spec` helper given a `dm_env.Environment` instance.
-"""
-from typing import Dict, List
+# python3
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from types import SimpleNamespace
+from typing import Any, Dict, List
 
 import dm_env
 from acme.specs import EnvironmentSpec
@@ -13,8 +22,6 @@ from acme.specs import EnvironmentSpec
 from mava.utils.sort_utils import sort_str_num
 
 
-# TODO Why use this class to define specs, when you can just update
-# the specs on the wrappers themselves
 class MAEnvironmentSpec:
     def __init__(
         self,
@@ -22,6 +29,13 @@ class MAEnvironmentSpec:
         specs: Dict[str, EnvironmentSpec] = None,
         extra_specs: Dict = None,
     ):
+        """_summary_
+
+        Args:
+            environment : _description_
+            specs : _description_.
+            extra_specs : _description_.
+        """
         if not specs:
             specs = self._make_ma_environment_spec(environment)
         else:
@@ -32,8 +46,13 @@ class MAEnvironmentSpec:
     def _make_ma_environment_spec(
         self, environment: dm_env.Environment
     ) -> Dict[str, EnvironmentSpec]:
-        """Returns an `EnvironmentSpec` describing values used by
-        an environment for each agent."""
+        """_summary_
+
+        Args:
+            environment : _description_
+        Returns:
+            _description_
+        """
         specs = {}
         observation_specs = environment.observation_spec()
         action_specs = environment.action_spec()
@@ -50,12 +69,27 @@ class MAEnvironmentSpec:
         return specs
 
     def get_extra_specs(self) -> Dict[str, EnvironmentSpec]:
+        """_summary_
+
+        Returns:
+            _description_
+        """
         return self.extra_specs  # type: ignore
 
     def get_agent_specs(self) -> Dict[str, EnvironmentSpec]:
+        """_summary_
+
+        Returns:
+            _description_
+        """
         return self._specs
 
     def get_agent_type_specs(self) -> Dict[str, EnvironmentSpec]:
+        """_summary_
+
+        Returns:
+            _description_
+        """
         specs = {}
         agent_types = list({agent.split("_")[0] for agent in self._keys})
         for agent_type in agent_types:
@@ -63,12 +97,27 @@ class MAEnvironmentSpec:
         return specs
 
     def get_agent_ids(self) -> List[str]:
+        """_summary_
+
+        Returns:
+            _description_
+        """
         return self._keys
 
     def get_agent_types(self) -> List[str]:
+        """_summary_
+
+        Returns:
+            _description_
+        """
         return list({agent.split("_")[0] for agent in self._keys})
 
     def get_agents_by_type(self) -> Dict[str, List[str]]:
+        """_summary_
+
+        Returns:
+            _description_
+        """
         agents_by_type: Dict[str, List[str]] = {}
         agents_ids = self.get_agent_ids()
         agent_types = self.get_agent_types()
@@ -78,3 +127,17 @@ class MAEnvironmentSpec:
                 if agent_type in agent:
                     agents_by_type[agent_type].append(agent)
         return agents_by_type
+
+
+class DesignSpec(SimpleNamespace):
+    def __init__(self, **kwargs: Any) -> None:
+        """_summary_"""
+        super().__init__(**kwargs)
+
+    def get(self) -> Dict[str, Any]:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return self.__dict__

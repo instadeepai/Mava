@@ -74,6 +74,7 @@ class SequentialEnvironmentLoop(acme.core.Worker):
         self._executor = executor
         self._counter = counter or counting.Counter()
         self._logger = logger or loggers.make_default_logger(label)
+
         self._should_update = should_update
         self._running_statistics: Dict[str, float] = {}
         self.num_agents = self._environment.num_agents
@@ -352,6 +353,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         self._executor = executor
         self._counter = counter or counting.Counter()
         self._logger = logger or loggers.make_default_logger(label)
+
         self._should_update = should_update
         self._running_statistics: Dict[str, float] = {}
 
@@ -511,6 +513,13 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             }
             result.update(counts)
             return result
+
+    def run_episode_and_log(self) -> loggers.LoggingData:
+        """_summary_"""
+
+        results = self.run_episode()
+        self._logger.write(results)
+        return results
 
     def run(
         self, num_episodes: Optional[int] = None, num_steps: Optional[int] = None
