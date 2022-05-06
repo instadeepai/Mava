@@ -124,6 +124,11 @@ class ExecutorInit(Component):
     def on_execution_init_start(self, executor: SystemExecutor) -> None:
         """_summary_"""
         executor._interval = self.config.interval  # type: ignore
+        executor.store.steps_count = 0  # To be updated at the beginning of observation
+
+    def on_execution_observe_start(self, executor: SystemExecutor) -> None:
+        """Increase the executor step counts for this episode."""
+        executor.store.steps_count += 1
 
     @staticmethod
     def name() -> str:
@@ -132,4 +137,5 @@ class ExecutorInit(Component):
 
     @staticmethod
     def config_class() -> Callable:
+        """Returns the config class for this component."""
         return ExecutorInitConfig
