@@ -68,7 +68,12 @@ class TransitionDataset(Component):
         builder.store.dataset = iter(dataset)
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return TransitionDatasetConfig
 
 
@@ -115,6 +120,7 @@ class TrajectoryDataset(Component):
 
         # Add batch dimension.
         dataset = dataset.batch(self.config.sample_batch_size, drop_remainder=True)
+        builder.store.sample_batch_size = self.config.sample_batch_size
 
         builder.store.dataset_iterator = dataset.as_numpy_iterator()
 
@@ -128,5 +134,10 @@ class TrajectoryDataset(Component):
         return "trainer_dataset"
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return TrajectoryDatasetConfig

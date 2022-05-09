@@ -23,13 +23,9 @@ import numpy as np
 import pytest
 
 from mava.components.jax import building, executing
-from mava.components.jax.building.adders import (
-    ParallelSequenceAdder,
-    ParallelSequenceAdderSignature,
-)
+from mava.components.jax.building.adders import ParallelSequenceAdderSignature
 from mava.components.jax.building.data_server import OnPolicyDataServer
 from mava.components.jax.building.distributor import Distributor
-from mava.components.jax.building.networks import DefaultNetworks
 from mava.components.jax.building.parameter_client import ExecutorParameterClient
 from mava.components.jax.updating.parameter_server import DefaultParameterServer
 from mava.specs import DesignSpec
@@ -39,6 +35,9 @@ from mava.systems.jax.system import System
 from mava.testing.building import mocks
 from mava.utils.environments import debugging_utils
 
+system_init = DesignSpec(
+    environment_spec=building.EnvironmentSpec, system_init=building.SystemInit
+).get()
 executor = DesignSpec(
     executor_init=executing.ExecutorInit,
     executor_observe=executing.FeedforwardExecutorObserve,
@@ -59,16 +58,14 @@ class TestSystemExecutor(System):
             system callback components
         """
         components = DesignSpec(
-            data_server=mocks.MockDataServer,
-            data_server_adder=mocks.MockAdderSignature,
+            **system_init,
+            data_server=mocks.MockOnPolicyDataServer,
+            data_server_signature=ParallelSequenceAdderSignature,
             parameter_server=mocks.MockParameterServer,
             executor_parameter_client=mocks.MockExecutorParameterClient,
             trainer_parameter_client=mocks.MockTrainerParameterClient,
             logger=mocks.MockLogger,
             **executor,
-            executor_environment_loop=mocks.MockExecutorEnvironmentLoop,
-            executor_adder=mocks.MockAdder,
-            networks=mocks.MockNetworks,
             trainer=mocks.MockTrainer,
             trainer_dataset=mocks.MockTrainerDataset,
             distributor=mocks.MockDistributor,
@@ -126,16 +123,14 @@ class TestSystemExecutorAndParameterSever(System):
             system callback components
         """
         components = DesignSpec(
-            data_server=mocks.MockDataServer,
-            data_server_adder=mocks.MockAdderSignature,
+            **system_init,
+            data_server=mocks.MockOnPolicyDataServer,
+            data_server_signature=ParallelSequenceAdderSignature,
             parameter_server=DefaultParameterServer,
             executor_parameter_client=ExecutorParameterClient,
             trainer_parameter_client=mocks.MockTrainerParameterClient,
             logger=mocks.MockLogger,
             **executor,
-            executor_environment_loop=mocks.MockExecutorEnvironmentLoop,
-            executor_adder=mocks.MockAdder,
-            networks=mocks.MockNetworks,
             trainer=mocks.MockTrainer,
             trainer_dataset=mocks.MockTrainerDataset,
             distributor=mocks.MockDistributor,
@@ -195,7 +190,7 @@ def test_executor_parameter_server(
 
     # Check if the executor variable has changed.
     parameters = executor._executor.store.executor_parameter_client._parameters
-    assert parameters["evaluator_steps"][0] == 1234
+    assert parameters["evaluator_steps"] == 1234
 
 
 #########################################################################
@@ -209,15 +204,13 @@ class TestSystemExceptTrainer(System):
             system callback components
         """
         components = DesignSpec(
+            **system_init,
             data_server=OnPolicyDataServer,
             data_server_adder_signature=ParallelSequenceAdderSignature,
             extras_spec=ExtrasLogProbSpec,
             parameter_server=DefaultParameterServer,
             executor_parameter_client=ExecutorParameterClient,
             **executor,
-            executor_environment_loop=mocks.MockExecutorEnvironmentLoop,
-            executor_adder=ParallelSequenceAdder,
-            networks=DefaultNetworks,
             distributor=Distributor,
             trainer_parameter_client=mocks.MockTrainerParameterClient,
             logger=mocks.MockLogger,

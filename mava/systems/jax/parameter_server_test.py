@@ -21,6 +21,8 @@ from typing import Dict, Tuple
 import numpy as np
 import pytest
 
+from mava.components.jax import building
+from mava.components.jax.building.adders import ParallelTransitionAdderSignature
 from mava.components.jax.updating.parameter_server import DefaultParameterServer
 from mava.specs import DesignSpec
 from mava.systems.jax import ParameterServer, mappo
@@ -37,8 +39,10 @@ class TestSystem(System):
             system callback components
         """
         components = DesignSpec(
-            data_server=mocks.MockDataServer,
-            data_server_adder=mocks.MockAdderSignature,
+            environment_spec=building.EnvironmentSpec,
+            system_init=building.SystemInit,
+            data_server=mocks.MockOnPolicyDataServer,
+            data_server_signature=ParallelTransitionAdderSignature,
             parameter_server=DefaultParameterServer,
             executor_parameter_client=mocks.MockExecutorParameterClient,
             trainer_parameter_client=mocks.MockTrainerParameterClient,
