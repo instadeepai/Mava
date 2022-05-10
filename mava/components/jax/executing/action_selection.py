@@ -72,7 +72,7 @@ class FeedforwardExecutorSelectAction(Component):
             utils.add_batch_dim(executor.store.observation.legal_actions),
         )
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_"""
         return "action_selector"

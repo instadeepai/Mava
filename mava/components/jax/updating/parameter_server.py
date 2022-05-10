@@ -13,14 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Parameter server component for Mava systems."""
+"""Parameter server Component for Mava systems."""
 import time
 from dataclasses import dataclass
+from typing import Callable, Optional
 
 import numpy as np
 from acme.jax import savers
 
-from mava.callbacks import Callback
+from mava.components.jax.component import Component
 from mava.core_jax import SystemParameterServer
 
 
@@ -32,12 +33,12 @@ class ParameterServerConfig:
     non_blocking_sleep_seconds: int = 10
 
 
-class DefaultParameterServer(Callback):
+class DefaultParameterServer(Component):
     def __init__(
         self,
         config: ParameterServerConfig = ParameterServerConfig(),
     ) -> None:
-        """Mock system component."""
+        """Mock system Component."""
         self.config = config
 
     def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
@@ -153,7 +154,16 @@ class DefaultParameterServer(Callback):
             server.store.last_checkpoint_time = time.time()
             print("Updated variables checkpoint.")
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "parameter_server"
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for Component.
+
+        Returns:
+            config class/dataclass for Component.
+        """
+        return ParameterServerConfig

@@ -16,18 +16,22 @@
 """Tests for config class for Jax-based Mava systems"""
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import pytest
-import reverb
 from acme import specs
 
 from mava.components.jax import Component
 from mava.components.jax.building import adders
-from mava.core_jax import SystemBuilder
+from mava.components.jax.building.base import SystemInit
+from mava.components.jax.building.environments import EnvironmentSpec
 from mava.specs import DesignSpec, MAEnvironmentSpec
 from mava.systems.jax.system import System
+from mava.testing.building.mocks import (
+    MockOnPolicyDataServer,
+    make_fake_environment_factory,
+)
 from mava.utils.wrapper_utils import parameterized_restart
 
 agents = {"agent_0", "agent_1", "agent_2"}
@@ -65,44 +69,6 @@ def make_fake_env_specs() -> MAEnvironmentSpec:
 
 
 @dataclass
-class MockConfig:
-    pass
-
-
-class MockTestSetup(Component):
-    """_summary_"""
-
-    def __init__(self, config: MockConfig = MockConfig()) -> None:
-        """_summary_"""
-        self.config = config
-
-    def on_building_data_server(self, builder: SystemBuilder) -> None:
-        """_summary_"""
-        env_spec = make_fake_env_specs()
-        builder.store.server = reverb.Server(
-            [
-                reverb.Table.queue(
-                    name="data_server",
-                    max_size=100,
-                    signature=builder.store.adder_signature_fn(
-                        env_spec, builder.store.sequence_length, {}
-                    ),
-                )
-            ]
-        )
-        builder.store.system_data_server = reverb.Client(
-            f"localhost:{builder.store.server.port}"
-        )
-        builder.store.unique_net_keys = ["network_0"]
-        builder.store.table_network_config = {"table_0": "network_0"}
-
-    @property
-    def name(self) -> str:
-        """_summary_"""
-        return "setup"
-
-
-@dataclass
 class DistributorDefaultConfig:
     num_executors: int = 1
     nodes_on_gpu: List[str] = field(default_factory=list)
@@ -121,14 +87,23 @@ class MockDistributor(Component):
         """
         self.config = config
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'.
 
         Returns:
             Component type name
         """
         return "distributor"
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return DistributorDefaultConfig
 
 
 class TestSystemWithParallelSequenceAdder(System):
@@ -138,14 +113,13 @@ class TestSystemWithParallelSequenceAdder(System):
         Returns:
             system callback components
         """
-        executor_adder = adders.ParallelSequenceAdder
-        executor_adder_priority = adders.UniformAdderPriority
-        data_server_adder = adders.ParallelSequenceAdderSignature
         components = DesignSpec(
-            data_server_adder=data_server_adder,
-            executor_adder=executor_adder,
-            executor_adder_priority=executor_adder_priority,
-            setup=MockTestSetup,
+            environment_spec=EnvironmentSpec,
+            system_init=SystemInit,
+            data_server_signature=adders.ParallelSequenceAdderSignature,
+            executor_adder=adders.ParallelSequenceAdder,
+            executor_adder_priority=adders.UniformAdderPriority,
+            data_server=MockOnPolicyDataServer,
             distributor=MockDistributor,
         )
         return components, {}
@@ -157,11 +131,15 @@ def test_system_parallel_sequence_adder() -> System:
     return TestSystemWithParallelSequenceAdder()
 
 
+# TODO Fix test.
 def test_adders(
     test_system_parallel_sequence_adder: System,
 ) -> None:
     """Test if system builder instantiates processes as expected."""
-    test_system_parallel_sequence_adder.build()
+    # TODO Update once rewrite these tests.
+    test_system_parallel_sequence_adder.build(
+        environment_factory=make_fake_environment_factory()
+    )
     test_system_parallel_sequence_adder._builder.data_server()
     test_system_parallel_sequence_adder._builder.store.system_executor = None
     test_system_parallel_sequence_adder._builder.executor(

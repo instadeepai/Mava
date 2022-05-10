@@ -17,7 +17,7 @@
 
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -82,8 +82,8 @@ class DefaultStep(Component):
         # Write to the loggers.
         trainer.store.trainer_logger.write({**results})
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_
 
         Returns:
@@ -108,6 +108,12 @@ class MAPGWithTrustRegionStep(Step):
             config : _description_.
         """
         self.config = config
+
+    def on_training_init_start(self, trainer: SystemTrainer) -> None:
+        # Note (dries): Assuming the batch and sequence dimensions are flattened.
+        trainer.store.full_batch_size = trainer.store.sample_batch_size * (
+            trainer.store.sequence_length - 1
+        )
 
     def on_training_step_fn(self, trainer: SystemTrainer) -> None:
         """_summary_"""
@@ -246,6 +252,7 @@ class MAPGWithTrustRegionStep(Step):
             states = TrainingState(
                 params=params, opt_states=opt_states, random_key=random_key
             )
+
             new_states, metrics = sgd_step(states, sample)
 
             # Set the new variables
@@ -271,11 +278,20 @@ class MAPGWithTrustRegionStep(Step):
 
         trainer.store.step_fn = step
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_
 
         Returns:
             _description_
         """
         return "step_fn"
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return MAPGWithTrustRegionStepConfig

@@ -17,7 +17,7 @@
 import abc
 import copy
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 import reverb
 from reverb import rate_limiters, reverb_types
@@ -25,6 +25,7 @@ from reverb import rate_limiters, reverb_types
 from mava import specs
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
+from mava.utils import enums
 from mava.utils.builder_utils import covert_specs
 from mava.utils.sort_utils import sort_str_num
 
@@ -44,6 +45,17 @@ class DataServer(Component):
 
     def _create_table_per_trainer(self, builder: SystemBuilder) -> List[reverb.Table]:
         data_tables = []
+        # Default table network config - often overwritten by TrainerInit.
+        if not hasattr(builder.store, "table_network_config"):
+            builder.store.table_network_config = {
+                "table_0": sort_str_num(builder.store.agent_net_keys.values())
+            }
+            assert (
+                builder.store.network_sampling_setup_type
+                == enums.NetworkSampler.fixed_agent_networks
+            ), f"We only have a default config for the fixed_agent_networks sampler setting, \
+            not the {builder.store.network_sampling_setup_type} setting."
+
         for table_key in builder.store.table_network_config.keys():
             # TODO (dries): Clean the below coverter code up.
             # Convert a Mava spec
@@ -81,8 +93,8 @@ class DataServer(Component):
         """[summary]"""
         builder.store.data_tables = self._create_table_per_trainer(builder)
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "data_server"
 
@@ -94,13 +106,11 @@ class OffPolicyDataServerConfig:
     max_size: int = 100000
     rate_limiter: rate_limiters.RateLimiter = None
     max_times_sampled: int = 0
-    data_server_name: str = "off_policy_table"
 
 
 class OffPolicyDataServer(DataServer):
     def __init__(
-        self,
-        config: OffPolicyDataServerConfig = OffPolicyDataServerConfig(),
+        self, config: OffPolicyDataServerConfig = OffPolicyDataServerConfig()
     ) -> None:
         """_summary_
 
@@ -128,14 +138,24 @@ class OffPolicyDataServer(DataServer):
             _description_
         """
         table = reverb.Table(
-            name=f"{self.config.data_server_name}_{table_key}",
+            name=table_key,
             sampler=self.config.sampler,
             remover=self.config.remover,
             max_size=self.config.max_size,
             rate_limiter=builder.store.rate_limiter_fn(),
             signature=builder.store.adder_signature_fn(environment_spec, extras_spec),
+            max_times_sampled=self.config.max_times_sampled,
         )
         return table
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return OffPolicyDataServerConfig
 
 
 @dataclass
@@ -173,11 +193,24 @@ class OnPolicyDataServer(DataServer):
         Returns:
             _description_
         """
+        if builder.store.__dict__.get("sequence_length"):
+            signature = builder.store.adder_signature_fn(
+                environment_spec, builder.store.sequence_length, extras_spec
+            )
+        else:
+            signature = builder.store.adder_signature_fn(environment_spec, extras_spec)
         table = reverb.Table.queue(
             name=table_key,
             max_size=self.config.max_queue_size,
-            signature=builder.store.adder_signature_fn(
-                environment_spec, builder.store.sequence_length, extras_spec
-            ),
+            signature=signature,
         )
         return table
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return OnPolicyDataServerConfig

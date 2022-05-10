@@ -15,41 +15,40 @@
 
 """Tests for config class for Jax-based Mava systems"""
 
+import abc
+import copy
+import functools
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import dm_env
 import jax
+import numpy as np
+import reverb
+from acme import specs as acme_specs
 from acme import types
+from reverb import rate_limiters, reverb_types
 
 from mava import specs
-from mava.callbacks import Callback
+from mava.components.jax import Component
+from mava.components.jax.building.data_server import (
+    OffPolicyDataServerConfig,
+    OnPolicyDataServerConfig,
+)
 from mava.core_jax import SystemBuilder
 from mava.environment_loop import ParallelEnvironmentLoop
-
+from mava.specs import DesignSpec, MAEnvironmentSpec
+from mava.systems.jax.system import System
+from mava.utils.builder_utils import covert_specs
+from tests.enums import EnvType, MockedEnvironments
+from tests.mocks import (
+    ParallelMAContinuousEnvironment,
+    ParallelMADiscreteEnvironment,
+    SequentialMAContinuousEnvironment,
+    SequentialMADiscreteEnvironment,
+)
 
 # Mock components to feed to the builder
-@dataclass
-class MockAdderSignatureConfig:
-    adder_signature_param: int = 1
-
-
-class MockAdderSignature(Callback):
-    def __init__(
-        self,
-        config: MockAdderSignatureConfig = MockAdderSignatureConfig(),
-    ) -> None:
-        """Mock system component."""
-        self.config = config
-
-    def on_building_data_server_adder_signature(self, builder: SystemBuilder) -> None:
-        """_summary_"""
-        builder.store.adder_signature_fn = self.config.adder_signature_param
-
-    @property
-    def name(self) -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
-        return "adder_signature"
 
 
 @dataclass
@@ -91,7 +90,7 @@ class MockAdderClass:
         pass
 
 
-class MockAdder(Callback):
+class MockAdder(Component):
     def __init__(self, config: MockAdderConfig = MockAdderConfig()) -> None:
         """Mock system component."""
         self.config = config
@@ -100,33 +99,350 @@ class MockAdder(Callback):
         """_summary_"""
         builder.store.adder = MockAdderClass()
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "adder"
 
 
+def make_fake_env_specs() -> MAEnvironmentSpec:
+    """_summary_
+
+    Returns:
+        _description_
+    """
+    agents = ["agent_0", "agent_1"]
+    env_spec = {}
+    for agent in agents:
+        env_spec[agent] = acme_specs.EnvironmentSpec(
+            observations=acme_specs.Array(shape=(10, 5), dtype=np.float32),
+            actions=acme_specs.DiscreteArray(num_values=3),
+            rewards=acme_specs.Array(shape=(), dtype=np.float32),
+            discounts=acme_specs.BoundedArray(
+                shape=(), dtype=np.float32, minimum=0.0, maximum=1.0
+            ),
+        )
+    return MAEnvironmentSpec(
+        environment=None,
+        specs=env_spec,
+        extra_specs={"extras": acme_specs.Array(shape=(), dtype=np.float32)},
+    )
+
+
+def make_fake_env(
+    env_name: MockedEnvironments = MockedEnvironments.Mocked_Dicrete,
+    env_type: EnvType = EnvType.Parallel,
+    evaluation: bool = False,
+) -> Any:
+    """Func that creates a fake env.
+
+    Args:
+        env_name : env name.
+        env_type : type of env.
+        evaluation: whether env is used for eval or not.
+            Not sure we should use this in spec.
+
+    Raises:
+        Exception: no matching env.
+
+    Returns:
+        mock env.
+    """
+    del evaluation
+    if env_name is MockedEnvironments.Mocked_Dicrete:
+        if env_type == EnvType.Parallel:
+            env = ParallelMADiscreteEnvironment(
+                num_actions=18,
+                num_observations=2,
+                obs_shape=(84, 84, 4),
+                obs_dtype=np.float32,
+                episode_length=10,
+            )
+        elif env_type == EnvType.Sequential:
+            env = SequentialMADiscreteEnvironment(
+                num_actions=18,
+                num_observations=2,
+                obs_shape=(84, 84, 4),
+                obs_dtype=np.float32,
+                episode_length=10,
+            )
+    elif env_name is MockedEnvironments.Mocked_Continous:
+        if env_type == EnvType.Parallel:
+            env = ParallelMAContinuousEnvironment(
+                action_dim=2,
+                observation_dim=2,
+                bounded=True,
+                episode_length=10,
+            )
+        elif env_type == EnvType.Sequential:
+            env = SequentialMAContinuousEnvironment(
+                action_dim=2,
+                observation_dim=2,
+                bounded=True,
+                episode_length=10,
+            )
+
+    if env is None:
+        raise Exception("Env_spec is not valid.")
+
+    return env
+
+
+def make_fake_environment_factory(
+    env_name: MockedEnvironments = MockedEnvironments.Mocked_Dicrete,
+    env_type: EnvType = EnvType.Parallel,
+) -> Any:
+    """Returns a mock env factory.
+
+    Args:
+        env_name : env name.
+        env_type : env type.
+
+    Returns:
+        a mocked env factory.
+    """
+    return functools.partial(
+        make_fake_env,
+        env_name=env_name,
+        env_type=env_type,
+    )
+
+
+def mock_table(
+    name: str = "mock_table",
+    sampler: reverb_types.SelectorType = reverb.selectors.Uniform(),
+    remover: reverb_types.SelectorType = reverb.selectors.Fifo(),
+    max_size: int = 100,
+    rate_limiter: rate_limiters.RateLimiter = reverb.rate_limiters.MinSize(1),
+    max_times_sampled: int = 0,
+    signature: Any = None,
+) -> reverb.Table:
+    """Func returns mock table used in testing.
+
+    Args:
+        name : table name.
+        sampler : reverb sampler.
+        remover : reverb remover.
+        max_size : max size of table.
+        rate_limiter : rate limiter.
+        max_times_sampled : max times sampled.
+        signature : signature.
+
+    Returns:
+        mock reverb table.
+    """
+    return reverb.Table(
+        name=name,
+        sampler=sampler,
+        remover=remover,
+        max_size=max_size,
+        rate_limiter=rate_limiter,
+        signature=signature,
+        max_times_sampled=max_times_sampled,
+    )
+
+
+def mock_queue(
+    name: str = "mock_table",
+    max_queue_size: int = 100,
+    signature: Any = None,
+) -> reverb.Table:
+    """Func returns mock queue.
+
+    Args:
+        name : table name.
+        max_queue_size : max queue size.
+        signature : signature.
+
+    Returns:
+        mock queue.
+    """
+    return reverb.Table.queue(name=name, max_size=max_queue_size, signature=signature)
+
+
 @dataclass
 class MockDataServerConfig:
-    data_server_param: int = 2
+    pass
 
 
-class MockDataServer(Callback):
-    def __init__(
-        self,
-        config: MockDataServerConfig = MockDataServerConfig(),
-    ) -> None:
-        """Mock system component."""
+class MockDataServer(Component):
+    def __init__(self, config: MockDataServerConfig = MockDataServerConfig()) -> None:
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
         self.config = config
 
-    def on_building_data_server(self, builder: SystemBuilder) -> None:
-        """_summary_"""
-        builder.store.data_tables = self.config.data_server_param
+    def _create_table_per_trainer(self, builder: SystemBuilder) -> List[reverb.Table]:
+        builder.store.table_network_config = {"table_0": "network_0"}
+        data_tables = []
+        extras_spec: dict = {}
+        for table_key in builder.store.table_network_config.keys():
+            num_networks = len(builder.store.table_network_config[table_key])
+            env_spec = copy.deepcopy(builder.store.environment_spec)
+            env_spec._specs = covert_specs(
+                builder.store.agent_net_keys, env_spec._specs, num_networks
+            )
+            table = self.table(table_key, env_spec, extras_spec, builder)
+            data_tables.append(table)
+        return data_tables
 
-    @property
-    def name(self) -> str:
+    @abc.abstractmethod
+    def table(
+        self,
+        table_key: str,
+        environment_spec: specs.MAEnvironmentSpec,
+        extras_spec: Dict[str, Any],
+        builder: SystemBuilder,
+    ) -> reverb.Table:
+        """_summary_"""
+
+    def on_building_data_server(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+        builder.store.data_tables = self._create_table_per_trainer(builder)
+
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "data_server"
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return MockDataServerConfig
+
+
+class MockOnPolicyDataServer(MockDataServer):
+    def __init__(
+        self, config: OnPolicyDataServerConfig = OnPolicyDataServerConfig()
+    ) -> None:
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    def _create_table_per_trainer(self, builder: SystemBuilder) -> List[reverb.Table]:
+        builder.store.table_network_config = {"table_0": "network_0"}
+        data_tables = []
+        extras_spec: dict = {}
+        for table_key in builder.store.table_network_config.keys():
+            num_networks = len(builder.store.table_network_config[table_key])
+            env_spec = copy.deepcopy(builder.store.environment_spec)
+            env_spec._specs = covert_specs(
+                builder.store.agent_net_keys, env_spec._specs, num_networks
+            )
+            table = self.table(table_key, env_spec, extras_spec, builder)
+            data_tables.append(table)
+        return data_tables
+
+    def table(
+        self,
+        table_key: str,
+        environment_spec: specs.MAEnvironmentSpec,
+        extras_spec: Dict[str, Any],
+        builder: SystemBuilder,
+    ) -> reverb.Table:
+        """Func returns mock table used in testing.
+
+        Args:
+            table_key: key for specific table.
+            environment_spec: env spec.
+            extras_spec: extras spec.
+            builder: builder used for building this component.
+
+        Returns:
+            mock reverb table.
+        """
+        if builder.store.__dict__.get("sequence_length"):
+            signature = builder.store.adder_signature_fn(
+                environment_spec, builder.store.sequence_length, extras_spec
+            )
+        else:
+            signature = builder.store.adder_signature_fn(environment_spec, extras_spec)
+        return mock_queue(
+            name=table_key,
+            max_queue_size=self.config.max_queue_size,
+            signature=signature,
+        )
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return OnPolicyDataServerConfig
+
+
+class MockOffPolicyDataServer(MockDataServer):
+    def __init__(
+        self, config: OffPolicyDataServerConfig = OffPolicyDataServerConfig()
+    ) -> None:
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    def _create_table_per_trainer(self, builder: SystemBuilder) -> List[reverb.Table]:
+        builder.store.table_network_config = {"table_0": "network_0"}
+        data_tables = []
+        extras_spec: dict = {}
+        for table_key in builder.store.table_network_config.keys():
+            num_networks = len(builder.store.table_network_config[table_key])
+            env_spec = copy.deepcopy(builder.store.environment_spec)
+            env_spec._specs = covert_specs(
+                builder.store.agent_net_keys, env_spec._specs, num_networks
+            )
+            table = self.table(table_key, env_spec, extras_spec, builder)
+            data_tables.append(table)
+        return data_tables
+
+    def table(
+        self,
+        table_key: str,
+        environment_spec: specs.MAEnvironmentSpec,
+        extras_spec: Dict[str, Any],
+        builder: SystemBuilder,
+    ) -> reverb.Table:
+        """Func returns mock table used in testing.
+
+        Args:
+            table_key: key for specific table.
+            environment_spec: env spec.
+            extras_spec: extras spec.
+            builder: builder used for building this component.
+
+        Returns:
+            mock reverb table.
+        """
+        return mock_table(
+            name=table_key,
+            sampler=self.config.sampler,
+            remover=self.config.remover,
+            max_size=self.config.max_size,
+            max_times_sampled=self.config.max_times_sampled,
+            rate_limiter=builder.store.rate_limiter_fn(),
+            signature=builder.store.adder_signature_fn(environment_spec, extras_spec),
+        )
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return OffPolicyDataServerConfig
 
 
 @dataclass
@@ -134,7 +450,7 @@ class MockParameterServerConfig:
     parameter_server_param: int = 2
 
 
-class MockParameterServer(Callback):
+class MockParameterServer(Component):
     def __init__(
         self,
         config: MockParameterServerConfig = MockParameterServerConfig(),
@@ -145,8 +461,8 @@ class MockParameterServer(Callback):
     def on_building_parameter_server(self, builder: SystemBuilder) -> None:
         """_summary_"""
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "parameter_server"
 
@@ -167,7 +483,7 @@ class MockLogerClass:
         pass
 
 
-class MockLogger(Callback):
+class MockLogger(Component):
     def __init__(
         self,
         config: MockLoggerConfig = MockLoggerConfig(),
@@ -183,8 +499,8 @@ class MockLogger(Callback):
         """_summary_"""
         builder.store.trainer_logger = MockLogerClass()
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "logger"
 
@@ -195,7 +511,7 @@ class MockExecutorParameterClientConfig:
     executor_parameter_client_param_1: str = "param"
 
 
-class MockExecutorParameterClient(Callback):
+class MockExecutorParameterClient(Component):
     def __init__(
         self,
         config: MockExecutorParameterClientConfig = MockExecutorParameterClientConfig(),
@@ -207,8 +523,8 @@ class MockExecutorParameterClient(Callback):
         """_summary_"""
         builder.store.executor_parameter_client = None
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "executor_parameter_client"
 
@@ -219,7 +535,7 @@ class MockTrainerParameterClientConfig:
     trainer_parameter_client_param_1: str = "param"
 
 
-class MockTrainerParameterClient(Callback):
+class MockTrainerParameterClient(Component):
     def __init__(
         self,
         config: MockTrainerParameterClientConfig = MockTrainerParameterClientConfig(),
@@ -231,10 +547,19 @@ class MockTrainerParameterClient(Callback):
         """_summary_"""
         builder.store.trainer_parameter_client = None
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "trainer_parameter_client"
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return MockTrainerParameterClientConfig
 
 
 @dataclass
@@ -242,7 +567,7 @@ class MockExecutorDefaultConfig:
     executor_param: int = 1
 
 
-class MockExecutor(Callback):
+class MockExecutor(Component):
     def __init__(
         self,
         config: MockExecutorDefaultConfig = MockExecutorDefaultConfig(),
@@ -258,19 +583,18 @@ class MockExecutor(Callback):
             "agent_2": "network_agent",
         }
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "executor"
 
 
 @dataclass
 class MockExecutorEnvironmentLoopConfig:
-    environment_factory: str = "param"
     should_update: bool = True
 
 
-class MockExecutorEnvironmentLoop(Callback):
+class MockExecutorEnvironmentLoop(Component):
     def __init__(
         self,
         config: MockExecutorEnvironmentLoopConfig = MockExecutorEnvironmentLoopConfig(),
@@ -280,19 +604,13 @@ class MockExecutorEnvironmentLoop(Callback):
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
-        if not isinstance(self.config.environment_factory, str):
-            builder.store.executor_environment = self.config.environment_factory(
-                evaluation=False
-            )  # type: ignore
-            builder.store.environment_spec = specs.MAEnvironmentSpec(
-                builder.store.executor_environment
-            )
-        else:
-            # Just assign a None for the environment for testing.
-            builder.store.executor_environment = None
+        pass
 
     def on_building_executor_environment(self, builder: SystemBuilder) -> None:
         """_summary_"""
+        builder.store.executor_environment = self.config.environment_factory(  # type: ignore # noqa: E501
+            evaluation=False
+        )
 
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
         """_summary_"""
@@ -304,26 +622,33 @@ class MockExecutorEnvironmentLoop(Callback):
             should_update=self.config.should_update,
         )
         del builder.store.executor_logger
-
         if builder.store.executor_id == "evaluator":
             builder.store.system_evaluator = executor_environment_loop
         else:
             builder.store.system_executor = executor_environment_loop
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "executor_environment_loop"
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return MockExecutorEnvironmentLoopConfig
 
 
 @dataclass
 class MockNetworksConfig:
     network_factory: Optional[Callable[[str], dm_env.Environment]] = None
-    shared_weights: bool = True
     seed: int = 1234
 
 
-class MockNetworks(Callback):
+class MockNetworks(Component):
     def __init__(
         self,
         config: MockNetworksConfig = MockNetworksConfig(),
@@ -333,8 +658,6 @@ class MockNetworks(Callback):
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """Summary"""
-        # Set the shared weights
-        builder.store.shared_networks = self.config.shared_weights
 
         # Setup the jax key for network initialisations
         builder.store.key = jax.random.PRNGKey(self.config.seed)
@@ -349,10 +672,19 @@ class MockNetworks(Callback):
             )
         )
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_"""
         return "networks"
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return MockNetworksConfig
 
 
 @dataclass
@@ -360,7 +692,7 @@ class MockTrainerDatasetConfig:
     trainer_dataset_param: int = 5
 
 
-class MockTrainerDataset(Callback):
+class MockTrainerDataset(Component):
     def __init__(
         self,
         config: MockTrainerDatasetConfig = MockTrainerDatasetConfig(),
@@ -376,10 +708,19 @@ class MockTrainerDataset(Callback):
         """_summary_"""
         builder.store.dataset = self.config.trainer_dataset_param
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "trainer_dataset"
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return MockTrainerDatasetConfig
 
 
 @dataclass
@@ -388,7 +729,7 @@ class MockTrainerConfig:
     trainer_param_1: str = "train"
 
 
-class MockTrainer(Callback):
+class MockTrainer(Component):
     def __init__(
         self,
         config: MockTrainerConfig = MockTrainerConfig(),
@@ -412,8 +753,8 @@ class MockTrainer(Callback):
             builder.store.trainer_parameter_client,
         )
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "trainer"
 
@@ -426,7 +767,7 @@ class DistributorConfig:
     name: str = "system"
 
 
-class MockDistributor(Callback):
+class MockDistributor(Component):
     def __init__(self, config: DistributorConfig = DistributorConfig()) -> None:
         """Mock system distributor component.
 
@@ -463,11 +804,33 @@ class MockDistributor(Callback):
             trainer,
         )
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'.
 
         Returns:
             Component type name
         """
         return "distributor"
+
+
+def return_test_system(components: Dict) -> System:
+    """Func that generates a test system based on a dict of components.
+
+    Args:
+        components : components that are part of the system.
+
+    Returns:
+        a system.
+    """
+
+    class TestSystem(System):
+        def design(self) -> Tuple[DesignSpec, Dict]:
+            """Mock system design with zero components.
+
+            Returns:
+                system callback components
+            """
+            return DesignSpec(**components), {}
+
+    return TestSystem()

@@ -16,7 +16,7 @@
 """MAPPO system implementation."""
 
 import functools
-from typing import Any, Callable, Dict, Optional, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import acme
 import dm_env
@@ -24,24 +24,27 @@ import launchpad as lp
 import reverb
 import sonnet as snt
 from acme import specs as acme_specs
-from acme.utils import counting, loggers
+from acme.tf import utils as tf2_utils
+from acme.utils import loggers
+from dm_env import specs
 
 import mava
-from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActorCritic
 from mava.environment_loop import ParallelEnvironmentLoop
-from mava.systems.tf import savers as tf2_savers
+from mava.systems.tf import executors
 from mava.systems.tf.mappo import builder, execution, training
-from mava.utils import lp_utils
+from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
+from mava.utils import enums
 from mava.utils.loggers import MavaLogger, logger_utils
+from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 from mava.wrappers import DetailedPerAgentStatistics
 
 
 class MAPPO:
     """MAPPO system."""
 
-    def __init__(
+    def __init__(  # noqa
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
@@ -50,12 +53,20 @@ class MAPPO:
             DecentralisedValueActorCritic
         ] = DecentralisedValueActorCritic,
         trainer_fn: Type[training.MAPPOTrainer] = training.MAPPOTrainer,
-        executor_fn: Type[core.Executor] = execution.MAPPOFeedForwardExecutor,
+        executor_fn: Type[
+            Union[execution.MAPPOFeedForwardExecutor, execution.MAPPORecurrentExecutor]
+        ] = execution.MAPPOFeedForwardExecutor,
         num_executors: int = 1,
-        num_caches: int = 0,
+        trainer_networks: Union[
+            Dict[str, List], enums.Trainer
+        ] = enums.Trainer.single_trainer,
+        network_sampling_setup: Union[
+            List, enums.NetworkSampler
+        ] = enums.NetworkSampler.fixed_agent_networks,
+        fix_sampler: Optional[List] = None,
+        net_spec_keys: Dict = {},
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
-        agent_net_keys: Dict[str, str] = {},
         executor_variable_update_period: int = 100,
         policy_optimizer: Union[
             snt.Optimizer, Dict[str, snt.Optimizer]
@@ -67,12 +78,12 @@ class MAPPO:
         lambda_gae: float = 0.95,
         clipping_epsilon: float = 0.2,
         entropy_cost: float = 0.01,
-        baseline_cost: float = 1.0,
+        baseline_cost: float = 0.5,
         max_gradient_norm: Optional[float] = 0.5,
         max_queue_size: Optional[int] = None,
         batch_size: int = 512,
         minibatch_size: int = None,
-        num_epochs: int = 10,
+        num_epochs: int = 5,
         sequence_length: int = 10,
         sequence_period: Optional[int] = None,
         max_executor_steps: int = None,
@@ -84,6 +95,7 @@ class MAPPO:
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        termination_condition: Optional[Dict[str, int]] = None,
         evaluator_interval: Optional[dict] = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
         normalize_advantage: bool = False,
@@ -106,6 +118,24 @@ class MAPPO:
                 or recurrent. Defaults to execution.MAPPOFeedForwardExecutor.
             num_executors : number of executor processes to run in
                 parallel. Defaults to 1.
+            trainer_networks: networks each trainer trains on.
+            network_sampling_setup: List of networks that are randomly
+                sampled from by the executors at the start of an environment run.
+                enums.NetworkSampler settings:
+                fixed_agent_networks: Keeps the networks
+                used by each agent fixed throughout training.
+                random_agent_networks: Creates N network policies, where N is the
+                number of agents. Randomly select policies from this sets for each
+                agent at the start of a episode. This sampling is done with
+                replacement so the same policy can be selected for more than one
+                agent for a given episode.
+                Custom list: Alternatively one can specify a custom nested list,
+                with network keys in, that will be used by the executors at
+                the start of each episode to sample networks for each agent.
+            fix_sampler: Optional list that can fix the executor sampler to sample
+                in a specific way.
+            net_spec_keys: Optional network to agent mapping used to get the environment
+                specs for each network.
             num_caches : number of trainer node caches. Defaults to 0.
             environment_spec : description of
                 the action, observation spaces etc. for each agent in the system.
@@ -230,25 +260,125 @@ class MAPPO:
                 time_delta=10,
             )
 
+        # Setup agent networks and network sampling setup
+        agents = sort_str_num(environment_spec.get_agent_ids())
+        self._network_sampling_setup = network_sampling_setup
+
+        if type(network_sampling_setup) is not list:
+            if network_sampling_setup == enums.NetworkSampler.fixed_agent_networks:
+                # if no network_sampling_setup is fixed, use shared_weights to
+                # determine setup
+                self._agent_net_keys = {
+                    agent: "network_0" if shared_weights else f"network_{i}"
+                    for i, agent in enumerate(agents)
+                }
+                self._network_sampling_setup = [
+                    [
+                        self._agent_net_keys[key]
+                        for key in sort_str_num(self._agent_net_keys.keys())
+                    ]
+                ]
+            elif network_sampling_setup == enums.NetworkSampler.random_agent_networks:
+                """Create N network policies, where N is the number of agents. Randomly
+                select policies from this sets for each agent at the start of a
+                episode. This sampling is done with replacement so the same policy
+                can be selected for more than one agent for a given episode."""
+                if shared_weights:
+                    raise ValueError(
+                        "Shared weights cannot be used with random policy per agent"
+                    )
+                self._agent_net_keys = {
+                    agents[i]: f"network_{i}" for i in range(len(agents))
+                }
+                self._network_sampling_setup = [
+                    [
+                        [self._agent_net_keys[key]]
+                        for key in sort_str_num(self._agent_net_keys.keys())
+                    ]
+                ]
+            else:
+                raise ValueError(
+                    "network_sampling_setup must be a dict or fixed_agent_networks"
+                )
+
+        else:
+            # if a dictionary is provided, use network_sampling_setup to determine setup
+            _, self._agent_net_keys = sample_new_agent_keys(
+                agents,
+                self._network_sampling_setup,  # type: ignore
+                fix_sampler=fix_sampler,
+            )
+
+        # Check that the environment and agent_net_keys has the same amount of agents
+        sample_length = len(self._network_sampling_setup[0])  # type: ignore
+        assert len(environment_spec.get_agent_ids()) == len(self._agent_net_keys.keys())
+
+        # Check if the samples are of the same length and that they perfectly fit
+        # into the total number of agents
+        assert len(self._agent_net_keys.keys()) % sample_length == 0
+        for i in range(1, len(self._network_sampling_setup)):  # type: ignore
+            assert len(self._network_sampling_setup[i]) == sample_length  # type: ignore
+
+        # Get all the unique agent network keys
+        all_samples = []
+        for sample in self._network_sampling_setup:  # type: ignore
+            all_samples.extend(sample)
+        unique_net_keys = list(sort_str_num(list(set(all_samples))))
+
+        # Create mapping from ints to networks
+        net_keys_to_ids = {net_key: i for i, net_key in enumerate(unique_net_keys)}
+
+        # Setup trainer_networks
+        if type(trainer_networks) is not dict:
+            if trainer_networks == enums.Trainer.single_trainer:
+                self._trainer_networks = {"trainer": unique_net_keys}
+            elif trainer_networks == enums.Trainer.one_trainer_per_network:
+                self._trainer_networks = {
+                    f"trainer_{i}": [unique_net_keys[i]]
+                    for i in range(len(unique_net_keys))
+                }
+            else:
+                raise ValueError(
+                    "trainer_networks does not support this enums setting."
+                )
+        else:
+            self._trainer_networks = trainer_networks  # type: ignore
+
+        # Get all the unique trainer network keys
+        all_trainer_net_keys = []
+        for trainer_nets in self._trainer_networks.values():
+            all_trainer_net_keys.extend(trainer_nets)
+        unique_trainer_net_keys = sort_str_num(list(set(all_trainer_net_keys)))
+
+        # Check that all agent_net_keys are in trainer_networks
+        assert unique_net_keys == unique_trainer_net_keys
+        # Setup specs for each network
+        self._net_spec_keys = net_spec_keys
+        if not net_spec_keys:
+            for i in range(len(unique_net_keys)):
+                self._net_spec_keys[unique_net_keys[i]] = agents[i % len(agents)]
+
+        # Setup table_network_config
+        table_network_config = {}
+        for trainer_key in self._trainer_networks.keys():
+            most_matches = 0
+            trainer_nets = self._trainer_networks[trainer_key]
+            for sample in self._network_sampling_setup:  # type: ignore
+                matches = 0
+                for entry in sample:
+                    if entry in trainer_nets:
+                        matches += 1
+                if most_matches < matches:
+                    matches = most_matches
+                    table_network_config[trainer_key] = sample
+
+        self._table_network_config = table_network_config
         self._architecture = architecture
         self._environment_factory = environment_factory
         self._network_factory = network_factory
         self._logger_factory = logger_factory
         self._environment_spec = environment_spec
-        # Setup agent networks to assign a single network to all agents of the same type
-        # if weights are shared else assign separate networks to each agent
-        self._agent_net_keys = agent_net_keys
-        if not agent_net_keys:
-            agents = environment_spec.get_agent_ids()
-            self._agent_net_keys = {
-                agent: f"network_{agent.split('_')[0]}"
-                if shared_weights
-                else f"network_{agent}"
-                for agent in agents
-            }
         self._num_exectors = num_executors
-        self._num_caches = num_caches
-        self._max_executor_steps = max_executor_steps
         self._checkpoint_subpath = checkpoint_subpath
         self._checkpoint = checkpoint
         self._logger_config = logger_config
@@ -256,9 +386,16 @@ class MAPPO:
         self._train_loop_fn_kwargs = train_loop_fn_kwargs
         self._eval_loop_fn = eval_loop_fn
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
-        self._checkpoint_minute_interval = checkpoint_minute_interval
-        self._evaluator_interval = evaluator_interval
 
+        extra_specs = {}
+        if issubclass(executor_fn, executors.RecurrentExecutor):
+            extra_specs = self._get_extra_specs()
+
+        int_spec = specs.DiscreteArray(len(unique_net_keys))
+        agents = environment_spec.get_agent_ids()
+        net_spec = {"network_keys": {agent: int_spec for agent in agents}}
+        extra_specs.update(net_spec)
+        self._evaluator_interval = evaluator_interval
         self._builder = builder.MAPPOBuilder(
             config=builder.MAPPOConfig(
                 environment_spec=environment_spec,
@@ -281,13 +418,43 @@ class MAPPO:
                 critic_optimizer=critic_optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
+                trainer_networks=self._trainer_networks,
+                table_network_config=table_network_config,
+                network_sampling_setup=self._network_sampling_setup,  # type: ignore
+                fix_sampler=fix_sampler,
+                net_spec_keys=self._net_spec_keys,
+                net_keys_to_ids=net_keys_to_ids,
+                unique_net_keys=unique_net_keys,
+                termination_condition=termination_condition,
                 evaluator_interval=evaluator_interval,
                 learning_rate_scheduler_fn=learning_rate_scheduler_fn,
                 normalize_advantage=normalize_advantage,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
+            extra_specs=extra_specs,
         )
+
+    def _get_extra_specs(self) -> Any:
+        """helper to establish specs for extra information
+        Returns:
+            Dict[str, Any]: dictionary containing extra specs
+        """
+
+        agents = self._environment_spec.get_agent_ids()
+        core_state_specs = {}
+        networks = self._network_factory(  # type: ignore
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
+        )
+        for agent in agents:
+            net_keys = self._agent_net_keys[agent]
+            core_state_specs[agent] = (
+                tf2_utils.squeeze_batch_dim(
+                    networks["policies"][net_keys].initial_state(1)
+                ),
+            )
+        return {"core_states": core_state_specs}
 
     def replay(self) -> Any:
         """Replay data storage.
@@ -298,130 +465,66 @@ class MAPPO:
 
         return self._builder.make_replay_tables(self._environment_spec)
 
-    def counter(self, checkpoint: bool) -> Any:
-        """Step counter
-
-        Args:
-            checkpoint : whether to checkpoint the counter.
-
-        Returns:
-            Any: step counter object.
-        """
-
-        if checkpoint:
-            return tf2_savers.CheckpointingRunner(
-                counting.Counter(),
-                time_delta_minutes=self._checkpoint_minute_interval,
-                directory=self._checkpoint_subpath,
-                subdirectory="counter",
-            )
-        else:
-            return counting.Counter()
-
-    def coordinator(self, counter: counting.Counter) -> Any:
-        """Coordination helper for a distributed program
-
-        Args:
-            counter: step counter object.
-
-        Returns:
-            Any: step limiter object.
-        """
-
-        return lp_utils.StepsLimiter(counter, self._max_executor_steps)  # type: ignore
-
-    def trainer(
+    def create_system(
         self,
-        replay: reverb.Client,
-        counter: counting.Counter,
-    ) -> mava.core.Trainer:
-        """System trainer
-
-        Args:
-            replay: replay data table to pull data from.
-            counter: step counter object.
-
-        Returns:
-            mava.core.Trainer: system trainer.
-        """
-
+    ) -> Tuple[Dict[str, Dict[str, snt.Module]], Dict[str, Dict[str, snt.Module]]]:
+        """Initialise the system variables from the network factory."""
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec,
             agent_net_keys=self._agent_net_keys,
+            net_spec_keys=self._net_spec_keys,
         )
 
-        # Create system architecture with target networks.
-        system_networks = self._architecture(
-            environment_spec=self._environment_spec,
-            observation_networks=networks["observations"],
-            policy_networks=networks["policies"],
-            critic_networks=networks["critics"],
-            agent_net_keys=self._agent_net_keys,
-        ).create_system()
+        # architecture args
+        architecture_config = {
+            "environment_spec": self._environment_spec,
+            "observation_networks": networks["observations"],
+            "policy_networks": networks["policies"],
+            "critic_networks": networks["critics"],
+            "agent_net_keys": self._agent_net_keys,
+        }
 
-        # create logger
-        trainer_logger_config = {}
-        if self._logger_config:
-            if "trainer" in self._logger_config:
-                trainer_logger_config = self._logger_config["trainer"]
-        trainer_logger = self._logger_factory(  # type: ignore
-            "trainer", **trainer_logger_config
-        )
+        # net_spec_keys is only implemented for the Decentralised architectures
+        if self._architecture == DecentralisedValueActorCritic:
+            architecture_config["net_spec_keys"] = self._net_spec_keys
 
-        dataset = self._builder.make_dataset_iterator(replay)
-        counter = counting.Counter(counter, "trainer")
+        # TODO (dries): Can net_spec_keys and network_spec be used as
+        # the same thing? Can we use use one of those two instead of both.
 
-        return self._builder.make_trainer(
-            networks=system_networks,
-            dataset=dataset,
-            counter=counter,
-            logger=trainer_logger,
-        )
+        system = self._architecture(**architecture_config)
+        networks = system.create_system()
+        behaviour_networks = system.create_behaviour_policy()
+        return behaviour_networks, networks
+
+    def variable_server(self) -> MavaVariableSource:
+        """Create the variable server."""
+        # Create the system
+        _, networks = self.create_system()
+        return self._builder.make_variable_server(networks)
 
     def executor(
         self,
         executor_id: str,
         replay: reverb.Client,
         variable_source: acme.VariableSource,
-        counter: counting.Counter,
     ) -> mava.ParallelEnvironmentLoop:
         """System executor
-
         Args:
             executor_id: id to identify the executor process for logging purposes.
             replay: replay data table to push data to.
-            variable_source (acme.VariableSource): variable server for updating
+            variable_source: variable server for updating
                 network variables.
-            counter: step counter object.
-
         Returns:
             mava.ParallelEnvironmentLoop: environment-executor loop instance.
         """
 
-        # Create the behavior policy.
-        networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec,
-            agent_net_keys=self._agent_net_keys,
-        )
-
-        # Create system architecture with target networks.
-        system = self._architecture(
-            environment_spec=self._environment_spec,
-            observation_networks=networks["observations"],
-            policy_networks=networks["policies"],
-            critic_networks=networks["critics"],
-            agent_net_keys=self._agent_net_keys,
-        )
-
-        # create variables
-        _ = system.create_system()
-
-        # behaviour policy networks (obs net + policy head)
-        behaviour_policy_networks = system.create_behaviour_policy()
+        # Create the system
+        behaviour_policy_networks, networks = self.create_system()
 
         # Create the executor.
         executor = self._builder.make_executor(
+            networks=networks,
             policy_networks=behaviour_policy_networks,
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
@@ -432,14 +535,10 @@ class MAPPO:
         # Create the environment.
         environment = self._environment_factory(evaluation=False)  # type: ignore
 
-        # Create logger and counter; actors will not spam bigtable.
-        counter = counting.Counter(counter, "executor")
-
         # Create executor logger
         executor_logger_config = {}
-        if self._logger_config:
-            if "executor" in self._logger_config:
-                executor_logger_config = self._logger_config["executor"]
+        if self._logger_config and "executor" in self._logger_config:
+            executor_logger_config = self._logger_config["executor"]
         exec_logger = self._logger_factory(  # type: ignore
             f"executor_{executor_id}", **executor_logger_config
         )
@@ -448,7 +547,6 @@ class MAPPO:
         train_loop = self._train_loop_fn(
             environment,
             executor,
-            counter=counter,
             logger=exec_logger,
             **self._train_loop_fn_kwargs,
         )
@@ -460,44 +558,25 @@ class MAPPO:
     def evaluator(
         self,
         variable_source: acme.VariableSource,
-        counter: counting.Counter,
         logger: loggers.Logger = None,
     ) -> Any:
-        """System evaluator - an executor process not connected to a dataset.
-
+        """System evaluator (an executor process not connected to a dataset)
         Args:
-            variable_source : variable server for updating network variables.
-            counter : step counter object.
-            logger : logger object. Defaults to None.
-
+            variable_source: variable server for updating
+                network variables.
+            logger: logger object.
         Returns:
             environment-executor evaluation loop instance for evaluating the
                 performance of a system.
         """
 
-        # Create the behavior policy.
-        networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec,
-            agent_net_keys=self._agent_net_keys,
-        )
-
-        # Create system architecture with target networks.
-        system = self._architecture(
-            environment_spec=self._environment_spec,
-            observation_networks=networks["observations"],
-            policy_networks=networks["policies"],
-            critic_networks=networks["critics"],
-            agent_net_keys=self._agent_net_keys,
-        )
-
-        # create variables
-        _ = system.create_system()
-
-        # behaviour policy networks (obs net + policy head)
-        behaviour_policy_networks = system.create_behaviour_policy()
+        # Create the system
+        behaviour_policy_networks, networks = self.create_system()
 
         # Create the agent.
         executor = self._builder.make_executor(
+            # executor_id="evaluator",
+            networks=networks,
             policy_networks=behaviour_policy_networks,
             variable_source=variable_source,
             evaluator=True,
@@ -507,11 +586,9 @@ class MAPPO:
         environment = self._environment_factory(evaluation=True)  # type: ignore
 
         # Create logger and counter.
-        counter = counting.Counter(counter, "evaluator")
         evaluator_logger_config = {}
-        if self._logger_config:
-            if "evaluator" in self._logger_config:
-                evaluator_logger_config = self._logger_config["evaluator"]
+        if self._logger_config and "evaluator" in self._logger_config:
+            evaluator_logger_config = self._logger_config["evaluator"]
         eval_logger = self._logger_factory(  # type: ignore
             "evaluator", **evaluator_logger_config
         )
@@ -521,7 +598,6 @@ class MAPPO:
         eval_loop = self._eval_loop_fn(
             environment,
             executor,
-            counter=counter,
             logger=eval_logger,
             **self._eval_loop_fn_kwargs,
         )
@@ -529,54 +605,74 @@ class MAPPO:
         eval_loop = DetailedPerAgentStatistics(eval_loop)
         return eval_loop
 
-    def build(self, name: str = "mappo") -> Any:
-        """Build the distributed system as a graph program.
-
+    def trainer(
+        self,
+        trainer_id: str,
+        replay: reverb.Client,
+        variable_source: MavaVariableSource,
+    ) -> mava.core.Trainer:
+        """System trainer
         Args:
-            name : system name. Defaults to "mappo".
-
+            trainer_id: Id of the trainer being created.
+            replay: replay data table to pull data from.
+            variable_source: variable server for updating
+                network variables.
         Returns:
-            Any: graph program for distributed system training.
+            system trainer.
+        """
+
+        # create logger
+        trainer_logger_config = {}
+        if self._logger_config and "trainer" in self._logger_config:
+            trainer_logger_config = self._logger_config["trainer"]
+        trainer_logger = self._logger_factory(  # type: ignore
+            trainer_id, **trainer_logger_config
+        )
+
+        # Create the system
+        _, networks = self.create_system()
+
+        dataset = self._builder.make_dataset_iterator(replay, trainer_id)
+
+        return self._builder.make_trainer(
+            networks=networks,
+            trainer_networks=self._trainer_networks[trainer_id],
+            trainer_table_entry=self._table_network_config[trainer_id],
+            dataset=dataset,
+            logger=trainer_logger,
+            variable_source=variable_source,
+        )
+
+    def build(self, name: str = "maddpg") -> Any:
+        """Build the distributed system as a graph program.
+        Args:
+            name: system name.
+        Returns:
+            graph program for distributed system training.
         """
         program = lp.Program(name=name)
 
         with program.group("replay"):
             replay = program.add_node(lp.ReverbNode(self.replay))
 
-        with program.group("counter"):
-            counter = program.add_node(lp.CourierNode(self.counter, self._checkpoint))
-
-        if self._max_executor_steps:
-            with program.group("coordinator"):
-                _ = program.add_node(lp.CourierNode(self.coordinator, counter))
+        with program.group("variable_server"):
+            variable_server = program.add_node(lp.CourierNode(self.variable_server))
 
         with program.group("trainer"):
-            trainer = program.add_node(lp.CourierNode(self.trainer, replay, counter))
+            # Add executors which pull round-robin from our variable sources.
+            for trainer_id in self._trainer_networks.keys():
+                program.add_node(
+                    lp.CourierNode(self.trainer, trainer_id, replay, variable_server)
+                )
 
         with program.group("evaluator"):
-            program.add_node(lp.CourierNode(self.evaluator, trainer, counter))
-
-        if not self._num_caches:
-            # Use the trainer as a single variable source.
-            sources = [trainer]
-        else:
-            with program.group("cacher"):
-                # Create a set of trainer caches.
-                sources = []
-                for _ in range(self._num_caches):
-                    cacher = program.add_node(
-                        lp.CacherNode(
-                            trainer, refresh_interval_ms=2000, stale_after_ms=4000
-                        )
-                    )
-                    sources.append(cacher)
+            program.add_node(lp.CourierNode(self.evaluator, variable_server))
 
         with program.group("executor"):
             # Add executors which pull round-robin from our variable sources.
             for executor_id in range(self._num_exectors):
-                source = sources[executor_id % len(sources)]
                 program.add_node(
-                    lp.CourierNode(self.executor, executor_id, replay, source, counter)
+                    lp.CourierNode(self.executor, executor_id, replay, variable_server)
                 )
 
         return program

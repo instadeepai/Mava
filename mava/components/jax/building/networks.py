@@ -28,7 +28,6 @@ from mava.core_jax import SystemBuilder
 @dataclass
 class NetworksConfig:
     network_factory: Optional[Callable[[str], dm_env.Environment]] = None
-    shared_weights: bool = True
     seed: int = 1234
 
 
@@ -57,7 +56,16 @@ class DefaultNetworks(Component):
             rng_key=network_key,
         )
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_"""
         return "networks"
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return NetworksConfig
