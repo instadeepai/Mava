@@ -17,6 +17,7 @@
 
 from dataclasses import dataclass
 
+import acme.jax.utils as utils
 import jax
 
 from mava.components.jax import Component
@@ -66,7 +67,9 @@ class FeedforwardExecutorSelectAction(Component):
         # We can also try jit over all the agents in a for loop. This would
         # allow the jit function to save us even more time.
         executor.store.action_info, executor.store.policy_info = network.get_action(
-            observation, rng_key
+            observation,
+            rng_key,
+            utils.add_batch_dim(executor.store.observation.legal_actions),
         )
 
     @property

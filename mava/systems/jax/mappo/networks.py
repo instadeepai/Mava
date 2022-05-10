@@ -21,6 +21,7 @@ import haiku as hk  # type: ignore
 import jax
 import jax.numpy as jnp
 import numpy as np
+import tensorflow_probability.substrates.jax.distributions as tfd
 from acme import specs
 from acme.jax import networks as networks_lib
 from acme.jax import utils
@@ -59,11 +60,20 @@ class PPONetworks:
             params: Dict[str, jnp.ndarray],
             observations: networks_lib.Observation,
             key: networks_lib.PRNGKey,
+            mask: Array = None,
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
             """TODO: Add description here."""
             # The parameters of the network might change. So it has to
             # be fed into the jitted function.
             distribution, _ = self.network.apply(params, observations)
+            if mask is not None:
+                distribution_logits = jnp.where(
+                    mask.astype(bool),
+                    distribution.logits,
+                    jnp.finfo(distribution.logits.dtype).min,
+                )
+                distribution = tfd.Categorical(logits=distribution_logits)
+
             actions = jax.numpy.squeeze(distribution.sample(seed=key))
             log_prob = distribution.log_prob(actions)
 
@@ -72,10 +82,13 @@ class PPONetworks:
         self.forward_fn = forward_fn
 
     def get_action(
-        self, observations: networks_lib.Observation, key: networks_lib.PRNGKey
+        self,
+        observations: networks_lib.Observation,
+        key: networks_lib.PRNGKey,
+        mask: Array = None,
     ) -> Tuple[np.ndarray, Dict]:
         """TODO: Add description here."""
-        actions, log_prob = self.forward_fn(self.params, observations, key)
+        actions, log_prob = self.forward_fn(self.params, observations, key, mask)
         actions = np.array(actions, dtype=np.int64)
         log_prob = np.squeeze(np.array(log_prob, dtype=np.float32))
         return actions, {"log_prob": log_prob}
