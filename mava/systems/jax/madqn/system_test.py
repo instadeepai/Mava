@@ -4,6 +4,7 @@ from typing import Tuple
 import acme
 import optax
 import pytest
+import reverb
 
 from mava.systems.jax import madqn
 from mava.systems.jax.madqn import MADQNSystem
@@ -80,6 +81,69 @@ def test_full_system() -> Tuple:
     return data_server, parameter_server, executor, evaluator, trainer
 
 
+@pytest.fixture
+def test_full_system_not_evaluator() -> Tuple:
+    """Creates a full system."""
+    # Environment.
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name="simple_spread",
+        action_space="discrete",
+    )
+
+    # Networks.
+    network_factory = madqn.make_default_networks
+
+    # Checkpointer appends "Checkpoints" to checkpoint_dir.
+    base_dir = "~/mava"
+    mava_id = "12345"
+    checkpoint_subpath = f"{base_dir}/{mava_id}"
+
+    # Log every [log_every] seconds.
+    log_every = 10
+    logger_factory = functools.partial(
+        logger_utils.make_logger,
+        directory=base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=mava_id,
+        time_delta=log_every,
+    )
+
+    # Optimizer.
+    optimizer = optax.chain(
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+    )
+
+    # epsilon scheduler.
+    epsilon_scheduler = LinearEpsilonScheduler(1.0, 0.0, 100)
+    # Build the system
+    system = MADQNSystem()
+    system.build(
+        epsilon_scheduler=epsilon_scheduler,
+        environment_factory=environment_factory,
+        network_factory=network_factory,
+        logger_factory=logger_factory,
+        checkpoint_subpath=checkpoint_subpath,
+        optimizer=optimizer,
+        executor_parameter_update_period=20,
+        multi_process=False,
+        run_evaluator=False,
+        num_executors=1,
+        use_next_extras=False,
+        sample_batch_size=2,
+    )
+
+    (
+        data_server,
+        parameter_server,
+        executor,
+        trainer,
+    ) = system._builder.store.system_build
+
+    return data_server, parameter_server, executor, trainer
+
+
 def test_except_trainer(test_full_system: Tuple) -> None:
     """Test if the parameter server instantiates processes as expected."""
     data_server, parameter_server, executor, evaluator, trainer = test_full_system
@@ -124,3 +188,16 @@ def test_epsilon_scheduler_update(test_full_system: Tuple) -> None:
     executor.run_episode()
     # after more than 100 steps, the epsilon should remain the final value
     assert executor._executor.store.epsilon_scheduler.epsilon == 0.0
+
+
+def test_data_server(test_full_system_not_evaluator: Tuple) -> None:
+    """Test if the data server instantiates correctly."""
+    data_server, _, _, _ = test_full_system_not_evaluator
+    assert isinstance(data_server, reverb.client.Client)
+
+
+def test_data_server_filling(test_full_system_not_evaluator: Tuple) -> None:
+    """Test if the data server fills correctly."""
+    data_server, _, executor, _ = test_full_system_not_evaluator
+    executor.run_episode()
+    assert 1 == 1

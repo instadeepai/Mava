@@ -77,6 +77,7 @@ class AdderPriority(Component):
 
     @staticmethod
     def config_class() -> Callable:
+        """Returns the class of the config for this component."""
         return AdderPriorityConfig
 
 
@@ -112,13 +113,15 @@ class AdderSignature(Component):
 
     @staticmethod
     def config_class() -> Callable:
+        """Returns the class of the config for this component."""
         return AdderSignatureConfig
 
 
 @dataclass
 class ParallelTransitionAdderConfig:
-    n_step: int = 5
+    n_step: int = 1
     discount: float = 0.99
+    use_next_extras: bool = False
 
 
 class ParallelTransitionAdder(Adder):
@@ -149,13 +152,20 @@ class ParallelTransitionAdder(Adder):
             n_step=self.config.n_step,
             table_network_config=builder.store.table_network_config,
             discount=self.config.discount,
+            use_next_extras=self.config.use_next_extras,
         )
 
         builder.store.adder = adder
 
     @staticmethod
     def config_class() -> Callable:
+        """Returns the class of the config for this component."""
         return ParallelTransitionAdderConfig
+
+    @staticmethod
+    def name() -> str:
+        """Returns the name of the component"""
+        return "parallel_transition_adder"
 
 
 class UniformAdderPriority(AdderPriority):
@@ -196,7 +206,7 @@ class ParallelSequenceAdderConfig:
     use_next_extras: bool = False
 
 
-class ParallelSequenceAdder(Adder):
+class ParallelSequenceAdder(Component):
     def __init__(
         self, config: ParallelSequenceAdderConfig = ParallelSequenceAdderConfig()
     ):
@@ -223,7 +233,7 @@ class ParallelSequenceAdder(Adder):
         """
         assert not hasattr(builder.store, "adder_priority_fn")
 
-        # Create custom priority functons for the adder
+        # Create custom priority functions for the adder
         priority_fns = {
             table_key: lambda x: 1.0
             for table_key in builder.store.table_network_config.keys()
@@ -243,7 +253,13 @@ class ParallelSequenceAdder(Adder):
 
     @staticmethod
     def config_class() -> Callable:
+        """Returns the class of the config for this component."""
         return ParallelSequenceAdderConfig
+
+    @staticmethod
+    def name() -> str:
+        """Returns the name of the component."""
+        return "parallel_sequence_adder"
 
 
 class ParallelSequenceAdderSignature(AdderSignature):

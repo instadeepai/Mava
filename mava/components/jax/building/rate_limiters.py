@@ -16,7 +16,7 @@
 """Commonly used rate limiter components for system builders"""
 import abc
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable, Optional
 
 import reverb
 
@@ -37,12 +37,12 @@ class RateLimiter(Component):
         self.config = config
 
     @abc.abstractmethod
-    def on_building_rate_limiter(self, builder: SystemBuilder) -> None:
+    def on_building_data_server_rate_limiter(self, builder: SystemBuilder) -> None:
         """[summary]"""
 
 
 class MinSizeRateLimiter(RateLimiter):
-    def on_building_rate_limiter(self, builder: SystemBuilder) -> None:
+    def on_building_data_server_rate_limiter(self, builder: SystemBuilder) -> None:
         """_summary_
 
         Args:
@@ -54,9 +54,19 @@ class MinSizeRateLimiter(RateLimiter):
 
         builder.store.rate_limiter_fn = rate_limiter_fn
 
+    @staticmethod
+    def config_class() -> Callable:
+        """Returns the configuration class."""
+        return RateLimiterConfig
+
+    @staticmethod
+    def name() -> str:
+        """Returns the name of the component."""
+        return "min_size_rate_limiter"
+
 
 class SampleToInsertRateLimiter(RateLimiter):
-    def on_building_rate_limiter(self, builder: SystemBuilder) -> None:
+    def on_building_data_server_rate_limiter(self, builder: SystemBuilder) -> None:
         """_summary_
 
         Args:
@@ -81,3 +91,13 @@ class SampleToInsertRateLimiter(RateLimiter):
             )
 
         builder.store.rate_limiter_fn = rate_limiter_fn
+
+    @staticmethod
+    def config_class() -> Callable:
+        """Returns the configuration class."""
+        return RateLimiterConfig
+
+    @staticmethod
+    def name() -> str:
+        """Returns the name of the component."""
+        return "sample_to_insert_rate_limiter"

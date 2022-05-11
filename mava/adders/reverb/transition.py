@@ -91,6 +91,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         *,
         priority_fns: Optional[base.PriorityFnMapping] = None,
         max_in_flight_items: int = 5,
+        use_next_extras: bool = True,
     ) -> None:
         """Creates an N-step transition adder.
 
@@ -126,7 +127,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             max_sequence_length=n_step + 1,
             priority_fns=priority_fns,
             max_in_flight_items=max_in_flight_items,
-            use_next_extras=True,
+            use_next_extras=use_next_extras,
         )
 
     def _write(self) -> None:

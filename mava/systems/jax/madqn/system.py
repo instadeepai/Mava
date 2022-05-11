@@ -39,7 +39,6 @@ class MADQNSystem(System):
             executor_init=executing.ExecutorInit,
             executor_observe=executing.FeedforwardExecutorObserve,
             executor_select_action=executing.FeedforwardExecutorSelectActionValueBased,
-            executor_adder=building.ParallelSequenceAdder,
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
             executor_scheduler=executing.EpsilonScheduler,
             networks=building.DefaultNetworks,
@@ -52,15 +51,17 @@ class MADQNSystem(System):
             loss=training.MAPGWithTrustRegionClippingLoss,
             epoch_update=training.MAPGEpochUpdate,
             minibatch_update=training.MAPGMinibatchUpdate,
-            sgd_step=training.MAPGWithTrustRegionStep,
+            # sgd_step=training.MAPGWithTrustRegionStep,
             step=training.DefaultStep,
             trainer_dataset=building.TrajectoryDataset,
         ).get()
 
         # Data Server
         data_server_process = DesignSpec(
-            data_server=building.OnPolicyDataServer,
-            data_server_adder_signature=building.ParallelSequenceAdderSignature,
+            executor_adder=building.ParallelTransitionAdder,
+            data_server_rate_limiter=building.MinSizeRateLimiter,
+            data_server=building.OffPolicyDataServer,
+            data_server_adder_signature=building.ParallelTransitionAdderSignature,
             extras_spec=ExtrasLogProbSpec,
         ).get()
 

@@ -101,7 +101,7 @@ class FeedforwardExecutorSelectActionValueBased(Component):
         for agent, observation in executor.store.observations.items():
             action_info, policy_info = executor.select_action(agent, observation)
             executor.store.actions_info[agent] = action_info
-            executor.store.policy_info[agent] = policy_info
+            executor.store.policies_info[agent] = policy_info
 
     # Select action
     def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:

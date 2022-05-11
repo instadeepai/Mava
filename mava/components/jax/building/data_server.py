@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, List
 
 import reverb
-from reverb import rate_limiters, reverb_types
+from reverb import reverb_types
 
 from mava import specs
 from mava.components.jax import Component
@@ -92,9 +92,7 @@ class OffPolicyDataServerConfig:
     sampler: reverb_types.SelectorType = reverb.selectors.Uniform()
     remover: reverb_types.SelectorType = reverb.selectors.Fifo()
     max_size: int = 100000
-    rate_limiter: rate_limiters.RateLimiter = None
     max_times_sampled: int = 0
-    data_server_name: str = "off_policy_table"
 
 
 class OffPolicyDataServer(DataServer):
@@ -128,7 +126,8 @@ class OffPolicyDataServer(DataServer):
             _description_
         """
         table = reverb.Table(
-            name=f"{self.config.data_server_name}_{table_key}",
+            # name=f"{self.config.data_server_name}_{table_key}",
+            name=table_key,
             sampler=self.config.sampler,
             remover=self.config.remover,
             max_size=self.config.max_size,
@@ -136,6 +135,11 @@ class OffPolicyDataServer(DataServer):
             signature=builder.store.adder_signature_fn(environment_spec, extras_spec),
         )
         return table
+
+    @staticmethod
+    def config_class() -> Callable:
+        """Return the configuration class for this component."""
+        return OffPolicyDataServerConfig
 
 
 @dataclass
@@ -184,4 +188,5 @@ class OnPolicyDataServer(DataServer):
 
     @staticmethod
     def config_class() -> Callable:
+        """Return the configuration class for this component."""
         return OnPolicyDataServerConfig

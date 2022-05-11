@@ -64,7 +64,7 @@ def test_except_trainer(
         optimizer=optimizer,
         executor_parameter_update_period=20,
         multi_process=False,
-        run_evaluator=True,
+        run_evaluator=False,
         num_executors=1,
         use_next_extras=False,
         sample_batch_size=2,
@@ -74,7 +74,6 @@ def test_except_trainer(
         data_server,
         parameter_server,
         executor,
-        evaluator,
         trainer,
     ) = test_full_system._builder.store.system_build
 
@@ -82,6 +81,6 @@ def test_except_trainer(
 
     # Step the executor
     executor.run_episode()
-
+    assert 1 == 1
     # Step the trainer
     trainer.step()
