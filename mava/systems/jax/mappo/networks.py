@@ -29,6 +29,7 @@ from dm_env import specs as dm_specs
 from jax import jit
 
 from mava import specs as mava_specs
+from mava.utils.jax_training_utils import action_mask_categorical_policies
 
 Array = dm_specs.Array
 BoundedArray = dm_specs.BoundedArray
@@ -67,13 +68,8 @@ class PPONetworks:
             # be fed into the jitted function.
             distribution, _ = self.network.apply(params, observations)
             if mask is not None:
-                distribution_logits = jnp.where(
-                    mask.astype(bool),
-                    distribution.logits,
-                    jnp.finfo(distribution.logits.dtype).min,
-                )
-                distribution = tfd.Categorical(logits=distribution_logits)
-
+                distribution = action_mask_categorical_policies(distribution,mask)
+                
             actions = jax.numpy.squeeze(distribution.sample(seed=key))
             log_prob = distribution.log_prob(actions)
 
