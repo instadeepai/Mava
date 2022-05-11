@@ -21,7 +21,6 @@ import haiku as hk  # type: ignore
 import jax
 import jax.numpy as jnp
 import numpy as np
-import tensorflow_probability.substrates.jax.distributions as tfd
 from acme import specs
 from acme.jax import networks as networks_lib
 from acme.jax import utils
@@ -68,8 +67,8 @@ class PPONetworks:
             # be fed into the jitted function.
             distribution, _ = self.network.apply(params, observations)
             if mask is not None:
-                distribution = action_mask_categorical_policies(distribution,mask)
-                
+                distribution = action_mask_categorical_policies(distribution, mask)
+
             actions = jax.numpy.squeeze(distribution.sample(seed=key))
             log_prob = distribution.log_prob(actions)
 
