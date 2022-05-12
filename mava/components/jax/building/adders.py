@@ -142,11 +142,11 @@ class ParallelTransitionAdder(Adder):
         Args:
             builder : _description_
         """
-        if not hasattr(builder.store, "adder_priority_fn"):
-            builder.store.adder_priority_fn = None
+        if not hasattr(builder.store, "priority_fns"):
+            builder.store.priority_fns = None
 
         adder = reverb_adders.ParallelNStepTransitionAdder(
-            priority_fns=builder.store.adder_priority_fn,
+            priority_fns=builder.store.priority_fns,
             client=builder.store.data_server_client,
             net_ids_to_keys=builder.store.unique_net_keys,
             n_step=self.config.n_step,
