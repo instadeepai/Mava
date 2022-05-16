@@ -65,9 +65,10 @@ class DQNNetworks:
         """
         action_values = self.forward_fn(self.params, observations)
         actions = rlax.epsilon_greedy(epsilon=epsilon).sample(key, action_values)
+        assert len(actions) == 1, "Only one action is allowed."
         actions = np.array(actions, dtype=np.int64)
-
-        return actions, {"action_values": action_values}
+        actions = np.squeeze(actions)
+        return actions, {"action_values": np.squeeze(action_values)}
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
         """Get the value of the network.

@@ -150,9 +150,9 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             get_first, (history["observations"], history["extras"], history["actions"])
         )
 
-        s_, e_ = tree.map_structure(
-            get_last, (history["observations"], history["extras"])
-        )
+        s_ = tree.map_structure(get_last, history["observations"])
+
+        e_ = tree.map_structure(get_first, history["extras"])
 
         # # Maybe get extras to add to the transition later.
         # if 'extras' in history:

@@ -19,8 +19,7 @@ from typing import Any, Tuple
 from mava.components.jax import building, executing, training, updating
 from mava.specs import DesignSpec
 from mava.systems.jax import System
-
-# from mava.systems.jax.madqn.components import ExtrasLogProbSpec
+from mava.systems.jax.madqn.components import ExtrasActionInfo
 from mava.systems.jax.madqn.config import MADQNDefaultConfig
 
 
@@ -64,7 +63,7 @@ class MADQNSystem(System):
             executor_adder=building.ParallelTransitionAdder,
             data_server_rate_limiter=building.MinSizeRateLimiter,
             data_server_adder_signature=building.ParallelTransitionAdderSignature,
-            # extras_spec=ExtrasLogProbSpec,
+            extras_spec=ExtrasActionInfo,
         ).get()
 
         # Parameter Server

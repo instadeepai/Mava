@@ -26,14 +26,14 @@ from mava.core_jax import SystemBuilder
 
 
 @dataclass
-class ExtrasLogProbSpecConfig:
+class ExtrasActionInfoConfig:
     pass
 
 
-class ExtrasLogProbSpec(Component):
+class ExtrasActionInfo(Component):
     def __init__(
         self,
-        config: ExtrasLogProbSpecConfig = ExtrasLogProbSpecConfig(),
+        config: ExtrasActionInfoConfig = ExtrasActionInfoConfig(),
     ):
         """_summary_
 
@@ -50,7 +50,7 @@ class ExtrasLogProbSpec(Component):
         for agent, spec in agent_specs.items():
             # Make dummy log_probs
             builder.store.extras_spec["policy_info"][agent] = np.ones(
-                shape=(), dtype=np.float32
+                shape=spec.actions.num_values, dtype=np.float32
             )
 
         # Add the networks keys to extras.
