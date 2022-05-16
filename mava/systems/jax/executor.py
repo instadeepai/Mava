@@ -30,16 +30,16 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
     def __init__(
         self,
-        config: SimpleNamespace,
+        store: SimpleNamespace,
         components: List[Callback] = [],
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            store : _description_.
             components : _description_.
         """
-        self.store = config
+        self.store = store
         self.callbacks = components
 
         self.on_execution_init_start()
