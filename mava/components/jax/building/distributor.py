@@ -29,6 +29,7 @@ class DistributorConfig:
     nodes_on_gpu: Union[List[str], str] = "trainer"
     run_evaluator: bool = True
     distributor_name: str = "System"
+    terminal: str = "current_terminal"
 
 
 class Distributor(Component):
@@ -52,6 +53,7 @@ class Distributor(Component):
             multi_process=self.config.multi_process,
             nodes_on_gpu=self.config.nodes_on_gpu,
             name=self.config.distributor_name,
+            terminal=self.config.terminal,
         )
 
         # tables node
