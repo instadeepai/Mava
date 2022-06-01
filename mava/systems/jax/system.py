@@ -39,13 +39,13 @@ class System(BaseSystem):
 
         # Enforce that design keys match component names
         for key, value in self._design.get().items():
-            if not hasattr(value, 'name'):
-                raise Exception(
-                    "Component '" + key + "' does not have a mandatory name() method"
-                )
             if key != value.name():
                 raise Exception(
-                    "Component '" + key + "' has mismatching name '" + value.name() + "'"
+                    "Component '"
+                    + key
+                    + "' has mismatching name '"
+                    + value.name()
+                    + "'"
                 )
 
     def _make_config(self) -> None:
