@@ -15,7 +15,9 @@
 
 """Execution components for system builders"""
 
+import abc
 from dataclasses import dataclass
+from typing import Any
 
 import jax
 from acme.jax import utils
@@ -29,7 +31,27 @@ class ExecutorSelectActionProcessConfig:
     pass
 
 
-class FeedforwardExecutorSelectAction(Component):
+class ExecutorSelectAction(Component):
+    @abc.abstractmethod
+    def __init__(self, config: Any) -> None:
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "executor_select_action"
+
+
+class FeedforwardExecutorSelectAction(ExecutorSelectAction):
     def __init__(
         self,
         config: ExecutorSelectActionProcessConfig = ExecutorSelectActionProcessConfig(),
@@ -69,8 +91,3 @@ class FeedforwardExecutorSelectAction(Component):
         executor.store.action_info, executor.store.policy_info = network.get_action(
             observation, rng_key
         )
-
-    @staticmethod
-    def name() -> str:
-        """_summary_"""
-        return "action_selector"

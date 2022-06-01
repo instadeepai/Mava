@@ -60,10 +60,10 @@ class Logger(Component):
             f"trainer_{builder.store.trainer_id}", **logger_config
         )
 
-    @staticmethod
-    def name() -> str:
-        """_summary_"""
-        return "logger"
+    # @staticmethod
+    # def name() -> str:
+    #     """_summary_"""
+    #     return "logger"
 
     @staticmethod
     def config_class() -> Optional[Callable]:

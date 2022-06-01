@@ -15,6 +15,7 @@
 
 """Trainer components for system updating."""
 
+import abc
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Tuple
 
@@ -29,6 +30,26 @@ from mava.components.jax.training import Batch, Utility
 from mava.core_jax import SystemTrainer
 
 
+class MinibatchUpdate(Utility):
+    @abc.abstractmethod
+    def __init__(self, config: Any) -> None:
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "minibatch_update"
+
+
 @dataclass
 class MAPGMinibatchUpdateConfig:
     learning_rate: float = 1e-3
@@ -37,7 +58,7 @@ class MAPGMinibatchUpdateConfig:
     optimizer: Optional[optax_base.GradientTransformation] = (None,)
 
 
-class MAPGMinibatchUpdate(Utility):
+class MAPGMinibatchUpdate(MinibatchUpdate):
     def __init__(
         self,
         config: MAPGMinibatchUpdateConfig = MAPGMinibatchUpdateConfig(),
@@ -115,15 +136,6 @@ class MAPGMinibatchUpdate(Utility):
         trainer.store.minibatch_update_fn = model_update_minibatch
 
     @staticmethod
-    def name() -> str:
-        """_summary_
-
-        Returns:
-            _description_
-        """
-        return "minibatch_update_fn"
-
-    @staticmethod
     def config_class() -> Optional[Callable]:
         """Config class used for component.
 
@@ -133,13 +145,33 @@ class MAPGMinibatchUpdate(Utility):
         return MAPGMinibatchUpdateConfig
 
 
+class EpochUpdate(Utility):
+    @abc.abstractmethod
+    def __init__(self, config: Any) -> None:
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "epoch_update"
+
+
 @dataclass
 class MAPGEpochUpdateConfig:
     num_epochs: int = 4
     num_minibatches: int = 1
 
 
-class MAPGEpochUpdate(Utility):
+class MAPGEpochUpdate(EpochUpdate):
     def __init__(
         self,
         config: MAPGEpochUpdateConfig = MAPGEpochUpdateConfig(),
@@ -201,15 +233,6 @@ class MAPGEpochUpdate(Utility):
             return (new_key, new_params, new_opt_states, batch), metrics
 
         trainer.store.epoch_update_fn = model_update_epoch
-
-    @staticmethod
-    def name() -> str:
-        """_summary_
-
-        Returns:
-            _description_
-        """
-        return "epoch_update_fn"
 
     @staticmethod
     def config_class() -> Optional[Callable]:
