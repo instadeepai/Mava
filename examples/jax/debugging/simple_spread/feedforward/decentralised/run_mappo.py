@@ -101,6 +101,7 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
+        terminal="current_terminal",
     )
 
     # Launch the system.
