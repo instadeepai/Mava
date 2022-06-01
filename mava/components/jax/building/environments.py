@@ -16,7 +16,7 @@
 """Execution components for system builders"""
 import abc
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, Optional, Type
 
 import acme
 
@@ -25,6 +25,10 @@ from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.utils.sort_utils import sort_str_num
+from mava.wrappers.environment_loop_wrappers import (
+    DetailedPerAgentStatistics,
+    EnvironmentLoopStatisticsBase,
+)
 
 
 @dataclass
@@ -67,6 +71,9 @@ class EnvironmentSpec(Component):
 @dataclass
 class ExecutorEnvironmentLoopConfig:
     should_update: bool = True
+    executor_stats_wrapper_class: Optional[
+        Type[EnvironmentLoopStatisticsBase]
+    ] = DetailedPerAgentStatistics
 
 
 class ExecutorEnvironmentLoop(Component):
@@ -124,4 +131,8 @@ class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
         )
         del builder.store.executor_logger
 
+        if self.config.executor_stats_wrapper_class:
+            executor_environment_loop = self.config.executor_stats_wrapper_class(
+                executor_environment_loop
+            )
         builder.store.system_executor = executor_environment_loop
