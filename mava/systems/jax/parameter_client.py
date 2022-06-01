@@ -159,10 +159,7 @@ class ParameterClient:
                 for name in names:
                     self._async_add_buffer[name] += params[name]
 
-                raise NotImplementedError("Is the below line correct?")
-                self._add_future = self._async_add(
-                    params.keys(), self._async_add_buffer
-                )
+                self._add_future = self._async_add(self._async_add_buffer)
                 self._async_add_buffer = {}
             return
         else:
