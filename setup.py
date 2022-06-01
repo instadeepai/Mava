@@ -26,7 +26,7 @@ _metadata = import_util.module_from_spec(spec)  # type: ignore
 spec.loader.exec_module(_metadata)  # type: ignore
 
 reverb_requirements = [
-    "dm-reverb~=0.7.2",
+    "dm-reverb~=0.7.0",
 ]
 
 tf_requirements = [
@@ -54,7 +54,7 @@ pettingzoo_requirements = [
     "pysc2",
 ]
 
-launchpad_requirements = ["dm-launchpad~=0.5.2"]
+launchpad_requirements = ["dm-launchpad~=0.5.0"]
 
 smac_requirements = ["pysc2", "SMAC @ git+https://github.com/oxwhirl/smac.git"]
 testing_formatting_requirements = [
