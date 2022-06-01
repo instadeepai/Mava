@@ -3,7 +3,9 @@ import tensorflow_probability.substrates.jax.distributions as tfd
 from chex import Array
 
 
-def action_mask_categorical_policies(distribution: tfd.Categorical, mask: Array):
+def action_mask_categorical_policies(
+    distribution: tfd.Categorical, mask: Array
+) -> tfd.Categorical:
     """TODO Add description"""
     masked_logits = jnp.where(
         mask.astype(bool),

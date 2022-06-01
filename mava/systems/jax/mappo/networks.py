@@ -17,6 +17,7 @@
 import dataclasses
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
+import chex
 import haiku as hk  # type: ignore
 import jax
 import jax.numpy as jnp
@@ -60,7 +61,7 @@ class PPONetworks:
             params: Dict[str, jnp.ndarray],
             observations: networks_lib.Observation,
             key: networks_lib.PRNGKey,
-            mask: Array = None,
+            mask: chex.Array = None,
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
             """TODO: Add description here."""
             # The parameters of the network might change. So it has to
@@ -80,7 +81,7 @@ class PPONetworks:
         self,
         observations: networks_lib.Observation,
         key: networks_lib.PRNGKey,
-        mask: Array = None,
+        mask: chex.Array = None,
     ) -> Tuple[np.ndarray, Dict]:
         """TODO: Add description here."""
         actions, log_prob = self.forward_fn(self.params, observations, key, mask)
