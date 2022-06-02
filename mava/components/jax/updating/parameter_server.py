@@ -16,7 +16,7 @@
 """Parameter server Component for Mava systems."""
 import time
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Any, Callable, Dict, Optional
 
 import numpy as np
 from acme.jax import savers
@@ -31,6 +31,7 @@ class ParameterServerConfig:
     checkpoint_subpath: str = "~/mava/"
     checkpoint_minute_interval: int = 5
     non_blocking_sleep_seconds: int = 10
+    termination_condition: Optional[Dict[str, Any]] = None
 
 
 class DefaultParameterServer(Component):
@@ -50,6 +51,7 @@ class DefaultParameterServer(Component):
 
         server.store.non_blocking_sleep_seconds = self.config.non_blocking_sleep_seconds
         networks = server.store.network_factory()
+        server.store.termination_condition = self.config.termination_condition
 
         # # Create parameters
         server.store.parameters = {
@@ -153,6 +155,11 @@ class DefaultParameterServer(Component):
             server.store.system_checkpointer.save()
             server.store.last_checkpoint_time = time.time()
             print("Updated variables checkpoint.")
+
+            print(f"TERMINATION CONDITION: {server.store.termination_condition}")
+            if server.store.parameters["executor_steps"][0] > 10:
+                print(server.store.parameters["executor_steps"])
+                raise
 
     @staticmethod
     def name() -> str:
