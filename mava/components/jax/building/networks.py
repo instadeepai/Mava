@@ -15,6 +15,7 @@
 
 """Execution components for system builders"""
 
+import abc
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -31,7 +32,22 @@ class NetworksConfig:
     seed: int = 1234
 
 
-class DefaultNetworks(Component):
+class Networks(Component):
+    @abc.abstractmethod
+    def __init__(
+        self,
+        config: NetworksConfig = NetworksConfig(),
+    ):
+        """[summary]"""
+        self.config = config
+
+    @staticmethod
+    def name() -> str:
+        """_summary_"""
+        return "networks"
+
+
+class DefaultNetworks(Networks):
     def __init__(
         self,
         config: NetworksConfig = NetworksConfig(),
@@ -55,11 +71,6 @@ class DefaultNetworks(Component):
             agent_net_keys=builder.store.agent_net_keys,
             rng_key=network_key,
         )
-
-    @staticmethod
-    def name() -> str:
-        """_summary_"""
-        return "networks"
 
     @staticmethod
     def config_class() -> Optional[Callable]:
