@@ -74,7 +74,7 @@ def atari_preprocessing(
         env = supersuit.frame_skip_v0(env, 4)
 
         # downscale observation for faster processing
-        env = supersuit.resize_v0(env, 84, 84)
+        env = supersuit.resize_v1(env, 84, 84)
 
         # allow agent to see everything on the screen
         # despite Atari's flickering screen problem

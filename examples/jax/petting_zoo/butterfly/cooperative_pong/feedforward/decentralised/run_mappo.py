@@ -18,25 +18,27 @@ import functools
 from datetime import datetime
 from typing import Any
 
+import numpy as np
 import optax
 import haiku as hk
-from acme.jax.networks.atari import DeepAtariTorso
+from acme.jax.networks.atari import DeepAtariTorso, AtariTorso
 from absl import app, flags
+from supersuit import dtype_v0
 
 from mava.systems.jax import mappo
-from mava.utils.environments import debugging_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
+    "env_class",
+    "butterfly",
+    "Pettingzoo environment class, e.g. atari (str).",
 )
 flags.DEFINE_string(
-    "action_space",
-    "discrete",
-    "Environment action space type (str).",
+    "env_name",
+    "cooperative_pong_v5",
+    "Pettingzoo environment name, e.g. pong (str).",
 )
 
 flags.DEFINE_string(
@@ -44,6 +46,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
+
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
@@ -55,18 +58,17 @@ def main(_: Any) -> None:
     """
     # Environment.
     environment_factory = functools.partial(
-        debugging_utils.make_environment,
+        pettingzoo_utils.make_environment,
+        env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
+        env_preprocess_wrappers=[(dtype_v0, {"dtype": np.float32})],
     )
 
     # Networks.
     def network_factory(
-        policy_layer_sizes=(64,), critic_layer_sizes=(512, 512), *args, **kwargs
+        policy_layer_sizes=(64,), critic_layer_sizes=(256,), *args, **kwargs
     ):
-        obs_net_forward = lambda x: hk.Sequential([hk.Embed(128, 8), DeepAtariTorso()])(
-            x.astype(int)
-        )
+        obs_net_forward = lambda x: DeepAtariTorso()(x)
         return mappo.make_default_networks(
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
