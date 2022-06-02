@@ -77,7 +77,7 @@ class GAE(Utility):
         Returns:
             _description_
         """
-        return "advantage_estimator"
+        return "gae_fn"
 
     @staticmethod
     def config_class() -> Optional[Callable]:
