@@ -41,11 +41,7 @@ class System(BaseSystem):
         for key, value in self._design.get().items():
             if key != value.name():
                 raise Exception(
-                    "Component '"
-                    + key
-                    + "' has mismatching name '"
-                    + value.name()
-                    + "'"
+                    f"Component '{key}' has mismatching name '{value.name()}'"
                 )
 
     def _make_config(self) -> None:
