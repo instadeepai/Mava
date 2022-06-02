@@ -18,11 +18,13 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional
 
+import launchpad as lp
 import numpy as np
 from acme.jax import savers
 
 from mava.components.jax.component import Component
 from mava.core_jax import SystemParameterServer
+from mava.utils.training_utils import check_count_condition
 
 
 @dataclass
@@ -51,6 +53,10 @@ class DefaultParameterServer(Component):
 
         server.store.non_blocking_sleep_seconds = self.config.non_blocking_sleep_seconds
         networks = server.store.network_factory()
+
+        server.store.terminal_key, server.store.terminal_count = check_count_condition(
+            self.config.termination_condition
+        )
         server.store.termination_condition = self.config.termination_condition
 
         # # Create parameters
@@ -156,10 +162,19 @@ class DefaultParameterServer(Component):
             server.store.last_checkpoint_time = time.time()
             print("Updated variables checkpoint.")
 
-            print(f"TERMINATION CONDITION: {server.store.termination_condition}")
-            if server.store.parameters["executor_steps"][0] > 10:
-                print(server.store.parameters["executor_steps"])
-                raise
+        if server.store.termination_condition is not None:
+            if (
+                server.store.parameters[server.store.terminal_key][0]
+                > server.store.terminal_count
+            ):
+                print(
+                    "StepsLimiter: Max",
+                    server.store.terminal_key,
+                    "of",
+                    server.store.terminal_count,
+                    "reached, terminating.",
+                )
+                lp.stop()
 
     @staticmethod
     def name() -> str:

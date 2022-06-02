@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 import tensorflow_probability.substrates.jax.distributions as tfd
-from chex import Array
+from chex import Array  # type: ignore
 
 
 def action_mask_categorical_policies(
