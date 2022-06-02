@@ -14,5 +14,35 @@
 # limitations under the License.
 
 """Terminator component for Mava systems."""
+import abc
+from typing import Any
 
-# TODO (Dries)
+from mava.components.jax.component import Component
+
+
+class Terminator(Component):
+    @abc.abstractmethod
+    def __init__(
+        self,
+        config: Any,
+    ):
+        """_summary_
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    @abc.abstractmethod
+    def on_termination_update(
+        self,
+    ) -> None:
+        pass
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "temination_condition"
