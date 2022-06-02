@@ -17,7 +17,9 @@
 
 from dataclasses import dataclass
 
+import acme.jax.utils as utils
 import jax
+from acme.jax import utils
 
 from mava.components.jax import Component
 from mava.core_jax import SystemExecutor
@@ -59,14 +61,16 @@ class FeedforwardExecutorSelectAction(Component):
             executor.store.agent_net_keys[agent]
         ]
 
-        observation = executor.store.observation.observation.reshape((1, -1))
+        observation = utils.add_batch_dim(executor.store.observation.observation)
         rng_key, executor.store.key = jax.random.split(executor.store.key)
 
         # TODO (dries): We are currently using jit in the networks per agent.
         # We can also try jit over all the agents in a for loop. This would
         # allow the jit function to save us even more time.
         executor.store.action_info, executor.store.policy_info = network.get_action(
-            observation, rng_key
+            observation,
+            rng_key,
+            utils.add_batch_dim(executor.store.observation.legal_actions),
         )
 
     @staticmethod
