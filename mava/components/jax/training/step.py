@@ -279,15 +279,6 @@ class MAPGWithTrustRegionStep(Step):
         trainer.store.step_fn = step
 
     @staticmethod
-    def name() -> str:
-        """_summary_
-
-        Returns:
-            _description_
-        """
-        return "step_fn"
-
-    @staticmethod
     def config_class() -> Optional[Callable]:
         """Config class used for component.
 

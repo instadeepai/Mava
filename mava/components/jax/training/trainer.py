@@ -115,7 +115,7 @@ class TrainerInit(Component):
     @staticmethod
     def name() -> str:
         """_summary_"""
-        return "trainer"
+        return "trainer_init"
 
     @staticmethod
     def config_class() -> Optional[Callable]:

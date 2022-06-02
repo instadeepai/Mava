@@ -37,6 +37,17 @@ class System(BaseSystem):
         # make config from build
         self._make_config()
 
+        # Enforce that design keys match component names
+        for key, value in self._design.get().items():
+            if key != value.name():
+                raise Exception(
+                    "Component '"
+                    + key
+                    + "' has mismatching name '"
+                    + value.name()
+                    + "'"
+                )
+
     def _make_config(self) -> None:
         """Private method to construct system config upon initialisation."""
         for component in self._design.get().values():
