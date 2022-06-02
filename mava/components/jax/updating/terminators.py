@@ -15,7 +15,10 @@
 
 """Terminator component for Mava systems."""
 import abc
-from typing import Any
+from typing import Any, Callable, Optional, Type
+
+import launchpad as lp
+from chex import dataclass
 
 from mava.components.jax.component import Component
 
@@ -33,9 +36,7 @@ class Terminator(Component):
         self.config = config
 
     @abc.abstractmethod
-    def on_termination_update(
-        self,
-    ) -> None:
+    def on_parameter_server_run_loop_termination(self, **kwargs) -> None:
         pass
 
     @staticmethod
@@ -46,3 +47,31 @@ class Terminator(Component):
             _description_
         """
         return "temination_condition"
+
+
+@dataclass
+class ParameterTerminatorConfig:
+    max_executor_steps: int = 3500
+
+
+class ParameterTerminator(Terminator):
+    def __init__(
+        self,
+        config: Any = ParameterTerminatorConfig(),
+    ):
+        """_summary_
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    def on_parameter_server_run_loop_termination(self, parameter_sever) -> None:
+        if (
+            parameter_sever.store.parameters["executor_steps"]
+            > self.config.max_executor_steps
+        ):
+            lp.stop()
+
+    @staticmethod
+    def config_class() -> Type[ParameterTerminatorConfig]:
+        return ParameterTerminatorConfig
