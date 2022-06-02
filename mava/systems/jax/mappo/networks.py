@@ -17,7 +17,7 @@
 import dataclasses
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
-import chex  # type: ignore
+import chex
 import haiku as hk  # type: ignore
 import jax
 import jax.numpy as jnp

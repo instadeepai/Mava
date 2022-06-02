@@ -15,12 +15,13 @@
 
 """Terminator component for Mava systems."""
 import abc
-from typing import Any, Callable, Optional, Type
+from typing import Any, Type
 
 import launchpad as lp
 from chex import dataclass
 
 from mava.components.jax.component import Component
+from mava.core_jax import SystemParameterServer
 
 
 class Terminator(Component):
@@ -30,13 +31,17 @@ class Terminator(Component):
         config: Any,
     ):
         """_summary_
+
         Args:
             config : _description_.
         """
         self.config = config
 
     @abc.abstractmethod
-    def on_parameter_server_run_loop_termination(self, **kwargs) -> None:
+    def on_parameter_server_run_loop_termination(
+        self, parameter_sever: SystemParameterServer
+    ) -> None:
+        """_summary_"""
         pass
 
     @staticmethod
@@ -51,7 +56,8 @@ class Terminator(Component):
 
 @dataclass
 class ParameterTerminatorConfig:
-    max_executor_steps: int = 3500
+    parameter_termination_key: str = "executor_steps"
+    parameter_termination_value: int = 5000
 
 
 class ParameterTerminator(Terminator):
@@ -60,18 +66,40 @@ class ParameterTerminator(Terminator):
         config: Any = ParameterTerminatorConfig(),
     ):
         """_summary_
+
         Args:
             config : _description_.
         """
         self.config = config
 
-    def on_parameter_server_run_loop_termination(self, parameter_sever) -> None:
+        valid_options = [
+            "trainer_steps",
+            "trainer_walltime",
+            "evaluator_steps",
+            "evaluator_episodes",
+            "executor_episodes",
+            "executor_steps",
+        ]
+        assert self.config.parameter_termination_key in valid_options, (
+            "Please give a valid termination condition. "
+            + f"Current valid conditions are {valid_options}"
+        )
+
+    def on_parameter_server_run_loop_termination(
+        self, parameter_sever: SystemParameterServer
+    ) -> None:
+        """_summary_"""
         if (
-            parameter_sever.store.parameters["executor_steps"]
-            > self.config.max_executor_steps
+            parameter_sever.store.parameters[self.config.parameter_termination_key]
+            > self.config.parameter_termination_value
         ):
+            print(
+                f"Max {self.config.parameter_termination_key} of "
+                + f"{self.config.parameter_termination_value} reached, terminating."
+            )
             lp.stop()
 
     @staticmethod
     def config_class() -> Type[ParameterTerminatorConfig]:
+        """_summary_"""
         return ParameterTerminatorConfig
