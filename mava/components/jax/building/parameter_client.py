@@ -76,9 +76,18 @@ class ExecutorParameterClient(BaseParameterClient):
             get_keys.append(param_key)
 
         count_names, params = self._set_up_count_parameters(params=params)
+
         get_keys.extend(count_names)
 
         builder.store.executor_counts = {name: params[name] for name in count_names}
+
+        set_keys = get_keys.copy()
+
+        # Executors should only be able to update relevant params.
+        if builder.store.is_evaluator is True:
+            set_keys = [x for x in set_keys if x.startswith("evaluator")]
+        else:
+            set_keys = [x for x in set_keys if x.startswith("executor")]
 
         parameter_client = None
         if builder.store.parameter_server_client:
@@ -87,7 +96,7 @@ class ExecutorParameterClient(BaseParameterClient):
                 client=builder.store.parameter_server_client,
                 parameters=params,
                 get_keys=get_keys,
-                set_keys=[],
+                set_keys=set_keys,
                 update_period=self.config.executor_parameter_update_period,
             )
 
