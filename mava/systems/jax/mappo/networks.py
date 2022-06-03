@@ -18,6 +18,7 @@ import dataclasses
 import functools
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
+import chex
 import haiku as hk  # type: ignore
 import jax
 import jax.numpy as jnp
@@ -29,6 +30,7 @@ from dm_env import specs as dm_specs
 from jax import jit
 
 from mava import specs as mava_specs
+from mava.utils.jax_training_utils import action_mask_categorical_policies
 
 Array = dm_specs.Array
 BoundedArray = dm_specs.BoundedArray
@@ -60,11 +62,15 @@ class PPONetworks:
             params: Dict[str, jnp.ndarray],
             observations: networks_lib.Observation,
             key: networks_lib.PRNGKey,
+            mask: chex.Array = None,
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
             """TODO: Add description here."""
             # The parameters of the network might change. So it has to
             # be fed into the jitted function.
             distribution, _ = self.network.apply(params, observations)
+            if mask is not None:
+                distribution = action_mask_categorical_policies(distribution, mask)
+
             actions = jax.numpy.squeeze(distribution.sample(seed=key))
             log_prob = distribution.log_prob(actions)
 
@@ -73,11 +79,14 @@ class PPONetworks:
         self.forward_fn = forward_fn
 
     def get_action(
-        self, observations: networks_lib.Observation, key: networks_lib.PRNGKey
+        self,
+        observations: networks_lib.Observation,
+        key: networks_lib.PRNGKey,
+        mask: chex.Array = None,
     ) -> Tuple[np.ndarray, Dict]:
         """TODO: Add description here."""
 
-        actions, log_prob = self.forward_fn(self.params, observations, key)
+        actions, log_prob = self.forward_fn(self.params, observations, key, mask)
         actions = np.array(actions, dtype=np.int64)
         log_prob = np.squeeze(np.array(log_prob, dtype=np.float32))
         return actions, {"log_prob": log_prob}

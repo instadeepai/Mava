@@ -35,6 +35,70 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       -
+        name: Build and push jax-core
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.vars2.outputs.docker_repo }}:jax-core-latest
+          target: jax-core
+
+      -
+        name: Build and push pz-jax
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.vars2.outputs.docker_repo }}:pz-jax-latest
+          target: pz-jax
+
+      -
+        name: Build and push sc2-jax
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.vars2.outputs.docker_repo }}:sc2-jax-latest
+          target: sc2-jax
+
+
+      -
+        name: Build and push flatland-jax
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.vars2.outputs.docker_repo }}:flatland-jax-latest
+          target: flatland-jax
+
+      -
+        name: Build and push robocup-jax
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.vars2.outputs.docker_repo }}:robocup-jax-latest
+          target: robocup-jax
+
+      -
+        name: Build and push openspiel-jax
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.vars2.outputs.docker_repo }}:openspiel-jax-latest
+          target: openspiel-jax
+
+      -
+        name: Build and push meltingpot-jax
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.vars2.outputs.docker_repo }}:meltingpot-jax-latest
+          target: meltingpot-jax
+
+      -
         name: Build and push tf-core
         uses: docker/build-push-action@v2
         with:
@@ -99,69 +163,7 @@ jobs:
           target: meltingpot
 
 
-      -
-        name: Build and push jax-core
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:jax-core-latest
-          target: jax-core
 
-      -
-        name: Build and push pz-jax
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:pz-jax-latest
-          target: pz-jax
-
-      -
-        name: Build and push sc2-jax
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:sc2-jax-latest
-          target: sc2-jax
-
-
-      -
-        name: Build and push flatland-jax
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:flatland-jax-latest
-          target: flatland-jax
-
-      -
-        name: Build and push robocup-jax
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:robocup-jax-latest
-          target: robocup-jax
-
-      -
-        name: Build and push openspiel-jax
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:openspiel-jax-latest
-          target: openspiel-jax
-
-      -
-        name: Build and push meltingpot-jax
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:meltingpot-jax-latest
-          target: meltingpot-jax
 
   # Action pushes new docker image if we have a PR to dev and have the label benchmark
   build-push-branches:
@@ -198,69 +200,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      -
-        name: Build and push tf-core
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:tf-core-${{ steps.vars.outputs.sha_short }}
-          target: tf-core
-
-      -
-        name: Build and push pz
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:pz-${{ steps.vars.outputs.sha_short }}
-          target: pz
-
-      -
-        name: Build and push sc2
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:sc2-${{ steps.vars.outputs.sha_short }}
-          target: sc2
-
-      -
-        name: Build and push flatland
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:flatland-${{ steps.vars.outputs.sha_short }}
-          target: flatland
-
-      -
-        name: Build and push robocup
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:robocup-${{ steps.vars.outputs.sha_short }}
-          target: robocup
-
-      -
-        name: Build and push openspiel
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:openspiel-${{ steps.vars.outputs.sha_short }}
-          target: openspiel
-
-      -
-        name: Build and push meltingpot
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:meltingpot-${{ steps.vars.outputs.sha_short }}
-          target: meltingpot
 
       -
         name: Build and push jax-core
@@ -324,3 +263,66 @@ jobs:
           push: true
           tags: ${{ steps.vars2.outputs.docker_repo }}:meltingpot-jax-${{ steps.vars.outputs.sha_short }}
           target: meltingpot-jax
+
+      -
+        name: Build and push tf-core
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.vars2.outputs.docker_repo }}:tf-core-${{ steps.vars.outputs.sha_short }}
+          target: tf-core
+
+      -
+        name: Build and push pz
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.vars2.outputs.docker_repo }}:pz-${{ steps.vars.outputs.sha_short }}
+          target: pz
+
+      -
+        name: Build and push sc2
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.vars2.outputs.docker_repo }}:sc2-${{ steps.vars.outputs.sha_short }}
+          target: sc2
+
+      -
+        name: Build and push flatland
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.vars2.outputs.docker_repo }}:flatland-${{ steps.vars.outputs.sha_short }}
+          target: flatland
+
+      -
+        name: Build and push robocup
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.vars2.outputs.docker_repo }}:robocup-${{ steps.vars.outputs.sha_short }}
+          target: robocup
+
+      -
+        name: Build and push openspiel
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.vars2.outputs.docker_repo }}:openspiel-${{ steps.vars.outputs.sha_short }}
+          target: openspiel
+
+      -
+        name: Build and push meltingpot
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.vars2.outputs.docker_repo }}:meltingpot-${{ steps.vars.outputs.sha_short }}
+          target: meltingpot

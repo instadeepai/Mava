@@ -33,6 +33,7 @@ class DistributorConfig:
     run_evaluator: bool = True
     distributor_name: str = "System"
     rng_seed: int = 0
+    terminal: str = "current_terminal"
 
 
 class Distributor(Component):
@@ -56,6 +57,7 @@ class Distributor(Component):
             multi_process=self.config.multi_process,
             nodes_on_gpu=self.config.nodes_on_gpu,
             name=self.config.distributor_name,
+            terminal=self.config.terminal,
         )
 
         # tables node

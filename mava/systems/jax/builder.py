@@ -141,7 +141,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
 
         # create the executor
         self.store.executor = Executor(
-            config=self.store,
+            store=self.store,
             components=self.callbacks,
         )
 

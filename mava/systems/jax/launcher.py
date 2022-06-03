@@ -40,6 +40,7 @@ class Launcher:
         sp_trainer_period: int = 10,
         sp_evaluator_period: int = 10,
         name: str = "System",
+        terminal: str = "current_terminal",
     ) -> None:
         """_summary_
 
@@ -49,11 +50,13 @@ class Launcher:
             sp_trainer_period : _description_.
             sp_evaluator_period : _description_.
             name : _description_.
+            terminal : terminal for launchpad processes to be shown on
         """
         self._multi_process = multi_process
         self._name = name
         self._sp_trainer_period = sp_trainer_period
         self._sp_evaluator_period = sp_evaluator_period
+        self._terminal = terminal
         if multi_process:
             self._program = lp.Program(name=name)
             self._nodes_on_gpu = nodes_on_gpu
@@ -140,7 +143,7 @@ class Launcher:
             lp.launch(
                 self._program,
                 lp.LaunchType.LOCAL_MULTI_PROCESSING,
-                terminal="current_terminal",
+                terminal=self._terminal,
                 local_resources=local_resources,
             )
         else:
