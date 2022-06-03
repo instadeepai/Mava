@@ -71,7 +71,7 @@ def main(_: Any) -> None:
     checkpoint_subpath = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
-    log_every = 1
+    log_every = 10
     logger_factory = functools.partial(
         logger_utils.make_logger,
         directory=FLAGS.base_dir,
