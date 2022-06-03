@@ -107,6 +107,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
             executor_id : id to identify the executor process for logging purposes
             data_server_client : data server client for pushing transition data
             parameter_server_client : parameter server client for pulling parameters
+            rng_seed : seed for creating random generators
         Returns:
             System executor
         """

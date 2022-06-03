@@ -108,7 +108,7 @@ class MAEnvironmentSpec:
         """
         return self._keys
 
-    def get_agent_types(self) -> List[str]:
+    def get_agent_types(self) -> List[int]:
         """_summary_
 
         Returns:

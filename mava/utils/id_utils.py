@@ -9,13 +9,20 @@ class EntityId:
     type: int
     id: int
 
-    def __lt__(self, other):
+    def __init__(self, type: int, id: int):
+        """Set attributes"""
+        self.type = type
+        self.id = id
+
+    def __lt__(self, other: Union[str, "EntityId"]) -> bool:
+        """Create less than operator"""
         if isinstance(other, str) or isinstance(other, EntityId):
             return str(self) < str(other)
         else:
             raise TypeError(f"Unknown Type used in less than operator: {type(other)}")
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """Convert EntityId to string"""
         # Using dash to separate to allow underscores in attribute names
         string_rep = ""
         for attribute, value in self.__dict__.items():
@@ -23,13 +30,16 @@ class EntityId:
         return string_rep[1:]
 
     def __hash__(self) -> int:
+        """Create hash operator"""
         return hash(str(self))
 
     def __eq__(self, __o: object) -> bool:
+        """Create equality operator"""
         return str(self) == str(__o)
 
     @staticmethod
-    def from_string(entity_str: Union[str, "EntityId"]):
+    def from_string(entity_str: Union[str, "EntityId"]) -> "EntityId":
+        """Set EntityId from string"""
         if isinstance(entity_str, str):
             split_string = entity_str.split("-")
             attributes = {}
