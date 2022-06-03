@@ -116,20 +116,22 @@ class MAEnvironmentSpec:
         """
         return list({EntityId.from_string(agent).type for agent in self._keys})
 
-    def get_agents_by_type(self) -> Dict[str, List[str]]:
+    def get_agents_by_type(self) -> Dict[int, List[str]]:
         """_summary_
 
         Returns:
             _description_
         """
-        agents_by_type: Dict[str, List[str]] = {}
         agents_ids = self.get_agent_ids()
         agent_types = self.get_agent_types()
+        agents_by_type: Dict[int, List[str]] = {agent_type: [] for agent_type in agent_types}
+
         for agent_type in agent_types:
             agents_by_type[agent_type] = []
-            for agent in agents_ids:
-                if agent_type in agent:
-                    agents_by_type[agent_type].append(agent)
+
+        for agent in agents_ids:
+            agents_by_type[EntityId.from_string(agent).type] = agent
+
         return agents_by_type
 
 

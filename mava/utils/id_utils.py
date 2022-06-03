@@ -9,11 +9,6 @@ class EntityId:
     type: int
     id: int
 
-    def __init__(self, type: int, id: int):
-        """Set attributes"""
-        self.type = type
-        self.id = id
-
     def __lt__(self, other: Union[str, "EntityId"]) -> bool:
         """Create less than operator"""
         if isinstance(other, str) or isinstance(other, EntityId):
