@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, List
 
 import jax
 import jax.numpy as jnp
@@ -19,6 +19,6 @@ def index_stacked_tree(tree: Any, index: int) -> Any:
     return jax.tree_map(lambda leaf: leaf[index], tree)
 
 
-def stack_trees(trees: list) -> Any:
+def stack_trees(trees: List) -> Any:
     """_description_"""
     return jax.tree_map(lambda *leaves: jnp.stack(leaves), *trees)
