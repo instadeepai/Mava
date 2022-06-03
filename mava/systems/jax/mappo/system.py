@@ -17,7 +17,6 @@
 from typing import Any, Tuple
 
 from mava.components.jax import building, executing, training, updating
-from mava.components.jax.updating.terminators import ParameterTerminator
 from mava.specs import DesignSpec
 from mava.systems.jax import System
 from mava.systems.jax.mappo.components import ExtrasLogProbSpec
@@ -74,7 +73,7 @@ class MAPPOSystem(System):
             parameter_server=updating.DefaultParameterServer,
             executor_parameter_client=building.ExecutorParameterClient,
             trainer_parameter_client=building.TrainerParameterClient,
-            temination_condition=ParameterTerminator
+            termination_condition=updating.ParameterServerTerminator,
         ).get()
 
         system = DesignSpec(

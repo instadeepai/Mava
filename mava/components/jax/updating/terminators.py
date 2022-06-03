@@ -15,13 +15,14 @@
 
 """Terminator component for Mava systems."""
 import abc
-from typing import Any, Type
+from typing import Any, Dict, Optional, Type
 
 import launchpad as lp
 from chex import dataclass
 
 from mava.components.jax.component import Component
 from mava.core_jax import SystemParameterServer
+from mava.utils.training_utils import check_count_condition
 
 
 class Terminator(Component):
@@ -51,19 +52,18 @@ class Terminator(Component):
         Returns:
             _description_
         """
-        return "temination_condition"
+        return "termination_condition"
 
 
 @dataclass
-class ParameterTerminatorConfig:
-    parameter_termination_key: str = "executor_steps"
-    parameter_termination_value: int = 5000
+class ParameterServerTerminatorConfig:
+    termination_condition: Optional[Dict[str, Any]] = None
 
 
-class ParameterTerminator(Terminator):
+class ParameterServerTerminator(Terminator):
     def __init__(
         self,
-        config: Any = ParameterTerminatorConfig(),
+        config: ParameterServerTerminatorConfig = ParameterServerTerminatorConfig(),
     ):
         """_summary_
 
@@ -72,34 +72,27 @@ class ParameterTerminator(Terminator):
         """
         self.config = config
 
-        valid_options = [
-            "trainer_steps",
-            "trainer_walltime",
-            "evaluator_steps",
-            "evaluator_episodes",
-            "executor_episodes",
-            "executor_steps",
-        ]
-        assert self.config.parameter_termination_key in valid_options, (
-            "Please give a valid termination condition. "
-            + f"Current valid conditions are {valid_options}"
-        )
+        if self.config.termination_condition is not None:
+            self.termination_key, self.termination_value = check_count_condition(
+                self.config.termination_condition
+            )
 
     def on_parameter_server_run_loop_termination(
         self, parameter_sever: SystemParameterServer
     ) -> None:
         """_summary_"""
         if (
-            parameter_sever.store.parameters[self.config.parameter_termination_key]
-            > self.config.parameter_termination_value
+            self.config.termination_condition is not None
+            and parameter_sever.store.parameters[self.termination_key]
+            > self.termination_value
         ):
             print(
-                f"Max {self.config.parameter_termination_key} of "
-                + f"{self.config.parameter_termination_value} reached, terminating."
+                f"Max {self.termination_key} of {self.termination_value}"
+                " reached, terminating."
             )
             lp.stop()
 
     @staticmethod
-    def config_class() -> Type[ParameterTerminatorConfig]:
+    def config_class() -> Type[ParameterServerTerminatorConfig]:
         """_summary_"""
-        return ParameterTerminatorConfig
+        return ParameterServerTerminatorConfig

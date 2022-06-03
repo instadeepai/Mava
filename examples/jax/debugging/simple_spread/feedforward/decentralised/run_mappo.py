@@ -101,8 +101,7 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        parameter_termination_key="executor_steps",
-        parameter_termination_value=1500,
+        termination_condition={"executor_step": 2e6},
     )
 
     # Launch the system.
