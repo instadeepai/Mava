@@ -41,6 +41,11 @@ class Networks(Component):
         """[summary]"""
         self.config = config
 
+    @abc.abstractmethod
+    def on_building_init_start(self, builder: SystemBuilder) -> None:
+        """Summary"""
+        pass
+
     @staticmethod
     def name() -> str:
         """_summary_"""
