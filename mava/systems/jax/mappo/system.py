@@ -73,6 +73,7 @@ class MAPPOSystem(System):
             parameter_server=updating.DefaultParameterServer,
             executor_parameter_client=building.ExecutorParameterClient,
             trainer_parameter_client=building.TrainerParameterClient,
+            termination_condition=updating.ParameterServerTerminator,
         ).get()
 
         system = DesignSpec(
