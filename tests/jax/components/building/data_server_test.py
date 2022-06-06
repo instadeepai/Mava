@@ -20,8 +20,8 @@ from typing import Any, Dict
 import pytest
 from reverb import item_selectors, pybind, reverb_types
 
-from mava.testing.building.mocks import return_test_system
-from mava.testing.utils import assert_if_value_is_not_none
+from tests.jax.mocks import return_test_system
+from tests.jax.utils import assert_if_value_is_not_none
 
 from .data_server_test_data import transition_adder_data_server_test_cases
 

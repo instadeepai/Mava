@@ -31,7 +31,7 @@ from mava.components.jax.building.rate_limiters import (
     MinSizeRateLimiter,
     SampleToInsertRateLimiter,
 )
-from mava.testing.building.mocks import (  # MockedEnvSpec,
+from tests.jax.mocks import (  # MockedEnvSpec,
     MockOffPolicyDataServer,
     MockOnPolicyDataServer,
     make_fake_environment_factory,

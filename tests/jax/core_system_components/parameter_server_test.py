@@ -27,8 +27,8 @@ from mava.components.jax.updating.parameter_server import DefaultParameterServer
 from mava.specs import DesignSpec
 from mava.systems.jax import ParameterServer, mappo
 from mava.systems.jax.system import System
-from mava.testing.building import mocks
 from mava.utils.environments import debugging_utils
+from tests.jax import mocks
 
 
 class TestSystem(System):

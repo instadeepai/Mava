@@ -28,11 +28,8 @@ from mava.components.jax.building.base import SystemInit
 from mava.components.jax.building.environments import EnvironmentSpec
 from mava.specs import DesignSpec, MAEnvironmentSpec
 from mava.systems.jax.system import System
-from mava.testing.building.mocks import (
-    MockOnPolicyDataServer,
-    make_fake_environment_factory,
-)
 from mava.utils.wrapper_utils import parameterized_restart
+from tests.jax.mocks import MockOnPolicyDataServer, make_fake_environment_factory
 
 agents = {"agent_0", "agent_1", "agent_2"}
 obs_first = {agent: np.array([0.0, 1.0]) for agent in agents}

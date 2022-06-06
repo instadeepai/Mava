@@ -26,7 +26,7 @@ from mava.components.jax.building.environments import EnvironmentSpec
 from mava.specs import DesignSpec
 from mava.systems.jax import ParameterServer, Trainer
 from mava.systems.jax.system import System
-from mava.testing.building import mocks
+from tests.jax import mocks
 
 
 class TestSystem(System):

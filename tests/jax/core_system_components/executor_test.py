@@ -32,8 +32,8 @@ from mava.specs import DesignSpec
 from mava.systems.jax import mappo
 from mava.systems.jax.mappo.components import ExtrasLogProbSpec
 from mava.systems.jax.system import System
-from mava.testing.building import mocks
 from mava.utils.environments import debugging_utils
+from tests.jax import mocks
 
 system_init = DesignSpec(
     environment_spec=building.EnvironmentSpec, system_init=building.SystemInit
