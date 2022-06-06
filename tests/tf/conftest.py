@@ -48,8 +48,8 @@ from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
     PettingZooParallelEnvWrapper,
 )
-from tests.enums import EnvSource, EnvSpec, EnvType, MockedEnvironments
-from tests.mocks import (
+from tests.tf.enums import EnvSource, EnvSpec, EnvType, MockedEnvironments
+from tests.tf.mocks import (
     ParallelMAContinuousEnvironment,
     ParallelMADiscreteEnvironment,
     SequentialMAContinuousEnvironment,

@@ -15,8 +15,8 @@
 
 import pytest
 
-from tests.conftest import EnvSpec, EnvType, Helpers, MockedEnvironments
-from tests.mocks import MockedExecutor, MockedSystem
+from tests.tf.conftest import EnvSpec, EnvType, Helpers, MockedEnvironments
+from tests.tf.mocks import MockedExecutor, MockedSystem
 
 
 @pytest.mark.parametrize(

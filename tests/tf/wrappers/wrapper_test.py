@@ -23,8 +23,8 @@ from _pytest.monkeypatch import MonkeyPatch
 
 from mava import types
 from mava.utils.environments.flatland_utils import check_flatland_import
-from tests.conftest import EnvSpec, EnvType, Helpers
-from tests.enums import EnvSource
+from tests.tf.conftest import EnvSpec, EnvType, Helpers
+from tests.tf.enums import EnvSource
 
 _has_flatland = check_flatland_import()
 """

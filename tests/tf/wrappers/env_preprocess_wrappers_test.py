@@ -24,7 +24,7 @@ from mava.wrappers.env_preprocess_wrappers import (
     StandardizeRewardParallel,
     StandardizeRewardSequential,
 )
-from tests.conftest import EnvSpec, EnvType, Helpers
+from tests.tf.conftest import EnvSpec, EnvType, Helpers
 
 
 @pytest.mark.parametrize(

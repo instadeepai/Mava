@@ -4,8 +4,8 @@ import dm_env
 from absl.testing import parameterized
 
 from mava.adders import reverb as reverb_adders
-from tests.adders.adders_utils import MultiAgentAdderTestMixin
-from tests.adders.episode_adders_test_data import TEST_CASES
+from tests.tf.adders.adders_utils import MultiAgentAdderTestMixin
+from tests.tf.adders.episode_adders_test_data import TEST_CASES
 
 
 class EpisodeAdderTest(MultiAgentAdderTestMixin, parameterized.TestCase):

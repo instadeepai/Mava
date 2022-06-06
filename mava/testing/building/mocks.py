@@ -40,8 +40,8 @@ from mava.environment_loop import ParallelEnvironmentLoop
 from mava.specs import DesignSpec, MAEnvironmentSpec
 from mava.systems.jax.system import System
 from mava.utils.builder_utils import covert_specs
-from tests.enums import EnvType, MockedEnvironments
-from tests.mocks import (
+from tests.tf.enums import EnvType, MockedEnvironments
+from tests.tf.mocks import (
     ParallelMAContinuousEnvironment,
     ParallelMADiscreteEnvironment,
     SequentialMAContinuousEnvironment,

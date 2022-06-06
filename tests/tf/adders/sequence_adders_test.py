@@ -5,8 +5,8 @@ from absl.testing import parameterized
 from acme.adders.reverb.sequence import EndBehavior
 
 from mava.adders import reverb as reverb_adders
-from tests.adders.adders_utils import MultiAgentAdderTestMixin
-from tests.adders.sequence_adders_test_data import TEST_CASES
+from tests.tf.adders.adders_utils import MultiAgentAdderTestMixin
+from tests.tf.adders.sequence_adders_test_data import TEST_CASES
 
 
 class SequenceAdderTest(MultiAgentAdderTestMixin, parameterized.TestCase):

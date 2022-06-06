@@ -28,7 +28,7 @@ from mava import core
 from mava.types import OLT, Observation
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
-from tests.system import System
+from tests.tf.system import System
 
 """Mock Objects for Tests"""
 
