@@ -14,8 +14,9 @@
 # limitations under the License.
 
 """Commonly used dataset components for system builders"""
+import abc
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import reverb
 from acme import datasets
@@ -24,6 +25,38 @@ from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 
 Transform = Callable[[reverb.ReplaySample], reverb.ReplaySample]
+
+
+class TrainerDataset(Component):
+    @abc.abstractmethod
+    def __init__(
+        self,
+        config: Any,
+    ):
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    @abc.abstractmethod
+    def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
+        """_summary_
+
+        Args:
+            builder : _description_
+        """
+        pass
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "trainer_dataset"
 
 
 @dataclass
@@ -36,7 +69,7 @@ class TransitionDatasetConfig:
     # dataset_name: str = "transition_dataset"
 
 
-class TransitionDataset(Component):
+class TransitionDataset(TrainerDataset):
     def __init__(
         self,
         config: TransitionDatasetConfig = TransitionDatasetConfig(),
@@ -89,7 +122,7 @@ class TrajectoryDatasetConfig:
     # dataset_name: str = "trajectory_dataset"
 
 
-class TrajectoryDataset(Component):
+class TrajectoryDataset(TrainerDataset):
     def __init__(
         self,
         config: TrajectoryDatasetConfig = TrajectoryDatasetConfig(),
@@ -123,15 +156,6 @@ class TrajectoryDataset(Component):
         builder.store.sample_batch_size = self.config.sample_batch_size
 
         builder.store.dataset_iterator = dataset.as_numpy_iterator()
-
-    @staticmethod
-    def name() -> str:
-        """_summary_
-
-        Returns:
-            _description_
-        """
-        return "trainer_dataset"
 
     @staticmethod
     def config_class() -> Optional[Callable]:
