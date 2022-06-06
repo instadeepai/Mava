@@ -1,9 +1,11 @@
 import functools
 
-import acme
 import optax
 import pytest
+import reverb
 
+import mava
+from mava import wrappers
 from mava.systems.jax import mappo
 from mava.systems.jax.system import System
 from mava.utils.environments import debugging_utils
@@ -78,7 +80,23 @@ def test_except_trainer(
         trainer,
     ) = test_full_system._builder.store.system_build
 
-    assert isinstance(executor, acme.core.Worker)
+    print("System TYPE: \n\n")
+    for item in test_full_system._builder.store.system_build:
+        print(type(item))
+
+    assert isinstance(data_server, reverb.client.Client)
+    assert isinstance(
+        parameter_server, mava.systems.jax.parameter_server.ParameterServer
+    )
+    assert isinstance(
+        executor, wrappers.environment_loop_wrappers.DetailedPerAgentStatistics
+    )
+    assert isinstance(
+        evaluator, wrappers.environment_loop_wrappers.DetailedPerAgentStatistics
+    )
+    assert isinstance(trainer, mava.systems.jax.trainer.Trainer)
+
+    # assert isinstance(executor, acme.core.Worker)
 
     # Step the executor
     executor.run_episode()
