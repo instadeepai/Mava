@@ -27,7 +27,7 @@ from mava.core_jax import SystemBuilder
 Transform = Callable[[reverb.ReplaySample], reverb.ReplaySample]
 
 
-class TrainerDataset(Component):
+class Dataset(Component):
     @abc.abstractmethod
     def __init__(
         self,
@@ -69,7 +69,7 @@ class TransitionDatasetConfig:
     # dataset_name: str = "transition_dataset"
 
 
-class TransitionDataset(TrainerDataset):
+class TransitionDataset(Dataset):
     def __init__(
         self,
         config: TransitionDatasetConfig = TransitionDatasetConfig(),
@@ -122,7 +122,7 @@ class TrajectoryDatasetConfig:
     # dataset_name: str = "trajectory_dataset"
 
 
-class TrajectoryDataset(TrainerDataset):
+class TrajectoryDataset(Dataset):
     def __init__(
         self,
         config: TrajectoryDatasetConfig = TrajectoryDatasetConfig(),

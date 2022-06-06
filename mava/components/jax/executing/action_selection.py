@@ -26,7 +26,7 @@ from mava.core_jax import SystemExecutor
 
 
 @dataclass
-class ExecutorSelectActionProcessConfig:
+class ExecutorSelectActionConfig:
     pass
 
 
@@ -34,7 +34,7 @@ class ExecutorSelectAction(Component):
     @abc.abstractmethod
     def __init__(
         self,
-        config: ExecutorSelectActionProcessConfig = ExecutorSelectActionProcessConfig(),
+        config: ExecutorSelectActionConfig = ExecutorSelectActionConfig(),
     ):
         """_summary_
 
@@ -68,7 +68,7 @@ class ExecutorSelectAction(Component):
 class FeedforwardExecutorSelectAction(ExecutorSelectAction):
     def __init__(
         self,
-        config: ExecutorSelectActionProcessConfig = ExecutorSelectActionProcessConfig(),
+        config: ExecutorSelectActionConfig = ExecutorSelectActionConfig(),
     ):
         """_summary_
 
