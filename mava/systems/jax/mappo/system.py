@@ -57,7 +57,7 @@ class MAPPOSystem(System):
             epoch_update=training.MAPGEpochUpdate,
             minibatch_update=training.MAPGMinibatchUpdate,
             sgd_step=training.MAPGWithTrustRegionStep,
-            step=training.DefaultStep,
+            step=training.DefaultTrainerStep,
             trainer_dataset=building.TrajectoryDataset,
         ).get()
 

@@ -17,9 +17,7 @@
 
 import abc
 from dataclasses import dataclass
-from typing import Any
 
-import acme.jax.utils as utils
 import jax
 from acme.jax import utils
 
@@ -28,19 +26,34 @@ from mava.core_jax import SystemExecutor
 
 
 @dataclass
-class ExecutorSelectActionProcessConfig:
+class ExecutorSelectActionConfig:
     pass
 
 
 class ExecutorSelectAction(Component):
     @abc.abstractmethod
-    def __init__(self, config: Any) -> None:
+    def __init__(
+        self,
+        config: ExecutorSelectActionConfig = ExecutorSelectActionConfig(),
+    ):
         """_summary_
 
         Args:
             config : _description_.
         """
         self.config = config
+
+    # Select actions
+    @abc.abstractmethod
+    def on_execution_select_actions(self, executor: SystemExecutor) -> None:
+        """Summary"""
+        pass
+
+    # Select action
+    @abc.abstractmethod
+    def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
+        """Summary"""
+        pass
 
     @staticmethod
     def name() -> str:
@@ -55,7 +68,7 @@ class ExecutorSelectAction(Component):
 class FeedforwardExecutorSelectAction(ExecutorSelectAction):
     def __init__(
         self,
-        config: ExecutorSelectActionProcessConfig = ExecutorSelectActionProcessConfig(),
+        config: ExecutorSelectActionConfig = ExecutorSelectActionConfig(),
     ):
         """_summary_
 
