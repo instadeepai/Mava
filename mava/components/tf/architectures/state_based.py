@@ -137,7 +137,7 @@ class StateBasedQValueCritic(DecentralisedQValueActorCritic):
             net_key = self._agent_net_keys[agent_key]
             # Get observation and action spec for critic.
             critic_obs_specs[net_key] = critic_obs_spec
-            critic_act_specs[net_key] = action_specs_per_type[agent_type]
+            critic_act_specs[agent_key] = action_specs_per_type[agent_type]
         return critic_obs_specs, critic_act_specs
 
 
@@ -288,5 +288,5 @@ class StateBasedQValueSingleActionCritic(DecentralisedQValueActorCritic):
             net_key = self._agent_net_keys[agent_key]
             # Get observation and action spec for critic.
             critic_obs_specs[net_key] = critic_obs_spec
-            critic_act_specs[net_key] = action_specs_per_type[agent_type]
+            critic_act_specs[agent_key] = action_specs_per_type[agent_type]
         return critic_obs_specs, critic_act_specs
