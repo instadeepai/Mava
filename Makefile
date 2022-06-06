@@ -77,10 +77,10 @@ bash:
 	$(DOCKER_RUN) bash
 
 run-tests:
-	$(DOCKER_RUN) /bin/bash bash_scripts/tests.sh
+	$(DOCKER_RUN) /bin/bash bash_scripts/tf_tests.sh
 
 run-integration-tests:
-	$(DOCKER_RUN) /bin/bash bash_scripts/tests.sh true
+	$(DOCKER_RUN) /bin/bash bash_scripts/tf_tests.sh true
 
 run-checks:
 	$(DOCKER_RUN) /bin/bash bash_scripts/check_format.sh
