@@ -78,7 +78,9 @@ class ParameterServerTerminator(Terminator):
             )
 
     def on_parameter_server_run_loop_termination(
-        self, parameter_sever: SystemParameterServer
+        self,
+        parameter_sever: SystemParameterServer,
+        termination_fn: Type[lp.stop] = lp.stop,
     ) -> None:
         """_summary_"""
         if (
@@ -90,7 +92,7 @@ class ParameterServerTerminator(Terminator):
                 f"Max {self.termination_key} of {self.termination_value}"
                 " reached, terminating."
             )
-            lp.stop()
+            termination_fn()
 
     @staticmethod
     def config_class() -> Type[ParameterServerTerminatorConfig]:
