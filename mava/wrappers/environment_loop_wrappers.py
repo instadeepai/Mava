@@ -193,7 +193,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
 
         # statistics dictionary
         for agent in self._environment.possible_agents:
-            agent_label = self._loop_label + "_" + agent
+            agent_label = self._loop_label + "_" + str(agent)  # agent to str to support AgentIDs
             self._agent_loggers[agent] = Logger(
                 label=agent_label,
                 directory=base_dir,

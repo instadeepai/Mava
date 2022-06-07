@@ -20,6 +20,8 @@ from typing import Any, Dict, Optional, Tuple
 
 import acme
 import dm_env
+import jax
+import jax.random as random
 import numpy as np
 from acme.utils import counting, loggers
 
@@ -600,3 +602,150 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             # We need to get the latest counts if we are using eval intervals.
             if environment_loop_schedule:
                 self._executor.update()
+
+
+class JAXParallelEnvironmentLoop(ParallelEnvironmentLoop):
+    def __init__(
+        self,
+        environment: dm_env.Environment,
+        executor: mava.core.Executor,
+        counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        should_update: bool = True,
+        label: str = "parallel_environment_loop",
+    ):
+        """Parallel environment loop init
+
+        Args:
+            environment: an environment
+            executor: a Mava executor
+            counter: an optional counter. Defaults to None.
+            logger: an optional counter. Defaults to None.
+            should_update: should update. Defaults to True.
+            label: optional label. Defaults to "sequential_environment_loop".
+        """
+        # Internalize agent and environment.
+        self._environment = environment
+
+        self.jitted_reset_fn = jax.jit(self._environment.reset)
+        self.jitted_step_fn = jax.jit(self._environment.step)
+
+        self._executor = executor
+        self._counter = counter or counting.Counter()
+        self._logger = logger or loggers.make_default_logger(label)
+
+        self._should_update = should_update
+        self._running_statistics: Dict[str, float] = {}
+
+        # We need this to schedule evaluation/test runs
+        self._last_evaluator_run_t = -1
+
+        self.rng_key = jax.random.PRNGKey(executor.store.rng_seed)
+
+    def run_episode(self) -> loggers.LoggingData:
+        """Run one episode.
+
+        Each episode is a loop which interacts first with the environment to get a
+        dictionary of observations and then give those observations to the executor
+        in order to retrieve an action for each agent in the system.
+
+        Returns:
+            An instance of `loggers.LoggingData`.
+        """
+
+        # Reset any counts and start the environment.
+        start_time = time.time()
+        episode_steps = 0
+
+        self.rng_key, reset_key = random.split(self.rng_key)
+
+        state, timestep, extras = self.jitted_reset_fn(reset_key)
+
+        if type(timestep) == tuple:
+            timestep, env_extras = timestep
+        else:
+            env_extras = {}
+
+        # Make the first observation.
+        self._executor.observe_first(timestep, extras=env_extras)
+        self._executor.store.environment_state = state
+        # For evaluation, this keeps track of the total undiscounted reward
+        # for each agent accumulated during the episode.
+        rewards: Dict[str, float] = {}
+        episode_returns: Dict[str, float] = {}
+        for agent, spec in self._environment.reward_spec().items():
+            rewards.update({agent: generate_zeros_from_spec(spec)})
+            episode_returns.update({agent: generate_zeros_from_spec(spec)})
+
+        # Run an episode.
+        while not timestep.last():
+
+            # Generate an action from the agent's policy and step the environment.
+            actions = self._get_actions(timestep)
+
+            if type(actions) == tuple:
+                # Return other action information
+                # e.g. the policy information.
+                env_actions, _ = actions
+            else:
+                env_actions = actions
+
+            state, timestep, extras = self.jitted_step_fn(state, env_actions)
+
+            if type(timestep) == tuple:
+                timestep, env_extras = timestep
+            else:
+                env_extras = {}
+
+            rewards = timestep.reward
+
+            # Have the agent observe the timestep and let the actor update itself.
+            self._executor.observe(
+                actions, next_timestep=timestep, next_extras=env_extras
+            )
+            self._executor.store.environment_state = state
+
+            if self._should_update:
+                self._executor.update()
+
+            # Book-keeping.
+            episode_steps += 1
+
+            if hasattr(self._executor, "after_action_selection"):
+                if hasattr(self._executor, "_counts"):
+                    loop_type = "evaluator" if self._executor._evaluator else "executor"
+                    total_steps_before_current_episode = self._executor._counts[
+                        f"{loop_type}_steps"
+                    ].numpy()
+                else:
+                    total_steps_before_current_episode = self._counter.get_counts().get(
+                        "executor_steps", 0
+                    )
+                current_step_t = total_steps_before_current_episode + episode_steps
+                self._executor.after_action_selection(current_step_t)
+
+            self._compute_step_statistics(rewards)
+
+            for agent, reward in rewards.items():
+                episode_returns[agent] = episode_returns[agent] + reward
+
+        self._compute_episode_statistics(
+            episode_returns,
+            episode_steps,
+            start_time,
+        )
+        if self._get_running_stats():
+            return self._get_running_stats()
+        else:
+
+            counts = self.record_counts(episode_steps)
+
+            # Collect the results and combine with counts.
+            steps_per_second = episode_steps / (time.time() - start_time)
+            result = {
+                "episode_length": episode_steps,
+                "mean_episode_return": np.mean(list(episode_returns.values())),
+                "steps_per_second": steps_per_second,
+            }
+            result.update(counts)
+            return result

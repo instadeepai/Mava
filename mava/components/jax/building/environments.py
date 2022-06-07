@@ -23,7 +23,7 @@ import acme
 from mava import specs
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
-from mava.environment_loop import ParallelEnvironmentLoop
+from mava.environment_loop import JAXParallelEnvironmentLoop, ParallelEnvironmentLoop
 from mava.utils.sort_utils import sort_str_num
 from mava.wrappers.environment_loop_wrappers import (
     DetailedPerAgentStatistics,
@@ -136,3 +136,36 @@ class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
                 executor_environment_loop
             )
         builder.store.system_executor = executor_environment_loop
+
+
+@dataclass
+class JAXParallelExecutorEnvironmentLoopConfig(ExecutorEnvironmentLoopConfig):
+    pass
+
+
+class JAXParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
+    def __init__(
+        self,
+        config: JAXParallelExecutorEnvironmentLoopConfig = JAXParallelExecutorEnvironmentLoopConfig(),
+    ):
+        self.config = config
+
+    def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
+        """_summary_
+
+        Args:
+            builder : _description_
+        """
+        executor_environment_loop = JAXParallelEnvironmentLoop(
+            environment=builder.store.executor_environment,
+            executor=builder.store.executor,
+            logger=builder.store.executor_logger,
+            should_update=self.config.should_update,
+        )
+        del builder.store.executor_logger
+
+        builder.store.system_executor = executor_environment_loop
+
+    @staticmethod
+    def config_class() -> Callable:
+        return JAXParallelExecutorEnvironmentLoopConfig

@@ -16,8 +16,10 @@
 """General launcher for systems"""
 from typing import Any, Dict, List, Union
 
+import jax.random as random
 import launchpad as lp
 import reverb
+from chex import PRNGKey
 
 from mava.utils import lp_utils
 
@@ -95,6 +97,7 @@ class Launcher:
         if self._multi_process:
             with self._program.group(name):
                 node = self._program.add_node(node_type(node_fn, *arguments))
+
             return node
         else:
             if name not in self._node_dict:

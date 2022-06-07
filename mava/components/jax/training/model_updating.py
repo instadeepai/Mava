@@ -195,6 +195,7 @@ class MAPGEpochUpdate(EpochUpdate):
             Tuple[KeyArray, Any, optax.OptState, Batch],
             Dict[str, jnp.ndarray],
         ]:
+
             """Performs model updates based on one epoch of data."""
             key, params, opt_states, batch = carry
 

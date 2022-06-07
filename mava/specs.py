@@ -19,6 +19,7 @@ from typing import Any, Dict, List
 import dm_env
 from acme.specs import EnvironmentSpec
 
+from mava.utils.id_utils import EntityId
 from mava.utils.sort_utils import sort_str_num
 
 
@@ -40,7 +41,7 @@ class MAEnvironmentSpec:
             specs = self._make_ma_environment_spec(environment)
         else:
             self.extra_specs = extra_specs
-        self._keys = list(sort_str_num(specs.keys()))
+        self._keys = sort_str_num(list(map(str, specs.keys())))
         self._specs = {key: specs[key] for key in self._keys}
 
     def _make_ma_environment_spec(
@@ -60,6 +61,7 @@ class MAEnvironmentSpec:
         discount_specs = environment.discount_spec()
         self.extra_specs = environment.extra_spec()
         for agent in environment.possible_agents:
+            agent = str(agent)
             specs[agent] = EnvironmentSpec(
                 observations=observation_specs[agent],
                 actions=action_specs[agent],
@@ -91,9 +93,11 @@ class MAEnvironmentSpec:
             _description_
         """
         specs = {}
-        agent_types = list({agent.split("_")[0] for agent in self._keys})
+
+        agent_types = list({agent.type for agent in self._keys})
         for agent_type in agent_types:
-            specs[agent_type] = self._specs[f"{agent_type}_0"]
+            agent_id = str(EntityId(id=0, type=agent_type))
+            specs[agent_type] = self._specs[agent_id]
         return specs
 
     def get_agent_ids(self) -> List[str]:
@@ -104,28 +108,30 @@ class MAEnvironmentSpec:
         """
         return self._keys
 
-    def get_agent_types(self) -> List[str]:
+    def get_agent_types(self) -> List[int]:
         """_summary_
 
         Returns:
             _description_
         """
-        return list({agent.split("_")[0] for agent in self._keys})
+        return list({EntityId.from_string(agent).type for agent in self._keys})
 
-    def get_agents_by_type(self) -> Dict[str, List[str]]:
+    def get_agents_by_type(self) -> Dict[int, List[str]]:
         """_summary_
 
         Returns:
             _description_
         """
-        agents_by_type: Dict[str, List[str]] = {}
         agents_ids = self.get_agent_ids()
         agent_types = self.get_agent_types()
+        agents_by_type: Dict[int, List[str]] = {agent_type: [] for agent_type in agent_types}
+
         for agent_type in agent_types:
             agents_by_type[agent_type] = []
-            for agent in agents_ids:
-                if agent_type in agent:
-                    agents_by_type[agent_type].append(agent)
+
+        for agent in agents_ids:
+            agents_by_type[EntityId.from_string(agent).type] = agent
+
         return agents_by_type
 
 

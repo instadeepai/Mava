@@ -15,6 +15,7 @@
 
 """Jax MAPPO system networks."""
 import dataclasses
+import functools
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import chex
@@ -84,6 +85,7 @@ class PPONetworks:
         mask: chex.Array = None,
     ) -> Tuple[np.ndarray, Dict]:
         """TODO: Add description here."""
+
         actions, log_prob = self.forward_fn(self.params, observations, key, mask)
         actions = np.array(actions, dtype=np.int64)
         log_prob = np.squeeze(np.array(log_prob, dtype=np.float32))
@@ -106,32 +108,6 @@ def make_ppo_network(
         entropy=lambda distribution: distribution.entropy(),
         sample=lambda distribution, key: distribution.sample(seed=key),
     )
-
-
-def make_networks(
-    spec: specs.EnvironmentSpec,
-    key: networks_lib.PRNGKey,
-    policy_layer_sizes: Sequence[int] = (
-        256,
-        256,
-        256,
-    ),
-    critic_layer_sizes: Sequence[int] = (512, 512, 256),
-) -> PPONetworks:
-    """TODO: Add description here."""
-    if isinstance(spec.actions, specs.DiscreteArray):
-        return make_discrete_networks(
-            environment_spec=spec,
-            key=key,
-            policy_layer_sizes=policy_layer_sizes,
-            critic_layer_sizes=critic_layer_sizes,
-        )
-    else:
-        raise NotImplementedError(
-            "Continuous networks not implemented yet."
-            + "See: https://github.com/deepmind/acme/blob/"
-            + "master/acme/agents/jax/ppo/networks.py"
-        )
 
 
 def make_discrete_networks(
@@ -162,6 +138,7 @@ def make_discrete_networks(
     forward_fn = hk.without_apply_rng(hk.transform(forward_fn))
 
     dummy_obs = utils.zeros_like(environment_spec.observations.observation)
+
     dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
 
     network_key, key = jax.random.split(key)
@@ -169,6 +146,32 @@ def make_discrete_networks(
 
     # Create PPONetworks to add functionality required by the agent.
     return make_ppo_network(network=forward_fn, params=params)
+
+
+def make_networks(
+    spec: specs.EnvironmentSpec,
+    key: networks_lib.PRNGKey,
+    policy_layer_sizes: Sequence[int] = (
+        256,
+        256,
+        256,
+    ),
+    critic_layer_sizes: Sequence[int] = (512, 512, 256),
+) -> PPONetworks:
+    """TODO: Add description here."""
+    if isinstance(spec.actions, specs.DiscreteArray):
+        return make_discrete_networks(
+            environment_spec=spec,
+            key=key,
+            policy_layer_sizes=policy_layer_sizes,
+            critic_layer_sizes=critic_layer_sizes,
+        )
+    else:
+        raise NotImplementedError(
+            "Continuous networks not implemented yet."
+            + "See: https://github.com/deepmind/acme/blob/"
+            + "master/acme/agents/jax/ppo/networks.py"
+        )
 
 
 def make_default_networks(

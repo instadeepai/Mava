@@ -96,7 +96,11 @@ class SystemBuilder(abc.ABC):
 
     @abc.abstractmethod
     def executor(
-        self, executor_id: str, data_server_client: Any, parameter_server_client: Any
+        self,
+        executor_id: str,
+        data_server_client: Any,
+        parameter_server_client: Any,
+        rng_seed: int,
     ) -> Any:
         """Executor, a collection of agents in an environment to gather experience.
 
@@ -104,6 +108,7 @@ class SystemBuilder(abc.ABC):
             executor_id : id to identify the executor process for logging purposes
             data_server_client : data server client for pushing transition data
             parameter_server_client : parameter server client for pulling parameters
+            rng_seed : seed for creating random generators
         Returns:
             System executor
         """
