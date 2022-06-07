@@ -29,7 +29,7 @@ RUN pip install -e .[reverb]
 ENV DISPLAY=:0
 RUN if [ "$record" = "true" ]; then \
     ./bash_scripts/install_record.sh; \
-fi
+    fi
 EXPOSE 6006
 ##########################################################
 
@@ -89,6 +89,10 @@ RUN pip install .[open_spiel]
 ##########################################################
 # MeltingPot Image
 FROM tf-core AS meltingpot
+
+# Melting pot requires python>=3.9
+RUN apt-get install python3.9 -y && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 1 && rm -rf /root/.cache && apt-get clean
+
 # Install meltingpot
 RUN apt-get install -y git
 RUN ./bash_scripts/install_meltingpot.sh
@@ -153,6 +157,10 @@ RUN pip install .[open_spiel]
 ##########################################################
 # MeltingPot Image
 FROM jax-core AS meltingpot-jax
+
+# Melting pot requires python>=3.9
+RUN apt-get install python3.9 -y && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 1 && rm -rf /root/.cache && apt-get clean
+
 # Install meltingpot
 RUN apt-get install -y git
 RUN ./bash_scripts/install_meltingpot.sh
