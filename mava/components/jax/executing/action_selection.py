@@ -15,9 +15,9 @@
 
 """Execution components for system builders"""
 
+import abc
 from dataclasses import dataclass
 
-import acme.jax.utils as utils
 import jax
 from acme.jax import utils
 
@@ -26,14 +26,49 @@ from mava.core_jax import SystemExecutor
 
 
 @dataclass
-class ExecutorSelectActionProcessConfig:
+class ExecutorSelectActionConfig:
     pass
 
 
-class FeedforwardExecutorSelectAction(Component):
+class ExecutorSelectAction(Component):
+    @abc.abstractmethod
     def __init__(
         self,
-        config: ExecutorSelectActionProcessConfig = ExecutorSelectActionProcessConfig(),
+        config: ExecutorSelectActionConfig = ExecutorSelectActionConfig(),
+    ):
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    # Select actions
+    @abc.abstractmethod
+    def on_execution_select_actions(self, executor: SystemExecutor) -> None:
+        """Summary"""
+        pass
+
+    # Select action
+    @abc.abstractmethod
+    def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
+        """Summary"""
+        pass
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "executor_select_action"
+
+
+class FeedforwardExecutorSelectAction(ExecutorSelectAction):
+    def __init__(
+        self,
+        config: ExecutorSelectActionConfig = ExecutorSelectActionConfig(),
     ):
         """_summary_
 
@@ -72,8 +107,3 @@ class FeedforwardExecutorSelectAction(Component):
             rng_key,
             utils.add_batch_dim(executor.store.observation.legal_actions),
         )
-
-    @staticmethod
-    def name() -> str:
-        """_summary_"""
-        return "action_selector"

@@ -21,5 +21,8 @@ from mava.components.jax.training.model_updating import (
     MAPGEpochUpdate,
     MAPGMinibatchUpdate,
 )
-from mava.components.jax.training.step import DefaultStep, MAPGWithTrustRegionStep
+from mava.components.jax.training.step import (
+    DefaultTrainerStep,
+    MAPGWithTrustRegionStep,
+)
 from mava.components.jax.training.trainer import TrainerInit

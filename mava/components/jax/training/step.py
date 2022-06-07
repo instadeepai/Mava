@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Trainer components for gradient step calculations."""
-
+import abc
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Tuple
@@ -33,14 +33,42 @@ from mava.core_jax import SystemTrainer
 
 
 @dataclass
-class DefaultStepConfig:
+class TrainerStepConfig:
     random_key: int = 42
 
 
-class DefaultStep(Component):
+class TrainerStep(Component):
+    @abc.abstractmethod
     def __init__(
         self,
-        config: DefaultStepConfig = DefaultStepConfig(),
+        config: TrainerStepConfig = TrainerStepConfig(),
+    ):
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    @abc.abstractmethod
+    def on_training_step(self, trainer: SystemTrainer) -> None:
+        """Do a training step and log the results."""
+        pass
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "step"
+
+
+class DefaultTrainerStep(TrainerStep):
+    def __init__(
+        self,
+        config: TrainerStepConfig = TrainerStepConfig(),
     ):
         """_summary_
 
@@ -81,15 +109,6 @@ class DefaultStep(Component):
 
         # Write to the loggers.
         trainer.store.trainer_logger.write({**results})
-
-    @staticmethod
-    def name() -> str:
-        """_summary_
-
-        Returns:
-            _description_
-        """
-        return "step"
 
 
 @dataclass
@@ -277,15 +296,6 @@ class MAPGWithTrustRegionStep(Step):
             return metrics
 
         trainer.store.step_fn = step
-
-    @staticmethod
-    def name() -> str:
-        """_summary_
-
-        Returns:
-            _description_
-        """
-        return "step_fn"
 
     @staticmethod
     def config_class() -> Optional[Callable]:

@@ -202,21 +202,29 @@ def check_count_condition(condition: Optional[dict]) -> Tuple:
         the condition key and count.
     """
 
-    valid_options = [
+    valid_options = {
         "trainer_steps",
         "trainer_walltime",
         "evaluator_steps",
         "evaluator_episodes",
         "executor_episodes",
         "executor_steps",
-    ]
+    }
 
     condition_key, condition_count = None, None
     if condition is not None:
-        assert len(condition) == 1
+        if len(condition) != 1:
+            raise Exception("Please pass only a single termination condition.")
         condition_key, condition_count = list(condition.items())[0]
-        assert condition_key in valid_options
-        assert condition_count > 0
+        if condition_key not in valid_options:
+            raise Exception(
+                "Please give a valid termination condition. "
+                f"Current valid conditions are {valid_options}"
+            )
+        if not condition_count > 0:
+            raise Exception(
+                "Termination condition must have a positive value greater than 0."
+            )
 
     return condition_key, condition_count
 
