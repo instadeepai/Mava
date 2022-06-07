@@ -167,7 +167,6 @@ class TestMAD4PG:
             checkpoint=False,
             architecture=architectures.CentralisedQValueCritic,
             trainer_fn=mad4pg.MAD4PGCentralisedTrainer,
-            shared_weights=False,
         )
         program = system.build()
 
@@ -221,7 +220,6 @@ class TestMAD4PG:
             checkpoint=False,
             trainer_fn=mad4pg.MAD4PGStateBasedTrainer,
             architecture=architectures.StateBasedQValueCritic,
-            shared_weights=False,
         )
         program = system.build()
 
