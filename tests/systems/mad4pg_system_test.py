@@ -43,7 +43,8 @@ class TestMAD4PG:
         # networks
         network_factory = lp_utils.partial_kwargs(
             mad4pg.make_default_networks,
-            policy_networks_layer_sizes=(64, 64),
+            policy_networks_layer_sizes=(32, 32),
+            critic_networks_layer_sizes=(64, 64),
             vmin=-10,
             vmax=50,
         )
@@ -95,6 +96,7 @@ class TestMAD4PG:
             mad4pg.make_default_networks,
             architecture_type=ArchitectureType.recurrent,
             policy_networks_layer_sizes=(32, 32),
+            critic_networks_layer_sizes=(64, 64),
             vmin=-10,
             vmax=50,
         )
@@ -150,6 +152,7 @@ class TestMAD4PG:
         network_factory = lp_utils.partial_kwargs(
             mad4pg.make_default_networks,
             policy_networks_layer_sizes=(32, 32),
+            critic_networks_layer_sizes=(64, 64),
             vmin=-10,
             vmax=50,
         )
@@ -203,6 +206,7 @@ class TestMAD4PG:
         network_factory = lp_utils.partial_kwargs(
             mad4pg.make_default_networks,
             policy_networks_layer_sizes=(32, 32),
+            critic_networks_layer_sizes=(64, 64),
             vmin=-10,
             vmax=50,
         )

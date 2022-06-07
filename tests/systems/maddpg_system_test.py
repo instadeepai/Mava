@@ -191,9 +191,9 @@ class TestMADDPG:
 
     @pytest.mark.skip(
         reason="""
-            Running tests with shared_weights=False pass when running indepedently 
-            (other tests commented out), but fail when run with other tests and not 
-            enough parallel cores (2 or less). This is likely a race condition, 
+            Running tests with shared_weights=False pass when running indepedently
+            (other tests commented out), but fail when run with other tests and not
+            enough parallel cores (2 or less). This is likely a race condition,
             hangling process from previous tests or related to network sampling
             (TODO @Dries investigate if you have a chance). Only the test fails,
             the examples run.
