@@ -7,14 +7,19 @@ import numpy as np
 from dm_env import specs
 
 from mava.types import OLT
-from mava.utils.environments.JaxSlimeVolley import SlimeVolley
+from mava.utils.environments.JaxEnvironments.JaxSlimeVolley import SlimeVolley
 from mava.utils.id_utils import EntityId
 
 
 class SlimeVolleyWrapper:
     """Environment wrapper for Debugging MARL environments."""
 
-    def __init__(self, environment: SlimeVolley, is_multi_agent: bool = True):
+    def __init__(
+        self,
+        environment: SlimeVolley,
+        is_multi_agent: bool = True,
+        is_cooperative: bool = False,
+    ):
         self._environment = environment
         self.action_table = jnp.array(
             [
@@ -30,6 +35,7 @@ class SlimeVolleyWrapper:
 
         self.num_actions = len(self.action_table)
         self.is_multi_agent = is_multi_agent
+        self.is_cooperative = is_cooperative
 
         self.num_agents = 2 if self.is_multi_agent else 1
 
@@ -70,7 +76,7 @@ class SlimeVolleyWrapper:
         right_action = jnp.take(self.action_table, discrete_right_action, axis=0)
 
         def left_step():
-            discrete_left_action = actions[self.possible_agents[1]]
+            discrete_left_action = actions[self.possible_agents[-1]]
             left_action = jnp.take(self.action_table, discrete_left_action, axis=0)
 
             return self._environment.step(state, right_action, left_action)
@@ -80,6 +86,12 @@ class SlimeVolleyWrapper:
 
         state, reward_right, reward_left, done = jax.lax.cond(
             self.is_multi_agent, lambda: left_step(), lambda: right_step()
+        )
+
+        reward_right, reward_left = jax.lax.cond(
+            self.is_cooperative,
+            lambda: (-jnp.abs(reward_right), -jnp.abs(reward_left)),
+            lambda: (reward_right, reward_left),
         )
 
         right_observation = state.obs_right

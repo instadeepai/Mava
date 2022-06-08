@@ -398,6 +398,8 @@ class GameState(object):
     action_left: jnp.ndarray
     action_right_flag: jnp.int32  # same as above
     action_right: jnp.ndarray
+    agent_right_bounce_counter: int
+    agent_left_bounce_counter: int
 
 
 @dataclass
@@ -636,6 +638,7 @@ class Particle:
             vy=newvy,
             r=self.p.r,
         )
+        return jax.lax.cond(d2 < r2, lambda: True, lambda: False)
 
     def limitSpeed(self, maxSpeed):
         oldp = self.p
@@ -663,10 +666,11 @@ class Particle:
 class Agent:
     """keeps track of the agent in the game. note: not the policy network"""
 
-    def __init__(self, agent, c):
+    def __init__(self, agent, c, bounce_limit=3):
         self.p = agent
         self.state = getZeroObs()
         self.c = c
+        self.bounce_limit = bounce_limit
 
     def setAction(self, action):
         forward = jnp.int32(0)
@@ -777,14 +781,18 @@ class Agent:
             p.life,
         )
 
-    def updateLife(self, result):
+    def updateLife(self, result, bounce_counter):
         """updates the life based on result and internal direction"""
         p = self.p
         updateAmount = p.direction * result  # only update if this value is -1
         new_life = jnp.where(updateAmount < 0, p.life - 1, p.life)
+        new_life = jnp.where(bounce_counter > self.bounce_limit, p.life - 1, new_life)
         self.p = AgentState(
             p.direction, p.x, p.y, p.r, p.vx, p.vy, p.desired_vx, p.desired_vy, new_life
         )
+        bounce_counter = jnp.where(new_life == p.life - 1, 0, bounce_counter)
+
+        return bounce_counter
 
     def updateState(self, ball: ParticleState, opponent: AgentState):
         """normalized to side, customized for each agent's perspective"""
@@ -913,6 +921,8 @@ class Game:
         self.ground = None
         self.fence = None
         self.fenceStub = None
+        self.agent_left_bounce_counter = 0
+        self.agent_right_bounce_counter = 0
         self.reset(gameState)
 
     def reset(self, gameState):
@@ -942,6 +952,8 @@ class Game:
         self.action_left = gameState.action_left
         self.action_right_flag = gameState.action_right_flag
         self.action_right = gameState.action_right
+        self.agent_left_bounce_counter = gameState.agent_left_bounce_counter
+        self.agent_right_bounce_counter = gameState.agent_right_bounce_counter
 
     def setLeftAction(self, action):
         self.action_left_flag = jnp.int32(1)
@@ -979,6 +991,8 @@ class Game:
             self.action_left,
             self.action_right_flag,
             self.action_right,
+            self.agent_right_bounce_counter,
+            self.agent_left_bounce_counter,
         )
 
     def step(self):
@@ -991,19 +1005,50 @@ class Game:
         self.ball.limitSpeed(MAX_BALL_SPEED)
         self.ball.move()
 
-        self.ball.bounceIfColliding(self.agent_left.p)
-        self.ball.bounceIfColliding(self.agent_right.p)
+        agent_left_bounced = self.ball.bounceIfColliding(self.agent_left.p)
+        agent_right_bounced = self.ball.bounceIfColliding(self.agent_right.p)
+        self.agent_left_bounce_counter, self.agent_right_bounce_counter = jax.lax.cond(
+            agent_left_bounced,
+            lambda: (self.agent_left_bounce_counter + 1, 0),
+            lambda: (self.agent_left_bounce_counter, self.agent_right_bounce_counter),
+        )
+        self.agent_right_bounce_counter, self.agent_left_bounce_counter = jax.lax.cond(
+            agent_right_bounced,
+            lambda: (self.agent_right_bounce_counter + 1, 0),
+            lambda: (self.agent_right_bounce_counter, self.agent_left_bounce_counter),
+        )
+
         self.ball.bounceIfColliding(self.fenceStub.p)
 
         # negated, since we want reward to be from the persepctive
         # of right agent being trained.
         result = -self.ball.checkEdges()
+        result = jax.lax.cond(
+            self.agent_right_bounce_counter > self.agent_right.bounce_limit,
+            lambda: -1,
+            lambda: result,
+        )
+        result = jax.lax.cond(
+            self.agent_left_bounce_counter > self.agent_left.bounce_limit,
+            lambda: 1,
+            lambda: result,
+        )
 
-        self.agent_left.updateLife(result)
-        self.agent_right.updateLife(result)
+        self.agent_left_bounce_counter = self.agent_left.updateLife(
+            result, self.agent_left_bounce_counter
+        )
+        self.agent_right_bounce_counter = self.agent_right.updateLife(
+            result, self.agent_right_bounce_counter
+        )
 
         self.agent_left.updateState(self.ball.p, self.agent_right.p)
         self.agent_right.updateState(self.ball.p, self.agent_left.p)
+
+        self.agent_left_bounce_counter, self.agent_right_bounce_counter = jax.lax.cond(
+            result == 0,
+            lambda: (self.agent_left_bounce_counter, self.agent_right_bounce_counter),
+            lambda: (0, 0),
+        )
 
         return result
 
@@ -1040,6 +1085,8 @@ def initGameState(ball_vx, ball_vy):
         action_left,
         action_right_flag,
         action_right,
+        0,
+        0,
     )
 
 
@@ -1056,6 +1103,8 @@ def newMatch(prevGameState: GameState, ball_vx, ball_vy) -> GameState:
         p.action_left,
         p.action_right_flag,
         p.action_right,
+        0,
+        0,
     )
 
 
@@ -1087,7 +1136,12 @@ def update_state_for_new_match(game_state: GameState, reward, key: jnp.ndarray):
     vx = jnp.where(reward == 0, old_ball.vx, new_ball.vx)
     vy = jnp.where(reward == 0, old_ball.vy, new_ball.vy)
     ball = ParticleState(x, y, prev_x, prev_y, vx, vy, old_ball.r)
+
     p = game_state
+
+    agent_right_bounce_counter = jnp.where(reward == 0, p.agent_right_bounce_counter, 0)
+    agent_left_bounce_counter = jnp.where(reward == 0, p.agent_left_bounce_counter, 0)
+
     return GameState(
         ball,
         p.agent_left,
@@ -1098,6 +1152,8 @@ def update_state_for_new_match(game_state: GameState, reward, key: jnp.ndarray):
         p.action_left,
         p.action_right_flag,
         p.action_right,
+        agent_right_bounce_counter,
+        agent_left_bounce_counter,
     )
 
 
@@ -1145,7 +1201,7 @@ def get_left_obs(game_state: GameState):
 class SlimeVolley(VectorizedTask):
     """Neural Slime Volleyball Environment."""
 
-    def __init__(self, max_steps: int = 3000, test: bool = False):
+    def __init__(self, max_steps: int = 3000):
 
         self.max_steps = max_steps
         self.obs_shape = tuple(
@@ -1158,7 +1214,8 @@ class SlimeVolley(VectorizedTask):
                 3,
             ]
         )
-        self.test = test
+        # If false then episode runs for max timesteps even if agents lose all lives
+        self.test = True
 
         def reset_fn(key):
             next_key, key = random.split(key)

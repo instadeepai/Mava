@@ -8,15 +8,14 @@ from dm_env import specs
 from haiku import one_hot
 
 from mava.types import OLT
-from mava.utils.environments.MAWaterworld import MultiAgentWaterWorld
+from mava.utils.environments.JaxEnvironments.JaxMAWaterworld import MultiAgentWaterWorld
 from mava.utils.id_utils import EntityId
-from mava.utils.sort_utils import sort_str_num
 
 
-class MAWaterworldWrapper:
+class MultiAgentWaterworldWrapper:
     """Environment wrapper for Debugging MARL environments."""
 
-    def __init__(self, environment: MultiAgentWaterWorld, is_multi_agent: bool = True):
+    def __init__(self, environment: MultiAgentWaterWorld):
         self._environment = environment
 
         self.num_actions = self._environment.act_shape[-1]

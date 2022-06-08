@@ -6,8 +6,8 @@ import chex
 # should we make a default for type?
 @chex.dataclass(frozen=True)
 class EntityId:
-    type: int
     id: int
+    type: int = 0
 
     def __lt__(self, other):
         if isinstance(other, str) or isinstance(other, EntityId):
@@ -28,6 +28,10 @@ class EntityId:
     def __eq__(self, __o: object) -> bool:
         return str(self) == str(__o)
 
+    def index(self, num_agents: int):
+        """Returns the index of this agent's items in an observation/reward/etc array"""
+        return self.type * num_agents + self.id
+
     @staticmethod
     def from_string(entity_str: Union[str, "EntityId"]):
         if isinstance(entity_str, str):
@@ -44,3 +48,7 @@ class EntityId:
             raise TypeError(
                 f"Attempted to convert a non-string type: {type(entity_str)}"
             )
+
+    @staticmethod
+    def first():
+        return EntityId(id=0, type=0)
