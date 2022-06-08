@@ -15,7 +15,7 @@
 
 """Terminator component for Mava systems."""
 import abc
-from typing import Any, Dict, Optional, Type
+from typing import Any, Callable, Dict, Optional, Type
 
 import launchpad as lp
 from chex import dataclass
@@ -58,6 +58,7 @@ class Terminator(Component):
 @dataclass
 class ParameterServerTerminatorConfig:
     termination_condition: Optional[Dict[str, Any]] = None
+    termination_function: Callable = lp.stop
 
 
 class ParameterServerTerminator(Terminator):
@@ -78,7 +79,8 @@ class ParameterServerTerminator(Terminator):
             )
 
     def on_parameter_server_run_loop_termination(
-        self, parameter_sever: SystemParameterServer
+        self,
+        parameter_sever: SystemParameterServer,
     ) -> None:
         """_summary_"""
         if (
@@ -90,7 +92,7 @@ class ParameterServerTerminator(Terminator):
                 f"Max {self.termination_key} of {self.termination_value}"
                 " reached, terminating."
             )
-            lp.stop()
+            self.config.termination_function()
 
     @staticmethod
     def config_class() -> Type[ParameterServerTerminatorConfig]:
