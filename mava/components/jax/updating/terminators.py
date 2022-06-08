@@ -101,7 +101,7 @@ class CountConditionTerminator(Terminator):
 
 @dataclass
 class TimeTerminatorConfig:
-    run_seconds: float = float(60)
+    run_seconds: float = 60.0
 
 
 class TimeTerminator(Terminator):
@@ -115,7 +115,7 @@ class TimeTerminator(Terminator):
             config : _description_.
         """
         self.config = config
-        self._start_time = float(0)
+        self._start_time = 0.0
 
     def on_parameter_server_init(self, parameter_sever: SystemParameterServer) -> None:
         """_summary_"""
