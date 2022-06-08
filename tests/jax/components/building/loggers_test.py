@@ -1,10 +1,12 @@
-from typing import Any, Callable, Tuple
+import functools
+from typing import Callable
 
 import pytest
 
 from mava.components.jax.building.loggers import Logger, LoggerConfig
 from mava.core_jax import SystemBuilder
 from mava.systems.jax import Builder
+from mava.utils.loggers import logger_utils
 
 
 class TestLogger(Logger):
@@ -15,21 +17,24 @@ class TestLogger(Logger):
         logger_config = LoggerConfig()
         logger_config.logger_factory = test_logger_factory
         logger_config.logger_config = {
-            "trainer": LoggerConfig(logger_config="trainer_config"),
-            "executor": LoggerConfig(logger_config="executor_config"),
-            "evaluator": LoggerConfig(logger_config="evaluator_config"),
+            "trainer": {"time_stamp": "trainer_config"},
+            "executor": {"time_stamp": "executor_config"},
+            "evaluator": {"time_stamp": "evaluator_config"},
         }
 
         super().__init__(logger_config)
 
-        # self.on_building_executor_logger(builder)
-        # self.on_building_trainer_logger(builder)
-
 
 @pytest.fixture
 def test_logger_factory() -> Callable:
-    def simple_factory(component_id: int, config: LoggerConfig) -> Tuple[int, Any]:
-        return component_id, config.logger_config
+    simple_factory = functools.partial(
+        logger_utils.make_logger,
+        directory="~/mava",
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp="01/01/1997-00:00:00",
+        time_delta=10,
+    )
 
     return simple_factory
 
@@ -37,22 +42,30 @@ def test_logger_factory() -> Callable:
 @pytest.fixture
 def test_builder() -> SystemBuilder:
     system_builder = Builder(components=[])
-    system_builder.store.executor_id = 1
-    system_builder.store.trainer_id = 2
+    system_builder.store.executor_id = "executor_1"
+    system_builder.store.trainer_id = "trainer_2"
     return system_builder
 
 
 @pytest.fixture
-def test_executor_logger(
-    test_builder: SystemBuilder, test_logger_factory: Callable
-) -> Logger:
-    test_builder.store.is_evaluator = False
-
+def test_logger(test_logger_factory: Callable) -> Logger:
     test_logger = TestLogger(test_logger_factory)
     return test_logger
 
 
-def test_assert_true(test_executor_logger: Logger) -> None:
-    assert test_executor_logger.name() == "logger"
-    print(test_executor_logger.config.logger_config)
-    assert True
+def test_on_building_executor_logger(
+    test_logger: Logger, test_builder: SystemBuilder
+) -> None:
+    test_builder.store.is_evaluator = False
+    test_logger.on_building_executor_logger(test_builder)
+
+    # Correct component name
+    assert test_logger.name() == "logger"
+
+    # Correct logger has been created
+    assert test_builder.store.executor_logger is not None
+    assert not hasattr(test_builder.store, "trainer_logger")
+
+    # Correct logger config has been loaded
+    assert test_builder.store.executor_logger._label == "executor_1"
+    assert test_builder.store.executor_logger._time_stamp == "executor_config"
