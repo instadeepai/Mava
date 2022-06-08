@@ -104,6 +104,7 @@ class CountConditionTerminator(Terminator):
 @dataclass
 class TimeTerminatorConfig:
     run_seconds: float = 60.0
+    termination_function: Callable = lp.stop
 
 
 class TimeTerminator(Terminator):
@@ -131,7 +132,7 @@ class TimeTerminator(Terminator):
             print(
                 f"Run time of {self.config.run_seconds} seconds reached, terminating."
             )
-            lp.stop()
+            self.config.termination_function()
 
     @staticmethod
     def config_class() -> Type[TimeTerminatorConfig]:
