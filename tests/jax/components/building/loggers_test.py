@@ -10,10 +10,17 @@ from mava.utils.loggers import logger_utils
 
 
 class TestLogger(Logger):
+    """Test Logger component."""
+
     def __init__(
         self,
         test_logger_factory: Callable,
     ):
+        """Create TestLogger
+
+        Args:
+            test_logger_factory: factory to use in the logger config.
+        """
         logger_config = LoggerConfig()
         logger_config.logger_factory = test_logger_factory
         logger_config.logger_config = {
@@ -27,6 +34,11 @@ class TestLogger(Logger):
 
 @pytest.fixture
 def test_logger_factory() -> Callable:
+    """Pytest fixture for logger factory.
+
+    Returns:
+        Logger factory using default Mava logger.
+    """
     simple_factory = functools.partial(
         logger_utils.make_logger,
         directory="~/mava",
@@ -41,6 +53,11 @@ def test_logger_factory() -> Callable:
 
 @pytest.fixture
 def test_builder() -> SystemBuilder:
+    """Pytest fixture for system builder. Added executor and trainer IDs to the store.
+
+    Returns:
+        System builder with no components.
+    """
     system_builder = Builder(components=[])
     system_builder.store.executor_id = "executor_1"
     system_builder.store.trainer_id = "trainer_2"
@@ -49,6 +66,14 @@ def test_builder() -> SystemBuilder:
 
 @pytest.fixture
 def test_logger(test_logger_factory: Callable) -> Logger:
+    """Pytest fixture for TestLogger.
+
+    Args:
+        test_logger_factory: factory to use in logger config.
+
+    Returns:
+        Default TestLogger.
+    """
     test_logger = TestLogger(test_logger_factory)
     return test_logger
 
@@ -56,6 +81,15 @@ def test_logger(test_logger_factory: Callable) -> Logger:
 def test_on_building_executor_logger_executor(
     test_logger: Logger, test_builder: SystemBuilder
 ) -> None:
+    """Test on_building_executor_logger_executor method for executor.
+
+    Args:
+        test_logger: Fixture Logger.
+        test_builder: Fixture SystemBuilder.
+
+    Returns:
+        None.
+    """
     test_builder.store.is_evaluator = False
     test_logger.on_building_executor_logger(test_builder)
 
@@ -74,6 +108,15 @@ def test_on_building_executor_logger_executor(
 def test_on_building_executor_logger_evaluator(
     test_logger: Logger, test_builder: SystemBuilder
 ) -> None:
+    """Test on_building_executor_logger_executor method for evaluator.
+
+    Args:
+        test_logger: Fixture Logger.
+        test_builder: Fixture SystemBuilder.
+
+    Returns:
+        None.
+    """
     test_builder.store.is_evaluator = True
     test_logger.on_building_executor_logger(test_builder)
 
@@ -92,6 +135,15 @@ def test_on_building_executor_logger_evaluator(
 def test_on_building_trainer_logger(
     test_logger: Logger, test_builder: SystemBuilder
 ) -> None:
+    """Test on_building_trainer_logger method for trainer.
+
+    Args:
+        test_logger: Fixture Logger.
+        test_builder: Fixture SystemBuilder.
+
+    Returns:
+        None.
+    """
     test_logger.on_building_trainer_logger(test_builder)
 
     # Correct component name
