@@ -53,7 +53,7 @@ def test_logger(test_logger_factory: Callable) -> Logger:
     return test_logger
 
 
-def test_on_building_executor_logger(
+def test_on_building_executor_logger_executor(
     test_logger: Logger, test_builder: SystemBuilder
 ) -> None:
     test_builder.store.is_evaluator = False
@@ -69,3 +69,38 @@ def test_on_building_executor_logger(
     # Correct logger config has been loaded
     assert test_builder.store.executor_logger._label == "executor_1"
     assert test_builder.store.executor_logger._time_stamp == "executor_config"
+
+
+def test_on_building_executor_logger_evaluator(
+    test_logger: Logger, test_builder: SystemBuilder
+) -> None:
+    test_builder.store.is_evaluator = True
+    test_logger.on_building_executor_logger(test_builder)
+
+    # Correct component name
+    assert test_logger.name() == "logger"
+
+    # Correct logger has been created
+    assert test_builder.store.executor_logger is not None
+    assert not hasattr(test_builder.store, "trainer_logger")
+
+    # Correct logger config has been loaded
+    assert test_builder.store.executor_logger._label == "executor_1"
+    assert test_builder.store.executor_logger._time_stamp == "evaluator_config"
+
+
+def test_on_building_trainer_logger(
+    test_logger: Logger, test_builder: SystemBuilder
+) -> None:
+    test_logger.on_building_trainer_logger(test_builder)
+
+    # Correct component name
+    assert test_logger.name() == "logger"
+
+    # Correct logger has been created
+    assert test_builder.store.trainer_logger is not None
+    assert not hasattr(test_builder.store, "executor_logger")
+
+    # Correct logger config has been loaded
+    assert test_builder.store.trainer_logger._label == "trainer_2"
+    assert test_builder.store.trainer_logger._time_stamp == "trainer_config"
