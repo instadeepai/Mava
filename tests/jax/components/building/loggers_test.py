@@ -53,7 +53,7 @@ def test_logger_factory() -> Callable:
 
 @pytest.fixture
 def test_builder() -> SystemBuilder:
-    """Pytest fixture for system builder. Added executor and trainer IDs to the store.
+    """Pytest fixture for system builder. Adds executor and trainer IDs to the store.
 
     Returns:
         System builder with no components.
