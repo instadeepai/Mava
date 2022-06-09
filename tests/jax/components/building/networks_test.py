@@ -7,6 +7,7 @@ from mava.components.jax.building.networks import Networks, NetworksConfig
 from mava.core_jax import SystemBuilder
 from mava.specs import MAEnvironmentSpec
 from mava.systems.jax import Builder, mappo
+from tests.jax.mocks import make_fake_env_specs
 
 
 class TestDefaultNetworks(DefaultNetworks):
@@ -78,7 +79,10 @@ def test_builder() -> SystemBuilder:
     Returns:
         System builder with no components.
     """
-    return Builder(components=[])
+    test_builder = Builder(components=[])
+    test_builder.store.environment_spec = make_fake_env_specs()
+    test_builder.store.agent_net_keys = {"key1": "value1", "key2": "value2"}
+    return test_builder
 
 
 @pytest.fixture
