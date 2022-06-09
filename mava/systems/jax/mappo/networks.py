@@ -108,6 +108,35 @@ def make_ppo_network(
     )
 
 
+def make_networks(
+    spec: specs.EnvironmentSpec,
+    key: networks_lib.PRNGKey,
+    policy_layer_sizes: Sequence[int] = (
+        256,
+        256,
+        256,
+    ),
+    critic_layer_sizes: Sequence[int] = (512, 512, 256),
+    observation_network: Callable = utils.batch_concat,
+) -> PPONetworks:
+    """TODO: Add description here."""
+    if isinstance(spec.actions, specs.DiscreteArray):
+        return make_discrete_networks(
+            environment_spec=spec,
+            key=key,
+            policy_layer_sizes=policy_layer_sizes,
+            critic_layer_sizes=critic_layer_sizes,
+            observation_network=observation_network,
+        )
+
+    else:
+        raise NotImplementedError(
+            "Continuous networks not implemented yet."
+            + "See: https://github.com/deepmind/acme/blob/"
+            + "master/acme/agents/jax/ppo/networks.py"
+        )
+
+
 def make_discrete_networks(
     environment_spec: specs.EnvironmentSpec,
     key: networks_lib.PRNGKey,
@@ -144,35 +173,6 @@ def make_discrete_networks(
 
     # Create PPONetworks to add functionality required by the agent.
     return make_ppo_network(network=forward_fn, params=params)
-
-
-def make_networks(
-    spec: specs.EnvironmentSpec,
-    key: networks_lib.PRNGKey,
-    policy_layer_sizes: Sequence[int] = (
-        256,
-        256,
-        256,
-    ),
-    critic_layer_sizes: Sequence[int] = (512, 512, 256),
-    observation_network: Callable = utils.batch_concat,
-) -> PPONetworks:
-    """TODO: Add description here."""
-    if isinstance(spec.actions, specs.DiscreteArray):
-        return make_discrete_networks(
-            environment_spec=spec,
-            key=key,
-            policy_layer_sizes=policy_layer_sizes,
-            critic_layer_sizes=critic_layer_sizes,
-            observation_network=observation_network,
-        )
-
-    else:
-        raise NotImplementedError(
-            "Continuous networks not implemented yet."
-            + "See: https://github.com/deepmind/acme/blob/"
-            + "master/acme/agents/jax/ppo/networks.py"
-        )
 
 
 def make_default_networks(
