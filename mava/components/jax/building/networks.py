@@ -30,6 +30,7 @@ from mava.core_jax import SystemBuilder
 class NetworksConfig:
     network_factory: Optional[Callable[[str], dm_env.Environment]] = None
     seed: int = 1234
+    shared_weights: bool = True
 
 
 class Networks(Component):

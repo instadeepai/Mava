@@ -89,4 +89,8 @@ def test_default_networks(test_network_factory: Callable) -> Networks:
 def test_assert_true(
     test_default_networks: Networks, test_builder: SystemBuilder
 ) -> None:
+    test_default_networks.on_building_init_start(test_builder)
+    networks = test_builder.store.network_factory()
+    print(networks)
+
     assert True
