@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Type
 
@@ -26,10 +25,11 @@ from terminators_test_data import (
 
 from mava.components.jax.updating.terminators import (
     CountConditionTerminator,
+    CountConditionTerminatorConfig,
     TimeTerminator,
+    TimeTerminatorConfig,
 )
 from mava.core_jax import SystemParameterServer
-from tests.jax.mocks import MockCountConditionTerminatorConfig, MockTimeTerminatorConfig
 
 
 @dataclass
@@ -81,7 +81,7 @@ def test_count_condition_terminator_terminated(
         test_parameter_server.store.stopped = True
 
     test_terminator = CountConditionTerminator(
-        config=MockCountConditionTerminatorConfig(
+        config=CountConditionTerminatorConfig(
             termination_condition=condition, termination_function=_set_stopped
         )
     )
@@ -107,7 +107,7 @@ def test_count_condition_terminator_not_terminated(
         test_parameter_server.store.stopped = True
 
     test_terminator = CountConditionTerminator(
-        config=MockCountConditionTerminatorConfig(
+        config=CountConditionTerminatorConfig(
             termination_condition=condition, termination_function=_set_stopped
         )
     )
@@ -139,7 +139,7 @@ def test_count_condition_terminator_exceptions(
             test_parameter_server.store.stopped = True
 
         test_terminator = CountConditionTerminator(
-            config=MockCountConditionTerminatorConfig(
+            config=CountConditionTerminatorConfig(
                 termination_condition=fail_condition, termination_function=_set_stopped
             )
         )
@@ -155,7 +155,7 @@ def test_count_condition_terminator_exceptions(
 def test_time_terminator_terminated(
     mock_parameter_server: SystemParameterServer,
 ) -> None:
-    """Test if time terminator terminates"""
+    """Test that time terminator terminates"""
 
     test_parameter_server = mock_parameter_server
 
@@ -163,14 +163,10 @@ def test_time_terminator_terminated(
         test_parameter_server.store.stopped = True
 
     test_terminator = TimeTerminator(
-        config=MockTimeTerminatorConfig(
-            run_seconds=0.5, termination_function=_set_stopped
-        )
+        config=TimeTerminatorConfig(run_seconds=0.0, termination_function=_set_stopped)
     )
 
     test_terminator.on_parameter_server_init(test_parameter_server)
-
-    time.sleep(1)
 
     test_terminator.on_parameter_server_run_loop_termination(test_parameter_server)
 
@@ -180,7 +176,7 @@ def test_time_terminator_terminated(
 def test_time_terminator_not_terminated(
     mock_parameter_server: SystemParameterServer,
 ) -> None:
-    """Test if time terminator does not terminate"""
+    """Test that time terminator does not terminate"""
 
     test_parameter_server = mock_parameter_server
 
@@ -188,14 +184,10 @@ def test_time_terminator_not_terminated(
         test_parameter_server.store.stopped = True
 
     test_terminator = TimeTerminator(
-        config=MockTimeTerminatorConfig(
-            run_seconds=10, termination_function=_set_stopped
-        )
+        config=TimeTerminatorConfig(run_seconds=10, termination_function=_set_stopped)
     )
 
     test_terminator.on_parameter_server_init(test_parameter_server)
-
-    time.sleep(1)
 
     test_terminator.on_parameter_server_run_loop_termination(test_parameter_server)
 

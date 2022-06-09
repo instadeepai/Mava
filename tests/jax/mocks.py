@@ -23,7 +23,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import dm_env
 import jax
-import launchpad as lp
 import numpy as np
 import reverb
 from acme import specs as acme_specs
@@ -35,10 +34,6 @@ from mava.components.jax import Component
 from mava.components.jax.building.data_server import (
     OffPolicyDataServerConfig,
     OnPolicyDataServerConfig,
-)
-from mava.components.jax.updating.terminators import (
-    CountConditionTerminatorConfig,
-    TimeTerminatorConfig,
 )
 from mava.core_jax import SystemBuilder
 from mava.environment_loop import ParallelEnvironmentLoop
@@ -839,15 +834,3 @@ def return_test_system(components: Dict) -> System:
             return DesignSpec(**components), {}
 
     return TestSystem()
-
-
-@dataclass
-class MockTimeTerminatorConfig(TimeTerminatorConfig):
-    termination_function: Callable = lp.stop
-    run_seconds: float = 1.0
-
-
-@dataclass
-class MockCountConditionTerminatorConfig(CountConditionTerminatorConfig):
-    termination_condition: Optional[Dict[str, Any]] = None
-    termination_function: Callable = lp.stop
