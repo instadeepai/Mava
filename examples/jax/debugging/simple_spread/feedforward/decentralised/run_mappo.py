@@ -20,6 +20,7 @@ from typing import Any
 
 import optax
 from absl import app, flags
+from mava.components.jax.executing.offline import EvaluatorOfflineLogging
 
 from mava.systems.jax import mappo
 from mava.utils.environments import debugging_utils
@@ -101,6 +102,7 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
+        evaluator_offline_logging=EvaluatorOfflineLogging,
     )
 
     # Launch the system.
