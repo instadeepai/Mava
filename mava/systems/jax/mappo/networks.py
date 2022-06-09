@@ -142,7 +142,8 @@ def make_discrete_networks(
     key: networks_lib.PRNGKey,
     policy_layer_sizes: Sequence[int],
     critic_layer_sizes: Sequence[int],
-    observation_network: Callable = utils.batch_concat,  # default behaviour is to flatten observations
+    observation_network: Callable = utils.batch_concat,
+    # default behaviour is to flatten observations
 ) -> PPONetworks:
     """TODO: Add description here."""
 
