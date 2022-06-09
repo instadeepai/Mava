@@ -13,94 +13,190 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
 from dataclasses import dataclass
-import pytest 
-from typing import List, Dict, Any
-from .terminators import (
-    ParameterServerTerminatorConfig, 
-    ParameterServerTerminator,
+from typing import Any, Dict, Optional, Type
+
+import numpy as np
+import pytest
+from terminators_test_data import (
+    count_condition_terminator_data,
+    count_condition_terminator_failure_cases,
 )
-import numpy as np 
 
-# @pytest.fixture
-def executor_steps_termination_condition() -> Dict[str, Any]:
-    """Add description here."""
-    return {'executor_steps': 10}
+from mava.components.jax.updating.terminators import (
+    CountConditionTerminator,
+    TimeTerminator,
+)
+from mava.core_jax import SystemParameterServer
+from tests.jax.mocks import MockCountConditionTerminatorConfig, MockTimeTerminatorConfig
 
-@dataclass
-class MockParameterServer:
-    store: str = None
 
 @dataclass
 class MockParameterStore:
-    parameters: str = None
+    parameters: Optional[Dict[str, Any]] = None
+    stopped: bool = False
+
 
 @dataclass
-class MockParameterServerTerminatorConfig:
-    termination_condition: str = None
+class MockParameterServer:
+    store: Optional[MockParameterStore] = None
 
 
-# @pytest.fixture
-def create_mock_parameter_server():
-    """Add description here."""
-    return MockParameterServer(
-        store = MockParameterStore(
-            parameters = {
+@pytest.fixture
+def mock_parameter_server() -> MockParameterServer:
+    """Create a mock parameter server for terminator tests"""
+
+    mock_server = MockParameterServer(
+        store=MockParameterStore(
+            parameters={
                 "trainer_steps": np.zeros(1, dtype=np.int32),
                 "trainer_walltime": np.zeros(1, dtype=np.float32),
                 "evaluator_steps": np.zeros(1, dtype=np.int32),
                 "evaluator_episodes": np.zeros(1, dtype=np.int32),
                 "executor_episodes": np.zeros(1, dtype=np.int32),
                 "executor_steps": np.zeros(1, dtype=np.int32),
-            }
-            
+            },
+            stopped=False,
         )
     )
 
-def step_parameters(parameter_dict, key):
+    return mock_server
+
+
+def step_parameters(parameter_dict: Dict[str, Any], key: str) -> None:
+    """Utility function for stepping parameters"""
+
     parameter_dict[key] += 1
 
-def test_executor_steps_termination_condition() -> None:
 
-    test_terminator = ParameterServerTerminator(config=MockParameterServerTerminatorConfig(termination_condition = executor_steps_termination_condition()))
+@pytest.mark.parametrize("condition", count_condition_terminator_data())
+def test_count_condition_terminator_terminated(
+    condition: Dict, mock_parameter_server: SystemParameterServer
+) -> None:
+    """Test if count condition terminator terminates"""
+    test_parameter_server = mock_parameter_server
 
-    test_parameter_server = create_mock_parameter_server()
+    def _set_stopped() -> None:
+        test_parameter_server.store.stopped = True
 
-    for _ in range(5):
-        step_parameters(test_parameter_server.store.parameters, 'executor_steps')
-    
+    test_terminator = CountConditionTerminator(
+        config=MockCountConditionTerminatorConfig(
+            termination_condition=condition, termination_function=_set_stopped
+        )
+    )
+
+    for _ in range(15):
+        step_parameters(
+            test_parameter_server.store.parameters, list(condition.keys())[0]
+        )
 
     test_terminator.on_parameter_server_run_loop_termination(test_parameter_server)
 
+    assert test_parameter_server.store.stopped is True
 
-# class ParameterServerTerminator(Terminator):
-#     def __init__(
-#         self,
-#         config: ParameterServerTerminatorConfig = ParameterServerTerminatorConfig(),
-#     ):
-#         """_summary_
 
-#         Args:
-#             config : _description_.
-#         """
-#         self.config = config
+@pytest.mark.parametrize("condition", count_condition_terminator_data())
+def test_count_condition_terminator_not_terminated(
+    condition: Dict, mock_parameter_server: SystemParameterServer
+) -> None:
+    """Test if count condition terminator does not terminate"""
+    test_parameter_server = mock_parameter_server
 
-#         if self.config.termination_condition is not None:
-#             self.termination_key, self.termination_value = check_count_condition(
-#                 self.config.termination_condition
-#             )
+    def _set_stopped() -> None:
+        test_parameter_server.store.stopped = True
 
-#     def on_parameter_server_run_loop_termination(
-#         self, parameter_sever: SystemParameterServer
-#     ) -> None:
-#         """_summary_"""
-#         if (
-#             self.config.termination_condition is not None
-#             and parameter_sever.store.parameters[self.termination_key]
-#             > self.termination_value
-#         ):
-#             print(
-#                 f"Max {self.termination_key} of {self.termination_value}"
-#                 " reached, terminating."
-#             )
-#             lp.stop()
+    test_terminator = CountConditionTerminator(
+        config=MockCountConditionTerminatorConfig(
+            termination_condition=condition, termination_function=_set_stopped
+        )
+    )
+
+    for _ in range(5):
+        step_parameters(
+            test_parameter_server.store.parameters, list(condition.keys())[0]
+        )
+
+    test_terminator.on_parameter_server_run_loop_termination(test_parameter_server)
+
+    assert test_parameter_server.store.stopped is False
+
+
+@pytest.mark.parametrize(
+    "fail_condition,failure", count_condition_terminator_failure_cases()
+)
+def test_count_condition_terminator_exceptions(
+    fail_condition: Dict,
+    failure: Type[Exception],
+    mock_parameter_server: SystemParameterServer,
+) -> None:
+    """Test count condition terminator exceptions"""
+
+    with pytest.raises(failure):
+        test_parameter_server = mock_parameter_server
+
+        def _set_stopped() -> None:
+            test_parameter_server.store.stopped = True
+
+        test_terminator = CountConditionTerminator(
+            config=MockCountConditionTerminatorConfig(
+                termination_condition=fail_condition, termination_function=_set_stopped
+            )
+        )
+
+        assert (
+            test_terminator.on_parameter_server_run_loop_termination(  # type:ignore
+                test_parameter_server
+            )
+            == failure
+        )
+
+
+def test_time_terminator_terminated(
+    mock_parameter_server: SystemParameterServer,
+) -> None:
+    """Test if time terminator terminates"""
+
+    test_parameter_server = mock_parameter_server
+
+    def _set_stopped() -> None:
+        test_parameter_server.store.stopped = True
+
+    test_terminator = TimeTerminator(
+        config=MockTimeTerminatorConfig(
+            run_seconds=0.5, termination_function=_set_stopped
+        )
+    )
+
+    test_terminator.on_parameter_server_init(test_parameter_server)
+
+    time.sleep(1)
+
+    test_terminator.on_parameter_server_run_loop_termination(test_parameter_server)
+
+    assert test_parameter_server.store.stopped is True
+
+
+def test_time_terminator_not_terminated(
+    mock_parameter_server: SystemParameterServer,
+) -> None:
+    """Test if time terminator does not terminate"""
+
+    test_parameter_server = mock_parameter_server
+
+    def _set_stopped() -> None:
+        test_parameter_server.store.stopped = True
+
+    test_terminator = TimeTerminator(
+        config=MockTimeTerminatorConfig(
+            run_seconds=10, termination_function=_set_stopped
+        )
+    )
+
+    test_terminator.on_parameter_server_init(test_parameter_server)
+
+    time.sleep(1)
+
+    test_terminator.on_parameter_server_run_loop_termination(test_parameter_server)
+
+    assert test_parameter_server.store.stopped is False
