@@ -167,6 +167,7 @@ class TestMADDPG:
             checkpoint=False,
             architecture=architectures.CentralisedQValueCritic,
             trainer_fn=maddpg.MADDPGCentralisedTrainer,
+            shared_weights=True,
         )
         program = system.build()
 
@@ -229,7 +230,6 @@ class TestMADDPG:
             trainer_fn=maddpg.MADDPGNetworkedTrainer,
             architecture=architectures.NetworkedQValueCritic,
             connection_spec=fully_connected_network_spec,
-            shared_weights=False,
         )
         program = system.build()
 
@@ -282,6 +282,7 @@ class TestMADDPG:
             checkpoint=False,
             trainer_fn=maddpg.MADDPGStateBasedTrainer,
             architecture=architectures.StateBasedQValueCritic,
+            shared_weights=True,
         )
         program = system.build()
 
