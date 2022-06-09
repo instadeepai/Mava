@@ -230,6 +230,7 @@ class TestMADDPG:
             trainer_fn=maddpg.MADDPGNetworkedTrainer,
             architecture=architectures.NetworkedQValueCritic,
             connection_spec=fully_connected_network_spec,
+            shared_weights=False,
         )
         program = system.build()
 
