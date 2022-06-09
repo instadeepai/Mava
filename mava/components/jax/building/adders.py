@@ -113,7 +113,7 @@ class AdderSignature(Component):
         Returns:
             _description_
         """
-        return "data_server_adder_signature"
+        return "data_server_signature"
 
     @staticmethod
     def config_class() -> Optional[Callable]:
