@@ -74,8 +74,7 @@ def test_logger(test_logger_factory: Callable) -> Logger:
     Returns:
         Default TestLogger.
     """
-    test_logger = TestLogger(test_logger_factory)
-    return test_logger
+    return TestLogger(test_logger_factory)
 
 
 def test_on_building_executor_logger_executor(
