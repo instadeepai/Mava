@@ -16,6 +16,9 @@ class TestDefaultNetworks(DefaultNetworks):
         networks_config.network_factory = test_network_factory
         networks_config.seed = 919
 
+        # Normally set in the system_init
+        networks_config.shared_weights = True  # type: ignore
+
         super().__init__(networks_config)
 
 
