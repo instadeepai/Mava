@@ -24,7 +24,7 @@ from mava.core_jax import SystemTrainer
 
 
 def different_reward_values() -> List[Tuple]:
-    """Create test case data"""
+    """Create test case data with different reward scalings"""
 
     return [
         (
@@ -65,7 +65,7 @@ def different_reward_values() -> List[Tuple]:
 
 
 def similar_reward_values() -> List[Tuple]:
-    """Create test case data"""
+    """Create test case data with identical reward scalings"""
 
     return [
         (
@@ -113,7 +113,6 @@ class MockTrainer(SystemTrainer):
     ) -> None:
         """System trainer init"""
 
-        # Simple namespace for assigning system executor attributes dynamically
         self.store = SimpleNamespace(gae_fn=None)
 
         self._inputs: Any
