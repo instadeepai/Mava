@@ -17,9 +17,6 @@ class TestDefaultNetworks(DefaultNetworks):
         networks_config.network_factory = test_network_factory
         networks_config.seed = 919
 
-        # Normally set in the system_init
-        networks_config.shared_weights = True  # type: ignore
-
         super().__init__(networks_config)
 
 
@@ -110,3 +107,9 @@ def test_key_in_store(
     assert test_builder.store.key is not None
     assert isinstance(test_builder.store.key, jax.random.PRNGKeyArray)\
            or isinstance(test_builder.store.key, jax.numpy.DeviceArray)
+
+
+def test_config_set(
+    test_default_networks: Networks
+) -> None:
+    assert test_default_networks.config.seed == 919
