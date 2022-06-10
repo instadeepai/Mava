@@ -47,7 +47,7 @@ def test_network_factory() -> Callable:
         ),
         critic_layer_sizes: Sequence[int] = (512, 512, 256),
     ) -> Dict[str, Any]:
-        net_keys = {"1", "2", "3"}
+        net_keys = {"net_1", "net_2", "net_3"}
         networks = {}
 
         for net_key in net_keys:
@@ -113,3 +113,14 @@ def test_config_set(
     test_default_networks: Networks
 ) -> None:
     assert test_default_networks.config.seed == 919
+
+
+def test_network_factory_environment_spec(
+    test_default_networks: Networks, test_builder: SystemBuilder
+) -> None:
+    test_default_networks.on_building_init_start(test_builder)
+    networks = test_builder.store.network_factory()
+
+    for net_key, network in networks.items():
+        assert network['environment_spec']._keys == ['agent_0', 'agent_1']
+        assert network['environment_spec']._specs['agent_0'].observations.shape == (10, 5)
