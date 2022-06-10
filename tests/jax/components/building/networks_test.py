@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Sequence, Union
+from typing import Any, Callable, Dict, List, Sequence
 
 import jax
 import pytest
@@ -7,12 +7,19 @@ from mava.components.jax.building import DefaultNetworks
 from mava.components.jax.building.networks import Networks, NetworksConfig
 from mava.core_jax import SystemBuilder
 from mava.specs import MAEnvironmentSpec
-from mava.systems.jax import Builder, mappo
+from mava.systems.jax import Builder
 from tests.jax.mocks import make_fake_env_specs
 
 
 class TestDefaultNetworks(DefaultNetworks):
+    """Test Default Networks component."""
+
     def __init__(self, test_network_factory: Callable):
+        """Create TestDefaultNetworks.
+
+        Args:
+            test_network_factory: factory to use in network config.
+        """
         networks_config = NetworksConfig()
         networks_config.network_factory = test_network_factory
         networks_config.seed = 919
@@ -21,20 +28,13 @@ class TestDefaultNetworks(DefaultNetworks):
 
 
 @pytest.fixture
-def test_mappo_network_factory() -> Callable:
-    def network_factory(*args: Any, **kwargs: Any) -> Any:
-        return mappo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(254, 254, 254),
-            critic_layer_sizes=(512, 512, 256),
-            *args,
-            **kwargs,
-        )
-
-    return network_factory
-
-
-@pytest.fixture
 def test_network_factory() -> Callable:
+    """Pytest fixture for network factory.
+
+    Returns:
+        Network factory using custom make_default_networks.
+    """
+
     def make_default_networks(
         environment_spec: MAEnvironmentSpec,
         agent_net_keys: Dict[str, str],
@@ -76,7 +76,10 @@ def test_network_factory() -> Callable:
 
 @pytest.fixture
 def test_builder() -> SystemBuilder:
-    """Pytest fixture for system builder. Adds executor and trainer IDs to the store.
+    """Pytest fixture for system builder.
+
+    Adds mock env specs and agent net keys to store.
+
     Returns:
         System builder with no components.
     """
@@ -88,60 +91,122 @@ def test_builder() -> SystemBuilder:
 
 @pytest.fixture
 def test_default_networks(test_network_factory: Callable) -> Networks:
+    """Pytest fixture for default networks.
+
+    Args:
+        test_network_factory: factory to use in default networks config.
+
+    Returns:
+        Default networks test component.
+    """
     return TestDefaultNetworks(test_network_factory)
 
 
 def test_key_in_store(
     test_default_networks: Networks, test_builder: SystemBuilder
 ) -> None:
+    """Test if key is loaded into the store by build.
+
+    Args:
+        test_default_networks: Pytest fixture for default networks component.
+        test_builder: Pytest fixture for test system builder
+
+    Returns:
+        None.
+    """
+    assert not hasattr(test_builder.store, "key")
     test_default_networks.on_building_init_start(test_builder)
-    assert test_builder.store.key is not None
-    assert isinstance(test_builder.store.key, jax.random.PRNGKeyArray)\
-           or isinstance(test_builder.store.key, jax.numpy.DeviceArray)
+    assert hasattr(test_builder.store, "key")
+    assert isinstance(test_builder.store.key, jax.random.PRNGKeyArray) or isinstance(
+        test_builder.store.key, jax.numpy.DeviceArray
+    )
 
 
-def test_config_set(
-    test_default_networks: Networks
-) -> None:
+def test_config_set(test_default_networks: Networks) -> None:
+    """Test if config is set by component init.
+
+    Args:
+        test_default_networks: Pytest fixture for default networks component.
+
+    Returns:
+        None.
+    """
     assert test_default_networks.config.seed == 919
 
 
 def test_network_factory_environment_spec(
     test_default_networks: Networks, test_builder: SystemBuilder
 ) -> None:
+    """Test if environment spec is given to the network factory and stored by build.
+
+    Args:
+        test_default_networks: Pytest fixture for default networks component.
+        test_builder: Pytest fixture for test system builder
+
+    Returns:
+        None.
+    """
     test_default_networks.on_building_init_start(test_builder)
     networks = test_builder.store.network_factory()
 
     for network in networks.values():
-        assert network['environment_spec']._keys == ['agent_0', 'agent_1']
-        assert network['environment_spec']._specs['agent_0'].observations.shape == (10, 5)
+        assert network["environment_spec"]._keys == ["agent_0", "agent_1"]
+        assert network["environment_spec"]._specs["agent_0"].observations.shape == (
+            10,
+            5,
+        )
 
 
 def test_network_factory_agent_net_keys(
     test_default_networks: Networks, test_builder: SystemBuilder
 ) -> None:
+    """Test if net keys are given to the network factory and stored by build.
+
+    Args:
+        test_default_networks: Pytest fixture for default networks component.
+        test_builder: Pytest fixture for test system builder
+
+    Returns:
+        None.
+    """
     test_default_networks.on_building_init_start(test_builder)
     networks = test_builder.store.network_factory()
 
     for network in networks.values():
-        assert network['agent_net_keys'] == {"key1": "value1", "key2": "value2"}
+        assert network["agent_net_keys"] == {"key1": "value1", "key2": "value2"}
 
 
 def test_network_factory_rng_keys(
     test_default_networks: Networks, test_builder: SystemBuilder
 ) -> None:
+    """Test if rng keys are given to the network factory and stored by build.
+
+    Args:
+        test_default_networks: Pytest fixture for default networks component.
+        test_builder: Pytest fixture for test system builder
+
+    Returns:
+        None.
+    """
     test_default_networks.on_building_init_start(test_builder)
     networks = test_builder.store.network_factory()
 
     keys = []
     for network in networks.values():
-        assert isinstance(network['rng_key'], jax.random.PRNGKeyArray) \
-               or isinstance(network['rng_key'], jax.numpy.DeviceArray)
-        keys.append(tuple(network['rng_key'].tolist()))
+        assert isinstance(network["rng_key"], jax.random.PRNGKeyArray) or isinstance(
+            network["rng_key"], jax.numpy.DeviceArray
+        )
+        keys.append(tuple(network["rng_key"].tolist()))
     assert len(set(keys)) == 1
 
 
-def test_no_network_factory_before_build(
-    test_builder: SystemBuilder
-) -> None:
-    assert not hasattr(test_builder.store, 'network_factory')
+def test_no_network_factory_before_build(test_builder: SystemBuilder) -> None:
+    """Test if network factory is not in store before build.
+
+    Args:
+        test_builder: Pytest fixture for test system builder
+
+    Returns:
+        None.
+    """
+    assert not hasattr(test_builder.store, "network_factory")
