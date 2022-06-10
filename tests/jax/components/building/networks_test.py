@@ -134,3 +134,17 @@ def test_network_factory_agent_net_keys(
 
     for network in networks.values():
         assert network['agent_net_keys'] == {"key1": "value1", "key2": "value2"}
+
+
+def test_network_factory_rng_keys(
+    test_default_networks: Networks, test_builder: SystemBuilder
+) -> None:
+    test_default_networks.on_building_init_start(test_builder)
+    networks = test_builder.store.network_factory()
+
+    keys = []
+    for network in networks.values():
+        assert isinstance(network['rng_key'], jax.random.PRNGKeyArray) \
+               or isinstance(network['rng_key'], jax.numpy.DeviceArray)
+        keys.append(tuple(network['rng_key'].tolist()))
+    assert len(set(keys)) == 1
