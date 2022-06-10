@@ -118,6 +118,7 @@ class MAOfflineEnvironmentSequenceLogger:
         Returns:
             dm.env timestep, extras
         """
+        print("IN RESET!")
         timestep = self._environment.reset()
 
         if isinstance(timestep, tuple):
@@ -140,7 +141,8 @@ class MAOfflineEnvironmentSequenceLogger:
         Returns:
             dm.env timestep, extras
         """
-
+        print("IN OFFLINE LOGGER STEP!")
+        exit()
         next_timestep = self._environment.step(actions)
 
         if isinstance(next_timestep, tuple) and len(next_timestep) == 2:

@@ -1,16 +1,16 @@
 from mava.components.jax import Component
 from chex import dataclass
 from mava.wrappers.offline_environment_logger import MAOfflineEnvironmentSequenceLogger
-from mava.core_jax import SystemExecutor
+from mava.core_jax import SystemExecutor, SystemBuilder
 
 
 @dataclass
 class EvaluatorOfflineLoggingConfig:
     offline_sequence_length: int = 1000
-    offline_sequence_period: int = 100
-    offline_logdir: str = "~/offline_env_logs"
+    offline_sequence_period: int = 1000
+    offline_logdir: str = "./offline_env_logs"
     offline_label: str = "offline_logger"
-    offline_min_sequences_per_file: int = 1000
+    offline_min_sequences_per_file: int = 1
 
 
 class EvaluatorOfflineLogging(Component):
@@ -25,18 +25,20 @@ class EvaluatorOfflineLogging(Component):
         """
         self.config = config
 
-    def on_building_executor_end(self, executor: SystemExecutor):
-        if executor.store.is_evaluator:
-            executor.store.system_executor._environment = (
-                MAOfflineEnvironmentSequenceLogger(
-                    executor.store.system_executor._environment,
-                    self.config.offline_sequence_length,
-                    self.config.offline_sequence_period,
-                    self.config.offline_logdir,
-                    self.config.offline_label,
-                    self.config.offline_min_sequences_per_file,
-                )
+    def on_building_executor_environment(self, builder: SystemBuilder):
+        env = self.config.environment_factory(evaluation=False)  # type: ignore
+
+        if builder.store.is_evaluator:
+            env = MAOfflineEnvironmentSequenceLogger(
+                env,
+                self.config.offline_sequence_length,
+                self.config.offline_sequence_period,
+                self.config.offline_logdir,
+                self.config.offline_label,
+                self.config.offline_min_sequences_per_file,
             )
+
+        builder.store.executor_environment = env
 
     @staticmethod
     def name() -> str:
@@ -45,7 +47,7 @@ class EvaluatorOfflineLogging(Component):
         Returns:
             _description_
         """
-        return "evaluator_offline_logging"  # for creating system lowercase underscore
+        return "executor_environment_loop"  # "evaluator_offline_logging"  # for creating system lowercase underscore
 
     @staticmethod
     def config_class():
