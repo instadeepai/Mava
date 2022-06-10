@@ -96,7 +96,7 @@ class MockExecutor(Executor):
         self, agent: str, observation: NestedArray, state: NestedArray = None
     ) -> NestedArray:
         action_info = "action_info_" + str(agent)
-        policy_info = "policy_info_" + str(agent) 
+        policy_info = "policy_info_" + str(agent)
         return action_info, policy_info
 
 
@@ -169,5 +169,3 @@ def test_on_execution_select_action_compute(
     ff_executor.on_execution_select_action_compute(executor=mock_executor)
     assert mock_executor.store.action_info == "action_info_after_get_action"
     assert mock_executor.store.policy_info == "policy_info_after_get_action"
-
-
