@@ -14,14 +14,14 @@
 # limitations under the License.
 
 from types import SimpleNamespace
-from typing import Any, List, Tuple
+from typing import Callable, List, Tuple
 
 import jax
 import jax.numpy as jnp
 import pytest
 
 from mava.components.jax.training.advantage_estimation import GAE, GAEConfig
-from mava.core_jax import SystemTrainer
+from mava.systems.jax.trainer import Trainer
 
 
 def different_reward_values() -> List[Tuple]:
@@ -106,31 +106,41 @@ def similar_reward_values() -> List[Tuple]:
     ]
 
 
-class MockTrainer(SystemTrainer):
-    """Abstract system trainer."""
+@pytest.fixture
+def mock_trainer() -> Trainer:
+    """Creates mock trainer fixture"""
 
-    def __init__(
-        self,
-    ) -> None:
-        """System trainer init"""
+    mock_trainer = Trainer(config=SimpleNamespace())
+    mock_trainer.store.gae_fn = None
 
-        self.store = SimpleNamespace(gae_fn=None)
-
-        self._inputs: Any
-
-    def step(self) -> None:
-        """Trainer forward and backward passes."""
-        pass
+    return mock_trainer
 
 
-def test_gae_creation() -> None:
+@pytest.fixture
+def gae_with_reward_clipping() -> GAE:
+    """Creates gae fixture with reward clipping"""
+
+    test_gae = GAE(config=GAEConfig(max_abs_reward=1.0))
+
+    return test_gae
+
+
+@pytest.fixture
+def gae_without_reward_clipping() -> GAE:
+    """Creates gae fixture without reward clipping"""
+
+    test_gae = GAE(config=GAEConfig())
+
+    return test_gae
+
+
+def test_gae_creation(mock_trainer: Trainer, gae_without_reward_clipping: GAE) -> None:
     """Test whether gae function is successfully created"""
 
-    test_gae = GAE()
-    mock_trainer = MockTrainer()
-    test_gae.on_training_utility_fns(trainer=mock_trainer)
+    gae_without_reward_clipping.on_training_utility_fns(trainer=mock_trainer)
 
-    assert mock_trainer.store.gae_fn is not None
+    assert hasattr(mock_trainer.store, "gae_fn")
+    assert isinstance(mock_trainer.store.gae_fn, Callable)  # type:ignore
 
 
 @pytest.mark.parametrize(
@@ -141,6 +151,8 @@ def test_gae_function_reward_clipping_different_rewards(
     rewards_high: jnp.ndarray,
     discounts: jnp.ndarray,
     values: jnp.ndarray,
+    gae_with_reward_clipping: GAE,
+    mock_trainer: Trainer,
 ) -> None:
     """Test whether reward clipping in gae_advantages is working
 
@@ -148,10 +160,7 @@ def test_gae_function_reward_clipping_different_rewards(
     and target values when given rewards with different scales.
     """
 
-    test_gae = GAE(config=GAEConfig(max_abs_reward=1.0))
-    mock_trainer = MockTrainer()
-    test_gae.on_training_utility_fns(trainer=mock_trainer)
-
+    gae_with_reward_clipping.on_training_utility_fns(trainer=mock_trainer)
     gae_fn = mock_trainer.store.gae_fn
 
     advantages_high, target_values_high = gae_fn(
@@ -174,17 +183,16 @@ def test_gae_function_reward_not_clipping_different_rewards(
     rewards_high: jnp.ndarray,
     discounts: jnp.ndarray,
     values: jnp.ndarray,
+    gae_without_reward_clipping: GAE,
+    mock_trainer: Trainer,
 ) -> None:
-    """Test whether gae_advantages is working
+    """Test whether gae_advantages is working without reward clipping
 
     Done by verifying whether it is returning different advantage
     and target values when given rewards with different scales.
     """
 
-    test_gae = GAE(config=GAEConfig())
-    mock_trainer = MockTrainer()
-    test_gae.on_training_utility_fns(trainer=mock_trainer)
-
+    gae_without_reward_clipping.on_training_utility_fns(trainer=mock_trainer)
     gae_fn = mock_trainer.store.gae_fn
 
     advantages_high, target_values_high = gae_fn(
@@ -207,6 +215,8 @@ def test_gae_function_reward_clipping_similar_rewards(
     rewards_2: jnp.ndarray,
     discounts: jnp.ndarray,
     values: jnp.ndarray,
+    gae_with_reward_clipping: GAE,
+    mock_trainer: Trainer,
 ) -> None:
     """Test whether reward clipping in gae_advantages is working
 
@@ -215,10 +225,7 @@ def test_gae_function_reward_clipping_similar_rewards(
     below the clipping threshold.
     """
 
-    test_gae = GAE(config=GAEConfig(max_abs_reward=1.0))
-    mock_trainer = MockTrainer()
-    test_gae.on_training_utility_fns(trainer=mock_trainer)
-
+    gae_with_reward_clipping.on_training_utility_fns(trainer=mock_trainer)
     gae_fn = mock_trainer.store.gae_fn
 
     advantages_1, target_values_1 = gae_fn(
@@ -241,6 +248,8 @@ def test_gae_function_stop_gradient(
     rewards_2: jnp.ndarray,
     discounts: jnp.ndarray,
     values: jnp.ndarray,
+    gae_without_reward_clipping: GAE,
+    mock_trainer: Trainer,
 ) -> None:
     """Test whether gradients are being stopped in gae_advantages.
 
@@ -248,10 +257,8 @@ def test_gae_function_stop_gradient(
     by extracting only the advantages and summing them. The gradient
     of this function when applied to something will always be zero.
     """
-    test_gae = GAE(config=GAEConfig())
-    mock_trainer = MockTrainer()
-    test_gae.on_training_utility_fns(trainer=mock_trainer)
 
+    gae_without_reward_clipping.on_training_utility_fns(trainer=mock_trainer)
     gae_fn = mock_trainer.store.gae_fn
 
     def scalar_advantage_gae_fn(
