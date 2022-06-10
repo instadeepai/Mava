@@ -473,7 +473,7 @@ class MockLoggerConfig:
     logger_param_1: int = 2
 
 
-class MockLogerClass:
+class MockLoggerClass:
     def __init__(self) -> None:
         """Mock logger component."""
         pass
@@ -493,11 +493,11 @@ class MockLogger(Component):
 
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.store.executor_logger = MockLogerClass()
+        builder.store.executor_logger = MockLoggerClass()
 
     def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.store.trainer_logger = MockLogerClass()
+        builder.store.trainer_logger = MockLoggerClass()
 
     @staticmethod
     def name() -> str:
