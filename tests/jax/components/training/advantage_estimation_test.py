@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from types import SimpleNamespace
-from typing import Any, Callable, List, Tuple
+from typing import Any, List, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -241,8 +241,8 @@ def test_gae_function_stop_gradient(
     rewards_2: jnp.ndarray,
     discounts: jnp.ndarray,
     values: jnp.ndarray,
-):
-    """Test whether gradients are being stopped in gae_advantages
+) -> None:
+    """Test whether gradients are being stopped in gae_advantages.
 
     Done by defining a function from gae_fn which returns a scalar,
     by extracting only the advantages and summing them. The gradient
