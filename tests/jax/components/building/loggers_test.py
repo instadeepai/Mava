@@ -9,29 +9,6 @@ from mava.systems.jax import Builder
 from mava.utils.loggers import logger_utils
 
 
-class TestLogger(Logger):
-    """Test Logger component."""
-
-    def __init__(
-        self,
-        test_logger_factory: Callable,
-    ):
-        """Create TestLogger
-
-        Args:
-            test_logger_factory: factory to use in the logger config.
-        """
-        logger_config = LoggerConfig()
-        logger_config.logger_factory = test_logger_factory
-        logger_config.logger_config = {
-            "trainer": {"time_stamp": "trainer_logger_config"},
-            "executor": {"time_stamp": "executor_logger_config"},
-            "evaluator": {"time_stamp": "evaluator_logger_config"},
-        }
-
-        super().__init__(logger_config)
-
-
 @pytest.fixture
 def test_logger_factory() -> Callable:
     """Pytest fixture for logger factory.
@@ -74,7 +51,15 @@ def test_logger(test_logger_factory: Callable) -> Logger:
     Returns:
         Default TestLogger.
     """
-    return TestLogger(test_logger_factory)
+    logger_config = LoggerConfig()
+    logger_config.logger_factory = test_logger_factory
+    logger_config.logger_config = {
+        "trainer": {"time_stamp": "trainer_logger_config"},
+        "executor": {"time_stamp": "executor_logger_config"},
+        "evaluator": {"time_stamp": "evaluator_logger_config"},
+    }
+
+    return Logger(logger_config)
 
 
 def test_on_building_executor_logger_executor(
