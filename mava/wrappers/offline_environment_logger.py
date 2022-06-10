@@ -118,7 +118,6 @@ class MAOfflineEnvironmentSequenceLogger:
         Returns:
             dm.env timestep, extras
         """
-        print("IN RESET!")
         timestep = self._environment.reset()
 
         if isinstance(timestep, tuple):
@@ -141,8 +140,6 @@ class MAOfflineEnvironmentSequenceLogger:
         Returns:
             dm.env timestep, extras
         """
-        print("IN OFFLINE LOGGER STEP!")
-        exit()
         next_timestep = self._environment.step(actions)
 
         if isinstance(next_timestep, tuple) and len(next_timestep) == 2:
@@ -179,12 +176,12 @@ class MAOfflineEnvironmentSequenceLogger:
         for write_sequence in self._active_buffer:
             if write_sequence.t < self._sequence_length:
                 write_sequence.insert(
-                    self._agents, timestep, actions, next_timestep, extras
+                    self.possible_agents, timestep, actions, next_timestep, extras
                 )
 
         if next_timestep.last():
             for write_sequence in self._active_buffer:
-                write_sequence.zero_pad(self._agents, episode_return)
+                write_sequence.zero_pad(self.possible_agents, episode_return)
                 self._write_buffer.append(write_sequence)
         if len(self._write_buffer) >= self._min_sequences_per_file:
             self._write()
