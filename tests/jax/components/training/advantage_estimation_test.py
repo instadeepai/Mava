@@ -234,17 +234,19 @@ def test_gae_function_reward_clipping_similar_rewards(
 
 
 @pytest.mark.parametrize(
-    "rewards_low,rewards_high,discounts,values", different_reward_values()
+    "rewards_1,rewards_2,discounts,values", different_reward_values()
 )
 def test_gae_function_stop_gradient(
-    rewards_low: jnp.ndarray,
-    rewards_high: jnp.ndarray,
+    rewards_1: jnp.ndarray,
+    rewards_2: jnp.ndarray,
     discounts: jnp.ndarray,
     values: jnp.ndarray,
 ):
     """Test whether gradients are being stopped in gae_advantages
 
-    Done by defining a function from gae_fn which returns a scalar.
+    Done by defining a function from gae_fn which returns a scalar,
+    by extracting only the advantages and summing them. The gradient
+    of this function when applied to something will always be zero.
     """
     test_gae = GAE(config=GAEConfig())
     mock_trainer = MockTrainer()
@@ -264,7 +266,7 @@ def test_gae_function_stop_gradient(
         )
 
     grad_gae_fn = jax.grad(scalar_advantage_gae_fn)
-    gradients = grad_gae_fn(rewards_low, discounts, values)
+    gradients = grad_gae_fn(rewards_1, discounts, values)
 
     # Gradient of zero means gradient was stopped
     assert jnp.array_equal(gradients, jax.numpy.array([0, 0, 0, 0]))
