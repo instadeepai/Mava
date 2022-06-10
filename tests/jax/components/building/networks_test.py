@@ -91,15 +91,6 @@ def test_default_networks(test_network_factory: Callable) -> Networks:
     return TestDefaultNetworks(test_network_factory)
 
 
-def test_assert_true(
-    test_default_networks: Networks, test_builder: SystemBuilder
-) -> None:
-    test_default_networks.on_building_init_start(test_builder)
-    networks = test_builder.store.network_factory()
-
-    assert True
-
-
 def test_key_in_store(
     test_default_networks: Networks, test_builder: SystemBuilder
 ) -> None:
@@ -148,3 +139,9 @@ def test_network_factory_rng_keys(
                or isinstance(network['rng_key'], jax.numpy.DeviceArray)
         keys.append(tuple(network['rng_key'].tolist()))
     assert len(set(keys)) == 1
+
+
+def test_no_network_factory_before_build(
+    test_builder: SystemBuilder
+) -> None:
+    assert not hasattr(test_builder.store, 'network_factory')
