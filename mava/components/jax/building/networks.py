@@ -62,10 +62,6 @@ class DefaultNetworks(Networks):
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """Summary"""
-
-        # Set the shared weights
-        builder.store.shared_networks = self.config.shared_weights
-
         # Setup the jax key for network initialisations
         builder.store.key = jax.random.PRNGKey(self.config.seed)
 
