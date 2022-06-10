@@ -121,6 +121,16 @@ def test_network_factory_environment_spec(
     test_default_networks.on_building_init_start(test_builder)
     networks = test_builder.store.network_factory()
 
-    for net_key, network in networks.items():
+    for network in networks.values():
         assert network['environment_spec']._keys == ['agent_0', 'agent_1']
         assert network['environment_spec']._specs['agent_0'].observations.shape == (10, 5)
+
+
+def test_network_factory_agent_net_keys(
+    test_default_networks: Networks, test_builder: SystemBuilder
+) -> None:
+    test_default_networks.on_building_init_start(test_builder)
+    networks = test_builder.store.network_factory()
+
+    for network in networks.values():
+        assert network['agent_net_keys'] == {"key1": "value1", "key2": "value2"}
