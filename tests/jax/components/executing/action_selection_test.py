@@ -39,6 +39,7 @@ def dummy_config() -> ExecutorSelectActionConfig:
     config.parm_0 = 1
     return config
 
+
 @pytest.fixture
 def dummy_ff_executor_select_action():
     """Dummy FeedforwardExecutorSelectAction.
@@ -47,6 +48,7 @@ def dummy_ff_executor_select_action():
         FeedforwardExecutorSelectAction
     """
     return FeedforwardExecutorSelectAction()
+
 
 @pytest.fixture
 def mock_empty_executor() -> Executor:
@@ -127,7 +129,8 @@ def test_constructor(dummy_config: ExecutorSelectActionConfig) -> None:
 
 # Test on_execution_select_actions
 def test_on_execution_select_actions_with_empty_observations(
-    mock_empty_executor: Executor, dummy_ff_executor_select_action: FeedforwardExecutorSelectAction
+    mock_empty_executor: Executor,
+    dummy_ff_executor_select_action: FeedforwardExecutorSelectAction,
 ) -> None:
     """Test on_execution_select_actions with empty observations
 
@@ -135,14 +138,17 @@ def test_on_execution_select_actions_with_empty_observations(
         mock_empty_executor: executor with no observations and no agents
         dummy_ff_executor_select_action: FeedforwardExecutorSelectAction
     """
-    dummy_ff_executor_select_action.on_execution_select_actions(executor=mock_empty_executor)
+    dummy_ff_executor_select_action.on_execution_select_actions(
+        executor=mock_empty_executor
+    )
 
     assert mock_empty_executor.store.actions_info == {}
     assert mock_empty_executor.store.policies_info == {}
 
 
 def test_on_execution_select_actions(
-    mock_executor: Executor, dummy_ff_executor_select_action: FeedforwardExecutorSelectAction
+    mock_executor: Executor,
+    dummy_ff_executor_select_action: FeedforwardExecutorSelectAction,
 ) -> None:
     """Test on_execution_select_actions.
 
@@ -153,13 +159,14 @@ def test_on_execution_select_actions(
     dummy_ff_executor_select_action.on_execution_select_actions(executor=mock_executor)
 
     for agent in mock_executor.store.observations.keys():
-        assert mock_executor.store.actions_info[agent] == "action_info_"+agent
-        assert mock_executor.store.policies_info[agent] == "policy_info_"+agent
+        assert mock_executor.store.actions_info[agent] == "action_info_" + agent
+        assert mock_executor.store.policies_info[agent] == "policy_info_" + agent
 
 
 # Test on_execution_select_action_compute
 def test_on_execution_select_action_compute(
-    mock_executor: Executor, dummy_ff_executor_select_action: FeedforwardExecutorSelectAction
+    mock_executor: Executor,
+    dummy_ff_executor_select_action: FeedforwardExecutorSelectAction,
 ) -> None:
     """Test on_execution_select_action_compute.
 
@@ -167,7 +174,9 @@ def test_on_execution_select_action_compute(
         dummy_config: config
         mock_executor: Executor
     """
-    dummy_ff_executor_select_action.on_execution_select_action_compute(executor=mock_executor)
-    
+    dummy_ff_executor_select_action.on_execution_select_action_compute(
+        executor=mock_executor
+    )
+
     assert mock_executor.store.action_info == "action_info_after_get_action"
     assert mock_executor.store.policy_info == "policy_info_after_get_action"
