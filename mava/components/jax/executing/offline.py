@@ -6,11 +6,11 @@ from mava.core_jax import SystemExecutor
 
 @dataclass
 class EvaluatorOfflineLoggingConfig:
-    sequence_length: int = 1000
-    period: int = 100
-    logdir: str = "~./offline_env_logs"
-    label: str = "offline_logger"
-    min_sequences_per_file: int = 1000
+    offline_sequence_length: int = 1000
+    offline_sequence_period: int = 100
+    offline_logdir: str = "~./offline_env_logs"
+    offline_label: str = "offline_logger"
+    offline_min_sequences_per_file: int = 1000
 
 
 class EvaluatorOfflineLogging(Component):
@@ -26,15 +26,17 @@ class EvaluatorOfflineLogging(Component):
         self.config = config
 
     def on_execution_init_end(self, executor: SystemExecutor):
+        print("in exec init")
         if executor.store.is_evaluator:
+            print(executor.store)
             executor.store.environment_loop._environment = (
                 MAOfflineEnvironmentSequenceLogger(
                     executor.store.environment_loop._environment,
-                    self.config.sequence_length,
-                    self.config.period,
-                    self.config.logdir,
-                    self.config.label,
-                    self.config.min_sequences_per_file,
+                    self.config.offline_sequence_length,
+                    self.config.offline_sequence_period,
+                    self.config.offline_logdir,
+                    self.config.offline_label,
+                    self.config.offline_min_sequences_per_file,
                 )
             )
 

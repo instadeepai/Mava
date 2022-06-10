@@ -89,6 +89,7 @@ def main(_: Any) -> None:
 
     # Create the system.
     system = mappo.MAPPOSystem()
+    system.add(EvaluatorOfflineLogging)
 
     # Build the system.
     system.build(
@@ -102,7 +103,6 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        evaluator_offline_logging=EvaluatorOfflineLogging,
     )
 
     # Launch the system.
