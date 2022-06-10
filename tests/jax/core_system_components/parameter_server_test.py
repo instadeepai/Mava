@@ -92,12 +92,30 @@ def test_parameter_server(
     ) = test_system._builder.store.system_build
     assert type(parameter_server) == ParameterServer
 
-    step_var = parameter_server.get_parameters("trainer_steps")
-    assert type(step_var) == np.ndarray
-    assert step_var[0] == 0
+    trainer_step_var = parameter_server.get_parameters("trainer_steps")
+    walltime_var = parameter_server.get_parameters("trainer_walltime")
+    evaluator_steps_var = parameter_server.get_parameters("evaluator_steps")
+    evaluator_episodes_var = parameter_server.get_parameters("evaluator_episodes")
+    executor_episodes_var = parameter_server.get_parameters("executor_episodes")
+    executor_steps_var = parameter_server.get_parameters("executor_episodes")
+
+    assert type(trainer_step_var) == np.ndarray
+    assert type(walltime_var) == np.ndarray
+    assert type(evaluator_steps_var) == np.ndarray
+    assert type(evaluator_episodes_var) == np.ndarray
+    assert type(executor_episodes_var) == np.ndarray
+    assert type(executor_steps_var) == np.ndarray
+    
+    assert trainer_step_var[0] == 0
+    assert walltime_var[0] == 0
+    assert evaluator_steps_var[0] == 0
+    assert evaluator_episodes_var[0] == 0
+    assert executor_episodes_var[0] == 0
+    assert executor_steps_var[0] == 0
 
     parameter_server.set_parameters({"trainer_steps": np.ones(1, dtype=np.int32)})
     assert parameter_server.get_parameters("trainer_steps")[0] == 1
+
 
     parameter_server.add_to_parameters({"trainer_steps": np.ones(1, dtype=np.int32)})
     assert parameter_server.get_parameters("trainer_steps")[0] == 2
