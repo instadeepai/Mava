@@ -41,23 +41,13 @@ def dummy_config() -> ExecutorSelectActionConfig:
 
 
 @pytest.fixture
-def dummy_empty_config() -> ExecutorSelectActionConfig:
-    """Dummy empty config attribute for FeedforwardExecutorSelectAction class
-
-    Returns:
-        ExecutorSelectActionConfig
-    """
-    return ExecutorSelectActionConfig()
-
-
-@pytest.fixture
 def mock_empty_executor() -> Executor:
     """Mock executore component with empty observations"""
     store = SimpleNamespace(is_evaluator=None, observations={})
     return Executor(store=store)
 
 
-def get_action(parm_0, parm_1, parm_2):
+def get_action(observation, rng_key, legal_actions):
     """Function used in the networks.
 
     Returns:
@@ -69,9 +59,9 @@ def get_action(parm_0, parm_1, parm_2):
 class MockExecutor(Executor):
     def __init__(self):
         observations = {
-            "agent_0": "observation_0",
-            "agent_1": "observation_1",
-            "agent_2": "observation_2",
+            "agent_0": [0.1, 0.5, 0.7],
+            "agent_1": [0.8, 0.3, 0.7],
+            "agent_2": [0.9, 0.9, 0.8],
         }
         agent_net_keys = {
             "agent_0": "network_agent",
@@ -92,7 +82,7 @@ class MockExecutor(Executor):
         store = SimpleNamespace(
             is_evaluator=None,
             observations=observations,
-            observation=SimpleNamespace(observation=[0, 0, 1, 0], legal_actions=3),
+            observation=SimpleNamespace(observation=[0, 0, 1, 0], legal_actions=[1]),
             agent="agent_0",
             networks=networks,
             agent_net_keys=agent_net_keys,
@@ -105,19 +95,19 @@ class MockExecutor(Executor):
     def select_action(
         self, agent: str, observation: NestedArray, state: NestedArray = None
     ) -> NestedArray:
-        action_info = "action_info_" + str(agent) + "_" + str(observation)
-        policy_info = "policy_info_" + str(agent) + "_" + str(observation)
+        action_info = "action_info_" + str(agent)
+        policy_info = "policy_info_" + str(agent) 
         return action_info, policy_info
 
 
 @pytest.fixture
 def mock_executor() -> Executor:
-    """Mock executore component."""
+    """Mock executor component."""
     return MockExecutor()
 
 
 # Test initiator
-def test_constructor(dummy_config: type) -> None:
+def test_constructor(dummy_config: ExecutorSelectActionConfig) -> None:
     """Test adding config as an attribute
 
     Args:
@@ -127,24 +117,9 @@ def test_constructor(dummy_config: type) -> None:
     assert ff_executor_select_action.config.parm_0 == dummy_config.parm_0
 
 
-def test_constructor_empty_config(dummy_empty_config: type) -> None:
-    """Test adding empty config as an attribute
-
-    Args:
-        dummy_empty_config: ExecutorSelectActionConfig()
-    """
-    ff_executor_select_action = FeedforwardExecutorSelectAction(
-        config=dummy_empty_config
-    )
-    assert (
-        ff_executor_select_action.config.__dict__
-        == ExecutorSelectActionConfig().__dict__
-    )
-
-
 # Test on_execution_select_actions
 def test_on_execution_select_actions_with_empty_observations(
-    mock_empty_executor: Executor, dummy_config: type
+    mock_empty_executor: Executor, dummy_config: ExecutorSelectActionConfig
 ) -> None:
     """Test on_execution_select_actions with empty observations
 
@@ -159,7 +134,7 @@ def test_on_execution_select_actions_with_empty_observations(
 
 
 def test_on_execution_select_actions(
-    mock_executor: Executor, dummy_config: type
+    mock_executor: Executor, dummy_config: ExecutorSelectActionConfig
 ) -> None:
     """Test on_execution_select_actions.
 
@@ -171,47 +146,18 @@ def test_on_execution_select_actions(
     ff_executor_select_action = FeedforwardExecutorSelectAction(dummy_config)
     ff_executor_select_action.on_execution_select_actions(executor=mock_executor)
 
-    assert (
-        mock_executor.store.actions_info["agent_0"]
-        == "action_info_agent_0_observation_0"
-    )
-    assert (
-        mock_executor.store.actions_info["agent_1"]
-        == "action_info_agent_1_observation_1"
-    )
-    assert (
-        mock_executor.store.actions_info["agent_2"]
-        == "action_info_agent_2_observation_2"
-    )
+    assert mock_executor.store.actions_info["agent_0"] == "action_info_agent_0"
+    assert mock_executor.store.actions_info["agent_1"] == "action_info_agent_1"
+    assert mock_executor.store.actions_info["agent_2"] == "action_info_agent_2"
 
-    assert (
-        mock_executor.store.policies_info["agent_0"]
-        == "policy_info_agent_0_observation_0"
-    )
-    assert (
-        mock_executor.store.policies_info["agent_1"]
-        == "policy_info_agent_1_observation_1"
-    )
-    assert (
-        mock_executor.store.policies_info["agent_2"]
-        == "policy_info_agent_2_observation_2"
-    )
-
-
-def test_on_execution_select_actions_param(dummy_config: type) -> None:
-    """test errors of parameter enter in on_execution_select_actions
-
-    Args:
-        dummy_config: config
-    """
-    ff_executor_select_action = FeedforwardExecutorSelectAction(dummy_config)
-    with pytest.raises(Exception):
-        ff_executor_select_action.on_execution_select_actions(executor="Test_str_type")
+    assert mock_executor.store.policies_info["agent_0"] == "policy_info_agent_0"
+    assert mock_executor.store.policies_info["agent_1"] == "policy_info_agent_1"
+    assert mock_executor.store.policies_info["agent_2"] == "policy_info_agent_2"
 
 
 # Test on_execution_select_action_compute
 def test_on_execution_select_action_compute(
-    mock_executor: Executor, dummy_config: type
+    mock_executor: Executor, dummy_config: ExecutorSelectActionConfig
 ) -> None:
     """Test on_execution_select_action_compute.
 
@@ -225,13 +171,3 @@ def test_on_execution_select_action_compute(
     assert mock_executor.store.policy_info == "policy_info_after_get_action"
 
 
-def test_on_execution_select_action_compute_param(dummy_config: type) -> None:
-    """test errors of parameter enter in on_execution_select_action_compute
-    Args:
-        dummy_config: config
-    """
-    ff_executor_select_action = dummy_config
-    with pytest.raises(Exception):
-        ff_executor_select_action.on_execution_select_action_compute(
-            executor="Test_str_type"
-        )
