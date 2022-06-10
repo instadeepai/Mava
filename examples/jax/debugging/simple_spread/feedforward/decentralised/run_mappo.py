@@ -26,6 +26,7 @@ from mava.systems.jax import mappo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
+
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "env_name",
@@ -103,7 +104,7 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        terminal="gnome-terminal"
+        terminal="gnome-terminal",
     )
 
     # Launch the system.
