@@ -14,8 +14,9 @@
 # limitations under the License.
 
 from types import SimpleNamespace
-from typing import Any, List, Tuple
+from typing import Any, Callable, List, Tuple
 
+import jax
 import jax.numpy as jnp
 import pytest
 
@@ -230,3 +231,40 @@ def test_gae_function_reward_clipping_similar_rewards(
 
     assert jnp.array_equal(advantages_1, advantages_2)
     assert jnp.array_equal(target_values_1, target_values_2)
+
+
+@pytest.mark.parametrize(
+    "rewards_low,rewards_high,discounts,values", different_reward_values()
+)
+def test_gae_function_stop_gradient(
+    rewards_low: jnp.ndarray,
+    rewards_high: jnp.ndarray,
+    discounts: jnp.ndarray,
+    values: jnp.ndarray,
+):
+    """Test whether gradients are being stopped in gae_advantages
+
+    Done by defining a function from gae_fn which returns a scalar.
+    """
+    test_gae = GAE(config=GAEConfig())
+    mock_trainer = MockTrainer()
+    test_gae.on_training_utility_fns(trainer=mock_trainer)
+
+    gae_fn = mock_trainer.store.gae_fn
+
+    def scalar_advantage_gae_fn(
+        inner_rewards: jnp.ndarray,
+        inner_discounts: jnp.ndarray,
+        inner_values: jnp.ndarray,
+    ) -> jnp.ndarray:
+        return jax.numpy.sum(
+            gae_fn(
+                rewards=inner_rewards, discounts=inner_discounts, values=inner_values
+            )[0]
+        )
+
+    grad_gae_fn = jax.grad(scalar_advantage_gae_fn)
+    gradients = grad_gae_fn(rewards_low, discounts, values)
+
+    # Gradient of zero means gradient was stopped
+    assert jnp.array_equal(gradients, jax.numpy.array([0, 0, 0, 0]))
