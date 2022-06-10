@@ -20,7 +20,7 @@ def natural_keys(text: str) -> List:
 
 
 def sort_str_num(str_num: Any) -> List[Any]:
-    return sorted(str_num, key=natural_keys)
+    return sorted(list(map(str, str_num)), key=natural_keys)
 
 
 def sample_new_agent_keys(
