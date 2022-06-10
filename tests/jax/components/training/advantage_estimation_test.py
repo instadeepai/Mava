@@ -259,7 +259,7 @@ def test_gae_function_stop_gradient(
         inner_discounts: jnp.ndarray,
         inner_values: jnp.ndarray,
     ) -> jnp.ndarray:
-        return jax.numpy.sum(
+        return jnp.sum(
             gae_fn(
                 rewards=inner_rewards, discounts=inner_discounts, values=inner_values
             )[0]
@@ -270,5 +270,5 @@ def test_gae_function_stop_gradient(
     gradients_2 = grad_gae_fn(rewards_2, discounts, values)
 
     # Gradient of zero means gradient was stopped
-    assert jnp.array_equal(gradients_1, jax.numpy.array([0, 0, 0, 0]))
-    assert jnp.array_equal(gradients_2, jax.numpy.array([0, 0, 0, 0]))
+    assert jnp.array_equal(gradients_1, jnp.array([0, 0, 0, 0]))
+    assert jnp.array_equal(gradients_2, jnp.array([0, 0, 0, 0]))
