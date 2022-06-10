@@ -266,7 +266,9 @@ def test_gae_function_stop_gradient(
         )
 
     grad_gae_fn = jax.grad(scalar_advantage_gae_fn)
-    gradients = grad_gae_fn(rewards_1, discounts, values)
+    gradients_1 = grad_gae_fn(rewards_1, discounts, values)
+    gradients_2 = grad_gae_fn(rewards_2, discounts, values)
 
     # Gradient of zero means gradient was stopped
-    assert jnp.array_equal(gradients, jax.numpy.array([0, 0, 0, 0]))
+    assert jnp.array_equal(gradients_1, jax.numpy.array([0, 0, 0, 0]))
+    assert jnp.array_equal(gradients_2, jax.numpy.array([0, 0, 0, 0]))
