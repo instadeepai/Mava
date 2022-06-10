@@ -1,5 +1,6 @@
-from typing import Any, Callable, Dict, List, Sequence
+from typing import Any, Callable, Dict, List, Sequence, Union
 
+import jax
 import pytest
 
 from mava.components.jax.building import DefaultNetworks
@@ -98,6 +99,14 @@ def test_assert_true(
 ) -> None:
     test_default_networks.on_building_init_start(test_builder)
     networks = test_builder.store.network_factory()
-    print(networks)
 
     assert True
+
+
+def test_key_in_store(
+    test_default_networks: Networks, test_builder: SystemBuilder
+) -> None:
+    test_default_networks.on_building_init_start(test_builder)
+    assert test_builder.store.key is not None
+    assert isinstance(test_builder.store.key, jax.random.PRNGKeyArray)\
+           or isinstance(test_builder.store.key, jax.numpy.DeviceArray)
