@@ -39,6 +39,14 @@ def dummy_config() -> ExecutorSelectActionConfig:
     config.parm_0 = 1
     return config
 
+@pytest.fixture
+def dummy_ff_executor_select_action():
+    """Dummy FeedforwardExecutorSelectAction.
+
+    Returns:
+        FeedforwardExecutorSelectAction
+    """
+    return FeedforwardExecutorSelectAction()
 
 @pytest.fixture
 def mock_empty_executor() -> Executor:
@@ -82,7 +90,7 @@ class MockExecutor(Executor):
         store = SimpleNamespace(
             is_evaluator=None,
             observations=observations,
-            observation=SimpleNamespace(observation=[0, 0, 1, 0], legal_actions=[1]),
+            observation=SimpleNamespace(observation=[0.1, 0.5, 0.7], legal_actions=[1]),
             agent="agent_0",
             networks=networks,
             agent_net_keys=agent_net_keys,
@@ -119,22 +127,22 @@ def test_constructor(dummy_config: ExecutorSelectActionConfig) -> None:
 
 # Test on_execution_select_actions
 def test_on_execution_select_actions_with_empty_observations(
-    mock_empty_executor: Executor, dummy_config: ExecutorSelectActionConfig
+    mock_empty_executor: Executor, dummy_ff_executor_select_action: FeedforwardExecutorSelectAction
 ) -> None:
     """Test on_execution_select_actions with empty observations
 
     Args:
         mock_empty_executor: executor with no observations and no agents
+        dummy_ff_executor_select_action: FeedforwardExecutorSelectAction
     """
-    ff_executor_select_action = FeedforwardExecutorSelectAction(dummy_config)
-    ff_executor_select_action.on_execution_select_actions(executor=mock_empty_executor)
+    dummy_ff_executor_select_action.on_execution_select_actions(executor=mock_empty_executor)
 
     assert mock_empty_executor.store.actions_info == {}
     assert mock_empty_executor.store.policies_info == {}
 
 
 def test_on_execution_select_actions(
-    mock_executor: Executor, dummy_config: ExecutorSelectActionConfig
+    mock_executor: Executor, dummy_ff_executor_select_action: FeedforwardExecutorSelectAction
 ) -> None:
     """Test on_execution_select_actions.
 
@@ -142,22 +150,16 @@ def test_on_execution_select_actions(
         dummy_config: config
         mock_executor: Executor
     """
+    dummy_ff_executor_select_action.on_execution_select_actions(executor=mock_executor)
 
-    ff_executor_select_action = FeedforwardExecutorSelectAction(dummy_config)
-    ff_executor_select_action.on_execution_select_actions(executor=mock_executor)
-
-    assert mock_executor.store.actions_info["agent_0"] == "action_info_agent_0"
-    assert mock_executor.store.actions_info["agent_1"] == "action_info_agent_1"
-    assert mock_executor.store.actions_info["agent_2"] == "action_info_agent_2"
-
-    assert mock_executor.store.policies_info["agent_0"] == "policy_info_agent_0"
-    assert mock_executor.store.policies_info["agent_1"] == "policy_info_agent_1"
-    assert mock_executor.store.policies_info["agent_2"] == "policy_info_agent_2"
+    for agent in mock_executor.store.observations.keys():
+        assert mock_executor.store.actions_info[agent] == "action_info_"+agent
+        assert mock_executor.store.policies_info[agent] == "policy_info_"+agent
 
 
 # Test on_execution_select_action_compute
 def test_on_execution_select_action_compute(
-    mock_executor: Executor, dummy_config: ExecutorSelectActionConfig
+    mock_executor: Executor, dummy_ff_executor_select_action: FeedforwardExecutorSelectAction
 ) -> None:
     """Test on_execution_select_action_compute.
 
@@ -165,7 +167,7 @@ def test_on_execution_select_action_compute(
         dummy_config: config
         mock_executor: Executor
     """
-    ff_executor = FeedforwardExecutorSelectAction(dummy_config)
-    ff_executor.on_execution_select_action_compute(executor=mock_executor)
+    dummy_ff_executor_select_action.on_execution_select_action_compute(executor=mock_executor)
+    
     assert mock_executor.store.action_info == "action_info_after_get_action"
     assert mock_executor.store.policy_info == "policy_info_after_get_action"
