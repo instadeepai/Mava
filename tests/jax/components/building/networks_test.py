@@ -11,22 +11,6 @@ from mava.systems.jax import Builder
 from tests.jax.mocks import make_fake_env_specs
 
 
-class TestDefaultNetworks(DefaultNetworks):
-    """Test Default Networks component."""
-
-    def __init__(self, test_network_factory: Callable):
-        """Create TestDefaultNetworks.
-
-        Args:
-            test_network_factory: factory to use in network config.
-        """
-        networks_config = NetworksConfig()
-        networks_config.network_factory = test_network_factory
-        networks_config.seed = 919
-
-        super().__init__(networks_config)
-
-
 @pytest.fixture
 def test_network_factory() -> Callable:
     """Pytest fixture for network factory.
@@ -99,7 +83,11 @@ def test_default_networks(test_network_factory: Callable) -> Networks:
     Returns:
         Default networks test component.
     """
-    return TestDefaultNetworks(test_network_factory)
+    networks_config = NetworksConfig()
+    networks_config.network_factory = test_network_factory
+    networks_config.seed = 919
+
+    return DefaultNetworks(networks_config)
 
 
 def test_key_in_store(
