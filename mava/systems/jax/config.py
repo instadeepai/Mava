@@ -31,9 +31,9 @@ class Config:
         self._current_params: List = []
         self._built = False
 
-        self._param_to_component: Dict = (
-            {}
-        )  # Map from config parameter to which component added it
+        self._param_to_component: Dict[
+            str, str
+        ] = {}  # Map from config parameter to which component added it
 
     def add(self, **kwargs: Any) -> None:
         """Add a component config dataclass.
