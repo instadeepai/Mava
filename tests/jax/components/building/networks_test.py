@@ -69,7 +69,10 @@ def test_builder() -> SystemBuilder:
     """
     test_builder = Builder(components=[])
     test_builder.store.environment_spec = make_fake_env_specs()
-    test_builder.store.agent_net_keys = {"key1": "value1", "key2": "value2"}
+    test_builder.store.agent_net_keys = {
+        "net_key1": "network_1",
+        "net_key2": "network_2",
+    }
     return test_builder
 
 
@@ -161,7 +164,10 @@ def test_network_factory_agent_net_keys(
     networks = test_builder.store.network_factory()
 
     for network in networks.values():
-        assert network["agent_net_keys"] == {"key1": "value1", "key2": "value2"}
+        assert network["agent_net_keys"] == {
+            "net_key1": "network_1",
+            "net_key2": "network_2",
+        }
 
 
 def test_network_factory_rng_keys(
@@ -181,10 +187,13 @@ def test_network_factory_rng_keys(
 
     keys = []
     for network in networks.values():
+        # Ensure keys are all the correct type
         assert isinstance(network["rng_key"], jax.random.PRNGKeyArray) or isinstance(
             network["rng_key"], jax.numpy.DeviceArray
         )
         keys.append(tuple(network["rng_key"].tolist()))
+
+    # Ensure network factory passes the same key along to each network initialisation
     assert len(set(keys)) == 1
 
 
