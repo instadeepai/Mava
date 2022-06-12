@@ -438,7 +438,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         # for each agent accumulated during the episode.
         rewards: Dict[str, float] = {}
         episode_returns: Dict[str, float] = {}
-        print("TYPE OF ENV:", type(self._environment), self._environment)
         for agent, spec in self._environment.reward_spec().items():
             rewards.update({agent: generate_zeros_from_spec(spec)})
             episode_returns.update({agent: generate_zeros_from_spec(spec)})
