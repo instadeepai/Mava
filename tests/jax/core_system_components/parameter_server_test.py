@@ -42,7 +42,7 @@ class TestSystem(System):
             environment_spec=building.EnvironmentSpec,
             system_init=building.SystemInit,
             data_server=mocks.MockOnPolicyDataServer,
-            data_server_signature=ParallelTransitionAdderSignature,
+            data_server_adder_signature=ParallelTransitionAdderSignature,
             parameter_server=DefaultParameterServer,
             executor_parameter_client=mocks.MockExecutorParameterClient,
             trainer_parameter_client=mocks.MockTrainerParameterClient,

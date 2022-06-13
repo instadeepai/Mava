@@ -102,7 +102,7 @@ class MockAdder(Component):
     @staticmethod
     def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
-        return "adder"
+        return "executor_adder"
 
 
 def make_fake_env_specs() -> MAEnvironmentSpec:
