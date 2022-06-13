@@ -170,7 +170,14 @@ def test_system() -> System:
 @pytest.fixture
 def test_parameter_server() -> ParameterServer:
     """Dummy parameter server with no components"""
-    return TestParameterServer(SimpleNamespace(config_key="expected_value"), [])
+    return TestParameterServer(
+        SimpleNamespace(
+            config_key="expected_value",
+            non_blocking_sleep_seconds=1,
+            get_parameters="parameter_list",
+        ),
+        [],
+    )
 
 
 def test_parameter_server_process_instantiate(
@@ -223,5 +230,61 @@ def test_init_hook_order(test_parameter_server: TestParameterServer) -> None:
             "on_parameter_server_init",
             "on_parameter_server_init_checkpointer",
             "on_parameter_server_init_end",
+        ]
+    )
+
+
+def test_get_parameters_hook_order(test_parameter_server: TestParameterServer) -> None:
+    """Test if get_parameters hooks are called in the correct order"""
+    test_parameter_server.reset_token()
+    test_parameter_server.get_parameters("")
+    assert test_parameter_server.token == get_final_token_value(
+        [
+            "on_parameter_server_get_parameters_start",
+            "on_parameter_server_get_parameters",
+            "on_parameter_server_get_parameters_end",
+        ]
+    )
+
+
+def test_set_parameters_hook_order(test_parameter_server: TestParameterServer) -> None:
+    """Test if set_parameters hooks are called in the correct order"""
+    test_parameter_server.reset_token()
+    test_parameter_server.set_parameters({})
+    assert test_parameter_server.token == get_final_token_value(
+        [
+            "on_parameter_server_set_parameters_start",
+            "on_parameter_server_set_parameters",
+            "on_parameter_server_set_parameters_end",
+        ]
+    )
+
+
+def test_add_to_parameters_hook_order(
+    test_parameter_server: TestParameterServer,
+) -> None:
+    """Test if add_to_parameters hooks are called in the correct order"""
+    test_parameter_server.reset_token()
+    test_parameter_server.add_to_parameters({})
+    assert test_parameter_server.token == get_final_token_value(
+        [
+            "on_parameter_server_add_to_parameters_start",
+            "on_parameter_server_add_to_parameters",
+            "on_parameter_server_add_to_parameters_end",
+        ]
+    )
+
+
+def test_step_hook_order(test_parameter_server: TestParameterServer) -> None:
+    """Test if step hooks are called in the correct order"""
+    test_parameter_server.reset_token()
+    test_parameter_server.step()
+    assert test_parameter_server.token == get_final_token_value(
+        [
+            "on_parameter_server_run_loop_start",
+            "on_parameter_server_run_loop_checkpoint",
+            "on_parameter_server_run_loop",
+            "on_parameter_server_run_loop_termination",
+            "on_parameter_server_run_loop_end",
         ]
     )
