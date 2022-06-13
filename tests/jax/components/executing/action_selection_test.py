@@ -168,7 +168,7 @@ def test_on_execution_select_actions(
     """Test on_execution_select_actions.
 
     Args:
-        dummy_config: config
+        dummy_ff_executor_select_action: FeedforwardExecutorSelectAction
         mock_executor: Executor
     """
     dummy_ff_executor_select_action.on_execution_select_actions(executor=mock_executor)
@@ -186,7 +186,7 @@ def test_on_execution_select_action_compute(
     """Test on_execution_select_action_compute.
 
     Args:
-        dummy_config: config
+        dummy_ff_executor_select_action: FeedforwardExecutorSelectAction
         mock_executor: Executor
     """
     for agent in mock_executor.store.observations.keys():
