@@ -19,6 +19,7 @@ from types import SimpleNamespace
 
 import jax
 import pytest
+from acme.jax import utils
 from acme.types import NestedArray
 
 from mava.components.jax.executing.action_selection import (
@@ -63,7 +64,9 @@ def get_action(observation, rng_key, legal_actions):
     Returns:
         action_info and policy info
     """
-    return "action_info_after_get_action", "policy_info_after_get_action"
+    return "action_info_after_get_action_" + str(
+        observation[0]
+    ), "policy_info_after_get_action_" + str(observation[0])
 
 
 class MockExecutor(Executor):
@@ -74,9 +77,9 @@ class MockExecutor(Executor):
             "agent_2": [0.9, 0.9, 0.8],
         }
         agent_net_keys = {
-            "agent_0": "network_agent",
-            "agent_1": "network_agent",
-            "agent_2": "network_agent",
+            "agent_0": "network_agent_0",
+            "agent_1": "network_agent_1",
+            "agent_2": "network_agent_2",
         }
         networks = {
             "networks": {
@@ -108,6 +111,18 @@ class MockExecutor(Executor):
         action_info = "action_info_" + str(agent)
         policy_info = "policy_info_" + str(agent)
         return action_info, policy_info
+
+    def set_agent(self, agent) -> None:
+        """Update agent, observation
+
+        Args:
+            agent: the new agent to be in store.agent
+        """
+        if not agent in self.store.observations.keys():
+            pass
+
+        self.store.agent = agent
+        self.store.observation.observation = self.store.observations[agent]
 
 
 @pytest.fixture
@@ -174,9 +189,15 @@ def test_on_execution_select_action_compute(
         dummy_config: config
         mock_executor: Executor
     """
-    dummy_ff_executor_select_action.on_execution_select_action_compute(
-        executor=mock_executor
-    )
-
-    assert mock_executor.store.action_info == "action_info_after_get_action"
-    assert mock_executor.store.policy_info == "policy_info_after_get_action"
+    for agent in mock_executor.store.observations.keys():
+        mock_executor.set_agent(agent)
+        dummy_ff_executor_select_action.on_execution_select_action_compute(
+            executor=mock_executor
+        )
+        observation = utils.add_batch_dim(mock_executor.store.observations[agent])
+        assert mock_executor.store.action_info == "action_info_after_get_action_" + str(
+            observation[0]
+        )
+        assert mock_executor.store.policy_info == "policy_info_after_get_action_" + str(
+            observation[0]
+        )
