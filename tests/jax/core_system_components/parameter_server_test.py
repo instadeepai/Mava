@@ -32,7 +32,7 @@ from mava.systems.jax import ParameterServer, mappo
 from mava.systems.jax.system import System
 from mava.utils.environments import debugging_utils
 from tests.jax import mocks
-from tests.jax.utils import get_final_token_value, hash_token, initial_token_value
+from tests.jax.hashable_hooks import HashableHooks
 
 
 class TestSystem(System):
@@ -62,104 +62,16 @@ class TestSystem(System):
         return components, {}
 
 
-class TestParameterServer(ParameterServer):
+class TestParameterServer(HashableHooks, ParameterServer):
     def __init__(
         self,
         config: SimpleNamespace,
         components: List[Callback],
     ) -> None:
         """Initialise the parameter server."""
-        self.token = initial_token_value
+        self.reset_token()
 
         super().__init__(config, components)
-
-    def reset_token(self) -> None:
-        """Reset token to initial value"""
-        self.token = initial_token_value
-
-    # init hooks
-    def on_parameter_server_init_start(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(self.token, "on_parameter_server_init_start")
-
-    def on_parameter_server_init(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(self.token, "on_parameter_server_init")
-
-    def on_parameter_server_init_checkpointer(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(self.token, "on_parameter_server_init_checkpointer")
-
-    def on_parameter_server_init_end(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(self.token, "on_parameter_server_init_end")
-
-    # get_parameters hooks
-    def on_parameter_server_get_parameters_start(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(self.token, "on_parameter_server_get_parameters_start")
-
-    def on_parameter_server_get_parameters(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(self.token, "on_parameter_server_get_parameters")
-
-    def on_parameter_server_get_parameters_end(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(self.token, "on_parameter_server_get_parameters_end")
-
-    # set_parameters hooks
-    def on_parameter_server_set_parameters_start(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(self.token, "on_parameter_server_set_parameters_start")
-
-    def on_parameter_server_set_parameters(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(self.token, "on_parameter_server_set_parameters")
-
-    def on_parameter_server_set_parameters_end(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(self.token, "on_parameter_server_set_parameters_end")
-
-    # add_to_parameters hooks
-    def on_parameter_server_add_to_parameters_start(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(
-            self.token, "on_parameter_server_add_to_parameters_start"
-        )
-
-    def on_parameter_server_add_to_parameters(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(self.token, "on_parameter_server_add_to_parameters")
-
-    def on_parameter_server_add_to_parameters_end(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(self.token, "on_parameter_server_add_to_parameters_end")
-
-    # step hooks
-    def on_parameter_server_run_loop_start(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(self.token, "on_parameter_server_run_loop_start")
-
-    def on_parameter_server_run_loop_checkpoint(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(self.token, "on_parameter_server_run_loop_checkpoint")
-
-    def on_parameter_server_run_loop(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(self.token, "on_parameter_server_run_loop")
-
-    def on_parameter_server_run_loop_termination(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(self.token, "on_parameter_server_run_loop_termination")
-
-    def on_parameter_server_run_loop_end(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(self.token, "on_parameter_server_run_loop_end")
-
-    # run hooks
-    def on_parameter_server_run_start(self) -> None:
-        """Override hook to update token using the method name"""
-        self.token = hash_token(self.token, "on_parameter_server_run_start")
 
 
 @pytest.fixture
@@ -257,7 +169,7 @@ def test_step_sleep(test_parameter_server: TestParameterServer) -> None:
 
 def test_init_hook_order(test_parameter_server: TestParameterServer) -> None:
     """Test if init hooks are called in the correct order"""
-    assert test_parameter_server.token == get_final_token_value(
+    assert test_parameter_server.token == HashableHooks.get_final_token_value(
         [
             "on_parameter_server_init_start",
             "on_parameter_server_init",
@@ -271,7 +183,7 @@ def test_get_parameters_hook_order(test_parameter_server: TestParameterServer) -
     """Test if get_parameters hooks are called in the correct order"""
     test_parameter_server.reset_token()
     test_parameter_server.get_parameters("")
-    assert test_parameter_server.token == get_final_token_value(
+    assert test_parameter_server.token == HashableHooks.get_final_token_value(
         [
             "on_parameter_server_get_parameters_start",
             "on_parameter_server_get_parameters",
@@ -284,7 +196,7 @@ def test_set_parameters_hook_order(test_parameter_server: TestParameterServer) -
     """Test if set_parameters hooks are called in the correct order"""
     test_parameter_server.reset_token()
     test_parameter_server.set_parameters({})
-    assert test_parameter_server.token == get_final_token_value(
+    assert test_parameter_server.token == HashableHooks.get_final_token_value(
         [
             "on_parameter_server_set_parameters_start",
             "on_parameter_server_set_parameters",
@@ -299,7 +211,7 @@ def test_add_to_parameters_hook_order(
     """Test if add_to_parameters hooks are called in the correct order"""
     test_parameter_server.reset_token()
     test_parameter_server.add_to_parameters({})
-    assert test_parameter_server.token == get_final_token_value(
+    assert test_parameter_server.token == HashableHooks.get_final_token_value(
         [
             "on_parameter_server_add_to_parameters_start",
             "on_parameter_server_add_to_parameters",
@@ -312,7 +224,7 @@ def test_step_hook_order(test_parameter_server: TestParameterServer) -> None:
     """Test if step hooks are called in the correct order"""
     test_parameter_server.reset_token()
     test_parameter_server.step()
-    assert test_parameter_server.token == get_final_token_value(
+    assert test_parameter_server.token == HashableHooks.get_final_token_value(
         [
             "on_parameter_server_run_loop_start",
             "on_parameter_server_run_loop_checkpoint",
