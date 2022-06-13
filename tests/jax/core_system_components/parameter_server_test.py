@@ -16,8 +16,9 @@
 """Tests for parameter server class for Jax-based Mava systems"""
 
 import functools
+import hashlib
 from types import SimpleNamespace
-from typing import Dict, Tuple, List
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pytest
@@ -61,26 +62,33 @@ class TestSystem(System):
 
 
 class TestParameterServer(ParameterServer):
+    initial_token_value = "initial_token_value"
+
     def __init__(
         self,
         config: SimpleNamespace,
         components: List[Callback],
     ) -> None:
         """Initialise the parameter server."""
+        self.token = self.initial_token_value
+
         super().__init__(config, components)
+
+    def reset_token(self):
+        self.token = self.initial_token_value
 
     # init hooks
     def on_parameter_server_init_start(self):
-        pass
+        self.token = hash_token(self.token, "on_parameter_server_init_start")
 
     def on_parameter_server_init(self):
-        pass
+        self.token = hash_token(self.token, "on_parameter_server_init")
 
     def on_parameter_server_init_checkpointer(self):
-        pass
+        self.token = hash_token(self.token, "on_parameter_server_init_checkpointer")
 
     def on_parameter_server_init_end(self):
-        pass
+        self.token = hash_token(self.token, "on_parameter_server_init_end")
 
     # get_parameters hooks
     def on_parameter_server_get_parameters_start(self):
@@ -139,6 +147,25 @@ def test_system() -> System:
     return TestSystem()
 
 
+@pytest.fixture
+def test_parameter_server() -> ParameterServer:
+    """Dummy parameter server with no components"""
+    return TestParameterServer(SimpleNamespace(config_key="expected_value"), [])
+
+
+def hash_token(token: str, hash_by: str) -> str:
+    """Use 'hash_by' to hash the given string token"""
+    return hashlib.md5((token + hash_by).encode()).hexdigest()
+
+
+def get_final_token_value(method_names: List[str]) -> str:
+    """Get the final expected value of a token after it is hashed by the method names"""
+    token = TestParameterServer.initial_token_value
+    for method_name in method_names:
+        token = hash_token(token, method_name)
+    return token
+
+
 def test_parameter_server_process_instantiate(
     test_system: System,
 ) -> None:
@@ -179,3 +206,15 @@ def test_parameter_server_process_instantiate(
 
     # Step the parameter sever
     parameter_server.step()
+
+
+def test_init_hook_order(test_parameter_server: TestParameterServer) -> None:
+    """Test if init hooks are called in the correct order"""
+    assert test_parameter_server.token == get_final_token_value(
+        [
+            "on_parameter_server_init_start",
+            "on_parameter_server_init",
+            "on_parameter_server_init_checkpointer",
+            "on_parameter_server_init_end",
+        ]
+    )
