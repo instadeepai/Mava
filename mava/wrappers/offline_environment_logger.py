@@ -120,7 +120,7 @@ class MAOfflineEnvironmentSequenceLogger:
         """
         timestep = self._environment.reset()
 
-        if type(timestep, tuple):
+        if type(timestep) == tuple:
             self._timestep, self._extras = timestep
         else:
             self._extras = {}
@@ -142,7 +142,7 @@ class MAOfflineEnvironmentSequenceLogger:
         """
         next_timestep = self._environment.step(actions)
 
-        if type(next_timestep, tuple):
+        if type(next_timestep) == tuple:
             next_timestep, next_extras = next_timestep
         else:
             next_extras = {}
