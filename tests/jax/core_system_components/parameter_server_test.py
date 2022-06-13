@@ -16,11 +16,13 @@
 """Tests for parameter server class for Jax-based Mava systems"""
 
 import functools
-from typing import Dict, Tuple
+from types import SimpleNamespace
+from typing import Dict, Tuple, List
 
 import numpy as np
 import pytest
 
+from mava.callbacks import Callback
 from mava.components.jax import building
 from mava.components.jax.building.adders import ParallelTransitionAdderSignature
 from mava.components.jax.updating.parameter_server import DefaultParameterServer
@@ -58,13 +60,86 @@ class TestSystem(System):
         return components, {}
 
 
+class TestParameterServer(ParameterServer):
+    def __init__(
+        self,
+        config: SimpleNamespace,
+        components: List[Callback],
+    ) -> None:
+        """Initialise the parameter server."""
+        super().__init__(config, components)
+
+    # init hooks
+    def on_parameter_server_init_start(self):
+        pass
+
+    def on_parameter_server_init(self):
+        pass
+
+    def on_parameter_server_init_checkpointer(self):
+        pass
+
+    def on_parameter_server_init_end(self):
+        pass
+
+    # get_parameters hooks
+    def on_parameter_server_get_parameters_start(self):
+        pass
+
+    def on_parameter_server_get_parameters(self):
+        pass
+
+    def on_parameter_server_get_parameters_end(self):
+        pass
+
+    # set_parameters hooks
+    def on_parameter_server_set_parameters_start(self):
+        pass
+
+    def on_parameter_server_set_parameters(self):
+        pass
+
+    def on_parameter_server_set_parameters_end(self):
+        pass
+
+    # add_to_parameters hooks
+    def on_parameter_server_add_to_parameters_start(self):
+        pass
+
+    def on_parameter_server_add_to_parameters(self):
+        pass
+
+    def on_parameter_server_add_to_parameters_end(self):
+        pass
+
+    # step hooks
+    def on_parameter_server_run_loop_start(self):
+        pass
+
+    def on_parameter_server_run_loop_checkpoint(self):
+        pass
+
+    def on_parameter_server_run_loop(self):
+        pass
+
+    def on_parameter_server_run_loop_termination(self):
+        pass
+
+    def on_parameter_server_run_loop_end(self):
+        pass
+
+    # run hooks
+    def on_parameter_server_run_start(self):
+        pass
+
+
 @pytest.fixture
 def test_system() -> System:
     """Dummy system with zero components."""
     return TestSystem()
 
 
-def test_parameter_server(
+def test_parameter_server_process_instantiate(
     test_system: System,
 ) -> None:
     """Test if the parameter server instantiates processes as expected."""
