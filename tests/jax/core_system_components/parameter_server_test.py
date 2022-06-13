@@ -16,7 +16,6 @@
 """Tests for parameter server class for Jax-based Mava systems"""
 
 import functools
-import hashlib
 from types import SimpleNamespace
 from typing import Dict, List, Tuple
 
@@ -32,6 +31,7 @@ from mava.systems.jax import ParameterServer, mappo
 from mava.systems.jax.system import System
 from mava.utils.environments import debugging_utils
 from tests.jax import mocks
+from tests.jax.utils import get_final_token_value, hash_token, initial_token_value
 
 
 class TestSystem(System):
@@ -62,21 +62,19 @@ class TestSystem(System):
 
 
 class TestParameterServer(ParameterServer):
-    initial_token_value = "initial_token_value"
-
     def __init__(
         self,
         config: SimpleNamespace,
         components: List[Callback],
     ) -> None:
         """Initialise the parameter server."""
-        self.token = self.initial_token_value
+        self.token = initial_token_value
 
         super().__init__(config, components)
 
     def reset_token(self) -> None:
         """Reset token to initial value"""
-        self.token = self.initial_token_value
+        self.token = initial_token_value
 
     # init hooks
     def on_parameter_server_init_start(self) -> None:
@@ -173,19 +171,6 @@ def test_system() -> System:
 def test_parameter_server() -> ParameterServer:
     """Dummy parameter server with no components"""
     return TestParameterServer(SimpleNamespace(config_key="expected_value"), [])
-
-
-def hash_token(token: str, hash_by: str) -> str:
-    """Use 'hash_by' to hash the given string token"""
-    return hashlib.md5((token + hash_by).encode()).hexdigest()
-
-
-def get_final_token_value(method_names: List[str]) -> str:
-    """Get the final expected value of a token after it is hashed by the method names"""
-    token = TestParameterServer.initial_token_value
-    for method_name in method_names:
-        token = hash_token(token, method_name)
-    return token
 
 
 def test_parameter_server_process_instantiate(

@@ -14,9 +14,8 @@
 # limitations under the License.
 
 """Tests utils for Jax-based Mava systems"""
-
-
-from typing import Any
+import hashlib
+from typing import Any, List
 
 
 def assert_if_value_is_not_none(value1: Any, value2: Any) -> None:
@@ -28,3 +27,20 @@ def assert_if_value_is_not_none(value1: Any, value2: Any) -> None:
     """
     if value1:
         assert value1 == value2
+
+
+# Functions to help with asserting that hooks are called in a specific order
+initial_token_value = "initial_token_value"
+
+
+def hash_token(token: str, hash_by: str) -> str:
+    """Use 'hash_by' to hash the given string token"""
+    return hashlib.md5((token + hash_by).encode()).hexdigest()
+
+
+def get_final_token_value(method_names: List[str]) -> str:
+    """Get the final expected value of a token after it is hashed by the method names"""
+    token = initial_token_value
+    for method_name in method_names:
+        token = hash_token(token, method_name)
+    return token
