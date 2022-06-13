@@ -120,6 +120,10 @@ class MAOfflineEnvironmentSequenceLogger:
         """
         timestep = self._environment.reset()
 
+        print(timestep)
+        print(type(timestep))
+        print(len(timestep))
+        exit()
         if isinstance(timestep, tuple):
             self._timestep, self._extras = timestep
         else:
