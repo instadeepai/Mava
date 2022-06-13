@@ -123,6 +123,7 @@ class MAOfflineEnvironmentSequenceLogger:
         if type(timestep) == tuple:
             self._timestep, self._extras = timestep
         else:
+            self._timestep = timestep
             self._extras = {}
 
         self._episode_return = np.mean(list(self._timestep.reward.values()))
