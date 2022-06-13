@@ -11,6 +11,10 @@ class HashableHooks:
 
     def hash_token(self, hash_by: str) -> None:
         """Use 'hash_by' to hash the given string token"""
+        if not hasattr(self, "token"):
+            raise Exception(
+                "Initial token needs to be created using HashableHooks.reset_token()"
+            )
         self.token = self._hash_function(self.token, hash_by)
 
     @staticmethod
