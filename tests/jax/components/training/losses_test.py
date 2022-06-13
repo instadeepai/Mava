@@ -17,6 +17,14 @@ def mock_trainer() -> Trainer:
 
     return mock_trainer
 
+#@pytest.fixture
+def mapg_trust_region_clipping_loss_config() -> MAPGTrustRegionClippingLossConfig:
+    """Creates an MAPG loss config fixture with trust region and clipping"""
+
+    test_mapg_config = MAPGTrustRegionClippingLossConfig()
+
+    return test_mapg_config
+
 @pytest.fixture
 def mapg_trust_region_clipping_loss() -> MAPGWithTrustRegionClippingLoss:
     """Creates an MAPG loss fixture with trust region and clipping"""
@@ -29,6 +37,15 @@ def test_mapg_creation(mock_trainer: Trainer, mapg_trust_region_clipping_loss:MA
     """Test whether mapg function is successfully created"""
     
     mapg_trust_region_clipping_loss.on_training_loss_fns(trainer=mock_trainer)
-
     assert hasattr(mock_trainer.store,"grad_fn")
     assert isinstance(mock_trainer.store.grad_fn, Callable) # type:ignore
+
+def test_mapg_config_creation() -> None:
+    """Test whether mapg loss config variables are of correct type"""
+    
+    mapg_config = mapg_trust_region_clipping_loss_config()
+    
+    assert isinstance(mapg_config.clipping_epsilon,float)
+    assert isinstance(mapg_config.clip_value,bool)
+    assert isinstance(mapg_config.entropy_cost,float)
+    assert isinstance(mapg_config.value_cost,float)
