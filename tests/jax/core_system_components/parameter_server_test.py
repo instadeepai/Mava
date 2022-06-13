@@ -16,6 +16,7 @@
 """Tests for parameter server class for Jax-based Mava systems"""
 
 import functools
+import time
 from types import SimpleNamespace
 from typing import Dict, List, Tuple
 
@@ -244,7 +245,14 @@ def test_add_to_parameters_store(test_parameter_server: TestParameterServer) -> 
     """Test that store is handled properly in add_to_parameters"""
     add_to_params = {"parameter_name": "value"}
     test_parameter_server.add_to_parameters(add_to_params)
-    assert test_parameter_server.store._set_params["parameter_name"] == "value"
+    assert test_parameter_server.store._add_to_params["parameter_name"] == "value"
+
+
+def test_step_sleep(test_parameter_server: TestParameterServer) -> None:
+    """Test that step sleeps"""
+    start = time.time()
+    test_parameter_server.step()
+    assert time.time() - start >= 1
 
 
 def test_init_hook_order(test_parameter_server: TestParameterServer) -> None:
