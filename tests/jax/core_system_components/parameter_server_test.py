@@ -74,71 +74,93 @@ class TestParameterServer(ParameterServer):
 
         super().__init__(config, components)
 
-    def reset_token(self):
+    def reset_token(self) -> None:
+        """Reset token to initial value"""
         self.token = self.initial_token_value
 
     # init hooks
-    def on_parameter_server_init_start(self):
+    def on_parameter_server_init_start(self) -> None:
+        """Override hook to update token using the method name"""
         self.token = hash_token(self.token, "on_parameter_server_init_start")
 
-    def on_parameter_server_init(self):
+    def on_parameter_server_init(self) -> None:
+        """Override hook to update token using the method name"""
         self.token = hash_token(self.token, "on_parameter_server_init")
 
-    def on_parameter_server_init_checkpointer(self):
+    def on_parameter_server_init_checkpointer(self) -> None:
+        """Override hook to update token using the method name"""
         self.token = hash_token(self.token, "on_parameter_server_init_checkpointer")
 
-    def on_parameter_server_init_end(self):
+    def on_parameter_server_init_end(self) -> None:
+        """Override hook to update token using the method name"""
         self.token = hash_token(self.token, "on_parameter_server_init_end")
 
     # get_parameters hooks
-    def on_parameter_server_get_parameters_start(self):
-        pass
+    def on_parameter_server_get_parameters_start(self) -> None:
+        """Override hook to update token using the method name"""
+        self.token = hash_token(self.token, "on_parameter_server_get_parameters_start")
 
-    def on_parameter_server_get_parameters(self):
-        pass
+    def on_parameter_server_get_parameters(self) -> None:
+        """Override hook to update token using the method name"""
+        self.token = hash_token(self.token, "on_parameter_server_get_parameters")
 
-    def on_parameter_server_get_parameters_end(self):
-        pass
+    def on_parameter_server_get_parameters_end(self) -> None:
+        """Override hook to update token using the method name"""
+        self.token = hash_token(self.token, "on_parameter_server_get_parameters_end")
 
     # set_parameters hooks
-    def on_parameter_server_set_parameters_start(self):
-        pass
+    def on_parameter_server_set_parameters_start(self) -> None:
+        """Override hook to update token using the method name"""
+        self.token = hash_token(self.token, "on_parameter_server_set_parameters_start")
 
-    def on_parameter_server_set_parameters(self):
-        pass
+    def on_parameter_server_set_parameters(self) -> None:
+        """Override hook to update token using the method name"""
+        self.token = hash_token(self.token, "on_parameter_server_set_parameters")
 
-    def on_parameter_server_set_parameters_end(self):
-        pass
+    def on_parameter_server_set_parameters_end(self) -> None:
+        """Override hook to update token using the method name"""
+        self.token = hash_token(self.token, "on_parameter_server_set_parameters_end")
 
     # add_to_parameters hooks
-    def on_parameter_server_add_to_parameters_start(self):
-        pass
+    def on_parameter_server_add_to_parameters_start(self) -> None:
+        """Override hook to update token using the method name"""
+        self.token = hash_token(
+            self.token, "on_parameter_server_add_to_parameters_start"
+        )
 
-    def on_parameter_server_add_to_parameters(self):
-        pass
+    def on_parameter_server_add_to_parameters(self) -> None:
+        """Override hook to update token using the method name"""
+        self.token = hash_token(self.token, "on_parameter_server_add_to_parameters")
 
-    def on_parameter_server_add_to_parameters_end(self):
-        pass
+    def on_parameter_server_add_to_parameters_end(self) -> None:
+        """Override hook to update token using the method name"""
+        self.token = hash_token(self.token, "on_parameter_server_add_to_parameters_end")
 
     # step hooks
-    def on_parameter_server_run_loop_start(self):
-        pass
+    def on_parameter_server_run_loop_start(self) -> None:
+        """Override hook to update token using the method name"""
+        self.token = hash_token(self.token, "on_parameter_server_run_loop_start")
 
-    def on_parameter_server_run_loop_checkpoint(self):
-        pass
+    def on_parameter_server_run_loop_checkpoint(self) -> None:
+        """Override hook to update token using the method name"""
+        self.token = hash_token(self.token, "on_parameter_server_run_loop_checkpoint")
 
-    def on_parameter_server_run_loop(self):
-        pass
+    def on_parameter_server_run_loop(self) -> None:
+        """Override hook to update token using the method name"""
+        self.token = hash_token(self.token, "on_parameter_server_run_loop")
 
-    def on_parameter_server_run_loop_termination(self):
-        pass
+    def on_parameter_server_run_loop_termination(self) -> None:
+        """Override hook to update token using the method name"""
+        self.token = hash_token(self.token, "on_parameter_server_run_loop_termination")
 
-    def on_parameter_server_run_loop_end(self):
-        pass
+    def on_parameter_server_run_loop_end(self) -> None:
+        """Override hook to update token using the method name"""
+        self.token = hash_token(self.token, "on_parameter_server_run_loop_end")
 
     # run hooks
-    def on_parameter_server_run_start(self):
-        pass
+    def on_parameter_server_run_start(self) -> None:
+        """Override hook to update token using the method name"""
+        self.token = hash_token(self.token, "on_parameter_server_run_start")
 
 
 @pytest.fixture
