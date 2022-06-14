@@ -22,14 +22,20 @@ import numpy as np
 import pytest
 from acme import specs
 
-from mava.components.jax import Component
+from mava.components.jax import Component, building
 from mava.components.jax.building import adders
 from mava.components.jax.building.base import SystemInit
 from mava.components.jax.building.environments import EnvironmentSpec
 from mava.specs import DesignSpec, MAEnvironmentSpec
 from mava.systems.jax.system import System
 from mava.utils.wrapper_utils import parameterized_restart
-from tests.jax.mocks import MockOnPolicyDataServer, make_fake_environment_factory
+from tests.jax.mocks import (
+    MockExecutorEnvironmentLoop,
+    MockOnPolicyDataServer,
+    MockReverbDistributor,
+    make_fake_environment_factory,
+    MockLogger,
+)
 
 agents = {"agent_0", "agent_1", "agent_2"}
 obs_first = {agent: np.array([0.0, 1.0]) for agent in agents}
@@ -113,11 +119,13 @@ class TestSystemWithParallelSequenceAdder(System):
         components = DesignSpec(
             environment_spec=EnvironmentSpec,
             system_init=SystemInit,
-            data_server_signature=adders.ParallelSequenceAdderSignature,
-            executor_adder=adders.ParallelSequenceAdder,
-            executor_adder_priority=adders.UniformAdderPriority,
+            data_server_adder_signature=adders.ParallelSequenceAdderSignature,
+            executor_adder=building.ParallelSequenceAdder,
+            adder_priority=adders.UniformAdderPriority,
             data_server=MockOnPolicyDataServer,
-            distributor=MockDistributor,
+            distributor=MockReverbDistributor,
+            logger=MockLogger,
+            executor_environment_loop=MockExecutorEnvironmentLoop,
         )
         return components, {}
 
@@ -137,13 +145,20 @@ def test_adders(
     test_system_parallel_sequence_adder.build(
         environment_factory=make_fake_environment_factory()
     )
-    test_system_parallel_sequence_adder._builder.data_server()
-    test_system_parallel_sequence_adder._builder.store.system_executor = None
-    test_system_parallel_sequence_adder._builder.executor(
-        executor_id="executor", data_server_client=None, parameter_server_client=None
+    test_system_parallel_sequence_adder._builder.data_server()  # to get client
+    # test_system_parallel_sequence_adder._builder.store.system_executor = None
+    test_system_parallel_sequence_adder._builder.executor(  # _builder.store.data_server_client assigned here
+        executor_id="executor",
+        data_server_client=test_system_parallel_sequence_adder._builder.store.system_build[
+            0
+        ],
+        parameter_server_client=None,
     )
     test_system_parallel_sequence_adder._builder.store.adder.add_first(env_restart)
-    test_system_parallel_sequence_adder._builder.store.server.stop()
+    # TODO test add and sample
+    # TODO test padding
+    # TODO test single_process distributor
+    # test_system_parallel_sequence_adder._builder.store.server.stop()
 
 
 # TODO (Kale-ab): test adder behaviour in more detail
