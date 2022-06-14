@@ -56,7 +56,7 @@ class SystemInit(Component):
                 select policies from this sets for each agent at the start of a
                 episode. This sampling is done with replacement so the same policy
                 can be selected for more than one agent for a given episode."""
-                if builder.store.shared_weights:
+                if self.config.shared_weights:
                     raise ValueError(
                         "Shared weights cannot be used with random policy per agent"
                     )
