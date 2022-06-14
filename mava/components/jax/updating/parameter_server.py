@@ -13,14 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Parameter server component for Mava systems."""
+"""Parameter server Component for Mava systems."""
+import abc
 import time
 from dataclasses import dataclass
+from typing import Callable, Optional
 
 import numpy as np
 from acme.jax import savers
 
-from mava.callbacks import Callback
+from mava.components.jax.component import Component
 from mava.core_jax import SystemParameterServer
 
 
@@ -32,12 +34,75 @@ class ParameterServerConfig:
     non_blocking_sleep_seconds: int = 10
 
 
-class DefaultParameterServer(Callback):
+class ParameterServer(Component):
+    @abc.abstractmethod
     def __init__(
         self,
         config: ParameterServerConfig = ParameterServerConfig(),
     ) -> None:
-        """Mock system component."""
+        """Mock system Component."""
+        self.config = config
+
+    @abc.abstractmethod
+    def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
+        """_summary_
+
+        Args:
+            server : _description_
+        """
+        pass
+
+    # Get
+    @abc.abstractmethod
+    def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
+        """_summary_"""
+        pass
+
+    # Set
+    @abc.abstractmethod
+    def on_parameter_server_set_parameters(self, server: SystemParameterServer) -> None:
+        """_summary_"""
+        pass
+
+    # Add
+    @abc.abstractmethod
+    def on_parameter_server_add_to_parameters(
+        self, server: SystemParameterServer
+    ) -> None:
+        """_summary_"""
+        pass
+
+    # Save variables using checkpointer
+    @abc.abstractmethod
+    def on_parameter_server_run_loop(self, server: SystemParameterServer) -> None:
+        """_summary_
+
+        Args:
+            server : _description_
+        """
+        pass
+
+    @staticmethod
+    def name() -> str:
+        """Component type name, e.g. 'dataset' or 'executor'."""
+        return "parameter_server"
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for Component.
+
+        Returns:
+            config class/dataclass for Component.
+        """
+        return ParameterServerConfig
+
+
+class DefaultParameterServer(ParameterServer):
+    def __init__(
+        self,
+        config: ParameterServerConfig = ParameterServerConfig(),
+    ) -> None:
+        """Mock system Component."""
         self.config = config
 
     def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
@@ -152,8 +217,3 @@ class DefaultParameterServer(Callback):
             server.store.system_checkpointer.save()
             server.store.last_checkpoint_time = time.time()
             print("Updated variables checkpoint.")
-
-    @property
-    def name(self) -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
-        return "parameter_server"

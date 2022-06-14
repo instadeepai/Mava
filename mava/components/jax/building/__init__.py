@@ -19,10 +19,14 @@ from mava.components.jax.building.adders import (
     ParallelSequenceAdder,
     ParallelSequenceAdderSignature,
 )
+from mava.components.jax.building.base import SystemInit
 from mava.components.jax.building.data_server import OnPolicyDataServer
 from mava.components.jax.building.datasets import TrajectoryDataset
 from mava.components.jax.building.distributor import Distributor
-from mava.components.jax.building.environments import ParallelExecutorEnvironmentLoop
+from mava.components.jax.building.environments import (
+    EnvironmentSpec,
+    ParallelExecutorEnvironmentLoop,
+)
 from mava.components.jax.building.loggers import Logger
 from mava.components.jax.building.networks import DefaultNetworks
 from mava.components.jax.building.parameter_client import (

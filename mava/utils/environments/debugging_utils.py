@@ -34,6 +34,7 @@ def make_environment(
     render: bool = False,
     return_state_info: bool = False,
     random_seed: Optional[int] = None,
+    recurrent_test: bool = False,
 ) -> dm_env.Environment:
 
     assert action_space == "continuous" or action_space == "discrete"
@@ -50,7 +51,9 @@ def make_environment(
         return environment_fn
     else:
         """Creates a MPE environment."""
-        env_module = make_debugging_env(env_name, action_space, num_agents, random_seed)
+        env_module = make_debugging_env(
+            env_name, action_space, num_agents, recurrent_test, random_seed
+        )
         environment = DebuggingEnvWrapper(
             env_module, return_state_info=return_state_info
         )

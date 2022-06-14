@@ -34,6 +34,11 @@ class MAPPOSystem(System):
         default_params = MAPPODefaultConfig()
 
         # Default system processes
+        # System initialization
+        system_init = DesignSpec(
+            environment_spec=building.EnvironmentSpec, system_init=building.SystemInit
+        ).get()
+
         # Executor
         executor_process = DesignSpec(
             executor_init=executing.ExecutorInit,
@@ -52,7 +57,7 @@ class MAPPOSystem(System):
             epoch_update=training.MAPGEpochUpdate,
             minibatch_update=training.MAPGMinibatchUpdate,
             sgd_step=training.MAPGWithTrustRegionStep,
-            step=training.DefaultStep,
+            step=training.DefaultTrainerStep,
             trainer_dataset=building.TrajectoryDataset,
         ).get()
 
@@ -68,9 +73,11 @@ class MAPPOSystem(System):
             parameter_server=updating.DefaultParameterServer,
             executor_parameter_client=building.ExecutorParameterClient,
             trainer_parameter_client=building.TrainerParameterClient,
+            termination_condition=updating.CountConditionTerminator,
         ).get()
 
         system = DesignSpec(
+            **system_init,
             **data_server_process,
             **parameter_server_process,
             **executor_process,

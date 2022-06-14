@@ -37,12 +37,20 @@ class System(BaseSystem):
         # make config from build
         self._make_config()
 
+        # Enforce that design keys match component names
+        for key, value in self._design.get().items():
+            if key != value.name():
+                raise Exception(
+                    f"Component '{key}' has mismatching name '{value.name()}'"
+                )
+
     def _make_config(self) -> None:
         """Private method to construct system config upon initialisation."""
         for component in self._design.get().values():
-            comp = component()
-            input = {comp.name: comp.config}
-            self.config.add(**input)
+            config_class = component.config_class()
+            if config_class:
+                input = {component.name(): config_class()}
+                self.config.add(**input)
 
     @abc.abstractmethod
     def design(self) -> Tuple[DesignSpec, Dict]:
@@ -64,13 +72,14 @@ class System(BaseSystem):
                 "System already built. Must call .update() on components before the \
                     system has been built."
             )
-        comp = component()
-        name = comp.name
+        name = component.name()
 
         if name in list(self._design.get().keys()):
             self._design.get()[name] = component
-            config_feed = {name: comp.config}
-            self.config.update(**config_feed)
+            config_class = component.config_class()
+            if config_class:
+                config_feed = {name: config_class()}
+                self.config.update(**config_feed)
         else:
             raise Exception(
                 f"The given component ({name}) is not part of the current system.\
@@ -89,8 +98,7 @@ class System(BaseSystem):
                 "System already built. Must call .add() on components before the \
                     system has been built."
             )
-        comp = component()
-        name = comp.name
+        name = component.name()
         if name in list(self._design.get().keys()):
             raise Exception(
                 "The given component is already part of the current system.\
@@ -98,8 +106,10 @@ class System(BaseSystem):
             )
         else:
             self._design.get()[name] = component
-            config_feed = {name: comp.config}
-            self.config.add(**config_feed)
+            config_class = component.config_class()
+            if config_class:
+                config_feed = {name: config_class()}
+                self.config.add(**config_feed)
 
     def build(self, **kwargs: Any) -> None:
         """Configure system hyperparameters."""
@@ -108,7 +118,10 @@ class System(BaseSystem):
             raise Exception("System already built.")
 
         # Add the system defaults, but allow the kwargs to overwrite them.
-        parameter = copy.copy(self._default_params.__dict__)
+        if self._default_params:
+            parameter = copy.copy(self._default_params.__dict__)
+        else:
+            parameter = {}
         parameter.update(kwargs)
 
         self.config.build()

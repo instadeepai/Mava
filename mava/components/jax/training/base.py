@@ -58,14 +58,14 @@ class Loss(Component):
     def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
         """[summary]"""
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_
 
         Returns:
             _description_
         """
-        return "loss_fn"
+        return "loss"
 
 
 class Step(Component):
@@ -73,11 +73,11 @@ class Step(Component):
     def on_training_step_fn(self, trainer: SystemTrainer) -> None:
         """[summary]"""
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """_summary_
 
         Returns:
             _description_
         """
-        return "step_fn"
+        return "sgd_step"

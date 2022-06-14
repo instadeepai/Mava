@@ -15,7 +15,7 @@
 
 """Commonly used distributor components for system builders"""
 from dataclasses import dataclass
-from typing import List, Union
+from typing import Callable, List, Optional, Union
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
@@ -29,6 +29,7 @@ class DistributorConfig:
     nodes_on_gpu: Union[List[str], str] = "trainer"
     run_evaluator: bool = True
     distributor_name: str = "System"
+    terminal: str = "current_terminal"
 
 
 class Distributor(Component):
@@ -52,6 +53,7 @@ class Distributor(Component):
             multi_process=self.config.multi_process,
             nodes_on_gpu=self.config.nodes_on_gpu,
             name=self.config.distributor_name,
+            terminal=self.config.terminal,
         )
 
         # tables node
@@ -106,7 +108,16 @@ class Distributor(Component):
         """
         builder.store.program.launch()
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "distributor"
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return DistributorConfig

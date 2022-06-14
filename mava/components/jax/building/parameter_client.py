@@ -15,7 +15,7 @@
 
 """Parameter client for system builders"""
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -76,9 +76,18 @@ class ExecutorParameterClient(BaseParameterClient):
             get_keys.append(param_key)
 
         count_names, params = self._set_up_count_parameters(params=params)
+
         get_keys.extend(count_names)
 
         builder.store.executor_counts = {name: params[name] for name in count_names}
+
+        set_keys = get_keys.copy()
+
+        # Executors should only be able to update relevant params.
+        if builder.store.is_evaluator is True:
+            set_keys = [x for x in set_keys if x.startswith("evaluator")]
+        else:
+            set_keys = [x for x in set_keys if x.startswith("executor")]
 
         parameter_client = None
         if builder.store.parameter_server_client:
@@ -87,7 +96,7 @@ class ExecutorParameterClient(BaseParameterClient):
                 client=builder.store.parameter_server_client,
                 parameters=params,
                 get_keys=get_keys,
-                set_keys=[],
+                set_keys=set_keys,
                 update_period=self.config.executor_parameter_update_period,
             )
 
@@ -97,10 +106,19 @@ class ExecutorParameterClient(BaseParameterClient):
 
         builder.store.executor_parameter_client = parameter_client
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "executor_parameter_client"
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return ExecutorParameterClientConfig
 
 
 @dataclass
@@ -172,7 +190,7 @@ class TrainerParameterClient(BaseParameterClient):
 
         builder.store.trainer_parameter_client = parameter_client
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "trainer_parameter_client"

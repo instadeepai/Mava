@@ -14,7 +14,9 @@
 # limitations under the License.
 
 """Custom components for MAPPO system."""
+import abc
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from dm_env import specs
@@ -28,7 +30,27 @@ class ExtrasLogProbSpecConfig:
     pass
 
 
-class ExtrasLogProbSpec(Component):
+class ExtrasSpec(Component):
+    @abc.abstractmethod
+    def __init__(self, config: Any) -> None:
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "extras_spec"
+
+
+class ExtrasLogProbSpec(ExtrasSpec):
     def __init__(
         self,
         config: ExtrasLogProbSpecConfig = ExtrasLogProbSpecConfig(),
@@ -56,12 +78,3 @@ class ExtrasLogProbSpec(Component):
         agents = builder.store.environment_spec.get_agent_ids()
         net_spec = {"network_keys": {agent: int_spec for agent in agents}}
         builder.store.extras_spec.update(net_spec)
-
-    @property
-    def name(self) -> str:
-        """_summary_
-
-        Returns:
-            _description_
-        """
-        return "extras_log_prob"

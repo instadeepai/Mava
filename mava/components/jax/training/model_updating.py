@@ -15,8 +15,9 @@
 
 """Trainer components for system updating."""
 
+import abc
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -29,6 +30,26 @@ from mava.components.jax.training import Batch, Utility
 from mava.core_jax import SystemTrainer
 
 
+class MinibatchUpdate(Utility):
+    @abc.abstractmethod
+    def __init__(self, config: Any) -> None:
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "minibatch_update"
+
+
 @dataclass
 class MAPGMinibatchUpdateConfig:
     learning_rate: float = 1e-3
@@ -37,7 +58,7 @@ class MAPGMinibatchUpdateConfig:
     optimizer: Optional[optax_base.GradientTransformation] = (None,)
 
 
-class MAPGMinibatchUpdate(Utility):
+class MAPGMinibatchUpdate(MinibatchUpdate):
     def __init__(
         self,
         config: MAPGMinibatchUpdateConfig = MAPGMinibatchUpdateConfig(),
@@ -114,24 +135,43 @@ class MAPGMinibatchUpdate(Utility):
 
         trainer.store.minibatch_update_fn = model_update_minibatch
 
-    @property
-    def name(self) -> str:
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return MAPGMinibatchUpdateConfig
+
+
+class EpochUpdate(Utility):
+    @abc.abstractmethod
+    def __init__(self, config: Any) -> None:
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    @staticmethod
+    def name() -> str:
         """_summary_
 
         Returns:
             _description_
         """
-        return "minibatch_update_fn"
+        return "epoch_update"
 
 
 @dataclass
 class MAPGEpochUpdateConfig:
     num_epochs: int = 4
     num_minibatches: int = 1
-    batch_size: int = 256
 
 
-class MAPGEpochUpdate(Utility):
+class MAPGEpochUpdate(EpochUpdate):
     def __init__(
         self,
         config: MAPGEpochUpdateConfig = MAPGEpochUpdateConfig(),
@@ -157,8 +197,21 @@ class MAPGEpochUpdate(Utility):
         ]:
             """Performs model updates based on one epoch of data."""
             key, params, opt_states, batch = carry
+
             new_key, subkey = jax.random.split(key)
-            permutation = jax.random.permutation(subkey, self.config.batch_size)
+
+            # TODO (dries): This assert is ugly. Is there a better way to do this check?
+            # Maybe using a tree map of some sort?
+            # shapes = jax.tree_map(
+            #         lambda x: x.shape[0]==trainer.store.full_batch_size, batch
+            #     )
+            # assert ...
+            assert (
+                list(batch.observations.values())[0].observation.shape[0]
+                == trainer.store.full_batch_size
+            )
+
+            permutation = jax.random.permutation(subkey, trainer.store.full_batch_size)
 
             shuffled_batch = jax.tree_map(
                 lambda x: jnp.take(x, permutation, axis=0), batch
@@ -181,11 +234,11 @@ class MAPGEpochUpdate(Utility):
 
         trainer.store.epoch_update_fn = model_update_epoch
 
-    @property
-    def name(self) -> str:
-        """_summary_
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
 
         Returns:
-            _description_
+            config class/dataclass for component.
         """
-        return "epoch_update_fn"
+        return MAPGEpochUpdateConfig

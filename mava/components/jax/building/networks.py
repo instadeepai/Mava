@@ -15,6 +15,7 @@
 
 """Execution components for system builders"""
 
+import abc
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -28,11 +29,30 @@ from mava.core_jax import SystemBuilder
 @dataclass
 class NetworksConfig:
     network_factory: Optional[Callable[[str], dm_env.Environment]] = None
-    shared_weights: bool = True
     seed: int = 1234
 
 
-class DefaultNetworks(Component):
+class Networks(Component):
+    @abc.abstractmethod
+    def __init__(
+        self,
+        config: NetworksConfig = NetworksConfig(),
+    ):
+        """[summary]"""
+        self.config = config
+
+    @abc.abstractmethod
+    def on_building_init_start(self, builder: SystemBuilder) -> None:
+        """Summary"""
+        pass
+
+    @staticmethod
+    def name() -> str:
+        """_summary_"""
+        return "networks"
+
+
+class DefaultNetworks(Networks):
     def __init__(
         self,
         config: NetworksConfig = NetworksConfig(),
@@ -42,10 +62,6 @@ class DefaultNetworks(Component):
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """Summary"""
-
-        # Set the shared weights
-        builder.store.shared_networks = self.config.shared_weights
-
         # Setup the jax key for network initialisations
         builder.store.key = jax.random.PRNGKey(self.config.seed)
 
@@ -57,7 +73,11 @@ class DefaultNetworks(Component):
             rng_key=network_key,
         )
 
-    @property
-    def name(self) -> str:
-        """_summary_"""
-        return "networks"
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return NetworksConfig

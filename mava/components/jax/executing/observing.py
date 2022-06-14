@@ -15,6 +15,7 @@
 
 """Execution components for system builders"""
 
+import abc
 from dataclasses import dataclass
 from typing import Any, Dict
 
@@ -28,7 +29,49 @@ class ExecutorObserveConfig:
     pass
 
 
-class FeedforwardExecutorObserve(Component):
+class ExecutorObserve(Component):
+    @abc.abstractmethod
+    def __init__(self, config: ExecutorObserveConfig = ExecutorObserveConfig()):
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    # Observe first
+    @abc.abstractmethod
+    def on_execution_observe_first(self, executor: SystemExecutor) -> None:
+        """_summary_
+
+        Args:
+            executor : _description_
+        """
+        pass
+
+    # Observe
+    @abc.abstractmethod
+    def on_execution_observe(self, executor: SystemExecutor) -> None:
+        """_summary_
+
+        Args:
+            executor : _description_
+        """
+        pass
+
+    # Update the executor variables.
+    @abc.abstractmethod
+    def on_execution_update(self, executor: SystemExecutor) -> None:
+        """Update the policy variables."""
+        pass
+
+    @staticmethod
+    def name() -> str:
+        """_summary_"""
+        return "executor_observe"
+
+
+class FeedforwardExecutorObserve(ExecutorObserve):
     def __init__(self, config: ExecutorObserveConfig = ExecutorObserveConfig()):
         """_summary_
 
@@ -97,8 +140,3 @@ class FeedforwardExecutorObserve(Component):
         """Update the policy variables."""
         if executor.store.executor_parameter_client:
             executor.store.executor_parameter_client.get_async()
-
-    @property
-    def name(self) -> str:
-        """_summary_"""
-        return "executor_observe"

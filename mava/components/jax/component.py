@@ -16,7 +16,7 @@
 """Base components for system builder"""
 
 import abc
-from typing import Any
+from typing import Any, Callable, Optional
 
 from mava.callbacks import Callback
 
@@ -31,7 +31,17 @@ class Component(Callback):
         """
         self.config = config
 
-    @property
+    @staticmethod
     @abc.abstractmethod
-    def name(self) -> str:
-        """_summary_"""
+    def name() -> str:
+        """Static method that returns component name."""
+        raise NotImplementedError("Name method not implemented for component")
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Optional class which specifies the dataclass/config object for the component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        pass

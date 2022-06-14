@@ -14,10 +14,10 @@
 # limitations under the License.
 
 """Trainer components for gradient step calculations."""
-
+import abc
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -33,14 +33,42 @@ from mava.core_jax import SystemTrainer
 
 
 @dataclass
-class DefaultStepConfig:
+class TrainerStepConfig:
     random_key: int = 42
 
 
-class DefaultStep(Component):
+class TrainerStep(Component):
+    @abc.abstractmethod
     def __init__(
         self,
-        config: DefaultStepConfig = DefaultStepConfig(),
+        config: TrainerStepConfig = TrainerStepConfig(),
+    ):
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    @abc.abstractmethod
+    def on_training_step(self, trainer: SystemTrainer) -> None:
+        """Do a training step and log the results."""
+        pass
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "step"
+
+
+class DefaultTrainerStep(TrainerStep):
+    def __init__(
+        self,
+        config: TrainerStepConfig = TrainerStepConfig(),
     ):
         """_summary_
 
@@ -82,15 +110,6 @@ class DefaultStep(Component):
         # Write to the loggers.
         trainer.store.trainer_logger.write({**results})
 
-    @property
-    def name(self) -> str:
-        """_summary_
-
-        Returns:
-            _description_
-        """
-        return "step"
-
 
 @dataclass
 class MAPGWithTrustRegionStepConfig:
@@ -108,6 +127,12 @@ class MAPGWithTrustRegionStep(Step):
             config : _description_.
         """
         self.config = config
+
+    def on_training_init_start(self, trainer: SystemTrainer) -> None:
+        # Note (dries): Assuming the batch and sequence dimensions are flattened.
+        trainer.store.full_batch_size = trainer.store.sample_batch_size * (
+            trainer.store.sequence_length - 1
+        )
 
     def on_training_step_fn(self, trainer: SystemTrainer) -> None:
         """_summary_"""
@@ -246,6 +271,7 @@ class MAPGWithTrustRegionStep(Step):
             states = TrainingState(
                 params=params, opt_states=opt_states, random_key=random_key
             )
+
             new_states, metrics = sgd_step(states, sample)
 
             # Set the new variables
@@ -271,11 +297,11 @@ class MAPGWithTrustRegionStep(Step):
 
         trainer.store.step_fn = step
 
-    @property
-    def name(self) -> str:
-        """_summary_
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
 
         Returns:
-            _description_
+            config class/dataclass for component.
         """
-        return "step_fn"
+        return MAPGWithTrustRegionStepConfig
