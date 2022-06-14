@@ -41,17 +41,6 @@ class MockExecutorParameterClient:
 
 
 @pytest.fixture
-def dummy_config() -> ExecutorObserveConfig:
-    """Dummy config attribute for FeedforwardExecutorObserve class
-    Returns:
-        ExecutorObserveConfig
-    """
-    config = ExecutorObserveConfig()
-    config.parm = 1
-    return config
-
-
-@pytest.fixture
 def mock_executor_without_adder() -> Executor:
     """Mock executore component without adder"""
     store = SimpleNamespace(is_evaluator=None, observations={}, adder=None)
@@ -151,18 +140,6 @@ def mock_feedforward_executor_observe() -> FeedforwardExecutorObserve:
         FeedforwardExecutorObserve
     """
     return FeedforwardExecutorObserve()
-
-
-# Test initiator
-def test_constructor(dummy_config: ExecutorObserveConfig) -> None:
-    """Test adding config as an attribut
-
-    Args:
-        dummy_config
-    """
-    ff_executor_observe = FeedforwardExecutorObserve(config=dummy_config)
-
-    assert ff_executor_observe.config.parm == dummy_config.parm
 
 
 # Test on_execution_observe_first
