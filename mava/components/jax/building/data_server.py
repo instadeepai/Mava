@@ -280,13 +280,13 @@ class OffPolicyDataServer(DataServer):
         Returns:
             _description_
         """
-        if not hasattr(builder.store, "data_server_sampler"):
+        if not hasattr(builder.store, "sampler_fn"):
             builder.store.sampler_fn = reverb.selectors.Uniform
             warnings.warn(
                 "Sampler has not been expicitly chosen - defaults to uniform sampler."
             )
 
-        if not hasattr(builder.store, "data_server_remover"):
+        if not hasattr(builder.store, "remover_fn"):
             builder.store.remover_fn = reverb.selectors.Fifo
             warnings.warn(
                 "Remover has not been expicitly chosen - defaults to FIFO remover."
