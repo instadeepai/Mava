@@ -32,7 +32,7 @@ from mava.systems.jax import ParameterServer, mappo
 from mava.systems.jax.system import System
 from mava.utils.environments import debugging_utils
 from tests.jax import mocks
-from tests.jax.hashable_hooks import HashableHooks
+from tests.jax.hook_order_tracking import HookOrderTracking
 
 
 class TestSystem(System):
@@ -62,14 +62,14 @@ class TestSystem(System):
         return components, {}
 
 
-class TestParameterServer(HashableHooks, ParameterServer):
+class TestParameterServer(HookOrderTracking, ParameterServer):
     def __init__(
         self,
         config: SimpleNamespace,
         components: List[Callback],
     ) -> None:
         """Initialise the parameter server."""
-        self.reset_token()
+        self.reset_hook_list()
 
         super().__init__(config, components)
 
@@ -169,67 +169,57 @@ def test_step_sleep(test_parameter_server: TestParameterServer) -> None:
 
 def test_init_hook_order(test_parameter_server: TestParameterServer) -> None:
     """Test if init hooks are called in the correct order"""
-    assert test_parameter_server.token == HashableHooks.get_final_token_value(
-        [
-            "on_parameter_server_init_start",
-            "on_parameter_server_init",
-            "on_parameter_server_init_checkpointer",
-            "on_parameter_server_init_end",
-        ]
-    )
+    assert test_parameter_server.hook_list == [
+        "on_parameter_server_init_start",
+        "on_parameter_server_init",
+        "on_parameter_server_init_checkpointer",
+        "on_parameter_server_init_end",
+    ]
 
 
 def test_get_parameters_hook_order(test_parameter_server: TestParameterServer) -> None:
     """Test if get_parameters hooks are called in the correct order"""
-    test_parameter_server.reset_token()
+    test_parameter_server.reset_hook_list()
     test_parameter_server.get_parameters("")
-    assert test_parameter_server.token == HashableHooks.get_final_token_value(
-        [
-            "on_parameter_server_get_parameters_start",
-            "on_parameter_server_get_parameters",
-            "on_parameter_server_get_parameters_end",
-        ]
-    )
+    assert test_parameter_server.hook_list == [
+        "on_parameter_server_get_parameters_start",
+        "on_parameter_server_get_parameters",
+        "on_parameter_server_get_parameters_end",
+    ]
 
 
 def test_set_parameters_hook_order(test_parameter_server: TestParameterServer) -> None:
     """Test if set_parameters hooks are called in the correct order"""
-    test_parameter_server.reset_token()
+    test_parameter_server.reset_hook_list()
     test_parameter_server.set_parameters({})
-    assert test_parameter_server.token == HashableHooks.get_final_token_value(
-        [
-            "on_parameter_server_set_parameters_start",
-            "on_parameter_server_set_parameters",
-            "on_parameter_server_set_parameters_end",
-        ]
-    )
+    assert test_parameter_server.hook_list == [
+        "on_parameter_server_set_parameters_start",
+        "on_parameter_server_set_parameters",
+        "on_parameter_server_set_parameters_end",
+    ]
 
 
 def test_add_to_parameters_hook_order(
     test_parameter_server: TestParameterServer,
 ) -> None:
     """Test if add_to_parameters hooks are called in the correct order"""
-    test_parameter_server.reset_token()
+    test_parameter_server.reset_hook_list()
     test_parameter_server.add_to_parameters({})
-    assert test_parameter_server.token == HashableHooks.get_final_token_value(
-        [
-            "on_parameter_server_add_to_parameters_start",
-            "on_parameter_server_add_to_parameters",
-            "on_parameter_server_add_to_parameters_end",
-        ]
-    )
+    assert test_parameter_server.hook_list == [
+        "on_parameter_server_add_to_parameters_start",
+        "on_parameter_server_add_to_parameters",
+        "on_parameter_server_add_to_parameters_end",
+    ]
 
 
 def test_step_hook_order(test_parameter_server: TestParameterServer) -> None:
     """Test if step hooks are called in the correct order"""
-    test_parameter_server.reset_token()
+    test_parameter_server.reset_hook_list()
     test_parameter_server.step()
-    assert test_parameter_server.token == HashableHooks.get_final_token_value(
-        [
-            "on_parameter_server_run_loop_start",
-            "on_parameter_server_run_loop_checkpoint",
-            "on_parameter_server_run_loop",
-            "on_parameter_server_run_loop_termination",
-            "on_parameter_server_run_loop_end",
-        ]
-    )
+    assert test_parameter_server.hook_list == [
+        "on_parameter_server_run_loop_start",
+        "on_parameter_server_run_loop_checkpoint",
+        "on_parameter_server_run_loop",
+        "on_parameter_server_run_loop_termination",
+        "on_parameter_server_run_loop_end",
+    ]
