@@ -167,8 +167,10 @@ class CentralisedQValueCritic(DecentralisedQValueActorCritic):
         critic_act_specs = {}
         for agent_key in self._agents:
             agent_type = agent_key.split("_")[0]
+            net_key = self._agent_net_keys[agent_key]
+
             # Get observation and action spec for critic.
-            critic_obs_specs[agent_key] = obs_specs_per_type[agent_type]
+            critic_obs_specs[net_key] = obs_specs_per_type[agent_type]
             critic_act_specs[agent_key] = action_specs_per_type[agent_type]
         return critic_obs_specs, critic_act_specs
 

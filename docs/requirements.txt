@@ -1,4 +1,4 @@
-git+https://github.com/instadeepai/Mava#egg=id-mava[tf,envs,reverb,launchpad]
+git+https://github.com/instadeepai/Mava#egg=id-mava[tf,envs,reverb]
 mkdocstrings
 mkdocs-material
 pymdown-extensions
