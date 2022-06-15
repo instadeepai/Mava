@@ -15,34 +15,41 @@
 
 """Tests for FeedforwardExecutorSelectAction class for Jax-based Mava systems"""
 
+from dataclasses import dataclass
 from types import SimpleNamespace
+from typing import Any
 
+import chex
 import jax
 import pytest
+from acme.jax import networks as networks_lib
 from acme.jax import utils
 from acme.types import NestedArray
 
 from mava.components.jax.executing.action_selection import (
-    ExecutorSelectActionConfig,
     FeedforwardExecutorSelectAction,
 )
 from mava.systems.jax.executor import Executor
 
 
+@dataclass
+class DummyExecutorSelectActionConfig:
+    parm_0: int
+
+
 @pytest.fixture
-def dummy_config() -> ExecutorSelectActionConfig:
+def dummy_config() -> DummyExecutorSelectActionConfig:
     """Dummy config attribute for FeedforwardExecutorSelectAction class
 
     Returns:
         ExecutorSelectActionConfig
     """
-    config = ExecutorSelectActionConfig()
-    config.parm_0 = 1
+    config = DummyExecutorSelectActionConfig(parm_0=1)
     return config
 
 
 @pytest.fixture
-def ff_executor_select_action():
+def ff_executor_select_action() -> FeedforwardExecutorSelectAction:
     """Create an object of the class FeedforwardExecutorSelectAction.
 
     Returns:
@@ -58,7 +65,11 @@ def mock_empty_executor() -> Executor:
     return Executor(store=store)
 
 
-def get_action(observation, rng_key, legal_actions):
+def get_action(
+    observation: networks_lib.Observation,
+    rng_key: networks_lib.PRNGKey,
+    legal_actions: chex.Array,
+) -> Any:
     """Function used in the networks.
 
     Returns:
@@ -70,7 +81,7 @@ def get_action(observation, rng_key, legal_actions):
 
 
 class MockExecutor(Executor):
-    def __init__(self):
+    def __init__(self) -> None:
         observations = {
             "agent_0": [0.1, 0.5, 0.7],
             "agent_1": [0.8, 0.3, 0.7],
@@ -112,13 +123,13 @@ class MockExecutor(Executor):
         policy_info = "policy_info_" + str(agent)
         return action_info, policy_info
 
-    def set_agent(self, agent) -> None:
+    def set_agent(self, agent: str) -> None:
         """Update agent, observation
 
         Args:
             agent: the new agent to be in store.agent
         """
-        if not agent in self.store.observations.keys():
+        if agent not in self.store.observations.keys():
             pass
 
         self.store.agent = agent
@@ -132,13 +143,13 @@ def mock_executor() -> Executor:
 
 
 # Test initiator
-def test_constructor(dummy_config: ExecutorSelectActionConfig) -> None:
+def test_constructor(dummy_config: DummyExecutorSelectActionConfig) -> None:
     """Test adding config as an attribute
 
     Args:
         dummy_config
     """
-    ff_executor_select_action = FeedforwardExecutorSelectAction(config=dummy_config)
+    ff_executor_select_action = FeedforwardExecutorSelectAction(config=dummy_config)  # type: ignore # noqa: E501
     assert ff_executor_select_action.config.parm_0 == dummy_config.parm_0
 
 
@@ -188,7 +199,7 @@ def test_on_execution_select_action_compute(
         mock_executor: Executor
     """
     for agent in mock_executor.store.observations.keys():
-        mock_executor.set_agent(agent)
+        mock_executor.set_agent(agent)  # type: ignore
         ff_executor_select_action.on_execution_select_action_compute(
             executor=mock_executor
         )
