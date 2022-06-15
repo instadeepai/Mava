@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from typing import Any, Dict, Sequence, Union
 
 import pytest
@@ -44,5 +45,16 @@ class MockSystemParameterServer(SystemParameterServer):
 def mock_system_parameter_server() -> SystemParameterServer:
     """Pytest fixture for mock system parameter server"""
     mock_system_parameter_server = MockSystemParameterServer()
-    mock_system_parameter_server.store.network_factory = lambda: {}
+
+    mock_system_parameter_server.store.network_factory = lambda: {
+        "net_type_1": {
+            "agent_net_1": SimpleNamespace(params="net_1_1_params"),
+            "agent_net_2": SimpleNamespace(params="net_1_2_params"),
+        },
+        "net_type_2": {
+            "agent_net_1": SimpleNamespace(params="net_2_1_params"),
+            "agent_net_2": SimpleNamespace(params="net_2_2_params"),
+        },
+    }
+
     return mock_system_parameter_server
