@@ -26,27 +26,33 @@ _metadata = import_util.module_from_spec(spec)  # type: ignore
 spec.loader.exec_module(_metadata)  # type: ignore
 
 reverb_requirements = [
-    "dm-reverb~=0.6.1",
-    "jax",
-    "jaxlib",
+    "dm-reverb~=0.7.2",
 ]
 
 tf_requirements = [
-    "tensorflow~=2.7.0",
+    "tensorflow~=2.8.0",
     "tensorflow_probability~=0.15.0",
     "dm-sonnet",
     "trfl",
 ]
 
+jax_requirements = [
+    "chex",
+    "jax",
+    "jaxlib",
+    "dm-haiku",
+    "flax",
+    "optax",
+    "rlax",
+] + tf_requirements
+
 pettingzoo_requirements = [
-    "pettingzoo~=1.13.1",
+    "pettingzoo~=1.17.0",
     "multi_agent_ale_py",
-    "supersuit==3.3.1",
+    "supersuit==3.3.4",
     "pygame",
     "pysc2",
 ]
-
-launchpad_requirements = ["dm-launchpad~=0.3.2"]
 
 smac_requirements = ["pysc2", "SMAC @ git+https://github.com/oxwhirl/smac.git"]
 testing_formatting_requirements = [
@@ -55,7 +61,7 @@ testing_formatting_requirements = [
     "mypy==0.941",
     "pytest-xdist",
     "flake8==3.8.2",
-    "black==21.4b1",
+    "black==22.3.0",
     "pytest-cov",
     "interrogate",
     "pydocstyle",
@@ -94,7 +100,7 @@ setup(
     keywords="multi-agent reinforcement-learning python machine learning",
     packages=find_packages(),
     install_requires=[
-        "dm-acme~=0.2.4",
+        "dm-acme~=0.4.0",
         "chex",
         "absl-py",
         "dm_env",
@@ -112,11 +118,11 @@ setup(
         "flatland": flatland_requirements,
         "open_spiel": open_spiel_requirements,
         "reverb": reverb_requirements,
-        "launchpad": launchpad_requirements,
         "testing_formatting": testing_formatting_requirements,
         "record_episode": record_episode_requirements,
         "sc2": smac_requirements,
         "envs": pettingzoo_requirements + open_spiel_requirements + smac_requirements,
+        "jax": jax_requirements,
     },
     classifiers=[
         "Development Status :: 3 - Alpha",
