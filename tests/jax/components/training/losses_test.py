@@ -15,41 +15,61 @@ from mava.systems.jax.trainer import Trainer
 
 
 class mock_net:
+    """Creates a mock network for loss function"""
+
     def apply(
         observation: jnp.array, rng_key: jnp.array
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
-        """Function used in the networks.
-
-        Returns:
-            action_info and policy info
-        """
+        """Mock function to apply the network to training data"""
         return jnp.array([-1.7, -1.7, -1.7, -1.7, -1.7]), jnp.array(
             [-1.7, -1.7, -1.7, -1.7, -1.7]
         )
 
 
 def log_prob(distribution_params: jnp.array, actions: jnp.array) -> jnp.ndarray:
-    """Function used in the networks.
+    """Mock function to return fixed log probs"""
 
-    Returns:
-        action_info and policy info
-    """
+    log_probs = jnp.array([-1.7, -1.7, -1.7, -1.7, -1.7])
 
-    actions = jnp.array([-1.7, -1.7, -1.7, -1.7, -1.7])
-
-    return actions
+    return log_probs
 
 
 def entropy(distribution_params: jnp.array) -> jnp.ndarray:
-    """Function used in the networks.
+    """Mock function to return fixed entropy"""
 
-    Returns:
-        action_info and policy info
-    """
+    entropy = jnp.array([-1.7, -1.7, -1.7, -1.7, -1.7])
 
+    return entropy
+
+
+def mock_actions() -> Dict[str, jnp.ndarray]:
+    """Returns set of mock actions"""
+    actions = jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])
+    return {"agent_0": actions, "agent_1": actions, "agent_2": actions}
+
+
+def mock_behaviour_log_probs() -> Dict[str, jnp.ndarray]:
+    """Returns set of mock_behaviour_log_probs"""
     actions = jnp.array([-1.7, -1.7, -1.7, -1.7, -1.7])
+    return {"agent_0": actions, "agent_1": actions, "agent_2": actions}
 
-    return actions
+
+def mock_target_values() -> Dict[str, jnp.ndarray]:
+    """Returns set of mock_target_values"""
+    actions = jnp.array([3.0, 3.0, 3.0, 3.0, 3.0])
+    return {"agent_0": actions, "agent_1": actions, "agent_2": actions}
+
+
+def mock_advantages() -> Dict[str, jnp.ndarray]:
+    """Returns set of mock_advantages"""
+    actions = jnp.array([2.0, 2.0, 2.0, 2.0, 2.0])
+    return {"agent_0": actions, "agent_1": actions, "agent_2": actions}
+
+
+def mock_behavior_values() -> Dict[str, jnp.ndarray]:
+    """Returns set of mock_behavior_values"""
+    actions = jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])
+    return {"agent_0": actions, "agent_1": actions, "agent_2": actions}
 
 
 @pytest.fixture
@@ -154,36 +174,6 @@ def test_mapg_config_creation() -> None:
     assert isinstance(mapg_config.value_cost, float)
 
 
-def mock_actions() -> Dict[str, jnp.ndarray]:
-    """Test whether mapg loss config variables are of correct type"""
-    actions = jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])
-    return {"agent_0": actions, "agent_1": actions, "agent_2": actions}
-
-
-def mock_behaviour_log_probs() -> Dict[str, jnp.ndarray]:
-    """Test whether mapg loss config variables are of correct type"""
-    actions = jnp.array([-1.7, -1.7, -1.7, -1.7, -1.7])
-    return {"agent_0": actions, "agent_1": actions, "agent_2": actions}
-
-
-def mock_target_values() -> Dict[str, jnp.ndarray]:
-    """Test whether mapg loss config variables are of correct type"""
-    actions = jnp.array([3.0, 3.0, 3.0, 3.0, 3.0])
-    return {"agent_0": actions, "agent_1": actions, "agent_2": actions}
-
-
-def mock_advantages() -> Dict[str, jnp.ndarray]:
-    """Test whether mapg loss config variables are of correct type"""
-    actions = jnp.array([2.0, 2.0, 2.0, 2.0, 2.0])
-    return {"agent_0": actions, "agent_1": actions, "agent_2": actions}
-
-
-def mock_behavior_values() -> Dict[str, jnp.ndarray]:
-    """Test whether mapg loss config variables are of correct type"""
-    actions = jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])
-    return {"agent_0": actions, "agent_1": actions, "agent_2": actions}
-
-
 def test_mapg_loss(
     mock_trainer: Trainer,
     mapg_trust_region_clipping_loss: MAPGWithTrustRegionClippingLoss,
@@ -198,7 +188,7 @@ def test_mapg_loss(
     advantages = mock_advantages()
     behavior_values = mock_behavior_values()
 
-    grads, loss_info = grad_fn(
+    _, loss_info = grad_fn(
         params=mock_trainer.store.parameters,
         observations=mock_trainer.store.observations,
         actions=actions,
@@ -208,6 +198,13 @@ def test_mapg_loss(
         behavior_values=behavior_values,
     )
 
-    print(grads)
-    print(loss_info)
-    mapg_trust_region_clipping_loss.on_training_loss_fns
+    agent_0_loss = loss_info["agent_0"]
+    loss_entropy = agent_0_loss["loss_entropy"]
+    loss_policy = agent_0_loss["loss_policy"]
+    loss_total = agent_0_loss["loss_total"]
+    loss_value = agent_0_loss["loss_value"]
+
+    assert loss_entropy == 1.7
+    assert loss_policy == -2.0
+    assert loss_total == 9.062
+    assert loss_value == 22.09
