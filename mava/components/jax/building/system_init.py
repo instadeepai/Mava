@@ -134,10 +134,8 @@ class RandomSamplingSystemInit(Component):
         }
 
         builder.store.network_sampling_setup = [
-            [
-                [builder.store.agent_net_keys[key]]
-                for key in sort_str_num(builder.store.agent_net_keys.keys())
-            ]
+            [builder.store.agent_net_keys[key]]
+            for key in sort_str_num(builder.store.agent_net_keys.keys())
         ]
 
         # Check that the environment and agent_net_keys has the same amount of agents
