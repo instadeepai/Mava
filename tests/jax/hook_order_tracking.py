@@ -13,7 +13,7 @@ class HookOrderTracking:
     """
 
     def reset_hook_list(self) -> None:
-        """Reset token to initial value"""
+        """Reset called hook list to be empty"""
         self.hook_list: List[str] = []
 
     ######################
