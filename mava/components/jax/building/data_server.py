@@ -16,7 +16,6 @@
 """Commonly used replay table components for system builders"""
 import abc
 import copy
-import warnings
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
@@ -100,152 +99,6 @@ class DataServer(Component):
 
 
 @dataclass
-class SamplerConfig:
-    pass
-
-
-class Sampler(Component):
-    def __init__(
-        self,
-        config: SamplerConfig = SamplerConfig(),
-    ):
-        """_summary_
-
-        Args:
-            config : _description_.
-        """
-        self.config = config
-
-    @abc.abstractmethod
-    def on_building_data_server_start(self, builder: SystemBuilder) -> None:
-        """_summary_"""
-
-    @staticmethod
-    def name() -> str:
-        """_summary_
-
-        Returns:
-            _description_
-        """
-        return "data_server_sampler"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return SamplerConfig
-
-
-class UniformSampler(Sampler):
-    def on_building_data_server_start(self, builder: SystemBuilder) -> None:
-        """_summary_"""
-
-        def sampler_fn() -> reverb.selectors:
-            return reverb.selectors.Uniform()
-
-        builder.store.sampler_fn = sampler_fn
-
-
-@dataclass
-class PrioritySamplerConfig:
-    priority_exponent: float = 1.0
-
-
-class PrioritySampler(Sampler):
-    def __init__(
-        self,
-        config: PrioritySamplerConfig = PrioritySamplerConfig(),
-    ):
-        """_summary_
-
-        Args:
-            config : _description_.
-        """
-        self.config = config
-
-    def on_building_data_server_start(self, builder: SystemBuilder) -> None:
-        """_summary_"""
-        builder.store.priority_exponent = self.config.priority_exponent
-
-        def sampler_fn() -> reverb.selectors:
-            return reverb.selectors.Prioritized(self.config.priority_exponent)
-
-        builder.store.sampler_fn = sampler_fn
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return PrioritySamplerConfig
-
-
-@dataclass
-class RemoverConfig:
-    pass
-
-
-class Remover(Component):
-    def __init__(
-        self,
-        config: RemoverConfig = RemoverConfig(),
-    ):
-        """_summary_
-
-        Args:
-            config : _description_.
-        """
-        self.config = config
-
-    @abc.abstractmethod
-    def on_building_data_server_start(self, builder: SystemBuilder) -> None:
-        """_summary_"""
-
-    @staticmethod
-    def name() -> str:
-        """_summary_
-
-        Returns:
-            _description_
-        """
-        return "data_server_remover"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return RemoverConfig
-
-
-class FIFORemover(Remover):
-    def on_building_data_server_start(self, builder: SystemBuilder) -> None:
-        """_summary_"""
-
-        def remover_fn() -> reverb.selectors:
-            return reverb.selectors.Fifo()
-
-        builder.store.remover_fn = remover_fn
-
-
-class LIFORemover(Remover):
-    def on_building_data_server_start(self, builder: SystemBuilder) -> None:
-        """_summary_"""
-
-        def remover_fn() -> reverb.selectors:
-            return reverb.selectors.Lifo()
-
-        builder.store.remover_fn = remover_fn
-
-
-@dataclass
 class OffPolicyDataServerConfig:
     max_size: int = 100000
     max_times_sampled: int = 0
@@ -280,17 +133,6 @@ class OffPolicyDataServer(DataServer):
         Returns:
             _description_
         """
-        if not hasattr(builder.store, "sampler_fn"):
-            builder.store.sampler_fn = reverb.selectors.Uniform
-            warnings.warn(
-                "Sampler has not been expicitly chosen - defaults to uniform sampler."
-            )
-
-        if not hasattr(builder.store, "remover_fn"):
-            builder.store.remover_fn = reverb.selectors.Fifo
-            warnings.warn(
-                "Remover has not been expicitly chosen - defaults to FIFO remover."
-            )
 
         table = reverb.Table(
             name=table_key,
