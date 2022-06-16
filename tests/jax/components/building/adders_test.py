@@ -16,62 +16,32 @@
 """Tests for config class for Jax-based Mava systems"""
 
 from types import SimpleNamespace
-from typing import Callable, Dict, List, Optional, Tuple
 
-import numpy as np
-from mava.components.jax.executing.base import ExecutorInit
 import pytest
-from acme import specs
+
+from mava.adders import reverb as reverb_adders
 from mava.components.jax.building.adders import (
     ParallelSequenceAdder,
-    ParallelTransitionAdder,
     ParallelSequenceAdderConfig,
+    ParallelSequenceAdderSignature,
+    ParallelTransitionAdder,
     ParallelTransitionAdderConfig,
     ParallelTransitionAdderSignature,
-    ParallelSequenceAdderSignature,
     UniformAdderPriority,
 )
-from mava.adders import reverb as reverb_adders
-from mava.components.jax import Component, building
-from mava.components.jax.building import adders
-from mava.components.jax.building.base import SystemInit
-from mava.components.jax.building.environments import EnvironmentSpec
-from mava.specs import DesignSpec, MAEnvironmentSpec
-from mava.systems.jax.system import System
-from mava.utils.wrapper_utils import parameterized_restart
-from tests.jax.mocks import (
-    MockExecutorEnvironmentLoop,
-    MockOnPolicyDataServer,
-    MockDataServer,
-    MockDistributor,
-    MockLogger,
-)
 from mava.systems.jax.builder import Builder
-
-
-def make_fake_env_specs() -> MAEnvironmentSpec:
-    """_summary_
-
-    Returns:
-        _description_
-    """
-
-
-@pytest.fixture
-def test_system_parallel_sequence_adder() -> System:
-    """Dummy system with zero components."""
-    return TestSystemWithParallelSequenceAdder()
+from tests.jax.mocks import MockDataServer
 
 
 @pytest.fixture
 def mock_builder() -> Builder:
     """Mock builder component.
+
     Returns:
-        Builder
+        System builder with no components.
     """
     builder = Builder(components=[])
     # store
-    adder = "paralleladder"
     store = SimpleNamespace(
         table_network_config={"table_0": "network_0"},
         unique_net_keys=["network_0"],
@@ -83,43 +53,59 @@ def mock_builder() -> Builder:
 
 @pytest.fixture
 def parallel_sequence_adder() -> ParallelSequenceAdder:
-    """Creates an MAPG loss fixture with trust region and clipping"""
+    """Creates a parallel sequence adder fixture with config
+
+    Returns:
+        ParallelSequenceAdder with ParallelSequenceAdderConfig.
+    """
 
     adder = ParallelSequenceAdder(config=ParallelSequenceAdderConfig())
-
     return adder
 
 
 @pytest.fixture
 def parallel_transition_adder() -> ParallelTransitionAdder:
-    """Creates an MAPG loss fixture with trust region and clipping"""
+    """Creates a parallel transition adder fixture with config
+
+    Returns:
+        ParallelTransitionAdder with ParallelTransitionAdderConfig.
+    """
 
     adder = ParallelTransitionAdder(config=ParallelTransitionAdderConfig())
-
     return adder
 
 
 @pytest.fixture
 def parallel_sequence_adder_signature() -> ParallelSequenceAdderSignature:
-    """Creates an MAPG loss fixture with trust region and clipping"""
+    """Creates a paralell sequence signature fixture
+
+    Returns:
+        ParallelSequenceAdderSignature.
+    """
 
     signature = ParallelSequenceAdderSignature()
-
     return signature
 
 
 @pytest.fixture
 def parallel_transition_adder_signature() -> ParallelTransitionAdderSignature:
-    """Creates an MAPG loss fixture with trust region and clipping"""
+    """Creates a paralell transition adder signature fixture
+
+    Returns:
+        ParallelTransitionAdderSignature.
+    """
 
     signature = ParallelTransitionAdderSignature()
-
     return signature
 
 
 @pytest.fixture
 def uniform_priority() -> UniformAdderPriority:
-    """Creates an MAPG loss fixture with trust region and clipping"""
+    """Creates a uniform adder priority fixture
+
+    Returns:
+        UniformAdderPriority.
+    """
 
     priority = UniformAdderPriority()
 
@@ -130,6 +116,16 @@ def test_sequence_adders(
     mock_builder: Builder,
     parallel_sequence_adder: ParallelSequenceAdder,
 ) -> None:
+    """Test sequence adder callbacks.
+
+    Args:
+        mock_builder: Fixture SystemBuilder.
+        parallel_sequence_adder: Fixture ParallelSequenceAdder.
+
+    Returns:
+        None
+    """
+
     parallel_sequence_adder.on_building_init_start(builder=mock_builder)
     assert (
         mock_builder.store.sequence_length
@@ -143,6 +139,15 @@ def test_sequence_adders_signature(
     mock_builder: Builder,
     parallel_sequence_adder_signature: ParallelSequenceAdderSignature,
 ) -> None:
+    """Test sequence adder signature callback.
+
+    Args:
+        mock_builder: Fixture SystemBuilder.
+        parallel_sequence_adder_signature: Fixture ParallelSequenceAdderSignature.
+
+    Returns:
+        None
+    """
     parallel_sequence_adder_signature.on_building_data_server_adder_signature(
         builder=mock_builder
     )
@@ -153,6 +158,15 @@ def test_transition_adders(
     mock_builder: Builder,
     parallel_transition_adder: ParallelTransitionAdder,
 ) -> None:
+    """Test transition adder callback
+
+    Args:
+        mock_builder: Fixture SystemBuilder.
+        parallel_transition_adder: Fixture ParallelTransitionAdder.
+
+    Returns:
+        None
+    """
     parallel_transition_adder.on_building_executor_adder(builder=mock_builder)
     assert type(mock_builder.store.adder) == reverb_adders.ParallelNStepTransitionAdder
 
@@ -161,6 +175,15 @@ def test_transition_adders_signature(
     mock_builder: Builder,
     parallel_transition_adder_signature: ParallelTransitionAdderSignature,
 ) -> None:
+    """Test transition adder signature callback
+
+    Args:
+        mock_builder: Fixture SystemBuilder.
+        parallel_transition_adder_signature: Fixture ParallelTransitionAdderSignature.
+
+    Returns:
+        None
+    """
     parallel_transition_adder_signature.on_building_data_server_adder_signature(
         builder=mock_builder
     )
@@ -171,9 +194,14 @@ def test_uniform_priority(
     mock_builder: Builder,
     uniform_priority: UniformAdderPriority,
 ) -> None:
+    """Test uniform priority callback
+
+    Args:
+        mock_builder: Fixture SystemBuilder.
+        uniform_priority: Fixture UniformAdderPriority.
+
+    Returns:
+        None
+    """
     uniform_priority.on_building_executor_adder_priority(builder=mock_builder)
     assert mock_builder.store.priority_fns
-
-
-# TEST SIGNATURES
-# TODO (Kale-ab): test adder behaviour in more detail
