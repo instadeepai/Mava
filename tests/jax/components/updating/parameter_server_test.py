@@ -74,6 +74,7 @@ def server() -> SystemParameterServer:
 
 @pytest.fixture
 def test_default_parameter_server() -> DefaultParameterServer:
+    """Pytest fixture for default parameter server"""
     config = ParameterServerConfig(non_blocking_sleep_seconds=15)
     return DefaultParameterServer(config)
 
@@ -81,6 +82,7 @@ def test_default_parameter_server() -> DefaultParameterServer:
 def test_on_parameter_server_init_start_parameter_creation(
     test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
 ) -> None:
+    """Test that parameters are correctly assigned to the store"""
     # Delete existing parameters from store, since following method will create them
     delattr(server.store, "parameters")
     test_default_parameter_server.on_parameter_server_init_start(server)
@@ -117,6 +119,7 @@ def test_on_parameter_server_init_start_parameter_creation(
 def test_on_parameter_server_init_start_no_checkpointer(
     test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
 ) -> None:
+    """Test init when no checkpointing specified"""
     test_default_parameter_server.config.checkpoint = False
     test_default_parameter_server.on_parameter_server_init_start(server)
 
@@ -126,6 +129,7 @@ def test_on_parameter_server_init_start_no_checkpointer(
 def test_on_parameter_server_init_start_create_checkpointer(
     test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
 ) -> None:
+    """Test init when checkpointer should be created"""
     test_default_parameter_server.config.checkpoint = True
     test_default_parameter_server.on_parameter_server_init_start(server)
 
@@ -174,7 +178,7 @@ def test_on_parameter_server_set_parameters(
 def test_on_parameter_server_add_to_parameters(
     test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
 ) -> None:
-    server.store.parameters['param3'] = 4
+    server.store.parameters["param3"] = 4
     server.store._add_to_params = {
         "param1": "_param1_add",
         "param3": 2,
@@ -193,19 +197,25 @@ def test_on_parameter_server_run_loop(
     server.store.last_checkpoint_time = 0
 
     # Do nothing if no checkpointer
-    server.store.system_checkpointer = None
-    assert server.store.last_checkpoint_time\
-           + test_default_parameter_server.config.checkpoint_minute_interval * 60 + 1 < time.time()
+    test_default_parameter_server.config.checkpoint = False
+    assert (
+        server.store.last_checkpoint_time
+        + test_default_parameter_server.config.checkpoint_minute_interval * 60
+        + 1
+        < time.time()
+    )
     test_default_parameter_server.on_parameter_server_run_loop(server)
     assert server.store.last_checkpoint_time == 0
 
     class DummyCheckpointer:
-        def __init__(self):
+        def __init__(self) -> None:
             self.called = False
 
-        def save(self):
+        def save(self) -> None:
             self.called = True
+
     server.store.system_checkpointer = DummyCheckpointer()
+    test_default_parameter_server.config.checkpoint = True
 
     # Checkpoint if past time
     test_default_parameter_server.on_parameter_server_run_loop(server)
