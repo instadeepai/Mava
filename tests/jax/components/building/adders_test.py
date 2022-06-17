@@ -21,6 +21,8 @@ import pytest
 
 from mava.adders import reverb as reverb_adders
 from mava.components.jax.building.adders import (
+    AdderPriorityConfig,
+    AdderSignatureConfig,
     ParallelSequenceAdder,
     ParallelSequenceAdderConfig,
     ParallelSequenceAdderSignature,
@@ -108,7 +110,6 @@ def uniform_priority() -> UniformAdderPriority:
     """
 
     priority = UniformAdderPriority()
-
     return priority
 
 
@@ -133,6 +134,7 @@ def test_sequence_adders(
     )
     parallel_sequence_adder.on_building_executor_adder(builder=mock_builder)
     assert type(mock_builder.store.adder) == reverb_adders.ParallelSequenceAdder
+    assert parallel_sequence_adder.name() == "executor_adder"
 
 
 def test_sequence_adders_signature(
@@ -151,7 +153,12 @@ def test_sequence_adders_signature(
     parallel_sequence_adder_signature.on_building_data_server_adder_signature(
         builder=mock_builder
     )
-    assert mock_builder.store.adder_signature_fn
+    assert mock_builder.store.adder_signature_fn is not None
+    assert parallel_sequence_adder_signature.name() == "data_server_adder_signature"
+    assert issubclass(
+        parallel_sequence_adder_signature.config_class(),  # type: ignore
+        AdderSignatureConfig,
+    )
 
 
 def test_transition_adders(
@@ -169,6 +176,7 @@ def test_transition_adders(
     """
     parallel_transition_adder.on_building_executor_adder(builder=mock_builder)
     assert type(mock_builder.store.adder) == reverb_adders.ParallelNStepTransitionAdder
+    assert parallel_transition_adder.name() == "executor_adder"
 
 
 def test_transition_adders_signature(
@@ -188,6 +196,11 @@ def test_transition_adders_signature(
         builder=mock_builder
     )
     assert mock_builder.store.adder_signature_fn
+    assert parallel_transition_adder_signature.name() == "data_server_adder_signature"
+    assert issubclass(
+        parallel_transition_adder_signature.config_class(),  # type: ignore
+        AdderSignatureConfig,
+    )
 
 
 def test_uniform_priority(
@@ -205,3 +218,8 @@ def test_uniform_priority(
     """
     uniform_priority.on_building_executor_adder_priority(builder=mock_builder)
     assert mock_builder.store.priority_fns
+    uniform_priority.on_building_executor_adder_priority(builder=mock_builder)
+    assert uniform_priority.name() == "adder_priority"
+    assert issubclass(
+        uniform_priority.config_class(), AdderPriorityConfig  # type: ignore
+    )
