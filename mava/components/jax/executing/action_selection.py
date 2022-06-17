@@ -34,14 +34,14 @@ class ExecutorSelectAction(Component):
     @abc.abstractmethod
     def __init__(
         self,
-        config: ExecutorSelectActionConfig = ExecutorSelectActionConfig(),
+        local_config: ExecutorSelectActionConfig = ExecutorSelectActionConfig(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     # Select actions
     @abc.abstractmethod
@@ -68,14 +68,14 @@ class ExecutorSelectAction(Component):
 class FeedforwardExecutorSelectAction(ExecutorSelectAction):
     def __init__(
         self,
-        config: ExecutorSelectActionConfig = ExecutorSelectActionConfig(),
+        local_config: ExecutorSelectActionConfig = ExecutorSelectActionConfig(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     # Select actions
     def on_execution_select_actions(self, executor: SystemExecutor) -> None:

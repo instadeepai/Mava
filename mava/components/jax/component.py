@@ -16,6 +16,7 @@
 """Base components for system builder"""
 
 import abc
+from types import SimpleNamespace
 from typing import Any, Callable, Optional
 
 from mava.callbacks import Callback
@@ -23,13 +24,15 @@ from mava.callbacks import Callback
 
 class Component(Callback):
     @abc.abstractmethod
-    def __init__(self, config: Any) -> None:
+    def __init__(self, local_config: SimpleNamespace, global_config: SimpleNamespace) -> None:
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : Config for this specific component, with type "config_class()".
+            global_config : Namespace containing config for all components.
         """
-        self.config = config
+        self.local_config = local_config
+        self.global_config = global_config
 
     @staticmethod
     @abc.abstractmethod

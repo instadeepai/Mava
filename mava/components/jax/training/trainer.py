@@ -32,13 +32,13 @@ class TrainerInitConfig:
 
 
 class TrainerInit(Component):
-    def __init__(self, config: TrainerInitConfig = TrainerInitConfig()):
+    def __init__(self, local_config: TrainerInitConfig = TrainerInitConfig()):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """_summary_

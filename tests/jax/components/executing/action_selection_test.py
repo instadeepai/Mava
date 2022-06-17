@@ -138,7 +138,7 @@ def test_constructor(dummy_config: ExecutorSelectActionConfig) -> None:
     Args:
         dummy_config
     """
-    ff_executor_select_action = FeedforwardExecutorSelectAction(config=dummy_config)
+    ff_executor_select_action = FeedforwardExecutorSelectAction(local_config=dummy_config)
     assert ff_executor_select_action.config.parm_0 == dummy_config.parm_0
 
 

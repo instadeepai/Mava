@@ -41,14 +41,14 @@ class TrainerStep(Component):
     @abc.abstractmethod
     def __init__(
         self,
-        config: TrainerStepConfig = TrainerStepConfig(),
+        local_config: TrainerStepConfig = TrainerStepConfig(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     @abc.abstractmethod
     def on_training_step(self, trainer: SystemTrainer) -> None:
@@ -68,14 +68,14 @@ class TrainerStep(Component):
 class DefaultTrainerStep(TrainerStep):
     def __init__(
         self,
-        config: TrainerStepConfig = TrainerStepConfig(),
+        local_config: TrainerStepConfig = TrainerStepConfig(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     def on_training_step(self, trainer: SystemTrainer) -> None:
         """Does a step of SGD and logs the results."""
@@ -119,14 +119,14 @@ class MAPGWithTrustRegionStepConfig:
 class MAPGWithTrustRegionStep(Step):
     def __init__(
         self,
-        config: MAPGWithTrustRegionStepConfig = MAPGWithTrustRegionStepConfig(),
+        local_config: MAPGWithTrustRegionStepConfig = MAPGWithTrustRegionStepConfig(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     def on_training_init_start(self, trainer: SystemTrainer) -> None:
         # Note (dries): Assuming the batch and sequence dimensions are flattened.

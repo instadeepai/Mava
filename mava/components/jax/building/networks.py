@@ -17,6 +17,7 @@
 
 import abc
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Callable, Optional
 
 import dm_env
@@ -36,10 +37,12 @@ class Networks(Component):
     @abc.abstractmethod
     def __init__(
         self,
-        config: NetworksConfig = NetworksConfig(),
+        local_config: NetworksConfig = NetworksConfig(),
+        global_config: SimpleNamespace = SimpleNamespace(),
     ):
         """[summary]"""
-        self.config = config
+        self.local_config = local_config
+        self.global_config = global_config
 
     @abc.abstractmethod
     def on_building_init_start(self, builder: SystemBuilder) -> None:
@@ -55,19 +58,21 @@ class Networks(Component):
 class DefaultNetworks(Networks):
     def __init__(
         self,
-        config: NetworksConfig = NetworksConfig(),
+        local_config: NetworksConfig = NetworksConfig(),
+        global_config: SimpleNamespace = SimpleNamespace(),
     ):
         """[summary]"""
-        self.config = config
+        self.local_config = local_config
+        self.global_config = global_config
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """Summary"""
         # Setup the jax key for network initialisations
-        builder.store.key = jax.random.PRNGKey(self.config.seed)
+        builder.store.key = jax.random.PRNGKey(self.local_config.seed)
 
         # Build network function here
         network_key, builder.store.key = jax.random.split(builder.store.key)
-        builder.store.network_factory = lambda: self.config.network_factory(
+        builder.store.network_factory = lambda: self.local_config.network_factory(
             environment_spec=builder.store.environment_spec,
             agent_net_keys=builder.store.agent_net_keys,
             rng_key=network_key,

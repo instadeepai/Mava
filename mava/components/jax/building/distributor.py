@@ -15,6 +15,7 @@
 
 """Commonly used distributor components for system builders"""
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Callable, List, Optional, Union
 
 from mava.components.jax import Component
@@ -33,15 +34,20 @@ class DistributorConfig:
 
 
 class Distributor(Component):
-    def __init__(self, config: DistributorConfig = DistributorConfig()):
+    def __init__(self,
+                 local_config: DistributorConfig = DistributorConfig(),
+                 global_config: SimpleNamespace = SimpleNamespace(),
+                 ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
+            global_config : _description_.
         """
-        if isinstance(config.nodes_on_gpu, str):
-            config.nodes_on_gpu = [config.nodes_on_gpu]
-        self.config = config
+        if isinstance(local_config.nodes_on_gpu, str):
+            local_config.nodes_on_gpu = [local_config.nodes_on_gpu]
+        self.local_config = local_config
+        self.global_config = global_config
 
     def on_building_program_nodes(self, builder: SystemBuilder) -> None:
         """_summary_
@@ -50,10 +56,10 @@ class Distributor(Component):
             builder : _description_
         """
         builder.store.program = Launcher(
-            multi_process=self.config.multi_process,
-            nodes_on_gpu=self.config.nodes_on_gpu,
-            name=self.config.distributor_name,
-            terminal=self.config.terminal,
+            multi_process=self.local_config.multi_process,
+            nodes_on_gpu=self.local_config.nodes_on_gpu,
+            name=self.local_config.distributor_name,
+            terminal=self.local_config.terminal,
         )
 
         # tables node
@@ -71,7 +77,7 @@ class Distributor(Component):
         )
 
         # executor nodes
-        for executor_id in range(self.config.num_executors):
+        for executor_id in range(self.local_config.num_executors):
             builder.store.program.add(
                 builder.executor,
                 [f"executor_{executor_id}", data_server, parameter_server],
@@ -79,7 +85,7 @@ class Distributor(Component):
                 name="executor",
             )
 
-        if self.config.run_evaluator:
+        if self.local_config.run_evaluator:
             # evaluator node
             builder.store.program.add(
                 builder.executor,
@@ -97,7 +103,7 @@ class Distributor(Component):
                 name="trainer",
             )
 
-        if not self.config.multi_process:
+        if not self.local_config.multi_process:
             builder.store.system_build = builder.store.program.get_nodes()
 
     def on_building_launch(self, builder: SystemBuilder) -> None:

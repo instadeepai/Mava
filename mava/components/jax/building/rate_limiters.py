@@ -16,6 +16,7 @@
 """Commonly used rate limiter components for system builders"""
 import abc
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Callable, Optional
 
 import reverb
@@ -32,9 +33,13 @@ class RateLimiterConfig:
 
 
 class RateLimiter(Component):
-    def __init__(self, config: RateLimiterConfig = RateLimiterConfig()) -> None:
+    def __init__(self,
+                 local_config: RateLimiterConfig = RateLimiterConfig(),
+                 global_config: SimpleNamespace = SimpleNamespace(),
+                 ) -> None:
         """[summary]"""
-        self.config = config
+        self.local_config = local_config
+        self.global_config = global_config
 
     @abc.abstractmethod
     def on_building_data_server_rate_limiter(self, builder: SystemBuilder) -> None:
@@ -64,7 +69,7 @@ class MinSizeRateLimiter(RateLimiter):
         """
 
         def rate_limiter_fn() -> reverb.rate_limiters:
-            return reverb.rate_limiters.MinSize(self.config.min_data_server_size)
+            return reverb.rate_limiters.MinSize(self.local_config.min_data_server_size)
 
         builder.store.rate_limiter_fn = rate_limiter_fn
 
@@ -78,19 +83,19 @@ class SampleToInsertRateLimiter(RateLimiter):
         Returns:
             _description_
         """
-        if not self.config.error_buffer:
+        if not self.local_config.error_buffer:
             # Create enough of an error buffer to give a 10% tolerance in rate.
-            samples_per_insert_tolerance = 0.1 * self.config.samples_per_insert
+            samples_per_insert_tolerance = 0.1 * self.local_config.samples_per_insert
             error_buffer = (
-                self.config.min_data_server_size * samples_per_insert_tolerance
+                self.local_config.min_data_server_size * samples_per_insert_tolerance
             )
         else:
-            error_buffer = self.config.error_buffer
+            error_buffer = self.local_config.error_buffer
 
         def rate_limiter_fn() -> reverb.rate_limiters:
             return reverb.rate_limiters.SampleToInsertRatio(
-                min_size_to_sample=self.config.min_data_server_size,
-                samples_per_insert=self.config.samples_per_insert,
+                min_size_to_sample=self.local_config.min_data_server_size,
+                samples_per_insert=self.local_config.samples_per_insert,
                 error_buffer=error_buffer,
             )
 

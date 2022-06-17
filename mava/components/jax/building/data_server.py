@@ -33,15 +33,15 @@ from mava.utils.sort_utils import sort_str_num
 class DataServer(Component):
     def __init__(
         self,
-        config: Any,
+        local_config: Any,
     ) -> None:
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
 
-        self.config = config
+        self.config = local_config
 
     def _create_table_per_trainer(self, builder: SystemBuilder) -> List[reverb.Table]:
         data_tables = []
@@ -110,15 +110,15 @@ class OffPolicyDataServerConfig:
 
 class OffPolicyDataServer(DataServer):
     def __init__(
-        self, config: OffPolicyDataServerConfig = OffPolicyDataServerConfig()
+        self, local_config: OffPolicyDataServerConfig = OffPolicyDataServerConfig()
     ) -> None:
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
 
-        self.config = config
+        self.config = local_config
 
     def table(
         self,
@@ -166,15 +166,15 @@ class OnPolicyDataServerConfig:
 class OnPolicyDataServer(DataServer):
     def __init__(
         self,
-        config: OnPolicyDataServerConfig = OnPolicyDataServerConfig(),
+        local_config: OnPolicyDataServerConfig = OnPolicyDataServerConfig(),
     ) -> None:
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
 
-        self.config = config
+        self.config = local_config
 
     def table(
         self,

@@ -32,13 +32,13 @@ class ExtrasLogProbSpecConfig:
 
 class ExtrasSpec(Component):
     @abc.abstractmethod
-    def __init__(self, config: Any) -> None:
+    def __init__(self, local_config: Any) -> None:
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     @staticmethod
     def name() -> str:
@@ -53,14 +53,14 @@ class ExtrasSpec(Component):
 class ExtrasLogProbSpec(ExtrasSpec):
     def __init__(
         self,
-        config: ExtrasLogProbSpecConfig = ExtrasLogProbSpecConfig(),
+        local_config: ExtrasLogProbSpecConfig = ExtrasLogProbSpecConfig(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """[summary]"""

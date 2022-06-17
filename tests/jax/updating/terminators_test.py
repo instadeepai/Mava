@@ -81,7 +81,7 @@ def test_count_condition_terminator_terminated(
         test_parameter_server.store.stopped = True
 
     test_terminator = CountConditionTerminator(
-        config=CountConditionTerminatorConfig(
+        local_config=CountConditionTerminatorConfig(
             termination_condition=condition, termination_function=_set_stopped
         )
     )
@@ -107,7 +107,7 @@ def test_count_condition_terminator_not_terminated(
         test_parameter_server.store.stopped = True
 
     test_terminator = CountConditionTerminator(
-        config=CountConditionTerminatorConfig(
+        local_config=CountConditionTerminatorConfig(
             termination_condition=condition, termination_function=_set_stopped
         )
     )
@@ -139,7 +139,7 @@ def test_count_condition_terminator_exceptions(
             test_parameter_server.store.stopped = True
 
         test_terminator = CountConditionTerminator(
-            config=CountConditionTerminatorConfig(
+            local_config=CountConditionTerminatorConfig(
                 termination_condition=fail_condition, termination_function=_set_stopped
             )
         )
@@ -163,7 +163,7 @@ def test_time_terminator_terminated(
         test_parameter_server.store.stopped = True
 
     test_terminator = TimeTerminator(
-        config=TimeTerminatorConfig(run_seconds=0.0, termination_function=_set_stopped)
+        local_config=TimeTerminatorConfig(run_seconds=0.0, termination_function=_set_stopped)
     )
 
     test_terminator.on_parameter_server_init(test_parameter_server)
@@ -184,7 +184,7 @@ def test_time_terminator_not_terminated(
         test_parameter_server.store.stopped = True
 
     test_terminator = TimeTerminator(
-        config=TimeTerminatorConfig(run_seconds=10, termination_function=_set_stopped)
+        local_config=TimeTerminatorConfig(run_seconds=10, termination_function=_set_stopped)
     )
 
     test_terminator.on_parameter_server_init(test_parameter_server)

@@ -91,9 +91,9 @@ class MockAdderClass:
 
 
 class MockAdder(Component):
-    def __init__(self, config: MockAdderConfig = MockAdderConfig()) -> None:
+    def __init__(self, local_config: MockAdderConfig = MockAdderConfig()) -> None:
         """Mock system component."""
-        self.config = config
+        self.config = local_config
 
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """_summary_"""
@@ -266,13 +266,13 @@ class MockDataServerConfig:
 
 
 class MockDataServer(Component):
-    def __init__(self, config: MockDataServerConfig = MockDataServerConfig()) -> None:
+    def __init__(self, local_config: MockDataServerConfig = MockDataServerConfig()) -> None:
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     def _create_table_per_trainer(self, builder: SystemBuilder) -> List[reverb.Table]:
         builder.store.table_network_config = {"table_0": "network_0"}
@@ -319,14 +319,14 @@ class MockDataServer(Component):
 
 class MockOnPolicyDataServer(MockDataServer):
     def __init__(
-        self, config: OnPolicyDataServerConfig = OnPolicyDataServerConfig()
+        self, local_config: OnPolicyDataServerConfig = OnPolicyDataServerConfig()
     ) -> None:
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     def _create_table_per_trainer(self, builder: SystemBuilder) -> List[reverb.Table]:
         builder.store.table_network_config = {"table_0": "network_0"}
@@ -384,14 +384,14 @@ class MockOnPolicyDataServer(MockDataServer):
 
 class MockOffPolicyDataServer(MockDataServer):
     def __init__(
-        self, config: OffPolicyDataServerConfig = OffPolicyDataServerConfig()
+        self, local_config: OffPolicyDataServerConfig = OffPolicyDataServerConfig()
     ) -> None:
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     def _create_table_per_trainer(self, builder: SystemBuilder) -> List[reverb.Table]:
         builder.store.table_network_config = {"table_0": "network_0"}
@@ -453,10 +453,10 @@ class MockParameterServerConfig:
 class MockParameterServer(Component):
     def __init__(
         self,
-        config: MockParameterServerConfig = MockParameterServerConfig(),
+        local_config: MockParameterServerConfig = MockParameterServerConfig(),
     ) -> None:
         """Mock system component."""
-        self.config = config
+        self.config = local_config
 
     def on_building_parameter_server(self, builder: SystemBuilder) -> None:
         """_summary_"""
@@ -486,10 +486,10 @@ class MockLoggerClass:
 class MockLogger(Component):
     def __init__(
         self,
-        config: MockLoggerConfig = MockLoggerConfig(),
+        local_config: MockLoggerConfig = MockLoggerConfig(),
     ) -> None:
         """Mock system component."""
-        self.config = config
+        self.config = local_config
 
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
         """_summary_"""
@@ -514,10 +514,10 @@ class MockExecutorParameterClientConfig:
 class MockExecutorParameterClient(Component):
     def __init__(
         self,
-        config: MockExecutorParameterClientConfig = MockExecutorParameterClientConfig(),
+        local_config: MockExecutorParameterClientConfig = MockExecutorParameterClientConfig(),
     ) -> None:
         """Mock system component."""
-        self.config = config
+        self.config = local_config
 
     def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
         """_summary_"""
@@ -538,10 +538,10 @@ class MockTrainerParameterClientConfig:
 class MockTrainerParameterClient(Component):
     def __init__(
         self,
-        config: MockTrainerParameterClientConfig = MockTrainerParameterClientConfig(),
+        local_config: MockTrainerParameterClientConfig = MockTrainerParameterClientConfig(),
     ) -> None:
         """Mock system component."""
-        self.config = config
+        self.config = local_config
 
     def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
         """_summary_"""
@@ -570,10 +570,10 @@ class MockExecutorDefaultConfig:
 class MockExecutor(Component):
     def __init__(
         self,
-        config: MockExecutorDefaultConfig = MockExecutorDefaultConfig(),
+        local_config: MockExecutorDefaultConfig = MockExecutorDefaultConfig(),
     ) -> None:
         """Mock system component."""
-        self.config = config
+        self.config = local_config
 
     def on_building_init(self, builder: SystemBuilder) -> None:
         """_summary_"""
@@ -597,10 +597,10 @@ class MockExecutorEnvironmentLoopConfig:
 class MockExecutorEnvironmentLoop(Component):
     def __init__(
         self,
-        config: MockExecutorEnvironmentLoopConfig = MockExecutorEnvironmentLoopConfig(),
+        local_config: MockExecutorEnvironmentLoopConfig = MockExecutorEnvironmentLoopConfig(),
     ) -> None:
         """Mock system component."""
-        self.config = config
+        self.config = local_config
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
@@ -651,10 +651,10 @@ class MockNetworksConfig:
 class MockNetworks(Component):
     def __init__(
         self,
-        config: MockNetworksConfig = MockNetworksConfig(),
+        local_config: MockNetworksConfig = MockNetworksConfig(),
     ):
         """[summary]"""
-        self.config = config
+        self.config = local_config
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """Summary"""
@@ -695,10 +695,10 @@ class MockTrainerDatasetConfig:
 class MockTrainerDataset(Component):
     def __init__(
         self,
-        config: MockTrainerDatasetConfig = MockTrainerDatasetConfig(),
+        local_config: MockTrainerDatasetConfig = MockTrainerDatasetConfig(),
     ) -> None:
         """Mock system component."""
-        self.config = config
+        self.config = local_config
 
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """_summary_"""
@@ -732,10 +732,10 @@ class MockTrainerConfig:
 class MockTrainer(Component):
     def __init__(
         self,
-        config: MockTrainerConfig = MockTrainerConfig(),
+        local_config: MockTrainerConfig = MockTrainerConfig(),
     ) -> None:
         """Mock system component."""
-        self.config = config
+        self.config = local_config
 
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """TODO: Add description here."""
@@ -768,13 +768,13 @@ class DistributorConfig:
 
 
 class MockDistributor(Component):
-    def __init__(self, config: DistributorConfig = DistributorConfig()) -> None:
+    def __init__(self, local_config: DistributorConfig = DistributorConfig()) -> None:
         """Mock system distributor component.
 
         Args:
-            config : dataclass configuration for setting component hyperparameters
+            local_config : dataclass configuration for setting component hyperparameters
         """
-        self.config = config
+        self.config = local_config
 
     def on_building_program_nodes(self, builder: SystemBuilder) -> None:
         """_summary_"""

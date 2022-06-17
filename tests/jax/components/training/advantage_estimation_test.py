@@ -120,7 +120,7 @@ def mock_trainer() -> Trainer:
 def gae_with_reward_clipping() -> GAE:
     """Creates gae fixture with reward clipping"""
 
-    test_gae = GAE(config=GAEConfig(max_abs_reward=1.0))
+    test_gae = GAE(local_config=GAEConfig(max_abs_reward=1.0))
 
     return test_gae
 
@@ -129,7 +129,7 @@ def gae_with_reward_clipping() -> GAE:
 def gae_without_reward_clipping() -> GAE:
     """Creates gae fixture without reward clipping"""
 
-    test_gae = GAE(config=GAEConfig())
+    test_gae = GAE(local_config=GAEConfig())
 
     return test_gae
 

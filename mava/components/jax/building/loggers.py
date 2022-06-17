@@ -16,6 +16,7 @@
 """Execution components for system builders"""
 
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any, Callable, Optional
 
 from mava.components.jax import Component
@@ -32,31 +33,33 @@ class LoggerConfig:
 class Logger(Component):
     def __init__(
         self,
-        config: LoggerConfig = LoggerConfig(),
+        local_config: LoggerConfig = LoggerConfig(),
+        global_config: SimpleNamespace = SimpleNamespace(),
     ):
         """[summary]"""
-        self.config = config
+        self.local_config = local_config
+        self.global_config = global_config
 
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
         """[summary]"""
-        logger_config = self.config.logger_config if self.config.logger_config else {}
+        logger_config = self.local_config.logger_config if self.local_config.logger_config else {}
         name = "executor" if not builder.store.is_evaluator else "evaluator"
 
-        if self.config.logger_config and name in self.config.logger_config:
-            logger_config = self.config.logger_config[name]
+        if self.local_config.logger_config and name in self.local_config.logger_config:
+            logger_config = self.local_config.logger_config[name]
 
-        builder.store.executor_logger = self.config.logger_factory(  # type: ignore
+        builder.store.executor_logger = self.local_config.logger_factory(  # type: ignore
             builder.store.executor_id, **logger_config
         )
 
     def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
         """[summary]"""
-        logger_config = self.config.logger_config if self.config.logger_config else {}
+        logger_config = self.local_config.logger_config if self.local_config.logger_config else {}
         name = "trainer"
-        if self.config.logger_config and name in self.config.logger_config:
-            logger_config = self.config.logger_config[name]
+        if self.local_config.logger_config and name in self.local_config.logger_config:
+            logger_config = self.local_config.logger_config[name]
 
-        builder.store.trainer_logger = self.config.logger_factory(  # type: ignore
+        builder.store.trainer_logger = self.local_config.logger_factory(  # type: ignore
             builder.store.trainer_id, **logger_config
         )
 

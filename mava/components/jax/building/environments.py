@@ -16,6 +16,7 @@
 """Execution components for system builders"""
 import abc
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Callable, Optional, Type
 
 import acme
@@ -37,15 +38,19 @@ class EnvironmentSpecConfig:
 
 
 class EnvironmentSpec(Component):
-    def __init__(self, config: EnvironmentSpecConfig = EnvironmentSpecConfig()):
+    def __init__(self,
+                 local_config: EnvironmentSpecConfig = EnvironmentSpecConfig(),
+                 global_config: SimpleNamespace = SimpleNamespace(),
+                 ):
         """[summary]"""
-        self.config = config
+        self.local_config = local_config
+        self.global_config = global_config
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
 
         builder.store.environment_spec = specs.MAEnvironmentSpec(
-            self.config.environment_factory()
+            self.local_config.environment_factory()
         )
 
         builder.store.agents = sort_str_num(
@@ -78,10 +83,13 @@ class ExecutorEnvironmentLoopConfig:
 
 class ExecutorEnvironmentLoop(Component):
     def __init__(
-        self, config: ExecutorEnvironmentLoopConfig = ExecutorEnvironmentLoopConfig()
+        self,
+        local_config: ExecutorEnvironmentLoopConfig = ExecutorEnvironmentLoopConfig(),
+        global_config: SimpleNamespace = SimpleNamespace(),
     ):
         """[summary]"""
-        self.config = config
+        self.config = local_config
+        self.global_config = global_config
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """[summary]"""

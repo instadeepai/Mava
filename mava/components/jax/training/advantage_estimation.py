@@ -36,14 +36,14 @@ class GAEConfig:
 class GAE(Utility):
     def __init__(
         self,
-        config: GAEConfig = GAEConfig(),
+        local_config: GAEConfig = GAEConfig(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """_summary_"""

@@ -55,14 +55,14 @@ class ComponentZeroDefaultConfig:
 
 class ComponentZero(MainComponent):
     def __init__(
-        self, config: ComponentZeroDefaultConfig = ComponentZeroDefaultConfig()
+        self, local_config: ComponentZeroDefaultConfig = ComponentZeroDefaultConfig()
     ) -> None:
         """Mock system component.
 
         Args:
-            config : dataclass configuration for setting component hyperparameters
+            local_config : dataclass configuration for setting component hyperparameters
         """
-        self.config = config
+        self.config = local_config
 
     def on_building_start(self, builder: SystemBuilder) -> None:
         """Dummy component function.
@@ -90,14 +90,14 @@ class ComponentOneDefaultConfig:
 
 class ComponentOne(SubComponent):
     def __init__(
-        self, config: ComponentOneDefaultConfig = ComponentOneDefaultConfig()
+        self, local_config: ComponentOneDefaultConfig = ComponentOneDefaultConfig()
     ) -> None:
         """Mock system component.
 
         Args:
-            config : dataclass configuration for setting component hyperparameters
+            local_config : dataclass configuration for setting component hyperparameters
         """
-        self.config = config
+        self.config = local_config
 
     def on_building_start(self, builder: SystemBuilder) -> None:
         """Dummy component function.
@@ -125,14 +125,14 @@ class ComponentTwoDefaultConfig:
 
 class ComponentTwo(MainComponent):
     def __init__(
-        self, config: ComponentTwoDefaultConfig = ComponentTwoDefaultConfig()
+        self, local_config: ComponentTwoDefaultConfig = ComponentTwoDefaultConfig()
     ) -> None:
         """Mock system component.
 
         Args:
-            config : dataclass configuration for setting component hyperparameters
+            local_config : dataclass configuration for setting component hyperparameters
         """
-        self.config = config
+        self.config = local_config
 
     def on_building_start(self, builder: SystemBuilder) -> None:
         """Dummy component function.
@@ -164,14 +164,14 @@ class DistributorDefaultConfig:
 
 class MockDistributorComponent(Component):
     def __init__(
-        self, config: DistributorDefaultConfig = DistributorDefaultConfig()
+        self, local_config: DistributorDefaultConfig = DistributorDefaultConfig()
     ) -> None:
         """Mock system distributor component.
 
         Args:
-            config : dataclass configuration for setting component hyperparameters
+            local_config : dataclass configuration for setting component hyperparameters
         """
-        self.config = config
+        self.config = local_config
 
     @staticmethod
     def name() -> str:

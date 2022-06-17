@@ -38,10 +38,10 @@ class ParameterServer(Component):
     @abc.abstractmethod
     def __init__(
         self,
-        config: ParameterServerConfig = ParameterServerConfig(),
+        local_config: ParameterServerConfig = ParameterServerConfig(),
     ) -> None:
         """Mock system Component."""
-        self.config = config
+        self.config = local_config
 
     @abc.abstractmethod
     def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
@@ -100,10 +100,10 @@ class ParameterServer(Component):
 class DefaultParameterServer(ParameterServer):
     def __init__(
         self,
-        config: ParameterServerConfig = ParameterServerConfig(),
+        local_config: ParameterServerConfig = ParameterServerConfig(),
     ) -> None:
         """Mock system Component."""
-        self.config = config
+        self.config = local_config
 
     def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
         """_summary_

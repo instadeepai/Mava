@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Callable, List, Optional, Union
 
 from mava.components.jax import Component
@@ -16,18 +17,23 @@ class SystemInitConfig:
 
 
 class SystemInit(Component):
-    def __init__(self, config: SystemInitConfig = SystemInitConfig()):
+    def __init__(self,
+                 local_config: SystemInitConfig = SystemInitConfig(),
+                 global_config: SimpleNamespace = SimpleNamespace(),
+                 ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
+            global_config : _description_.
         """
-        self.config = config
+        self.local_config = local_config
+        self.global_config = global_config
 
     def on_building_init(self, builder: SystemBuilder) -> None:
         """Summary"""
         # Setup agent networks and network sampling setup
-        builder.store.network_sampling_setup_type = self.config.network_sampling_setup
+        builder.store.network_sampling_setup_type = self.local_config.network_sampling_setup
         if not isinstance(builder.store.network_sampling_setup_type, list):
             if (
                 builder.store.network_sampling_setup_type
@@ -38,7 +44,7 @@ class SystemInit(Component):
                 # else assign seperate networks to each agent
                 builder.store.agent_net_keys = {
                     agent: f"network_{agent.split('_')[0]}"
-                    if self.config.shared_weights
+                    if self.local_config.shared_weights
                     else f"network_{agent}"
                     for agent in builder.store.agents
                 }

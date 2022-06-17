@@ -16,6 +16,7 @@
 """Commonly used dataset components for system builders"""
 import abc
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any, Callable, Optional
 
 import reverb
@@ -31,14 +32,17 @@ class TrainerDataset(Component):
     @abc.abstractmethod
     def __init__(
         self,
-        config: Any,
+        local_config: Any,
+        global_config: SimpleNamespace = SimpleNamespace(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
+            global_config : _description_.
         """
-        self.config = config
+        self.local_config = local_config
+        self.global_config = global_config
 
     @abc.abstractmethod
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
@@ -72,14 +76,17 @@ class TransitionDatasetConfig:
 class TransitionDataset(TrainerDataset):
     def __init__(
         self,
-        config: TransitionDatasetConfig = TransitionDatasetConfig(),
+        local_config: TransitionDatasetConfig = TransitionDatasetConfig(),
+        global_config: SimpleNamespace = SimpleNamespace(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
+            global_config : _description_.
         """
-        self.config = config
+        self.local_config = local_config
+        self.global_config = global_config
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
         """_summary_
@@ -87,15 +94,15 @@ class TransitionDataset(TrainerDataset):
         Args:
             builder : _description_
         """
-        max_in_flight_samples_per_worker = self.config.max_in_flight_samples_per_worker
+        max_in_flight_samples_per_worker = self.local_config.max_in_flight_samples_per_worker
         dataset = datasets.make_reverb_dataset(
             table=builder.store.trainer_id,
             server_address=builder.store.data_server_client.server_address,
-            batch_size=self.config.sample_batch_size,
-            prefetch_size=self.config.prefetch_size,
-            num_parallel_calls=self.config.num_parallel_calls,
+            batch_size=self.local_config.sample_batch_size,
+            prefetch_size=self.local_config.prefetch_size,
+            num_parallel_calls=self.local_config.num_parallel_calls,
             max_in_flight_samples_per_worker=max_in_flight_samples_per_worker,
-            postprocess=self.config.postprocess,
+            postprocess=self.local_config.postprocess,
         )
 
         builder.store.dataset = iter(dataset)
@@ -125,14 +132,17 @@ class TrajectoryDatasetConfig:
 class TrajectoryDataset(TrainerDataset):
     def __init__(
         self,
-        config: TrajectoryDatasetConfig = TrajectoryDatasetConfig(),
+        local_config: TrajectoryDatasetConfig = TrajectoryDatasetConfig(),
+        global_config: SimpleNamespace = SimpleNamespace(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
+            global_config : _description_.
         """
-        self.config = config
+        self.local_config = local_config
+        self.global_config = global_config
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
         """_summary_
@@ -143,17 +153,17 @@ class TrajectoryDataset(TrainerDataset):
         dataset = reverb.TrajectoryDataset.from_table_signature(
             server_address=builder.store.data_server_client.server_address,
             table=builder.store.trainer_id,
-            max_in_flight_samples_per_worker=2 * self.config.sample_batch_size,
-            num_workers_per_iterator=self.config.num_workers_per_iterator,
-            max_samples_per_stream=self.config.max_samples_per_stream,
-            rate_limiter_timeout_ms=self.config.rate_limiter_timeout_ms,
-            get_signature_timeout_secs=self.config.get_signature_timeout_secs,
+            max_in_flight_samples_per_worker=2 * self.local_config.sample_batch_size,
+            num_workers_per_iterator=self.local_config.num_workers_per_iterator,
+            max_samples_per_stream=self.local_config.max_samples_per_stream,
+            rate_limiter_timeout_ms=self.local_config.rate_limiter_timeout_ms,
+            get_signature_timeout_secs=self.local_config.get_signature_timeout_secs,
             # max_samples=self.config.max_samples,
         )
 
         # Add batch dimension.
-        dataset = dataset.batch(self.config.sample_batch_size, drop_remainder=True)
-        builder.store.sample_batch_size = self.config.sample_batch_size
+        dataset = dataset.batch(self.local_config.sample_batch_size, drop_remainder=True)
+        builder.store.sample_batch_size = self.local_config.sample_batch_size
 
         builder.store.dataset_iterator = dataset.as_numpy_iterator()
 

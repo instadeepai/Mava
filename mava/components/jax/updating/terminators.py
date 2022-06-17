@@ -30,14 +30,14 @@ class Terminator(Component):
     @abc.abstractmethod
     def __init__(
         self,
-        config: Any,
+        local_config: Any,
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     @abc.abstractmethod
     def on_parameter_server_run_loop_termination(
@@ -65,14 +65,14 @@ class CountConditionTerminatorConfig:
 class CountConditionTerminator(Terminator):
     def __init__(
         self,
-        config: CountConditionTerminatorConfig = CountConditionTerminatorConfig(),
+        local_config: CountConditionTerminatorConfig = CountConditionTerminatorConfig(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
         if self.config.termination_condition is not None:
             self.termination_key, self.termination_value = check_count_condition(
@@ -110,14 +110,14 @@ class TimeTerminatorConfig:
 class TimeTerminator(Terminator):
     def __init__(
         self,
-        config: TimeTerminatorConfig = TimeTerminatorConfig(),
+        local_config: TimeTerminatorConfig = TimeTerminatorConfig(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
         self._start_time = 0.0
 
     def on_parameter_server_init(self, parameter_sever: SystemParameterServer) -> None:

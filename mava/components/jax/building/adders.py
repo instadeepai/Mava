@@ -16,6 +16,7 @@
 """Commonly used adder components for system builders"""
 import abc
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any, Callable, Dict, Optional
 
 from mava import specs
@@ -47,14 +48,16 @@ class AdderPriorityConfig:
 class AdderPriority(Component):
     def __init__(
         self,
-        config: AdderPriorityConfig = AdderPriorityConfig(),
+        local_config: AdderPriorityConfig = AdderPriorityConfig(),
+        global_config: SimpleNamespace = SimpleNamespace(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.local_config = local_config
+        self.global_config = global_config
 
     @abc.abstractmethod
     def on_building_executor_adder_priority(self, builder: SystemBuilder) -> None:
@@ -93,14 +96,17 @@ class AdderSignatureConfig:
 class AdderSignature(Component):
     def __init__(
         self,
-        config: AdderSignatureConfig = AdderSignatureConfig(),
+        local_config: AdderSignatureConfig = AdderSignatureConfig(),
+        global_config: SimpleNamespace = SimpleNamespace(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
+            global_config : _description_.
         """
-        self.config = config
+        self.local_config = local_config
+        self.global_config = global_config
 
     @abc.abstractmethod
     def on_building_data_server_adder_signature(self, builder: SystemBuilder) -> None:
@@ -134,14 +140,17 @@ class ParallelTransitionAdderConfig:
 class ParallelTransitionAdder(Adder):
     def __init__(
         self,
-        config: ParallelTransitionAdderConfig = ParallelTransitionAdderConfig(),
+        local_config: ParallelTransitionAdderConfig = ParallelTransitionAdderConfig(),
+        global_config: SimpleNamespace = SimpleNamespace(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
+            global_config : _description_.
         """
-        self.config = config
+        self.local_config = local_config
+        self.global_config = global_config
 
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """_summary_
@@ -156,9 +165,9 @@ class ParallelTransitionAdder(Adder):
             priority_fns=builder.store.adder_priority_fn,
             client=builder.store.data_server_client,
             net_ids_to_keys=builder.store.unique_net_keys,
-            n_step=self.config.n_step,
+            n_step=self.local_config.n_step,
             table_network_config=builder.store.table_network_config,
-            discount=self.config.discount,
+            discount=self.local_config.discount,
         )
 
         builder.store.adder = adder
@@ -213,14 +222,17 @@ class ParallelSequenceAdderConfig:
 
 class ParallelSequenceAdder(Adder):
     def __init__(
-        self, config: ParallelSequenceAdderConfig = ParallelSequenceAdderConfig()
+        self, local_config: ParallelSequenceAdderConfig = ParallelSequenceAdderConfig(),
+        global_config: SimpleNamespace = SimpleNamespace(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
+            global_config : _description_.
         """
-        self.config = config
+        self.local_config = local_config
+        self.global_config = global_config
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """_summary_
@@ -228,7 +240,7 @@ class ParallelSequenceAdder(Adder):
         Args:
             builder : _description_
         """
-        builder.store.sequence_length = self.config.sequence_length
+        builder.store.sequence_length = self.local_config.sequence_length
 
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """_summary_
@@ -248,10 +260,10 @@ class ParallelSequenceAdder(Adder):
             priority_fns=priority_fns,
             client=builder.store.data_server_client,
             net_ids_to_keys=builder.store.unique_net_keys,
-            sequence_length=self.config.sequence_length,
+            sequence_length=self.local_config.sequence_length,
             table_network_config=builder.store.table_network_config,
-            period=self.config.period,
-            use_next_extras=self.config.use_next_extras,
+            period=self.local_config.period,
+            use_next_extras=self.local_config.use_next_extras,
         )
 
         builder.store.adder = adder

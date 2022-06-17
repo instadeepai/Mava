@@ -37,14 +37,14 @@ class MAPGTrustRegionClippingLossConfig:
 class MAPGWithTrustRegionClippingLoss(Loss):
     def __init__(
         self,
-        config: MAPGTrustRegionClippingLossConfig = MAPGTrustRegionClippingLossConfig(),
+        local_config: MAPGTrustRegionClippingLossConfig = MAPGTrustRegionClippingLossConfig(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
         """_summary_"""

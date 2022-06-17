@@ -31,13 +31,13 @@ class ExecutorObserveConfig:
 
 class ExecutorObserve(Component):
     @abc.abstractmethod
-    def __init__(self, config: ExecutorObserveConfig = ExecutorObserveConfig()):
+    def __init__(self, local_config: ExecutorObserveConfig = ExecutorObserveConfig()):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     # Observe first
     @abc.abstractmethod
@@ -72,13 +72,13 @@ class ExecutorObserve(Component):
 
 
 class FeedforwardExecutorObserve(ExecutorObserve):
-    def __init__(self, config: ExecutorObserveConfig = ExecutorObserveConfig()):
+    def __init__(self, local_config: ExecutorObserveConfig = ExecutorObserveConfig()):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     # Observe first
     def on_execution_observe_first(self, executor: SystemExecutor) -> None:

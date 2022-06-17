@@ -15,6 +15,7 @@
 
 """Parameter client for system builders"""
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -48,15 +49,18 @@ class ExecutorParameterClientConfig:
 class ExecutorParameterClient(BaseParameterClient):
     def __init__(
         self,
-        config: ExecutorParameterClientConfig = ExecutorParameterClientConfig(),
+        local_config: ExecutorParameterClientConfig = ExecutorParameterClientConfig(),
+        global_config: SimpleNamespace = SimpleNamespace(),
     ) -> None:
         """Parameter client
 
         Args:
-            config : parameter client config
+            local_config : parameter client config
+            global_config : all components config
         """
 
-        self.config = config
+        self.local_config = local_config
+        self.global_config = global_config
 
     def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
         """_summary_
@@ -97,7 +101,7 @@ class ExecutorParameterClient(BaseParameterClient):
                 parameters=params,
                 get_keys=get_keys,
                 set_keys=set_keys,
-                update_period=self.config.executor_parameter_update_period,
+                update_period=self.local_config.executor_parameter_update_period,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
@@ -129,15 +133,18 @@ class TrainerParameterClientConfig:
 class TrainerParameterClient(BaseParameterClient):
     def __init__(
         self,
-        config: TrainerParameterClientConfig = TrainerParameterClientConfig(),
+        local_config: TrainerParameterClientConfig = TrainerParameterClientConfig(),
+        global_config: SimpleNamespace = SimpleNamespace(),
     ) -> None:
         """Parameter client
 
         Args:
-            config : parameter client config
+            local_config : parameter client config
+            global_config : all components config
         """
 
-        self.config = config
+        self.local_config = local_config
+        self.global_config = global_config
 
     def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
         """_summary_

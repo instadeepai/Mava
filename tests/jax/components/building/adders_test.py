@@ -75,14 +75,14 @@ class DistributorDefaultConfig:
 
 class MockDistributor(Component):
     def __init__(
-        self, config: DistributorDefaultConfig = DistributorDefaultConfig()
+        self, local_config: DistributorDefaultConfig = DistributorDefaultConfig()
     ) -> None:
         """Mock system distributor component.
 
         Args:
-            config : dataclass configuration for setting component hyperparameters
+            local_config : dataclass configuration for setting component hyperparameters
         """
-        self.config = config
+        self.config = local_config
 
     @staticmethod
     def name() -> str:

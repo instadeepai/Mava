@@ -32,13 +32,13 @@ from mava.core_jax import SystemTrainer
 
 class MinibatchUpdate(Utility):
     @abc.abstractmethod
-    def __init__(self, config: Any) -> None:
+    def __init__(self, local_config: Any) -> None:
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     @staticmethod
     def name() -> str:
@@ -61,14 +61,14 @@ class MAPGMinibatchUpdateConfig:
 class MAPGMinibatchUpdate(MinibatchUpdate):
     def __init__(
         self,
-        config: MAPGMinibatchUpdateConfig = MAPGMinibatchUpdateConfig(),
+        local_config: MAPGMinibatchUpdateConfig = MAPGMinibatchUpdateConfig(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """_summary_"""
@@ -147,13 +147,13 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
 
 class EpochUpdate(Utility):
     @abc.abstractmethod
-    def __init__(self, config: Any) -> None:
+    def __init__(self, local_config: Any) -> None:
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     @staticmethod
     def name() -> str:
@@ -174,14 +174,14 @@ class MAPGEpochUpdateConfig:
 class MAPGEpochUpdate(EpochUpdate):
     def __init__(
         self,
-        config: MAPGEpochUpdateConfig = MAPGEpochUpdateConfig(),
+        local_config: MAPGEpochUpdateConfig = MAPGEpochUpdateConfig(),
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """_summary_"""

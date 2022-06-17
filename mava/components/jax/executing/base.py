@@ -28,13 +28,13 @@ class ExecutorInitConfig:
 
 
 class ExecutorInit(Component):
-    def __init__(self, config: ExecutorInitConfig = ExecutorInitConfig()):
+    def __init__(self, local_config: ExecutorInitConfig = ExecutorInitConfig()):
         """_summary_
 
         Args:
-            config : _description_.
+            local_config : _description_.
         """
-        self.config = config
+        self.config = local_config
 
     def on_building_init(self, builder: SystemBuilder) -> None:
         """Summary"""
