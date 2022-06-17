@@ -71,7 +71,7 @@ def test_default_parameter_server() -> DefaultParameterServer:
     return DefaultParameterServer(config)
 
 
-def test_on_parameter_server_init_start(
+def test_on_parameter_server_init_start_parameter_creation(
     test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
 ) -> None:
     test_default_parameter_server.on_parameter_server_init_start(server)
@@ -99,3 +99,30 @@ def test_on_parameter_server_init_start(
         )
 
     # Parameter store network parameters
+    assert server.store.parameters['net_type_1-agent_net_1'] == 'net_1_1_params'
+    assert server.store.parameters['net_type_1-agent_net_2'] == 'net_1_2_params'
+    assert server.store.parameters['net_type_2-agent_net_1'] == 'net_2_1_params'
+    assert server.store.parameters['net_type_2-agent_net_2'] == 'net_2_2_params'
+
+
+def test_on_parameter_server_init_start_no_checkpointer(
+    test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
+) -> None:
+    test_default_parameter_server.config.checkpoint = False
+    test_default_parameter_server.on_parameter_server_init_start(server)
+
+    assert not hasattr(server.store, 'system_checkpointer')
+
+
+def test_on_parameter_server_init_start_create_checkpointer(
+    test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
+) -> None:
+    test_default_parameter_server.config.checkpoint = True
+    test_default_parameter_server.on_parameter_server_init_start(server)
+
+    assert server.store.last_checkpoint_time == 0
+    assert server.store.checkpoint_minute_interval == ParameterServerConfig.checkpoint_minute_interval
+
+    assert hasattr(server.store, 'system_checkpointer')
+    # Test nothing more for now, since it's weird that a tf checkpointer is being used
+
