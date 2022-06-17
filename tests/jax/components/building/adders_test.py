@@ -153,7 +153,7 @@ def test_sequence_adders_signature(
     parallel_sequence_adder_signature.on_building_data_server_adder_signature(
         builder=mock_builder
     )
-    assert mock_builder.store.adder_signature_fn is not None
+    assert mock_builder.store.adder_signature_fn
     assert parallel_sequence_adder_signature.name() == "data_server_adder_signature"
     assert issubclass(
         parallel_sequence_adder_signature.config_class(),  # type: ignore
