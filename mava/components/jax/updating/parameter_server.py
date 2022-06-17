@@ -136,9 +136,6 @@ class DefaultParameterServer(ParameterServer):
         # Create the checkpointer
         if self.config.checkpoint:
             server.store.last_checkpoint_time = 0
-            server.store.checkpoint_minute_interval = (
-                self.config.checkpoint_minute_interval
-            )
 
             # Only save variables that are not empty.
             save_variables = {}
@@ -202,7 +199,7 @@ class DefaultParameterServer(ParameterServer):
         if (
             server.store.system_checkpointer
             and server.store.last_checkpoint_time
-            + server.store.checkpoint_minute_interval * 60
+            + self.config.checkpoint_minute_interval * 60
             + 1
             < time.time()
         ):
