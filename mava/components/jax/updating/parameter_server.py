@@ -197,7 +197,7 @@ class DefaultParameterServer(ParameterServer):
             server : _description_
         """
         if (
-            server.store.system_checkpointer
+            self.config.checkpoint
             and server.store.last_checkpoint_time
             + self.config.checkpoint_minute_interval * 60
             + 1
