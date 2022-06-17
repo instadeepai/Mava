@@ -1,8 +1,13 @@
 from types import SimpleNamespace
 from typing import Any, Dict, Sequence, Union
 
+import numpy as np
 import pytest
 
+from mava.components.jax.updating.parameter_server import (
+    DefaultParameterServer,
+    ParameterServerConfig,
+)
 from mava.core_jax import SystemParameterServer
 
 
@@ -42,7 +47,7 @@ class MockSystemParameterServer(SystemParameterServer):
 
 
 @pytest.fixture
-def mock_system_parameter_server() -> SystemParameterServer:
+def server() -> SystemParameterServer:
     """Pytest fixture for mock system parameter server"""
     mock_system_parameter_server = MockSystemParameterServer()
 
@@ -58,3 +63,39 @@ def mock_system_parameter_server() -> SystemParameterServer:
     }
 
     return mock_system_parameter_server
+
+
+@pytest.fixture
+def test_default_parameter_server() -> DefaultParameterServer:
+    config = ParameterServerConfig(non_blocking_sleep_seconds=15)
+    return DefaultParameterServer(config)
+
+
+def test_on_parameter_server_init_start(
+    test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
+) -> None:
+    test_default_parameter_server.on_parameter_server_init_start(server)
+
+    # Sleep seconds loaded into store for access in core parameter server
+    assert server.store.non_blocking_sleep_seconds == 15
+
+    # Parameters attribute in store
+    assert hasattr(server.store, "parameters")
+
+    # Parameter store training / executing info
+    required_int_keys = {
+        "trainer_steps",
+        "evaluator_steps",
+        "evaluator_episodes",
+        "executor_episodes",
+        "executor_steps",
+    }
+    required_float_keys = {"trainer_walltime"}
+    for required_int_key in required_int_keys:
+        assert server.store.parameters[required_int_key] == np.zeros(1, dtype=np.int32)
+    for required_float_key in required_float_keys:
+        assert server.store.parameters[required_float_key] == np.zeros(
+            1, dtype=np.float32
+        )
+
+    # Parameter store network parameters
