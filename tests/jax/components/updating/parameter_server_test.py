@@ -173,3 +173,19 @@ def test_on_parameter_server_set_parameters(
     assert server.store.parameters["param1"] == "param1_new_value"
     assert server.store.parameters["param2"] == "param2_value"
     assert server.store.parameters["param3"] == "param3_new_value"
+
+
+def test_on_parameter_server_add_to_parameters(
+    test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
+) -> None:
+    server.store.parameters['param3'] = 4
+    server.store._add_to_params = {
+        "param1": "_param1_add",
+        "param3": 2,
+    }
+
+    test_default_parameter_server.on_parameter_server_add_to_parameters(server)
+
+    assert server.store.parameters["param1"] == "param1_value_param1_add"
+    assert server.store.parameters["param2"] == "param2_value"
+    assert server.store.parameters["param3"] == 6
