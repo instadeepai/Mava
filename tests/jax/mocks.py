@@ -35,7 +35,6 @@ from mava.components.jax.building.data_server import (
     OffPolicyDataServerConfig,
     OnPolicyDataServerConfig,
 )
-from mava.systems.jax.launcher import Launcher, NodeType
 from mava.core_jax import SystemBuilder
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.specs import DesignSpec, MAEnvironmentSpec
@@ -805,77 +804,6 @@ class MockDistributor(Component):
             evaluator,
             trainer,
         )
-
-    @staticmethod
-    def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'.
-
-        Returns:
-            Component type name
-        """
-        return "distributor"
-
-
-class MockReverbDistributor(Component):
-    def __init__(self, config: DistributorConfig = DistributorConfig()) -> None:
-        """Mock system distributor component.
-
-        Args:
-            config : dataclass configuration for setting component hyperparameters
-        """
-        self.config = config
-
-    def on_building_program_nodes(self, builder: SystemBuilder) -> None:
-        """_summary_
-
-        Args:
-            builder : _description_
-        """
-        print("CREATING NODES LAD!!!")
-        # exit()
-        builder.store.program = Launcher(
-            multi_process=False,
-        )
-
-        # tables node
-        data_server = builder.store.program.add(
-            builder.data_server,
-            node_type=NodeType.reverb,
-            name="data_server",
-        )
-
-        # variable server node
-        parameter_server = builder.store.program.add(
-            builder.parameter_server,
-            node_type=NodeType.courier,
-            name="parameter_server",
-        )
-
-        # executor nodes
-        builder.store.program.add(
-            builder.executor,
-            ["executor", data_server, parameter_server],
-            node_type=NodeType.courier,
-            name="executor",
-        )
-
-        builder.store.program.add(
-            builder.executor,
-            ["evaluator", data_server, parameter_server],
-            node_type=NodeType.courier,
-            name="evaluator",
-        )
-
-        # trainer nodes
-        builder.store.program.add(
-            builder.trainer,
-            ["trainer", data_server, parameter_server],
-            node_type=NodeType.courier,
-            name="trainer",
-        )
-
-        # if not self.config.multi_process:
-        builder.store.system_build = builder.store.program.get_nodes()
 
     @staticmethod
     def name() -> str:
