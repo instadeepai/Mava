@@ -83,6 +83,7 @@ def test_on_parameter_server_init_start_parameter_creation(
     test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
 ) -> None:
     """Test that parameters are correctly assigned to the store"""
+
     # Delete existing parameters from store, since following method will create them
     delattr(server.store, "parameters")
     test_default_parameter_server.on_parameter_server_init_start(server)
@@ -141,6 +142,7 @@ def test_on_parameter_server_init_start_create_checkpointer(
 def test_on_parameter_server_get_parameters_single(
     test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
 ) -> None:
+    """Test get_parameters when only a single parameter is requested"""
     server.store._param_names = "param2"
 
     test_default_parameter_server.on_parameter_server_get_parameters(server)
@@ -151,6 +153,7 @@ def test_on_parameter_server_get_parameters_single(
 def test_on_parameter_server_get_parameters_list(
     test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
 ) -> None:
+    """Test get_parameters when a list of parameters are requested"""
     server.store._param_names = ["param1", "param3"]
 
     test_default_parameter_server.on_parameter_server_get_parameters(server)
@@ -163,6 +166,7 @@ def test_on_parameter_server_get_parameters_list(
 def test_on_parameter_server_set_parameters(
     test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
 ) -> None:
+    """Test setting parameters"""
     server.store._set_params = {
         "param1": "param1_new_value",
         "param3": "param3_new_value",
@@ -178,6 +182,7 @@ def test_on_parameter_server_set_parameters(
 def test_on_parameter_server_add_to_parameters(
     test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
 ) -> None:
+    """Test addition on parameters"""
     server.store.parameters["param3"] = 4
     server.store._add_to_params = {
         "param1": "_param1_add",
@@ -194,6 +199,7 @@ def test_on_parameter_server_add_to_parameters(
 def test_on_parameter_server_run_loop(
     test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
 ) -> None:
+    """Test checkpointing in run loop"""
     server.store.last_checkpoint_time = 0
 
     # Do nothing if no checkpointer
