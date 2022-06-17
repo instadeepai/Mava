@@ -62,6 +62,12 @@ def server() -> SystemParameterServer:
         },
     }
 
+    mock_system_parameter_server.store.parameters = {
+        "param1": "param1_value",
+        "param2": "param2_value",
+        "param3": "param3_value",
+    }
+
     return mock_system_parameter_server
 
 
@@ -74,6 +80,8 @@ def test_default_parameter_server() -> DefaultParameterServer:
 def test_on_parameter_server_init_start_parameter_creation(
     test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
 ) -> None:
+    # Delete existing parameters from store, since following method will create them
+    delattr(server.store, "parameters")
     test_default_parameter_server.on_parameter_server_init_start(server)
 
     # Sleep seconds loaded into store for access in core parameter server
@@ -99,10 +107,10 @@ def test_on_parameter_server_init_start_parameter_creation(
         )
 
     # Parameter store network parameters
-    assert server.store.parameters['net_type_1-agent_net_1'] == 'net_1_1_params'
-    assert server.store.parameters['net_type_1-agent_net_2'] == 'net_1_2_params'
-    assert server.store.parameters['net_type_2-agent_net_1'] == 'net_2_1_params'
-    assert server.store.parameters['net_type_2-agent_net_2'] == 'net_2_2_params'
+    assert server.store.parameters["net_type_1-agent_net_1"] == "net_1_1_params"
+    assert server.store.parameters["net_type_1-agent_net_2"] == "net_1_2_params"
+    assert server.store.parameters["net_type_2-agent_net_1"] == "net_2_1_params"
+    assert server.store.parameters["net_type_2-agent_net_2"] == "net_2_2_params"
 
 
 def test_on_parameter_server_init_start_no_checkpointer(
@@ -111,7 +119,7 @@ def test_on_parameter_server_init_start_no_checkpointer(
     test_default_parameter_server.config.checkpoint = False
     test_default_parameter_server.on_parameter_server_init_start(server)
 
-    assert not hasattr(server.store, 'system_checkpointer')
+    assert not hasattr(server.store, "system_checkpointer")
 
 
 def test_on_parameter_server_init_start_create_checkpointer(
@@ -121,8 +129,47 @@ def test_on_parameter_server_init_start_create_checkpointer(
     test_default_parameter_server.on_parameter_server_init_start(server)
 
     assert server.store.last_checkpoint_time == 0
-    assert server.store.checkpoint_minute_interval == ParameterServerConfig.checkpoint_minute_interval
+    assert (
+        server.store.checkpoint_minute_interval
+        == ParameterServerConfig.checkpoint_minute_interval
+    )
 
-    assert hasattr(server.store, 'system_checkpointer')
+    assert hasattr(server.store, "system_checkpointer")
     # Test nothing more for now, since it's weird that a tf checkpointer is being used
 
+
+def test_on_parameter_server_get_parameters_single(
+    test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
+) -> None:
+    server.store._param_names = "param2"
+
+    test_default_parameter_server.on_parameter_server_get_parameters(server)
+
+    assert server.store.get_parameters == "param2_value"
+
+
+def test_on_parameter_server_get_parameters_list(
+    test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
+) -> None:
+    server.store._param_names = ["param1", "param3"]
+
+    test_default_parameter_server.on_parameter_server_get_parameters(server)
+
+    assert server.store.get_parameters["param1"] == "param1_value"
+    assert server.store.get_parameters["param3"] == "param3_value"
+    assert "param2" not in server.store.get_parameters.keys()
+
+
+def test_on_parameter_server_set_parameters(
+    test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
+) -> None:
+    server.store._set_params = {
+        "param1": "param1_new_value",
+        "param3": "param3_new_value",
+    }
+
+    test_default_parameter_server.on_parameter_server_set_parameters(server)
+
+    assert server.store.parameters["param1"] == "param1_new_value"
+    assert server.store.parameters["param2"] == "param2_value"
+    assert server.store.parameters["param3"] == "param3_new_value"
