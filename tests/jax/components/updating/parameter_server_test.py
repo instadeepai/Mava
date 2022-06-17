@@ -1,3 +1,4 @@
+import time
 from types import SimpleNamespace
 from typing import Any, Dict, Sequence, Union
 
@@ -129,11 +130,6 @@ def test_on_parameter_server_init_start_create_checkpointer(
     test_default_parameter_server.on_parameter_server_init_start(server)
 
     assert server.store.last_checkpoint_time == 0
-    assert (
-        server.store.checkpoint_minute_interval
-        == ParameterServerConfig.checkpoint_minute_interval
-    )
-
     assert hasattr(server.store, "system_checkpointer")
     # Test nothing more for now, since it's weird that a tf checkpointer is being used
 
@@ -189,3 +185,33 @@ def test_on_parameter_server_add_to_parameters(
     assert server.store.parameters["param1"] == "param1_value_param1_add"
     assert server.store.parameters["param2"] == "param2_value"
     assert server.store.parameters["param3"] == 6
+
+
+def test_on_parameter_server_run_loop(
+    test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
+) -> None:
+    server.store.last_checkpoint_time = 0
+
+    # Do nothing if no checkpointer
+    server.store.system_checkpointer = None
+    assert server.store.last_checkpoint_time\
+           + test_default_parameter_server.config.checkpoint_minute_interval * 60 + 1 < time.time()
+    test_default_parameter_server.on_parameter_server_run_loop(server)
+    assert server.store.last_checkpoint_time == 0
+
+    class DummyCheckpointer:
+        def __init__(self):
+            self.called = False
+
+        def save(self):
+            self.called = True
+    server.store.system_checkpointer = DummyCheckpointer()
+
+    # Checkpoint if past time
+    test_default_parameter_server.on_parameter_server_run_loop(server)
+    assert server.store.system_checkpointer.called
+
+    # Wait for next checkpoint
+    server.store.system_checkpointer.called = False
+    test_default_parameter_server.on_parameter_server_run_loop(server)
+    assert not server.store.system_checkpointer.called
