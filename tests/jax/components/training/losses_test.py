@@ -16,31 +16,28 @@ class Mock_net:
     """Creates a mock network for loss function"""
 
     def apply(
-        observation: jnp.array, rng_key: jnp.array
+        parameters: jnp.array, observation: jnp.array
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """Mock function to apply the network to training data"""
-        return jnp.array([-1.7, -1.7, -1.7, -1.7, -1.7]), jnp.array(
-            [-1.7, -1.7, -1.7, -1.7, -1.7]
-        )
+        return jnp.array(observation), jnp.array(observation)
 
 
 def log_prob(distribution_params: jnp.array, actions: jnp.array) -> jnp.ndarray:
     """Mock function to return fixed log probs"""
-
-    return jnp.array([-1.7, -1.7, -1.7, -1.7, -1.7])
+    return distribution_params + actions
 
 
 def entropy(distribution_params: jnp.array) -> jnp.ndarray:
     """Mock function to return fixed entropy"""
 
-    return jnp.array([-1.7, -1.7, -1.7, -1.7, -1.7])
+    return distribution_params
 
 
 @pytest.fixture
 def mock_trainer() -> Trainer:
     """Creates mock trainer fixture"""
 
-    observation = SimpleNamespace(observation=[0.1, 0.5, 0.7, 0.2])
+    observation = SimpleNamespace(observation=[0.5, 0.5, 0.7, 0.2])
     observations = {
         "agent_0": observation,
         "agent_1": observation,
@@ -101,7 +98,7 @@ def mapg_trust_region_clipping_loss() -> MAPGWithTrustRegionClippingLoss:
     """Creates an MAPG loss fixture with trust region and clipping"""
 
     test_mapg = MAPGWithTrustRegionClippingLoss(
-        config=MAPGTrustRegionClippingLossConfig()
+        config=MAPGTrustRegionClippingLossConfig(value_cost=0.5, entropy_cost=0.01)
     )
 
     return test_mapg
@@ -131,19 +128,28 @@ def test_mapg_loss(
         for agent in {"agent_0", "agent_1", "agent_2"}
     }
     behaviour_log_probs = {
-        agent: jnp.array([-1.7, -1.7, -1.7, -1.7, -1.7])
+        agent: jnp.array([-2.0, -2.0, -2.0, -2.0])
         for agent in {"agent_0", "agent_1", "agent_2"}
     }
     target_values = {
-        agent: jnp.array([3.0, 3.0, 3.0, 3.0, 3.0])
+        agent: jnp.array([3.0, 3.0, 3.0, 3.0])
         for agent in {"agent_0", "agent_1", "agent_2"}
     }
     advantages = {
-        agent: jnp.array([2.0, 2.0, 2.0, 2.0, 2.0])
+        agent: jnp.array([2.0, 2.0, 2.0, 2.0])
         for agent in {"agent_0", "agent_1", "agent_2"}
     }
     behavior_values = {
-        agent: jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])
+        agent: jnp.array([1.0, 1.0, 1.0, 1.0])
+        for agent in {"agent_0", "agent_1", "agent_2"}
+    }
+
+    low_target_values = {
+        agent: jnp.array([1.0, 1.0, 1.0, 1.0])
+        for agent in {"agent_0", "agent_1", "agent_2"}
+    }
+    low_advantages = {
+        agent: jnp.array([3.0, 3.0, 3.0, 3.0])
         for agent in {"agent_0", "agent_1", "agent_2"}
     }
 
@@ -157,9 +163,29 @@ def test_mapg_loss(
         behavior_values=behavior_values,
     )
 
+    _, low_loss_info = grad_fn(
+        params=mock_trainer.store.parameters,
+        observations=mock_trainer.store.observations,
+        actions=actions,
+        behaviour_log_probs=behaviour_log_probs,
+        target_values=low_target_values,
+        advantages=low_advantages,
+        behavior_values=behavior_values,
+    )
+
     agent_0_loss = loss_info["agent_0"]
     loss_entropy = agent_0_loss["loss_entropy"]
     loss_value = agent_0_loss["loss_value"]
+    loss_policy = agent_0_loss["loss_policy"]
+    loss_total = agent_0_loss["loss_total"]
 
-    assert loss_entropy == 1.7
-    assert loss_value == 22.09
+    low_agent_0_loss = low_loss_info["agent_0"]
+    low_loss_value = low_agent_0_loss["loss_value"]
+    low_loss_policy = low_agent_0_loss["loss_policy"]
+
+    assert loss_entropy == -0.47500002
+    assert loss_value == 6.4075003
+    assert loss_total == (loss_entropy * 0.01 + loss_policy + loss_value * 0.5)
+
+    assert low_loss_value < loss_value
+    assert low_loss_policy < loss_policy
