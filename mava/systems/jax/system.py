@@ -137,7 +137,7 @@ class System(BaseSystem):
             self.components.append(component(system_config))
 
         # Build system
-        self._builder = Builder(components=self.components)
+        self._builder = Builder(components=self.components, global_config=system_config)
         self._builder.build()
         self._built = True
 
