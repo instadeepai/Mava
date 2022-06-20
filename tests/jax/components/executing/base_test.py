@@ -60,13 +60,12 @@ def mock_executor() -> Executor:
     Returns:
         Executor
     """
-    store = SimpleNamespace(is_evaluator=None, observations={})
+    store = SimpleNamespace(is_evaluator=None)
     executor = Executor(store=store)
     executor._interval = None
     return executor
 
 
-# test on_building_init
 def test_on_building_init(mock_builder: Builder) -> None:
     """Test on_building_init method from ExecutorInit
 
@@ -79,7 +78,6 @@ def test_on_building_init(mock_builder: Builder) -> None:
     assert mock_builder.store.networks == "after_network_factory"
 
 
-# test on_execution_init_start
 def test_on_execution_init_start(
     mock_executor: Executor, dummy_config: ExecutorInitConfig
 ) -> None:
@@ -95,7 +93,6 @@ def test_on_execution_init_start(
     assert mock_executor._interval == dummy_config.interval
 
 
-# test name
 def test_name() -> None:
     """Test name method from ExecutorInit"""
     executor_init = ExecutorInit()
@@ -104,7 +101,6 @@ def test_name() -> None:
     assert executor_init.name() == "executor_init"
 
 
-# test config_class
 def test_config_class() -> None:
     """Test config_class method from ExecutorInit"""
     executor_init = ExecutorInit()
