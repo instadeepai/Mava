@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Commonly used rate limiter components for system builders"""
+"""Commonly used rate limiter, sampler and remover components for system builders"""
 import abc
 from dataclasses import dataclass
 from typing import Callable, Optional
