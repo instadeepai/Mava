@@ -16,8 +16,9 @@
 """Jax-based Mava system implementation."""
 import abc
 import copy
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Type
 
+from mava.components.jax import Component
 from mava.core_jax import BaseSystem
 from mava.specs import DesignSpec
 from mava.systems.jax import Builder, Config
@@ -133,8 +134,11 @@ class System(BaseSystem):
 
         # update default system component configs
         assert len(self.components) == 0
+        component: Type[Component]  # provide type
         for component in self._design.get().values():
-            self.components.append(component(system_config))
+            self.components.append(
+                component(config=self.config.get_local_config(component))
+            )
 
         # Build system
         self._builder = Builder(components=self.components, global_config=system_config)
