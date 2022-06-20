@@ -5,6 +5,7 @@ import dm_env
 import numpy as np
 import tensorflow as tf
 import tree
+
 from mava.adders.reverb.base import Trajectory
 from mava.specs import MAEnvironmentSpec
 from mava.utils.offline_utils import get_schema
@@ -103,8 +104,8 @@ class MAOfflineEnvironmentSequenceLogger:
 
         self._logdir = logdir
         self._label = label
-        os.makedirs(logdir, exist_ok=True)
         print("ABS PATH: ", os.path.abspath(logdir), "&&&&&&&&&&&&&&&&&&&&&")
+        os.makedirs(logdir, exist_ok=True)
         print("PATH EXISTS: ", os.path.exists(logdir))
 
         self._timestep: Optional[dm_env.TimeStep] = None
