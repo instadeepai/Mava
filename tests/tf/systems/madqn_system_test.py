@@ -44,7 +44,7 @@ class TestMADQN:
 
         # networks
         network_factory = lp_utils.partial_kwargs(
-            madqn.make_default_networks, value_networks_layer_sizes=(64, 64)
+            madqn.make_default_networks, value_networks_layer_sizes=(2, 2)
         )
 
         # system
@@ -52,8 +52,8 @@ class TestMADQN:
             environment_factory=environment_factory,
             network_factory=network_factory,
             num_executors=1,
-            batch_size=32,
-            min_replay_size=32,
+            batch_size=2,
+            min_replay_size=3,
             max_replay_size=1000,
             optimizer=snt.optimizers.Adam(learning_rate=1e-3),
             checkpoint=False,
@@ -96,7 +96,7 @@ class TestMADQN:
         network_factory = lp_utils.partial_kwargs(
             madqn.make_default_networks,
             architecture_type=ArchitectureType.recurrent,
-            value_networks_layer_sizes=(32, 32),
+            value_networks_layer_sizes=(2, 2),
         )
 
         # system
@@ -104,8 +104,8 @@ class TestMADQN:
             environment_factory=environment_factory,
             network_factory=network_factory,
             num_executors=1,
-            batch_size=16,
-            min_replay_size=16,
+            batch_size=2,
+            min_replay_size=3,
             max_replay_size=1000,
             optimizer=snt.optimizers.Adam(learning_rate=1e-3),
             checkpoint=False,

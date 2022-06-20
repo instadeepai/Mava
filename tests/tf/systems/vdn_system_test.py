@@ -60,9 +60,9 @@ class TestVDN:
             optimizer=snt.optimizers.RMSProp(
                 learning_rate=0.0005, epsilon=0.00001, decay=0.99
             ),
-            batch_size=1,
+            batch_size=2,
             max_gradient_norm=20.0,
-            min_replay_size=1,
+            min_replay_size=3,
             max_replay_size=10000,
             samples_per_insert=None,
             evaluator_interval={"executor_episodes": 2},

@@ -44,7 +44,7 @@ class TestMADDPG:
 
         # networks
         network_factory = lp_utils.partial_kwargs(
-            maddpg.make_default_networks, policy_networks_layer_sizes=(64, 64)
+            maddpg.make_default_networks, policy_networks_layer_sizes=(2, 2)
         )
 
         # system
@@ -52,8 +52,8 @@ class TestMADDPG:
             environment_factory=environment_factory,
             network_factory=network_factory,
             num_executors=1,
-            batch_size=32,
-            min_replay_size=32,
+            batch_size=2,
+            min_replay_size=3,
             max_replay_size=1000,
             policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
             critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
@@ -93,7 +93,7 @@ class TestMADDPG:
         network_factory = lp_utils.partial_kwargs(
             maddpg.make_default_networks,
             architecture_type=ArchitectureType.recurrent,
-            policy_networks_layer_sizes=(32, 32),
+            policy_networks_layer_sizes=(2, 2),
         )
 
         # system
@@ -101,8 +101,8 @@ class TestMADDPG:
             environment_factory=environment_factory,
             network_factory=network_factory,
             num_executors=1,
-            batch_size=16,
-            min_replay_size=16,
+            batch_size=2,
+            min_replay_size=3,
             max_replay_size=1000,
             policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
             critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
@@ -146,7 +146,7 @@ class TestMADDPG:
         # networks
         network_factory = lp_utils.partial_kwargs(
             maddpg.make_default_networks,
-            policy_networks_layer_sizes=(32, 32),
+            policy_networks_layer_sizes=(2, 2),
         )
 
         # system
@@ -154,8 +154,8 @@ class TestMADDPG:
             environment_factory=environment_factory,
             network_factory=network_factory,
             num_executors=1,
-            batch_size=16,
-            min_replay_size=16,
+            batch_size=2,
+            min_replay_size=3,
             max_replay_size=1000,
             policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
             critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
@@ -197,7 +197,7 @@ class TestMADDPG:
         # networks
         network_factory = lp_utils.partial_kwargs(
             maddpg.make_default_networks,
-            policy_networks_layer_sizes=(32, 32),
+            policy_networks_layer_sizes=(2, 2),
         )
 
         # system
@@ -205,8 +205,8 @@ class TestMADDPG:
             environment_factory=environment_factory,
             network_factory=network_factory,
             num_executors=1,
-            batch_size=16,
-            min_replay_size=16,
+            batch_size=2,
+            min_replay_size=3,
             max_replay_size=1000,
             policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
             critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
@@ -250,7 +250,7 @@ class TestMADDPG:
         # networks
         network_factory = lp_utils.partial_kwargs(
             maddpg.make_default_networks,
-            policy_networks_layer_sizes=(32, 32),
+            policy_networks_layer_sizes=(2, 2),
         )
 
         # system
@@ -258,8 +258,8 @@ class TestMADDPG:
             environment_factory=environment_factory,
             network_factory=network_factory,
             num_executors=1,
-            batch_size=16,
-            min_replay_size=16,
+            batch_size=2,
+            min_replay_size=3,
             max_replay_size=1000,
             policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
             critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
