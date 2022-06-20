@@ -28,6 +28,7 @@ class EvaluatorOfflineLogging(ParallelExecutorEnvironmentLoop):
             config : _description_.
         """
         self.config = config
+        print("COMPONENT TEST: ", self.config.offline_logdir, "*********************")
 
     def on_building_executor_environment(self, builder: SystemBuilder):
         env = self.config.environment_factory(evaluation=False)  # type: ignore
