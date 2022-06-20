@@ -104,7 +104,7 @@ class MAOfflineEnvironmentSequenceLogger:
 
         self._logdir = logdir
         self._label = label
-        print("PATH: ", logdir, os.path(logdir), "##################################")
+        print("DIR: ", logdir, "##################################")
         print(
             "ABS PATH: ", os.path.absppath(logdir), "##################################"
         )
