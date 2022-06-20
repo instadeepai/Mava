@@ -1,10 +1,50 @@
+# python3
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import abc
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional, Union
+from typing import Any, Callable, List, Optional, Union
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 from mava.utils import enums
 from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
+
+
+class BaseSystemInit(Component):
+    @abc.abstractmethod
+    def __init__(
+        self,
+        config: Any,
+    ):
+        """Initialise system init components.
+
+        Args:
+            config : a dataclass specifying the component parameters.
+        """
+        self.config = config
+
+    @abc.abstractmethod
+    def on_building_init(self, builder: SystemBuilder) -> None:
+        """Compute and add network sampling information to the builder."""
+        pass
+
+    @staticmethod
+    def name() -> str:
+        """_summary_"""
+        return "system_init"
 
 
 @dataclass
@@ -15,7 +55,7 @@ class FixedNetworkSystemInitConfig:
     )
 
 
-class FixedNetworkSystemInit(Component):
+class FixedNetworkSystemInit(BaseSystemInit):
     def __init__(
         self, config: FixedNetworkSystemInitConfig = FixedNetworkSystemInitConfig()
     ):
@@ -76,11 +116,6 @@ class FixedNetworkSystemInit(Component):
         }
 
     @staticmethod
-    def name() -> str:
-        """_summary_"""
-        return "system_init"
-
-    @staticmethod
     def config_class() -> Optional[Callable]:
         """Config class used for component.
 
@@ -98,7 +133,7 @@ class RandomSamplingSystemInitConfig:
     shared_weights: bool = False
 
 
-class RandomSamplingSystemInit(Component):
+class RandomSamplingSystemInit(BaseSystemInit):
     def __init__(
         self, config: RandomSamplingSystemInitConfig = RandomSamplingSystemInitConfig()
     ):
@@ -161,11 +196,6 @@ class RandomSamplingSystemInit(Component):
         }
 
     @staticmethod
-    def name() -> str:
-        """_summary_"""
-        return "system_init"
-
-    @staticmethod
     def config_class() -> Optional[Callable]:
         """Config class used for component.
 
@@ -183,7 +213,7 @@ class CustomSamplingSystemInitConfig:
     shared_weights: bool = False
 
 
-class CustomSamplingSystemInit(Component):
+class CustomSamplingSystemInit(BaseSystemInit):
     def __init__(
         self,
         config: CustomSamplingSystemInitConfig = CustomSamplingSystemInitConfig(),
@@ -231,11 +261,6 @@ class CustomSamplingSystemInit(Component):
         builder.store.net_keys_to_ids = {
             net_key: i for i, net_key in enumerate(builder.store.unique_net_keys)
         }
-
-    @staticmethod
-    def name() -> str:
-        """_summary_"""
-        return "system_init"
 
     @staticmethod
     def config_class() -> Optional[Callable]:
