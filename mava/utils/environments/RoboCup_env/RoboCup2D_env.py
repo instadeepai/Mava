@@ -4,6 +4,7 @@ import time
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
+import math
 
 from mava.utils.environments.RoboCup_env.robocup_utils.agent import (  # type: ignore # noqa: E501
     Agent as basic_agent,
@@ -118,6 +119,8 @@ def connect_agents(
     print("Spawned %d agents." % len(agents))
     return agents
 
+def dist(pt1, pt2):
+    return math.sqrt(math.pow(pt2[0]-pt1[0], 2) + math.pow(pt2[1]-pt1[1], 2))
 
 class RoboCup2D:
     def __init__(
@@ -269,12 +272,12 @@ class RoboCup2D:
                 else:
                     raise ValueError("Unknown team: ", player["teamname"])
 
-                ball_goal_dist = wm.euclidean_distance(
+                ball_goal_dist = dist(
                     wm.ball["coords"], destination_coords
                 )
                 next_x = float(wm.ball["coords"][0]) + float(wm.ball["delta_coords"][0])
                 next_y = float(wm.ball["coords"][1]) + float(wm.ball["delta_coords"][1])
-                ball_goal_delta_dist = wm.euclidean_distance(
+                ball_goal_delta_dist = dist(
                     (next_x, next_y), destination_coords
                 )
                 ball_towards_goal = ball_goal_dist - ball_goal_delta_dist

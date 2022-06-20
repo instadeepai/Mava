@@ -379,8 +379,6 @@ class DecentralisedQValueActorCritic(DecentralisedValueActorCritic):
 
         # create critics
         for net_key in self._net_keys:
-            # agent_key = self._net_spec_keys[net_key]
-
             # get specs
             emb_spec = embed_specs[net_key]
             act_spec = act_specs[net_key]

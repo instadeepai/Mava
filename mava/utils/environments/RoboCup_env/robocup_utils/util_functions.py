@@ -460,87 +460,89 @@ class SpecWrapper(dm_env.Environment):
             s, e = obs_dict["last_action"]
             proc_agent_obs[s:e] = last_action
 
-        # [see_player, is_on_team, distance, direction, dist_change,
-        # dir_change, speed, body_direction, neck_direction]
-        if "players" in env_agent_obs and len(env_agent_obs["players"]) > 0:
-            raise NotImplementedError(
-                "Obs for more than one player not implemented yet."
-            )
-            # ["opponent", player.distance, player.direction (x, y format)]
-            num_see_players = len(env_agent_obs["players"])
+        see_other_agents = True
+        if see_other_agents:
+            # [see_player, is_on_team, distance, direction, dist_change,
+            # dir_change, speed, body_direction, neck_direction]
+            if "players" in env_agent_obs and len(env_agent_obs["players"]) > 0:
+                raise NotImplementedError(
+                    "Obs for more than one player not implemented yet."
+                )
+                # ["opponent", player.distance, player.direction (x, y format)]
+                num_see_players = len(env_agent_obs["players"])
 
-            # Place the players on the closest available spot
-            players = env_agent_obs["players"]
+                # Place the players on the closest available spot
+                players = env_agent_obs["players"]
 
-            # TODO: Get better sorting algorithm. This one is good,
-            # but also allows for player degrees not to
-            #  always be assending. This is because a player can be
-            # selected for a slot and then the player with a
-            #  bigger positive degree might be selected for a lower
-            # slot. Therefore this might happend:
-            #  player[i].degree > player[i+1].degree.
+                # TODO: Get better sorting algorithm. This one is good,
+                # but also allows for player degrees not to
+                #  always be assending. This is because a player can be
+                # selected for a slot and then the player with a
+                #  bigger positive degree might be selected for a lower
+                # slot. Therefore this might happend:
+                #  player[i].degree > player[i+1].degree.
 
-            player_ids = list(range(num_see_players))
-            spots = [[d_i, (d_i / 20) * 180 - 90] for d_i in range(21)]
-            player_spots = [-1] * num_see_players
-            for _ in range(num_see_players):
-                best_p_i = None
-                beset_spot = None
-                best_s_count = None
-                best_p_count = None
-                beset_dist = np.inf
+                player_ids = list(range(num_see_players))
+                spots = [[d_i, (d_i / 20) * 180 - 90] for d_i in range(21)]
+                player_spots = [-1] * num_see_players
+                for _ in range(num_see_players):
+                    best_p_i = None
+                    beset_spot = None
+                    best_s_count = None
+                    best_p_count = None
+                    beset_dist = np.inf
 
-                # All remaining players select the closest available spot
-                for p_count, p_i in enumerate(player_ids):
-                    player_type, player_dist, player_dir = players[p_i]
+                    # All remaining players select the closest available spot
+                    for p_count, p_i in enumerate(player_ids):
+                        player_type, player_dist, player_dir = players[p_i]
 
-                    # Go through all the spots and get the closest one to the player
-                    for s_count, spot in enumerate(spots):
-                        s_i, s_dir = spot
+                        # Go through all the spots and get the closest one to the player
+                        for s_count, spot in enumerate(spots):
+                            s_i, s_dir = spot
 
-                        dist_to_spot = abs(s_dir - player_dir)
+                            dist_to_spot = abs(s_dir - player_dir)
 
-                        if dist_to_spot < beset_dist:
-                            beset_dist = dist_to_spot
-                            best_p_i = p_i
-                            beset_spot = s_i
-                            best_p_count = p_count
-                            best_s_count = s_count
+                            if dist_to_spot < beset_dist:
+                                beset_dist = dist_to_spot
+                                best_p_i = p_i
+                                beset_spot = s_i
+                                best_p_count = p_count
+                                best_s_count = s_count
 
-                # Give the closest player its spot.
-                player_ids.pop(best_p_count)
-                spots.pop(best_s_count)
-                player_spots[best_p_i] = beset_spot
+                    # Give the closest player its spot.
+                    player_ids.pop(best_p_count)
+                    spots.pop(best_s_count)
+                    player_spots[best_p_i] = beset_spot
 
-            assert len(player_ids) == 0
-            # Calculate all the available slots to put player in
-            slots = [
-                [11 + self.action_size + s_i * 5, 11 + self.action_size + s_i * 5 + 5]
-                for s_i in player_spots
-            ]
-            # slots = [i, i + 5] for i in
-            # slots = [all_slots[p_spot] for p_spot in player_spots]
-
-            assert len(slots) == num_see_players
-            player_type_dict = {"opponent": 0.0, "team": 1.0}
-
-            for p_i, player in enumerate(players):
-                player_type, player_dist, player_dir = player
-
-                # pop a random element from the slots list
-                start_i, end_i = slots[p_i]
-
-                # see_player, is_on_team, player_distance,
-                # player_direction (x, y format)
-                dir_x, dir_y = deg_rot_to_xy(player_dir)
-
-                proc_agent_obs[start_i:end_i] = [
-                    1.0,
-                    player_type_dict[player_type],
-                    player_dist / self.scaling,
-                    dir_x,
-                    dir_y,
+                assert len(player_ids) == 0
+                # Calculate all the available slots to put player in
+                slots = [
+                    [11 + self.action_size + s_i * 5, 11 + self.action_size + s_i * 5 + 5]
+                    for s_i in player_spots
                 ]
+                # slots = [i, i + 5] for i in
+                # slots = [all_slots[p_spot] for p_spot in player_spots]
+
+                assert len(slots) == num_see_players
+                player_type_dict = {"opponent": 0.0, "team": 1.0}
+
+                for p_i, player in enumerate(players):
+                    player_type, player_dist, player_dir = player
+
+                    # pop a random element from the slots list
+                    start_i, end_i = slots[p_i]
+
+                    # see_player, is_on_team, player_distance,
+                    # player_direction (x, y format)
+                    dir_x, dir_y = deg_rot_to_xy(player_dir)
+
+                    proc_agent_obs[start_i:end_i] = [
+                        1.0,
+                        player_type_dict[player_type],
+                        player_dist / self.scaling,
+                        dir_x,
+                        dir_y,
+                    ]
 
         # if not env_agent_obs["obs_updated"]:
         #     proc_agent_obs[2] = 0.0

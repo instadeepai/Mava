@@ -24,6 +24,9 @@ from mava.wrappers.robocup import RoboCupWrapper
 
 def make_environment(
     game_name: str = "domain_randomisation",
+    players_per_team = None,
+    render_game: bool = False,
+    include_wait: bool = False,
     evaluation: bool = False,
 ) -> dm_env.Environment:
     """Wraps the Robocup environment with some basic preprocessing.
@@ -37,14 +40,15 @@ def make_environment(
     """
 
     # Create environment
-    if game_name == "domain_randomisation":
-        players_per_team = [1, 0]
-    elif game_name == "reward_shaping":
-        players_per_team = [1, 0]
-    # elif game_name == "fixed_opponent":
-    #     players_per_team = [2, 2]
-    else:
-        raise NotImplementedError("Game type not implemented: ", game_name)
+    if players_per_team is None:
+        if game_name == "domain_randomisation":
+            players_per_team = [1, 0]
+        elif game_name == "reward_shaping":
+            players_per_team = [1, 0]
+        # elif game_name == "fixed_opponent":
+        #     players_per_team = [2, 2]
+        else:
+            raise NotImplementedError("Game type not implemented: ", game_name)
 
     # TODO: Change this to better assign ports
     rand_port = np.random.randint(6000, 60000)
@@ -52,7 +56,7 @@ def make_environment(
         game_setting=game_name,
         team_names=["Team_A", "Team_B"],
         players_per_team=players_per_team,
-        render_game=False,
+        render_game=render_game,
         include_wait=False,
         game_length=1000,
         port=rand_port,
