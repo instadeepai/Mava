@@ -23,7 +23,7 @@ class MockNet:
 
 
 def log_prob(distribution_params: jnp.array, actions: jnp.array) -> jnp.ndarray:
-    """Mock function to return fixed log probs"""cd 
+    """Mock function to return fixed log probs"""
     return distribution_params + actions
 
 
@@ -37,7 +37,7 @@ def entropy(distribution_params: jnp.array) -> jnp.ndarray:
 def mock_trainer() -> Trainer:
     """Creates mock trainer fixture"""
 
-    observation = SimpleNamespace(observation= jnp.array([0.5, 0.5, 0.7, 0.2]))
+    observation = SimpleNamespace(observation=jnp.array([0.5, 0.5, 0.7, 0.2]))
     observations = {
         "agent_0": observation,
         "agent_1": observation,
@@ -182,9 +182,11 @@ def test_mapg_loss(
     low_agent_0_loss = low_loss_info["agent_0"]
     low_loss_value = low_agent_0_loss["loss_value"]
     low_loss_policy = low_agent_0_loss["loss_policy"]
+    loss_total_low = low_agent_0_loss["loss_total"]
 
     assert loss_entropy == -0.47500002
     assert loss_value == 6.4075003
 
     assert low_loss_value < loss_value
     assert low_loss_policy < loss_policy
+    assert loss_total_low < loss_total
