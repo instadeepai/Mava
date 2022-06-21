@@ -71,12 +71,6 @@ class FixedNetworkSystemInit(BaseSystemInit):
 
     def on_building_init(self, builder: SystemBuilder) -> None:
         """Compute and add network sampling information to the builder."""
-
-        # Add network sampling setup type to builder store for now due to
-        # being required in the data server component
-
-        builder.store.network_sampling_setup_type = self.config.network_sampling_setup
-
         if (
             self.config.network_sampling_setup
             != enums.NetworkSampler.fixed_agent_networks
@@ -155,12 +149,6 @@ class RandomSamplingSystemInit(BaseSystemInit):
 
     def on_building_init(self, builder: SystemBuilder) -> None:
         """Compute and add network sampling information to the builder."""
-
-        # Add network sampling setup type to builder store for now due to
-        # being required in the data server component
-
-        builder.store.network_sampling_setup_type = self.config.network_sampling_setup
-
         if (
             self.config.network_sampling_setup
             != enums.NetworkSampler.random_agent_networks
@@ -240,12 +228,6 @@ class CustomSamplingSystemInit(BaseSystemInit):
 
     def on_building_init(self, builder: SystemBuilder) -> None:
         """Compute and add network sampling information to the builder."""
-
-        # Add network sampling setup type to builder store for now due to
-        # being required in the data server component
-
-        builder.store.network_sampling_setup_type = self.config.network_sampling_setup
-
         if self.config.network_sampling_setup == []:
             raise ValueError("A custom network sampling setup list must be provided.")
 
