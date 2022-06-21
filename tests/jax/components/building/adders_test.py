@@ -18,6 +18,7 @@
 from types import SimpleNamespace
 
 import pytest
+
 from mava.adders import reverb as reverb_adders
 from mava.components.jax.building.adders import (
     AdderPriorityConfig,
@@ -86,6 +87,7 @@ def parallel_sequence_adder_signature() -> ParallelSequenceAdderSignature:
 
     signature = ParallelSequenceAdderSignature()
     return signature
+
 
 @pytest.fixture
 def parallel_transition_adder_signature() -> ParallelTransitionAdderSignature:
