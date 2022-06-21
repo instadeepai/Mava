@@ -19,7 +19,6 @@ from mava.components.jax.building.adders import (
     ParallelSequenceAdder,
     ParallelSequenceAdderSignature,
 )
-from mava.components.jax.building.base import SystemInit
 from mava.components.jax.building.data_server import OnPolicyDataServer
 from mava.components.jax.building.datasets import TrajectoryDataset
 from mava.components.jax.building.distributor import Distributor
@@ -32,4 +31,9 @@ from mava.components.jax.building.networks import DefaultNetworks
 from mava.components.jax.building.parameter_client import (
     ExecutorParameterClient,
     TrainerParameterClient,
+)
+from mava.components.jax.building.system_init import (
+    CustomSamplingSystemInit,
+    FixedNetworkSystemInit,
+    RandomSamplingSystemInit,
 )
