@@ -13,4 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for trainer class for Jax-based Mava systems"""
+from types import SimpleNamespace
+
+import pytest
+
+from mava.systems.jax.trainer import Trainer
+
+
+@pytest.fixture
+def mock_trainer() -> Trainer:
+    """Create mock trainer."""
+
+    trainer = Trainer(config=SimpleNamespace(), components=[])
+    return trainer
