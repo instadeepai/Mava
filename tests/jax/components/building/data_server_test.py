@@ -14,12 +14,12 @@
 # limitations under the License.
 
 """Tests for config class for Jax-based Mava systems"""
-
 from typing import Any, Dict
 
 import pytest
 from reverb import item_selectors, pybind, reverb_types
 
+from mava.utils import enums
 from tests.jax.mocks import return_test_system
 from tests.jax.utils import assert_if_value_is_not_none
 
@@ -58,6 +58,12 @@ class TestDataServer:
         test_system = return_test_system(components["component"])
         system_config = components["system_config"]
         test_system.build(**system_config)
+
+        # Manually add needed parameter to global config
+        test_system._builder.store.global_config.network_sampling_setup_type = (
+            enums.NetworkSampler.fixed_agent_networks
+        )
+
         test_system._builder.data_server()
 
         # Assuming a single table for now
