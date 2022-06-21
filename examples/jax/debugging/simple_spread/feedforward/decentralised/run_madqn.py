@@ -13,17 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MAPPO on debug MPE environments."""
+"""Example running MADQN on debug MPE environments."""
 import functools
 from datetime import datetime
 from typing import Any
-
+import numpy as np
 import optax
 from absl import app, flags
 
-from mava.systems.jax import mappo
+from mava.systems.jax import madqn
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
+from mava.utils.schedules.linear_epsilon_scheduler import LinearEpsilonScheduler
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -60,12 +61,7 @@ def main(_: Any) -> None:
 
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
-        return mappo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(254, 254, 254),
-            critic_layer_sizes=(512, 512, 256),
-            *args,
-            **kwargs,
-        )
+        return madqn.make_default_networks(policy_layer_sizes=(254, 254, 254), **kwargs)
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_subpath = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
@@ -83,24 +79,32 @@ def main(_: Any) -> None:
 
     # Optimizer.
     optimizer = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+        optax.clip_by_global_norm(40.0),
+        optax.adam(learning_rate=1e-3),
+        # optax.scale_by_adam(), optax.scale(-1e-4)
     )
-
+    # epsilon scheduler
+    epsilon_scheduler = LinearEpsilonScheduler(1.0, 0.1, 1000)
     # Create the system.
-    system = mappo.MAPPOSystem()
+    system = madqn.MADQNSystem()
 
     # Build the system.
     system.build(
+        epsilon_scheduler=epsilon_scheduler,
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
         checkpoint_subpath=checkpoint_subpath,
         optimizer=optimizer,
-        run_evaluator=False,
-        sample_batch_size=5,
-        num_epochs=15,
-        num_executors=1,
+        executor_parameter_update_period=10,
         multi_process=True,
+        run_evaluator=False,
+        num_executors=1,
+        # use_next_extras=False,
+        sample_batch_size=256,
+        target_update_period=10,
+        num_epochs=5, # why was this so high?
+        min_data_server_size=2000,
     )
 
     # Launch the system.

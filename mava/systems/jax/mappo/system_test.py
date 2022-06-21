@@ -66,7 +66,7 @@ def test_except_trainer(
         multi_process=False,
         run_evaluator=False,
         num_executors=1,
-        use_next_extras=False,
+        # use_next_extras=False,
         sample_batch_size=2,
     )
 
@@ -80,7 +80,8 @@ def test_except_trainer(
     assert isinstance(executor, acme.core.Worker)
 
     # Step the executor
-    executor.run_episode()
+    for _ in range(20):
+        executor.run_episode()
     assert 1 == 1
     # Step the trainer
     trainer.step()

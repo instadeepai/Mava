@@ -66,7 +66,7 @@ def test_full_system() -> Tuple:
         multi_process=False,
         run_evaluator=True,
         num_executors=1,
-        use_next_extras=False,
+        # use_next_extras=False,
         sample_batch_size=2,
     )
 

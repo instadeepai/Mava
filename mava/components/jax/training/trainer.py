@@ -14,9 +14,10 @@
 # limitations under the License.
 
 """Trainer components for system builders."""
-
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Union
+
+import numpy as np
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder, SystemTrainer
@@ -96,6 +97,7 @@ class TrainerInit(Component):
                     matches = most_matches
                     builder.store.table_network_config[trainer_key] = sample
 
+        # TODO (Nima): this is repeated before in ExecutorInit. Redundant?
         builder.store.networks = builder.store.network_factory()
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
@@ -112,6 +114,14 @@ class TrainerInit(Component):
             for a_i, agent in enumerate(trainer.store.trainer_agents)
         }
 
+    def on_training_init_start(self, trainer: SystemTrainer) -> None:
+        """Set up the counter for training steps."""
+        trainer.store.training_steps = np.array(0, dtype=np.int64)
+
+    def on_training_step_end(self, trainer: SystemTrainer) -> None:
+        """Increment the training step."""
+        trainer.store.training_steps += 1
+
     @staticmethod
     def name() -> str:
         """_summary_"""
@@ -119,4 +129,5 @@ class TrainerInit(Component):
 
     @staticmethod
     def config_class() -> Callable:
+        """Returns class config."""
         return TrainerInitConfig

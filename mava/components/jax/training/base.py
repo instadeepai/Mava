@@ -38,6 +38,23 @@ class Batch(NamedTuple):
     behavior_values: Any
     behavior_log_probs: Any
 
+    # values needed for Q-learning family of methods.
+    next_observations: Any
+    discounts: Any
+    rewards: Any
+
+
+class BatchDQN(NamedTuple):
+    """A batch of data; all shapes are expected to be [B, ...]."""
+
+    observations: Any
+    actions: Any
+
+    # values needed for Q-learning family of methods.
+    next_observations: Any
+    discounts: Any
+    rewards: Any
+
 
 class TrainingState(NamedTuple):
     """Training state consists of network parameters and optimiser state."""
@@ -45,6 +62,8 @@ class TrainingState(NamedTuple):
     params: Any
     opt_states: Dict[str, optax.OptState]
     random_key: Any
+    # values needed for Q-learning family of methods.
+    target_params: Any = {}
 
 
 class Utility(Component):

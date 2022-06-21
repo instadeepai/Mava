@@ -26,7 +26,7 @@ class DQNNetworks:
         self.network = network
         self.params = params
 
-        @jit
+        # @jit
         def forward_fn(
             params: Dict[str, jnp.ndarray], observations: networks_lib.Observation
         ) -> jnp.ndarray:

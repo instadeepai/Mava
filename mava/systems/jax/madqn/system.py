@@ -13,10 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Jax MAPPO system."""
+"""Jax MADQN system."""
 from typing import Any, Tuple
 
 from mava.components.jax import building, executing, training, updating
+from mava.components.jax.executing.base import ExecutorTargetNetInit
 from mava.specs import DesignSpec
 from mava.systems.jax import System
 from mava.systems.jax.madqn.components import ExtrasActionInfo
@@ -37,6 +38,8 @@ class MADQNSystem(System):
         # Executor
         executor_process = DesignSpec(
             executor_init=executing.ExecutorInit,
+            executor_target_network_init=ExecutorTargetNetInit,
+            executor_extra=executing.ExtrasFinder,
             executor_observe=executing.FeedforwardExecutorObserve,
             executor_select_action=executing.FeedforwardExecutorSelectActionValueBased,
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
@@ -47,12 +50,10 @@ class MADQNSystem(System):
         # Trainer
         trainer_process = DesignSpec(
             trainer_init=training.TrainerInit,
-            gae_fn=training.GAE,
-            loss=training.MAPGWithTrustRegionClippingLoss,
-            epoch_update=training.MAPGEpochUpdate,
-            minibatch_update=training.MAPGMinibatchUpdate,
-            # sgd_step=training.MAPGWithTrustRegionStep,
             step=training.DefaultStep,
+            sgd_step=training.MADQNStep,
+            loss=training.MADQNLoss,
+            epoch_update=training.MADQNEpochUpdate,
             trainer_dataset=building.TrajectoryDataset,
         ).get()
 

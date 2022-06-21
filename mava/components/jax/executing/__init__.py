@@ -18,6 +18,9 @@ from mava.components.jax.executing.action_selection import (
     FeedforwardExecutorSelectAction,
     FeedforwardExecutorSelectActionValueBased,
 )
-from mava.components.jax.executing.base import ExecutorInit
+from mava.components.jax.executing.base import ExecutorInit, ExecutorTargetNetInitConfig
 from mava.components.jax.executing.epsilon_scheduler import EpsilonScheduler
-from mava.components.jax.executing.observing import FeedforwardExecutorObserve
+from mava.components.jax.executing.observing import (
+    ExtrasFinder,
+    FeedforwardExecutorObserve,
+)

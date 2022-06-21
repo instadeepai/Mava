@@ -63,7 +63,20 @@ class DataServer(Component):
                 builder.store.extras_spec,
                 num_networks,
             )
-            table = self.table(table_key, env_spec, extras_spec, builder)
+
+            next_extras_spec = covert_specs(
+                builder.store.agent_net_keys,
+                builder.store.next_extras_spec,
+                num_networks,
+            )
+
+            table = self.table(
+                table_key=table_key,
+                environment_spec=env_spec,
+                extras_spec=extras_spec,
+                next_extras_spec=next_extras_spec,
+                builder=builder,
+            )
             data_tables.append(table)
         return data_tables
 
@@ -73,6 +86,7 @@ class DataServer(Component):
         table_key: str,
         environment_spec: specs.MAEnvironmentSpec,
         extras_spec: Dict[str, Any],
+        next_extras_spec: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
         """_summary_"""
@@ -89,9 +103,9 @@ class DataServer(Component):
 
 @dataclass
 class OffPolicyDataServerConfig:
-    sampler: reverb_types.SelectorType = reverb.selectors.Uniform()
-    remover: reverb_types.SelectorType = reverb.selectors.Fifo()
-    max_size: int = 100000
+    sampler: reverb_types.SelectorType = reverb.item_selectors.Uniform
+    remover: reverb_types.SelectorType = reverb.item_selectors.Fifo
+    max_size: int = 10000
     max_times_sampled: int = 0
 
 
@@ -113,6 +127,7 @@ class OffPolicyDataServer(DataServer):
         table_key: str,
         environment_spec: specs.MAEnvironmentSpec,
         extras_spec: Dict[str, Any],
+        next_extras_spec: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
         """_summary_
@@ -121,18 +136,20 @@ class OffPolicyDataServer(DataServer):
             table_key : _description_
             environment_spec : _description_
             extras_spec : _description_
+            next_extras_spec: _description_
             builder : _description_
         Returns:
             _description_
         """
         table = reverb.Table(
-            # name=f"{self.config.data_server_name}_{table_key}",
             name=table_key,
-            sampler=self.config.sampler,
-            remover=self.config.remover,
+            sampler=self.config.sampler(),
+            remover=self.config.remover(),
             max_size=self.config.max_size,
             rate_limiter=builder.store.rate_limiter_fn(),
-            signature=builder.store.adder_signature_fn(environment_spec, extras_spec),
+            signature=builder.store.adder_signature_fn(
+                environment_spec, extras_spec, next_extras_spec
+            ),
         )
         return table
 

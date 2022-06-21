@@ -256,7 +256,7 @@ def test_except_trainer(
         multi_process=False,
         run_evaluator=True,
         num_executors=1,
-        use_next_extras=False,
+        # use_next_extras=False,
     )
 
     (

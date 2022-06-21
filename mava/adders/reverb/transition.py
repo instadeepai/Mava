@@ -91,7 +91,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         *,
         priority_fns: Optional[base.PriorityFnMapping] = None,
         max_in_flight_items: int = 5,
-        use_next_extras: bool = True,
+        # use_next_extras: bool = True,
     ) -> None:
         """Creates an N-step transition adder.
 
@@ -127,7 +127,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             max_sequence_length=n_step + 1,
             priority_fns=priority_fns,
             max_in_flight_items=max_in_flight_items,
-            use_next_extras=use_next_extras,
+            # use_next_extras=use_next_extras,
         )
 
     def _write(self) -> None:
@@ -150,9 +150,26 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             get_first, (history["observations"], history["extras"], history["actions"])
         )
 
+        # Next observations.
         s_ = tree.map_structure(get_last, history["observations"])
 
-        e_ = tree.map_structure(get_first, history["extras"])
+        # Next extras.
+        # next extra refers to "extras" belonging to the next step. One should note
+        # that not all that extra information is yet available at this stage,
+        # because although the next state (and all the state-dependent extras) are
+        # known, the action dependent extras are not known as the action of the next
+        # state is not yet taken. So we should only ask for the ones which are available
+
+        e_ = {}
+        for available_key in self._keys_available_as_next_extra:
+            e_.update(
+                {
+                    available_key: tree.map_structure(
+                        get_last, history["extras"][available_key]
+                    )
+                }
+            )
+        # e_ = tree.map_structure(get_first, history["extras"])
 
         # # Maybe get extras to add to the transition later.
         # if 'extras' in history:
@@ -212,6 +229,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         cls,
         environment_spec: mava_specs.EnvironmentSpec,
         extras_spec: tf.TypeSpec = {},
+        next_extras_spec: tf.TypeSpec = {},
     ) -> tf.TypeSpec:
         """Signature for adder.
 
@@ -265,7 +283,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             rewards=reward_specs,
             discounts=step_discount_specs,
             extras=extras_spec,
-            next_extras=extras_spec,
+            next_extras=next_extras_spec,
         )
 
         return tree.map_structure_with_path(

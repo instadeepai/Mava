@@ -14,8 +14,7 @@
 # limitations under the License.
 
 """Custom components for MADQN system."""
-# TODO (Nima): I am not sure this is useful for the training. If not it should be
-# removed and also the data_server should be changed accordingly.
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -44,6 +43,7 @@ class ExtrasActionInfo(Component):
 
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """[summary]"""
+        # TODO: extras
         agent_specs = builder.store.environment_spec.get_agent_specs()
         builder.store.extras_spec = {"policy_info": {}}
 
@@ -58,6 +58,8 @@ class ExtrasActionInfo(Component):
         agents = builder.store.environment_spec.get_agent_ids()
         net_spec = {"network_keys": {agent: int_spec for agent in agents}}
         builder.store.extras_spec.update(net_spec)
+        # adding network keys to next_extras
+        builder.store.next_extras_spec = net_spec  # this could be easily set to {}
 
     @staticmethod
     def name() -> str:
@@ -66,4 +68,4 @@ class ExtrasActionInfo(Component):
         Returns:
             _description_
         """
-        return "extras_log_prob"
+        return "extras_info"

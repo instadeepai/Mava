@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Execution components for system builders"""
-
+import copy
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Union
 
@@ -139,3 +139,35 @@ class ExecutorInit(Component):
     def config_class() -> Callable:
         """Returns the config class for this component."""
         return ExecutorInitConfig
+
+
+@dataclass
+class ExecutorTargetNetInitConfig:
+    pass
+
+
+class ExecutorTargetNetInit(Component):
+    def __init__(
+        self, config: ExecutorTargetNetInitConfig = ExecutorTargetNetInitConfig()
+    ):
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    def on_building_init(self, builder: SystemBuilder) -> None:
+        """Summary"""
+        # Setup agent target networks
+        builder.store.target_networks = copy.deepcopy(builder.store.networks)
+
+    @staticmethod
+    def name() -> str:
+        """_summary_"""
+        return "executor_target_net_init"
+
+    @staticmethod
+    def config_class() -> Callable:
+        """Returns the config class for this component."""
+        return ExecutorTargetNetInitConfig

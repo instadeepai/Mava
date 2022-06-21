@@ -51,7 +51,7 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         priority_fns: Optional[base.PriorityFnMapping] = None,
         max_in_flight_items: int = 2,
         end_of_episode_behavior: Optional[EndBehavior] = EndBehavior.ZERO_PAD,
-        use_next_extras: bool = True,
+        # use_next_extras: bool = True,
     ):
         """Makes a SequenceAdder instance.
 
@@ -93,7 +93,7 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
             delta_encoded=delta_encoded,
             priority_fns=priority_fns,
             max_in_flight_items=max_in_flight_items,
-            use_next_extras=use_next_extras,
+            # use_next_extras=use_next_extras,
         )
 
         self._period = period

@@ -56,7 +56,7 @@ class Config:
                     new_param_names = list(dataclass.__dict__.keys())
                     if set(self._current_params) & set(new_param_names):
                         raise Exception(
-                            "Component configs share a common parameter name. \
+                            "Component configs share a common parameter name \
                             This is not allowed, please ensure config \
                             parameter names are unique."
                         )

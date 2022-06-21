@@ -21,8 +21,8 @@ from dataclasses import dataclass
 class MADQNDefaultConfig:
     """Configs for the MADQN agent."""
 
-    sample_batch_size: int = 32
+    sample_batch_size: int = 256
 
     # sequence_length: int = 20
     # period: int = 10
-    use_next_extras: bool = False
+    # use_next_extras: bool = False

@@ -121,7 +121,7 @@ class AdderSignature(Component):
 class ParallelTransitionAdderConfig:
     n_step: int = 1
     discount: float = 0.99
-    use_next_extras: bool = False
+    # use_next_extras: bool = False
 
 
 class ParallelTransitionAdder(Adder):
@@ -152,7 +152,7 @@ class ParallelTransitionAdder(Adder):
             n_step=self.config.n_step,
             table_network_config=builder.store.table_network_config,
             discount=self.config.discount,
-            use_next_extras=self.config.use_next_extras,
+            # use_next_extras=self.config.use_next_extras,
         )
 
         builder.store.adder = adder
@@ -190,10 +190,14 @@ class ParallelTransitionAdderSignature(AdderSignature):
         """
 
         def adder_sig_fn(
-            env_spec: specs.MAEnvironmentSpec, extra_specs: Dict[str, Any]
+            env_spec: specs.MAEnvironmentSpec,
+            extra_specs: Dict[str, Any],
+            next_extra_specs: Dict[str, Any],
         ) -> Any:
             return reverb_adders.ParallelNStepTransitionAdder.signature(
-                env_spec, extra_specs
+                environment_spec=env_spec,
+                extras_spec=extra_specs,
+                next_extras_spec=next_extra_specs,
             )
 
         builder.store.adder_signature_fn = adder_sig_fn
@@ -203,7 +207,7 @@ class ParallelTransitionAdderSignature(AdderSignature):
 class ParallelSequenceAdderConfig:
     sequence_length: int = 20
     period: int = 10
-    use_next_extras: bool = False
+    # use_next_extras: bool = False
 
 
 class ParallelSequenceAdder(Component):
@@ -246,7 +250,7 @@ class ParallelSequenceAdder(Component):
             sequence_length=self.config.sequence_length,
             table_network_config=builder.store.table_network_config,
             period=self.config.period,
-            use_next_extras=self.config.use_next_extras,
+            # use_next_extras=self.config.use_next_extras,
         )
 
         builder.store.adder = adder
