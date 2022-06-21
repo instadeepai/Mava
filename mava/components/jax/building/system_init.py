@@ -72,6 +72,11 @@ class FixedNetworkSystemInit(BaseSystemInit):
     def on_building_init(self, builder: SystemBuilder) -> None:
         """Compute and add network sampling information to the builder."""
 
+        # Add network sampling setup type to builder store for now due to
+        # being required in the data server component
+
+        builder.store.network_sampling_setup_type = self.config.network_sampling_setup
+
         if (
             self.config.network_sampling_setup
             != enums.NetworkSampler.fixed_agent_networks
@@ -110,7 +115,7 @@ class FixedNetworkSystemInit(BaseSystemInit):
             all_samples.extend(sample)
         builder.store.unique_net_keys = list(sort_str_num(list(set(all_samples))))
 
-        # Create mapping from ints to networks
+        # Create mapping from networks to ints
         builder.store.net_keys_to_ids = {
             net_key: i for i, net_key in enumerate(builder.store.unique_net_keys)
         }
@@ -151,6 +156,11 @@ class RandomSamplingSystemInit(BaseSystemInit):
     def on_building_init(self, builder: SystemBuilder) -> None:
         """Compute and add network sampling information to the builder."""
 
+        # Add network sampling setup type to builder store for now due to
+        # being required in the data server component
+
+        builder.store.network_sampling_setup_type = self.config.network_sampling_setup
+
         if (
             self.config.network_sampling_setup
             != enums.NetworkSampler.random_agent_networks
@@ -190,7 +200,7 @@ class RandomSamplingSystemInit(BaseSystemInit):
             all_samples.extend(sample)
         builder.store.unique_net_keys = list(sort_str_num(list(set(all_samples))))
 
-        # Create mapping from ints to networks
+        # Create mapping from networks to ints
         builder.store.net_keys_to_ids = {
             net_key: i for i, net_key in enumerate(builder.store.unique_net_keys)
         }
@@ -231,6 +241,11 @@ class CustomSamplingSystemInit(BaseSystemInit):
     def on_building_init(self, builder: SystemBuilder) -> None:
         """Compute and add network sampling information to the builder."""
 
+        # Add network sampling setup type to builder store for now due to
+        # being required in the data server component
+
+        builder.store.network_sampling_setup_type = self.config.network_sampling_setup
+
         if self.config.network_sampling_setup == []:
             raise ValueError("A custom network sampling setup list must be provided.")
 
@@ -257,7 +272,7 @@ class CustomSamplingSystemInit(BaseSystemInit):
             all_samples.extend(sample)
         builder.store.unique_net_keys = list(sort_str_num(list(set(all_samples))))
 
-        # Create mapping from ints to networks
+        # Create mapping from networks to ints
         builder.store.net_keys_to_ids = {
             net_key: i for i, net_key in enumerate(builder.store.unique_net_keys)
         }
