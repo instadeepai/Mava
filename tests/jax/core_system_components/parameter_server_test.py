@@ -44,7 +44,7 @@ class TestSystem(System):
         """
         components = DesignSpec(
             environment_spec=building.EnvironmentSpec,
-            system_init=building.SystemInit,
+            system_init=building.FixedNetworkSystemInit,
             data_server=mocks.MockOnPolicyDataServer,
             data_server_adder_signature=ParallelTransitionAdderSignature,
             parameter_server=DefaultParameterServer,
