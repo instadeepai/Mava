@@ -23,7 +23,7 @@ class MockNet:
 
 
 def log_prob(distribution_params: jnp.array, actions: jnp.array) -> jnp.ndarray:
-    """Mock function to return fixed log probs"""
+    """Mock function to return fixed log probs"""cd 
     return distribution_params + actions
 
 
