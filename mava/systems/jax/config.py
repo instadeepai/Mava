@@ -15,7 +15,7 @@
 
 """Config class for Mava systems"""
 
-from dataclasses import is_dataclass
+from dataclasses import fields, is_dataclass
 from types import SimpleNamespace
 from typing import Any, Dict, List, Type
 
@@ -213,9 +213,8 @@ class Config:
         if not config_class:  # no config class for component
             return SimpleNamespace()
 
-        # Check global config for names which appear in the config class
-        for parameter_name, value in global_config.items():
-            if hasattr(config_class, parameter_name):
-                local_config[parameter_name] = global_config[parameter_name]
+        # Set local config to global config for names which appear in the config class
+        for field in fields(config_class):
+            local_config[field.name] = global_config[field.name]
 
-        return SimpleNamespace(**local_config)
+        return config_class(**local_config)
