@@ -111,8 +111,6 @@ class DefaultParameterServer(ParameterServer):
         Args:
             server : _description_
         """
-
-        server.store.non_blocking_sleep_seconds = self.config.non_blocking_sleep_seconds
         networks = server.store.network_factory()
 
         # # Create parameters
