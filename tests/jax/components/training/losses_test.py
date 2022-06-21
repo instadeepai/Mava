@@ -12,14 +12,14 @@ from mava.components.jax.training.losses import (
 from mava.systems.jax.trainer import Trainer
 
 
-class Mock_net:
+class MockNet:
     """Creates a mock network for loss function"""
 
     def apply(
         parameters: jnp.array, observation: jnp.array
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """Mock function to apply the network to training data"""
-        return jnp.array(observation), jnp.array(observation)
+        return observation, observation
 
 
 def log_prob(distribution_params: jnp.array, actions: jnp.array) -> jnp.ndarray:
@@ -37,7 +37,7 @@ def entropy(distribution_params: jnp.array) -> jnp.ndarray:
 def mock_trainer() -> Trainer:
     """Creates mock trainer fixture"""
 
-    observation = SimpleNamespace(observation=[0.5, 0.5, 0.7, 0.2])
+    observation = SimpleNamespace(observation= jnp.array([0.5, 0.5, 0.7, 0.2]))
     observations = {
         "agent_0": observation,
         "agent_1": observation,
@@ -53,7 +53,7 @@ def mock_trainer() -> Trainer:
     network = {
         "networks": {
             "network_agent": SimpleNamespace(
-                network=Mock_net, log_prob=log_prob, entropy=entropy
+                network=MockNet, log_prob=log_prob, entropy=entropy
             )
         }
     }
@@ -185,7 +185,6 @@ def test_mapg_loss(
 
     assert loss_entropy == -0.47500002
     assert loss_value == 6.4075003
-    assert loss_total == (loss_entropy * 0.01 + loss_policy + loss_value * 0.5)
 
     assert low_loss_value < loss_value
     assert low_loss_policy < loss_policy
