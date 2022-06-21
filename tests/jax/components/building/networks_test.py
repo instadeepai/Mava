@@ -141,10 +141,12 @@ def test_network_factory_environment_spec(
     networks = test_builder.store.network_factory()
 
     for network in networks.values():
-        assert network["environment_spec"]._keys == ["agent_0", "agent_1"]
-        assert network["environment_spec"]._specs["agent_0"].observations.shape == (
-            10,
-            5,
+        assert list(network["environment_spec"]._keys) == list(
+            make_fake_env_specs()._specs.keys()
+        )
+        assert (
+            network["environment_spec"]._specs["agent_0"].observations.shape
+            == list(make_fake_env_specs()._specs.values())[0].observations.shape
         )
 
 
