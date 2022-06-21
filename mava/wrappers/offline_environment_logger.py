@@ -104,10 +104,6 @@ class MAOfflineEnvironmentSequenceLogger:
 
         self._logdir = logdir
         self._label = label
-        print("DIR: ", logdir, "##################################")
-        print(
-            "ABS PATH: ", os.path.abspath(logdir), "##################################"
-        )
         os.makedirs(logdir, exist_ok=True)
 
         self._timestep: Optional[dm_env.TimeStep] = None
