@@ -31,6 +31,10 @@ class Config:
         self._current_params: List = []
         self._built = False
 
+        self._param_to_component: Dict[
+            str, str
+        ] = {}  # Map from config parameter to which component added it
+
     def add(self, **kwargs: Any) -> None:
         """Add a component config dataclass.
 
@@ -55,16 +59,26 @@ class Config:
                 else:
                     new_param_names = list(dataclass.__dict__.keys())
                     if set(self._current_params) & set(new_param_names):
+                        common_parameter_names = set(self._current_params).intersection(
+                            set(new_param_names)
+                        )
                         raise Exception(
                             f"""
-                            Component configs share a common parameter name -
-                            {set(self._current_params).intersection(set(new_param_names))}.
+                            Component configs share common parameter names:
+                            {common_parameter_names}
+                            Components whose configs contain the common parameter names:
+                            {[self._param_to_component[common_parameter_name]
+                              for common_parameter_name in common_parameter_names]
+                             + [name]}.
                             This is not allowed, please ensure config parameter names
                             are unique.
                             """
                         )
                     else:
                         self._current_params.extend(new_param_names)
+
+                        for new_param_name in new_param_names:
+                            self._param_to_component[new_param_name] = name
                     self._config[name] = dataclass
             else:
                 raise Exception(
