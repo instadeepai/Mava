@@ -169,7 +169,7 @@ class RandomSamplingSystemInit(BaseSystemInit):
                 "Random sampling system init requires random_agent_networks sampling"
             )
 
-        if builder.store.shared_weights:
+        if self.config.shared_weights:
             raise ValueError(
                 "Shared weights cannot be used with random policy per agent"
             )
