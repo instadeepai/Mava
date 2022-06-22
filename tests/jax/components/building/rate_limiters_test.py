@@ -67,6 +67,15 @@ def test_sample_to_insert_rate_limiter_with_error_buffer(builder, sample_to_inse
 
     rate_limiter = builder.store.rate_limiter_fn()
     assert isinstance(rate_limiter, reverb.rate_limiters.SampleToInsertRatio)
+    assert rate_limiter._min_size_to_sample == 100
+    assert rate_limiter._samples_per_insert == 16.0
+
+    # Ensure offset created correctly
+    offset = rate_limiter._samples_per_insert * rate_limiter._min_size_to_sample
+    min_diff = offset - min_size_rate_limiter.config.error_buffer
+    max_diff = offset + min_size_rate_limiter.config.error_buffer
+    assert rate_limiter._min_diff == min_diff
+    assert rate_limiter._max_diff == max_diff
 
 
 def test_sample_to_insert_rate_limiter_no_error_buffer(builder, sample_to_insert_rate_limiter) -> None:
