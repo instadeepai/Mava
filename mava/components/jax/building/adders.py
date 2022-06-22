@@ -46,7 +46,7 @@ class Adder(Component):
         """List of other Components required in the system for this Component to function.
 
         TrainerInit required to set up builder.store.table_network_config.
-        BaseSystemInit required to set up builder.store.unique_net_keys
+        BaseSystemInit required to set up builder.store.unique_net_keys.
 
         Returns:
             List of required component classes.
@@ -247,14 +247,6 @@ class ParallelSequenceAdder(Adder):
             config : _description_.
         """
         self.config = config
-
-    def on_building_init_start(self, builder: SystemBuilder) -> None:
-        """_summary_
-
-        Args:
-            builder : _description_
-        """
-        builder.store.sequence_length = self.config.sequence_length
 
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """_summary_

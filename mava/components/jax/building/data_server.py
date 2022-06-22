@@ -17,13 +17,18 @@
 import abc
 import copy
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Type
 
 import reverb
 from reverb import rate_limiters, reverb_types
 
 from mava import specs
+from mava.callbacks import Callback
 from mava.components.jax import Component
+from mava.components.jax.building import EnvironmentSpec
+from mava.components.jax.building.adders import AdderSignature
+from mava.components.jax.building.rate_limiters import RateLimiter
+from mava.components.jax.training import TrainerInit
 from mava.core_jax import SystemBuilder
 from mava.utils import enums
 from mava.utils.builder_utils import covert_specs
@@ -98,6 +103,20 @@ class DataServer(Component):
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "data_server"
 
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        BaseSystemInit required to set up builder.store.agent_net_keys.
+        EnvironmentSpec required to set up builder.store.environment_spec
+        and builder.store.extras_spec.
+        AdderSignature required to set up builder.store.adder_signature_fn.
+
+        Returns:
+            List of required component classes.
+        """
+        return [TrainerInit, EnvironmentSpec, AdderSignature]
+
 
 @dataclass
 class OffPolicyDataServerConfig:
@@ -157,6 +176,17 @@ class OffPolicyDataServer(DataServer):
         """
         return OffPolicyDataServerConfig
 
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        RateLimiter required to set up builder.store.rate_limiter_fn.
+
+        Returns:
+            List of required component classes.
+        """
+        return DataServer.required_components() + [RateLimiter]
+
 
 @dataclass
 class OnPolicyDataServerConfig:
@@ -193,9 +223,11 @@ class OnPolicyDataServer(DataServer):
         Returns:
             _description_
         """
-        if builder.store.__dict__.get("sequence_length"):
+        if hasattr(builder.store.global_config, "sequence_length"):
             signature = builder.store.adder_signature_fn(
-                environment_spec, builder.store.sequence_length, extras_spec
+                environment_spec,
+                builder.store.global_config.sequence_length,
+                extras_spec,
             )
         else:
             signature = builder.store.adder_signature_fn(environment_spec, extras_spec)
