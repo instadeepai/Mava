@@ -22,6 +22,7 @@ from mava import specs
 from mava.adders import reverb as reverb_adders
 from mava.callbacks import Callback
 from mava.components.jax import Component
+from mava.components.jax.building.system_init import BaseSystemInit
 from mava.components.jax.training import TrainerInit
 from mava.core_jax import SystemBuilder
 
@@ -45,11 +46,12 @@ class Adder(Component):
         """List of other Components required in the system for this Component to function.
 
         TrainerInit required to set up builder.store.table_network_config.
+        BaseSystemInit required to set up builder.store.unique_net_keys
 
         Returns:
             List of required component classes.
         """
-        return [TrainerInit]
+        return [TrainerInit, BaseSystemInit]
 
 
 @dataclass
@@ -178,7 +180,7 @@ class ParallelTransitionAdder(Adder):
 
         adder = reverb_adders.ParallelNStepTransitionAdder(
             priority_fns=builder.store.adder_priority_fn,
-            client=builder.store.data_server_client,
+            client=builder.store.data_server_client,  # Created by builder
             net_ids_to_keys=builder.store.unique_net_keys,
             n_step=self.config.n_step,
             table_network_config=builder.store.table_network_config,
@@ -270,7 +272,7 @@ class ParallelSequenceAdder(Adder):
 
         adder = reverb_adders.ParallelSequenceAdder(
             priority_fns=priority_fns,
-            client=builder.store.data_server_client,
+            client=builder.store.data_server_client,  # Created by builder
             net_ids_to_keys=builder.store.unique_net_keys,
             sequence_length=self.config.sequence_length,
             table_network_config=builder.store.table_network_config,
