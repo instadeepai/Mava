@@ -93,7 +93,7 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
     def step(self) -> None:
         """_summary_"""
         # Wait {non_blocking_sleep_seconds} seconds before checking again
-        non_blocking_sleep(self.store.non_blocking_sleep_seconds)
+        non_blocking_sleep(self.store.global_config.non_blocking_sleep_seconds)
 
         self.on_parameter_server_run_loop_start()
 
