@@ -18,10 +18,6 @@ from typing import Any, Dict, Optional, Type
 
 import numpy as np
 import pytest
-from terminators_test_data import (
-    count_condition_terminator_data,
-    count_condition_terminator_failure_cases,
-)
 
 from mava.components.jax.updating.terminators import (
     CountConditionTerminator,
@@ -30,6 +26,10 @@ from mava.components.jax.updating.terminators import (
     TimeTerminatorConfig,
 )
 from mava.core_jax import SystemParameterServer
+from tests.jax.components.updating.terminators_test_data import (
+    count_condition_terminator_data,
+    count_condition_terminator_failure_cases,
+)
 
 
 @dataclass
