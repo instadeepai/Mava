@@ -16,11 +16,13 @@
 """Commonly used adder components for system builders"""
 import abc
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional, Type
 
 from mava import specs
 from mava.adders import reverb as reverb_adders
+from mava.callbacks import Callback
 from mava.components.jax import Component
+from mava.components.jax.training import TrainerInit
 from mava.core_jax import SystemBuilder
 
 
@@ -37,6 +39,17 @@ class Adder(Component):
             _description_
         """
         return "executor_adder"
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        TrainerInit required to set up builder.store.table_network_config.
+
+        Returns:
+            List of required component classes.
+        """
+        return [TrainerInit]
 
 
 @dataclass
@@ -83,6 +96,17 @@ class AdderPriority(Component):
             config class/dataclass for component.
         """
         return AdderPriorityConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        TrainerInit required to set up builder.store.table_network_config.
+
+        Returns:
+            List of required component classes.
+        """
+        return [TrainerInit]
 
 
 @dataclass
