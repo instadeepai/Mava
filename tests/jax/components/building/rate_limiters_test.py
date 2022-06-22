@@ -53,3 +53,29 @@ def test_min_size_rate_limiter(builder, min_size_rate_limiter) -> None:
     # TODO: the below should pass, but it does not
     # See https://github.com/deepmind/reverb/blob/7c33ea44589deb5c5ac440cb1b3a89319241b56e/reverb/rate_limiters.py#L31
     # assert rate_limiter._min_size_to_sample == 100
+
+
+def test_sample_to_insert_rate_limiter_with_error_buffer(builder, sample_to_insert_rate_limiter) -> None:
+    # Config loaded
+    assert min_size_rate_limiter.config.min_data_server_size == 100
+    assert min_size_rate_limiter.config.samples_per_insert == 16.0
+    assert min_size_rate_limiter.config.error_buffer == 5.0
+
+    # Rate limiter function created by hook
+    assert not hasattr(builder.store, "rate_limiter_fn")
+    min_size_rate_limiter.on_building_data_server_rate_limiter(builder)
+
+    rate_limiter = builder.store.rate_limiter_fn()
+    assert isinstance(rate_limiter, reverb.rate_limiters.SampleToInsertRatio)
+
+
+def test_sample_to_insert_rate_limiter_no_error_buffer(builder, sample_to_insert_rate_limiter) -> None:
+    # Manually set config
+    sample_to_insert_rate_limiter.config.error_buffer = None
+
+    # Rate limiter function created by hook
+    assert not hasattr(builder.store, "rate_limiter_fn")
+    min_size_rate_limiter.on_building_data_server_rate_limiter(builder)
+
+    rate_limiter = builder.store.rate_limiter_fn()
+    assert isinstance(rate_limiter, reverb.rate_limiters.SampleToInsertRatio)
