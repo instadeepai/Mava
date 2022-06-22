@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from typing import Callable, Tuple
+from typing import Callable, Dict, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -15,11 +15,12 @@ from mava.systems.jax.trainer import Trainer
 class MockNet:
     """Creates a mock network for loss function"""
 
+    @staticmethod
     def apply(
-        parameters: jnp.array, observation: jnp.array
+        parameters: Dict[str, jnp.ndarray], observation: jnp.array
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """Mock function to apply the network to training data"""
-        return observation, observation
+        return observation, parameters["mlp/~/linear_0"]["w"]
 
 
 def log_prob(distribution_params: jnp.array, actions: jnp.array) -> jnp.ndarray:
@@ -65,7 +66,7 @@ def mock_trainer() -> Trainer:
     parameters = {
         "network_agent": {
             "mlp/~/linear_0": {
-                "w": jnp.array([[0.0, 0.0, 0.0]]),
+                "w": jnp.array([[0.0, 0.0, 0.0, 0.0]]),
             }
         }
     }
@@ -185,7 +186,8 @@ def test_mapg_loss(
     loss_total_low = low_agent_0_loss["loss_total"]
 
     assert loss_entropy == -0.47500002
-    assert loss_value == 6.4075003
+    assert loss_value == 9
+    assert loss_total == (loss_entropy * 0.01 + loss_policy + loss_value * 0.5)
 
     assert low_loss_value < loss_value
     assert low_loss_policy < loss_policy
