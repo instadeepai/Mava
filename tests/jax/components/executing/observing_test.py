@@ -60,21 +60,21 @@ class MockExecutorParameterClient:
 
 @pytest.fixture
 def mock_executor_without_adder() -> Executor:
-    """Mock executore component without adder"""
+    """Mock executor component without adder"""
     store = SimpleNamespace(is_evaluator=None, observations={}, adder=None)
     return Executor(store=store)
 
 
 @pytest.fixture
 def mock_executor_without_parameter_client() -> Executor:
-    """Mock executore component without parameter_client"""
+    """Mock executor component without parameter_client"""
     store = SimpleNamespace(
         is_evaluator=None, observations={}, executor_parameter_client=None
     )
     return Executor(store=store)
 
 
-class MockExecutor(Exception):
+class MockExecutor(Executor):
     def __init__(self, *args: object) -> None:
         # agent_net_keys
         agent_net_keys = {
@@ -151,8 +151,8 @@ def mock_executor() -> MockExecutor:
 
 
 @pytest.fixture
-def mock_feedforward_executor_observe() -> FeedforwardExecutorObserve:
-    """Mock FeedforwardExecutorObserve.
+def feedforward_executor_observe() -> FeedforwardExecutorObserve:
+    """FeedforwardExecutorObserve.
 
     Returns:
         FeedforwardExecutorObserve
@@ -160,18 +160,17 @@ def mock_feedforward_executor_observe() -> FeedforwardExecutorObserve:
     return FeedforwardExecutorObserve()
 
 
-# Test on_execution_observe_first
 def test_on_execution_observe_first_without_adder(
-    mock_feedforward_executor_observe: FeedforwardExecutorObserve,
+    feedforward_executor_observe: FeedforwardExecutorObserve,
     mock_executor_without_adder: Executor,
 ) -> None:
     """Test entering executor without store.adder
 
     Args:
-        mock_feedforward_executor_observe: FeedForwardExecutorObserve,
+        feedforward_executor_observe: FeedForwardExecutorObserve,
         mock_executor_without_adder: Executor
     """
-    mock_feedforward_executor_observe.on_execution_observe_first(
+    feedforward_executor_observe.on_execution_observe_first(
         executor=mock_executor_without_adder
     )
 
@@ -179,16 +178,16 @@ def test_on_execution_observe_first_without_adder(
 
 
 def test_on_execution_observe_first(
-    mock_feedforward_executor_observe: FeedforwardExecutorObserve,
+    feedforward_executor_observe: FeedforwardExecutorObserve,
     mock_executor: MockExecutor,
 ) -> None:
     """Test on_execution_observe_first method from FeedForwardExecutorObserve
 
     Args:
-        mock_feedforward_executor_observe: FeedForwardExecutorObserve,
+        feedforward_executor_observe: FeedForwardExecutorObserve,
         mock_executor: Executor
     """
-    mock_feedforward_executor_observe.on_execution_observe_first(executor=mock_executor)
+    feedforward_executor_observe.on_execution_observe_first(executor=mock_executor)
 
     assert not mock_executor.store.network_int_keys_extras == None
     assert (
@@ -198,18 +197,17 @@ def test_on_execution_observe_first(
     assert mock_executor.store.adder.parm == "after_add_first"
 
 
-# test on_execution_observe
 def test_on_execution_observe_without_adder(
-    mock_feedforward_executor_observe: FeedforwardExecutorObserve,
+    feedforward_executor_observe: FeedforwardExecutorObserve,
     mock_executor_without_adder: Executor,
 ) -> None:
     """Test entering executor without store.adder
 
     Args:
-        mock_feedforward_executor_observe: FeedForwardExecutorObserve,
+        feedforward_executor_observe: FeedForwardExecutorObserve,
         mock_executor_without_adder: Executor
     """
-    mock_feedforward_executor_observe.on_execution_observe(
+    feedforward_executor_observe.on_execution_observe(
         executor=mock_executor_without_adder
     )
 
@@ -217,16 +215,16 @@ def test_on_execution_observe_without_adder(
 
 
 def test_on_execution_observe(
-    mock_feedforward_executor_observe: FeedforwardExecutorObserve,
+    feedforward_executor_observe: FeedforwardExecutorObserve,
     mock_executor: MockExecutor,
 ) -> None:
     """Test on_execution_observe method from FeedForwardExecutorObserve
 
     Args:
-        mock_feedforward_executor_observe: FeedForwardExecutorObserve,
+        feedforward_executor_observe: FeedForwardExecutorObserve,
         mock_executor: Executor
     """
-    mock_feedforward_executor_observe.on_execution_observe(executor=mock_executor)
+    feedforward_executor_observe.on_execution_observe(executor=mock_executor)
 
     for agent in mock_executor.store.policies_info.keys():
         assert mock_executor.store.next_extras["policy_info"][
@@ -239,18 +237,17 @@ def test_on_execution_observe(
     assert mock_executor.store.adder.parm == "after_add"
 
 
-# test on_execution_update
 def test_on_execution_update_without_parameter_client(
-    mock_feedforward_executor_observe: FeedforwardExecutorObserve,
+    feedforward_executor_observe: FeedforwardExecutorObserve,
     mock_executor_without_parameter_client: Executor,
 ) -> None:
     """Test entering executor without store.executor_parameter_client
 
     Args:
-        mock_feedforward_executor_observe: FeedForwardExecutorObserve,
+        feedforward_executor_observe: FeedForwardExecutorObserve,
         mock_executor_without_parameter_client: Executor
     """
-    mock_feedforward_executor_observe.on_execution_update(
+    feedforward_executor_observe.on_execution_update(
         executor=mock_executor_without_parameter_client
     )
 
@@ -258,15 +255,15 @@ def test_on_execution_update_without_parameter_client(
 
 
 def test_on_execution_update(
-    mock_feedforward_executor_observe: FeedforwardExecutorObserve,
+    feedforward_executor_observe: FeedforwardExecutorObserve,
     mock_executor: MockExecutor,
 ) -> None:
     """Test on_execution_update method from FeedForwardExecutorObserve
 
     Args:
-        mock_feedforward_executor_observe: FeedForwardExecutorObserve,
+        feedforward_executor_observe: FeedForwardExecutorObserve,
         mock_executor: Executor
     """
-    mock_feedforward_executor_observe.on_execution_update(executor=mock_executor)
+    feedforward_executor_observe.on_execution_update(executor=mock_executor)
 
     assert mock_executor.store.executor_parameter_client.parm == True
