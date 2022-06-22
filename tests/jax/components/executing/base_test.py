@@ -106,5 +106,5 @@ def test_config_class() -> None:
     """Test config_class method from ExecutorInit"""
     executor_init = ExecutorInit()
 
-    assert isinstance(ExecutorInit.config_class, ExecutorInitConfig)
-    assert isinstance(executor_init.config_class, ExecutorInitConfig)
+    assert ExecutorInit.config_class() == ExecutorInitConfig  # type: ignore
+    assert executor_init.config_class() == ExecutorInitConfig  # type: ignore
