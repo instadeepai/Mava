@@ -195,7 +195,7 @@ class TestMADDPG:
             Running tests with shared_weights=False pass when running indepedently
             (other tests commented out), but fail when run with other tests and not
             enough parallel cores (fail with 2 or less cores, pass with 4 cpu cores).
-            This is likely a race condition, hangling process from previous tests
+            This is likely a race condition, hanging process from previous tests
             or related to network sampling (TODO @Dries investigate if you have a
             chance). Only the test fails, the examples run.
         """
