@@ -17,7 +17,7 @@
 # have been created.
 
 """Jax-based Mava system builder implementation."""
-
+from types import SimpleNamespace
 from typing import Any, List
 
 from mava.callbacks import BuilderHookMixin, Callback
@@ -31,15 +31,18 @@ class Builder(SystemBuilder, BuilderHookMixin):
     def __init__(
         self,
         components: List[Callback],
+        global_config: SimpleNamespace = SimpleNamespace(),
     ) -> None:
         """System building init
 
         Args:
             components: system callback component
+            global_config: config shared across components
         """
         super().__init__()
 
         self.callbacks = components
+        self.store.global_config = global_config
 
         self.on_building_init_start()
 

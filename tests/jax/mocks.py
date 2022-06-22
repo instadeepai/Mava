@@ -102,7 +102,7 @@ class MockAdder(Component):
     @staticmethod
     def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
-        return "adder"
+        return "executor_adder"
 
 
 def make_fake_env_specs() -> MAEnvironmentSpec:
@@ -608,8 +608,8 @@ class MockExecutorEnvironmentLoop(Component):
 
     def on_building_executor_environment(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.store.executor_environment = self.config.environment_factory(  # type: ignore # noqa: E501
-            evaluation=False
+        builder.store.executor_environment = (
+            builder.store.global_config.environment_factory(evaluation=False)
         )
 
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
