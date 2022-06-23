@@ -93,11 +93,11 @@ class MockExecutor(Executor):
             ["network_agent_2"],
         ]
         # net_keys_to_ids
-        all_samples = []
-        for sample in network_sampling_setup:
-            all_samples.extend(sample)
-        unique_net_keys = list(sort_str_num(list(set(all_samples))))
-        net_keys_to_ids = {net_key: i for i, net_key in enumerate(unique_net_keys)}
+        net_keys_to_ids = {
+            "network_agent_0": 0,
+            "network_agent_1": 1,
+            "network_agent_2": 2,
+        }
         # timestep
         timestep = TimeStep(
             step_type=StepType.FIRST,
