@@ -38,7 +38,7 @@ class ExecutorInit(Component):
 
     def on_building_init(self, builder: SystemBuilder) -> None:
         """Summary"""
-        builder.store.networks = builder.store.network_factory()
+        # builder.store.networks = builder.store.network_factory()
 
     def on_execution_init_start(self, executor: SystemExecutor) -> None:
         """_summary_"""

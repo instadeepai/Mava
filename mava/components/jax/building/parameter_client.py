@@ -15,10 +15,11 @@
 
 """Parameter client for system builders"""
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 import numpy as np
 
+from mava.callbacks import Callback
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 from mava.systems.jax import ParameterClient
@@ -38,6 +39,17 @@ class BaseParameterClient(Component):
         }
         params.update(add_params)
         return list(add_params.keys()), params
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        None required.
+
+        Returns:
+            List of required component classes.
+        """
+        return []
 
 
 @dataclass
@@ -120,6 +132,18 @@ class ExecutorParameterClient(BaseParameterClient):
         """
         return ExecutorParameterClientConfig
 
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        EnvironmentSpec required to set up builder.store.environment_spec.
+        BaseSystemInit required to set up builder.store.agent_net_keys.
+
+        Returns:
+            List of required component classes.
+        """
+        return []
+
 
 @dataclass
 class TrainerParameterClientConfig:
@@ -194,3 +218,15 @@ class TrainerParameterClient(BaseParameterClient):
     def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "trainer_parameter_client"
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        EnvironmentSpec required to set up builder.store.environment_spec.
+        BaseSystemInit required to set up builder.store.agent_net_keys.
+
+        Returns:
+            List of required component classes.
+        """
+        return []
