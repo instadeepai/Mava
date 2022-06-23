@@ -13,4 +13,59 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for trainer class for Jax-based Mava systems"""
+# Unit tests for core Jax trainer component.
+
+from types import SimpleNamespace
+from typing import List
+
+import pytest
+
+from mava.callbacks import Callback
+from mava.systems.jax.trainer import Trainer
+from tests.jax.hook_order_tracking import HookOrderTracking
+
+
+class TestTrainer(HookOrderTracking, Trainer):
+    def __init__(
+        self,
+        config: SimpleNamespace,
+        components: List[Callback],
+    ) -> None:
+        """Initialise the trainer."""
+        self.reset_hook_list()
+
+        super().__init__(config, components)
+
+
+@pytest.fixture
+def mock_trainer() -> Trainer:
+    """Create mock trainer."""
+
+    trainer = TestTrainer(config=SimpleNamespace(), components=[])
+    return trainer
+
+
+def test_init_hook_order(mock_trainer: TestTrainer) -> None:
+    """Test if init hooks are called in the correct order"""
+
+    assert mock_trainer.hook_list == [
+        "on_training_init_start",
+        "on_training_utility_fns",
+        "on_training_loss_fns",
+        "on_training_step_fn",
+        "on_training_init",
+        "on_training_init_end",
+    ]
+
+
+def test_step_hook_order(mock_trainer: TestTrainer) -> None:
+    """Test if step hooks are called in the correct order"""
+
+    mock_trainer.reset_hook_list()
+    mock_trainer.step()
+
+    assert mock_trainer.hook_list == [
+        "on_training_step_start",
+        "on_training_step",
+        "on_training_step_end",
+    ]

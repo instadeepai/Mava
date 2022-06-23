@@ -65,13 +65,13 @@ class TestSystem(System):
 class TestParameterServer(HookOrderTracking, ParameterServer):
     def __init__(
         self,
-        config: SimpleNamespace,
+        store: SimpleNamespace,
         components: List[Callback],
     ) -> None:
         """Initialise the parameter server."""
         self.reset_hook_list()
 
-        super().__init__(config, components)
+        super().__init__(store, components)
 
 
 @pytest.fixture
@@ -84,7 +84,7 @@ def test_system() -> System:
 def test_parameter_server() -> ParameterServer:
     """Dummy parameter server with no components"""
     return TestParameterServer(
-        config=SimpleNamespace(
+        store=SimpleNamespace(
             config_key="expected_value",
             non_blocking_sleep_seconds=1,
             get_parameters="parameter_list",
