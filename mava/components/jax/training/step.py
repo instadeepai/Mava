@@ -129,9 +129,10 @@ class MAPGWithTrustRegionStep(Step):
         self.config = config
 
     def on_training_init_start(self, trainer: SystemTrainer) -> None:
+        """_summary_"""
         # Note (dries): Assuming the batch and sequence dimensions are flattened.
         trainer.store.full_batch_size = trainer.store.sample_batch_size * (
-            trainer.store.sequence_length - 1
+            trainer.store.global_config.sequence_length - 1
         )
 
     def on_training_step_fn(self, trainer: SystemTrainer) -> None:
