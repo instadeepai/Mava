@@ -46,7 +46,7 @@ class TestSystem(System):
             trainer_parameter_client=mocks.MockTrainerParameterClient,
             logger=mocks.MockLogger,
             executor=mocks.MockExecutor,
-            adder=mocks.MockAdder,
+            executor_adder=mocks.MockAdder,
             executor_environment_loop=mocks.MockExecutorEnvironmentLoop,
             trainer=mocks.MockTrainer,
             trainer_dataset=mocks.MockTrainerDataset,

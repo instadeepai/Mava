@@ -52,7 +52,7 @@ class TestSystem(System):
             trainer_parameter_client=mocks.MockTrainerParameterClient,
             logger=mocks.MockLogger,
             executor=mocks.MockExecutor,
-            adder=mocks.MockAdder,
+            executor_adder=mocks.MockAdder,
             executor_environment_loop=mocks.MockExecutorEnvironmentLoop,
             networks=mocks.MockNetworks,
             trainer=mocks.MockTrainer,
@@ -88,6 +88,7 @@ def test_parameter_server() -> ParameterServer:
             config_key="expected_value",
             non_blocking_sleep_seconds=1,
             get_parameters="parameter_list",
+            global_config=SimpleNamespace(non_blocking_sleep_seconds=1),
         ),
         components=[],
     )
