@@ -169,13 +169,13 @@ class MAPPOBuilder:
         env_adder_spec: specs.MAEnvironmentSpec = copy.deepcopy(environment_spec)
         keys = env_adder_spec._keys
         for key in keys:
-            agent_spec = env_adder_spec._specs[key]
+            agent_spec = env_adder_spec.get_agent_environment_specs()[key]
             new_act_spec = {"actions": agent_spec.actions}
 
             # Make dummy logits
             new_act_spec["log_probs"] = tf.ones(shape=(), dtype=tf.float32)
 
-            env_adder_spec._specs[key] = EnvironmentSpec(
+            env_adder_spec.get_agent_environment_specs()[key] = EnvironmentSpec(
                 observations=agent_spec.observations,
                 actions=new_act_spec,
                 rewards=agent_spec.rewards,
@@ -238,14 +238,20 @@ class MAPPOBuilder:
             # Convert a Mava spec
             trainer_network_names = self._config.table_network_config[table_key]
             env_spec = copy.deepcopy(adder_env_spec)
-            env_spec._specs = self.get_nets_specific_specs(
-                env_spec._specs, trainer_network_names
+            env_spec.set_agent_environment_specs(
+                self.get_nets_specific_specs(
+                    env_spec.get_agent_environment_specs(), trainer_network_names
+                )
             )
 
-            env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
-            if env_spec.extra_specs is not None:
-                env_spec.extra_specs = self.get_nets_specific_specs(
-                    env_spec.extra_specs, trainer_network_names
+            env_spec._keys = list(
+                sort_str_num(env_spec.get_agent_environment_specs().keys())
+            )
+            if env_spec.get_extras_specs() is not None:
+                env_spec.set_extras_specs(
+                    self.get_nets_specific_specs(
+                        env_spec.get_extras_specs(), trainer_network_names
+                    )
                 )
             extra_specs = self.get_nets_specific_specs(
                 self._extra_specs,
@@ -456,7 +462,7 @@ class MAPPOBuilder:
             policy_networks=policy_networks,
             counts=counts,
             net_keys_to_ids=self._config.net_keys_to_ids,
-            agent_specs=self._config.environment_spec.get_agent_specs(),
+            agent_specs=self._config.environment_spec.get_agent_environment_specs(),
             agent_net_keys=self._config.agent_net_keys,
             network_sampling_setup=self._config.network_sampling_setup,
             fix_sampler=self._config.fix_sampler,

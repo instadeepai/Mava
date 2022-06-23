@@ -268,12 +268,12 @@ class Helpers:
         specs = None
         if Helpers.is_mocked_env(env_spec.env_name):
             wrapped_env = Helpers.get_mocked_env(env_spec)
-            specs = wrapped_env._specs
+            specs = wrapped_env.get_agent_environment_specs()
         else:
             env = Helpers.get_env(env_spec)
             wrapper_func = Helpers.get_wrapper_function(env_spec)
             wrapped_env = wrapper_func(env, **kwargs)
-            specs = Helpers.get_pz_env_spec(wrapped_env)._specs
+            specs = Helpers.get_pz_env_spec(wrapped_env).get_agent_environment_specs()
         return wrapped_env, specs
 
     #

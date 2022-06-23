@@ -170,7 +170,7 @@ def get_ma_environment(
 
             self._specs = multi_agent_specs
 
-        def extra_spec(self) -> Dict:
+        def extras_spec(self) -> Dict:
             return {}
 
         def reward_spec(self) -> Dict[str, specs.Array]:

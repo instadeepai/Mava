@@ -76,9 +76,9 @@ def trajectory_signature(
             name="/".join(str(p) for p in paths),
         )
 
-    agent_specs = environment_spec.get_agent_specs()
+    agent_specs = environment_spec.get_agent_environment_specs()
     agents = environment_spec.get_agent_ids()
-    env_extras_spec = environment_spec.get_extra_specs()
+    env_extras_spec = environment_spec.get_extras_specs()
     extras_spec.update(env_extras_spec)
 
     obs_specs = {}
