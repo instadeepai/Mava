@@ -20,4 +20,7 @@ pip install https://github.com/deepmind/lab2d/releases/download/release_candidat
 mkdir ../packages
 cd ../packages
 git clone -b main https://github.com/deepmind/meltingpot
-pip install meltingpot/
+# Temp - Pin version before python 3.9 requirement.
+cd meltingpot/
+git checkout c4fea35d3b57b0c4fa10db823a81e16244826e8d
+pip install .

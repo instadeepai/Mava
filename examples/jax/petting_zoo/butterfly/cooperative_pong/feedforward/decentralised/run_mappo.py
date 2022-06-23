@@ -20,9 +20,8 @@ from typing import Any
 
 import numpy as np
 import optax
-import haiku as hk
-from acme.jax.networks.atari import DeepAtariTorso, AtariTorso
 from absl import app, flags
+from acme.jax.networks.atari import DeepAtariTorso
 from supersuit import dtype_v0
 
 from mava.systems.jax import mappo
@@ -65,13 +64,11 @@ def main(_: Any) -> None:
     )
 
     # Networks.
-    def network_factory(
-        policy_layer_sizes=(64,), critic_layer_sizes=(256,), *args, **kwargs
-    ):
-        obs_net_forward = lambda x: DeepAtariTorso()(x)
-        return mappo.make_default_networks(
-            policy_layer_sizes=policy_layer_sizes,
-            critic_layer_sizes=critic_layer_sizes,
+    def network_factory(*args: Any, **kwargs: Any) -> Any:
+        obs_net_forward = lambda x: DeepAtariTorso()(x)  # noqa: E731
+        return mappo.make_default_networks(  # type: ignore
+            policy_layer_sizes=(64,),
+            critic_layer_sizes=(256,),
             observation_network=obs_net_forward,
             *args,
             **kwargs,

@@ -114,12 +114,13 @@ class NetworkedQValueCritic(DecentralisedQValueActorCritic):
 
         for agent_type, agents in agents_by_type.items():
             for agent in agents:
-                critic_obs_shape = list(copy.copy(self._embed_specs[agent].shape))
+                net_key = self._agent_net_keys[agent]
+                critic_obs_shape = list(copy.copy(self._embed_specs[net_key].shape))
                 critic_act_shape = list(
                     copy.copy(self._agent_specs[agent].actions.shape)
                 )
                 critic_obs_shape.insert(0, len(self._network_spec[agent]))
-                critic_obs_specs[agent] = tf.TensorSpec(
+                critic_obs_specs[net_key] = tf.TensorSpec(
                     shape=critic_obs_shape,
                     dtype=tf.dtypes.float32,
                 )
