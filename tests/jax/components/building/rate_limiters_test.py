@@ -54,7 +54,7 @@ def test_min_size_rate_limiter(
 
     reverb_rate_limiter = builder.store.rate_limiter_fn()
     assert isinstance(reverb_rate_limiter, reverb.rate_limiters.MinSize)
-    # TODO: the below should pass, but it does not
+    # TODO: uncomment below when reverb is upgraded to >= 0.7.2
     # See https://github.com/deepmind/reverb/blob/
     # 7c33ea44589deb5c5ac440cb1b3a89319241b56e/reverb/rate_limiters.py#L31
     # assert rate_limiter._min_size_to_sample == 100
@@ -75,7 +75,7 @@ def test_sample_to_insert_rate_limiter_with_error_buffer(
 
     reverb_rate_limiter = builder.store.rate_limiter_fn()
     assert isinstance(reverb_rate_limiter, reverb.rate_limiters.SampleToInsertRatio)
-    # TODO: uncomment below
+    # TODO: uncomment below when reverb is upgraded to >= 0.7.2
     # assert reverb_rate_limiter._min_size_to_sample == 100
     # assert reverb_rate_limiter._samples_per_insert == 16.0
     #
@@ -101,7 +101,7 @@ def test_sample_to_insert_rate_limiter_no_error_buffer(
 
     reverb_rate_limiter = builder.store.rate_limiter_fn()
     assert isinstance(reverb_rate_limiter, reverb.rate_limiters.SampleToInsertRatio)
-    # TODO: uncomment below
+    # TODO: uncomment below when reverb is upgraded to >= 0.7.2
     # assert reverb_rate_limiter._min_size_to_sample == 100
     # assert reverb_rate_limiter._samples_per_insert == 16.0
     #
