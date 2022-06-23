@@ -17,12 +17,15 @@
 
 import abc
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, List, Optional, Type
 
 import dm_env
 import jax
 
+from mava.callbacks import Callback
 from mava.components.jax import Component
+from mava.components.jax.building.environments import EnvironmentSpec
+from mava.components.jax.building.system_init import BaseSystemInit
 from mava.core_jax import SystemBuilder
 
 
@@ -81,3 +84,15 @@ class DefaultNetworks(Networks):
             config class/dataclass for component.
         """
         return NetworksConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        EnvironmentSpec required to set up builder.store.environment_spec.
+        BaseSystemInit required to set up builder.store.agent_net_keys.
+
+        Returns:
+            List of required component classes.
+        """
+        return [EnvironmentSpec, BaseSystemInit]
