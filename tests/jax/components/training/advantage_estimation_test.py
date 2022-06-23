@@ -110,7 +110,7 @@ def similar_reward_values() -> List[Tuple]:
 def mock_trainer() -> Trainer:
     """Creates mock trainer fixture"""
 
-    mock_trainer = Trainer(config=SimpleNamespace())
+    mock_trainer = Trainer(store=SimpleNamespace())
     mock_trainer.store.gae_fn = None
 
     return mock_trainer
