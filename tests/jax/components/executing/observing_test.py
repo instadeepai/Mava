@@ -17,7 +17,7 @@
 
 
 from types import SimpleNamespace
-from typing import Dict
+from typing import Dict, Tuple
 
 import numpy as np
 import pytest
@@ -35,12 +35,13 @@ from mava.utils.sort_utils import sort_str_num
 
 class MockAdder:
     def __init__(self) -> None:
-        self.parm = "empty"
+        pass
 
     def add_first(
         self, timestep: TimeStep, extras: Dict[str, NestedArray] = ...  # type: ignore
     ) -> None:
-        self.parm = "after_add_first"
+        self.test_timestep = timestep
+        self.test_extras = extras
 
     def add(
         self,
@@ -48,7 +49,9 @@ class MockAdder:
         next_timestep: TimeStep,
         next_extras: Dict[str, NestedArray] = ...,  # type: ignore
     ) -> None:
-        self.parm = "after_add"
+        self.test_adder_actions = actions
+        self.test_next_timestep = next_timestep
+        self.test_next_extras = next_extras
 
 
 class MockExecutorParameterClient:
@@ -60,14 +63,16 @@ class MockExecutorParameterClient:
 
 
 @pytest.fixture
-def mock_executor_without_adder() -> Executor:
+def executor_without_adder() -> Executor:
     """Mock executor component without adder"""
-    extras={
+    extras = {
         "agent_0": np.array([0]),
         "agent_1": np.array([1]),
-        "agent_2": np.array([2])
+        "agent_2": np.array([2]),
     }
-    store = SimpleNamespace(is_evaluator=None, observations={}, adder=None, extras=extras)
+    store = SimpleNamespace(
+        is_evaluator=None, observations={}, adder=None, extras=extras
+    )
     return Executor(store=store)
 
 
@@ -159,25 +164,25 @@ def feedforward_executor_observe() -> FeedforwardExecutorObserve:
 
 def test_on_execution_observe_first_without_adder(
     feedforward_executor_observe: FeedforwardExecutorObserve,
-    mock_executor_without_adder: Executor,
+    executor_without_adder: Executor,
 ) -> None:
     """Test entering executor without store.adder
 
     Args:
         feedforward_executor_observe: FeedForwardExecutorObserve,
-        mock_executor_without_adder: Executor
+        executor_without_adder: Executor
     """
     feedforward_executor_observe.on_execution_observe_first(
-        executor=mock_executor_without_adder
+        executor=executor_without_adder
     )
 
-    assert mock_executor_without_adder.store.extras== {
+    assert executor_without_adder.store.extras == {
         "agent_0": np.array([0]),
         "agent_1": np.array([1]),
-        "agent_2": np.array([2])
+        "agent_2": np.array([2]),
     }
-    assert not hasattr(mock_executor_without_adder.store, "network_int_keys_extras")
-    assert not hasattr(mock_executor_without_adder.store, "agent_net_keys")
+    assert not hasattr(executor_without_adder.store, "network_int_keys_extras")
+    assert not hasattr(executor_without_adder.store, "agent_net_keys")
 
 
 def test_on_execution_observe_first(
@@ -209,25 +214,26 @@ def test_on_execution_observe_first(
         mock_executor.store.extras["network_int_keys"]
         == mock_executor.store.network_int_keys_extras
     )
-    assert mock_executor.store.adder.parm == "after_add_first"
+
+    # test mock_executor.store.adder.add_first()
+    assert mock_executor.store.adder.test_timestep == mock_executor.store.timestep
+    assert mock_executor.store.adder.test_extras == mock_executor.store.extras
 
 
 def test_on_execution_observe_without_adder(
     feedforward_executor_observe: FeedforwardExecutorObserve,
-    mock_executor_without_adder: Executor,
+    executor_without_adder: Executor,
 ) -> None:
     """Test entering executor without store.adder
 
     Args:
         feedforward_executor_observe: FeedForwardExecutorObserve,
-        mock_executor_without_adder: Executor
+        executor_without_adder: Executor
     """
-    feedforward_executor_observe.on_execution_observe(
-        executor=mock_executor_without_adder
-    )
+    feedforward_executor_observe.on_execution_observe(executor=executor_without_adder)
 
-    assert not hasattr(mock_executor_without_adder.store, "next_extras")
-    assert not hasattr(mock_executor_without_adder.store.adder, "add")
+    assert not hasattr(executor_without_adder.store, "next_extras")
+    assert not hasattr(executor_without_adder.store.adder, "add")
 
 
 def test_on_execution_observe(
@@ -246,11 +252,23 @@ def test_on_execution_observe(
         assert mock_executor.store.next_extras["policy_info"][
             agent
         ] == "policy_info_" + str(agent)
+
     assert (
         mock_executor.store.next_extras["network_int_keys"]
         == mock_executor.store.network_int_keys_extras
     )
-    assert mock_executor.store.adder.parm == "after_add"
+
+    # test mock_executor.store.adder.add()
+    assert mock_executor.store.adder.test_adder_actions == {
+        "agent_0": {"actions_info": "action_info_agent_0"},
+        "agent_1": {"actions_info": "action_info_agent_1"},
+        "agent_2": {"actions_info": "action_info_agent_2"},
+    }
+    assert (
+        mock_executor.store.adder.test_next_timestep
+        == mock_executor.store.next_timestep
+    )
+    assert mock_executor.store.adder.test_next_extras == mock_executor.store.next_extras
 
 
 def test_on_execution_update(
