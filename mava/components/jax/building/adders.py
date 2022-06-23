@@ -23,7 +23,7 @@ from mava.adders import reverb as reverb_adders
 from mava.callbacks import Callback
 from mava.components.jax import Component
 from mava.components.jax.building.system_init import BaseSystemInit
-from mava.components.jax.training import TrainerInit
+from mava.components.jax.training.trainer import TrainerInit
 from mava.core_jax import SystemBuilder
 
 

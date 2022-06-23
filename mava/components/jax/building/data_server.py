@@ -25,8 +25,8 @@ from reverb import rate_limiters, reverb_types
 from mava import specs
 from mava.callbacks import Callback
 from mava.components.jax import Component
-from mava.components.jax.building import EnvironmentSpec
 from mava.components.jax.building.adders import AdderSignature
+from mava.components.jax.building.environments import EnvironmentSpec
 from mava.components.jax.building.rate_limiters import RateLimiter
 from mava.components.jax.training import TrainerInit
 from mava.core_jax import SystemBuilder
