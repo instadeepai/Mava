@@ -19,6 +19,7 @@
 from types import SimpleNamespace
 from typing import Dict
 
+import numpy as np
 import pytest
 from acme.types import NestedArray
 from dm_env import StepType, TimeStep
@@ -33,11 +34,11 @@ from mava.utils.sort_utils import sort_str_num
 
 
 class MockAdder:
-    def __init__(self):
+    def __init__(self) -> None:
         self.parm = "empty"
 
     def add_first(
-        self, timestep: TimeStep, extras: Dict[str, NestedArray] = ...
+        self, timestep: TimeStep, extras: Dict[str, NestedArray] = ...  # type: ignore
     ) -> None:
         self.parm = "after_add_first"
 
@@ -45,32 +46,28 @@ class MockAdder:
         self,
         actions: Dict[str, NestedArray],
         next_timestep: TimeStep,
-        next_extras: Dict[str, NestedArray] = ...,
+        next_extras: Dict[str, NestedArray] = ...,  # type: ignore
     ) -> None:
         self.parm = "after_add"
 
 
 class MockExecutorParameterClient:
-    def __init__(self):
+    def __init__(self) -> None:
         self.parm = False
 
-    def get_async(self):
+    def get_async(self) -> None:
         self.parm = True
 
 
 @pytest.fixture
 def mock_executor_without_adder() -> Executor:
     """Mock executor component without adder"""
-    store = SimpleNamespace(is_evaluator=None, observations={}, adder=None)
-    return Executor(store=store)
-
-
-@pytest.fixture
-def mock_executor_without_parameter_client() -> Executor:
-    """Mock executor component without parameter_client"""
-    store = SimpleNamespace(
-        is_evaluator=None, observations={}, executor_parameter_client=None
-    )
+    extras={
+        "agent_0": np.array([0]),
+        "agent_1": np.array([1]),
+        "agent_2": np.array([2])
+    }
+    store = SimpleNamespace(is_evaluator=None, observations={}, adder=None, extras=extras)
     return Executor(store=store)
 
 
@@ -86,7 +83,9 @@ class MockExecutor(Executor):
         network_int_keys_extras = None
         # network_sampling_setup
         network_sampling_setup = [
-            [agent_net_keys[key] for key in sort_str_num(agent_net_keys.keys())]
+            ["network_agent_0"],
+            ["network_agent_1"],
+            ["network_agent_2"],
         ]
         # net_keys_to_ids
         all_samples = []
@@ -94,8 +93,6 @@ class MockExecutor(Executor):
             all_samples.extend(sample)
         unique_net_keys = list(sort_str_num(list(set(all_samples))))
         net_keys_to_ids = {net_key: i for i, net_key in enumerate(unique_net_keys)}
-        # network_int_keys_extras
-        network_int_keys_extras = None
         # timestep
         timestep = TimeStep(
             step_type=StepType.FIRST,
@@ -106,7 +103,7 @@ class MockExecutor(Executor):
             ),
         )
         # extras
-        extras = {}
+        extras = {}  # type: ignore
         # Aadder
         adder = MockAdder()
         # actions_info
@@ -174,7 +171,13 @@ def test_on_execution_observe_first_without_adder(
         executor=mock_executor_without_adder
     )
 
-    assert not mock_executor_without_adder.store.adder
+    assert mock_executor_without_adder.store.extras== {
+        "agent_0": np.array([0]),
+        "agent_1": np.array([1]),
+        "agent_2": np.array([2])
+    }
+    assert not hasattr(mock_executor_without_adder.store, "network_int_keys_extras")
+    assert not hasattr(mock_executor_without_adder.store, "agent_net_keys")
 
 
 def test_on_execution_observe_first(
@@ -189,7 +192,19 @@ def test_on_execution_observe_first(
     """
     feedforward_executor_observe.on_execution_observe_first(executor=mock_executor)
 
-    assert not mock_executor.store.network_int_keys_extras == None
+    for agent, net in mock_executor.store.agent_net_keys.items():
+        assert type(agent) == str
+        assert type(net) == str
+        assert agent in ["agent_0", "agent_1", "agent_2"]
+        assert net in ["network_agent_0", "network_agent_1", "network_agent_2"]
+
+    agents = sort_str_num(list(mock_executor.store.agent_net_keys.keys()))
+    for agent, value in mock_executor.store.network_int_keys_extras.items():
+        assert type(agent) == str
+        assert type(value) == np.ndarray
+        assert agent in agents
+        assert value in mock_executor.store.net_keys_to_ids.values()
+
     assert (
         mock_executor.store.extras["network_int_keys"]
         == mock_executor.store.network_int_keys_extras
@@ -211,7 +226,8 @@ def test_on_execution_observe_without_adder(
         executor=mock_executor_without_adder
     )
 
-    assert not mock_executor_without_adder.store.adder
+    assert not hasattr(mock_executor_without_adder.store, "next_extras")
+    assert not hasattr(mock_executor_without_adder.store.adder, "add")
 
 
 def test_on_execution_observe(
@@ -235,23 +251,6 @@ def test_on_execution_observe(
         == mock_executor.store.network_int_keys_extras
     )
     assert mock_executor.store.adder.parm == "after_add"
-
-
-def test_on_execution_update_without_parameter_client(
-    feedforward_executor_observe: FeedforwardExecutorObserve,
-    mock_executor_without_parameter_client: Executor,
-) -> None:
-    """Test entering executor without store.executor_parameter_client
-
-    Args:
-        feedforward_executor_observe: FeedForwardExecutorObserve,
-        mock_executor_without_parameter_client: Executor
-    """
-    feedforward_executor_observe.on_execution_update(
-        executor=mock_executor_without_parameter_client
-    )
-
-    assert not mock_executor_without_parameter_client.store.executor_parameter_client
 
 
 def test_on_execution_update(
