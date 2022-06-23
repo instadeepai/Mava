@@ -21,8 +21,8 @@ import acme
 import pytest
 
 from mava.components.jax.building.adders import ParallelTransitionAdderSignature
-from mava.components.jax.building.base import SystemInit
 from mava.components.jax.building.environments import EnvironmentSpec
+from mava.components.jax.building.system_init import FixedNetworkSystemInit
 from mava.specs import DesignSpec
 from mava.systems.jax import ParameterServer, Trainer
 from mava.systems.jax.system import System
@@ -37,7 +37,7 @@ class TestSystem(System):
             system callback components
         """
         components = DesignSpec(
-            system_init=SystemInit,
+            system_init=FixedNetworkSystemInit,
             environment_spec=EnvironmentSpec,
             data_server=mocks.MockOnPolicyDataServer,
             data_server_adder_signature=ParallelTransitionAdderSignature,

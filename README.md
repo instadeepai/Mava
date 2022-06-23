@@ -263,16 +263,16 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
     * Install core dependencies:
 
     ```bash
-    pip install id-mava[tf,reverb,launchpad]
+    pip install id-mava[tf,reverb]
     ```
 
     * Or for the latest version of mava from source (**you can do this for all pip install commands below for the latest depedencies**):
 
     ```bash
-    pip install git+https://github.com/instadeepai/Mava#egg=id-mava[reverb,tf,launchpad]
+    pip install git+https://github.com/instadeepai/Mava#egg=id-mava[reverb,tf]
     ```
 
-    **For the jax version of mava, please replace `tf` with `jax`, e.g. `pip install id-mava[jax,reverb,launchpad]`**
+    **For the jax version of mava, please replace `tf` with `jax`, e.g. `pip install id-mava[jax,reverb]`**
 
     1.2 For **optional** environments:
     * PettingZoo:

@@ -36,7 +36,8 @@ from mava.utils.environments import debugging_utils
 from tests.jax import mocks
 
 system_init = DesignSpec(
-    environment_spec=building.EnvironmentSpec, system_init=building.SystemInit
+    environment_spec=building.EnvironmentSpec,
+    system_init=building.FixedNetworkSystemInit,
 ).get()
 executor = DesignSpec(
     executor_init=executing.ExecutorInit,
