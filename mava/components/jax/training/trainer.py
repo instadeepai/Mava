@@ -96,6 +96,7 @@ class TrainerInit(Component):
                     matches = most_matches
                     builder.store.table_network_config[trainer_key] = sample
 
+        # TODO (Matthew): networks need to be created on the nodes instead?
         builder.store.networks = builder.store.network_factory()
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:

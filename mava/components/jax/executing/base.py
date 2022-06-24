@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from mava.components.jax import Component
-from mava.core_jax import SystemBuilder, SystemExecutor
+from mava.core_jax import SystemExecutor
 
 
 @dataclass
@@ -35,10 +35,6 @@ class ExecutorInit(Component):
             config : _description_.
         """
         self.config = config
-
-    def on_building_init(self, builder: SystemBuilder) -> None:
-        """Summary"""
-        # builder.store.networks = builder.store.network_factory()
 
     def on_execution_init_start(self, executor: SystemExecutor) -> None:
         """_summary_"""
