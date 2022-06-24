@@ -129,7 +129,6 @@ class RandomSamplingSystemInitConfig:
     network_sampling_setup: enums.NetworkSampler = (
         enums.NetworkSampler.random_agent_networks
     )
-    shared_weights: bool = False
 
 
 class RandomSamplingSystemInit(BaseSystemInit):
@@ -157,10 +156,6 @@ class RandomSamplingSystemInit(BaseSystemInit):
                 "Random sampling system init requires random_agent_networks sampling"
             )
 
-        if builder.store.shared_weights:
-            raise ValueError(
-                "Shared weights cannot be used with random policy per agent"
-            )
         builder.store.agent_net_keys = {
             builder.store.agents[i]: f"network_{i}"
             for i in range(len(builder.store.agents))
