@@ -209,7 +209,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
     @classmethod
     def signature(
         cls,
-        ma_environment_spec: mava_specs.EnvironmentSpec,
+        ma_environment_spec: mava_specs.MAEnvironmentSpec,
         extras_specs: Dict[str, Any] = {},
     ) -> tf.TypeSpec:
         """Signature for adder.

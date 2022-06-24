@@ -122,7 +122,9 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
             extras_specs=extras_specs,
         )
 
-        signature = adder.signature(ma_spec, extras_spec=extras_specs)
+        signature = adder.signature(
+            ma_environment_spec=ma_spec, extras_specs=extras_specs
+        )
 
         for episode_id in range(repeat_episode_times):
             # Add all the data up to the final step.
