@@ -21,7 +21,6 @@ from typing import Dict, List
 import reverb
 
 from mava.components.jax.building import adders
-from mava.components.jax.building.base import SystemInit
 from mava.components.jax.building.data_server import (
     OffPolicyDataServer,
     OnPolicyDataServer,
@@ -31,6 +30,7 @@ from mava.components.jax.building.reverb import (
     MinSizeRateLimiter,
     SampleToInsertRateLimiter,
 )
+from mava.components.jax.building.system_init import FixedNetworkSystemInit
 from tests.jax.mocks import (  # MockedEnvSpec,
     MockOffPolicyDataServer,
     MockOnPolicyDataServer,
@@ -41,7 +41,7 @@ transition_adder_data_server_test_cases: List[Dict] = [
     {
         "component": {
             "environment_spec": EnvironmentSpec,
-            "system_init": SystemInit,
+            "system_init": FixedNetworkSystemInit,
             "rate_limiter": MinSizeRateLimiter,
             "data_server_adder_signature": adders.ParallelTransitionAdderSignature,
             "data_server": MockOffPolicyDataServer,
@@ -58,7 +58,7 @@ transition_adder_data_server_test_cases: List[Dict] = [
     {
         "component": {
             "environment_spec": EnvironmentSpec,
-            "system_init": SystemInit,
+            "system_init": FixedNetworkSystemInit,
             "data_server_adder_signature": adders.ParallelTransitionAdderSignature,
             "data_server": MockOnPolicyDataServer,
         },
@@ -70,7 +70,7 @@ transition_adder_data_server_test_cases: List[Dict] = [
     {
         "component": {
             "environment_spec": EnvironmentSpec,
-            "system_init": SystemInit,
+            "system_init": FixedNetworkSystemInit,
             "rate_limiter": SampleToInsertRateLimiter,
             "data_server_adder_signature": adders.ParallelTransitionAdderSignature,
             "data_server": OffPolicyDataServer,
@@ -87,7 +87,7 @@ transition_adder_data_server_test_cases: List[Dict] = [
     {
         "component": {
             "environment_spec": EnvironmentSpec,
-            "system_init": SystemInit,
+            "system_init": FixedNetworkSystemInit,
             "data_server_adder_signature": adders.ParallelTransitionAdderSignature,
             "data_server": OnPolicyDataServer,
         },

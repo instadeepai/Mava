@@ -18,10 +18,6 @@ from typing import Any, Dict, Optional, Type
 
 import numpy as np
 import pytest
-from terminators_test_data import (
-    count_condition_terminator_data,
-    count_condition_terminator_failure_cases,
-)
 
 from mava.components.jax.updating.terminators import (
     CountConditionTerminator,
@@ -30,6 +26,10 @@ from mava.components.jax.updating.terminators import (
     TimeTerminatorConfig,
 )
 from mava.core_jax import SystemParameterServer
+from tests.jax.components.updating.terminators_test_data import (
+    count_condition_terminator_data,
+    count_condition_terminator_failure_cases,
+)
 
 
 @dataclass
@@ -70,6 +70,8 @@ def step_parameters(parameter_dict: Dict[str, Any], key: str) -> None:
     parameter_dict[key] += 1
 
 
+# Reason for # type: ignore in dataclasses -
+# https://mypy.readthedocs.io/en/stable/additional_features.html#caveats-known-issues
 @pytest.mark.parametrize("condition", count_condition_terminator_data())
 def test_count_condition_terminator_terminated(
     condition: Dict, mock_parameter_server: SystemParameterServer
@@ -81,7 +83,7 @@ def test_count_condition_terminator_terminated(
         test_parameter_server.store.stopped = True
 
     test_terminator = CountConditionTerminator(
-        config=CountConditionTerminatorConfig(
+        config=CountConditionTerminatorConfig(  # type: ignore
             termination_condition=condition, termination_function=_set_stopped
         )
     )
@@ -107,7 +109,7 @@ def test_count_condition_terminator_not_terminated(
         test_parameter_server.store.stopped = True
 
     test_terminator = CountConditionTerminator(
-        config=CountConditionTerminatorConfig(
+        config=CountConditionTerminatorConfig(  # type: ignore
             termination_condition=condition, termination_function=_set_stopped
         )
     )
@@ -139,7 +141,7 @@ def test_count_condition_terminator_exceptions(
             test_parameter_server.store.stopped = True
 
         test_terminator = CountConditionTerminator(
-            config=CountConditionTerminatorConfig(
+            config=CountConditionTerminatorConfig(  # type: ignore
                 termination_condition=fail_condition, termination_function=_set_stopped
             )
         )
@@ -163,7 +165,7 @@ def test_time_terminator_terminated(
         test_parameter_server.store.stopped = True
 
     test_terminator = TimeTerminator(
-        config=TimeTerminatorConfig(run_seconds=0.0, termination_function=_set_stopped)
+        config=TimeTerminatorConfig(run_seconds=0.0, termination_function=_set_stopped)  # type: ignore # noqa: E501
     )
 
     test_terminator.on_parameter_server_init(test_parameter_server)
@@ -184,7 +186,7 @@ def test_time_terminator_not_terminated(
         test_parameter_server.store.stopped = True
 
     test_terminator = TimeTerminator(
-        config=TimeTerminatorConfig(run_seconds=10, termination_function=_set_stopped)
+        config=TimeTerminatorConfig(run_seconds=10, termination_function=_set_stopped)  # type: ignore # noqa: E501
     )
 
     test_terminator.on_parameter_server_init(test_parameter_server)
