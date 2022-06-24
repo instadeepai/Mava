@@ -169,21 +169,6 @@ def random_networks_net_keys_to_ids() -> Dict[str, int]:
 
 
 @pytest.fixture
-def system_with_random_agent_networks_shared_weights(
-    environment_spec: EnvironmentSpec, builder: Builder
-) -> Tuple[RandomSamplingSystemInit, Builder]:
-    """Create system with random agent network sampling and shared weights."""
-
-    environment_spec.on_building_init_start(builder)
-
-    system = RandomSamplingSystemInit(
-        config=RandomSamplingSystemInitConfig(shared_weights=True)
-    )
-
-    return system, builder
-
-
-@pytest.fixture
 def system_with_random_agent_networks_no_shared_weights(
     environment_spec: EnvironmentSpec, builder: Builder
 ) -> Tuple[RandomSamplingSystemInit, Builder]:
@@ -191,9 +176,7 @@ def system_with_random_agent_networks_no_shared_weights(
 
     environment_spec.on_building_init_start(builder)
 
-    system = RandomSamplingSystemInit(
-        config=RandomSamplingSystemInitConfig(shared_weights=False)
-    )
+    system = RandomSamplingSystemInit(config=RandomSamplingSystemInitConfig())
 
     return system, builder
 
@@ -297,7 +280,6 @@ def random_agent_networks_with_incorrect_sampling_setup_type(
     system = RandomSamplingSystemInit(
         config=RandomSamplingSystemInitConfig(
             network_sampling_setup=enums.NetworkSampler.fixed_agent_networks,
-            shared_weights=True,
         )
     )
 
