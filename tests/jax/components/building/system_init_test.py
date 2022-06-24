@@ -454,18 +454,18 @@ def test_incorrect_sampling_setup_type(
         fixed_network_builder,
     ) = fixed_agent_networks_with_incorrect_sampling_setup_type
     with pytest.raises(ValueError):
-        assert fixed_network_system.on_building_init(fixed_network_builder) == ValueError  # type: ignore # noqa: E501
+        fixed_network_system.on_building_init(fixed_network_builder)
 
     (
         random_network_system,
         random_network_builder,
     ) = random_agent_networks_with_incorrect_sampling_setup_type
     with pytest.raises(ValueError):
-        assert random_network_system.on_building_init(random_network_builder) == ValueError  # type: ignore # noqa: E501
+        random_network_system.on_building_init(random_network_builder)
 
     (
         custom_network_system,
         custom_network_builder,
     ) = custom_agent_networks_with_incorrect_sampling_setup_type
     with pytest.raises(ValueError):
-        assert custom_network_system.on_building_init(custom_network_builder) == ValueError  # type: ignore # noqa: E501
+        custom_network_system.on_building_init(custom_network_builder)
