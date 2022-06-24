@@ -133,13 +133,12 @@ class ExecutorEnvironmentLoop(Component):
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
-        ExecutorEnvironmentLoop required to set up builder.store.executor_environment.
         Logger required to set up builder.store.executor_logger.
 
         Returns:
             List of required component classes.
         """
-        return [ExecutorEnvironmentLoop, Logger]
+        return [Logger]
 
 
 class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
