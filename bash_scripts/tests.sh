@@ -60,7 +60,7 @@ if [ "$integration" = "true" ]; then \
     pytest -n "${N_CPU}" tests -v ;
 else
     # Run all unit tests (non integration tests). TODO remove -v flag
-    pytest --durations=10 -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" -v ;
+    pytest --durations=10 -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
 fi
 
 # Clean-up.
