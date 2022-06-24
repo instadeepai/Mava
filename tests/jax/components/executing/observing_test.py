@@ -19,7 +19,7 @@
 from types import SimpleNamespace
 from typing import Dict, Tuple
 
-import numpy as np
+import jax.numpy as jnp
 import pytest
 from acme.types import NestedArray
 from dm_env import StepType, TimeStep
@@ -66,9 +66,9 @@ class MockExecutorParameterClient:
 def executor_without_adder() -> Executor:
     """Mock executor component without adder"""
     extras = {
-        "agent_0": np.array([0]),
-        "agent_1": np.array([1]),
-        "agent_2": np.array([2]),
+        "agent_0": jnp.array([0]),
+        "agent_1": jnp.array([1]),
+        "agent_2": jnp.array([2]),
     }
     store = SimpleNamespace(
         is_evaluator=None, observations={}, adder=None, extras=extras
@@ -177,9 +177,9 @@ def test_on_execution_observe_first_without_adder(
     )
 
     assert executor_without_adder.store.extras == {
-        "agent_0": np.array([0]),
-        "agent_1": np.array([1]),
-        "agent_2": np.array([2]),
+        "agent_0": jnp.array([0]),
+        "agent_1": jnp.array([1]),
+        "agent_2": jnp.array([2]),
     }
     assert not hasattr(executor_without_adder.store, "network_int_keys_extras")
     assert not hasattr(executor_without_adder.store, "agent_net_keys")
@@ -206,7 +206,6 @@ def test_on_execution_observe_first(
     agents = sort_str_num(list(mock_executor.store.agent_net_keys.keys()))
     for agent, value in mock_executor.store.network_int_keys_extras.items():
         assert type(agent) == str
-        assert type(value) == np.ndarray
         assert agent in agents
         assert value in mock_executor.store.net_keys_to_ids.values()
 
