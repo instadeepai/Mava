@@ -16,10 +16,11 @@
 """Commonly used rate limiter components for system builders"""
 import abc
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, List, Optional, Type
 
 import reverb
 
+from mava.callbacks import Callback
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 
@@ -53,6 +54,17 @@ class RateLimiter(Component):
             config class/dataclass for component.
         """
         return RateLimiterConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        None required.
+
+        Returns:
+            List of required component classes.
+        """
+        return []
 
 
 class MinSizeRateLimiter(RateLimiter):

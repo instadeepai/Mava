@@ -45,7 +45,6 @@ class BaseParameterClient(Component):
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
-        builder.store.networks
         TrainerInit required to set up builder.store.networks
         and builder.store.trainer_networks.
 
