@@ -53,6 +53,7 @@ class BaseSystemInit(Component):
         """List of other Components required in the system for this Component to function.
 
         EnvironmentSpec required to set up builder.store.agents
+        and builder.store.environment_spec.
 
         Returns:
             List of required component classes.
