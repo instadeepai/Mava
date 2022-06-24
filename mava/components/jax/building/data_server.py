@@ -60,11 +60,11 @@ class DataServer(Component):
             # TODO (dries): Clean the below converter code up.
             # Convert a Mava spec
             num_networks = len(builder.store.table_network_config[table_key])
-            env_specs = copy.deepcopy(builder.store.agent_environment_specs)
+            env_specs = copy.deepcopy(builder.store.ma_environment_spec)
             env_specs.set_agent_environment_specs(
                 convert_specs(
                     builder.store.agent_net_keys,
-                    env_specs.get_environment_specs(),
+                    env_specs.get_agent_environment_specs(),
                     num_networks,
                 )
             )
