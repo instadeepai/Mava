@@ -21,6 +21,7 @@ import numpy as np
 
 from mava.callbacks import Callback
 from mava.components.jax import Component
+from mava.components.jax.training.trainer import TrainerInit
 from mava.core_jax import SystemBuilder
 from mava.systems.jax import ParameterClient
 
@@ -44,12 +45,14 @@ class BaseParameterClient(Component):
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
-        None required.
+        builder.store.networks
+        TrainerInit required to set up builder.store.networks
+        and builder.store.trainer_networks.
 
         Returns:
             List of required component classes.
         """
-        return []
+        return [TrainerInit]
 
 
 @dataclass
@@ -96,13 +99,13 @@ class ExecutorParameterClient(BaseParameterClient):
         set_keys = get_keys.copy()
 
         # Executors should only be able to update relevant params.
-        if builder.store.is_evaluator is True:
+        if builder.store.is_evaluator is True:  # Set by builder
             set_keys = [x for x in set_keys if x.startswith("evaluator")]
         else:
             set_keys = [x for x in set_keys if x.startswith("executor")]
 
         parameter_client = None
-        if builder.store.parameter_server_client:
+        if builder.store.parameter_server_client:  # Created by builder
             # Create parameter client
             parameter_client = ParameterClient(
                 client=builder.store.parameter_server_client,
@@ -131,18 +134,6 @@ class ExecutorParameterClient(BaseParameterClient):
             config class/dataclass for component.
         """
         return ExecutorParameterClientConfig
-
-    @staticmethod
-    def required_components() -> List[Type[Callback]]:
-        """List of other Components required in the system for this Component to function.
-
-        EnvironmentSpec required to set up builder.store.environment_spec.
-        BaseSystemInit required to set up builder.store.agent_net_keys.
-
-        Returns:
-            List of required component classes.
-        """
-        return []
 
 
 @dataclass
@@ -175,6 +166,7 @@ class TrainerParameterClient(BaseParameterClient):
         get_keys = []
         # TODO (dries): Only add the networks this trainer is working with.
         # Not all of them.
+        # builder.store.trainer_id set by builder
         trainer_networks = builder.store.trainer_networks[builder.store.trainer_id]
         for net_type_key in builder.store.networks.keys():
             for net_key in builder.store.networks[net_type_key].keys():
@@ -218,15 +210,3 @@ class TrainerParameterClient(BaseParameterClient):
     def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "trainer_parameter_client"
-
-    @staticmethod
-    def required_components() -> List[Type[Callback]]:
-        """List of other Components required in the system for this Component to function.
-
-        EnvironmentSpec required to set up builder.store.environment_spec.
-        BaseSystemInit required to set up builder.store.agent_net_keys.
-
-        Returns:
-            List of required component classes.
-        """
-        return []
