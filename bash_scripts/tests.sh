@@ -56,11 +56,11 @@ AutoROM -v
 N_CPU=$(grep -c ^processor /proc/cpuinfo)
 
 if [ "$integration" = "true" ]; then \
-    # Run all tests
-    pytest -n "${N_CPU}" tests ;
+    # Run all tests, TODO remove -v flag
+    pytest -n "${N_CPU}" tests -v ;
 else
-    # Run all unit tests (non integration tests).
-    pytest --durations=10 -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
+    # Run all unit tests (non integration tests). TODO remove -v flag
+    pytest --durations=10 -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" -v ;
 fi
 
 # Clean-up.

@@ -44,7 +44,7 @@ class TestMADQN:
 
         # networks
         network_factory = lp_utils.partial_kwargs(
-            madqn.make_default_networks, value_networks_layer_sizes=(2, 2)
+            madqn.make_default_networks, value_networks_layer_sizes=(32, 32)
         )
 
         # system
@@ -79,7 +79,9 @@ class TestMADQN:
 
         trainer: mava.Trainer = trainer_node.create_handle().dereference()
 
+        print("about to step trainer")
         for _ in range(2):
+            print("trainer_stepping")
             trainer.step()
 
     def test_recurrent_madqn_on_debugging_env(self) -> None:
