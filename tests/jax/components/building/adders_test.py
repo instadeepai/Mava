@@ -48,9 +48,9 @@ def make_fake_env_specs() -> MAEnvironmentSpec:
         _description_
     """
     agents = ["agent_0", "agent_1"]
-    env_spec = {}
+    agent_environment_specs = {}
     for agent in agents:
-        env_spec[agent] = specs.EnvironmentSpec(
+        agent_environment_specs[agent] = specs.EnvironmentSpec(
             observations=specs.Array(shape=(10, 5), dtype=np.float32),
             actions=specs.DiscreteArray(num_values=3),
             rewards=specs.Array(shape=(), dtype=np.float32),
@@ -60,8 +60,8 @@ def make_fake_env_specs() -> MAEnvironmentSpec:
         )
     return MAEnvironmentSpec(
         environment=None,
-        specs=env_spec,
-        extra_specs={"extras": specs.Array(shape=(), dtype=np.float32)},
+        agent_environment_specs=agent_environment_specs,
+        extras_specs={"extras": specs.Array(shape=(), dtype=np.float32)},
     )
 
 

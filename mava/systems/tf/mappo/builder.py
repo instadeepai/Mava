@@ -259,9 +259,9 @@ class MAPPOBuilder:
             )
 
             signature = reverb_adders.ParallelSequenceAdder.signature(
-                env_spec,
+                ma_environment_spec=env_spec,
                 sequence_length=self._config.sequence_length,
-                extras_spec=extra_specs,
+                extras_specs=extra_specs,
             )
 
             replay_tables.append(
