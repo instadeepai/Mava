@@ -48,8 +48,12 @@ class BaseSystemInit(Component):
 
 
 @dataclass
-class FixedNetworkSystemInitConfig:
+class BaseSystemInitConfig:
     shared_weights: bool = True
+
+
+@dataclass
+class FixedNetworkSystemInitConfig(BaseSystemInitConfig):
     network_sampling_setup: enums.NetworkSampler = (
         enums.NetworkSampler.fixed_agent_networks
     )
@@ -131,11 +135,10 @@ class FixedNetworkSystemInit(BaseSystemInit):
 
 
 @dataclass
-class RandomSamplingSystemInitConfig:
+class RandomSamplingSystemInitConfig(BaseSystemInitConfig):
     network_sampling_setup: enums.NetworkSampler = (
         enums.NetworkSampler.random_agent_networks
     )
-    shared_weights: bool = False
 
 
 class RandomSamplingSystemInit(BaseSystemInit):
@@ -216,11 +219,10 @@ class RandomSamplingSystemInit(BaseSystemInit):
 
 
 @dataclass
-class CustomSamplingSystemInitConfig:
+class CustomSamplingSystemInitConfig(BaseSystemInitConfig):
     network_sampling_setup: Union[List, enums.NetworkSampler] = field(
         default_factory=lambda: []
     )
-    shared_weights: bool = False
 
 
 class CustomSamplingSystemInit(BaseSystemInit):
