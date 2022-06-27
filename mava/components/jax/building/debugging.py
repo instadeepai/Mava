@@ -91,19 +91,45 @@ class ComponentDependencyDebugger(Component):
         left_ax.axis("off")
 
         # Compute node colors
-        color_map = []
+        node_color = []
         for node in graph:
-            if node in to_nodes:
-                color_map.append("#FFCCCB")
+            if node in to_nodes:  # Other components depend on it
+                node_color.append("#90EE90")
             else:
-                color_map.append("#D3D3D3")
+                node_color.append("#D3D3D3")
+
+        # Compute cycles
+        cycles = sorted(nx.simple_cycles(graph))
+        for cycle in cycles:
+            print("Circular dependency found: ", end="")
+            print([id_to_component[node] for node in cycle])
+        cycle_edges = []
+        for cycle in cycles:
+            current_node = cycle[-1]
+            for node in cycle:
+                cycle_edges.append((current_node, node))
+                current_node = node
+
+        # Compute edge colors
+        edge_color = []
+        for edge in graph.edges:
+            if edge in cycle_edges:  # Flag cycle edges
+                edge_color.append("#FF0000")
+            else:
+                edge_color.append("#000000")
 
         # Draw graph
-        pos = nx.spring_layout(graph, scale=1, iterations=2)
         pos = nx.circular_layout(graph, scale=2)
         degrees = nx.degree(graph)
         degrees = [(degrees[node] + 1) * 150 - 100 for node in graph.nodes()]
-        nx.draw(graph, pos=pos, ax=right_ax, node_color=color_map, node_size=degrees)
+        nx.draw(
+            graph,
+            pos=pos,
+            ax=right_ax,
+            node_color=node_color,
+            node_size=degrees,
+            edge_color=edge_color,
+        )
         nx.draw_networkx_labels(graph, pos=pos, font_size=8, ax=right_ax)
         right_ax.axis("off")
 
