@@ -28,7 +28,7 @@ from acme.jax import utils
 from jax import jit
 
 from mava.components.jax import Component
-from mava.components.jax.training import Batch, Step, TrainingState
+from mava.components.jax.training import Batch, TrainingState
 from mava.core_jax import SystemTrainer
 
 
@@ -109,6 +109,21 @@ class DefaultTrainerStep(TrainerStep):
 
         # Write to the loggers.
         trainer.store.trainer_logger.write({**results})
+
+
+class Step(Component):
+    @abc.abstractmethod
+    def on_training_step_fn(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "sgd_step"
 
 
 @dataclass

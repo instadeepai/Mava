@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Trainer components for calculating losses."""
-
+import abc
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Tuple
 
@@ -22,8 +22,23 @@ import jax
 import jax.numpy as jnp
 import rlax
 
-from mava.components.jax.training.base import Loss
+from mava.components.jax import Component
 from mava.core_jax import SystemTrainer
+
+
+class Loss(Component):
+    @abc.abstractmethod
+    def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "loss"
 
 
 @dataclass
