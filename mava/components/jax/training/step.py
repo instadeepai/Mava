@@ -231,10 +231,10 @@ class MAPGWithTrustRegionStep(Step):
             num_sequences = agent_0_t_vals.shape[0]
             num_steps = agent_0_t_vals.shape[1]
             batch_size = num_sequences * num_steps
-            assert batch_size % trainer.store.num_minibatches == 0, (
+            assert batch_size % trainer.store.global_config.num_minibatches == 0, (
                 "Num minibatches must divide batch size. Got batch_size={}"
                 " num_minibatches={}."
-            ).format(batch_size, trainer.store.num_minibatches)
+            ).format(batch_size, trainer.store.global_config.num_minibatches)
             batch = jax.tree_map(
                 lambda x: x.reshape((batch_size,) + x.shape[2:]), trajectories
             )
@@ -243,7 +243,7 @@ class MAPGWithTrustRegionStep(Step):
                 trainer.store.epoch_update_fn,
                 (states.random_key, states.params, states.opt_states, batch),
                 (),
-                length=trainer.store.num_epochs,
+                length=trainer.store.global_config.num_epochs,
             )
 
             # Set the metrics

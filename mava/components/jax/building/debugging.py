@@ -108,7 +108,7 @@ class ComponentDependencyDebugger(Component):
         save_path = "./component_dependency_map.png"
         print("Saving figure to '", save_path, "'", sep="")
         plt.savefig(save_path, dpi=100, bbox_inches="tight", pad_inches=0.5)
-        raise Exception("TODO: remove")
+        # raise Exception("TODO: remove")
 
     def _component_to_str(self, component: Callback) -> str:
         """Convert a component to a string representation."""
