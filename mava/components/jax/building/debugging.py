@@ -30,7 +30,17 @@ class ComponentDependencyDebugger(Component):
         additional_required_components = []
         for component in components:
             additional_required_components.extend(component.required_components())
-        components.extend(list(set(additional_required_components)))
+        components.extend(additional_required_components)
+
+        # Sort components alphabetically and remove duplicates
+        unique_component_strings = []
+        unique_components = []
+        for component in components:
+            component_str = self._component_to_str(component)
+            if component_str not in unique_component_strings:
+                unique_component_strings.append(component_str)
+                unique_components.append(component)
+        components = sorted(unique_components, key=lambda x: self._component_to_str(x))
 
         # Map from unique int IDs to components
         id_to_component = {}
@@ -89,7 +99,7 @@ class ComponentDependencyDebugger(Component):
                 color_map.append("#D3D3D3")
 
         # Draw graph
-        pos = nx.planar_layout(graph, scale=2)
+        pos = nx.planar_layout(graph, scale=1)
         nx.draw(graph, pos=pos, ax=right_ax, node_color=color_map)
         nx.draw_networkx_labels(graph, pos=pos, font_size=8, ax=right_ax)
         right_ax.axis("off")
