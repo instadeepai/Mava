@@ -183,7 +183,6 @@ def test_mapg_loss(
     low_agent_0_loss = low_loss_info["agent_0"]
     low_loss_value = low_agent_0_loss["loss_value"]
     low_loss_policy = low_agent_0_loss["loss_policy"]
-    loss_total_low = low_agent_0_loss["loss_total"]
 
     assert loss_entropy == -0.47500002
     assert loss_value == 9
@@ -191,4 +190,3 @@ def test_mapg_loss(
 
     assert low_loss_value < loss_value
     assert low_loss_policy < loss_policy
-    assert loss_total_low < loss_total
