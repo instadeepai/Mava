@@ -199,8 +199,9 @@ def test_on_parameter_server_run_loop(
     """Test checkpointing in run loop"""
     server.store.last_checkpoint_time = 0
 
-    # Do nothing if no checkpointer
+    # Do nothing if no checkpointer, even if checkpoint time has been reached
     test_default_parameter_server.config.checkpoint = False
+    # Assert that the time to checkpoint has been reached
     assert (
         server.store.last_checkpoint_time
         + test_default_parameter_server.config.checkpoint_minute_interval * 60
