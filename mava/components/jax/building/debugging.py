@@ -32,6 +32,12 @@ class ComponentDependencyDebugger(Component):
             additional_required_components.extend(component.required_components())
         components.extend(list(set(additional_required_components)))
 
+        # Map from unique int IDs to components
+        id_to_component = {}
+        for i, component in enumerate(components):
+            id_to_component[i] = self._component_to_str(component)
+        component_to_id = {component: i for i, component in id_to_component.items()}
+
         # Create edge map
         edges_from = []
         for component in components:
@@ -39,18 +45,59 @@ class ComponentDependencyDebugger(Component):
                 component_str = self._component_to_str(component)
                 required_component_str = self._component_to_str(required_component)
                 print(component_str, "---> requires --->", required_component_str)
-                edges_from.append((component_str, required_component_str))
+                edges_from.append(
+                    (
+                        component_to_id[component_str],
+                        component_to_id[required_component_str],
+                    )
+                )
+        to_nodes = [node_2 for (node_1, node_2) in edges_from]
 
         # Create graph
         graph = nx.DiGraph()
         graph.add_edges_from(edges_from)
 
+        # Create subplots
+        fig = plt.figure(1)
+        plt.clf()
+        fig, (left_ax, right_ax) = plt.subplots(
+            nrows=1, ncols=2, gridspec_kw={"width_ratios": [1, 5]}
+        )
+        fig.set_size_inches(18.5, 10.5)
+
+        # Draw manual legend
+        text = ""
+        for i in range(len(components)):
+            text += str(i) + " : " + id_to_component[i] + "\n"
+        plt.text(
+            x=0,
+            y=0.5,
+            s=text,
+            horizontalalignment="left",
+            verticalalignment="center",
+            transform=left_ax.transAxes,
+            fontsize=12,
+        )
+        left_ax.axis("off")
+
+        # Compute node colors
+        color_map = []
+        for node in graph:
+            if node in to_nodes:
+                color_map.append("#FFCCCB")
+            else:
+                color_map.append("#D3D3D3")
+
         # Draw graph
         pos = nx.planar_layout(graph, scale=2)
-        nx.draw(graph, pos=pos)
-        nx.draw_networkx_labels(graph, pos=pos, font_size=8)
-        plt.axis("off")
-        plt.savefig("./component_dependency_map.png")
+        nx.draw(graph, pos=pos, ax=right_ax, node_color=color_map)
+        nx.draw_networkx_labels(graph, pos=pos, font_size=8, ax=right_ax)
+        right_ax.axis("off")
+
+        # Save figure
+        save_path = "./component_dependency_map.png"
+        print("Saving figure to '", save_path, "'", sep="")
+        plt.savefig(save_path, dpi=100, bbox_inches="tight", pad_inches=0.5)
 
     def _component_to_str(self, component: Callback) -> str:
         """Convert a component to a string representation."""
