@@ -134,11 +134,12 @@ class ExecutorEnvironmentLoop(Component):
         """List of other Components required in the system for this Component to function.
 
         Logger required to set up builder.store.executor_logger.
+        EnvironmentSpec required for config environment_factory.
 
         Returns:
             List of required component classes.
         """
-        return [Logger]
+        return [Logger, EnvironmentSpec]
 
 
 class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
