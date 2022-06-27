@@ -28,6 +28,7 @@ from mava.components.jax import Component
 from mava.components.jax.building.adders import AdderSignature
 from mava.components.jax.building.environments import EnvironmentSpec
 from mava.components.jax.building.rate_limiters import RateLimiter
+from mava.components.jax.building.system_init import BaseSystemInit
 from mava.components.jax.training import TrainerInit
 from mava.core_jax import SystemBuilder
 from mava.utils import enums
@@ -56,10 +57,10 @@ class DataServer(Component):
                 "table_0": sort_str_num(builder.store.agent_net_keys.values())
             }
             assert (
-                builder.store.global_config.network_sampling_setup_type
+                builder.store.global_config.network_sampling_setup
                 == enums.NetworkSampler.fixed_agent_networks
             ), f"We only have a default config for the fixed_agent_networks sampler setting, \
-            not the {builder.store.global_config.network_sampling_setup_type} setting."
+            not the {builder.store.global_config.network_sampling_setup} setting."
 
         for table_key in builder.store.table_network_config.keys():
             # TODO (dries): Clean the below coverter code up.
@@ -111,11 +112,12 @@ class DataServer(Component):
         EnvironmentSpec required to set up builder.store.environment_spec
         and builder.store.extras_spec.
         AdderSignature required to set up builder.store.adder_signature_fn.
+        BaseSystemInit required for config network_sampling_setup.
 
         Returns:
             List of required component classes.
         """
-        return [TrainerInit, EnvironmentSpec, AdderSignature]
+        return [TrainerInit, EnvironmentSpec, AdderSignature, BaseSystemInit]
 
 
 @dataclass
