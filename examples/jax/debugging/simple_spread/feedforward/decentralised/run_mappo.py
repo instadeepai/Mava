@@ -21,6 +21,8 @@ from typing import Any
 import optax
 from absl import app, flags
 
+from mava.components.jax.building.environments import MonitorExecutorEnvironmentLoopConfig, \
+    MonitorExecutorEnvironmentLoop
 from mava.systems.jax import mappo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -68,7 +70,7 @@ def main(_: Any) -> None:
         )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
-    checkpoint_subpath = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+    experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
     log_every = 10
@@ -88,19 +90,20 @@ def main(_: Any) -> None:
 
     # Create the system.
     system = mappo.MAPPOSystem()
-
+    system.update(MonitorExecutorEnvironmentLoop)
     # Build the system.
     system.build(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        checkpoint_subpath=checkpoint_subpath,
+        experiment_path=experiment_path,
         optimizer=optimizer,
         run_evaluator=True,
         sample_batch_size=5,
         num_epochs=15,
         num_executors=1,
         multi_process=True,
+        record_every=100
     )
 
     # Launch the system.
