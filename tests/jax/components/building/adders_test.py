@@ -24,8 +24,8 @@ from acme import specs
 
 from mava.components.jax import Component
 from mava.components.jax.building import adders
-from mava.components.jax.building.base import SystemInit
 from mava.components.jax.building.environments import EnvironmentSpec
+from mava.components.jax.building.system_init import FixedNetworkSystemInit
 from mava.specs import DesignSpec, MAEnvironmentSpec
 from mava.systems.jax.system import System
 from mava.utils.wrapper_utils import parameterized_restart
@@ -112,7 +112,7 @@ class TestSystemWithParallelSequenceAdder(System):
         """
         components = DesignSpec(
             environment_spec=EnvironmentSpec,
-            system_init=SystemInit,
+            system_init=FixedNetworkSystemInit,
             data_server_signature=adders.ParallelSequenceAdderSignature,
             executor_adder=adders.ParallelSequenceAdder,
             executor_adder_priority=adders.UniformAdderPriority,

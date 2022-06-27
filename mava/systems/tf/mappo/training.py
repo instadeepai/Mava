@@ -793,7 +793,7 @@ class StateBasedMAPPOTrainer(MAPPOTrainer):
         agent: str,
     ) -> tf.Tensor:
         # State based
-        if type(extras["env_states"]) == dict:  # type: ignore
-            return extras["env_states"][agent]
+        if type(extras["s_t"]) == dict:  # type: ignore
+            return extras["s_t"][agent]
         else:
-            return extras["env_states"]
+            return extras["s_t"]
