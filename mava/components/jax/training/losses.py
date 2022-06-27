@@ -16,13 +16,15 @@
 """Trainer components for calculating losses."""
 import abc
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 import jax
 import jax.numpy as jnp
 import rlax
 
+from mava.callbacks import Callback
 from mava.components.jax import Component
+from mava.components.jax.training.trainer import TrainerInit
 from mava.core_jax import SystemTrainer
 
 
@@ -39,6 +41,18 @@ class Loss(Component):
             _description_
         """
         return "loss"
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        TrainerInit required to set up trainer.store.trainer_agents,
+        trainer.store.trainer_agent_net_keys and trainer.store.networks.
+
+        Returns:
+            List of required component classes.
+        """
+        return [TrainerInit]
 
 
 @dataclass
