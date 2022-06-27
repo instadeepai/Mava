@@ -81,6 +81,12 @@ class MockOptimizer:
 def mock_optimizer() -> MockOptimizer:
     return MockOptimizer()
 
+def mock_minibatch_update(params, opt_states):
+    return (params, opt_states)
+
+@pytest.fixture
+def mock_minibatch_update_fn():
+    return mock_minibatch_update
 
 @pytest.fixture
 def fake_batch() -> Batch:
@@ -249,11 +255,13 @@ def test_on_training_utility_fns_epoch(mock_trainer: MockTrainer) -> None:
     assert mock_trainer.store.epoch_update_fn
 
 
-"""def test_epoch_update_fn(fake_state:Any)->None:
+def test_epoch_update_fn(fake_state:Any, mock_minibatch_update_fn: Any)->None:
     mock_trainer= fake_state[1]
     mini_epoch_update= MAPGEpochUpdate()
     mini_epoch_update.on_training_utility_fns(trainer=mock_trainer)
+    mock_trainer.store.minibatch_update_fn=mock_minibatch_update_fn
     state= fake_state[0]
-
+    state["params"]=jnp.array([0,0,0])
+    state["opt_states"]=jnp.array([0,0,0])
     carry= [state["random_key"], state["params"], state["opt_states"], state["batch"]]
-    mock_trainer.store.epoch_update_fn(carry=carry, unused_t=None)"""
+    mock_trainer.store.epoch_update_fn(carry=carry, unused_t=None)
