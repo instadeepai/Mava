@@ -68,7 +68,7 @@ def test_builder() -> SystemBuilder:
         System builder with no components.
     """
     test_builder = Builder(components=[])
-    test_builder.store.ma_environment_spec = make_fake_env_specs()
+    test_builder.store.agent_environment_specs = make_fake_env_specs()
     test_builder.store.agent_net_keys = {
         "net_key1": "network_1",
         "net_key2": "network_2",
