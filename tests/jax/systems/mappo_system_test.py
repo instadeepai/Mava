@@ -20,7 +20,7 @@ def test_full_system() -> System:
 
 
 # TODO: fix test
-@pytest.mark.skip(reason="test currently just hangs")
+@pytest.mark.skip(reason="test is currently breaking ci pipeline")
 def test_except_trainer(
     test_full_system: System,
 ) -> None:

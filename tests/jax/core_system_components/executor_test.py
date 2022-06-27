@@ -179,10 +179,9 @@ def test_executor_parameter_server(
         trainer,
     ) = test_executor_parameter_server_system._builder.store.system_build
 
-    # assert isinstance(executor, acme.core.Worker)  #TODO: fix test
+    assert isinstance(executor, acme.core.Worker)
 
     # Save the executor policy
-
     parameters = executor._executor.store.executor_parameter_client._parameters
 
     # Change a variable in the policy network

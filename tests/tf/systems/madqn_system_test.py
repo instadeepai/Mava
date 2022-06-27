@@ -79,9 +79,7 @@ class TestMADQN:
 
         trainer: mava.Trainer = trainer_node.create_handle().dereference()
 
-        print("about to step trainer")
         for _ in range(2):
-            print("trainer_stepping")
             trainer.step()
 
     def test_recurrent_madqn_on_debugging_env(self) -> None:
