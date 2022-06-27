@@ -88,9 +88,6 @@ def test_on_parameter_server_init_start_parameter_creation(
     delattr(server.store, "parameters")
     test_default_parameter_server.on_parameter_server_init_start(server)
 
-    # Sleep seconds loaded into store for access in core parameter server
-    assert server.store.non_blocking_sleep_seconds == 15
-
     # Parameters attribute in store
     assert hasattr(server.store, "parameters")
 
