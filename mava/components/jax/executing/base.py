@@ -16,8 +16,9 @@
 """Execution components for system builders"""
 
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, List, Optional, Type
 
+from mava.callbacks import Callback
 from mava.components.jax import Component
 from mava.core_jax import SystemExecutor
 
@@ -53,3 +54,14 @@ class ExecutorInit(Component):
             config class/dataclass for component.
         """
         return ExecutorInitConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        None required.
+
+        Returns:
+            List of required component classes.
+        """
+        return []
