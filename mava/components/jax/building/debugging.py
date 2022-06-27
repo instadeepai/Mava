@@ -99,7 +99,7 @@ class ComponentDependencyDebugger(Component):
                 color_map.append("#D3D3D3")
 
         # Draw graph
-        pos = nx.planar_layout(graph, scale=1)
+        pos = nx.spring_layout(graph, scale=1, iterations=2)
         nx.draw(graph, pos=pos, ax=right_ax, node_color=color_map)
         nx.draw_networkx_labels(graph, pos=pos, font_size=8, ax=right_ax)
         right_ax.axis("off")

@@ -27,7 +27,7 @@ from jax.random import KeyArray
 from optax._src import base as optax_base
 
 from mava.callbacks import Callback
-from mava.components.jax.training import Batch, Utility
+from mava.components.jax.training.base import Batch, Utility
 from mava.components.jax.training.losses import Loss
 from mava.components.jax.training.step import Step
 from mava.components.jax.training.trainer import TrainerInit
@@ -187,7 +187,6 @@ class EpochUpdate(Utility):
 
         Step required to set up trainer.store.full_batch_size.
         MinibatchUpdate required to set up trainer.store.minibatch_update_fn.
-
 
         Returns:
             List of required component classes.

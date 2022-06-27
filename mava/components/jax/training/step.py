@@ -17,7 +17,7 @@
 import abc
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 import jax
 import jax.numpy as jnp
@@ -27,8 +27,17 @@ import tree
 from acme.jax import utils
 from jax import jit
 
+import mava.components.jax.building.adders  # To avoid circular imports
+import mava.components.jax.training.model_updating  # To avoid circular imports
+from mava.callbacks import Callback
 from mava.components.jax import Component
-from mava.components.jax.training import Batch, TrainingState
+from mava.components.jax.building.datasets import TrainerDataset, TrajectoryDataset
+from mava.components.jax.building.loggers import Logger
+from mava.components.jax.building.networks import Networks
+from mava.components.jax.building.parameter_client import TrainerParameterClient
+from mava.components.jax.training.advantage_estimation import GAE
+from mava.components.jax.training.base import Batch, TrainingState
+from mava.components.jax.training.trainer import TrainerInit
 from mava.core_jax import SystemTrainer
 
 
@@ -63,6 +72,21 @@ class TrainerStep(Component):
             _description_
         """
         return "step"
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        TrajectoryDataset required to set up trainer.store.dataset_iterator.
+        Step required to set up trainer.store.step_fn.
+        TrainerParameterClient required to set up trainer.store.trainer_parameter_client
+        and trainer.store.trainer_counts.
+        Logger required to set up trainer.store.trainer_logger.
+
+        Returns:
+            List of required component classes.
+        """
+        return [TrajectoryDataset, Step, TrainerParameterClient, Logger]
 
 
 class DefaultTrainerStep(TrainerStep):
@@ -125,6 +149,30 @@ class Step(Component):
         """
         return "sgd_step"
 
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        TrainerDataset required for config sample_batch_size.
+        ParallelSequenceAdder required for config sequence_length.
+        TrainerInit required to set up trainer.store.networks
+        and trainer.store.trainer_agent_net_keys.
+        EpochUpdate required to set up trainer.store.epoch_update_fn.
+        MinibatchUpdate required to set up trainer.store.opt_states.
+        Networks required to set up trainer.store.key.
+
+        Returns:
+            List of required component classes.
+        """
+        return [
+            TrainerDataset,
+            mava.components.jax.building.adders.ParallelSequenceAdder,
+            TrainerInit,
+            mava.components.jax.training.model_updating.EpochUpdate,
+            mava.components.jax.training.model_updating.MinibatchUpdate,
+            Networks,
+        ]
+
 
 @dataclass
 class MAPGWithTrustRegionStepConfig:
@@ -146,8 +194,9 @@ class MAPGWithTrustRegionStep(Step):
     def on_training_init_start(self, trainer: SystemTrainer) -> None:
         """_summary_"""
         # Note (dries): Assuming the batch and sequence dimensions are flattened.
-        trainer.store.full_batch_size = trainer.store.sample_batch_size * (
-            trainer.store.global_config.sequence_length - 1
+        trainer.store.full_batch_size = (
+            trainer.store.global_config.sample_batch_size
+            * (trainer.store.global_config.sequence_length - 1)
         )
 
     def on_training_step_fn(self, trainer: SystemTrainer) -> None:
@@ -321,3 +370,18 @@ class MAPGWithTrustRegionStep(Step):
             config class/dataclass for component.
         """
         return MAPGWithTrustRegionStepConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        GAE required to set up trainer.store.gae_fn.
+        MAPGEpochUpdate required for config num_epochs and num_minibatches.
+
+        Returns:
+            List of required component classes.
+        """
+        return Step.required_components() + [
+            GAE,
+            mava.components.jax.training.model_updating.MAPGEpochUpdate,
+        ]
