@@ -100,7 +100,10 @@ class ComponentDependencyDebugger(Component):
 
         # Draw graph
         pos = nx.spring_layout(graph, scale=1, iterations=2)
-        nx.draw(graph, pos=pos, ax=right_ax, node_color=color_map)
+        pos = nx.circular_layout(graph, scale=2)
+        degrees = nx.degree(graph)
+        degrees = [(degrees[node] + 1) * 150 - 100 for node in graph.nodes()]
+        nx.draw(graph, pos=pos, ax=right_ax, node_color=color_map, node_size=degrees)
         nx.draw_networkx_labels(graph, pos=pos, font_size=8, ax=right_ax)
         right_ax.axis("off")
 
@@ -108,7 +111,7 @@ class ComponentDependencyDebugger(Component):
         save_path = "./component_dependency_map.png"
         print("Saving figure to '", save_path, "'", sep="")
         plt.savefig(save_path, dpi=100, bbox_inches="tight", pad_inches=0.5)
-        # raise Exception("TODO: remove")
+        raise Exception("TODO: remove")
 
     def _component_to_str(self, component: Callback) -> str:
         """Convert a component to a string representation."""
