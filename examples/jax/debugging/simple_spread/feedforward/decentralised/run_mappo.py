@@ -21,8 +21,7 @@ from typing import Any
 import optax
 from absl import app, flags
 
-from mava.components.jax.building.environments import MonitorExecutorEnvironmentLoopConfig, \
-    MonitorExecutorEnvironmentLoop
+from mava.components.jax.building.environments import MonitorExecutorEnvironmentLoop
 from mava.systems.jax import mappo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -103,7 +102,7 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        record_every=100
+        record_every=100,
     )
 
     # Launch the system.

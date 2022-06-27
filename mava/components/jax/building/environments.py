@@ -16,7 +16,7 @@
 """Execution components for system builders"""
 import abc
 from dataclasses import dataclass
-from typing import Callable, Optional, Type, Union, Tuple
+from typing import Callable, Optional, Tuple, Type, Union
 
 import acme
 
@@ -154,15 +154,16 @@ class MonitorExecutorEnvironmentLoopConfig(ExecutorEnvironmentLoopConfig):
 class MonitorExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
     def __init__(
         self,
-        config: MonitorExecutorEnvironmentLoopConfig = MonitorExecutorEnvironmentLoopConfig(),
+        config: MonitorExecutorEnvironmentLoopConfig = MonitorExecutorEnvironmentLoopConfig(),  # noqa
     ):
         super().__init__(config=config)
         self.config = config
 
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
         """
-        Builds a `ParallelEnvironmentLoop` on all executors and a `MonitorParallelEnvironmentLoop`
-        on the executor and stores it in the `builder.store.system_executor`
+        Builds a `ParallelEnvironmentLoop` on all executors and a
+        `MonitorParallelEnvironmentLoop` on the executor and stores it
+         in the `builder.store.system_executor`
 
         Args:
             builder : the system builder
