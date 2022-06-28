@@ -386,6 +386,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             add_dict,
             partial_step=True,
         )
+
         self._add_first_called = True
 
     def add(
@@ -424,6 +425,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             next_step,
             partial_step=True,
         )
+
         self._write()
 
         if next_timestep.last():
