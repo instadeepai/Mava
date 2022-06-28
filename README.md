@@ -272,7 +272,12 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
     pip install git+https://github.com/instadeepai/Mava#egg=id-mava[reverb,tf]
     ```
 
-    **For the jax version of mava, please replace `tf` with `jax`, e.g. `pip install id-mava[jax,reverb]`**
+    **For the jax version of mava, please replace `tf` with `jax`, e.g. `pip install id-mava[jax,reverb]`**.
+
+    **If you are using `jax` and `CUDA`, you also need to run the following:**
+    ```bash
+    pip install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+    ```
 
     1.2 For **optional** environments:
     * PettingZoo:
@@ -333,7 +338,7 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
 
         If this fails, follow instructions [here](https://github.com/deepmind/meltingpot#installation).
 
-2. Run an example:
+3. Run an example:
 
     ```
     python dir/to/example/example.py
