@@ -153,6 +153,19 @@ def mock_executor() -> MockExecutor:
 
 
 @pytest.fixture
+def mock_executor_fixed_net() -> MockExecutor:
+    """Mock executor component with network sampling setup fixed."""
+    mock_executor_fixed_network = MockExecutor()
+    fixed_network_sampling_setup = [
+        ["network_agent_0", "network_agent_1", "network_agent_2"]
+    ]
+    mock_executor_fixed_network.store.network_sampling_setup = (
+        fixed_network_sampling_setup
+    )
+    return mock_executor_fixed_network
+
+
+@pytest.fixture
 def feedforward_executor_observe() -> FeedforwardExecutorObserve:
     """FeedforwardExecutorObserve.
 
@@ -217,6 +230,48 @@ def test_on_execution_observe_first(
     # test mock_executor.store.adder.add_first()
     assert mock_executor.store.adder.test_timestep == mock_executor.store.timestep
     assert mock_executor.store.adder.test_extras == mock_executor.store.extras
+
+
+def test_on_execution_observe_first_fixed_sampling(
+    feedforward_executor_observe: FeedforwardExecutorObserve,
+    mock_executor_fixed_net: MockExecutor,
+) -> None:
+    """Test on_execution_observe_first method from FeedForwardExecutorObserve
+
+    Args:
+        feedforward_executor_observe: FeedForwardExecutorObserve,
+        mock_executor_fixed_net: Executor with fixed network sampling setup
+    """
+    feedforward_executor_observe.on_execution_observe_first(
+        executor=mock_executor_fixed_net
+    )
+
+    assert mock_executor_fixed_net.store.agent_net_keys == {
+        "agent_0": "network_agent_0",
+        "agent_1": "network_agent_1",
+        "agent_2": "network_agent_2",
+    }
+
+    assert mock_executor_fixed_net.store.network_int_keys_extras == {
+        "agent_0": 0,
+        "agent_1": 1,
+        "agent_2": 2,
+    }
+
+    assert (
+        mock_executor_fixed_net.store.extras["network_int_keys"]
+        == mock_executor_fixed_net.store.network_int_keys_extras
+    )
+
+    # test mock_executor_fixed_net.store.adder.add_first()
+    assert (
+        mock_executor_fixed_net.store.adder.test_timestep
+        == mock_executor_fixed_net.store.timestep
+    )
+    assert (
+        mock_executor_fixed_net.store.adder.test_extras
+        == mock_executor_fixed_net.store.extras
+    )
 
 
 def test_on_execution_observe_without_adder(
