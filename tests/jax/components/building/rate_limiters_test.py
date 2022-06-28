@@ -57,7 +57,7 @@ def test_min_size_rate_limiter(
     # TODO: uncomment below when reverb is upgraded to >= 0.7.2
     # See https://github.com/deepmind/reverb/blob/
     # 7c33ea44589deb5c5ac440cb1b3a89319241b56e/reverb/rate_limiters.py#L31
-    # assert rate_limiter._min_size_to_sample == 100
+    assert reverb_rate_limiter._min_size_to_sample == 100
 
 
 def test_sample_to_insert_rate_limiter_with_error_buffer(
@@ -76,16 +76,18 @@ def test_sample_to_insert_rate_limiter_with_error_buffer(
     reverb_rate_limiter = builder.store.rate_limiter_fn()
     assert isinstance(reverb_rate_limiter, reverb.rate_limiters.SampleToInsertRatio)
     # TODO: uncomment below when reverb is upgraded to >= 0.7.2
-    # assert reverb_rate_limiter._min_size_to_sample == 100
-    # assert reverb_rate_limiter._samples_per_insert == 16.0
-    #
-    # # Ensure offset created correctly
-    # offset = reverb_rate_limiter._samples_per_insert\
-    #     * reverb_rate_limiter._min_size_to_sample
-    # min_diff = offset - sample_to_insert_rate_limiter.config.error_buffer
-    # max_diff = offset + sample_to_insert_rate_limiter.config.error_buffer
-    # assert reverb_rate_limiter._min_diff == min_diff
-    # assert reverb_rate_limiter._max_diff == max_diff
+    assert reverb_rate_limiter._min_size_to_sample == 100
+    assert reverb_rate_limiter._samples_per_insert == 16.0
+
+    # Ensure offset created correctly
+    offset = (
+        reverb_rate_limiter._samples_per_insert
+        * reverb_rate_limiter._min_size_to_sample
+    )
+    min_diff = offset - sample_to_insert_rate_limiter.config.error_buffer
+    max_diff = offset + sample_to_insert_rate_limiter.config.error_buffer
+    assert reverb_rate_limiter._min_diff == min_diff
+    assert reverb_rate_limiter._max_diff == max_diff
 
 
 def test_sample_to_insert_rate_limiter_no_error_buffer(
@@ -102,18 +104,23 @@ def test_sample_to_insert_rate_limiter_no_error_buffer(
     reverb_rate_limiter = builder.store.rate_limiter_fn()
     assert isinstance(reverb_rate_limiter, reverb.rate_limiters.SampleToInsertRatio)
     # TODO: uncomment below when reverb is upgraded to >= 0.7.2
-    # assert reverb_rate_limiter._min_size_to_sample == 100
-    # assert reverb_rate_limiter._samples_per_insert == 16.0
-    #
-    # # Ensure offset created correctly
-    # samples_per_insert_tolerance = 0.1\
-    #     * sample_to_insert_rate_limiter.config.samples_per_insert
-    # error_buffer = sample_to_insert_rate_limiter.config.min_data_server_size\
-    #     * samples_per_insert_tolerance
-    #
-    # offset = reverb_rate_limiter._samples_per_insert\
-    #     * reverb_rate_limiter._min_size_to_sample
-    # min_diff = offset - error_buffer
-    # max_diff = offset + error_buffer
-    # assert reverb_rate_limiter._min_diff == min_diff
-    # assert reverb_rate_limiter._max_diff == max_diff
+    assert reverb_rate_limiter._min_size_to_sample == 100
+    assert reverb_rate_limiter._samples_per_insert == 16.0
+
+    # Ensure offset created correctly
+    samples_per_insert_tolerance = (
+        0.1 * sample_to_insert_rate_limiter.config.samples_per_insert
+    )
+    error_buffer = (
+        sample_to_insert_rate_limiter.config.min_data_server_size
+        * samples_per_insert_tolerance
+    )
+
+    offset = (
+        reverb_rate_limiter._samples_per_insert
+        * reverb_rate_limiter._min_size_to_sample
+    )
+    min_diff = offset - error_buffer
+    max_diff = offset + error_buffer
+    assert reverb_rate_limiter._min_diff == min_diff
+    assert reverb_rate_limiter._max_diff == max_diff
