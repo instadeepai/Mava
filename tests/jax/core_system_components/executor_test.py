@@ -102,3 +102,24 @@ def test_observe_store(
     assert test_executor.store.actions == dummy_actions
     assert test_executor.store.next_timestep == dummy_time_step
     assert test_executor.store.next_extras == dummy_extras
+
+
+def test_select_action_store(
+    test_executor: Executor,
+) -> None:
+    """Test that store is handled properly in select_action"""
+    agent = "agent_0"
+    observation = np.array([1, 2, 3, 4])
+    state = np.array([5, 6, 7, 8])
+
+    # Manually load info into store
+    test_executor.store.action_info = "action_info"
+    test_executor.store.policy_info = "policy_info"
+
+    assert test_executor.select_action(
+        agent=agent, observation=observation, state=state
+    ) == ("action_info", "policy_info")
+
+    assert test_executor.store.agent == agent
+    assert (test_executor.store.observation == observation).all()
+    assert (test_executor.store.state == state).all()
