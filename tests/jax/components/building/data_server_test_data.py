@@ -26,7 +26,7 @@ from mava.components.jax.building.data_server import (
     OnPolicyDataServer,
 )
 from mava.components.jax.building.environments import EnvironmentSpec
-from mava.components.jax.building.reverb import (
+from mava.components.jax.building.reverb_components import (
     MinSizeRateLimiter,
     SampleToInsertRateLimiter,
 )
