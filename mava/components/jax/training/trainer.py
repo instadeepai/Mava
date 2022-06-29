@@ -16,12 +16,12 @@
 """Trainer components for system builders."""
 
 import abc
-from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Union
+from dataclasses import dataclass, field
+from types import SimpleNamespace
+from typing import Any, Callable, Dict, Optional
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder, SystemTrainer
-from mava.utils import enums
 from mava.utils.sort_utils import sort_str_num
 
 
@@ -55,20 +55,8 @@ class BaseTrainerInit(Component):
         return "trainer_init"
 
 
-@dataclass
-class BaseTrainerInitConfig:
-    trainer_networks: Union[
-        Dict[str, List], enums.Trainer
-    ] = enums.Trainer.single_trainer
-
-
-@dataclass
-class SingleTrainerInitConfig(BaseTrainerInitConfig):
-    pass
-
-
 class SingleTrainerInit(BaseTrainerInit):
-    def __init__(self, config: SingleTrainerInitConfig = SingleTrainerInitConfig()):
+    def __init__(self, config: SimpleNamespace = SimpleNamespace()):
         """Initialises a single trainer.
 
         Single trainer is used to train all networks.
@@ -87,15 +75,9 @@ class SingleTrainerInit(BaseTrainerInit):
             ValueError: Raises an error when trainer_networks is not
                         set to single_trainer.
         """
-        trainer_networks = self.config.trainer_networks
         unique_net_keys = builder.store.unique_net_keys
 
         # Setup trainer_networks
-
-        if trainer_networks != enums.Trainer.single_trainer:
-            raise ValueError(
-                "Please ensure that trainer_networks is set to use a single trainer."
-            )
 
         builder.store.trainer_networks = {"trainer": unique_net_keys}
 
@@ -144,27 +126,9 @@ class SingleTrainerInit(BaseTrainerInit):
             for a_i, agent in enumerate(trainer.store.trainer_agents)
         }
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return SingleTrainerInitConfig
-
-
-@dataclass
-class OneTrainerPerNetworkInitConfig(BaseTrainerInitConfig):
-    trainer_networks: Union[
-        Dict[str, List], enums.Trainer
-    ] = enums.Trainer.one_trainer_per_network
-
 
 class OneTrainerPerNetworkInit(BaseTrainerInit):
-    def __init__(
-        self, config: OneTrainerPerNetworkInitConfig = OneTrainerPerNetworkInitConfig()
-    ):
+    def __init__(self, config: SimpleNamespace = SimpleNamespace()):
         """Initialises a multiple trainers.
 
         Different trainer will be dedicated to training each network.
@@ -183,19 +147,9 @@ class OneTrainerPerNetworkInit(BaseTrainerInit):
             ValueError: Raises an error when trainer_networks is not
                         set to one_trainer_per_network.
         """
-        trainer_networks = self.config.trainer_networks
         unique_net_keys = builder.store.unique_net_keys
 
         # Setup trainer_networks
-
-        if trainer_networks != enums.Trainer.one_trainer_per_network:
-
-            raise ValueError(
-                """Please ensure that trainer_networks is set to use
-                one trainer per network.
-                """
-            )
-
         builder.store.trainer_networks = {
             f"trainer_{i}": [unique_net_keys[i]] for i in range(len(unique_net_keys))
         }
@@ -245,19 +199,10 @@ class OneTrainerPerNetworkInit(BaseTrainerInit):
             for a_i, agent in enumerate(trainer.store.trainer_agents)
         }
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return OneTrainerPerNetworkInitConfig
-
 
 @dataclass
-class CustomTrainerInitConfig(BaseTrainerInitConfig):
-    pass
+class CustomTrainerInitConfig:
+    trainer_networks: Dict = field(default_factory=lambda: {})
 
 
 class CustomTrainerInit(BaseTrainerInit):
