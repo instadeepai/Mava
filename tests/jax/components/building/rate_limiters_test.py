@@ -54,9 +54,16 @@ def test_min_size_rate_limiter(
 
     reverb_rate_limiter = builder.store.rate_limiter_fn()
     assert isinstance(reverb_rate_limiter, reverb.rate_limiters.MinSize)
-    # TODO: uncomment below when reverb is upgraded to >= 0.7.2
-    # See https://github.com/deepmind/reverb/blob/
-    # 7c33ea44589deb5c5ac440cb1b3a89319241b56e/reverb/rate_limiters.py#L31
+
+
+# TODO: do not skip this test when reverb is upgraded to 0.8.0
+@pytest.mark.skip
+def test_min_size_rate_limiter_attributes(
+    builder: Builder, min_size_rate_limiter: MinSizeRateLimiter
+) -> None:
+    """Test MinSizeRateLimiter attributes loaded correctly."""
+    min_size_rate_limiter.on_building_data_server_rate_limiter(builder)
+    reverb_rate_limiter = builder.store.rate_limiter_fn()
     assert reverb_rate_limiter._min_size_to_sample == 100
 
 
@@ -75,7 +82,17 @@ def test_sample_to_insert_rate_limiter_with_error_buffer(
 
     reverb_rate_limiter = builder.store.rate_limiter_fn()
     assert isinstance(reverb_rate_limiter, reverb.rate_limiters.SampleToInsertRatio)
-    # TODO: uncomment below when reverb is upgraded to >= 0.7.2
+
+
+# TODO: do not skip this test when reverb is upgraded to 0.8.0
+@pytest.mark.skip
+def test_sample_to_insert_rate_limiter_with_error_buffer_attributes(
+    builder: SystemBuilder, sample_to_insert_rate_limiter: SampleToInsertRateLimiter
+) -> None:
+    """Test SampleToInsertRateLimiter attributes loaded correctly with error buffer."""
+    sample_to_insert_rate_limiter.on_building_data_server_rate_limiter(builder)
+    reverb_rate_limiter = builder.store.rate_limiter_fn()
+
     assert reverb_rate_limiter._min_size_to_sample == 100
     assert reverb_rate_limiter._samples_per_insert == 16.0
 
@@ -103,7 +120,19 @@ def test_sample_to_insert_rate_limiter_no_error_buffer(
 
     reverb_rate_limiter = builder.store.rate_limiter_fn()
     assert isinstance(reverb_rate_limiter, reverb.rate_limiters.SampleToInsertRatio)
-    # TODO: uncomment below when reverb is upgraded to >= 0.7.2
+
+
+# TODO: do not skip this test when reverb is upgraded to 0.8.0
+@pytest.mark.skip
+def test_sample_to_insert_rate_limiter_no_error_buffer_attributes(
+    builder: SystemBuilder, sample_to_insert_rate_limiter: SampleToInsertRateLimiter
+) -> None:
+    """Test SampleToInsertRateLimiter attributes without error buffer."""
+    # Manually set config
+    sample_to_insert_rate_limiter.config.error_buffer = None
+    sample_to_insert_rate_limiter.on_building_data_server_rate_limiter(builder)
+
+    reverb_rate_limiter = builder.store.rate_limiter_fn()
     assert reverb_rate_limiter._min_size_to_sample == 100
     assert reverb_rate_limiter._samples_per_insert == 16.0
 
