@@ -33,16 +33,16 @@ class RateLimiterConfig:
 
 class RateLimiter(Component):
     def __init__(self, config: RateLimiterConfig = RateLimiterConfig()) -> None:
-        """[summary]"""
+        """Creates reverb rate limiter functions"""
         self.config = config
 
     @abc.abstractmethod
     def on_building_data_server_rate_limiter(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Hook for adding reverb rate limiter function to builder store."""
 
     @staticmethod
     def name() -> str:
-        """_summary_"""
+        """Assigns name to component"""
         return "rate_limiter"
 
     @staticmethod
@@ -57,10 +57,13 @@ class RateLimiter(Component):
 
 class MinSizeRateLimiter(RateLimiter):
     def on_building_data_server_rate_limiter(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Block sample calls unless replay contains `min_size_to_sample`.
+
+        This limiter blocks all sample calls when the replay contains less than
+        `min_size_to_sample` items, and accepts all sample calls otherwise.
 
         Args:
-            builder : _description_
+            builder : system builder
         """
 
         def rate_limiter_fn() -> reverb.rate_limiters:
@@ -71,12 +74,37 @@ class MinSizeRateLimiter(RateLimiter):
 
 class SampleToInsertRateLimiter(RateLimiter):
     def on_building_data_server_rate_limiter(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Maintains a specified ratio between samples and inserts.
+
+        The limiter works in two stages:
+
+            Stage 1. Size of table is lt `min_size_to_sample`.
+            Stage 2. Size of table is ge `min_size_to_sample`.
+
+        During stage 1 the limiter works exactly like MinSize, i.e. it allows
+        all insert calls and blocks all sample calls. Note that it is possible to
+        transition into stage 1 from stage 2 when items are removed from the table.
+
+        During stage 2 the limiter attempts to maintain the ratio
+        `samples_per_inserts` between the samples and inserts. This is done by
+        measuring the "error" in this ratio, calculated as:
+
+            number_of_inserts * samples_per_insert - number_of_samples
+
+        If `error_buffer` is a number and this quantity is larger than
+        `min_size_to_sample * samples_per_insert + error_buffer` then insert calls
+        will be blocked; sampling will be blocked for error less than
+        `min_size_to_sample * samples_per_insert - error_buffer`.
+
+        If `error_buffer` is a tuple of two numbers then insert calls will block if
+        the error is larger than error_buffer[1], and sampling will block if the error
+        is less than error_buffer[0].
+
+        `error_buffer` exists to avoid unnecessary blocking for a system that is
+        more or less in equilibrium.
 
         Args:
-            builder : _description_
-        Returns:
-            _description_
+            builder : system builder
         """
         if not self.config.error_buffer:
             # Create enough of an error buffer to give a 10% tolerance in rate.
@@ -107,24 +135,24 @@ class Sampler(Component):
         self,
         config: SamplerConfig = SamplerConfig(),
     ):
-        """_summary_
+        """Creates reverb selector functions for sampling data.
 
-        Args:
-            config : _description_.
+        These functions dictate how experience will be sampled form the
+        replay table.
         """
         self.config = config
 
     @abc.abstractmethod
     def on_building_data_server_start(self, builder: SystemBuilder) -> None:
-        """_summary_"""
+        """Hook for adding reverb selector to builder store.
+
+        This determines how experience will be sampled from the replay table.
+        """
 
     @staticmethod
     def name() -> str:
-        """_summary_
+        """Assigns name to component"""
 
-        Returns:
-            _description_
-        """
         return "data_server_sampler"
 
     @staticmethod
@@ -139,7 +167,7 @@ class Sampler(Component):
 
 class UniformSampler(Sampler):
     def on_building_data_server_start(self, builder: SystemBuilder) -> None:
-        """_summary_"""
+        """Sample data from the table uniformly"""
 
         def sampler_fn() -> reverb.selectors:
             return reverb.selectors.Uniform()
@@ -157,15 +185,12 @@ class PrioritySampler(Sampler):
         self,
         config: PrioritySamplerConfig = PrioritySamplerConfig(),
     ):
-        """_summary_
+        """Initialise priortized sampling from replay table."""
 
-        Args:
-            config : _description_.
-        """
         self.config = config
 
     def on_building_data_server_start(self, builder: SystemBuilder) -> None:
-        """_summary_"""
+        """Sample experience from the replay table according to its importance."""
 
         def sampler_fn() -> reverb.selectors:
             return reverb.selectors.Prioritized(self.config.priority_exponent)
@@ -192,24 +217,24 @@ class Remover(Component):
         self,
         config: RemoverConfig = RemoverConfig(),
     ):
-        """_summary_
+        """Creates reverb selector functions for removing data.
 
-        Args:
-            config : _description_.
+        These functions dictate how experience will be removed form the
+        replay table once the maximum replay table size is reached.
         """
         self.config = config
 
     @abc.abstractmethod
     def on_building_data_server_start(self, builder: SystemBuilder) -> None:
-        """_summary_"""
+        """Hook for adding reverb selector to builder store.
+
+        This determines how experience will be experience from the replay table.
+        """
 
     @staticmethod
     def name() -> str:
-        """_summary_
+        """Assigns name to component"""
 
-        Returns:
-            _description_
-        """
         return "data_server_remover"
 
     @staticmethod
@@ -224,7 +249,10 @@ class Remover(Component):
 
 class FIFORemover(Remover):
     def on_building_data_server_start(self, builder: SystemBuilder) -> None:
-        """_summary_"""
+        """First In First Out remover.
+
+        The experience that was added to the replay table earlier is removed first.
+        """
 
         def remover_fn() -> reverb.selectors:
             return reverb.selectors.Fifo()
@@ -234,7 +262,10 @@ class FIFORemover(Remover):
 
 class LIFORemover(Remover):
     def on_building_data_server_start(self, builder: SystemBuilder) -> None:
-        """_summary_"""
+        """Last In First Out remover.
+
+        The experience that was added to the replay table later is removed first.
+        """
 
         def remover_fn() -> reverb.selectors:
             return reverb.selectors.Lifo()
