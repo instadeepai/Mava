@@ -17,7 +17,7 @@
 
 
 from types import SimpleNamespace
-from typing import Dict, Tuple
+from typing import Dict, Any
 
 import jax.numpy as jnp
 import pytest
@@ -25,12 +25,10 @@ from acme.types import NestedArray
 from dm_env import StepType, TimeStep
 
 from mava.components.jax.executing.observing import (
-    ExecutorObserveConfig,
     FeedforwardExecutorObserve,
 )
 from mava.systems.jax.executor import Executor
 from mava.types import OLT
-from mava.utils.sort_utils import sort_str_num
 
 
 class MockAdder:
@@ -38,7 +36,7 @@ class MockAdder:
         pass
 
     def add_first(
-        self, timestep: TimeStep, extras: Dict[str, NestedArray] = ...  # type: ignore
+        self, timestep: TimeStep, extras: Dict[str, NestedArray]
     ) -> None:
         self.test_timestep = timestep
         self.test_extras = extras
@@ -47,7 +45,7 @@ class MockAdder:
         self,
         actions: Dict[str, NestedArray],
         next_timestep: TimeStep,
-        next_extras: Dict[str, NestedArray] = ...,  # type: ignore
+        next_extras: Dict[str, NestedArray]
     ) -> None:
         self.test_adder_actions = actions
         self.test_next_timestep = next_timestep
@@ -108,7 +106,7 @@ class MockExecutor(Executor):
             ),
         )
         # extras
-        extras = {}  # type: ignore
+        extras: Dict[str, Any] = {}
         # Aadder
         adder = MockAdder()
         # actions_info
@@ -216,10 +214,9 @@ def test_on_execution_observe_first(
         assert agent in ["agent_0", "agent_1", "agent_2"]
         assert net in ["network_agent_0", "network_agent_1", "network_agent_2"]
 
-    agents = sort_str_num(list(mock_executor.store.agent_net_keys.keys()))
     for agent, value in mock_executor.store.network_int_keys_extras.items():
         assert type(agent) == str
-        assert agent in agents
+        assert agent in ["agent_0", "agent_1", "agent_2"]
         assert value in mock_executor.store.net_keys_to_ids.values()
 
     assert (
