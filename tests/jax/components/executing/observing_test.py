@@ -17,16 +17,14 @@
 
 
 from types import SimpleNamespace
-from typing import Dict, Any
+from typing import Any, Dict
 
 import jax.numpy as jnp
 import pytest
 from acme.types import NestedArray
 from dm_env import StepType, TimeStep
 
-from mava.components.jax.executing.observing import (
-    FeedforwardExecutorObserve,
-)
+from mava.components.jax.executing.observing import FeedforwardExecutorObserve
 from mava.systems.jax.executor import Executor
 from mava.types import OLT
 
@@ -35,9 +33,7 @@ class MockAdder:
     def __init__(self) -> None:
         pass
 
-    def add_first(
-        self, timestep: TimeStep, extras: Dict[str, NestedArray]
-    ) -> None:
+    def add_first(self, timestep: TimeStep, extras: Dict[str, NestedArray]) -> None:
         self.test_timestep = timestep
         self.test_extras = extras
 
@@ -45,7 +41,7 @@ class MockAdder:
         self,
         actions: Dict[str, NestedArray],
         next_timestep: TimeStep,
-        next_extras: Dict[str, NestedArray]
+        next_extras: Dict[str, NestedArray],
     ) -> None:
         self.test_adder_actions = actions
         self.test_next_timestep = next_timestep
