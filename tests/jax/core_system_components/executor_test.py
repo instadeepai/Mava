@@ -123,3 +123,27 @@ def test_select_action_store(
     assert test_executor.store.agent == agent
     assert (test_executor.store.observation == observation).all()
     assert (test_executor.store.state == state).all()
+
+
+def test_select_actions_store(
+    test_executor: Executor,
+) -> None:
+    """Test that store is handled properly in select_actions"""
+    observations = {
+        "agent_0": np.array([1, 2, 3, 4]),
+        "agent_1": np.array([5, 6, 7, 8]),
+    }
+
+    # Manually load info into store
+    actions_info = {"agent_0": "actions_info_0", "agent_1": "actions_info_1"}
+    policies_info = {"agent_0": "policies_info_0", "agent_1": "policies_info_1"}
+
+    test_executor.store.actions_info = actions_info
+    test_executor.store.policies_info = policies_info
+
+    assert test_executor.select_actions(observations=observations) == (
+        actions_info,
+        policies_info,
+    )
+
+    assert test_executor.store.observations == observations
