@@ -22,8 +22,8 @@ class ComponentDependenciesConfig:
     cycle_edge_color: str = "#FF0000"
     default_edge_color: str = "#000000"
     layout_scale: int = 2
-    node_size_multiplier: int = 150
-    node_size_offset: int = 100
+    node_size_increment: int = 100
+    min_node_size: int = 160
     dependency_graph_save_path: str = "./component_dependency_map.png"
 
 
@@ -135,8 +135,8 @@ class ComponentDependencyDebugger(Component):
         pos = nx.circular_layout(graph, scale=self.config.layout_scale)
         degrees = nx.degree(graph)
         degrees = [
-            (degrees[node] + 1) * self.config.node_size_multiplier
-            - self.config.node_size_offset
+            (degrees[node] - 1) * self.config.node_size_increment
+            + self.config.min_node_size
             for node in graph.nodes()
         ]
         nx.draw(
@@ -160,7 +160,6 @@ class ComponentDependencyDebugger(Component):
             bbox_inches="tight",
             pad_inches=0.5,
         )
-        raise Exception("TODO: remove")
 
     def _component_to_str(self, component: Callback) -> str:
         """Convert a component to a string representation."""
