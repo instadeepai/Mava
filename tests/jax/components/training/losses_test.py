@@ -3,6 +3,7 @@ from typing import Callable, Dict, Tuple
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pytest
 
 from mava.components.jax.training.losses import (
@@ -17,18 +18,18 @@ class MockNet:
 
     @staticmethod
     def apply(
-        parameters: Dict[str, jnp.ndarray], observation: jnp.array
-    ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+        parameters: Dict[str, np.ndarray], observation: np.array
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """Mock function to apply the network to training data"""
         return observation, parameters["mlp/~/linear_0"]["w"]
 
 
-def log_prob(distribution_params: jnp.array, actions: jnp.array) -> jnp.ndarray:
+def log_prob(distribution_params: np.array, actions: np.array) -> np.ndarray:
     """Mock function to return fixed log probs"""
     return distribution_params + actions
 
 
-def entropy(distribution_params: jnp.array) -> jnp.ndarray:
+def entropy(distribution_params: np.array) -> np.ndarray:
     """Mock function to return fixed entropy"""
 
     return distribution_params
@@ -38,7 +39,7 @@ def entropy(distribution_params: jnp.array) -> jnp.ndarray:
 def mock_trainer() -> Trainer:
     """Creates mock trainer fixture"""
 
-    observation = SimpleNamespace(observation=jnp.array([0.5, 0.5, 0.7, 0.2]))
+    observation = SimpleNamespace(observation=np.array([0.5, 0.5, 0.7, 0.2]))
     observations = {
         "agent_0": observation,
         "agent_1": observation,
