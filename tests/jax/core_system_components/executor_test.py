@@ -13,10 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for executor class for Jax-based Mava systems"""
+"""Tests for executor class for Jax-based Mava systems."""
 from types import SimpleNamespace
 from typing import List
 
+import dm_env
+import numpy as np
 import pytest
 
 from mava.callbacks import Callback
@@ -38,7 +40,7 @@ class TestExecutor(HookOrderTracking, Executor):
 
 @pytest.fixture
 def test_executor() -> Executor:
-    """Dummy parameter server with no components"""
+    """Dummy Executor with no components."""
     return TestExecutor(
         store=SimpleNamespace(
             store_key="expected_value",
@@ -49,6 +51,20 @@ def test_executor() -> Executor:
 
 
 def test_store_loaded(test_executor: Executor) -> None:
-    """Test that store is loaded during init"""
+    """Test that store is loaded during init."""
     assert test_executor.store.store_key == "expected_value"
     assert not test_executor.store.is_evaluator
+    assert test_executor._evaluator == test_executor.store.is_evaluator
+
+
+def test_observe_first_store(test_executor: Executor) -> None:
+    """Test that store is handled properly in observe_first"""
+    timestep = dm_env.TimeStep(
+        step_type="type1", reward=-100, discount=0.9, observation=np.array([1, 2, 3])
+    )
+    extras = {"extras_key": "extras_value"}
+    test_executor.observe_first(
+        timestep=timestep, extras={"extras_key": "extras_value"}
+    )
+    assert test_executor.store.timestep == timestep
+    assert test_executor.store.extras == extras
