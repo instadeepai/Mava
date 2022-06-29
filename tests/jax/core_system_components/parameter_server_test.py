@@ -44,7 +44,7 @@ def test_parameter_server() -> ParameterServer:
     return TestParameterServer(
         store=SimpleNamespace(
             config_key="expected_value",
-            non_blocking_sleep_seconds=1,
+            global_config=SimpleNamespace(non_blocking_sleep_seconds=1),
             get_parameters="parameter_list",
         ),
         components=[],
