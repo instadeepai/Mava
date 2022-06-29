@@ -15,11 +15,12 @@
 
 """Tests for executor class for Jax-based Mava systems."""
 from types import SimpleNamespace
-from typing import List
+from typing import Dict, List
 
 import dm_env
 import numpy as np
 import pytest
+from acme.types import NestedArray
 
 from mava.callbacks import Callback
 from mava.systems.jax import Executor
@@ -50,6 +51,26 @@ def test_executor() -> Executor:
     )
 
 
+@pytest.fixture
+def dummy_time_step() -> dm_env.TimeStep:
+    """Dummy TimeStep."""
+    return dm_env.TimeStep(
+        step_type="type1", reward=-100, discount=0.9, observation=np.array([1, 2, 3])
+    )
+
+
+@pytest.fixture
+def dummy_extras() -> Dict[str, NestedArray]:
+    """Dummy extras."""
+    return {"extras_key": "extras_value"}
+
+
+@pytest.fixture
+def dummy_actions() -> Dict[str, NestedArray]:
+    """Dummy actions."""
+    return {"actions_key": "actions_value"}
+
+
 def test_store_loaded(test_executor: Executor) -> None:
     """Test that store is loaded during init."""
     assert test_executor.store.store_key == "expected_value"
@@ -57,14 +78,12 @@ def test_store_loaded(test_executor: Executor) -> None:
     assert test_executor._evaluator == test_executor.store.is_evaluator
 
 
-def test_observe_first_store(test_executor: Executor) -> None:
+def test_observe_first_store(
+    test_executor: Executor,
+    dummy_time_step: dm_env.TimeStep,
+    dummy_extras: Dict[str, NestedArray],
+) -> None:
     """Test that store is handled properly in observe_first"""
-    timestep = dm_env.TimeStep(
-        step_type="type1", reward=-100, discount=0.9, observation=np.array([1, 2, 3])
-    )
-    extras = {"extras_key": "extras_value"}
-    test_executor.observe_first(
-        timestep=timestep, extras={"extras_key": "extras_value"}
-    )
-    assert test_executor.store.timestep == timestep
-    assert test_executor.store.extras == extras
+    test_executor.observe_first(timestep=dummy_time_step, extras=dummy_extras)
+    assert test_executor.store.timestep == dummy_time_step
+    assert test_executor.store.extras == dummy_extras
