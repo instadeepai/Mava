@@ -43,7 +43,7 @@ def test_parameter_server() -> ParameterServer:
     """Dummy parameter server with no components"""
     return TestParameterServer(
         store=SimpleNamespace(
-            config_key="expected_value",
+            store_key="expected_value",
             global_config=SimpleNamespace(non_blocking_sleep_seconds=1),
             get_parameters="parameter_list",
         ),
@@ -51,9 +51,9 @@ def test_parameter_server() -> ParameterServer:
     )
 
 
-def test_config_loaded(test_parameter_server: TestParameterServer) -> None:
-    """Test that config is loaded into the store during init"""
-    assert test_parameter_server.store.config_key == "expected_value"
+def test_store_loaded(test_parameter_server: TestParameterServer) -> None:
+    """Test that store is loaded during init"""
+    assert test_parameter_server.store.store_key == "expected_value"
 
 
 def test_get_parameters_store(test_parameter_server: TestParameterServer) -> None:
