@@ -21,7 +21,6 @@ from typing import Any, Dict
 
 import jax.numpy as jnp
 import pytest
-from acme.types import NestedArray
 from dm_env import StepType, TimeStep
 
 from mava.components.jax.executing.observing import FeedforwardExecutorObserve
@@ -33,15 +32,15 @@ class MockAdder:
     def __init__(self) -> None:
         pass
 
-    def add_first(self, timestep: TimeStep, extras: Dict[str, NestedArray]) -> None:
+    def add_first(self, timestep: TimeStep, extras: Dict[str, Any]) -> None:
         self.test_timestep = timestep
         self.test_extras = extras
 
     def add(
         self,
-        actions: Dict[str, NestedArray],
+        actions: Dict[str, Any],
         next_timestep: TimeStep,
-        next_extras: Dict[str, NestedArray],
+        next_extras: Dict[str, Any],
     ) -> None:
         self.test_adder_actions = actions
         self.test_next_timestep = next_timestep
@@ -103,7 +102,7 @@ class MockExecutor(Executor):
         )
         # extras
         extras: Dict[str, Any] = {}
-        # Aadder
+        # Adder
         adder = MockAdder()
         # actions_info
         actions_info = {
@@ -220,7 +219,6 @@ def test_on_execution_observe_first(
         == mock_executor.store.network_int_keys_extras
     )
 
-    # test mock_executor.store.adder.add_first()
     assert mock_executor.store.adder.test_timestep == mock_executor.store.timestep
     assert mock_executor.store.adder.test_extras == mock_executor.store.extras
 
