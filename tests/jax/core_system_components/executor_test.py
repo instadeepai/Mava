@@ -87,3 +87,18 @@ def test_observe_first_store(
     test_executor.observe_first(timestep=dummy_time_step, extras=dummy_extras)
     assert test_executor.store.timestep == dummy_time_step
     assert test_executor.store.extras == dummy_extras
+
+
+def test_observe_store(
+    test_executor: Executor,
+    dummy_actions: Dict[str, NestedArray],
+    dummy_time_step: dm_env.TimeStep,
+    dummy_extras: Dict[str, NestedArray],
+) -> None:
+    """Test that store is handled properly in observe"""
+    test_executor.observe(
+        actions=dummy_actions, next_timestep=dummy_time_step, next_extras=dummy_extras
+    )
+    assert test_executor.store.actions == dummy_actions
+    assert test_executor.store.next_timestep == dummy_time_step
+    assert test_executor.store.next_extras == dummy_extras
