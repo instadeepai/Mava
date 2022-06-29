@@ -147,3 +147,13 @@ def test_select_actions_store(
     )
 
     assert test_executor.store.observations == observations
+
+
+def test_update_store(
+    test_executor: Executor,
+) -> None:
+    """Test that store is handled properly in update"""
+    test_executor.update(wait=False)
+    assert not test_executor.store._wait
+    test_executor.update(wait=True)
+    assert test_executor.store._wait
