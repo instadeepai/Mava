@@ -15,10 +15,11 @@
 
 """Config class for Mava systems"""
 
-from dataclasses import is_dataclass
+from dataclasses import fields, is_dataclass
 from types import SimpleNamespace
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Type
 
+from mava.components.jax import Component
 from mava.utils.config_utils import flatten_dict
 
 
@@ -189,3 +190,31 @@ class Config:
             )
 
         return SimpleNamespace(**self._built_config)
+
+    def get_local_config(self, component: Type[Component]) -> SimpleNamespace:
+        """Get built config for a single component.
+
+        Args:
+            component: component to provide config for.
+
+        Returns:
+            built config for a single component.
+        """
+        if not self._built:
+            raise Exception(
+                "The config must first be built using .build()"
+                "before calling .get_local_config()."
+            )
+
+        global_config = self._built_config
+        local_config: Dict[str, Any] = {}
+
+        config_class = component.config_class()
+        if not config_class:  # no config class for component
+            return SimpleNamespace()
+
+        # Set local config to global config for names which appear in the config class
+        for field in fields(config_class):
+            local_config[field.name] = global_config[field.name]
+
+        return config_class(**local_config)
