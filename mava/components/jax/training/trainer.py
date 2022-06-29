@@ -71,7 +71,7 @@ class SingleTrainerInit(BaseTrainerInit):
     def __init__(self, config: SingleTrainerInitConfig = SingleTrainerInitConfig()):
         """Initialises a single trainer.
 
-        Here a single trainer is used to train all networks.
+        Single trainer is used to train all networks.
 
         Args:
             config : a dataclass specifying the component parameters.
@@ -167,7 +167,7 @@ class OneTrainerPerNetworkInit(BaseTrainerInit):
     ):
         """Initialises a multiple trainers.
 
-        Here a different trainer will be dedicated to training each network.
+        Different trainer will be dedicated to training each network.
 
         Args:
             config : a dataclass specifying the component parameters.
@@ -264,7 +264,7 @@ class CustomTrainerInit(BaseTrainerInit):
     def __init__(self, config: CustomTrainerInitConfig = CustomTrainerInitConfig()):
         """Initialises custom trainers.
 
-        Here a custom trainer network configuration can be given as a dictionary
+        Custom trainer network configuration can be given as a dictionary
         assigning specific trainers to specific networks.
 
         Args:
