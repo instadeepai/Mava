@@ -34,8 +34,9 @@ def dummy_config() -> ExecutorInitConfig:
     return ExecutorInitConfig(interval={"test": 1})
 
 
-def network_factory():
+def network_factory() -> str:
     """Function used in builder.store.networ_factory"""
+
     return "after_network_factory"
 
 
@@ -62,7 +63,7 @@ def mock_executor() -> Executor:
     """
     store = SimpleNamespace(is_evaluator=None)
     executor = Executor(store=store)
-    executor._interval = None
+    executor._interval = None  # type: ignore
     return executor
 
 
@@ -90,7 +91,7 @@ def test_on_execution_init_start(
     executor_init = ExecutorInit(config=dummy_config)
     executor_init.on_execution_init_start(executor=mock_executor)
 
-    assert mock_executor._interval == dummy_config.interval
+    assert mock_executor._interval == dummy_config.interval  # type: ignore
 
 
 def test_name() -> None:
@@ -105,5 +106,5 @@ def test_config_class() -> None:
     """Test config_class method from ExecutorInit"""
     executor_init = ExecutorInit()
 
-    assert ExecutorInit.config_class() == ExecutorInitConfig
-    assert executor_init.config_class() == ExecutorInitConfig
+    assert ExecutorInit.config_class() == ExecutorInitConfig  # type: ignore
+    assert executor_init.config_class() == ExecutorInitConfig  # type: ignore

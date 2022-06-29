@@ -864,8 +864,8 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         """Get critic feed."""
 
         # State based
-        o_tm1_feed = e_tm1["env_states"]
-        o_t_feed = e_t["env_states"]
+        o_tm1_feed = e_tm1["s_t"]
+        o_t_feed = e_t["s_t"]
         a_tm1_feed = tf.stack([a_tm1[agent] for agent in self._agents], 1)
         a_t_feed = tf.stack([a_t[agent] for agent in self._agents], 1)
 
@@ -1733,8 +1733,8 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
         # State based
-        obs_trans_feed = extras["env_states"]
-        target_obs_trans_feed = extras["env_states"]
+        obs_trans_feed = extras["s_t"]
+        target_obs_trans_feed = extras["s_t"]
         if type(obs_trans_feed) == dict:  # type: ignore
             obs_trans_feed = obs_trans_feed[agent]
             target_obs_trans_feed = target_obs_trans_feed[agent]
@@ -1828,8 +1828,8 @@ class MADDPGStateBasedSingleActionCriticRecurrentTrainer(MADDPGBaseRecurrentTrai
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
         # State based
-        obs_trans_feed = extras["env_states"][agent]
-        target_obs_trans_feed = extras["env_states"][agent]
+        obs_trans_feed = extras["s_t"][agent]
+        target_obs_trans_feed = extras["s_t"][agent]
         actions_feed = actions[agent]
         target_actions_feed = target_actions[agent]
         return obs_trans_feed, target_obs_trans_feed, actions_feed, target_actions_feed
