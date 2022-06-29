@@ -12,6 +12,19 @@ from mava.core_jax import SystemBuilder
 @dataclass
 class ComponentDependenciesConfig:
     show_full_component_path: bool = False
+    fig_width_ratios = [1, 5]
+    fig_inch_width: float = 18.5
+    fig_inch_height: float = 10.5
+    component_name_fontsize: int = 12
+    node_label_font_size: int = 8
+    required_node_color: str = "#90EE90"
+    default_node_color: str = "#D3D3D3"
+    cycle_edge_color: str = "#FF0000"
+    default_edge_color: str = "#000000"
+    layout_scale: int = 2
+    node_size_multiplier: int = 150
+    node_size_offset: int = 100
+    dependency_graph_save_path: str = "./component_dependency_map.png"
 
 
 class ComponentDependencyDebugger(Component):
@@ -68,12 +81,12 @@ class ComponentDependencyDebugger(Component):
         graph.add_edges_from(edges_from)
 
         # Create subplots
-        fig = plt.figure(1)
+        fig = plt.figure(1)  # TODO: remove and see if it breaks
         plt.clf()
         fig, (left_ax, right_ax) = plt.subplots(
-            nrows=1, ncols=2, gridspec_kw={"width_ratios": [1, 5]}
+            nrows=1, ncols=2, gridspec_kw={"width_ratios": self.config.fig_width_ratios}
         )
-        fig.set_size_inches(18.5, 10.5)
+        fig.set_size_inches(self.config.fig_inch_width, self.config.fig_inch_height)
 
         # Draw manual legend
         text = ""
@@ -86,7 +99,7 @@ class ComponentDependencyDebugger(Component):
             horizontalalignment="left",
             verticalalignment="center",
             transform=left_ax.transAxes,
-            fontsize=12,
+            fontsize=self.config.component_name_fontsize,
         )
         left_ax.axis("off")
 
@@ -94,9 +107,9 @@ class ComponentDependencyDebugger(Component):
         node_color = []
         for node in graph:
             if node in to_nodes:  # Other components depend on it
-                node_color.append("#90EE90")
+                node_color.append(self.config.required_node_color)
             else:
-                node_color.append("#D3D3D3")
+                node_color.append(self.config.default_node_color)
 
         # Compute cycles
         cycles = sorted(nx.simple_cycles(graph))
@@ -114,14 +127,18 @@ class ComponentDependencyDebugger(Component):
         edge_color = []
         for edge in graph.edges:
             if edge in cycle_edges:  # Flag cycle edges
-                edge_color.append("#FF0000")
+                edge_color.append(self.config.cycle_edge_color)
             else:
-                edge_color.append("#000000")
+                edge_color.append(self.config.default_edge_color)
 
         # Draw graph
-        pos = nx.circular_layout(graph, scale=2)
+        pos = nx.circular_layout(graph, scale=self.config.layout_scale)
         degrees = nx.degree(graph)
-        degrees = [(degrees[node] + 1) * 150 - 100 for node in graph.nodes()]
+        degrees = [
+            (degrees[node] + 1) * self.config.node_size_multiplier
+            - self.config.node_size_offset
+            for node in graph.nodes()
+        ]
         nx.draw(
             graph,
             pos=pos,
@@ -130,19 +147,26 @@ class ComponentDependencyDebugger(Component):
             node_size=degrees,
             edge_color=edge_color,
         )
-        nx.draw_networkx_labels(graph, pos=pos, font_size=8, ax=right_ax)
+        nx.draw_networkx_labels(
+            graph, pos=pos, font_size=self.config.node_label_font_size, ax=right_ax
+        )
         right_ax.axis("off")
 
         # Save figure
-        save_path = "./component_dependency_map.png"
-        print("Saving figure to '", save_path, "'", sep="")
-        plt.savefig(save_path, dpi=100, bbox_inches="tight", pad_inches=0.5)
+        print("Saving figure to '", self.config.dependency_graph_save_path, "'", sep="")
+        plt.savefig(
+            self.config.dependency_graph_save_path,
+            dpi=100,
+            bbox_inches="tight",
+            pad_inches=0.5,
+        )
         raise Exception("TODO: remove")
 
     def _component_to_str(self, component: Callback) -> str:
         """Convert a component to a string representation."""
         component_str = str(component)[1:-1]  # Trim edge brackets
         component_str = component_str.replace("'", "")  # Replace quotations
+
         # Only the component path
         if component_str[:5] == "class":
             component_str = component_str.split(" ")[1]
