@@ -157,3 +157,90 @@ def test_update_store(
     assert not test_executor.store._wait
     test_executor.update(wait=True)
     assert test_executor.store._wait
+
+
+def test_init_hook_order(test_executor: TestExecutor) -> None:
+    """Test if init hooks are called in the correct order"""
+    assert test_executor.hook_list == [
+        "on_execution_init_start",
+        "on_execution_init",
+        "on_execution_init_end",
+    ]
+
+
+def test_observe_first_hook_order(
+    test_executor: TestExecutor,
+    dummy_time_step: dm_env.TimeStep,
+    dummy_extras: Dict[str, NestedArray],
+) -> None:
+    """Test if observe_first hooks are called in the correct order"""
+    test_executor.reset_hook_list()
+    test_executor.observe_first(timestep=dummy_time_step, extras=dummy_extras)
+    assert test_executor.hook_list == [
+        "on_execution_observe_first_start",
+        "on_execution_observe_first",
+        "on_execution_observe_first_end",
+    ]
+
+
+def test_observe_hook_order(
+    test_executor: TestExecutor,
+    dummy_actions: Dict[str, NestedArray],
+    dummy_time_step: dm_env.TimeStep,
+    dummy_extras: Dict[str, NestedArray],
+) -> None:
+    """Test if observe hooks are called in the correct order"""
+    test_executor.reset_hook_list()
+    test_executor.observe(
+        actions=dummy_actions, next_timestep=dummy_time_step, next_extras=dummy_extras
+    )
+    assert test_executor.hook_list == [
+        "on_execution_observe_start",
+        "on_execution_observe",
+        "on_execution_observe_end",
+    ]
+
+
+def test_select_action_hook_order(
+    test_executor: TestExecutor,
+) -> None:
+    """Test if select_action hooks are called in the correct order"""
+    test_executor.reset_hook_list()
+    test_executor.store.action_info = None
+    test_executor.store.policy_info = None
+    test_executor.select_action(agent="", observation=[], state=None)
+    assert test_executor.hook_list == [
+        "on_execution_select_action_start",
+        "on_execution_select_action_preprocess",
+        "on_execution_select_action_compute",
+        "on_execution_select_action_sample",
+        "on_execution_select_action_end",
+    ]
+
+
+def test_select_actions_hook_order(
+    test_executor: TestExecutor,
+) -> None:
+    """Test if select_actions hooks are called in the correct order"""
+    test_executor.reset_hook_list()
+    test_executor.store.actions_info = None
+    test_executor.store.policies_info = None
+    test_executor.select_actions(observations={})
+    assert test_executor.hook_list == [
+        "on_execution_select_actions_start",
+        "on_execution_select_actions",
+        "on_execution_select_actions_end",
+    ]
+
+
+def test_update_hook_order(
+    test_executor: TestExecutor,
+) -> None:
+    """Test if update hooks are called in the correct order"""
+    test_executor.reset_hook_list()
+    test_executor.update()
+    assert test_executor.hook_list == [
+        "on_execution_update_start",
+        "on_execution_update",
+        "on_execution_update_end",
+    ]
