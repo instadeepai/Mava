@@ -180,7 +180,7 @@ class MultiAgentEnv(gym.Env):
             agent = self.agents[agent_id]
             obs_n[agent_id] = self._get_obs(a_i, agent)
         state_n = self._get_state()
-        return obs_n, {"env_states": state_n}
+        return obs_n, {"s_t": state_n}
 
     # get info used for benchmarking
     def _get_info(self, agent: Agent) -> Dict:
