@@ -55,6 +55,9 @@ def test_min_size_rate_limiter(
     reverb_rate_limiter = builder.store.rate_limiter_fn()
     assert isinstance(reverb_rate_limiter, reverb.rate_limiters.MinSize)
 
+    # TODO: remove below when following test is no longer skipped
+    assert repr(reverb_rate_limiter).split("min_size_to_sample=")[1][:3] == "100"
+
 
 # TODO: do not skip this test when reverb is upgraded to 0.8.0
 @pytest.mark.skip
@@ -82,6 +85,12 @@ def test_sample_to_insert_rate_limiter_with_error_buffer(
 
     reverb_rate_limiter = builder.store.rate_limiter_fn()
     assert isinstance(reverb_rate_limiter, reverb.rate_limiters.SampleToInsertRatio)
+
+    # TODO: remove below when following test is no longer skipped
+    assert repr(reverb_rate_limiter).split("min_size_to_sample=")[1][:3] == "100"
+    assert repr(reverb_rate_limiter).split("samples_per_insert=")[1][:2] == "16"
+    assert repr(reverb_rate_limiter).split("min_diff_=")[1][:4] == "1100"
+    assert repr(reverb_rate_limiter).split("max_diff=")[1][:4] == "2100"
 
 
 # TODO: do not skip this test when reverb is upgraded to 0.8.0
@@ -120,6 +129,12 @@ def test_sample_to_insert_rate_limiter_no_error_buffer(
 
     reverb_rate_limiter = builder.store.rate_limiter_fn()
     assert isinstance(reverb_rate_limiter, reverb.rate_limiters.SampleToInsertRatio)
+
+    # TODO: remove below when following test is no longer skipped
+    assert repr(reverb_rate_limiter).split("min_size_to_sample=")[1][:3] == "100"
+    assert repr(reverb_rate_limiter).split("samples_per_insert=")[1][:2] == "16"
+    assert repr(reverb_rate_limiter).split("min_diff_=")[1][:4] == "1440"
+    assert repr(reverb_rate_limiter).split("max_diff=")[1][:4] == "1760"
 
 
 # TODO: do not skip this test when reverb is upgraded to 0.8.0
