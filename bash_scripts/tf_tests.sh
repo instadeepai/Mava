@@ -46,7 +46,7 @@ apt-get -y install git
 apt-get install swig -y
 
 # Install depedencies
-pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
+pip install .[tf,envs,reverb,testing_formatting,record_episode]
 
 # For atari envs
 apt-get -y install unrar-free
