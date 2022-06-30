@@ -37,6 +37,7 @@ from tests.jax.hook_order_tracking import HookOrderTracking
 
 class TestSystem(System):
     __test__ = False
+
     def design(self) -> Tuple[DesignSpec, Dict]:
         """Mock system design with zero components.
 
@@ -65,6 +66,7 @@ class TestSystem(System):
 
 class TestParameterServer(HookOrderTracking, ParameterServer):
     __test__ = False
+
     def __init__(
         self,
         store: SimpleNamespace,

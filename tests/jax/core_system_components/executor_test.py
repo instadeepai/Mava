@@ -53,6 +53,7 @@ executor = DesignSpec(
 # Test executor in isolation.
 class TestSystemExecutor(System):
     __test__ = False
+
     def design(self) -> Tuple[DesignSpec, Dict]:
         """Mock system design with zero components.
 
@@ -121,6 +122,7 @@ def test_executor(
 # Intergration test for the executor, variable_client and variable_server.
 class TestSystemExecutorAndParameterSever(System):
     __test__ = False
+
     def design(self) -> Tuple[DesignSpec, Dict]:
         """Mock system design with zero components.
 
@@ -204,6 +206,7 @@ def test_executor_parameter_server(
 # and variable_server.
 class TestSystemExceptTrainer(System):
     __test__ = False
+
     def design(self) -> Tuple[DesignSpec, Dict]:
         """Mock system design with zero components.
 
