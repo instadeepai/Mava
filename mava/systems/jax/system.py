@@ -15,10 +15,12 @@
 
 """Jax-based Mava system implementation."""
 import abc
-from types import SimpleNamespace
-from typing import Any, Callable, List
+import copy
+from typing import Any, Dict, List, Tuple, Type
 
+from mava.components.jax import Component
 from mava.core_jax import BaseSystem
+from mava.specs import DesignSpec
 from mava.systems.jax import Builder, Config
 
 
@@ -28,22 +30,31 @@ class System(BaseSystem):
 
     def __init__(self) -> None:
         """System Initialisation"""
-        self._design = self.design()
+        self._design, self._default_params = self.design()
         self.config = Config()  # Mava config
         self.components: List = []
+        self._built = False
 
         # make config from build
         self._make_config()
 
+        # Enforce that design keys match component names
+        for key, value in self._design.get().items():
+            if key != value.name():
+                raise Exception(
+                    f"Component '{key}' has mismatching name '{value.name()}'"
+                )
+
     def _make_config(self) -> None:
         """Private method to construct system config upon initialisation."""
-        for component in self._design.__dict__.values():
-            comp = component()
-            input = {comp.name: comp.config}
-            self.config.add(**input)
+        for component in self._design.get().values():
+            config_class = component.config_class()
+            if config_class:
+                input = {component.name(): config_class()}
+                self.config.add(**input)
 
     @abc.abstractmethod
-    def design(self) -> SimpleNamespace:
+    def design(self) -> Tuple[DesignSpec, Dict]:
         """System design specifying the list of components to use.
 
         Returns:
@@ -57,15 +68,22 @@ class System(BaseSystem):
             component : system callback component
             name : component name
         """
-        comp = component()
-        name = comp.name
-        if name in list(self._design.__dict__.keys()):
-            self._design.__dict__[name] = component
-            config_feed = {name: comp.config}
-            self.config.update(**config_feed)
+        if self._built:
+            raise Exception(
+                "System already built. Must call .update() on components before the \
+                    system has been built."
+            )
+        name = component.name()
+
+        if name in list(self._design.get().keys()):
+            self._design.get()[name] = component
+            config_class = component.config_class()
+            if config_class:
+                config_feed = {name: config_class()}
+                self.config.update(**config_feed)
         else:
             raise Exception(
-                "The given component is not part of the current system.\
+                f"The given component ({name}) is not part of the current system.\
                 Perhaps try adding it instead using .add()."
             )
 
@@ -76,63 +94,63 @@ class System(BaseSystem):
             component : system callback component
             name : component name
         """
-        comp = component()
-        name = comp.name
-        if name in list(self._design.__dict__.keys()):
+        if self._built:
+            raise Exception(
+                "System already built. Must call .add() on components before the \
+                    system has been built."
+            )
+        name = component.name()
+        if name in list(self._design.get().keys()):
             raise Exception(
                 "The given component is already part of the current system.\
                 Perhaps try updating it instead using .update()."
             )
         else:
-            self._design.__dict__[name] = component
-            config_feed = {name: comp.config}
-            self.config.add(**config_feed)
+            self._design.get()[name] = component
+            config_class = component.config_class()
+            if config_class:
+                config_feed = {name: config_class()}
+                self.config.add(**config_feed)
 
-    def configure(self, **kwargs: Any) -> None:
+    def build(self, **kwargs: Any) -> None:
         """Configure system hyperparameters."""
+
+        if self._built:
+            raise Exception("System already built.")
+
+        # Add the system defaults, but allow the kwargs to overwrite them.
+        if self._default_params:
+            parameter = copy.copy(self._default_params.__dict__)
+        else:
+            parameter = {}
+        parameter.update(kwargs)
+
         self.config.build()
-        self.config.set_parameters(**kwargs)
 
-    def launch(
-        self,
-        num_executors: int,
-        nodes_on_gpu: List[str],
-        multi_process: bool = True,
-        name: str = "system",
-        builder_class: Callable = Builder,
-    ) -> None:
-        """Run the system.
+        self.config.set_parameters(**parameter)
 
-        Args
-            num_executors : number of executor processes to run in parallel
-            nodes_on_gpu : which processes to run on gpu
-            multi_process : whether to run locally or distributed, local runs are
-                for debugging
-            name : name of the system
-            builder_class: callable builder class.
-        """
-        # build config is not already built
-        if not self.config._built:
-            self.config.build()
-
-        # update distributor config
-        self.config.set_parameters(
-            num_executors=num_executors,
-            nodes_on_gpu=nodes_on_gpu,
-            multi_process=multi_process,
-            name=name,
-        )
-
-        # get system config to feed to component list to update hyperparamete settings
+        # get system config to feed to component list to update hyperparameter settings
         system_config = self.config.get()
 
         # update default system component configs
-        for component in self._design.__dict__.values():
-            self.components.append(component(system_config))
+        assert len(self.components) == 0
+        component: Type[Component]  # provide type
+        for component in self._design.get().values():
+            self.components.append(
+                component(config=self.config.get_local_config(component))
+            )
 
         # Build system
-        self._builder = builder_class(components=self.components)
+        self._builder = Builder(components=self.components, global_config=system_config)
         self._builder.build()
+        self._built = True
+
+    def launch(self) -> None:
+        """Run the system."""
+        if not self._built:
+            raise Exception(
+                "System not built. First call .build() before calling .launch()."
+            )
 
         # Launch system
         self._builder.launch()

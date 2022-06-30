@@ -105,7 +105,7 @@ ENV XLA_PYTHON_CLIENT_PREALLOCATE=false
 ## Install core jax dependencies.
 # Install jax gpu
 RUN pip install -e .[jax]
-RUN pip install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_releases.html
+RUN pip install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ##########################################################
 
 ##########################################################
@@ -135,6 +135,8 @@ ENV SC2PATH /home/app/mava/3rdparty/StarCraftII
 # Flatland Image
 FROM jax-core AS flatland-jax
 RUN pip install -e .[flatland]
+# To fix module 'jaxlib.xla_extension' has no attribute '__path__'
+RUN pip install cloudpickle -U
 ##########################################################
 
 #########################################################
