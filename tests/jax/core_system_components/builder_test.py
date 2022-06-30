@@ -71,3 +71,27 @@ def test_executor_store_when_is_evaluator(test_builder: TestBuilder) -> None:
 
     assert isinstance(test_builder.store.executor, Executor)
     assert test_builder.store.executor.store == test_builder.store
+
+
+def test_executor_store_when_executor(test_builder: TestBuilder) -> None:
+    """Test that store is handled correctly in executor() when it's an executor."""
+    executor_id = "executor"
+    data_server_client = "data_server_client"
+    parameter_server_client = "parameter_server_client"
+    assert (
+        test_builder.executor(
+            executor_id=executor_id,
+            data_server_client=data_server_client,
+            parameter_server_client=parameter_server_client,
+        )
+        == "system_executor"
+    )
+
+    assert test_builder.store.executor_id == executor_id
+    assert test_builder.store.data_server_client == data_server_client
+    assert test_builder.store.parameter_server_client == parameter_server_client
+    assert not test_builder.store.is_evaluator
+    assert test_builder.store.adder == "adder"
+
+    assert isinstance(test_builder.store.executor, Executor)
+    assert test_builder.store.executor.store == test_builder.store
