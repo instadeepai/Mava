@@ -104,6 +104,7 @@ class MockDistributor(Component):
 
 
 class TestSystemWithParallelSequenceAdder(System):
+    __test__ = False
     def design(self) -> Tuple[DesignSpec, Dict]:
         """Mock system design with zero components.
 
