@@ -93,7 +93,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
         self.on_building_parameter_server_end()
 
         return ParameterServer(
-            config=self.store,
+            store=self.store,
             components=self.callbacks,
         )
 
@@ -192,7 +192,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
 
         # create and rreturn the trainer
         return Trainer(
-            config=self.store,
+            store=self.store,
             components=self.callbacks,
         )
 

@@ -48,7 +48,7 @@ flake8 mava  --count --select=E9,F63,F7,F82 --ignore=C901 --show-source --statis
 flake8 mava --count --exit-zero --statistics
 
 # Check types.
-mypy mava
+mypy .
 
 # Check docstring code coverage.
 interrogate -c pyproject.toml mava
