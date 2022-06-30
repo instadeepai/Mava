@@ -193,8 +193,6 @@ def test_on_building_program_nodes_multi_process_no_evaluator(
         == mock_builder.trainer
     )
 
-    assert not "evaluator" in mock_builder.store.program._program._groups.keys()
-
     with pytest.raises(Exception):
         mock_builder.store.program.get_nodes()
 
