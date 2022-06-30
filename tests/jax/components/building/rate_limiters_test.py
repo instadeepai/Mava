@@ -87,10 +87,20 @@ def test_sample_to_insert_rate_limiter_with_error_buffer(
     assert isinstance(reverb_rate_limiter, reverb.rate_limiters.SampleToInsertRatio)
 
     # TODO: remove below when following test is no longer skipped
+
     assert repr(reverb_rate_limiter).split("min_size_to_sample=")[1][:3] == "100"
     assert repr(reverb_rate_limiter).split("samples_per_insert=")[1][:2] == "16"
-    assert repr(reverb_rate_limiter).split("min_diff_=")[1][:4] == "1100"
-    assert repr(reverb_rate_limiter).split("max_diff=")[1][:4] == "2100"
+
+    # Ensure offset created correctly
+    offset = (
+        16  # reverb_rate_limiter._samples_per_insert
+        * 100  # reverb_rate_limiter._min_size_to_sample
+    )
+    min_diff = offset - sample_to_insert_rate_limiter.config.error_buffer
+    max_diff = offset + sample_to_insert_rate_limiter.config.error_buffer
+
+    assert int(repr(reverb_rate_limiter).split("min_diff_=")[1][:4]) == int(min_diff)
+    assert int(repr(reverb_rate_limiter).split("max_diff=")[1][:4]) == int(max_diff)
 
 
 # TODO: do not skip this test when reverb is upgraded to 0.8.0
@@ -131,10 +141,28 @@ def test_sample_to_insert_rate_limiter_no_error_buffer(
     assert isinstance(reverb_rate_limiter, reverb.rate_limiters.SampleToInsertRatio)
 
     # TODO: remove below when following test is no longer skipped
+
     assert repr(reverb_rate_limiter).split("min_size_to_sample=")[1][:3] == "100"
     assert repr(reverb_rate_limiter).split("samples_per_insert=")[1][:2] == "16"
-    assert repr(reverb_rate_limiter).split("min_diff_=")[1][:4] == "1440"
-    assert repr(reverb_rate_limiter).split("max_diff=")[1][:4] == "1760"
+
+    # Ensure offset created correctly
+    samples_per_insert_tolerance = (
+        0.1 * sample_to_insert_rate_limiter.config.samples_per_insert
+    )
+    error_buffer = (
+        sample_to_insert_rate_limiter.config.min_data_server_size
+        * samples_per_insert_tolerance
+    )
+
+    offset = (
+        16  # reverb_rate_limiter._samples_per_insert
+        * 100  # reverb_rate_limiter._min_size_to_sample
+    )
+    min_diff = offset - error_buffer
+    max_diff = offset + error_buffer
+
+    assert int(repr(reverb_rate_limiter).split("min_diff_=")[1][:4]) == int(min_diff)
+    assert int(repr(reverb_rate_limiter).split("max_diff=")[1][:4]) == int(max_diff)
 
 
 # TODO: do not skip this test when reverb is upgraded to 0.8.0
