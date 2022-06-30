@@ -200,16 +200,13 @@ def test_parallel_sequence_adder_signature(
         builder=mock_builder
     )
 
-    assert mock_builder.store.adder_signature_fn
+    assert hasattr(mock_builder.store, "adder_signature_fn")
+
     signature = mock_builder.store.adder_signature_fn(
         environment_specs=mock_env_specs,
         sequence_length=parallel_sequence_adder.config.sequence_length,
         extras_specs=mock_env_specs.extra_specs,
     )
-
-    print(mock_env_specs._specs)
-    print(signature.actions["agent_0"].shape.as_list()[1:])
-
     assert type(signature) == reverb_base.Step
 
     # Dimensions preserved after spec is generated, ignoring the time dim
@@ -280,7 +277,7 @@ def test_parallel_transition_adder_signature(
     parallel_transition_adder_signature.on_building_data_server_adder_signature(
         builder=mock_builder
     )
-    assert mock_builder.store.adder_signature_fn
+    assert hasattr(mock_builder.store, "adder_signature_fn")
 
     signature = mock_builder.store.adder_signature_fn(
         environment_specs=mock_env_specs,
