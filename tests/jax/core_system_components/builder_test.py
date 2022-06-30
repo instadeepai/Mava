@@ -4,7 +4,7 @@ from typing import List
 import pytest
 
 from mava.callbacks import Callback
-from mava.systems.jax import Builder, Executor, ParameterServer
+from mava.systems.jax import Builder, Executor, ParameterServer, Trainer
 from tests.jax.hook_order_tracking import HookOrderTracking
 
 
@@ -95,3 +95,22 @@ def test_executor_store_when_executor(test_builder: TestBuilder) -> None:
 
     assert isinstance(test_builder.store.executor, Executor)
     assert test_builder.store.executor.store == test_builder.store
+
+
+def test_trainer_store(test_builder: TestBuilder) -> None:
+    """Test that store is handled correctly in trainer()."""
+    trainer_id = "executor"
+    data_server_client = "data_server_client"
+    parameter_server_client = "parameter_server_client"
+
+    trainer = test_builder.trainer(
+        trainer_id=trainer_id,
+        data_server_client=data_server_client,
+        parameter_server_client=parameter_server_client,
+    )
+    assert isinstance(trainer, Trainer)
+    assert trainer.store == test_builder.store
+
+    assert test_builder.store.trainer_id == trainer_id
+    assert test_builder.store.data_server_client == data_server_client
+    assert test_builder.store.parameter_server_client == parameter_server_client
