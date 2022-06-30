@@ -113,7 +113,6 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
             )
 
             # Update the networks and optimizors.
-            # metrics = {}
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
                 # Apply updates
@@ -130,7 +129,6 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
                     gradients[agent_key]
                 )
                 agent_metrics[agent_key]["norm_updates"] = optax.global_norm(updates)
-                # metrics[agent_key] = agent_metrics
             return (params, opt_states), agent_metrics
 
         trainer.store.minibatch_update_fn = model_update_minibatch
