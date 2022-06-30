@@ -114,3 +114,110 @@ def test_trainer_store(test_builder: TestBuilder) -> None:
     assert test_builder.store.trainer_id == trainer_id
     assert test_builder.store.data_server_client == data_server_client
     assert test_builder.store.parameter_server_client == parameter_server_client
+
+
+def test_init_hook_order(test_builder: TestBuilder) -> None:
+    """Test if init() hooks are called in the correct order."""
+    assert test_builder.hook_list == [
+        "on_building_init_start",
+        "on_building_init",
+        "on_building_init_end",
+    ]
+
+
+def test_data_server_hook_order(test_builder: TestBuilder) -> None:
+    """Test if data_server() hooks are called in the correct order."""
+    test_builder.reset_hook_list()
+    test_builder.data_server()
+    assert test_builder.hook_list == [
+        "on_building_data_server_start",
+        "on_building_data_server_adder_signature",
+        "on_building_data_server_rate_limiter",
+        "on_building_data_server",
+        "on_building_data_server_end",
+    ]
+
+
+def test_parameter_server_hook_order(test_builder: TestBuilder) -> None:
+    """Test if parameter_server() hooks are called in the correct order."""
+    test_builder.reset_hook_list()
+    test_builder.parameter_server()
+    assert test_builder.hook_list == [
+        "on_building_parameter_server_start",
+        "on_building_parameter_server",
+        "on_building_parameter_server_end",
+    ]
+
+
+def test_executor_hook_order_when_executor(test_builder: TestBuilder) -> None:
+    """Test if executor() hooks are called in the correct order when executor."""
+    test_builder.reset_hook_list()
+    test_builder.executor(
+        executor_id="executor", data_server_client="", parameter_server_client=""
+    )
+    assert test_builder.hook_list == [
+        "on_building_executor_start",
+        "on_building_executor_adder_priority",
+        "on_building_executor_adder",
+        "on_building_executor_logger",
+        "on_building_executor_parameter_client",
+        "on_building_executor",
+        "on_building_executor_environment",
+        "on_building_executor_environment_loop",
+        "on_building_executor_end",
+    ]
+
+
+def test_executor_hook_order_when_evaluator(test_builder: TestBuilder) -> None:
+    """Test if executor() hooks are called in the correct order when evaluator."""
+    test_builder.reset_hook_list()
+    test_builder.executor(
+        executor_id="evaluator", data_server_client="", parameter_server_client=""
+    )
+    assert test_builder.hook_list == [
+        "on_building_executor_start",
+        "on_building_executor_logger",
+        "on_building_executor_parameter_client",
+        "on_building_executor",
+        "on_building_executor_environment",
+        "on_building_executor_environment_loop",
+        "on_building_executor_end",
+    ]
+
+
+def test_trainer_hook_order(test_builder: TestBuilder) -> None:
+    """Test if trainer() hooks are called in the correct order."""
+    test_builder.reset_hook_list()
+    test_builder.trainer(
+        trainer_id="trainer", data_server_client="", parameter_server_client=""
+    )
+    assert test_builder.hook_list == [
+        "on_building_trainer_start",
+        "on_building_trainer_logger",
+        "on_building_trainer_dataset",
+        "on_building_trainer_parameter_client",
+        "on_building_trainer",
+        "on_building_trainer_end",
+    ]
+
+
+def test_build_hook_order(test_builder: TestBuilder) -> None:
+    """Test if build() hooks are called in the correct order."""
+    test_builder.reset_hook_list()
+    test_builder.build()
+    assert test_builder.hook_list == [
+        "on_building_start",
+        "on_building_program_nodes",
+        "on_building_end",
+    ]
+
+
+def test_launch_hook_order(test_builder: TestBuilder) -> None:
+    """Test if launch() hooks are called in the correct order."""
+    test_builder.reset_hook_list()
+    test_builder.launch()
+    assert test_builder.hook_list == [
+        "on_building_launch_start",
+        "on_building_launch",
+        "on_building_launch_end",
+    ]
