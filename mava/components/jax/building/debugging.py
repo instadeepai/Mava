@@ -17,13 +17,15 @@ class ComponentDependenciesConfig:
     fig_inch_height: float = 10.5
     component_name_fontsize: int = 12
     node_label_font_size: int = 8
-    required_node_color: str = "#90EE90"
-    default_node_color: str = "#D3D3D3"
+    required_node_color: str = "#ADD8E6"
+    leaf_required_node_color: str = "#90EE90"
+    detached_node_color: str = "#F0F0F0"
+    dependent_node_color: str = "#D3D3D3"
     cycle_edge_color: str = "#FF0000"
     default_edge_color: str = "#000000"
     layout_scale: int = 2
-    node_size_increment: int = 100
-    min_node_size: int = 160
+    node_size_increment: int = 80
+    min_node_size: int = 190
     dependency_graph_save_path: str = "./component_dependency_map.png"
 
 
@@ -35,7 +37,7 @@ class ComponentDependencyDebugger(Component):
         """Save the config"""
         self.config = config
 
-    def on_building_init_end(self, builder: SystemBuilder) -> None:
+    def on_building_init_end(self, builder: SystemBuilder) -> None:  # noqa: C901
         """Compute component dependencies and save graph."""
         components: List = builder.callbacks[:]
 
@@ -62,26 +64,29 @@ class ComponentDependencyDebugger(Component):
         component_to_id = {component: i for i, component in id_to_component.items()}
 
         # Create edge map
-        edges_from = []
+        edges = []
         for component in components:
+            component_str = self._component_to_str(component)
+
             for required_component in component.required_components():
-                component_str = self._component_to_str(component)
                 required_component_str = self._component_to_str(required_component)
+
                 print(component_str, "---> requires --->", required_component_str)
-                edges_from.append(
+                edges.append(
                     (
                         component_to_id[component_str],
                         component_to_id[required_component_str],
                     )
                 )
-        to_nodes = [node_2 for (node_1, node_2) in edges_from]
+        to_nodes = [node_2 for (node_1, node_2) in edges]
+        from_nodes = [node_1 for (node_1, node_2) in edges]
 
         # Create graph
         graph = nx.DiGraph()
-        graph.add_edges_from(edges_from)
+        graph.add_edges_from(edges)
+        graph.add_nodes_from(id_to_component.keys())
 
         # Create subplots
-        fig = plt.figure(1)  # TODO: remove and see if it breaks
         plt.clf()
         fig, (left_ax, right_ax) = plt.subplots(
             nrows=1, ncols=2, gridspec_kw={"width_ratios": self.config.fig_width_ratios}
@@ -106,10 +111,14 @@ class ComponentDependencyDebugger(Component):
         # Compute node colors
         node_color = []
         for node in graph:
-            if node in to_nodes:  # Other components depend on it
+            if node in to_nodes and node not in from_nodes:  # Leaf of graph
+                node_color.append(self.config.leaf_required_node_color)
+            elif node in to_nodes:  # Other components depend on it
                 node_color.append(self.config.required_node_color)
-            else:
-                node_color.append(self.config.default_node_color)
+            elif node in from_nodes:  # It depends on other nodes
+                node_color.append(self.config.dependent_node_color)
+            else:  # No adjacent edges
+                node_color.append(self.config.detached_node_color)
 
         # Compute cycles
         cycles = sorted(nx.simple_cycles(graph))
@@ -160,6 +169,7 @@ class ComponentDependencyDebugger(Component):
             bbox_inches="tight",
             pad_inches=0.5,
         )
+        raise Exception("TODO: remove")
 
     def _component_to_str(self, component: Callback) -> str:
         """Convert a component to a string representation."""
