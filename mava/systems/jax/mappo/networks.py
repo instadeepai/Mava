@@ -117,6 +117,7 @@ def make_networks(
         256,
     ),
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
+    observation_network: Callable = utils.batch_concat,
 ) -> PPONetworks:
     """TODO: Add description here."""
     if isinstance(spec.actions, specs.DiscreteArray):
@@ -125,7 +126,9 @@ def make_networks(
             key=key,
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
+            observation_network=observation_network,
         )
+
     else:
         raise NotImplementedError(
             "Continuous networks not implemented yet."
@@ -139,6 +142,8 @@ def make_discrete_networks(
     key: networks_lib.PRNGKey,
     policy_layer_sizes: Sequence[int],
     critic_layer_sizes: Sequence[int],
+    observation_network: Callable = utils.batch_concat,
+    # default behaviour is to flatten observations
 ) -> PPONetworks:
     """TODO: Add description here."""
 
@@ -151,7 +156,7 @@ def make_discrete_networks(
     def forward_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
         policy_value_network = hk.Sequential(
             [
-                utils.batch_concat,
+                observation_network,
                 networks_lib.LayerNormMLP(policy_layer_sizes, activation=jax.nn.relu),
                 networks_lib.CategoricalValueHead(num_values=num_actions),
             ]
@@ -182,6 +187,7 @@ def make_default_networks(
         256,
     ),
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
+    observation_network: Callable = utils.batch_concat,
 ) -> Dict[str, Any]:
     """Description here"""
 
@@ -199,6 +205,7 @@ def make_default_networks(
             key=rng_key,
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
+            observation_network=observation_network,
         )
 
     return {
