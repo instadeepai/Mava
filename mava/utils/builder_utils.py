@@ -22,7 +22,7 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 from mava.utils.sort_utils import sort_str_num
 
 
-def covert_specs(
+def convert_specs(
     agent_net_keys: Dict[str, Any], spec: Dict[str, Any], num_networks: int
 ) -> Dict[str, Any]:
     """_summary_
@@ -45,7 +45,7 @@ def covert_specs(
     else:
         # For the extras
         for key in spec.keys():
-            converted_spec[key] = covert_specs(agent_net_keys, spec[key], num_networks)
+            converted_spec[key] = convert_specs(agent_net_keys, spec[key], num_networks)
     return converted_spec
 
 
