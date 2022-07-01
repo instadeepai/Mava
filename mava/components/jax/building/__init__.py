@@ -18,6 +18,7 @@
 from mava.components.jax.building.adders import (
     ParallelSequenceAdder,
     ParallelSequenceAdderSignature,
+    UniformAdderPriority,
 )
 from mava.components.jax.building.data_server import OnPolicyDataServer
 from mava.components.jax.building.datasets import TrajectoryDataset
