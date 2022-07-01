@@ -47,6 +47,7 @@ class TestQMIX:
         # Networks.
         network_factory = lp_utils.partial_kwargs(
             value_decomposition.make_default_networks,
+            value_networks_layer_sizes=(10, 10),
         )
 
         # system

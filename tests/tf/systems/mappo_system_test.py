@@ -40,7 +40,9 @@ class TestMAPPO:
 
         # networks
         network_factory = lp_utils.partial_kwargs(
-            mappo.make_default_networks, policy_networks_layer_sizes=(64, 64)
+            mappo.make_default_networks,
+            policy_networks_layer_sizes=(32, 32),
+            critic_networks_layer_sizes=(64, 64),
         )
 
         # system

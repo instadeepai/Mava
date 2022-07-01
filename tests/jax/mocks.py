@@ -39,7 +39,7 @@ from mava.core_jax import SystemBuilder
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.specs import DesignSpec, MAEnvironmentSpec
 from mava.systems.jax.system import System
-from mava.utils.builder_utils import covert_specs
+from mava.utils.builder_utils import convert_specs
 from tests.tf.enums import EnvType, MockedEnvironments
 from tests.tf.mocks import (
     ParallelMAContinuousEnvironment,
@@ -102,7 +102,7 @@ class MockAdder(Component):
     @staticmethod
     def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
-        return "adder"
+        return "executor_adder"
 
 
 def make_fake_env_specs() -> MAEnvironmentSpec:
@@ -281,7 +281,7 @@ class MockDataServer(Component):
         for table_key in builder.store.table_network_config.keys():
             num_networks = len(builder.store.table_network_config[table_key])
             env_spec = copy.deepcopy(builder.store.environment_spec)
-            env_spec._specs = covert_specs(
+            env_spec._specs = convert_specs(
                 builder.store.agent_net_keys, env_spec._specs, num_networks
             )
             table = self.table(table_key, env_spec, extras_spec, builder)
@@ -335,7 +335,7 @@ class MockOnPolicyDataServer(MockDataServer):
         for table_key in builder.store.table_network_config.keys():
             num_networks = len(builder.store.table_network_config[table_key])
             env_spec = copy.deepcopy(builder.store.environment_spec)
-            env_spec._specs = covert_specs(
+            env_spec._specs = convert_specs(
                 builder.store.agent_net_keys, env_spec._specs, num_networks
             )
             table = self.table(table_key, env_spec, extras_spec, builder)
@@ -400,7 +400,7 @@ class MockOffPolicyDataServer(MockDataServer):
         for table_key in builder.store.table_network_config.keys():
             num_networks = len(builder.store.table_network_config[table_key])
             env_spec = copy.deepcopy(builder.store.environment_spec)
-            env_spec._specs = covert_specs(
+            env_spec._specs = convert_specs(
                 builder.store.agent_net_keys, env_spec._specs, num_networks
             )
             table = self.table(table_key, env_spec, extras_spec, builder)
@@ -608,8 +608,8 @@ class MockExecutorEnvironmentLoop(Component):
 
     def on_building_executor_environment(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.store.executor_environment = self.config.environment_factory(  # type: ignore # noqa: E501
-            evaluation=False
+        builder.store.executor_environment = (
+            builder.store.global_config.environment_factory(evaluation=False)
         )
 
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:

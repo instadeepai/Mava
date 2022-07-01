@@ -24,7 +24,7 @@ from mava.utils import lp_utils
 
 class NodeType:
     reverb = lp.ReverbNode
-    corrier = lp.CourierNode
+    courier = lp.CourierNode
 
 
 class Launcher:
@@ -72,7 +72,7 @@ class Launcher:
         self,
         node_fn: Any,
         arguments: Any = [],
-        node_type: Union[lp.ReverbNode, lp.CourierNode] = NodeType.corrier,
+        node_type: Union[lp.ReverbNode, lp.CourierNode] = NodeType.courier,
         name: str = "Node",
     ) -> Any:
         """_summary_

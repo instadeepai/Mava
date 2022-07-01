@@ -14,8 +14,6 @@
 # limitations under the License.
 
 """Tests utils for Jax-based Mava systems"""
-
-
 from typing import Any
 
 

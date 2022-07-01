@@ -26,7 +26,7 @@ from mava import specs
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 from mava.utils import enums
-from mava.utils.builder_utils import covert_specs
+from mava.utils.builder_utils import convert_specs
 from mava.utils.sort_utils import sort_str_num
 
 
@@ -51,26 +51,26 @@ class DataServer(Component):
                 "table_0": sort_str_num(builder.store.agent_net_keys.values())
             }
             assert (
-                builder.store.network_sampling_setup_type
+                builder.store.global_config.network_sampling_setup_type
                 == enums.NetworkSampler.fixed_agent_networks
             ), f"We only have a default config for the fixed_agent_networks sampler setting, \
-            not the {builder.store.network_sampling_setup_type} setting."
+            not the {builder.store.global_config.network_sampling_setup_type} setting."
 
         for table_key in builder.store.table_network_config.keys():
             # TODO (dries): Clean the below coverter code up.
             # Convert a Mava spec
             num_networks = len(builder.store.table_network_config[table_key])
             env_spec = copy.deepcopy(builder.store.environment_spec)
-            env_spec._specs = covert_specs(
+            env_spec._specs = convert_specs(
                 builder.store.agent_net_keys, env_spec._specs, num_networks
             )
 
             env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
             if env_spec.extra_specs is not None:
-                env_spec.extra_specs = covert_specs(
+                env_spec.extra_specs = convert_specs(
                     builder.store.agent_net_keys, env_spec.extra_specs, num_networks
                 )
-            extras_spec = covert_specs(
+            extras_spec = convert_specs(
                 builder.store.agent_net_keys,
                 builder.store.extras_spec,
                 num_networks,

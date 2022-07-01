@@ -48,8 +48,12 @@ class BaseSystemInit(Component):
 
 
 @dataclass
-class FixedNetworkSystemInitConfig:
+class BaseSystemInitConfig:
     shared_weights: bool = True
+
+
+@dataclass
+class FixedNetworkSystemInitConfig(BaseSystemInitConfig):
     network_sampling_setup: enums.NetworkSampler = (
         enums.NetworkSampler.fixed_agent_networks
     )
@@ -71,12 +75,6 @@ class FixedNetworkSystemInit(BaseSystemInit):
 
     def on_building_init(self, builder: SystemBuilder) -> None:
         """Compute and add network sampling information to the builder."""
-
-        # Add network sampling setup type to builder store for now due to
-        # being required in the data server component
-
-        builder.store.network_sampling_setup_type = self.config.network_sampling_setup
-
         if (
             self.config.network_sampling_setup
             != enums.NetworkSampler.fixed_agent_networks
@@ -135,7 +133,6 @@ class RandomSamplingSystemInitConfig:
     network_sampling_setup: enums.NetworkSampler = (
         enums.NetworkSampler.random_agent_networks
     )
-    shared_weights: bool = False
 
 
 class RandomSamplingSystemInit(BaseSystemInit):
@@ -155,12 +152,6 @@ class RandomSamplingSystemInit(BaseSystemInit):
 
     def on_building_init(self, builder: SystemBuilder) -> None:
         """Compute and add network sampling information to the builder."""
-
-        # Add network sampling setup type to builder store for now due to
-        # being required in the data server component
-
-        builder.store.network_sampling_setup_type = self.config.network_sampling_setup
-
         if (
             self.config.network_sampling_setup
             != enums.NetworkSampler.random_agent_networks
@@ -169,10 +160,6 @@ class RandomSamplingSystemInit(BaseSystemInit):
                 "Random sampling system init requires random_agent_networks sampling"
             )
 
-        if builder.store.shared_weights:
-            raise ValueError(
-                "Shared weights cannot be used with random policy per agent"
-            )
         builder.store.agent_net_keys = {
             builder.store.agents[i]: f"network_{i}"
             for i in range(len(builder.store.agents))
@@ -216,11 +203,10 @@ class RandomSamplingSystemInit(BaseSystemInit):
 
 
 @dataclass
-class CustomSamplingSystemInitConfig:
+class CustomSamplingSystemInitConfig(BaseSystemInitConfig):
     network_sampling_setup: Union[List, enums.NetworkSampler] = field(
         default_factory=lambda: []
     )
-    shared_weights: bool = False
 
 
 class CustomSamplingSystemInit(BaseSystemInit):
@@ -240,12 +226,6 @@ class CustomSamplingSystemInit(BaseSystemInit):
 
     def on_building_init(self, builder: SystemBuilder) -> None:
         """Compute and add network sampling information to the builder."""
-
-        # Add network sampling setup type to builder store for now due to
-        # being required in the data server component
-
-        builder.store.network_sampling_setup_type = self.config.network_sampling_setup
-
         if self.config.network_sampling_setup == []:
             raise ValueError("A custom network sampling setup list must be provided.")
 
