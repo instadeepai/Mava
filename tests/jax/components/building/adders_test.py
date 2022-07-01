@@ -13,137 +13,306 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for config class for Jax-based Mava systems"""
+from types import SimpleNamespace
 
-from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional, Tuple
-
-import numpy as np
 import pytest
-from acme import specs
 
-from mava.components.jax import Component
-from mava.components.jax.building import adders
-from mava.components.jax.building.environments import EnvironmentSpec
-from mava.components.jax.building.system_init import FixedNetworkSystemInit
-from mava.specs import DesignSpec, MAEnvironmentSpec
-from mava.systems.jax.system import System
-from mava.utils.wrapper_utils import parameterized_restart
-from tests.jax.mocks import MockOnPolicyDataServer, make_fake_environment_factory
-
-agents = {"agent_0", "agent_1", "agent_2"}
-obs_first = {agent: np.array([0.0, 1.0]) for agent in agents}
-default_discount = {agent: 1.0 for agent in agents}
-env_restart = parameterized_restart(
-    reward={agent: 0.0 for agent in agents},
-    discount=default_discount,
-    observation=obs_first,
+from mava import types
+from mava.adders import reverb as reverb_adders
+from mava.adders.reverb import base as reverb_base
+from mava.components.jax.building.adders import (
+    AdderPriorityConfig,
+    ParallelSequenceAdder,
+    ParallelSequenceAdderConfig,
+    ParallelSequenceAdderSignature,
+    ParallelTransitionAdder,
+    ParallelTransitionAdderConfig,
+    ParallelTransitionAdderSignature,
+    UniformAdderPriority,
 )
-
-
-def make_fake_env_specs() -> MAEnvironmentSpec:
-    """_summary_
-
-    Returns:
-        _description_
-    """
-    agents = ["agent_0", "agent_1"]
-    agent_environment_specs = {}
-    for agent in agents:
-        agent_environment_specs[agent] = specs.EnvironmentSpec(
-            observations=specs.Array(shape=(10, 5), dtype=np.float32),
-            actions=specs.DiscreteArray(num_values=3),
-            rewards=specs.Array(shape=(), dtype=np.float32),
-            discounts=specs.BoundedArray(
-                shape=(), dtype=np.float32, minimum=0.0, maximum=1.0
-            ),
-        )
-    return MAEnvironmentSpec(
-        environment=None,
-        agent_environment_specs=agent_environment_specs,
-        extras_specs={"extras": specs.Array(shape=(), dtype=np.float32)},
-    )
-
-
-@dataclass
-class DistributorDefaultConfig:
-    num_executors: int = 1
-    nodes_on_gpu: List[str] = field(default_factory=list)
-    multi_process: bool = True
-    name: str = "system"
-
-
-class MockDistributor(Component):
-    def __init__(
-        self, config: DistributorDefaultConfig = DistributorDefaultConfig()
-    ) -> None:
-        """Mock system distributor component.
-
-        Args:
-            config : dataclass configuration for setting component hyperparameters
-        """
-        self.config = config
-
-    @staticmethod
-    def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'.
-
-        Returns:
-            Component type name
-        """
-        return "distributor"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return DistributorDefaultConfig
-
-
-class TestSystemWithParallelSequenceAdder(System):
-    def design(self) -> Tuple[DesignSpec, Dict]:
-        """Mock system design with zero components.
-
-        Returns:
-            system callback components
-        """
-        components = DesignSpec(
-            environment_spec=EnvironmentSpec,
-            system_init=FixedNetworkSystemInit,
-            data_server_signature=adders.ParallelSequenceAdderSignature,
-            executor_adder=adders.ParallelSequenceAdder,
-            executor_adder_priority=adders.UniformAdderPriority,
-            data_server=MockOnPolicyDataServer,
-            distributor=MockDistributor,
-        )
-        return components, {}
+from mava.specs import MAEnvironmentSpec
+from mava.systems.jax.builder import Builder
+from tests.jax.mocks import MockDataServer, make_fake_env_specs
 
 
 @pytest.fixture
-def test_system_parallel_sequence_adder() -> System:
-    """Dummy system with zero components."""
-    return TestSystemWithParallelSequenceAdder()
+def mock_builder() -> Builder:
+    """Mock builder component.
+
+    Returns:
+        System builder with no components.
+    """
+    builder = Builder(components=[])
+    store = SimpleNamespace(
+        priority_fns={"table_0": 1},
+        table_network_config={"table_0": "network_0"},
+        unique_net_keys=["network_0"],
+        data_server_client=MockDataServer,
+    )
+    builder.store = store
+    return builder
 
 
-# TODO Fix test.
-def test_adders(
-    test_system_parallel_sequence_adder: System,
+@pytest.fixture
+def parallel_sequence_adder() -> ParallelSequenceAdder:
+    """Creates a parallel sequence adder fixture with config
+
+    Returns:
+        ParallelSequenceAdder with ParallelSequenceAdderConfig.
+    """
+
+    adder = ParallelSequenceAdder(
+        config=ParallelSequenceAdderConfig(
+            sequence_length=1, period=1, use_next_extras=True
+        )
+    )
+    return adder
+
+
+@pytest.fixture
+def parallel_transition_adder() -> ParallelTransitionAdder:
+    """Creates a parallel transition adder fixture with config
+
+    Returns:
+        ParallelTransitionAdder with ParallelTransitionAdderConfig.
+    """
+
+    adder = ParallelTransitionAdder(
+        config=ParallelTransitionAdderConfig(n_step=1, discount=1)
+    )
+    return adder
+
+
+@pytest.fixture
+def parallel_sequence_adder_signature() -> ParallelSequenceAdderSignature:
+    """Creates a parallel sequence signature fixture
+
+    Returns:
+        ParallelSequenceAdderSignature.
+    """
+
+    signature = ParallelSequenceAdderSignature()
+    return signature
+
+
+@pytest.fixture
+def parallel_transition_adder_signature() -> ParallelTransitionAdderSignature:
+    """Creates a parallel transition adder signature fixture
+
+    Returns:
+        ParallelTransitionAdderSignature.
+    """
+
+    signature = ParallelTransitionAdderSignature()
+    return signature
+
+
+@pytest.fixture
+def uniform_priority() -> UniformAdderPriority:
+    """Creates a uniform adder priority fixture
+
+    Returns:
+        UniformAdderPriority.
+    """
+
+    priority = UniformAdderPriority()
+    return priority
+
+
+@pytest.fixture
+def mock_env_specs() -> MAEnvironmentSpec:
+    """Creates a mock environment spec
+
+    Returns:
+        MAEnvironmentSpec.
+    """
+
+    return make_fake_env_specs()
+
+
+def test_parallel_sequence_adder(
+    mock_builder: Builder,
+    parallel_sequence_adder: ParallelSequenceAdder,
 ) -> None:
-    """Test if system builder instantiates processes as expected."""
-    # TODO Update once rewrite these tests.
-    test_system_parallel_sequence_adder.build(
-        environment_factory=make_fake_environment_factory()
+    """Test sequence adder callbacks.
+
+    Args:
+        mock_builder: Fixture SystemBuilder.
+        parallel_sequence_adder: Fixture ParallelSequenceAdder.
+
+    Returns:
+        None
+    """
+    # ParallelSequenceAdderConfig parameters set correctly
+    assert parallel_sequence_adder.config.sequence_length == 1
+    assert parallel_sequence_adder.config.period == 1
+    assert parallel_sequence_adder.config.use_next_extras is True
+
+    parallel_sequence_adder.on_building_init_start(builder=mock_builder)
+    assert (
+        mock_builder.store.sequence_length
+        == parallel_sequence_adder.config.sequence_length
     )
-    test_system_parallel_sequence_adder._builder.data_server()
-    test_system_parallel_sequence_adder._builder.store.system_executor = None
-    test_system_parallel_sequence_adder._builder.executor(
-        executor_id="executor", data_server_client=None, parameter_server_client=None
+
+    parallel_sequence_adder.on_building_executor_adder(builder=mock_builder)
+    assert type(mock_builder.store.adder) == reverb_adders.ParallelSequenceAdder
+
+    # Reverb ParallelSequenceAdder args have been set correctly
+    assert (
+        mock_builder.store.adder._sequence_length
+        == parallel_sequence_adder.config.sequence_length
     )
-    test_system_parallel_sequence_adder._builder.store.adder.add_first(env_restart)
-    test_system_parallel_sequence_adder._builder.store.server.stop()
+    assert mock_builder.store.adder._period == parallel_sequence_adder.config.period
+    assert (
+        mock_builder.store.adder._use_next_extras
+        == parallel_sequence_adder.config.use_next_extras
+    )
+    assert mock_builder.store.adder._client == mock_builder.store.data_server_client
+    assert mock_builder.store.adder._priority_fns == mock_builder.store.priority_fns
+    assert (
+        mock_builder.store.adder._net_ids_to_keys == mock_builder.store.unique_net_keys
+    )
+    assert (
+        mock_builder.store.adder._table_network_config
+        == mock_builder.store.table_network_config
+    )
+    assert parallel_sequence_adder.name() == "executor_adder"
 
 
-# TODO (Kale-ab): test adder behaviour in more detail
+def test_parallel_sequence_adder_signature(
+    mock_builder: Builder,
+    parallel_sequence_adder: ParallelSequenceAdder,
+    parallel_sequence_adder_signature: ParallelSequenceAdderSignature,
+    mock_env_specs: MAEnvironmentSpec,
+) -> None:
+    """Test sequence adder signature callback.
+
+    Args:
+        mock_builder: Fixture SystemBuilder.
+        parallel_sequence_adder_signature: Fixture ParallelSequenceAdderSignature.
+
+    Returns:
+        None
+    """
+    parallel_sequence_adder_signature.on_building_data_server_adder_signature(
+        builder=mock_builder
+    )
+
+    assert hasattr(mock_builder.store, "adder_signature_fn")
+
+    signature = mock_builder.store.adder_signature_fn(
+        environment_specs=mock_env_specs,
+        sequence_length=parallel_sequence_adder.config.sequence_length,
+        extras_specs=mock_env_specs.get_extras_specs(),
+    )
+    assert type(signature) == reverb_base.Step
+
+    # Dimensions preserved after spec is generated, ignoring the time dim
+    assert signature.observations["agent_0"].shape.as_list()[1:] == list(
+        mock_env_specs.get_agent_environment_specs()["agent_0"].observations.shape
+    )
+    assert signature.observations["agent_1"].shape.as_list()[1:] == list(
+        mock_env_specs.get_agent_environment_specs()["agent_1"].observations.shape
+    )
+    assert signature.actions["agent_1"].shape.as_list()[1:] == list(
+        mock_env_specs.get_agent_environment_specs()["agent_1"].actions.shape
+    )
+
+    assert parallel_sequence_adder_signature.name() == "data_server_adder_signature"
+
+
+def test_parallel_transition_adder(
+    mock_builder: Builder,
+    parallel_transition_adder: ParallelTransitionAdder,
+) -> None:
+    """Test transition adder callback
+
+    Args:
+        mock_builder: Fixture SystemBuilder.
+        parallel_transition_adder: Fixture ParallelTransitionAdder.
+
+    Returns:
+        None
+    """
+
+    # ParallelTransitionAdderConfig parameters set correctly
+    assert parallel_transition_adder.config.n_step == 1
+    assert parallel_transition_adder.config.discount == 1
+    parallel_transition_adder.on_building_executor_adder(builder=mock_builder)
+    assert type(mock_builder.store.adder) == reverb_adders.ParallelNStepTransitionAdder
+
+    # Reverb ParallelSequenceAdder args have been set correctly
+    assert mock_builder.store.adder.n_step == parallel_transition_adder.config.n_step
+    assert (
+        mock_builder.store.adder._discount == parallel_transition_adder.config.discount
+    )
+    assert mock_builder.store.adder._client == mock_builder.store.data_server_client
+    assert mock_builder.store.adder._priority_fns == mock_builder.store.priority_fns
+    assert (
+        mock_builder.store.adder._net_ids_to_keys == mock_builder.store.unique_net_keys
+    )
+    assert (
+        mock_builder.store.adder._table_network_config
+        == mock_builder.store.table_network_config
+    )
+    assert parallel_transition_adder.name() == "executor_adder"
+
+
+def test_parallel_transition_adder_signature(
+    mock_builder: Builder,
+    parallel_transition_adder_signature: ParallelTransitionAdderSignature,
+    mock_env_specs: MAEnvironmentSpec,
+) -> None:
+    """Test transition adder signature callback
+
+    Args:
+        mock_builder: Fixture SystemBuilder.
+        parallel_transition_adder_signature: Fixture ParallelTransitionAdderSignature.
+
+    Returns:
+        None
+    """
+    parallel_transition_adder_signature.on_building_data_server_adder_signature(
+        builder=mock_builder
+    )
+    assert hasattr(mock_builder.store, "adder_signature_fn")
+
+    signature = mock_builder.store.adder_signature_fn(
+        environment_specs=mock_env_specs,
+        extras_specs=mock_env_specs.get_extras_specs(),
+    )
+    assert type(signature) == types.Transition
+
+    # Dimensions preserved after spec is generated
+    assert signature.observations["agent_0"].shape.as_list() == list(
+        mock_env_specs.get_agent_environment_specs()["agent_0"].observations.shape
+    )
+    assert signature.observations["agent_1"].shape.as_list() == list(
+        mock_env_specs.get_agent_environment_specs()["agent_1"].observations.shape
+    )
+    assert signature.actions["agent_1"].shape.as_list() == list(
+        mock_env_specs.get_agent_environment_specs()["agent_1"].actions.shape
+    )
+    assert parallel_transition_adder_signature.name() == "data_server_adder_signature"
+
+
+def test_uniform_priority(
+    mock_builder: Builder,
+    uniform_priority: UniformAdderPriority,
+) -> None:
+    """Test uniform priority callback
+
+    Args:
+        mock_builder: Fixture SystemBuilder.
+        uniform_priority: Fixture UniformAdderPriority.
+
+    Returns:
+        None
+    """
+    uniform_priority.on_building_executor_adder_priority(builder=mock_builder)
+    assert mock_builder.store.priority_fns
+    assert uniform_priority.name() == "adder_priority"
+    assert issubclass(
+        uniform_priority.config_class(), AdderPriorityConfig  # type: ignore
+    )
+    assert all(mock_builder.store.priority_fns) == 1

@@ -141,8 +141,8 @@ class OffPolicyDataServer(DataServer):
 
         Args:
             table_key : _description_
-            environment_spec : _description_
-            extras_spec : _description_
+            environment_specs : _description_
+            extras_specs : _description_
             builder : _description_
         Returns:
             _description_
@@ -197,8 +197,8 @@ class OnPolicyDataServer(DataServer):
 
         Args:
             table_key : _description_
-            environment_spec : _description_
-            extras_spec : _description_
+            environment_specs : _description_
+            extras_specs : _description_
             builder : _description_
         Returns:
             _description_

@@ -149,11 +149,9 @@ class ParallelTransitionAdder(Adder):
         Args:
             builder : _description_
         """
-        if not hasattr(builder.store, "adder_priority_fn"):
-            builder.store.adder_priority_fn = None
 
         adder = reverb_adders.ParallelNStepTransitionAdder(
-            priority_fns=builder.store.adder_priority_fn,
+            priority_fns=builder.store.priority_fns,
             client=builder.store.data_server_client,
             net_ids_to_keys=builder.store.unique_net_keys,
             n_step=self.config.n_step,
@@ -237,16 +235,9 @@ class ParallelSequenceAdder(Adder):
         Args:
             builder : _description_
         """
-        assert not hasattr(builder.store, "adder_priority_fn")
-
-        # Create custom priority functons for the adder
-        priority_fns = {
-            table_key: lambda x: 1.0
-            for table_key in builder.store.table_network_config.keys()
-        }
 
         adder = reverb_adders.ParallelSequenceAdder(
-            priority_fns=priority_fns,
+            priority_fns=builder.store.priority_fns,
             client=builder.store.data_server_client,
             net_ids_to_keys=builder.store.unique_net_keys,
             sequence_length=self.config.sequence_length,
