@@ -104,19 +104,21 @@ def mock_builder() -> MockBuilder:
     return MockBuilder()
 
 
-def test_initiator() -> None:
+@pytest.fixture
+def distributor() -> Distributor:
+    """Distributor fixture for testing"""
+    return Distributor()
+
+
+def test_initiator(distributor: Distributor) -> None:
     """Test initiator of the Distributor"""
-    distributor = Distributor()
     assert distributor.config.nodes_on_gpu == ["trainer"]
 
 
-def test_on_building_program_nodes_multi_process(mock_builder: MockBuilder) -> None:
-    """Test on_building_program_nodes for multi_process distributor
-
-    Args:
-        mock_builder: MockBuilder
-    """
-    distributor = Distributor()
+def test_on_building_program_nodes_multi_process(
+    mock_builder: MockBuilder, distributor: Distributor
+) -> None:
+    """Test on_building_program_nodes for multi_process distributor"""
     distributor.on_building_program_nodes(builder=mock_builder)
 
     assert isinstance(mock_builder.store.program, Launcher)
@@ -157,13 +159,9 @@ def test_on_building_program_nodes_multi_process(mock_builder: MockBuilder) -> N
 
 def test_on_building_program_nodes_multi_process_no_evaluator(
     mock_builder: MockBuilder,
+    distributor: Distributor,
 ) -> None:
-    """Test on_building_program_nodes for multi_process distributor and no evaluator runs
-
-    Args:
-        mock_builder: MockBuilder
-    """
-    distributor = Distributor()
+    """Test on_building_program_nodes, multi_process distributor, no evaluator runs"""
     distributor.config.run_evaluator = False
     distributor.on_building_program_nodes(builder=mock_builder)
 
@@ -198,13 +196,10 @@ def test_on_building_program_nodes_multi_process_no_evaluator(
         mock_builder.store.program.get_nodes()
 
 
-def test_on_building_program_nodes(mock_builder: MockBuilder) -> None:
-    """Test on_building_program_nodes for non multi_process distributor
-
-    Args:
-        mock_builder: MockBuilder
-    """
-    distributor = Distributor()
+def test_on_building_program_nodes(
+    mock_builder: MockBuilder, distributor: Distributor
+) -> None:
+    """Test on_building_program_nodes for non multi_process distributor"""
     distributor.config.multi_process = False
     distributor.config.run_evaluator = True
     distributor.on_building_program_nodes(builder=mock_builder)
@@ -225,13 +220,10 @@ def test_on_building_program_nodes(mock_builder: MockBuilder) -> None:
     assert mock_builder.store.system_build == mock_builder.store.program._nodes
 
 
-def test_on_building_program_nodes_no_evaluator(mock_builder: MockBuilder) -> None:
-    """Test on_building_program_nodes for non multi_process distributor, no evaluator runs
-
-    Args:
-        mock_builder: MockBuilder
-    """
-    distributor = Distributor()
+def test_on_building_program_nodes_no_evaluator(
+    mock_builder: MockBuilder, distributor: Distributor
+) -> None:
+    """Test on_building_program_nodes, single process distributor, no evaluator runs"""
     distributor.config.multi_process = False
     distributor.config.run_evaluator = False
     distributor.on_building_program_nodes(builder=mock_builder)
@@ -255,12 +247,9 @@ def test_on_building_program_nodes_no_evaluator(mock_builder: MockBuilder) -> No
     assert mock_builder.store.system_build == mock_builder.store.program._nodes
 
 
-def test_on_building_launch(mock_builder: MockBuilder) -> None:
-    """Test on_building_launch
-
-    Args:
-        mock_builder: MockBuilder
-    """
-    distributor = Distributor()
+def test_on_building_launch(
+    mock_builder: MockBuilder, distributor: Distributor
+) -> None:
+    """Test on_building_launch"""
     distributor.on_building_launch(builder=mock_builder)
     assert mock_builder.program_launched
