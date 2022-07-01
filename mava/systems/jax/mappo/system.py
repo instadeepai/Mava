@@ -53,7 +53,7 @@ class MAPPOSystem(System):
 
         # Trainer
         trainer_process = DesignSpec(
-            trainer_init=training.TrainerInit,
+            trainer_init=training.SingleTrainerInit,
             gae_fn=training.GAE,
             loss=training.MAPGWithTrustRegionClippingLoss,
             epoch_update=training.MAPGEpochUpdate,
