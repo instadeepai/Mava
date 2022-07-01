@@ -190,6 +190,7 @@ def test_parallel_sequence_adder_signature(
     Args:
         mock_builder: Fixture SystemBuilder.
         parallel_sequence_adder_signature: Fixture ParallelSequenceAdderSignature.
+        mock_env_specs: Fixture MAEnvironmentSpec
 
     Returns:
         None
@@ -261,12 +262,14 @@ def test_parallel_transition_adder(
 def test_parallel_transition_adder_signature(
     mock_builder: Builder,
     parallel_transition_adder_signature: ParallelTransitionAdderSignature,
+    mock_env_specs: MAEnvironmentSpec,
 ) -> None:
     """Test transition adder signature callback
 
     Args:
         mock_builder: Fixture SystemBuilder.
         parallel_transition_adder_signature: Fixture ParallelTransitionAdderSignature.
+        mock_env_specs: Fixture MAEnvironmentSpec
 
     Returns:
         None
