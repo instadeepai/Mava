@@ -16,9 +16,12 @@
 """Tests for config class for Jax-based Mava systems"""
 
 from dataclasses import dataclass
+from types import SimpleNamespace
+from typing import Any, Callable, Optional
 
 import pytest
 
+from mava.components.jax.component import Component
 from mava.systems.jax import Config
 
 
@@ -38,6 +41,55 @@ class HyperparameterConfig:
 class SameParameterNameConfig:
     param_0: int
     param_2: str
+
+
+@dataclass
+class DummyComponentConfig:
+    param_3: int = 3
+    param_4: str = "4"
+
+
+class DummyComponentNoConfig(Component):
+    def __init__(
+        self,
+        config: Any,
+    ):
+        """Initialize component
+
+        Args:
+            config : component config
+        """
+
+        self.config = config
+
+    @staticmethod
+    def name() -> str:
+        """Returns component name"""
+
+        return "dummy_component_name"
+
+
+class DummyComponent(Component):
+    def __init__(self, config: DummyComponentConfig = DummyComponentConfig()):
+        """Initialize component
+
+        Args:
+            config : component config
+        """
+
+        self.config = config
+
+    @staticmethod
+    def name() -> str:
+        """Returns component name"""
+
+        return "dummy_component_name"
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Returns component config class"""
+
+        return DummyComponentConfig
 
 
 @pytest.fixture
@@ -68,6 +120,42 @@ def config() -> Config:
         instantiation of a Mava Config class
     """
     return Config()
+
+
+@pytest.fixture
+def dummy_component_without_config_class() -> Component:
+    """Creates a component with no config class.
+
+    Returns:
+        instantiation of a Mava Component
+    """
+
+    dummy_component = DummyComponentNoConfig(config=SimpleNamespace(param_1=1))
+
+    return dummy_component
+
+
+@pytest.fixture
+def dummy_component_with_config_class() -> Component:
+    """Creates a component with a config class.
+
+    Returns:
+        instantiation of a Mava Component
+    """
+
+    dummy_component = DummyComponent()
+
+    return dummy_component
+
+
+@pytest.fixture
+def dummy_component_config_class() -> DummyComponentConfig:
+    """Creates a component config.
+
+    Returns:
+        instantiation of a Mava Component Config
+    """
+    return DummyComponentConfig()
 
 
 def test_add_single_config(config: Config, dummy_component_config: type) -> None:
@@ -295,3 +383,124 @@ def test_accidental_parameter_override_with_update_exception(
             param_0=2, param_2="param"
         )
         config.update(component_0=other_hyperparameter_config)
+
+
+def test_add_non_dataclass_config_exception(config: Config) -> None:
+    """Test that exception is thrown when when trying to add component config that \
+        is not a dataclass.
+
+    Args:
+        config : Mava config
+    """
+
+    non_dataclass_type_config_dict = {"name": "component", "setting": 5}
+
+    with pytest.raises(Exception):
+        config.add(component=non_dataclass_type_config_dict)
+
+
+def test_add_before_built_exception(
+    config: Config, dummy_component_config: HyperparameterConfig
+) -> None:
+    """Tests that exception is thrown when when trying to add component config that \
+        has already been built.
+
+    Args:
+        config : Mava config
+        dummy_component_config: component config dataclass
+    """
+
+    config.add(component_0=dummy_component_config)
+    config.build()
+
+    with pytest.raises(Exception):
+        config.add(component_1=dummy_component_config)
+
+
+def test_add_same_component_twice_exception(
+    config: Config, dummy_component_config: HyperparameterConfig
+) -> None:
+    """Test that exception is thrown when when trying to add component configs that \
+        have the same name.
+
+    Args:
+        config : Mava config
+        dummy_component_config: component config dataclass
+    """
+
+    config.add(component_same_name=dummy_component_config)
+
+    with pytest.raises(Exception):
+        config.add(component_same_name=dummy_component_config)
+
+
+def test_get_local_config_not_built_exception(
+    config: Config, dummy_component_config: type
+) -> None:
+    """Test that exception is thrown when when trying to get the local config \
+        of a component when the system has not been built yet.
+
+    Args:
+        config : Mava config
+        dummy_component_config : component config dataclass
+    """
+
+    config.add(component=dummy_component_config)
+
+    with pytest.raises(Exception):
+        config.get_local_config(component=dummy_component_config)
+
+
+def test_get_local_config_with_config_class(
+    config: Config,
+    dummy_component_config: type,
+    dummy_component_config_class: type,
+    dummy_component_with_config_class: type,
+) -> None:
+    """Test that correct local config is returned for a component after the \
+        system has been built and the component has a config class.
+
+    Args:
+        config : Mava config
+        dummy_component_config : component config dataclass
+        dummy_component_config_class : component config dataclass
+        dummy_component_with_config_class : dummy component with config class
+    """
+
+    config.add(component_0=dummy_component_config)
+    config.add(component_1=dummy_component_config_class)
+
+    config.build()
+
+    local_config = config.get_local_config(component=dummy_component_with_config_class)
+
+    assert local_config.__dict__ == {"param_3": 3, "param_4": "4"}
+    assert type(local_config) == DummyComponentConfig  # type: ignore
+
+
+def test_get_local_config_without_config_class(
+    config: Config,
+    dummy_component_config: type,
+    dummy_component_config_class: type,
+    dummy_component_without_config_class: type,
+) -> None:
+    """Test that empty SimpleNamespace local config is returned for a component after the \
+        system has been built and the component doesn't have a config class.
+
+    Args:
+        config : Mava config
+        dummy_component_config : component config dataclass
+        dummy_component_config_class : component config dataclass
+        dummy_component_without_config_class : dummy component without config class
+    """
+
+    config.add(component_0=dummy_component_config)
+    config.add(component_1=dummy_component_config_class)
+
+    config.build()
+
+    local_config = config.get_local_config(
+        component=dummy_component_without_config_class
+    )
+
+    assert local_config == SimpleNamespace()
