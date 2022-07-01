@@ -46,6 +46,7 @@ class MAPPOSystem(System):
             executor_observe=executing.FeedforwardExecutorObserve,
             executor_select_action=executing.FeedforwardExecutorSelectAction,
             executor_adder=building.ParallelSequenceAdder,
+            adder_priority=building.UniformAdderPriority,
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
             networks=building.DefaultNetworks,
         ).get()
