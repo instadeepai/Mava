@@ -46,9 +46,9 @@ def mock_trainer() -> Trainer:
     }
 
     agent_net_keys = {
-        "agent_0": "network_agent_0",
-        "agent_1": "network_agent_1",
-        "agent_2": "network_agent_2",
+        "agent_0": "network_agent",
+        "agent_1": "network_agent",
+        "agent_2": "network_agent",
     }
 
     network = {
