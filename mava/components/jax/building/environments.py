@@ -156,14 +156,16 @@ class MonitorExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
         self,
         config: MonitorExecutorEnvironmentLoopConfig = MonitorExecutorEnvironmentLoopConfig(),  # noqa
     ):
+        """Component for visualising environment progress"""
         super().__init__(config=config)
         self.config = config
 
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
-        """
-        Builds a `ParallelEnvironmentLoop` on all executors and a
-        `MonitorParallelEnvironmentLoop` on the executor and stores it
-         in the `builder.store.system_executor`
+        """Monitors environments and produces videos of episodes
+
+        Builds a `ParallelEnvironmentLoop` on the evaluator and a
+        `MonitorParallelEnvironmentLoop` on all executors and stores it
+        in the `builder.store.system_executor`
 
         Args:
             builder : the system builder
@@ -202,4 +204,9 @@ class MonitorExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
 
     @staticmethod
     def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            MonitorExecutorEnvironmentLoopConfig.
+        """
         return MonitorExecutorEnvironmentLoopConfig

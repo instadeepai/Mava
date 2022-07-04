@@ -68,7 +68,7 @@ def main(_: Any) -> None:
             **kwargs,
         )
 
-    # Checkpointer appends "Checkpoints" to checkpoint_dir
+    # Used for checkpoints, tensorboard logging and env monitoring
     experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
