@@ -22,6 +22,29 @@ class SequenceAdderTest(MultiAgentAdderTestMixin, parameterized.TestCase):
         end_behavior: EndBehavior = EndBehavior.ZERO_PAD,
         repeat_episode_times: int = 1,
     ) -> None:
+        """Test sequence adders
+
+        Args:
+            max_sequence_length: The fixed length of sequences we wish to add.
+            period: The period with which we add sequences. If less than
+                sequence_length, overlapping sequences are added. If equal to
+                sequence_length, sequences are exactly non-overlapping.
+            first: The first `dm_env.TimeStep` that is used to call
+                `base.ReverbAdder.add_first()`.
+            steps: A sequence of (action, timestep) tuples that are passed to
+                `base.ReverbAdder.add()`.
+            expected_sequences: The sequence of items that are expected to be created
+                by calling the adder's `add_first()` method on `first` and `add()`
+                on all of the elements in `steps`.
+            agents: Dict containing agent names, e.g.
+                agents = {"agent_0", "agent_1", "agent_2"}.
+            end_behavior: How end of episode should be handled.
+            repeat_episode_times: How many times to run an episode.
+                end_behavior: How end of episode should be handled.
+
+        Returns:
+            None
+        """
         adder = reverb_adders.ParallelSequenceAdder(
             self.client,
             sequence_length=sequence_length,
