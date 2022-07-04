@@ -18,8 +18,6 @@
 
 from typing import Dict, List
 
-import reverb
-
 from mava.components.jax.building import adders
 from mava.components.jax.building.data_server import (
     OffPolicyDataServer,
@@ -27,8 +25,11 @@ from mava.components.jax.building.data_server import (
 )
 from mava.components.jax.building.environments import EnvironmentSpec
 from mava.components.jax.building.reverb_components import (
+    LIFORemover,
+    MinHeapSampler,
     MinSizeRateLimiter,
     SampleToInsertRateLimiter,
+    UniformSampler,
 )
 from mava.components.jax.building.system_init import FixedNetworkSystemInit
 from tests.jax.mocks import (  # MockedEnvSpec,
@@ -45,10 +46,10 @@ transition_adder_data_server_test_cases: List[Dict] = [
             "rate_limiter": MinSizeRateLimiter,
             "data_server_adder_signature": adders.ParallelTransitionAdderSignature,
             "data_server": MockOffPolicyDataServer,
+            "data_server_sampler": UniformSampler,
+            "data_server_remover": LIFORemover,
         },
         "system_config": {
-            "sampler": reverb.selectors.Uniform(),
-            "remover": reverb.selectors.Lifo(),
             "max_size": 500,
             "min_data_server_size": 100,
             "max_times_sampled": 12,
@@ -74,10 +75,10 @@ transition_adder_data_server_test_cases: List[Dict] = [
             "rate_limiter": SampleToInsertRateLimiter,
             "data_server_adder_signature": adders.ParallelTransitionAdderSignature,
             "data_server": OffPolicyDataServer,
+            "data_server_sampler": MinHeapSampler,
+            "data_server_remover": LIFORemover,
         },
         "system_config": {
-            "sampler": reverb.selectors.MinHeap(),
-            "remover": reverb.selectors.Lifo(),
             "max_size": 500,
             "min_data_server_size": 100,
             "max_times_sampled": 12,

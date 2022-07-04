@@ -67,6 +67,7 @@ class MinSizeRateLimiter(RateLimiter):
         """
 
         def rate_limiter_fn() -> reverb.rate_limiters:
+            """Function to retrieve rate limiter."""
             return reverb.rate_limiters.MinSize(self.config.min_data_server_size)
 
         builder.store.rate_limiter_fn = rate_limiter_fn
@@ -116,6 +117,7 @@ class SampleToInsertRateLimiter(RateLimiter):
             error_buffer = self.config.error_buffer
 
         def rate_limiter_fn() -> reverb.rate_limiters:
+            """Function to retrieve rate limiter."""
             return reverb.rate_limiters.SampleToInsertRatio(
                 min_size_to_sample=self.config.min_data_server_size,
                 samples_per_insert=self.config.samples_per_insert,
@@ -170,7 +172,18 @@ class UniformSampler(Sampler):
         """Sample data from the table uniformly"""
 
         def sampler_fn() -> reverb.selectors:
+            """Function to retrieve sampler."""
             return reverb.selectors.Uniform()
+
+        builder.store.sampler_fn = sampler_fn
+
+
+class MinHeapSampler(Sampler):
+    def on_building_data_server_start(self, builder: SystemBuilder) -> None:
+        """Sample data from the table with min heap"""
+
+        def sampler_fn() -> reverb.selectors:
+            return reverb.selectors.MinHeap()
 
         builder.store.sampler_fn = sampler_fn
 
@@ -193,6 +206,7 @@ class PrioritySampler(Sampler):
         """Sample experience from the replay table according to its importance."""
 
         def sampler_fn() -> reverb.selectors:
+            """Function to retrieve sampler."""
             return reverb.selectors.Prioritized(self.config.priority_exponent)
 
         builder.store.sampler_fn = sampler_fn
