@@ -18,6 +18,8 @@ from types import SimpleNamespace
 import pytest
 
 from mava.components.jax.training.trainer import (
+    CustomTrainerInit,
+    CustomTrainerInitConfig,
     OneTrainerPerNetworkInit,
     SingleTrainerInit,
 )
@@ -377,6 +379,87 @@ def test_one_trainer_per_network_random_sampling(
         "trainer_0": ["network_0"],
         "trainer_1": ["network_1"],
         "trainer_2": ["network_2"],
+    }
+    assert builder.store.networks == "network_initialized"
+
+
+def test_custom_trainer_on_building_init_value_error(
+    mock_builder_no_shared_weights_fixed_sampling: Builder,
+) -> None:
+    """Tests on_building_init_end hook.
+
+    Custom trainer init. Asserts than exception is thrown when an empty dictionary
+    is passed in.
+    """
+
+    trainer_init = CustomTrainerInit(config=CustomTrainerInitConfig())
+
+    builder = mock_builder_no_shared_weights_fixed_sampling
+
+    with pytest.raises(ValueError):
+        trainer_init.on_building_init_end(builder)
+
+
+def test_custom_trainer_init_no_shared_weights_random_sampling(
+    mock_builder_no_shared_weights_random_sampling: Builder,
+) -> None:
+    """Tests on_building_init_end hook.
+
+    Custom trainer init. Asserts that custom trainer init works correctly
+    when trainer networks corresponding to random network sampling and no
+    shared weights are passed in.
+    """
+
+    trainer_init = CustomTrainerInit(
+        config=CustomTrainerInitConfig(
+            trainer_networks={
+                "trainer_0": ["network_0"],
+                "trainer_1": ["network_1"],
+                "trainer_2": ["network_2"],
+            }
+        )
+    )
+
+    builder = mock_builder_no_shared_weights_random_sampling
+
+    trainer_init.on_building_init_end(builder)
+
+    assert builder.store.net_spec_keys == {
+        "network_0": "agent_0",
+        "network_1": "agent_1",
+        "network_2": "agent_2",
+    }
+
+    assert builder.store.table_network_config == {
+        "trainer_0": ["network_0"],
+        "trainer_1": ["network_1"],
+        "trainer_2": ["network_2"],
+    }
+
+    assert builder.store.networks == "network_initialized"
+
+
+def test_custom_trainer_init_shared_weights_fixed_sampling(
+    mock_builder_shared_weights_fixed_sampling: Builder,
+) -> None:
+    """Tests on_building_init_end hook.
+
+    Custom trainer init. Asserts that custom trainer init works correctly
+    when trainer networks corresponding to fixed network sampling and shared
+    network weights are passed in.
+    """
+
+    trainer_init = CustomTrainerInit(
+        config=CustomTrainerInitConfig(trainer_networks={"trainer": ["network_agent"]})
+    )
+
+    builder = mock_builder_shared_weights_fixed_sampling
+
+    trainer_init.on_building_init_end(builder)
+
+    assert builder.store.net_spec_keys == {"network_agent": "agent_0"}
+    assert builder.store.table_network_config == {
+        "trainer": ["network_agent", "network_agent", "network_agent"]
     }
     assert builder.store.networks == "network_initialized"
 
