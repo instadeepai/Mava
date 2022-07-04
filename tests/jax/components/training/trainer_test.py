@@ -18,7 +18,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from mava.components.jax.training.trainer import TrainerInit, TrainerInitConfig
+from mava.components.jax.training.trainer import (
+    OneTrainerPerNetworkInit,
+    SingleTrainerInit,
+)
 from mava.systems.jax.builder import Builder
 from mava.systems.jax.trainer import Trainer
 from mava.utils import enums
@@ -230,20 +233,6 @@ def mock_one_trainer_per_network_random_sampling() -> Trainer:
 # ON_BUILDING_INIT_END TESTS
 
 
-def test_trainer_networks_value_error(
-    mock_builder_shared_weights_fixed_sampling: Builder,
-    incorrect_trainer_enum: enums.Trainer,
-) -> None:
-    """Incorrect enum passed to trainer init."""
-
-    mock_trainer = TrainerInit(
-        config=TrainerInitConfig(trainer_networks=incorrect_trainer_enum)
-    )
-
-    with pytest.raises(ValueError):
-        mock_trainer.on_building_init_end(mock_builder_shared_weights_fixed_sampling)
-
-
 def test_single_trainer_shared_weights_fixed_sampling(
     mock_builder_shared_weights_fixed_sampling: Builder,
 ) -> None:
@@ -253,9 +242,7 @@ def test_single_trainer_shared_weights_fixed_sampling(
     fixed agent network sampling.
     """
 
-    mock_trainer = TrainerInit(
-        config=TrainerInitConfig(trainer_networks=enums.Trainer.single_trainer)
-    )
+    mock_trainer = SingleTrainerInit()
 
     builder = mock_builder_shared_weights_fixed_sampling
     mock_trainer.on_building_init_end(builder)
@@ -277,9 +264,7 @@ def test_single_trainer_no_shared_weights_fixed_sampling(
     fixed agent network sampling.
     """
 
-    mock_trainer = TrainerInit(
-        config=TrainerInitConfig(trainer_networks=enums.Trainer.single_trainer)
-    )
+    mock_trainer = SingleTrainerInit()
 
     builder = mock_builder_no_shared_weights_fixed_sampling
     mock_trainer.on_building_init_end(builder)
@@ -307,9 +292,7 @@ def test_single_trainer_no_shared_weights_random_sampling(
     random agent network sampling.
     """
 
-    mock_trainer = TrainerInit(
-        config=TrainerInitConfig(trainer_networks=enums.Trainer.single_trainer)
-    )
+    mock_trainer = SingleTrainerInit()
 
     builder = mock_builder_no_shared_weights_random_sampling
     mock_trainer.on_building_init_end(builder)
@@ -335,9 +318,7 @@ def test_one_trainer_per_network_shared_weights_fixed_sampling(
     fixed agent network sampling.
     """
 
-    mock_trainer = TrainerInit(
-        config=TrainerInitConfig(trainer_networks=enums.Trainer.one_trainer_per_network)
-    )
+    mock_trainer = OneTrainerPerNetworkInit()
 
     builder = mock_builder_shared_weights_fixed_sampling
     mock_trainer.on_building_init_end(builder)
@@ -359,9 +340,7 @@ def test_one_trainer_per_network_no_shared_weights_fixed_sampling(
     fixed agent network sampling.
     """
 
-    mock_trainer = TrainerInit(
-        config=TrainerInitConfig(trainer_networks=enums.Trainer.one_trainer_per_network)
-    )
+    mock_trainer = OneTrainerPerNetworkInit()
 
     builder = mock_builder_no_shared_weights_fixed_sampling
     mock_trainer.on_building_init_end(builder)
@@ -393,9 +372,7 @@ def test_one_trainer_per_network_random_sampling(
     random agent network sampling.
     """
 
-    mock_trainer = TrainerInit(
-        config=TrainerInitConfig(trainer_networks=enums.Trainer.one_trainer_per_network)
-    )
+    mock_trainer = OneTrainerPerNetworkInit()
 
     builder = mock_builder_no_shared_weights_random_sampling
     mock_trainer.on_building_init_end(builder)
@@ -434,9 +411,7 @@ def test_training_utility_single_trainer_shared_weights(
 
     trainer = mock_single_trainer_shared_weights_fixed_sampling
 
-    trainer_init = TrainerInit(
-        config=TrainerInitConfig(trainer_networks=enums.Trainer.single_trainer)
-    )
+    trainer_init = SingleTrainerInit()
 
     trainer_init.on_training_utility_fns(trainer)
 
@@ -464,9 +439,7 @@ def test_training_utility_single_trainer_no_shared_weights(
 
     trainer = mock_single_trainer_no_shared_weights_fixed_sampling
 
-    trainer_init = TrainerInit(
-        config=TrainerInitConfig(trainer_networks=enums.Trainer.single_trainer)
-    )
+    trainer_init = SingleTrainerInit()
 
     trainer_init.on_training_utility_fns(trainer)
 
@@ -494,9 +467,7 @@ def test_training_utility_single_trainer_no_shared_weights_random_sampling(
 
     trainer = mock_single_trainer_no_shared_weights_random_sampling
 
-    trainer_init = TrainerInit(
-        config=TrainerInitConfig(trainer_networks=enums.Trainer.single_trainer)
-    )
+    trainer_init = SingleTrainerInit()
 
     trainer_init.on_training_utility_fns(trainer)
 
@@ -516,9 +487,7 @@ def test_training_utility_one_trainer_per_network_shared_weights(
 
     trainer = mock_one_trainer_per_network_shared_weights_fixed_sampling
 
-    trainer_init = TrainerInit(
-        config=TrainerInitConfig(trainer_networks=enums.Trainer.one_trainer_per_network)
-    )
+    trainer_init = OneTrainerPerNetworkInit()
 
     trainer_init.on_training_utility_fns(trainer)
 
@@ -544,9 +513,7 @@ def test_training_utility_one_trainer_per_network_no_shared_weights(
     shared and the trainer sampling setup is fixed.
     """
 
-    trainer_init = TrainerInit(
-        config=TrainerInitConfig(trainer_networks=enums.Trainer.one_trainer_per_network)
-    )
+    trainer_init = OneTrainerPerNetworkInit()
 
     trainer_0 = mock_one_trainer_per_network_no_shared_weights_fixed_sampling
 
@@ -611,9 +578,7 @@ def test_training_utility_one_trainer_per_network_random_sampling(
         Tests with one trainer per network where network weights aren't
     shared and the trainer sampling setup is random.
     """
-    trainer_init = TrainerInit(
-        config=TrainerInitConfig(trainer_networks=enums.Trainer.one_trainer_per_network)
-    )
+    trainer_init = OneTrainerPerNetworkInit()
 
     trainer_0 = mock_one_trainer_per_network_random_sampling
 
