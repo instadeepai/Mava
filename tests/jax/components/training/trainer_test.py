@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from enum import Enum
 from types import SimpleNamespace
 
 import pytest
@@ -24,19 +23,6 @@ from mava.components.jax.training.trainer import (
 )
 from mava.systems.jax.builder import Builder
 from mava.systems.jax.trainer import Trainer
-from mava.utils import enums
-
-
-# TODO: fix type error here
-@pytest.fixture
-def incorrect_trainer_enum() -> enums.Trainer:
-    """Create incorrect trainer enum."""
-
-    class Trainer(Enum):
-        incorrect_enum = 3
-
-    return Trainer.incorrect_enum  # type: ignore
-
 
 #################
 # Mock builders
