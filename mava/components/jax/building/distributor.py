@@ -66,7 +66,7 @@ class Distributor(Component):
         # variable server node
         parameter_server = builder.store.program.add(
             builder.parameter_server,
-            node_type=NodeType.corrier,
+            node_type=NodeType.courier,
             name="parameter_server",
         )
 
@@ -75,7 +75,7 @@ class Distributor(Component):
             builder.store.program.add(
                 builder.executor,
                 [f"executor_{executor_id}", data_server, parameter_server],
-                node_type=NodeType.corrier,
+                node_type=NodeType.courier,
                 name="executor",
             )
 
@@ -84,7 +84,7 @@ class Distributor(Component):
             builder.store.program.add(
                 builder.executor,
                 ["evaluator", data_server, parameter_server],
-                node_type=NodeType.corrier,
+                node_type=NodeType.courier,
                 name="evaluator",
             )
 
@@ -93,7 +93,7 @@ class Distributor(Component):
             builder.store.program.add(
                 builder.trainer,
                 [trainer_id, data_server, parameter_server],
-                node_type=NodeType.corrier,
+                node_type=NodeType.courier,
                 name="trainer",
             )
 
