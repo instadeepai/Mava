@@ -26,9 +26,15 @@ from mava.systems.jax import Config
 
 
 @dataclass
-class ComponentConfig:
+class ComponentConfig_0:
     name: str
     setting: int
+
+
+@dataclass
+class ComponentConfig_1:
+    param_3: int = 3
+    param_4: str = "4"
 
 
 @dataclass
@@ -43,13 +49,7 @@ class SameParameterNameConfig:
     param_2: str
 
 
-@dataclass
-class DummyComponentConfig:
-    param_3: int = 3
-    param_4: str = "4"
-
-
-class DummyComponentNoConfig(Component):
+class DummyComponentNoConfigClass(Component):
     def __init__(
         self,
         config: Any,
@@ -70,7 +70,7 @@ class DummyComponentNoConfig(Component):
 
 
 class DummyComponent(Component):
-    def __init__(self, config: DummyComponentConfig = DummyComponentConfig()):
+    def __init__(self, config: ComponentConfig_1 = ComponentConfig_1()):
         """Initialize component
 
         Args:
@@ -89,17 +89,27 @@ class DummyComponent(Component):
     def config_class() -> Optional[Callable]:
         """Returns component config class"""
 
-        return DummyComponentConfig
+        return ComponentConfig_1
 
 
 @pytest.fixture
-def dummy_component_config() -> ComponentConfig:
+def dummy_component_config_0() -> ComponentConfig_0:
     """Dummy config dataclass for a component.
 
     Returns:
         config dataclass
     """
-    return ComponentConfig(name="component", setting=5)
+    return ComponentConfig_0(name="component", setting=5)
+
+
+@pytest.fixture
+def dummy_component_config_1() -> ComponentConfig_1:
+    """Dummy config dataclass for a component.
+
+    Returns:
+        instantiation of a Mava Component Config
+    """
+    return ComponentConfig_1()
 
 
 @pytest.fixture
@@ -130,7 +140,7 @@ def dummy_component_without_config_class() -> Component:
         instantiation of a Mava Component
     """
 
-    dummy_component = DummyComponentNoConfig(config=SimpleNamespace(param_1=1))
+    dummy_component = DummyComponentNoConfigClass(config=SimpleNamespace(param_1=1))
 
     return dummy_component
 
@@ -148,24 +158,14 @@ def dummy_component_with_config_class() -> Component:
     return dummy_component
 
 
-@pytest.fixture
-def dummy_component_config_class() -> DummyComponentConfig:
-    """Creates a component config.
-
-    Returns:
-        instantiation of a Mava Component Config
-    """
-    return DummyComponentConfig()
-
-
-def test_add_single_config(config: Config, dummy_component_config: type) -> None:
+def test_add_single_config(config: Config, dummy_component_config_0: type) -> None:
     """Test adding a single config.
 
     Args:
         config : Mava config
-        dummy_component_config : component config dataclass
+        dummy_component_config_0 : component config dataclass
     """
-    config.add(component=dummy_component_config)
+    config.add(component=dummy_component_config_0)
     config.build()
     conf = config.get()
 
@@ -174,17 +174,17 @@ def test_add_single_config(config: Config, dummy_component_config: type) -> None
 
 
 def test_add_multiple_configs(
-    config: Config, dummy_component_config: type, dummy_hyperparameter_config: type
+    config: Config, dummy_component_config_0: type, dummy_hyperparameter_config: type
 ) -> None:
     """Test adding multiple configs at the same time.
 
     Args:
         config : Mava config
-        dummy_component_config : component config dataclass
+        dummy_component_config_0 : component config dataclass
         dummy_hyperparameter_config : component config dataclass of hyperparameters
     """
     config.add(
-        component=dummy_component_config, hyperparameter=dummy_hyperparameter_config
+        component=dummy_component_config_0, hyperparameter=dummy_hyperparameter_config
     )
     config.build()
     conf = config.get()
@@ -196,16 +196,16 @@ def test_add_multiple_configs(
 
 
 def test_add_config_twice(
-    config: Config, dummy_component_config: type, dummy_hyperparameter_config: type
+    config: Config, dummy_component_config_0: type, dummy_hyperparameter_config: type
 ) -> None:
     """Test add two configs, one after the other.
 
     Args:
         config : Mava config
-        dummy_component_config : component config dataclass
+        dummy_component_config_0 : component config dataclass
         dummy_hyperparameter_config : component config dataclass of hyperparameters
     """
-    config.add(component=dummy_component_config)
+    config.add(component=dummy_component_config_0)
     config.add(hyperparameter=dummy_hyperparameter_config)
     config.build()
     conf = config.get()
@@ -217,16 +217,16 @@ def test_add_config_twice(
 
 
 def test_update_config(
-    config: Config, dummy_component_config: type, dummy_hyperparameter_config: type
+    config: Config, dummy_component_config_0: type, dummy_hyperparameter_config: type
 ) -> None:
     """Test add two configs, one after the other.
 
     Args:
         config : Mava config
-        dummy_component_config : component config dataclass
+        dummy_component_config_0 : component config dataclass
         dummy_hyperparameter_config : component config dataclass of hyperparameters
     """
-    config.add(component=dummy_component_config)
+    config.add(component=dummy_component_config_0)
     config.update(component=dummy_hyperparameter_config)
     config.build()
     conf = config.get()
@@ -238,18 +238,18 @@ def test_update_config(
 
 
 def test_update_config_twice(
-    config: Config, dummy_component_config: type, dummy_hyperparameter_config: type
+    config: Config, dummy_component_config_0: type, dummy_hyperparameter_config: type
 ) -> None:
     """Test add two configs, one after the other.
 
     Args:
         config : Mava config
-        dummy_component_config : component config dataclass
+        dummy_component_config_0 : component config dataclass
         dummy_hyperparameter_config : component config dataclass of hyperparameters
     """
-    config.add(component=dummy_component_config)
+    config.add(component=dummy_component_config_0)
     config.update(component=dummy_hyperparameter_config)
-    config.update(component=dummy_component_config)
+    config.update(component=dummy_component_config_0)
     config.build()
     conf = config.get()
 
@@ -260,17 +260,17 @@ def test_update_config_twice(
 
 
 def test_set_existing_parameter_on_the_fly(
-    config: Config, dummy_component_config: type
+    config: Config, dummy_component_config_0: type
 ) -> None:
     """Test updating a hyperparameter on the fly after the config has been built.
 
     Args:
         config : Mava config
-        dummy_component_config : component config dataclass
+        dummy_component_config_0 : component config dataclass
     """
 
     # add component dataclasses and build config
-    config.add(component=dummy_component_config)
+    config.add(component=dummy_component_config_0)
     config.build()
 
     # set config parameters on the fly
@@ -282,57 +282,57 @@ def test_set_existing_parameter_on_the_fly(
 
 
 def test_set_before_build_exception(
-    config: Config, dummy_component_config: type
+    config: Config, dummy_component_config_0: type
 ) -> None:
     """Test that exception is thrown if it is attempted to set a hyperparameter \
         before the config has been built.
 
     Args:
         config : Mava config
-        dummy_component_config : component config dataclass
+        dummy_component_config_0 : component config dataclass
     """
 
     with pytest.raises(Exception):
         # add component dataclasses and build config
-        config.add(component=dummy_component_config)
+        config.add(component=dummy_component_config_0)
 
         # Try setting parameters without having built first
         config.set_parameters(name="new_component_name")
 
 
 def test_get_before_build_exception(
-    config: Config, dummy_component_config: type
+    config: Config, dummy_component_config_0: type
 ) -> None:
     """Test that exception is thrown if it is attempted to call .get() \
         before the config has been built.
 
     Args:
         config : Mava config
-        dummy_component_config : component config dataclass
+        dummy_component_config_0 : component config dataclass
     """
 
     with pytest.raises(Exception):
         # add component dataclasses and build config
-        config.add(component=dummy_component_config)
+        config.add(component=dummy_component_config_0)
 
         # Try getting without having built first
         config.get()
 
 
 def test_parameter_setting_that_does_not_exist_exception(
-    config: Config, dummy_component_config: type
+    config: Config, dummy_component_config_0: type
 ) -> None:
     """Test that exception is thrown if it is attempted to set a hyperparameter \
         that does not exist.
 
     Args:
         config : Mava config
-        dummy_component_config : component config dataclass
+        dummy_component_config_0 : component config dataclass
     """
 
     with pytest.raises(Exception):
         # add component dataclasses and build config
-        config.add(component=dummy_component_config)
+        config.add(component=dummy_component_config_0)
         config.build()
 
         # Try setting a parameter that does not exist
@@ -361,20 +361,20 @@ def test_accidental_parameter_override_with_add_exception(
 
 
 def test_accidental_parameter_override_with_update_exception(
-    config: Config, dummy_component_config: type, dummy_hyperparameter_config: type
+    config: Config, dummy_component_config_0: type, dummy_hyperparameter_config: type
 ) -> None:
     """Test that exception is thrown when two component config dataclasses share the \
         same name for a specific hyperparameter when updating an existing config.
 
     Args:
         config : Mava config
-        dummy_component_config : component config dataclass
+        dummy_component_config_0 : component config dataclass
         dummy_hyperparameter_config : component config dataclass of hyperparameters
     """
 
     with pytest.raises(Exception):
         # add component dataclasses and build config
-        config.add(component_0=dummy_component_config)
+        config.add(component_0=dummy_component_config_0)
         config.add(component_1=dummy_hyperparameter_config)
 
         # add new component dataclass with a parameter of the same name
@@ -400,61 +400,61 @@ def test_add_non_dataclass_config_exception(config: Config) -> None:
 
 
 def test_add_before_built_exception(
-    config: Config, dummy_component_config: HyperparameterConfig
+    config: Config, dummy_component_config_0: HyperparameterConfig
 ) -> None:
     """Tests that exception is thrown when when trying to add component config that \
         has already been built.
 
     Args:
         config : Mava config
-        dummy_component_config: component config dataclass
+        dummy_component_config_0: component config dataclass
     """
 
-    config.add(component_0=dummy_component_config)
+    config.add(component_0=dummy_component_config_0)
     config.build()
 
     with pytest.raises(Exception):
-        config.add(component_1=dummy_component_config)
+        config.add(component_1=dummy_component_config_0)
 
 
 def test_add_same_component_twice_exception(
-    config: Config, dummy_component_config: HyperparameterConfig
+    config: Config, dummy_component_config_0: HyperparameterConfig
 ) -> None:
     """Test that exception is thrown when when trying to add component configs that \
         have the same name.
 
     Args:
         config : Mava config
-        dummy_component_config: component config dataclass
+        dummy_component_config_0: component config dataclass
     """
 
-    config.add(component_same_name=dummy_component_config)
+    config.add(component_same_name=dummy_component_config_0)
 
     with pytest.raises(Exception):
-        config.add(component_same_name=dummy_component_config)
+        config.add(component_same_name=dummy_component_config_0)
 
 
 def test_get_local_config_not_built_exception(
-    config: Config, dummy_component_config: type
+    config: Config, dummy_component_config_0: type
 ) -> None:
     """Test that exception is thrown when when trying to get the local config \
         of a component when the system has not been built yet.
 
     Args:
         config : Mava config
-        dummy_component_config : component config dataclass
+        dummy_component_config_0 : component config dataclass
     """
 
-    config.add(component=dummy_component_config)
+    config.add(component=dummy_component_config_0)
 
     with pytest.raises(Exception):
-        config.get_local_config(component=dummy_component_config)
+        config.get_local_config(component=dummy_component_config_0)
 
 
 def test_get_local_config_with_config_class(
     config: Config,
-    dummy_component_config: type,
-    dummy_component_config_class: type,
+    dummy_component_config_0: type,
+    dummy_component_config_1: type,
     dummy_component_with_config_class: type,
 ) -> None:
     """Test that correct local config is returned for a component after the \
@@ -462,26 +462,26 @@ def test_get_local_config_with_config_class(
 
     Args:
         config : Mava config
-        dummy_component_config : component config dataclass
-        dummy_component_config_class : component config dataclass
+        dummy_component_config_0 : component config dataclass
+        dummy_component_config_1 : component config dataclass
         dummy_component_with_config_class : dummy component with config class
     """
 
-    config.add(component_0=dummy_component_config)
-    config.add(component_1=dummy_component_config_class)
+    config.add(component_0=dummy_component_config_0)
+    config.add(component_1=dummy_component_config_1)
 
     config.build()
 
     local_config = config.get_local_config(component=dummy_component_with_config_class)
 
     assert local_config.__dict__ == {"param_3": 3, "param_4": "4"}
-    assert type(local_config) == DummyComponentConfig  # type: ignore
+    assert type(local_config) == ComponentConfig_1  # type: ignore
 
 
 def test_get_local_config_without_config_class(
     config: Config,
-    dummy_component_config: type,
-    dummy_component_config_class: type,
+    dummy_component_config_0: type,
+    dummy_component_config_1: type,
     dummy_component_without_config_class: type,
 ) -> None:
     """Test that empty SimpleNamespace local config is returned for a component after the \
@@ -489,13 +489,13 @@ def test_get_local_config_without_config_class(
 
     Args:
         config : Mava config
-        dummy_component_config : component config dataclass
-        dummy_component_config_class : component config dataclass
+        dummy_component_config_0 : component config dataclass
+        dummy_component_config_1 : component config dataclass
         dummy_component_without_config_class : dummy component without config class
     """
 
-    config.add(component_0=dummy_component_config)
-    config.add(component_1=dummy_component_config_class)
+    config.add(component_0=dummy_component_config_0)
+    config.add(component_1=dummy_component_config_1)
 
     config.build()
 
