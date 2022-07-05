@@ -54,11 +54,11 @@ pip install autorom
 AutoROM -v
 
 N_CPU=$(grep -c ^processor /proc/cpuinfo)
-N_CPU_INTEGRATION = $((N_CPU-2))
+N_CPU_INTEGRATION=$((N_CPU-2))
 
 if [ "$integration" = "true" ]; then \
     # Run all tests
-    pytest -n "${N_CPU_INTEGRATION}" tests ;
+    pytest -n "${N_CPU_INTEGRATION}" tests -v ;
 else
     # Run all unit tests (non integration tests).
     pytest --durations=10 -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
