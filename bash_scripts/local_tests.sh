@@ -54,6 +54,7 @@ pip install autorom
 AutoROM -v
 
 N_CPU=$(grep -c ^processor /proc/cpuinfo)
+# Use only 75% of local CPU cores
 N_CPU_INTEGRATION=`expr $N_CPU \* 3 / 4`
 
 if [ "$integration" = "true" ]; then \
