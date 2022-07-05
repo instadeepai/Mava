@@ -54,7 +54,7 @@ pip install autorom
 AutoROM -v
 
 N_CPU=$(grep -c ^processor /proc/cpuinfo)
-N_CPU_INTEGRATION=$((N_CPU-2))
+N_CPU_INTEGRATION=`expr $N_CPU \* 3 / 4`
 
 if [ "$integration" = "true" ]; then \
     # Run all tests
