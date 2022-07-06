@@ -14,9 +14,11 @@
 # limitations under the License.
 
 from types import SimpleNamespace
+from typing import List
 
 import pytest
 
+from mava.callbacks.base import Callback
 from mava.components.jax.training.trainer import (
     CustomTrainerInit,
     CustomTrainerInitConfig,
@@ -26,9 +28,43 @@ from mava.components.jax.training.trainer import (
 from mava.systems.jax.builder import Builder
 from mava.systems.jax.trainer import Trainer
 
+#######################
+# TrainerInit Fixtures
+#######################
+
+
+@pytest.fixture
+def single_trainer_init() -> SingleTrainerInit:
+    """Creates single trainer init component."""
+    return SingleTrainerInit()
+
+
+@pytest.fixture
+def one_trainer_per_network_init() -> OneTrainerPerNetworkInit:
+    """Create one trainer per network init component"""
+    return OneTrainerPerNetworkInit()
+
+
 #################
 # Mock builders
 #################
+
+
+class MockBuilder(Builder):
+    def __init__(
+        self,
+        components: List[Callback],
+        global_config: SimpleNamespace = SimpleNamespace(),
+    ) -> None:
+        """Creates a mock builder for testing
+
+        Args:
+            components : list of mava components
+            global_config : global system config
+        """
+        super().__init__(components, global_config)
+        self.store.agents = ["agent_0", "agent_1", "agent_2"]
+        self.store.network_factory = lambda: "network_initialized"
 
 
 @pytest.fixture
@@ -38,14 +74,12 @@ def mock_builder_shared_weights_fixed_sampling() -> Builder:
     Has shared weights and fixed agent trainer sampling setup.
     """
 
-    mock_builder = Builder(global_config=SimpleNamespace(), components=[])
+    mock_builder = MockBuilder(global_config=SimpleNamespace(), components=[])
 
-    mock_builder.store.agents = ["agent_0", "agent_1", "agent_2"]
     mock_builder.store.unique_net_keys = ["network_agent"]
     mock_builder.store.network_sampling_setup = [
         ["network_agent", "network_agent", "network_agent"]
     ]
-    mock_builder.store.network_factory = lambda: "network_initialized"
 
     return mock_builder
 
@@ -57,9 +91,8 @@ def mock_builder_no_shared_weights_fixed_sampling() -> Builder:
     Doesn't shared weights and has fixed agent trainer sampling setup.
     """
 
-    mock_builder = Builder(global_config=SimpleNamespace(), components=[])
+    mock_builder = MockBuilder(global_config=SimpleNamespace(), components=[])
 
-    mock_builder.store.agents = ["agent_0", "agent_1", "agent_2"]
     mock_builder.store.unique_net_keys = [
         "network_agent_0",
         "network_agent_1",
@@ -68,7 +101,6 @@ def mock_builder_no_shared_weights_fixed_sampling() -> Builder:
     mock_builder.store.network_sampling_setup = [
         ["network_agent_0", "network_agent_1", "network_agent_2"]
     ]
-    mock_builder.store.network_factory = lambda: "network_initialized"
 
     return mock_builder
 
@@ -80,16 +112,14 @@ def mock_builder_no_shared_weights_random_sampling() -> Builder:
     Doesn't have shared weights and has random agent trainer sampling setup
     """
 
-    mock_builder = Builder(global_config=SimpleNamespace(), components=[])
+    mock_builder = MockBuilder(global_config=SimpleNamespace(), components=[])
 
-    mock_builder.store.agents = ["agent_0", "agent_1", "agent_2"]
     mock_builder.store.unique_net_keys = ["network_0", "network_1", "network_2"]
     mock_builder.store.network_sampling_setup = [
         ["network_0"],
         ["network_1"],
         ["network_2"],
     ]
-    mock_builder.store.network_factory = lambda: "network_initialized"
 
     return mock_builder
 
@@ -99,6 +129,23 @@ def mock_builder_no_shared_weights_random_sampling() -> Builder:
 ##################
 
 
+class MockTrainer(Trainer):
+    def __init__(
+        self,
+        store: SimpleNamespace,
+        components: List[Callback] = [],
+    ) -> None:
+        """Creates mock trainer for testing
+
+        Args:
+            store : trainer store
+            components : list of Mava components
+        """
+
+        super().__init__(store, components)
+        self.store.agents = ["agent_0", "agent_1", "agent_2"]
+
+
 @pytest.fixture
 def mock_single_trainer_shared_weights_fixed_sampling() -> Trainer:
     """Creates mock trainer
@@ -106,9 +153,8 @@ def mock_single_trainer_shared_weights_fixed_sampling() -> Trainer:
     Has shared weights and fixed agent trainer sampling setup.
     """
 
-    mock_trainer = Trainer(store=SimpleNamespace(), components=[])
+    mock_trainer = MockTrainer(store=SimpleNamespace(), components=[])
 
-    mock_trainer.store.agents = ["agent_0", "agent_1", "agent_2"]
     mock_trainer.store.trainer_id = "trainer"
     mock_trainer.store.table_network_config = {
         "trainer": ["network_agent", "network_agent", "network_agent"]
@@ -125,9 +171,8 @@ def mock_single_trainer_no_shared_weights_fixed_sampling() -> Trainer:
     trainer sampling setup.
     """
 
-    mock_trainer = Trainer(store=SimpleNamespace(), components=[])
+    mock_trainer = MockTrainer(store=SimpleNamespace(), components=[])
 
-    mock_trainer.store.agents = ["agent_0", "agent_1", "agent_2"]
     mock_trainer.store.trainer_id = "trainer"
     mock_trainer.store.table_network_config = {
         "trainer": ["network_agent_0", "network_agent_1", "network_agent_2"]
@@ -144,10 +189,9 @@ def mock_single_trainer_no_shared_weights_random_sampling() -> Trainer:
     trainer sampling setup.
     """
 
-    mock_trainer = Trainer(store=SimpleNamespace(), components=[])
+    mock_trainer = MockTrainer(store=SimpleNamespace(), components=[])
 
     mock_trainer.store.trainer_id = "trainer"
-    mock_trainer.store.agents = ["agent_0", "agent_1", "agent_2"]
     mock_trainer.store.table_network_config = {"trainer": ["network_2"]}
 
     return mock_trainer
@@ -161,9 +205,8 @@ def mock_one_trainer_per_network_shared_weights_fixed_sampling() -> Trainer:
     trainer sampling setup.
     """
 
-    mock_trainer = Trainer(store=SimpleNamespace(), components=[])
+    mock_trainer = MockTrainer(store=SimpleNamespace(), components=[])
 
-    mock_trainer.store.agents = ["agent_0", "agent_1", "agent_2"]
     mock_trainer.store.trainer_id = "trainer_0"
     mock_trainer.store.table_network_config = {
         "trainer_0": ["network_agent", "network_agent", "network_agent"]
@@ -180,9 +223,8 @@ def mock_one_trainer_per_network_no_shared_weights_fixed_sampling() -> Trainer:
     trainer sampling setup.
     """
 
-    mock_trainer = Trainer(store=SimpleNamespace(), components=[])
+    mock_trainer = MockTrainer(store=SimpleNamespace(), components=[])
 
-    mock_trainer.store.agents = ["agent_0", "agent_1", "agent_2"]
     # trainer id must be specified per test
     mock_trainer.store.table_network_config = {
         "trainer_0": ["network_agent_0", "network_agent_1", "network_agent_2"],
@@ -201,10 +243,9 @@ def mock_one_trainer_per_network_random_sampling() -> Trainer:
     trainer sampling setup.
     """
 
-    mock_trainer = Trainer(store=SimpleNamespace(), components=[])
+    mock_trainer = MockTrainer(store=SimpleNamespace(), components=[])
 
     # trainer id must be given at each test
-    mock_trainer.store.agents = ["agent_0", "agent_1", "agent_2"]
     mock_trainer.store.table_network_config = {
         "trainer_0": ["network_0"],
         "trainer_1": ["network_1"],
@@ -223,6 +264,7 @@ def mock_one_trainer_per_network_random_sampling() -> Trainer:
 
 def test_single_trainer_shared_weights_fixed_sampling(
     mock_builder_shared_weights_fixed_sampling: Builder,
+    single_trainer_init: SingleTrainerInit,
 ) -> None:
     """Tests on_building_init_end hook.
 
@@ -230,10 +272,8 @@ def test_single_trainer_shared_weights_fixed_sampling(
     fixed agent network sampling.
     """
 
-    mock_trainer = SingleTrainerInit()
-
     builder = mock_builder_shared_weights_fixed_sampling
-    mock_trainer.on_building_init_end(builder)
+    single_trainer_init.on_building_init_end(builder)
 
     assert builder.store.net_spec_keys == {"network_agent": "agent_0"}
     assert builder.store.table_network_config == {
@@ -245,6 +285,7 @@ def test_single_trainer_shared_weights_fixed_sampling(
 
 def test_single_trainer_no_shared_weights_fixed_sampling(
     mock_builder_no_shared_weights_fixed_sampling: Builder,
+    single_trainer_init: SingleTrainerInit,
 ) -> None:
     """Tests on_building_init_end hook.
 
@@ -252,10 +293,8 @@ def test_single_trainer_no_shared_weights_fixed_sampling(
     fixed agent network sampling.
     """
 
-    mock_trainer = SingleTrainerInit()
-
     builder = mock_builder_no_shared_weights_fixed_sampling
-    mock_trainer.on_building_init_end(builder)
+    single_trainer_init.on_building_init_end(builder)
 
     assert builder.store.net_spec_keys == {
         "network_agent_0": "agent_0",
@@ -273,6 +312,7 @@ def test_single_trainer_no_shared_weights_fixed_sampling(
 
 def test_single_trainer_no_shared_weights_random_sampling(
     mock_builder_no_shared_weights_random_sampling: Builder,
+    single_trainer_init: SingleTrainerInit,
 ) -> None:
     """Tests on_building_init_end hook.
 
@@ -280,10 +320,8 @@ def test_single_trainer_no_shared_weights_random_sampling(
     random agent network sampling.
     """
 
-    mock_trainer = SingleTrainerInit()
-
     builder = mock_builder_no_shared_weights_random_sampling
-    mock_trainer.on_building_init_end(builder)
+    single_trainer_init.on_building_init_end(builder)
 
     assert builder.store.net_spec_keys == {
         "network_0": "agent_0",
@@ -299,6 +337,7 @@ def test_single_trainer_no_shared_weights_random_sampling(
 
 def test_one_trainer_per_network_shared_weights_fixed_sampling(
     mock_builder_shared_weights_fixed_sampling: Builder,
+    one_trainer_per_network_init: OneTrainerPerNetworkInit,
 ) -> None:
     """Tests on_building_init_end hook.
 
@@ -306,10 +345,8 @@ def test_one_trainer_per_network_shared_weights_fixed_sampling(
     fixed agent network sampling.
     """
 
-    mock_trainer = OneTrainerPerNetworkInit()
-
     builder = mock_builder_shared_weights_fixed_sampling
-    mock_trainer.on_building_init_end(builder)
+    one_trainer_per_network_init.on_building_init_end(builder)
 
     assert builder.store.net_spec_keys == {"network_agent": "agent_0"}
     assert builder.store.table_network_config == {
@@ -321,6 +358,7 @@ def test_one_trainer_per_network_shared_weights_fixed_sampling(
 
 def test_one_trainer_per_network_no_shared_weights_fixed_sampling(
     mock_builder_no_shared_weights_fixed_sampling: Builder,
+    one_trainer_per_network_init: OneTrainerPerNetworkInit,
 ) -> None:
     """Tests on_building_init_end hook.
 
@@ -328,10 +366,8 @@ def test_one_trainer_per_network_no_shared_weights_fixed_sampling(
     fixed agent network sampling.
     """
 
-    mock_trainer = OneTrainerPerNetworkInit()
-
     builder = mock_builder_no_shared_weights_fixed_sampling
-    mock_trainer.on_building_init_end(builder)
+    one_trainer_per_network_init.on_building_init_end(builder)
 
     assert builder.store.net_spec_keys == {
         "network_agent_0": "agent_0",
@@ -353,6 +389,7 @@ def test_one_trainer_per_network_no_shared_weights_fixed_sampling(
 
 def test_one_trainer_per_network_random_sampling(
     mock_builder_no_shared_weights_random_sampling: Builder,
+    one_trainer_per_network_init: OneTrainerPerNetworkInit,
 ) -> None:
     """Tests on_building_init_end hook.
 
@@ -360,10 +397,8 @@ def test_one_trainer_per_network_random_sampling(
     random agent network sampling.
     """
 
-    mock_trainer = OneTrainerPerNetworkInit()
-
     builder = mock_builder_no_shared_weights_random_sampling
-    mock_trainer.on_building_init_end(builder)
+    one_trainer_per_network_init.on_building_init_end(builder)
 
     assert builder.store.net_spec_keys == {
         "network_0": "agent_0",
@@ -471,6 +506,7 @@ def test_custom_trainer_init_shared_weights_fixed_sampling(
 
 def test_training_utility_single_trainer_shared_weights(
     mock_single_trainer_shared_weights_fixed_sampling: Trainer,
+    single_trainer_init: SingleTrainerInit,
 ) -> None:
     """Tests on_training_utility_fn hook in TrainerInit
 
@@ -480,9 +516,7 @@ def test_training_utility_single_trainer_shared_weights(
 
     trainer = mock_single_trainer_shared_weights_fixed_sampling
 
-    trainer_init = SingleTrainerInit()
-
-    trainer_init.on_training_utility_fns(trainer)
+    single_trainer_init.on_training_utility_fns(trainer)
 
     assert trainer.store.trainer_table_entry == [
         "network_agent",
@@ -499,6 +533,7 @@ def test_training_utility_single_trainer_shared_weights(
 
 def test_training_utility_single_trainer_no_shared_weights(
     mock_single_trainer_no_shared_weights_fixed_sampling: Trainer,
+    single_trainer_init: SingleTrainerInit,
 ) -> None:
     """Tests on_training_utility_fn hook in TrainerInit
 
@@ -508,9 +543,7 @@ def test_training_utility_single_trainer_no_shared_weights(
 
     trainer = mock_single_trainer_no_shared_weights_fixed_sampling
 
-    trainer_init = SingleTrainerInit()
-
-    trainer_init.on_training_utility_fns(trainer)
+    single_trainer_init.on_training_utility_fns(trainer)
 
     assert trainer.store.trainer_table_entry == [
         "network_agent_0",
@@ -527,6 +560,7 @@ def test_training_utility_single_trainer_no_shared_weights(
 
 def test_training_utility_single_trainer_no_shared_weights_random_sampling(
     mock_single_trainer_no_shared_weights_random_sampling: Trainer,
+    single_trainer_init: SingleTrainerInit,
 ) -> None:
     """Tests on_training_utility_fn hook in TrainerInit
 
@@ -536,9 +570,7 @@ def test_training_utility_single_trainer_no_shared_weights_random_sampling(
 
     trainer = mock_single_trainer_no_shared_weights_random_sampling
 
-    trainer_init = SingleTrainerInit()
-
-    trainer_init.on_training_utility_fns(trainer)
+    single_trainer_init.on_training_utility_fns(trainer)
 
     assert trainer.store.trainer_table_entry == ["network_2"]
     assert trainer.store.trainer_agents == ["agent_0"]
@@ -547,6 +579,7 @@ def test_training_utility_single_trainer_no_shared_weights_random_sampling(
 
 def test_training_utility_one_trainer_per_network_shared_weights(
     mock_one_trainer_per_network_shared_weights_fixed_sampling: Trainer,
+    one_trainer_per_network_init: OneTrainerPerNetworkInit,
 ) -> None:
     """Tests on_training_utility_fns hook.
 
@@ -556,9 +589,7 @@ def test_training_utility_one_trainer_per_network_shared_weights(
 
     trainer = mock_one_trainer_per_network_shared_weights_fixed_sampling
 
-    trainer_init = OneTrainerPerNetworkInit()
-
-    trainer_init.on_training_utility_fns(trainer)
+    one_trainer_per_network_init.on_training_utility_fns(trainer)
 
     assert trainer.store.trainer_table_entry == [
         "network_agent",
@@ -575,6 +606,7 @@ def test_training_utility_one_trainer_per_network_shared_weights(
 
 def test_training_utility_one_trainer_per_network_no_shared_weights(
     mock_one_trainer_per_network_no_shared_weights_fixed_sampling: Trainer,
+    one_trainer_per_network_init: OneTrainerPerNetworkInit,
 ) -> None:
     """Tests on_training_utility_fns hook.
 
@@ -582,13 +614,11 @@ def test_training_utility_one_trainer_per_network_no_shared_weights(
     shared and the trainer sampling setup is fixed.
     """
 
-    trainer_init = OneTrainerPerNetworkInit()
-
     trainer_0 = mock_one_trainer_per_network_no_shared_weights_fixed_sampling
 
     trainer_0.store.trainer_id = "trainer_0"
 
-    trainer_init.on_training_utility_fns(trainer_0)
+    one_trainer_per_network_init.on_training_utility_fns(trainer_0)
 
     assert trainer_0.store.trainer_table_entry == [
         "network_agent_0",
@@ -606,7 +636,7 @@ def test_training_utility_one_trainer_per_network_no_shared_weights(
 
     trainer_1.store.trainer_id = "trainer_1"
 
-    trainer_init.on_training_utility_fns(trainer_1)
+    one_trainer_per_network_init.on_training_utility_fns(trainer_1)
 
     assert trainer_1.store.trainer_table_entry == [
         "network_agent_0",
@@ -624,7 +654,7 @@ def test_training_utility_one_trainer_per_network_no_shared_weights(
 
     trainer_2.store.trainer_id = "trainer_2"
 
-    trainer_init.on_training_utility_fns(trainer_2)
+    one_trainer_per_network_init.on_training_utility_fns(trainer_2)
 
     assert trainer_2.store.trainer_table_entry == [
         "network_agent_0",
@@ -641,19 +671,19 @@ def test_training_utility_one_trainer_per_network_no_shared_weights(
 
 def test_training_utility_one_trainer_per_network_random_sampling(
     mock_one_trainer_per_network_random_sampling: Trainer,
+    one_trainer_per_network_init: OneTrainerPerNetworkInit,
 ) -> None:
     """Tests on_training_utility_fns hook.
 
         Tests with one trainer per network where network weights aren't
     shared and the trainer sampling setup is random.
     """
-    trainer_init = OneTrainerPerNetworkInit()
 
     trainer_0 = mock_one_trainer_per_network_random_sampling
 
     trainer_0.store.trainer_id = "trainer_0"
 
-    trainer_init.on_training_utility_fns(trainer_0)
+    one_trainer_per_network_init.on_training_utility_fns(trainer_0)
 
     assert trainer_0.store.trainer_table_entry == ["network_0"]
     assert trainer_0.store.trainer_agents == ["agent_0"]
@@ -663,7 +693,7 @@ def test_training_utility_one_trainer_per_network_random_sampling(
 
     trainer_1.store.trainer_id = "trainer_1"
 
-    trainer_init.on_training_utility_fns(trainer_1)
+    one_trainer_per_network_init.on_training_utility_fns(trainer_1)
 
     assert trainer_1.store.trainer_table_entry == ["network_1"]
     assert trainer_1.store.trainer_agents == ["agent_0"]
@@ -673,7 +703,7 @@ def test_training_utility_one_trainer_per_network_random_sampling(
 
     trainer_2.store.trainer_id = "trainer_2"
 
-    trainer_init.on_training_utility_fns(trainer_2)
+    one_trainer_per_network_init.on_training_utility_fns(trainer_2)
 
     assert trainer_2.store.trainer_table_entry == ["network_2"]
     assert trainer_2.store.trainer_agents == ["agent_0"]
