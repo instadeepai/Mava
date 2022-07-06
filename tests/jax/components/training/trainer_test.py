@@ -434,6 +434,15 @@ def test_custom_trainer_on_building_init_value_error(
     with pytest.raises(ValueError):
         trainer_init.on_building_init_end(builder)
 
+    trainer_init = CustomTrainerInit(
+        config=CustomTrainerInitConfig(trainer_networks=None)  # type:ignore
+    )
+
+    builder = mock_builder_no_shared_weights_fixed_sampling
+
+    with pytest.raises(ValueError):
+        trainer_init.on_building_init_end(builder)
+
 
 def test_custom_trainer_init_no_shared_weights_random_sampling(
     mock_builder_no_shared_weights_random_sampling: Builder,
