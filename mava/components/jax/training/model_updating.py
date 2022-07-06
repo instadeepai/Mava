@@ -56,6 +56,7 @@ class MAPGMinibatchUpdateConfig:
     adam_epsilon: float = 1e-5
     max_gradient_norm: float = 0.5
     optimizer: Optional[optax_base.GradientTransformation] = (None,)
+    normalize_advantage: bool = True
 
 
 class MAPGMinibatchUpdate(MinibatchUpdate):
@@ -96,10 +97,13 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
             params, opt_states = carry
 
             # Normalize advantages at the minibatch level before using them.
-            advantages = jax.tree_map(
-                lambda x: (x - jnp.mean(x, axis=0)) / (jnp.std(x, axis=0) + 1e-8),
-                minibatch.advantages,
-            )
+            if self.config.normalize_advantage:
+                advantages = jax.tree_map(
+                    lambda x: (x - jnp.mean(x, axis=0)) / (jnp.std(x, axis=0) + 1e-8),
+                    minibatch.advantages,
+                )
+            else:
+                advantages = minibatch.advantages
 
             # Calculate the gradients and agent metrics.
             gradients, agent_metrics = trainer.store.grad_fn(
