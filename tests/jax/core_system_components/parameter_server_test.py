@@ -27,6 +27,8 @@ from tests.jax.hook_order_tracking import HookOrderTracking
 
 
 class TestParameterServer(HookOrderTracking, ParameterServer):
+    __test__ = False
+
     def __init__(
         self,
         store: SimpleNamespace,
