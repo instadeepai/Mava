@@ -280,7 +280,7 @@ class MockDataServer(Component):
         extras_spec: dict = {}
         for table_key in builder.store.table_network_config.keys():
             num_networks = len(builder.store.table_network_config[table_key])
-            env_spec = copy.deepcopy(builder.store.agent_environment_specs)
+            env_spec = copy.deepcopy(builder.store.ma_environment_spec)
             env_spec.set_agent_environment_specs(
                 convert_specs(
                     builder.store.agent_net_keys,
@@ -338,7 +338,7 @@ class MockOnPolicyDataServer(MockDataServer):
         extras_spec: dict = {}
         for table_key in builder.store.table_network_config.keys():
             num_networks = len(builder.store.table_network_config[table_key])
-            env_spec = copy.deepcopy(builder.store.agent_environment_specs)
+            env_spec = copy.deepcopy(builder.store.ma_environment_spec)
             env_spec.set_agent_environment_specs(
                 convert_specs(
                     builder.store.agent_net_keys,
@@ -407,7 +407,7 @@ class MockOffPolicyDataServer(MockDataServer):
         extras_spec: dict = {}
         for table_key in builder.store.table_network_config.keys():
             num_networks = len(builder.store.table_network_config[table_key])
-            env_spec = copy.deepcopy(builder.store.agent_environment_specs)
+            env_spec = copy.deepcopy(builder.store.ma_environment_spec)
             env_spec.set_agent_environment_specs(
                 convert_specs(
                     builder.store.agent_net_keys,
@@ -678,7 +678,7 @@ class MockNetworks(Component):
         network_key, builder.store.key = jax.random.split(builder.store.key)
         builder.store.network_factory = (
             lambda: self.config.network_factory(  # type: ignore
-                environment_spec=builder.store.agent_environment_specs,
+                environment_spec=builder.store.ma_environment_spec,
                 agent_net_keys=builder.store.agent_net_keys,
                 rng_key=network_key,
             )
