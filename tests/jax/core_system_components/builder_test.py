@@ -4,11 +4,14 @@ from typing import List
 import pytest
 
 from mava.callbacks import Callback
+from mava.components.jax.building import Logger
 from mava.systems.jax import Builder, Executor, ParameterServer, Trainer
 from tests.jax.hook_order_tracking import HookOrderTracking
 
 
 class TestBuilder(HookOrderTracking, Builder):
+    __test__ = False
+
     def __init__(
         self,
         components: List[Callback],
@@ -27,7 +30,7 @@ class TestBuilder(HookOrderTracking, Builder):
 def test_builder() -> Builder:
     """Dummy builder with no components."""
     return TestBuilder(
-        components=[],
+        components=[Logger()],
         global_config=SimpleNamespace(config_key="config_value"),
     )
 
@@ -35,6 +38,8 @@ def test_builder() -> Builder:
 def test_global_config_loaded(test_builder: TestBuilder) -> None:
     """Test that global config is loaded into the store during init()."""
     assert test_builder.store.global_config.config_key == "config_value"
+    assert len(test_builder.callbacks) == 1
+    assert isinstance(test_builder.callbacks[0], Logger)
 
 
 def test_data_server_store(test_builder: TestBuilder) -> None:
