@@ -22,7 +22,7 @@ This implements an N-step transition adder which collapses trajectory sequences
 into a single transition, simplifying to a simple transition adder when N=1.
 """
 import copy
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import reverb
@@ -209,14 +209,14 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
     @classmethod
     def signature(
         cls,
-        environment_spec: mava_specs.EnvironmentSpec,
-        extras_spec: tf.TypeSpec = {},
+        ma_environment_spec: mava_specs.MAEnvironmentSpec,
+        extras_specs: Dict[str, Any] = {},
     ) -> tf.TypeSpec:
         """Signature for adder.
 
         Args:
-            environment_spec (mava_specs.EnvironmentSpec): MA environment spec.
-            extras_spec (tf.TypeSpec, optional): Spec for extras data. Defaults to {}.
+            ma_environment_spec (mava_specs.MAEnvironmentSpec): MA environment spec.
+            extras_specs (Dictionary, optional): Spec for extras data. Defaults to {}.
 
         Returns:
             tf.TypeSpec: Signature for transition adder.
@@ -232,10 +232,10 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         # either the signature discount shape nor the signature reward shape, so we
         # can ignore it.
 
-        agent_specs = environment_spec.get_agent_specs()
-        agents = environment_spec.get_agent_ids()
-        env_extras_spec = environment_spec.get_extra_specs()
-        extras_spec.update(env_extras_spec)
+        agent_environment_specs = ma_environment_spec.get_agent_environment_specs()
+        agents = ma_environment_spec.get_agent_ids()
+        env_extras_specs = ma_environment_spec.get_extras_specs()
+        extras_specs.update(env_extras_specs)
 
         obs_specs = {}
         act_specs = {}
@@ -244,7 +244,8 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         for agent in agents:
 
             rewards_spec, step_discounts_spec = tree_utils.broadcast_structures(
-                agent_specs[agent].rewards, agent_specs[agent].discounts
+                agent_environment_specs[agent].rewards,
+                agent_environment_specs[agent].discounts,
             )
 
             rewards_spec = tree.map_structure(
@@ -252,8 +253,8 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             )
             step_discounts_spec = tree.map_structure(copy.deepcopy, step_discounts_spec)
 
-            obs_specs[agent] = agent_specs[agent].observations
-            act_specs[agent] = agent_specs[agent].actions
+            obs_specs[agent] = agent_environment_specs[agent].observations
+            act_specs[agent] = agent_environment_specs[agent].actions
             reward_specs[agent] = rewards_spec
             step_discount_specs[agent] = step_discounts_spec
 
@@ -263,8 +264,8 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             actions=act_specs,
             rewards=reward_specs,
             discounts=step_discount_specs,
-            extras=extras_spec,
-            next_extras=extras_spec,
+            extras=extras_specs,
+            next_extras=extras_specs,
         )
 
         return tree.map_structure_with_path(

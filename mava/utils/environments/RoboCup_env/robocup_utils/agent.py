@@ -196,7 +196,7 @@ class Agent:
                 last_action=self.last_action,
             )
 
-            # Get the agent's action and covert it to a RoboCup environment command.
+            # Get the agent's action and convert it to a RoboCup environment command.
 
             self.last_action = self.agent_controller.get_action(observation)
             action = self.specWrapper.proc_agent_action(self.last_action)
