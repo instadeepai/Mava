@@ -11,6 +11,7 @@ from mava.components.jax.building.environments import (
 from mava.core_jax import SystemBuilder
 from mava.systems.jax import Builder
 from mava.utils.environments import debugging_utils
+from mava.utils.sort_utils import sort_str_num
 
 
 @pytest.fixture
@@ -84,3 +85,11 @@ class TestEnvironmentSpec:
                 environment_spec._specs[key].discounts
                 == expected_spec._specs[key].discounts
             )
+
+        # Agent list
+        assert test_builder.store.agents == sort_str_num(
+            test_builder.store.environment_spec.get_agent_ids()
+        )
+
+        # Extras spec created
+        assert test_builder.store.extras_spec == {}
