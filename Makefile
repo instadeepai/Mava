@@ -17,7 +17,7 @@ BASE_FLAGS=-it --rm  -v ${PWD}:/home/app/mava -w /home/app/mava
 RUN_FLAGS=$(GPUS) $(BASE_FLAGS)
 RUN_FLAGS_TENSORBOARD=$(GPUS) -p 6006:6006 $(BASE_FLAGS)
 
-# Default version is tf-core
+# Default version is jax-core
 version = jax-core
 DOCKER_IMAGE_NAME = mava
 DOCKER_IMAGE_TAG = $(version)
