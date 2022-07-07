@@ -22,7 +22,6 @@ class TestBuilder(HookOrderTracking, Builder):
         self.store.system_executor = "system_executor"
         self.store.adder = "adder"
 
-
 @pytest.fixture
 def test_builder() -> Builder:
     """Dummy builder with no components."""

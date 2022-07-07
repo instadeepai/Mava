@@ -18,7 +18,7 @@ RUN_FLAGS=$(GPUS) $(BASE_FLAGS)
 RUN_FLAGS_TENSORBOARD=$(GPUS) -p 6006:6006 $(BASE_FLAGS)
 
 # Default version is tf-core
-version = tf-core
+version = jax-core
 DOCKER_IMAGE_NAME = mava
 DOCKER_IMAGE_TAG = $(version)
 IMAGE = $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)-latest
@@ -77,10 +77,10 @@ bash:
 	$(DOCKER_RUN) bash
 
 run-tests:
-	$(DOCKER_RUN) /bin/bash bash_scripts/tf_tests.sh
+	$(DOCKER_RUN) /bin/bash bash_scripts/local_tests.sh
 
 run-integration-tests:
-	$(DOCKER_RUN) /bin/bash bash_scripts/tf_tests.sh true
+	$(DOCKER_RUN) /bin/bash bash_scripts/local_tests.sh true
 
 run-checks:
 	$(DOCKER_RUN) /bin/bash bash_scripts/check_format.sh

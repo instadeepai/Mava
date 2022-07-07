@@ -149,11 +149,9 @@ class ParallelTransitionAdder(Adder):
         Args:
             builder : _description_
         """
-        if not hasattr(builder.store, "adder_priority_fn"):
-            builder.store.adder_priority_fn = None
 
         adder = reverb_adders.ParallelNStepTransitionAdder(
-            priority_fns=builder.store.adder_priority_fn,
+            priority_fns=builder.store.priority_fns,
             client=builder.store.data_server_client,
             net_ids_to_keys=builder.store.unique_net_keys,
             n_step=self.config.n_step,
@@ -195,10 +193,10 @@ class ParallelTransitionAdderSignature(AdderSignature):
         """
 
         def adder_sig_fn(
-            env_spec: specs.MAEnvironmentSpec, extra_specs: Dict[str, Any]
+            environment_specs: specs.MAEnvironmentSpec, extras_specs: Dict[str, Any]
         ) -> Any:
             return reverb_adders.ParallelNStepTransitionAdder.signature(
-                env_spec, extra_specs
+                environment_specs, extras_specs
             )
 
         builder.store.adder_signature_fn = adder_sig_fn
@@ -236,16 +234,9 @@ class ParallelSequenceAdder(Adder):
         Args:
             builder : _description_
         """
-        assert not hasattr(builder.store, "adder_priority_fn")
-
-        # Create custom priority functons for the adder
-        priority_fns = {
-            table_key: lambda x: 1.0
-            for table_key in builder.store.table_network_config.keys()
-        }
 
         adder = reverb_adders.ParallelSequenceAdder(
-            priority_fns=priority_fns,
+            priority_fns=builder.store.priority_fns,
             client=builder.store.data_server_client,
             net_ids_to_keys=builder.store.unique_net_keys,
             sequence_length=self.config.sequence_length,
@@ -275,14 +266,14 @@ class ParallelSequenceAdderSignature(AdderSignature):
         """
 
         def adder_sig_fn(
-            environment_spec: specs.MAEnvironmentSpec,
+            environment_specs: specs.MAEnvironmentSpec,
             sequence_length: int,
-            extras_spec: Dict[str, Any],
+            extras_specs: Dict[str, Any],
         ) -> Any:
             return reverb_adders.ParallelSequenceAdder.signature(
-                environment_spec=environment_spec,
+                environment_spec=environment_specs,
                 sequence_length=sequence_length,
-                extras_spec=extras_spec,
+                extras_spec=extras_specs,
             )
 
         builder.store.adder_signature_fn = adder_sig_fn
