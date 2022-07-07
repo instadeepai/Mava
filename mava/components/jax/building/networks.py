@@ -68,7 +68,7 @@ class DefaultNetworks(Networks):
         # Build network function here
         network_key, builder.store.key = jax.random.split(builder.store.key)
         builder.store.network_factory = lambda: self.config.network_factory(
-            environment_spec=builder.store.environment_spec,
+            environment_spec=builder.store.agent_environment_specs,
             agent_net_keys=builder.store.agent_net_keys,
             rng_key=network_key,
         )

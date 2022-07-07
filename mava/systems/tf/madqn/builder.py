@@ -262,16 +262,24 @@ class MADQNBuilder:
         # Create table per trainer
         replay_tables = []
         for table_key in self._config.table_network_config.keys():
-            # TODO (dries): Clean the below coverter code up.
+            # TODO (dries): Clean the below converter code up.
             # Convert a Mava spec
             trainer_network_names = self._config.table_network_config[table_key]
             env_spec = copy.deepcopy(environment_spec)
-            env_spec._specs = self.convert_specs(env_spec._specs, trainer_network_names)
+            env_spec.set_agent_environment_specs(
+                self.convert_specs(
+                    env_spec.get_agent_environment_specs(), trainer_network_names
+                )
+            )
 
-            env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
-            if env_spec.extra_specs is not None:
-                env_spec.extra_specs = self.convert_specs(
-                    env_spec.extra_specs, trainer_network_names
+            env_spec._keys = list(
+                sort_str_num(env_spec.get_agent_environment_specs().keys())
+            )
+            if env_spec.get_extras_specs() is not None:
+                env_spec.set_extras_specs(
+                    self.convert_specs(
+                        env_spec.get_extras_specs(), trainer_network_names
+                    )
                 )
             extra_specs = self.convert_specs(
                 self._extra_specs,
@@ -515,7 +523,7 @@ class MADQNBuilder:
             action_selectors=action_selectors_with_scheduler,
             counts=counts,
             net_keys_to_ids=self._config.net_keys_to_ids,
-            agent_specs=self._config.environment_spec.get_agent_specs(),
+            agent_specs=self._config.environment_spec.get_agent_environment_specs(),
             agent_net_keys=self._config.agent_net_keys,
             network_sampling_setup=self._config.network_sampling_setup,
             fix_sampler=self._config.fix_sampler,
