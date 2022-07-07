@@ -140,9 +140,7 @@ def dummy_component_without_config_class() -> Component:
         instantiation of a Mava Component
     """
 
-    dummy_component = DummyComponentNoConfigClass(config=SimpleNamespace(param_1=1))
-
-    return dummy_component
+    return DummyComponentNoConfigClass(config=SimpleNamespace(param_1=1))
 
 
 @pytest.fixture
@@ -153,9 +151,7 @@ def dummy_component_with_config_class() -> Component:
         instantiation of a Mava Component
     """
 
-    dummy_component = DummyComponent()
-
-    return dummy_component
+    return DummyComponent()
 
 
 def test_add_single_config(config: Config, dummy_component_config_0: type) -> None:
