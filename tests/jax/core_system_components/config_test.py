@@ -414,7 +414,8 @@ def test_add_before_built_exception(
 
 
 def test_add_same_component_twice_exception(
-    config: Config, dummy_component_config_0: HyperparameterConfig
+    config: Config,
+    dummy_component_config_0: HyperparameterConfig,
 ) -> None:
     """Test that exception is thrown when when trying to add component configs that \
         have the same name.
@@ -428,6 +429,27 @@ def test_add_same_component_twice_exception(
 
     with pytest.raises(Exception):
         config.add(component_same_name=dummy_component_config_0)
+
+
+def test_add_same_component_twice_exception_different_parameters(
+    config: Config,
+    dummy_component_config_0: HyperparameterConfig,
+) -> None:
+    """Test that exception is thrown when when trying to add component configs that \
+        have the same name but different parameters with overlap.
+
+    Args:
+        config : Mava config
+        dummy_component_config_0: component config dataclass
+    """
+
+    config.add(component_same_name=dummy_component_config_0)
+
+    with pytest.raises(Exception):
+        other_hyperparameter_config = SameParameterNameConfig(
+            param_0=2, param_2="param"
+        )
+        config.add(component_same_name=other_hyperparameter_config)
 
 
 def test_get_local_config_not_built_exception(
