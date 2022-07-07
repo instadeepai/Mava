@@ -1,5 +1,6 @@
 import functools
 from types import SimpleNamespace
+from typing import Any
 
 import numpy as np
 import pytest
@@ -10,6 +11,7 @@ from mava.components.jax.building.environments import (
     EnvironmentSpecConfig,
     ExecutorEnvironmentLoop,
     ExecutorEnvironmentLoopConfig,
+    ParallelExecutorEnvironmentLoop,
 )
 from mava.core_jax import SystemBuilder
 from mava.systems.jax import Builder
@@ -48,6 +50,22 @@ def test_executor_environment_loop() -> ExecutorEnvironmentLoop:
 
 
 @pytest.fixture
+def test_parallel_executor_environment_loop() -> ParallelExecutorEnvironmentLoop:
+    """Pytest fixture for executor environment loop"""
+
+    class ExecutorStatsWrapperClass:
+        def __init__(self, executor_environment_loop: Any) -> None:
+            self.executor_environment_loop = executor_environment_loop
+            self.wrapped = True
+
+    config = ExecutorEnvironmentLoopConfig(
+        should_update=False,
+        executor_stats_wrapper_class=ExecutorStatsWrapperClass,  # type: ignore
+    )
+    return ParallelExecutorEnvironmentLoop(config=config)
+
+
+@pytest.fixture
 def test_builder() -> SystemBuilder:
     """Pytest fixture for system builder."""
 
@@ -56,6 +74,10 @@ def test_builder() -> SystemBuilder:
 
     global_config = SimpleNamespace(environment_factory=environment_factory)
     system_builder = Builder(components=[], global_config=global_config)
+    system_builder.store.executor_environment = "environment"
+    system_builder.store.executor = "executor"
+    system_builder.store.executor_logger = "executor_logger"
+
     return system_builder
 
 
@@ -135,3 +157,35 @@ class TestExecutorEnvironmentLoop:
         """Test by manually calling the hook and checking the store"""
         test_executor_environment_loop.on_building_executor_environment(test_builder)
         assert test_builder.store.executor_environment == "environment_eval_false"
+
+
+class TestParallelExecutorEnvironmentLoop:
+    """Tests for ParallelExecutorEnvironmentLoop"""
+
+    def test_on_building_executor_environment_loop_with_stats_wrapper(
+        self,
+        test_parallel_executor_environment_loop: ParallelExecutorEnvironmentLoop,
+        test_builder: SystemBuilder,
+    ) -> None:
+        """Test by calling hook with stats wrapper class in config"""
+        test_parallel_executor_environment_loop.on_building_executor_environment_loop(
+            test_builder
+        )
+
+        # Ensure logger deleted after it has been loaded into the environment loop
+        assert not hasattr(test_builder.store, "executor_logger")
+
+        # Assert executor_environment_loop was wrapped
+        assert test_builder.store.system_executor.wrapped
+
+        # Check that environment loop was created correctly
+        executor_environment_loop = (
+            test_builder.store.system_executor.executor_environment_loop
+        )
+        assert executor_environment_loop._environment == "environment"
+        assert executor_environment_loop._executor == "executor"
+        assert executor_environment_loop._logger == "executor_logger"
+        assert (
+            executor_environment_loop._should_update
+            == test_parallel_executor_environment_loop.config.should_update
+        )
