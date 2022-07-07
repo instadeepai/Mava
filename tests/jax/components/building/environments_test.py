@@ -189,3 +189,29 @@ class TestParallelExecutorEnvironmentLoop:
             executor_environment_loop._should_update
             == test_parallel_executor_environment_loop.config.should_update
         )
+
+    def test_on_building_executor_environment_loop_no_stats_wrapper(
+        self,
+        test_parallel_executor_environment_loop: ParallelExecutorEnvironmentLoop,
+        test_builder: SystemBuilder,
+    ) -> None:
+        """Test by calling hook with no stats wrapper class in config"""
+        test_parallel_executor_environment_loop.config.executor_stats_wrapper_class = (
+            None
+        )
+        test_parallel_executor_environment_loop.on_building_executor_environment_loop(
+            test_builder
+        )
+
+        # Ensure logger deleted after it has been loaded into the environment loop
+        assert not hasattr(test_builder.store, "executor_logger")
+
+        # Check that environment loop was created correctly
+        executor_environment_loop = test_builder.store.system_executor
+        assert executor_environment_loop._environment == "environment"
+        assert executor_environment_loop._executor == "executor"
+        assert executor_environment_loop._logger == "executor_logger"
+        assert (
+            executor_environment_loop._should_update
+            == test_parallel_executor_environment_loop.config.should_update
+        )
