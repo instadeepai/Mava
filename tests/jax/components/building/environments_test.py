@@ -97,43 +97,45 @@ class TestEnvironmentSpec:
         test_environment_spec.on_building_init_start(test_builder)
 
         # Assert for type and extra spec
-        environment_spec = test_builder.store.environment_spec
+        environment_spec = test_builder.store.agent_environment_specs
         assert isinstance(environment_spec, specs.MAEnvironmentSpec)
         environment = test_environment_spec.config.environment_factory()
 
         # Assert correct spec created
         expected_spec = MAEnvironmentSpec(environment)
-        assert environment_spec.extra_specs == expected_spec.extra_specs
+        assert environment_spec._extras_specs == expected_spec._extras_specs
         assert environment_spec._keys == expected_spec._keys
         for key in environment_spec._keys:
             assert (
-                environment_spec._specs[key].observations.observation
-                == expected_spec._specs[key].observations.observation
+                environment_spec._agent_environment_specs[key].observations.observation
+                == expected_spec._agent_environment_specs[key].observations.observation
             )
             assert np.array_equal(
-                environment_spec._specs[key].observations.legal_actions,
-                expected_spec._specs[key].observations.legal_actions,
+                environment_spec._agent_environment_specs[
+                    key
+                ].observations.legal_actions,
+                expected_spec._agent_environment_specs[key].observations.legal_actions,
             )
             assert (
-                environment_spec._specs[key].observations.terminal
-                == expected_spec._specs[key].observations.terminal
+                environment_spec._agent_environment_specs[key].observations.terminal
+                == expected_spec._agent_environment_specs[key].observations.terminal
             )
             assert (
-                environment_spec._specs[key].actions
-                == expected_spec._specs[key].actions
+                environment_spec._agent_environment_specs[key].actions
+                == expected_spec._agent_environment_specs[key].actions
             )
             assert (
-                environment_spec._specs[key].rewards
-                == expected_spec._specs[key].rewards
+                environment_spec._agent_environment_specs[key].rewards
+                == expected_spec._agent_environment_specs[key].rewards
             )
             assert (
-                environment_spec._specs[key].discounts
-                == expected_spec._specs[key].discounts
+                environment_spec._agent_environment_specs[key].discounts
+                == expected_spec._agent_environment_specs[key].discounts
             )
 
         # Agent list
         assert test_builder.store.agents == sort_str_num(
-            test_builder.store.environment_spec.get_agent_ids()
+            test_builder.store.agent_environment_specs.get_agent_ids()
         )
 
         # Extras spec created
