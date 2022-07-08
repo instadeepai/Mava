@@ -275,6 +275,7 @@ class MockDataServer(Component):
         self.config = config
 
     def _create_table_per_trainer(self, builder: SystemBuilder) -> List[reverb.Table]:
+        """Create table for each trainer"""
         builder.store.table_network_config = {"table_0": "network_0"}
         data_tables = []
         extras_spec: dict = {}
@@ -333,6 +334,7 @@ class MockOnPolicyDataServer(MockDataServer):
         self.config = config
 
     def _create_table_per_trainer(self, builder: SystemBuilder) -> List[reverb.Table]:
+        """Create table for each trainer"""
         builder.store.table_network_config = {"table_0": "network_0"}
         data_tables = []
         extras_spec: dict = {}
@@ -402,6 +404,7 @@ class MockOffPolicyDataServer(MockDataServer):
         self.config = config
 
     def _create_table_per_trainer(self, builder: SystemBuilder) -> List[reverb.Table]:
+        """Create table for each trainer"""
         builder.store.table_network_config = {"table_0": "network_0"}
         data_tables = []
         extras_spec: dict = {}
@@ -439,8 +442,8 @@ class MockOffPolicyDataServer(MockDataServer):
         """
         return mock_table(
             name=table_key,
-            sampler=self.config.sampler,
-            remover=self.config.remover,
+            sampler=reverb.selectors.Uniform(),
+            remover=reverb.selectors.Fifo(),
             max_size=self.config.max_size,
             max_times_sampled=self.config.max_times_sampled,
             rate_limiter=builder.store.rate_limiter_fn(),
@@ -459,6 +462,8 @@ class MockOffPolicyDataServer(MockDataServer):
 
 @dataclass
 class MockParameterServerConfig:
+    """Mock parameter server config"""
+
     parameter_server_param: int = 2
 
 
@@ -481,6 +486,8 @@ class MockParameterServer(Component):
 
 @dataclass
 class MockLoggerConfig:
+    """Mock logger config"""
+
     logger_param_0: int = 1
     logger_param_1: int = 2
 
@@ -519,6 +526,8 @@ class MockLogger(Component):
 
 @dataclass
 class MockExecutorParameterClientConfig:
+    """Mock parameter client config"""
+
     executor_parameter_client_param_0: int = 1
     executor_parameter_client_param_1: str = "param"
 
@@ -543,6 +552,8 @@ class MockExecutorParameterClient(Component):
 
 @dataclass
 class MockTrainerParameterClientConfig:
+    """Mock parameter client config"""
+
     trainer_parameter_client_param_0: int = 1
     trainer_parameter_client_param_1: str = "param"
 
@@ -576,6 +587,8 @@ class MockTrainerParameterClient(Component):
 
 @dataclass
 class MockExecutorDefaultConfig:
+    """Mock executor config"""
+
     executor_param: int = 1
 
 
@@ -603,6 +616,8 @@ class MockExecutor(Component):
 
 @dataclass
 class MockExecutorEnvironmentLoopConfig:
+    """Mock executor environment loop config"""
+
     should_update: bool = True
 
 
@@ -656,6 +671,8 @@ class MockExecutorEnvironmentLoop(Component):
 
 @dataclass
 class MockNetworksConfig:
+    """Mock networks config"""
+
     network_factory: Optional[Callable[[str], dm_env.Environment]] = None
     seed: int = 1234
 
@@ -701,6 +718,8 @@ class MockNetworks(Component):
 
 @dataclass
 class MockTrainerDatasetConfig:
+    """Mock trainer dataset config"""
+
     trainer_dataset_param: int = 5
 
 
@@ -737,6 +756,8 @@ class MockTrainerDataset(Component):
 
 @dataclass
 class MockTrainerConfig:
+    """Mock trainer config"""
+
     trainer_param_0: int = 2
     trainer_param_1: str = "train"
 
@@ -773,6 +794,8 @@ class MockTrainer(Component):
 
 @dataclass
 class DistributorConfig:
+    """Mock distributor config"""
+
     num_executors: int = 1
     nodes_on_gpu: List[str] = field(default_factory=list)
     multi_process: bool = True
