@@ -16,7 +16,7 @@
 """Tests for data server components of Jax-based Mava systems"""
 
 from types import SimpleNamespace
-from typing import List
+from typing import Any, List
 
 import pytest
 import reverb
@@ -81,23 +81,54 @@ def mock_builder() -> Builder:
     return builder
 
 
-def test_data_server(
+@pytest.mark.parametrize(
+    "sampler, remover, sampler_field, remover_field",
+    [
+        (reverb.selectors.Uniform(), reverb.selectors.Lifo(), "uniform", "lifo"),
+        (reverb.selectors.MinHeap(), reverb.selectors.Fifo(), "heap", "fifo"),
+        (
+            reverb.selectors.Prioritized(0.5),
+            reverb.selectors.Lifo(),
+            "prioritized",
+            "lifo",
+        ),
+    ],
+)
+def test_off_policy_data_server(
     mock_builder: Builder,
+    sampler: Any,
+    remover: Any,
+    sampler_field: str,
+    remover_field: str,
 ) -> None:
     """First test for data server.
 
     Args:
         mock_builder : Mava builder
+        sampler: reverb sampler
+        remover: reverb remover
+        sampler_field: string to test remover type
+        remover_field: string to test remover type
     """
 
     mock_builder.store.rate_limiter_fn = lambda: reverb.rate_limiters.MinSize(1000)
     mock_builder.store.adder_signature_fn = (
         lambda x, y: reverb_adders.ParallelNStepTransitionAdder.signature(x, y)
     )
-    mock_builder.store.sampler_fn = lambda: reverb.selectors.Uniform()
-    mock_builder.store.remover_fn = lambda: reverb.selectors.Fifo()
+    mock_builder.store.sampler_fn = lambda: sampler
+    mock_builder.store.remover_fn = lambda: remover
 
     data_server = OffPolicyDataServer()
     data_server.on_building_data_server(mock_builder)
 
-    # _table = mock_builder.store.data_tables
+    table = mock_builder.store.data_tables[0]
+
+    assert table.info.name == "trainer"
+    assert table.info.rate_limiter_info.min_size_to_sample == 1000
+    assert table.info.sampler_options.HasField(sampler_field)
+    assert table.info.remover_options.HasField(remover_field)
+    assert table.info.max_size == 100000
+    assert table.info.max_times_sampled == 0
+
+    # TODO: signature type test
+    # assert issubclass(table.info.signature, types.Transition)
