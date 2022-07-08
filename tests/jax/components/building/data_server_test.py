@@ -94,6 +94,8 @@ def test_data_server(
     mock_builder.store.adder_signature_fn = (
         lambda x, y: reverb_adders.ParallelNStepTransitionAdder.signature(x, y)
     )
+    mock_builder.store.sampler_fn = lambda: reverb.selectors.Uniform()
+    mock_builder.store.remover_fn = lambda: reverb.selectors.Fifo()
 
     data_server = OffPolicyDataServer()
     data_server.on_building_data_server(mock_builder)
