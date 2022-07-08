@@ -23,7 +23,10 @@ import reverb
 
 from mava.adders import reverb as reverb_adders
 from mava.callbacks.base import Callback
-from mava.components.jax.building.data_server import OffPolicyDataServer
+from mava.components.jax.building.data_server import (
+    OffPolicyDataServer,
+    OnPolicyDataServer,
+)
 from mava.components.jax.building.environments import (
     EnvironmentSpec,
     EnvironmentSpecConfig,
@@ -132,3 +135,40 @@ def test_off_policy_data_server(
 
     # TODO: signature type test
     # assert issubclass(table.info.signature, types.Transition)
+
+
+def test_on_policy_data_server_no_sequence_length(
+    mock_builder: Builder,
+) -> None:
+    """Tests on policy data server when no sequence length is given"""
+
+    mock_builder.store.adder_signature_fn = lambda env_specs, extras_specs: reverb_adders.ParallelNStepTransitionAdder.signature(  # noqa: E501
+        env_specs, extras_specs
+    )
+
+    data_server = OnPolicyDataServer()
+    data_server.on_building_data_server(mock_builder)
+
+    table = mock_builder.store.data_tables[0]
+
+    assert table.info.max_size == 1000
+
+
+def test_on_policy_data_server_with_sequence_length(
+    mock_builder: Builder,
+) -> None:
+    """Tests on policy data server when sequence length and \
+        sequence adder is given"""
+
+    mock_builder.store.adder_signature_fn = lambda env_specs, seq_length, extras_specs: reverb_adders.ParallelSequenceAdder.signature(  # noqa: E501
+        env_specs, seq_length, extras_specs
+    )
+
+    mock_builder.store.sequence_length = 20
+
+    data_server = OnPolicyDataServer()
+    data_server.on_building_data_server(mock_builder)
+
+    table = mock_builder.store.data_tables[0]
+
+    assert table.info.max_size == 1000
