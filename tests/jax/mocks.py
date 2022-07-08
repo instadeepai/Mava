@@ -124,8 +124,8 @@ def make_fake_env_specs() -> MAEnvironmentSpec:
         )
     return MAEnvironmentSpec(
         environment=None,
-        specs=env_spec,
-        extra_specs={"extras": acme_specs.Array(shape=(), dtype=np.float32)},
+        agent_environment_specs=env_spec,
+        extras_specs={"extras": acme_specs.Array(shape=(), dtype=np.float32)},
     )
 
 
@@ -281,9 +281,13 @@ class MockDataServer(Component):
         extras_spec: dict = {}
         for table_key in builder.store.table_network_config.keys():
             num_networks = len(builder.store.table_network_config[table_key])
-            env_spec = copy.deepcopy(builder.store.environment_spec)
-            env_spec._specs = convert_specs(
-                builder.store.agent_net_keys, env_spec._specs, num_networks
+            env_spec = copy.deepcopy(builder.store.agent_environment_specs)
+            env_spec.set_agent_environment_specs(
+                convert_specs(
+                    builder.store.agent_net_keys,
+                    env_spec.get_agent_environment_specs(),
+                    num_networks,
+                )
             )
             table = self.table(table_key, env_spec, extras_spec, builder)
             data_tables.append(table)
@@ -336,9 +340,13 @@ class MockOnPolicyDataServer(MockDataServer):
         extras_spec: dict = {}
         for table_key in builder.store.table_network_config.keys():
             num_networks = len(builder.store.table_network_config[table_key])
-            env_spec = copy.deepcopy(builder.store.environment_spec)
-            env_spec._specs = convert_specs(
-                builder.store.agent_net_keys, env_spec._specs, num_networks
+            env_spec = copy.deepcopy(builder.store.agent_environment_specs)
+            env_spec.set_agent_environment_specs(
+                convert_specs(
+                    builder.store.agent_net_keys,
+                    env_spec.get_agent_environment_specs(),
+                    num_networks,
+                )
             )
             table = self.table(table_key, env_spec, extras_spec, builder)
             data_tables.append(table)
@@ -402,9 +410,13 @@ class MockOffPolicyDataServer(MockDataServer):
         extras_spec: dict = {}
         for table_key in builder.store.table_network_config.keys():
             num_networks = len(builder.store.table_network_config[table_key])
-            env_spec = copy.deepcopy(builder.store.environment_spec)
-            env_spec._specs = convert_specs(
-                builder.store.agent_net_keys, env_spec._specs, num_networks
+            env_spec = copy.deepcopy(builder.store.agent_environment_specs)
+            env_spec.set_agent_environment_specs(
+                convert_specs(
+                    builder.store.agent_net_keys,
+                    env_spec.get_agent_environment_specs(),
+                    num_networks,
+                )
             )
             table = self.table(table_key, env_spec, extras_spec, builder)
             data_tables.append(table)
@@ -683,7 +695,7 @@ class MockNetworks(Component):
         network_key, builder.store.key = jax.random.split(builder.store.key)
         builder.store.network_factory = (
             lambda: self.config.network_factory(  # type: ignore
-                environment_spec=builder.store.environment_spec,
+                environment_spec=builder.store.agent_environment_specs,
                 agent_net_keys=builder.store.agent_net_keys,
                 rng_key=network_key,
             )

@@ -290,7 +290,7 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
             )
         return discount_specs
 
-    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+    def extras_spec(self) -> Dict[str, specs.BoundedArray]:
         """Extra data spec.
 
         Returns:
@@ -475,7 +475,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         else:
             return timestep
 
-    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+    def extras_spec(self) -> Dict[str, specs.BoundedArray]:
         """Function returns extra spec (format) of the env.
 
         Returns:
