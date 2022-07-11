@@ -97,7 +97,7 @@ class TestEnvironmentSpec:
         test_environment_spec.on_building_init_start(test_builder)
 
         # Assert for type and extra spec
-        environment_spec = test_builder.store.agent_environment_specs
+        environment_spec = test_builder.store.ma_environment_spec
         assert isinstance(environment_spec, specs.MAEnvironmentSpec)
         environment = test_environment_spec.config.environment_factory()
 
@@ -135,7 +135,7 @@ class TestEnvironmentSpec:
 
         # Agent list
         assert test_builder.store.agents == sort_str_num(
-            test_builder.store.agent_environment_specs.get_agent_ids()
+            test_builder.store.ma_environment_spec.get_agent_ids()
         )
 
         # Extras spec created
