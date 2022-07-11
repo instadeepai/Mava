@@ -61,7 +61,7 @@ def make_default_networks(
     assert value_networks_layer_sizes is not None
     assert value_network_func is not None
 
-    specs = environment_spec.get_agent_specs()
+    specs = environment_spec.get_agent_environment_specs()
 
     # Create agent_type specs
     specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
