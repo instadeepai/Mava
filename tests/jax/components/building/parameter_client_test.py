@@ -16,11 +16,9 @@
 """Unit tests for parameter client components"""
 
 from types import SimpleNamespace
-from typing import List
 
 import pytest
 
-from mava.callbacks.base import Callback
 from mava.components.jax.building.parameter_client import (
     ExecutorParameterClient,
     ExecutorParameterClientConfig,
@@ -28,16 +26,6 @@ from mava.components.jax.building.parameter_client import (
 )
 from mava.systems.jax.builder import Builder
 from mava.systems.jax.parameter_server import ParameterServer
-
-
-class MockBuilder(Builder):
-    def __init__(
-        self,
-        components: List[Callback],
-        global_config: SimpleNamespace = SimpleNamespace(),
-    ) -> None:
-        """Initialize mock builder for tests."""
-        super().__init__(components, global_config)
 
 
 @pytest.fixture
