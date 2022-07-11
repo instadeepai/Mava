@@ -24,6 +24,7 @@ from mava.callbacks.base import Callback
 from mava.components.jax.building.parameter_client import (
     ExecutorParameterClient,
     ExecutorParameterClientConfig,
+    TrainerParameterClient,
 )
 from mava.systems.jax.builder import Builder
 from mava.systems.jax.parameter_server import ParameterServer
@@ -41,8 +42,7 @@ class MockBuilder(Builder):
 
 @pytest.fixture
 def mock_builder_with_parameter_client() -> Builder:
-    """Create a mock builder for testing that is not an evaluator \
-        and that has a parameter client."""
+    """Create a mock builder for testing that has a parameter client."""
 
     builder = Builder(components=[])
 
@@ -54,6 +54,11 @@ def mock_builder_with_parameter_client() -> Builder:
         }
     }
 
+    builder.store.trainer_networks = {
+        "trainer_0": ["network_agent_0", "network_agent_1", "network_agent_2"]
+    }
+    builder.store.trainer_id = "trainer_0"
+
     builder.store.parameter_server_client = ParameterServer(
         store=SimpleNamespace(get_parameters={"key_1": 1}),
         components=[],
@@ -62,7 +67,7 @@ def mock_builder_with_parameter_client() -> Builder:
     return builder
 
 
-def test_no_evaluator_with_parameter_client(
+def test_executor_parameter_client_no_evaluator_with_parameter_client(
     mock_builder_with_parameter_client: Builder,
 ) -> None:
     """Test executor parameter client.
@@ -115,7 +120,7 @@ def test_no_evaluator_with_parameter_client(
     assert mock_builder.store.executor_parameter_client._update_period == 100
 
 
-def test_evaluator_with_parameter_client(
+def test_executor_parameter_client_evaluator_with_parameter_client(
     mock_builder_with_parameter_client: Builder,
 ) -> None:
     """Test evaluator parameter client.
@@ -184,3 +189,62 @@ def test_executor_parameter_client_with_no_parameter_client(
     exec_param_client.on_building_executor_parameter_client(mock_builder)
 
     assert mock_builder.store.executor_parameter_client is None
+
+
+def test_trainer_parameter_client(
+    mock_builder_with_parameter_client: Builder,
+) -> None:
+    """Test trainer parameter client.
+
+    Args:
+        mock_builder_with_parameter_client: mava builder object
+    """
+
+    mock_builder = mock_builder_with_parameter_client
+    trainer_param_client = TrainerParameterClient()
+    trainer_param_client.on_building_trainer_parameter_client(mock_builder)
+
+    assert hasattr(mock_builder.store, "trainer_parameter_client")
+    assert mock_builder.store.trainer_parameter_client._get_keys == [
+        "trainer_steps",
+        "trainer_walltime",
+        "evaluator_steps",
+        "evaluator_episodes",
+        "executor_episodes",
+        "executor_steps",
+    ]
+    assert mock_builder.store.trainer_parameter_client._set_keys == [
+        "networks-network_agent_0",
+        "networks-network_agent_1",
+        "networks-network_agent_2",
+    ]
+    assert list(mock_builder.store.trainer_parameter_client._parameters.keys()) == [
+        "networks-network_agent_0",
+        "networks-network_agent_1",
+        "networks-network_agent_2",
+        "trainer_steps",
+        "trainer_walltime",
+        "evaluator_steps",
+        "evaluator_episodes",
+        "executor_episodes",
+        "executor_steps",
+    ]
+    assert mock_builder.store.trainer_parameter_client._get_call_counter == 0
+    assert mock_builder.store.trainer_parameter_client._set_call_counter == 0
+    assert mock_builder.store.trainer_parameter_client._set_get_call_counter == 0
+    assert mock_builder.store.trainer_parameter_client._update_period == 1
+
+
+def test_trainer_parameter_client_with_no_parameter_client(
+    mock_builder_with_parameter_client: Builder,
+) -> None:
+    """Test trainer parameter server client when no parameter \
+        server client is added to the builder"""
+
+    mock_builder = mock_builder_with_parameter_client
+    mock_builder.store.parameter_server_client = False
+    trainer_param_client = TrainerParameterClient()
+
+    trainer_param_client.on_building_trainer_parameter_client(mock_builder)
+
+    assert mock_builder.store.trainer_parameter_client is None
