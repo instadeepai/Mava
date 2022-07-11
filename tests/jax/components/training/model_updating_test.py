@@ -128,17 +128,17 @@ def fake_batch() -> Batch:
         observations={
             "agent_0": OLT(
                 observation=jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
-                legal_actions=jnp.array([[1, 1], [1, 1]]),
+                legal_actions=jnp.array([[1], [1],[1],[1]]),
                 terminal=jnp.array([[1], [1]]),
             ),
             "agent_1": OLT(
                 observation=jnp.array([[0.8, 0.3, 0.7], [1.8, 1.3, 1.7]]),
-                legal_actions=jnp.array([[1, 1], [1, 1]]),
+                legal_actions=jnp.array([[1], [1],[1],[1]]),
                 terminal=jnp.array([[1], [1]]),
             ),
             "agent_2": OLT(
                 observation=jnp.array([[0.9, 0.9, 0.8], [1.9, 1.9, 1.8]]),
-                legal_actions=jnp.array([[1, 1], [1, 1]]),
+                legal_actions=jnp.array([[1], [1],[1],[1]]),
                 terminal=jnp.array([[1], [1]]),
             ),
         },
@@ -156,7 +156,7 @@ def fake_batch() -> Batch:
 
 
 @pytest.fixture
-def fake_state_and_trainer(
+def mock_state_and_trainer(
     mock_trainer: MockTrainer, fake_batch: Batch, mock_optimizer: MockOptimizer
 ) -> Any:
     """fake state dictionary and mock trainer component
@@ -295,15 +295,15 @@ def test_on_training_utility_fns(
 
 
 def test_minibatch_update_fn(
-    fake_state_and_trainer: Tuple[Dict[str, Any], MockTrainer]
+    mock_state_and_trainer: Tuple[Dict[str, Any], MockTrainer]
 ) -> None:
     """Test on_minibatch_update_fn
 
     Args:
-        fake_state_and_trainer: tuple include fake state and mock trainer
+        mock_state_and_trainer: tuple include fake state and mock trainer
     """
-    state = fake_state_and_trainer[0]
-    mock_trainer = fake_state_and_trainer[1]
+    state = mock_state_and_trainer[0]
+    mock_trainer = mock_state_and_trainer[1]
     carry = [state["params"], state["opt_states"]]
     (
         new_params,
@@ -352,21 +352,21 @@ def test_on_training_utility_fns_epoch(mock_trainer: MockTrainer) -> None:
 
 
 def test_epoch_update_fn(
-    fake_state_and_trainer: Tuple[Dict[str, Any], MockTrainer],
+    mock_state_and_trainer: Tuple[Dict[str, Any], MockTrainer],
     mock_minibatch_update_fn: Callable,
 ) -> None:
     """Test epoch_update_fn function
 
     Args:
-        fake_state_and_trainer: tuple include fake state and mock trainer
+        mock_state_and_trainer: tuple include fake state and mock trainer
         mock_minibatch_update_fn
     """
-    mock_trainer = fake_state_and_trainer[1]
+    mock_trainer = mock_state_and_trainer[1]
     mini_epoch_update = MAPGEpochUpdate()
     mini_epoch_update.on_training_utility_fns(trainer=mock_trainer)
     mock_trainer.store.minibatch_update_fn = mock_minibatch_update_fn
 
-    state = fake_state_and_trainer[0]
+    state = mock_state_and_trainer[0]
     # update params and opt_state to function in jax.lax.scan function
     state["params"] = jnp.array([0, 0, 0])
     state["opt_states"] = jnp.array([1, 1, 1])
