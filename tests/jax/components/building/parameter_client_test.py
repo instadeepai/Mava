@@ -21,7 +21,10 @@ from typing import List
 import pytest
 
 from mava.callbacks.base import Callback
-from mava.components.jax.building.parameter_client import ExecutorParameterClient
+from mava.components.jax.building.parameter_client import (
+    ExecutorParameterClient,
+    ExecutorParameterClientConfig,
+)
 from mava.systems.jax.builder import Builder
 from mava.systems.jax.parameter_server import ParameterServer
 
@@ -37,7 +40,7 @@ class MockBuilder(Builder):
 
 
 @pytest.fixture
-def mock_builder_no_evaluator_with_parameter_client() -> Builder:
+def mock_builder_with_parameter_client() -> Builder:
     """Create a mock builder for testing that is not an evaluator \
         and that has a parameter client."""
 
@@ -51,7 +54,6 @@ def mock_builder_no_evaluator_with_parameter_client() -> Builder:
         }
     }
 
-    builder.store.is_evaluator = False
     builder.store.parameter_server_client = ParameterServer(
         store=SimpleNamespace(get_parameters={"key_1": 1}),
         components=[],
@@ -61,16 +63,124 @@ def mock_builder_no_evaluator_with_parameter_client() -> Builder:
 
 
 def test_no_evaluator_with_parameter_client(
-    mock_builder_no_evaluator_with_parameter_client: Builder,
+    mock_builder_with_parameter_client: Builder,
 ) -> None:
     """Test executor parameter client.
 
     Args:
-        mock_builder_no_evaluator_with_parameter_client : mava builder object
+        mock_builder_with_parameter_client : mava builder object
     """
 
-    mock_builder = mock_builder_no_evaluator_with_parameter_client
-    exec_param_client = ExecutorParameterClient()
+    mock_builder = mock_builder_with_parameter_client
+    mock_builder.store.is_evaluator = False
+    exec_param_client = ExecutorParameterClient(
+        config=ExecutorParameterClientConfig(executor_parameter_update_period=100)
+    )
     exec_param_client.on_building_executor_parameter_client(builder=mock_builder)
 
-    assert hasattr(mock_builder.store, "executor_counts")
+    assert hasattr(mock_builder.store, "executor_parameter_client")
+    assert mock_builder.store.executor_parameter_client._get_keys == [
+        "networks-network_agent_0",
+        "networks-network_agent_1",
+        "networks-network_agent_2",
+        "trainer_steps",
+        "trainer_walltime",
+        "evaluator_steps",
+        "evaluator_episodes",
+        "executor_episodes",
+        "executor_steps",
+    ]
+    assert mock_builder.store.executor_parameter_client._set_keys == [
+        "executor_episodes",
+        "executor_steps",
+    ]
+    assert list(mock_builder.store.executor_parameter_client._parameters.keys()) == [
+        "networks-network_agent_0",
+        "networks-network_agent_1",
+        "networks-network_agent_2",
+        "trainer_steps",
+        "trainer_walltime",
+        "evaluator_steps",
+        "evaluator_episodes",
+        "executor_episodes",
+        "executor_steps",
+    ]
+    for i in range(2):
+        assert mock_builder.store.executor_parameter_client._parameters[
+            f"networks-network_agent_{i}"
+        ] == {"weights": i, "biases": i}
+    assert mock_builder.store.executor_parameter_client._get_call_counter == 0
+    assert mock_builder.store.executor_parameter_client._set_call_counter == 0
+    assert mock_builder.store.executor_parameter_client._set_get_call_counter == 0
+    assert mock_builder.store.executor_parameter_client._update_period == 100
+
+
+def test_evaluator_with_parameter_client(
+    mock_builder_with_parameter_client: Builder,
+) -> None:
+    """Test evaluator parameter client.
+
+    Args:
+        mock_builder_with_parameter_client: mava builder object
+    """
+
+    mock_builder = mock_builder_with_parameter_client
+    mock_builder.store.is_evaluator = True
+    exec_param_client = ExecutorParameterClient(
+        config=ExecutorParameterClientConfig(executor_parameter_update_period=100)
+    )
+    exec_param_client.on_building_executor_parameter_client(builder=mock_builder)
+
+    assert hasattr(mock_builder.store, "executor_parameter_client")
+    assert mock_builder.store.executor_parameter_client._get_keys == [
+        "networks-network_agent_0",
+        "networks-network_agent_1",
+        "networks-network_agent_2",
+        "trainer_steps",
+        "trainer_walltime",
+        "evaluator_steps",
+        "evaluator_episodes",
+        "executor_episodes",
+        "executor_steps",
+    ]
+    assert mock_builder.store.executor_parameter_client._set_keys == [
+        "evaluator_steps",
+        "evaluator_episodes",
+    ]
+    assert list(mock_builder.store.executor_parameter_client._parameters.keys()) == [
+        "networks-network_agent_0",
+        "networks-network_agent_1",
+        "networks-network_agent_2",
+        "trainer_steps",
+        "trainer_walltime",
+        "evaluator_steps",
+        "evaluator_episodes",
+        "executor_episodes",
+        "executor_steps",
+    ]
+    for i in range(2):
+        assert mock_builder.store.executor_parameter_client._parameters[
+            f"networks-network_agent_{i}"
+        ] == {"weights": i, "biases": i}
+    assert mock_builder.store.executor_parameter_client._get_call_counter == 0
+    assert mock_builder.store.executor_parameter_client._set_call_counter == 0
+    assert mock_builder.store.executor_parameter_client._set_get_call_counter == 0
+    assert mock_builder.store.executor_parameter_client._update_period == 100
+
+
+def test_executor_parameter_client_with_no_parameter_client(
+    mock_builder_with_parameter_client: Builder,
+) -> None:
+    """Test executor parameter server client when no parameter \
+        server client is added to the builder"""
+
+    mock_builder = mock_builder_with_parameter_client
+    mock_builder.store.is_evaluator = True
+    mock_builder.store.parameter_server_client = False
+    exec_param_client = ExecutorParameterClient(
+        config=ExecutorParameterClientConfig(executor_parameter_update_period=100)
+    )
+
+    exec_param_client.on_building_executor_parameter_client(mock_builder)
+
+    assert mock_builder.store.executor_parameter_client is None
