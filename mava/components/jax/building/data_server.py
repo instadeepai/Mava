@@ -20,7 +20,6 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
 import reverb
-from reverb import rate_limiters, reverb_types
 
 from mava import specs
 from mava.components.jax import Component
@@ -111,10 +110,7 @@ class DataServer(Component):
 
 @dataclass
 class OffPolicyDataServerConfig:
-    sampler: reverb_types.SelectorType = reverb.selectors.Uniform()
-    remover: reverb_types.SelectorType = reverb.selectors.Fifo()
     max_size: int = 100000
-    rate_limiter: rate_limiters.RateLimiter = None
     max_times_sampled: int = 0
 
 
@@ -147,10 +143,20 @@ class OffPolicyDataServer(DataServer):
         Returns:
             _description_
         """
+        if not hasattr(builder.store, "sampler_fn"):
+            raise ValueError(
+                "A sampler component for the dataserver has not been given"
+            )
+
+        if not hasattr(builder.store, "remover_fn"):
+            raise ValueError(
+                "A remover component for the dataserver has not been given"
+            )
+
         table = reverb.Table(
             name=table_key,
-            sampler=self.config.sampler,
-            remover=self.config.remover,
+            sampler=builder.store.sampler_fn(),
+            remover=builder.store.remover_fn(),
             max_size=self.config.max_size,
             rate_limiter=builder.store.rate_limiter_fn(),
             signature=builder.store.adder_signature_fn(environment_specs, extras_specs),
