@@ -202,21 +202,21 @@ def test_parallel_sequence_adder_signature(
     assert hasattr(mock_builder.store, "adder_signature_fn")
 
     signature = mock_builder.store.adder_signature_fn(
-        environment_specs=mock_env_specs,
+        ma_environment_spec=mock_env_specs,
         sequence_length=parallel_sequence_adder.config.sequence_length,
-        extras_specs=mock_env_specs.extra_specs,
+        extras_specs=mock_env_specs.get_extras_specs(),
     )
     assert type(signature) == reverb_base.Step
 
     # Dimensions preserved after spec is generated, ignoring the time dim
     assert signature.observations["agent_0"].shape.as_list()[1:] == list(
-        mock_env_specs._specs["agent_0"].observations.shape
+        mock_env_specs.get_agent_environment_specs()["agent_0"].observations.shape
     )
     assert signature.observations["agent_1"].shape.as_list()[1:] == list(
-        mock_env_specs._specs["agent_1"].observations.shape
+        mock_env_specs.get_agent_environment_specs()["agent_1"].observations.shape
     )
     assert signature.actions["agent_1"].shape.as_list()[1:] == list(
-        mock_env_specs._specs["agent_1"].actions.shape
+        mock_env_specs.get_agent_environment_specs()["agent_1"].actions.shape
     )
 
     assert parallel_sequence_adder_signature.name() == "data_server_adder_signature"
@@ -280,20 +280,20 @@ def test_parallel_transition_adder_signature(
     assert hasattr(mock_builder.store, "adder_signature_fn")
 
     signature = mock_builder.store.adder_signature_fn(
-        environment_specs=mock_env_specs,
-        extras_specs=mock_env_specs.extra_specs,
+        ma_environment_spec=mock_env_specs,
+        extras_specs=mock_env_specs.get_extras_specs(),
     )
     assert type(signature) == types.Transition
 
     # Dimensions preserved after spec is generated
     assert signature.observations["agent_0"].shape.as_list() == list(
-        mock_env_specs._specs["agent_0"].observations.shape
+        mock_env_specs.get_agent_environment_specs()["agent_0"].observations.shape
     )
     assert signature.observations["agent_1"].shape.as_list() == list(
-        mock_env_specs._specs["agent_1"].observations.shape
+        mock_env_specs.get_agent_environment_specs()["agent_1"].observations.shape
     )
     assert signature.actions["agent_1"].shape.as_list() == list(
-        mock_env_specs._specs["agent_1"].actions.shape
+        mock_env_specs.get_agent_environment_specs()["agent_1"].actions.shape
     )
     assert parallel_transition_adder_signature.name() == "data_server_adder_signature"
 

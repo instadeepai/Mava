@@ -21,16 +21,15 @@
 This implements adders which add sequences or partial trajectories.
 """
 import operator
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import reverb
 import tensorflow as tf
 import tree
-from acme import specs
 from acme.adders.reverb import utils as acme_utils
 from acme.adders.reverb.sequence import EndBehavior, SequenceAdder
-from acme.types import NestedSpec
 
+from mava import specs
 from mava.adders.reverb import base
 from mava.adders.reverb.base import ReverbParallelAdder
 from mava.adders.reverb.utils import trajectory_signature
@@ -137,23 +136,23 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
     @classmethod
     def signature(
         cls,
-        environment_spec: specs.EnvironmentSpec,
+        ma_environment_spec: specs.MAEnvironmentSpec,
         sequence_length: Optional[int] = None,
-        extras_spec: NestedSpec = (),
+        extras_specs: Dict[str, Any] = {},
     ) -> tf.TypeSpec:
         """Returns adder signature.
 
         Args:
-            environment_spec (specs.EnvironmentSpec): Spec of MA environment.
+            ma_environment_spec (specs.MAEnvironmentSpec): Spec of MA environment.
             sequence_length (Optional[int], optional): Length of sequence.
                 Defaults to None.
-            extras_spec (NestedSpec, optional): Spec for extra data. Defaults to ().
+            extras_specs (Dict, optional): Spec for extra data. Defaults to {}.
 
         Returns:
             tf.TypeSpec: Signature for sequence adder.
         """
         return trajectory_signature(
-            environment_spec=environment_spec,
+            ma_environment_spec=ma_environment_spec,
             sequence_length=sequence_length,
-            extras_spec=extras_spec,
+            extras_specs=extras_specs,
         )
