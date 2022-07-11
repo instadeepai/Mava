@@ -1,7 +1,7 @@
 import pytest
 import reverb
 
-from mava.components.jax.building.rate_limiters import (
+from mava.components.jax.building.reverb_components import (
     MinSizeRateLimiter,
     RateLimiterConfig,
     SampleToInsertRateLimiter,
