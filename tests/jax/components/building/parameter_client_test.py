@@ -113,7 +113,6 @@ def test_executor_parameter_client_no_evaluator_with_parameter_client(
     )
     exec_param_client.on_building_executor_parameter_client(builder=mock_builder)
 
-    assert hasattr(mock_builder.store, "executor_parameter_client")
     assert mock_builder.store.executor_parameter_client._get_keys == [
         "networks-network_agent_0",
         "networks-network_agent_1",
@@ -167,6 +166,19 @@ def test_executor_parameter_client_evaluator_with_parameter_client(
     exec_param_client.on_building_executor_parameter_client(builder=mock_builder)
 
     assert hasattr(mock_builder.store, "executor_parameter_client")
+
+    assert mock_builder.store.executor_parameter_client._all_keys == [
+        "evaluator_episodes",
+        "evaluator_steps",
+        "executor_episodes",
+        "executor_steps",
+        "networks-network_agent_0",
+        "networks-network_agent_1",
+        "networks-network_agent_2",
+        "trainer_steps",
+        "trainer_walltime",
+    ]
+
     assert mock_builder.store.executor_parameter_client._get_keys == [
         "networks-network_agent_0",
         "networks-network_agent_1",
@@ -234,7 +246,18 @@ def test_trainer_parameter_client(
     trainer_param_client = TrainerParameterClient()
     trainer_param_client.on_building_trainer_parameter_client(mock_builder)
 
-    assert hasattr(mock_builder.store, "trainer_parameter_client")
+    assert mock_builder.store.trainer_parameter_client._all_keys == [
+        "evaluator_episodes",
+        "evaluator_steps",
+        "executor_episodes",
+        "executor_steps",
+        "networks-network_agent_0",
+        "networks-network_agent_1",
+        "networks-network_agent_2",
+        "trainer_steps",
+        "trainer_walltime",
+    ]
+
     assert mock_builder.store.trainer_parameter_client._get_keys == [
         "trainer_steps",
         "trainer_walltime",
