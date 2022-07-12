@@ -45,7 +45,7 @@ class DecentralisedValueActor(BaseArchitecture):
         self._env_spec = environment_spec
         self._agents = self._env_spec.get_agent_ids()
         self._agent_types = self._env_spec.get_agent_types()
-        self._agent_specs = self._env_spec.get_agent_specs()
+        self._agent_specs = self._env_spec.get_agent_environment_specs()
         self._agent_type_specs = self._env_spec.get_agent_type_specs()
 
         self._value_networks = value_networks
@@ -129,7 +129,7 @@ class DecentralisedPolicyActor(BasePolicyArchitecture):
         self._env_spec = environment_spec
         self._agents = self._env_spec.get_agent_ids()
         self._agent_types = self._env_spec.get_agent_types()
-        self._agent_specs = self._env_spec.get_agent_specs()
+        self._agent_specs = self._env_spec.get_agent_environment_specs()
         self._agent_type_specs = self._env_spec.get_agent_type_specs()
 
         self._observation_networks = observation_networks
@@ -227,7 +227,7 @@ class DecentralisedValueActorCritic(BaseActorCritic):
         self._env_spec = environment_spec
         self._agents = self._env_spec.get_agent_ids()  # All agend ids
         self._agent_specs = (
-            self._env_spec.get_agent_specs()
+            self._env_spec.get_agent_environment_specs()
         )  # Each agent's environment interaction specification
 
         self._observation_networks = observation_networks

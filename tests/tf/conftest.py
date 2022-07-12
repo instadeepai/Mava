@@ -273,7 +273,7 @@ class Helpers:
             env = Helpers.get_env(env_spec)
             wrapper_func = Helpers.get_wrapper_function(env_spec)
             wrapped_env = wrapper_func(env, **kwargs)
-            specs = Helpers.get_pz_env_spec(wrapped_env)._specs
+            specs = Helpers.get_pz_env_spec(wrapped_env).get_agent_environment_specs()
         return wrapped_env, specs
 
     #
