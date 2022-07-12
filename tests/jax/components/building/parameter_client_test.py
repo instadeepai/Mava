@@ -16,16 +16,31 @@
 """Unit tests for parameter client components"""
 
 from types import SimpleNamespace
+from typing import Any
 
+import numpy as np
 import pytest
 
 from mava.components.jax.building.parameter_client import (
+    BaseParameterClient,
     ExecutorParameterClient,
     ExecutorParameterClientConfig,
     TrainerParameterClient,
 )
 from mava.systems.jax.builder import Builder
 from mava.systems.jax.parameter_server import ParameterServer
+
+
+class MockBaseParameterClient(BaseParameterClient):
+    def __init__(self, config: Any) -> None:
+        """Initialize mock base parameter client class to test the \
+            _set_up_count_parameters method in BaseParameterClient."""
+        super().__init__(config)
+
+    @staticmethod
+    def name() -> str:
+        """Component name"""
+        return "dummy_base_parameter_client_name"
 
 
 @pytest.fixture
@@ -53,6 +68,33 @@ def mock_builder_with_parameter_client() -> Builder:
     )
 
     return builder
+
+
+def test_base_parameter_client() -> None:
+    """Test that count parameters are create in base \
+        parameter client"""
+
+    mock_client = MockBaseParameterClient(config=SimpleNamespace())
+
+    keys, params = mock_client._set_up_count_parameters(params={})
+
+    assert keys == [
+        "trainer_steps",
+        "trainer_walltime",
+        "evaluator_steps",
+        "evaluator_episodes",
+        "executor_episodes",
+        "executor_steps",
+    ]
+
+    assert params == {
+        "trainer_steps": np.array(0, dtype=np.int32),
+        "trainer_walltime": np.array(0, dtype=np.float32),
+        "evaluator_steps": np.array(0, dtype=np.int32),
+        "evaluator_episodes": np.array(0, dtype=np.int32),
+        "executor_episodes": np.array(0, dtype=np.int32),
+        "executor_steps": np.array(0, dtype=np.int32),
+    }
 
 
 def test_executor_parameter_client_no_evaluator_with_parameter_client(
