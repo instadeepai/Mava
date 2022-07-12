@@ -150,10 +150,6 @@ def test_executor_parameter_client_no_evaluator_with_parameter_client(
         "executor_episodes": np.array(0, dtype=np.int32),
         "executor_steps": np.array(0, dtype=np.int32),
     }
-    for i in range(2):
-        assert mock_builder.store.executor_parameter_client._parameters[
-            f"networks-network_agent_{i}"
-        ] == {"weights": i, "biases": i}
     assert mock_builder.store.executor_parameter_client._get_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_get_call_counter == 0
@@ -219,10 +215,6 @@ def test_executor_parameter_client_evaluator_with_parameter_client(
         "executor_episodes": np.array(0, dtype=np.int32),
         "executor_steps": np.array(0, dtype=np.int32),
     }
-    for i in range(2):
-        assert mock_builder.store.executor_parameter_client._parameters[
-            f"networks-network_agent_{i}"
-        ] == {"weights": i, "biases": i}
     assert mock_builder.store.executor_parameter_client._get_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_get_call_counter == 0
