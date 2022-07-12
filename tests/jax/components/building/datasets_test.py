@@ -22,7 +22,6 @@ class MockBuilder(Builder):
             ],
             port=2000,
         )
-        """ https://colab.research.google.com/github/deepmind/reverb/blob/master/examples/demo.ipynb#scrollTo=SQFSZJkyroFX """
         data_server_client = SimpleNamespace(
             server_address=f"localhost:{simple_server.port}"
         )
