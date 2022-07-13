@@ -20,6 +20,7 @@ from acme import specs, types
 from acme.adders.reverb import utils as acme_utils
 from acme.utils import tree_utils
 
+from mava import specs as mava_specs
 from mava.adders.reverb import base
 
 
@@ -45,9 +46,9 @@ def final_step_like(
 
 
 def trajectory_signature(
-    environment_spec: specs.EnvironmentSpec,
+    ma_environment_spec: mava_specs.MAEnvironmentSpec,
     sequence_length: Optional[int] = None,
-    extras_spec: types.NestedSpec = (),
+    extras_specs: types.NestedSpec = (),
 ) -> tf.TypeSpec:
     """This is a helper method for generating signatures for Reverb tables.
 
@@ -55,11 +56,11 @@ def trajectory_signature(
     documentation for details on how they are used.
 
     Args:
-        environment_spec: A `specs.EnvironmentSpec` whose fields are nested
+        ma_environment_spec: A `MAEnvironmentSpec` whose fields are nested
         structures with leaf nodes that have `.shape` and `.dtype` attributes.
         This should come from the environment that will be used to generate
         the data inserted into the Reverb table.
-        extras_spec: A nested structure with leaf nodes that have `.shape` and
+        extras_specs: A nested structure with leaf nodes that have `.shape` and
         `.dtype` attributes. The structure (and shapes/dtypes) of this must
         be the same as the `extras` passed into `ReverbAdder.add`.
         sequence_length: An optional integer representing the expected length of
@@ -76,10 +77,10 @@ def trajectory_signature(
             name="/".join(str(p) for p in paths),
         )
 
-    agent_specs = environment_spec.get_agent_specs()
-    agents = environment_spec.get_agent_ids()
-    env_extras_spec = environment_spec.get_extra_specs()
-    extras_spec.update(env_extras_spec)
+    agent_environment_specs = ma_environment_spec.get_agent_environment_specs()
+    agents = ma_environment_spec.get_agent_ids()
+    env_extras_specs = ma_environment_spec.get_extras_specs()
+    extras_specs.update(env_extras_specs)
 
     obs_specs = {}
     act_specs = {}
@@ -87,10 +88,11 @@ def trajectory_signature(
     step_discount_specs = {}
     for agent in agents:
         rewards_spec, step_discounts_spec = tree_utils.broadcast_structures(
-            agent_specs[agent].rewards, agent_specs[agent].discounts
+            agent_environment_specs[agent].rewards,
+            agent_environment_specs[agent].discounts,
         )
-        obs_specs[agent] = agent_specs[agent].observations
-        act_specs[agent] = agent_specs[agent].actions
+        obs_specs[agent] = agent_environment_specs[agent].observations
+        act_specs[agent] = agent_environment_specs[agent].actions
         reward_specs[agent] = rewards_spec
         step_discount_specs[agent] = step_discounts_spec
 
@@ -101,7 +103,7 @@ def trajectory_signature(
         reward_specs,
         step_discount_specs,
         soe_spec,
-        extras_spec,
+        extras_specs,
     ) = tree.map_structure_with_path(
         add_time_dim,
         (
@@ -110,7 +112,7 @@ def trajectory_signature(
             reward_specs,
             step_discount_specs,
             specs.Array(shape=(), dtype=bool),
-            extras_spec,
+            extras_specs,
         ),
     )
 
@@ -120,7 +122,7 @@ def trajectory_signature(
         rewards=reward_specs,
         discounts=step_discount_specs,
         start_of_episode=soe_spec,
-        extras=extras_spec,
+        extras=extras_specs,
     )
 
     return spec_step

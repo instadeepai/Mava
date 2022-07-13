@@ -17,7 +17,7 @@
 import abc
 import time
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 import numpy as np
 from acme.jax import savers
@@ -134,9 +134,6 @@ class DefaultParameterServer(ParameterServer):
         # Create the checkpointer
         if self.config.checkpoint:
             server.store.last_checkpoint_time = 0
-            server.store.checkpoint_minute_interval = (
-                self.config.checkpoint_minute_interval
-            )
 
             # Only save variables that are not empty.
             save_variables = {}
@@ -152,7 +149,7 @@ class DefaultParameterServer(ParameterServer):
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
         """_summary_"""
-        names = server.store._param_names
+        names: Union[str, Sequence[str]] = server.store._param_names
 
         if type(names) == str:
             get_params = server.store.parameters[names]  # type: ignore
@@ -165,12 +162,8 @@ class DefaultParameterServer(ParameterServer):
     # Set
     def on_parameter_server_set_parameters(self, server: SystemParameterServer) -> None:
         """_summary_"""
-        params = server.store._set_params
+        params: Dict[str, Any] = server.store._set_params
         names = params.keys()
-
-        if type(names) == str:
-            params = {names: params}  # type: ignore
-            names = [names]  # type: ignore
 
         for var_key in names:
             assert var_key in server.store.parameters
@@ -187,12 +180,8 @@ class DefaultParameterServer(ParameterServer):
         self, server: SystemParameterServer
     ) -> None:
         """_summary_"""
-        params = server.store._add_to_params
+        params: Dict[str, Any] = server.store._add_to_params
         names = params.keys()
-
-        if type(names) == str:
-            params = {names: params}  # type: ignore
-            names = [names]  # type: ignore
 
         for var_key in names:
             assert var_key in server.store.parameters
@@ -206,9 +195,9 @@ class DefaultParameterServer(ParameterServer):
             server : _description_
         """
         if (
-            server.store.system_checkpointer
+            self.config.checkpoint
             and server.store.last_checkpoint_time
-            + server.store.checkpoint_minute_interval * 60
+            + self.config.checkpoint_minute_interval * 60
             + 1
             < time.time()
         ):

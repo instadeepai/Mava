@@ -68,7 +68,7 @@ def test_builder() -> SystemBuilder:
         System builder with no components.
     """
     test_builder = Builder(components=[])
-    test_builder.store.environment_spec = make_fake_env_specs()
+    test_builder.store.agent_environment_specs = make_fake_env_specs()
     test_builder.store.agent_net_keys = {
         "net_key1": "network_1",
         "net_key2": "network_2",
@@ -142,11 +142,15 @@ def test_network_factory_environment_spec(
 
     for network in networks.values():
         assert list(network["environment_spec"]._keys) == list(
-            make_fake_env_specs()._specs.keys()
+            make_fake_env_specs().get_agent_environment_specs().keys()
         )
         assert (
-            network["environment_spec"]._specs["agent_0"].observations.shape
-            == list(make_fake_env_specs()._specs.values())[0].observations.shape
+            network["environment_spec"]
+            .get_agent_environment_specs()["agent_0"]
+            .observations.shape
+            == list(make_fake_env_specs().get_agent_environment_specs().values())[
+                0
+            ].observations.shape
         )
 
 

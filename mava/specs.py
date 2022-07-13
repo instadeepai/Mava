@@ -26,97 +26,126 @@ class MAEnvironmentSpec:
     def __init__(
         self,
         environment: dm_env.Environment,
-        specs: Dict[str, EnvironmentSpec] = None,
-        extra_specs: Dict = None,
+        agent_environment_specs: Dict[str, EnvironmentSpec] = None,
+        extras_specs: Dict[str, Any] = None,
     ):
-        """_summary_
+        """Multi-agent environment spec
+
+        Create a multi-agent environment spec through a dm_env Environment
+        or through pre-existing enviromnent specs (specifying an environment
+        spec for each agent) and extras specs
 
         Args:
-            environment : _description_
-            specs : _description_.
-            extra_specs : _description_.
+            environment : dm_env.Environment object
+            agent_environment_specs : environment specs for each agent
+            extras_specs : extras specs for additional data not contained
+            in the acme EnvironmentSpec format, such as global state information
         """
-        if not specs:
-            specs = self._make_ma_environment_spec(environment)
+        if not agent_environment_specs:
+            agent_environment_specs = self._make_ma_environment_spec(environment)
         else:
-            self.extra_specs = extra_specs
-        self._keys = list(sort_str_num(specs.keys()))
-        self._specs = {key: specs[key] for key in self._keys}
+            self._extras_specs = extras_specs
+        self._keys = list(sort_str_num(agent_environment_specs.keys()))
+        self._agent_environment_specs = {
+            key: agent_environment_specs[key] for key in self._keys
+        }
 
     def _make_ma_environment_spec(
         self, environment: dm_env.Environment
     ) -> Dict[str, EnvironmentSpec]:
-        """_summary_
+        """Create a multi-agent environment spec from a dm_env environment
 
         Args:
-            environment : _description_
+            environment : dm_env.Environment
         Returns:
-            _description_
+            Dictionary with an environment spec for each agent
         """
-        specs = {}
+        agent_environment_specs = {}
         observation_specs = environment.observation_spec()
         action_specs = environment.action_spec()
         reward_specs = environment.reward_spec()
         discount_specs = environment.discount_spec()
-        self.extra_specs = environment.extra_spec()
+        self._extras_specs = environment.extras_spec()
         for agent in environment.possible_agents:
-            specs[agent] = EnvironmentSpec(
+            agent_environment_specs[agent] = EnvironmentSpec(
                 observations=observation_specs[agent],
                 actions=action_specs[agent],
                 rewards=reward_specs[agent],
                 discounts=discount_specs[agent],
             )
-        return specs
+        return agent_environment_specs
 
-    def get_extra_specs(self) -> Dict[str, EnvironmentSpec]:
-        """_summary_
-
-        Returns:
-            _description_
-        """
-        return self.extra_specs  # type: ignore
-
-    def get_agent_specs(self) -> Dict[str, EnvironmentSpec]:
-        """_summary_
+    def get_extras_specs(self) -> Dict[str, Any]:
+        """Get extras specs
 
         Returns:
-            _description_
+            Extras spec that contains any additional information not contained
+            within the environment specs
         """
-        return self._specs
+        return self._extras_specs  # type: ignore
+
+    def get_agent_environment_specs(self) -> Dict[str, EnvironmentSpec]:
+        """Get environment specs for all agents
+
+        Returns:
+            Dictionary of environment specs, representing each agent in the environment
+        """
+        return self._agent_environment_specs
+
+    def set_extras_specs(self, extras_specs: Dict[str, Any]) -> None:
+        """Set extras specs
+
+        Returns:
+            None
+        """
+        self._extras_specs = extras_specs
+
+    def set_agent_environment_specs(
+        self, agent_environment_specs: Dict[str, EnvironmentSpec]
+    ) -> None:
+        """Set agent environment specs
+
+        Returns:
+            None
+        """
+        self._agent_environment_specs = agent_environment_specs
 
     def get_agent_type_specs(self) -> Dict[str, EnvironmentSpec]:
-        """_summary_
+        """Get environment specs for all agent types
 
         Returns:
-            _description_
+            Dictionary of environment specs, representing each agent type
+            in the environment
         """
-        specs = {}
+        agent_environment_specs = {}
         agent_types = list({agent.split("_")[0] for agent in self._keys})
         for agent_type in agent_types:
-            specs[agent_type] = self._specs[f"{agent_type}_0"]
-        return specs
+            agent_environment_specs[agent_type] = self._agent_environment_specs[
+                f"{agent_type}_0"
+            ]
+        return agent_environment_specs
 
     def get_agent_ids(self) -> List[str]:
-        """_summary_
+        """Get agent ids
 
         Returns:
-            _description_
+            List of agent ids
         """
         return self._keys
 
     def get_agent_types(self) -> List[str]:
-        """_summary_
+        """Get agent types
 
         Returns:
-            _description_
+            List of agent types as defined by the ids of each agent
         """
         return list({agent.split("_")[0] for agent in self._keys})
 
     def get_agents_by_type(self) -> Dict[str, List[str]]:
-        """_summary_
+        """Get agents by type
 
         Returns:
-            _description_
+            Dictionary representing agents that belong to each agent type
         """
         agents_by_type: Dict[str, List[str]] = {}
         agents_ids = self.get_agent_ids()

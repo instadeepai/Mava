@@ -45,12 +45,12 @@ class EnvironmentSpec(Component):
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
 
-        builder.store.environment_spec = specs.MAEnvironmentSpec(
+        builder.store.agent_environment_specs = specs.MAEnvironmentSpec(
             self.config.environment_factory()
         )
 
         builder.store.agents = sort_str_num(
-            builder.store.environment_spec.get_agent_ids()
+            builder.store.agent_environment_specs.get_agent_ids()
         )
         builder.store.extras_spec = {}
 
