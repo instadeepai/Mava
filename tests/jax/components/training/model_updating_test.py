@@ -103,7 +103,7 @@ class MockOptimizer:
     """Mock optimizer configuration"""
 
     def __init__(self) -> None:
-        self.test = "Done"
+        self.initialized = "Done"
         pass
 
     def init(self, params: Dict[str, Any]) -> list:
@@ -284,7 +284,7 @@ def test_on_training_utility_fns(
     mini_batch_update.config.optimizer = mock_optimizer
     mini_batch_update.on_training_utility_fns(trainer=mock_trainer)
 
-    assert mock_trainer.store.optimizer.test == "Done"
+    assert mock_trainer.store.optimizer.initialized == "Done"
 
     for net_key in mock_trainer.store.networks["networks"].keys():
         assert mock_trainer.store.opt_states[net_key] == list(
