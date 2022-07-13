@@ -38,10 +38,12 @@ class MockParameterServer(ParameterServer):
         self.callbacks = components
         self.set_parameter_keys = set_parameter_keys
 
-    def _increment_parameters(self, names: Union[str, Sequence[str], Set[str]]) -> None:
+    def _increment_get_parameters(
+        self, names: Union[str, Sequence[str], Set[str]]
+    ) -> None:
         """Dummy method to update get parameters before updating client"""
         for name in names:
-            if name.split("_")[0] == "key":
+            if name.split("_")[0] == "key" or name.split("_")[0] == "allkey":
                 self.store.parameters[name] += 1
             elif name.split("-")[0] == "networks":
                 self.store.parameters[name]["layer_0"]["weights"] += 1
@@ -54,7 +56,7 @@ class MockParameterServer(ParameterServer):
         # Manually increment all parameters except the set parameters
         # and add them to store to simulate parameters that have changed.
         get_names = set(names) - set(self.set_parameter_keys)
-        self._increment_parameters(names=get_names)
+        self._increment_get_parameters(names=get_names)
         get_params = {name: self.store.parameters[name] for name in names}
         self.store.get_parameters = get_params
 
@@ -67,6 +69,16 @@ class MockParameterServer(ParameterServer):
 
         for key in set_params:
             self.store.parameters[key] = set_params[key]
+
+
+def increment_set_parameters(params: Dict[str, Any]) -> None:
+    """Utility function for incrementing parameter client parameters"""
+    for key in params:
+        if key.split("_")[0] == "key" or key.split("_")[0] == "allkey":
+            params[key] += 1
+        elif key.split("-")[0] == "networks":
+            params[key]["layer_0"]["weights"] += 1
+            params[key]["layer_0"]["biases"] += 1
 
 
 @pytest.fixture
@@ -83,6 +95,7 @@ def mock_parameter_server() -> ParameterServer:
                 "networks-network_key_0": {"layer_0": {"weights": 0, "biases": 0}},
                 "networks-network_key_1": {"layer_0": {"weights": 1, "biases": 1}},
                 "networks-network_key_2": {"layer_0": {"weights": 2, "biases": 2}},
+                "allkey_0": np.array(0, dtype=np.int32),
             },
         ),
         components=[],
@@ -114,6 +127,7 @@ def parameter_client(mock_parameter_server: ParameterServer) -> ParameterClient:
             "networks-network_key_0": {"layer_0": {"weights": 0, "biases": 0}},
             "networks-network_key_1": {"layer_0": {"weights": 1, "biases": 1}},
             "networks-network_key_2": {"layer_0": {"weights": 2, "biases": 2}},
+            "allkey_0": np.array(0, dtype=np.int32),
         },
         get_keys=[
             "key_0",
@@ -145,7 +159,7 @@ def test_add_and_wait(parameter_client: ParameterClient) -> None:
 def test_get_and_wait(parameter_client: ParameterClient) -> None:
     """Test get and wait method."""
     parameter_client.get_and_wait()
-    # check that all parameters have been incremented and updated
+    # check that all get parameters have been incremented and updated
     # except for the set parameters
     assert parameter_client._parameters == {
         "key_0": np.array(0, dtype=np.int32),
@@ -156,6 +170,7 @@ def test_get_and_wait(parameter_client: ParameterClient) -> None:
         "networks-network_key_0": {"layer_0": {"weights": 1, "biases": 1}},
         "networks-network_key_1": {"layer_0": {"weights": 2, "biases": 2}},
         "networks-network_key_2": {"layer_0": {"weights": 3, "biases": 3}},
+        "allkey_0": np.array(0, dtype=np.int32),
     }
 
 
@@ -173,12 +188,13 @@ def test_get_all_and_wait(parameter_client: ParameterClient) -> None:
         "networks-network_key_0": {"layer_0": {"weights": 1, "biases": 1}},
         "networks-network_key_1": {"layer_0": {"weights": 2, "biases": 2}},
         "networks-network_key_2": {"layer_0": {"weights": 3, "biases": 3}},
+        "allkey_0": np.array(1, dtype=np.int32),
     }
 
 
 def test_set_and_wait(parameter_client: ParameterClient) -> None:
     """Test set and wait method."""
-    pass
+    parameter_client.set_and_wait()
 
 
 def test__copy(parameter_client: ParameterClient) -> None:
