@@ -268,7 +268,7 @@ def test_on_training_utility_fns_empty_config_optimizer(
         )
         assert mock_trainer.store.opt_states[net_key][2] == optax.EmptyState()
 
-    assert mock_trainer.store.minibatch_update_fn
+    assert callable(mock_trainer.store.minibatch_update_fn)
 
 
 def test_on_training_utility_fns(
@@ -291,7 +291,7 @@ def test_on_training_utility_fns(
             mock_trainer.store.networks["networks"][net_key].params
         )
 
-    assert mock_trainer.store.minibatch_update_fn
+    assert callable(mock_trainer.store.minibatch_update_fn)
 
 
 def test_minibatch_update_fn(
@@ -348,7 +348,7 @@ def test_on_training_utility_fns_epoch(mock_trainer: MockTrainer) -> None:
     assert (
         mock_trainer.store.num_minibatches == mini_epoch_update.config.num_minibatches
     )
-    assert mock_trainer.store.epoch_update_fn
+    assert callable(mock_trainer.store.epoch_update_fn)
 
 
 def test_epoch_update_fn(
