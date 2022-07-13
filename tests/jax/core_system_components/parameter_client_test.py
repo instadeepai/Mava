@@ -16,7 +16,7 @@
 """Tests for parameter client class for Jax-based Mava systems"""
 
 from types import SimpleNamespace
-from typing import Any, Dict, List, Sequence, Union
+from typing import Any, Dict, List, Sequence, Set, Union
 
 import numpy as np
 import pytest
@@ -27,26 +27,37 @@ from mava.systems.jax.parameter_server import ParameterServer
 
 
 class MockParameterServer(ParameterServer):
-    def __init__(self, store: SimpleNamespace, components: List[Callback]) -> None:
+    def __init__(
+        self,
+        store: SimpleNamespace,
+        components: List[Callback],
+        set_parameter_keys: Union[str, Sequence[str]],
+    ) -> None:
         """Initialize mock parameter server."""
         self.store = store
         self.callbacks = components
+        self.set_parameter_keys = set_parameter_keys
 
-    def increment_parameters(self, names: Union[str, Sequence[str]]) -> None:
+    def _increment_parameters(self, names: Union[str, Sequence[str], Set[str]]) -> None:
         """Dummy method to update get parameters before updating client"""
         for name in names:
             if name.split("_")[0] == "key":
                 self.store.parameters[name] += 1
             elif name.split("-")[0] == "networks":
-                self.store.parameters[name]["weights"] += 1
-                self.store.parameters[name]["biases"] += 1
+                self.store.parameters[name]["layer_0"]["weights"] += 1
+                self.store.parameters[name]["layer_0"]["biases"] += 1
 
     def get_parameters(self, names: Union[str, Sequence[str]]) -> Any:
         """Dummy method for returning get parameters"""
         self.store._param_names = names
 
+        # Manually increment all parameters except the set parameters
+        # and add them to store to simulate parameters that have changed.
+        get_names = set(names) - set(self.set_parameter_keys)
+        self._increment_parameters(names=get_names)
         get_params = {name: self.store.parameters[name] for name in names}
         self.store.get_parameters = get_params
+
         return self.store.get_parameters
 
     def set_parameters(self, set_params: Dict[str, Any]) -> None:
@@ -75,6 +86,7 @@ def mock_parameter_server() -> ParameterServer:
             },
         ),
         components=[],
+        set_parameter_keys=["key_0", "key_2"],
     )
 
     return param_server
@@ -82,7 +94,14 @@ def mock_parameter_server() -> ParameterServer:
 
 @pytest.fixture()
 def parameter_client(mock_parameter_server: ParameterServer) -> ParameterClient:
-    """Create mock parameter client for testing."""
+    """Creates a mock parameter client for testing
+
+    Args:
+        mock_parameter_server: ParameterServer
+
+    Returns:
+        A parameter client object.
+    """
 
     param_client = ParameterClient(
         client=mock_parameter_server,
@@ -126,6 +145,40 @@ def test_add_and_wait(parameter_client: ParameterClient) -> None:
 def test_get_and_wait(parameter_client: ParameterClient) -> None:
     """Test get and wait method."""
     parameter_client.get_and_wait()
+    # check that all parameters have been incremented and updated
+    # except for the set parameters
+    assert parameter_client._parameters == {
+        "key_0": np.array(0, dtype=np.int32),
+        "key_1": np.array(2, dtype=np.float32),
+        "key_2": np.array(2, dtype=np.int32),
+        "key_3": np.array(4, dtype=np.int32),
+        "key_4": np.array(5, dtype=np.int32),
+        "networks-network_key_0": {"layer_0": {"weights": 1, "biases": 1}},
+        "networks-network_key_1": {"layer_0": {"weights": 2, "biases": 2}},
+        "networks-network_key_2": {"layer_0": {"weights": 3, "biases": 3}},
+    }
+
+
+def test_get_all_and_wait(parameter_client: ParameterClient) -> None:
+    """Test get all and wait method."""
+    parameter_client.get_all_and_wait()
+    # check that all parameters have been incremented and updated
+    # except for the set parameters
+    assert parameter_client._parameters == {
+        "key_0": np.array(0, dtype=np.int32),
+        "key_1": np.array(2, dtype=np.float32),
+        "key_2": np.array(2, dtype=np.int32),
+        "key_3": np.array(4, dtype=np.int32),
+        "key_4": np.array(5, dtype=np.int32),
+        "networks-network_key_0": {"layer_0": {"weights": 1, "biases": 1}},
+        "networks-network_key_1": {"layer_0": {"weights": 2, "biases": 2}},
+        "networks-network_key_2": {"layer_0": {"weights": 3, "biases": 3}},
+    }
+
+
+def test_set_and_wait(parameter_client: ParameterClient) -> None:
+    """Test set and wait method."""
+    pass
 
 
 def test__copy(parameter_client: ParameterClient) -> None:
