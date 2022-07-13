@@ -39,3 +39,15 @@
     ```
     pip install .[record_episode]
     ```
+
+- Note when rendering StarCraft II it may be necessary to point to the correct C++ version like this:
+  ```bash
+  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/x86_64-linux-gnu/
+  python examples/jax/smac/feedforward/decentralised/run_mappo.py
+  ```
+  
+  or
+
+  ```bash
+  LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/ python examples/jax/smac/feedforward/decentralised/run_mappo.py
+  ```
