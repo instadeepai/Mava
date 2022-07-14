@@ -361,8 +361,11 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
 
     def _append_frame(self) -> None:
         """Appends a frame to the sequence of frames."""
+        # TODO: THIS IS UGLY, we need to separate jax and tf functionality
         if hasattr(self._executor, "_counts"):
             counts = self._executor._counts
+        elif hasattr(self._executor, "store"):
+            counts = self._executor.store.executor_counts
         else:
             counts = self._counter.get_counts()
         counter = counts.get(self._counter_str)
@@ -378,6 +381,8 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
     def _write_frames(self) -> None:
         if hasattr(self._executor, "_counts"):
             counts = self._executor._counts
+        elif hasattr(self._executor, "store"):
+            counts = self._executor.store.executor_counts
         else:
             counts = self._counter.get_counts()
         counter = int(counts.get(self._counter_str))
