@@ -272,7 +272,7 @@ def system_with_two_components() -> System:
 def test_system_launch_with_build(
     system_with_two_components: System,
 ) -> None:
-    """Test if system can launch having had changed (buildd) the default \
+    """Test if system can launch having had changed (build) the default \
         config.
 
     Args:
@@ -282,6 +282,16 @@ def test_system_launch_with_build(
     assert system_with_two_components._builder.store.int_plus_str == 3
     assert system_with_two_components._builder.store.float_plus_bool == 1.2
     system_with_two_components.launch()
+
+
+def test_launch_when_not_built(
+    system_with_two_components: System,
+) -> None:
+    """Test that exception is thrown when launch is called before a system\
+        has been built."""
+
+    with pytest.raises(Exception):
+        system_with_two_components.launch()
 
 
 def test_system_update_with_existing_component(
@@ -296,6 +306,16 @@ def test_system_update_with_existing_component(
     system_with_two_components.build()
     assert system_with_two_components._builder.store.float_plus_bool == 2.2
     assert system_with_two_components._builder.store.str_plus_bool == 3
+
+
+def test_system_update_when_built(
+    system_with_two_components: System,
+) -> None:
+    """Test that exception is raised when system is updated are being built."""
+    system_with_two_components.build()
+
+    with pytest.raises(Exception):
+        system_with_two_components.update(ComponentTwo)
 
 
 def test_system_update_with_non_existing_component(
@@ -373,6 +393,15 @@ def test_system_add_and_update(system_with_zero_components: System) -> None:
     system_with_zero_components.update(ComponentTwo)
     system_with_zero_components.build()
     assert system_with_zero_components._builder.store.str_plus_bool == 3
+
+
+def test_add_when_built(system_with_one_component: System) -> None:
+    """Test that exception is raised when trying to add to a system that has\
+        already been built."""
+
+    system_with_one_component.build()
+    with pytest.raises(Exception):
+        system_with_one_component.add(ComponentOne)
 
 
 def test_system_build_one_component_params(
