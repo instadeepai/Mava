@@ -314,15 +314,12 @@ def test_set_and_get_async(parameter_client: ParameterClient) -> None:
     assert parameter_client._set_get_future is None
 
 
-@pytest.mark.skip(reason="not working")
 def test_add_async(parameter_client: ParameterClient) -> None:
     """Test add async method."""
     parameter_client.add_async(params={"new_key": "new_value"})
     assert parameter_client._add_future is not None
-
-    parameter_client.add_async(params={"new_key": "new_value"})
-
-    parameter_client.add_async(params={"new_key": "new_value"})
+    assert parameter_client._client.store._add_to_params == {"new_key": "new_value"}
+    assert parameter_client._async_add_buffer == {}
 
 
 def test__copy(parameter_client: ParameterClient) -> None:
@@ -387,7 +384,9 @@ def test_copy_tuple_with_device(parameter_client: ParameterClient) -> None:
         is give."""
     parameter_client._parameters.update({"tuple_key_0": [1, 2]})
     local_devices = jax.local_devices()
-    parameter_client._devices = {"tuple_key_0": (local_devices[0], local_devices[0])}
+    parameter_client._devices = {
+        "tuple_key_0": (local_devices[0], local_devices[0])
+    }  # type : ignore
 
     parameter_client._copy(
         new_parameters={"tuple_key_0": (np.array([11]), np.array([22]))}
