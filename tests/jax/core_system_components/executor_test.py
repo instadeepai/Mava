@@ -1,5 +1,5 @@
 # python3
-# Copyright 2022 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,10 +20,10 @@ from typing import Dict, List
 import dm_env
 import numpy as np
 import pytest
-from acme.types import NestedArray
 
 from mava.callbacks import Callback
 from mava.systems.jax import Executor
+from mava.types import NestedArray
 from tests.jax.hook_order_tracking import HookOrderTracking
 
 
