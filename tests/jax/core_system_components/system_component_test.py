@@ -14,6 +14,7 @@
 # limitations under the License.
 """Tests for Jax-based Mava system implementation."""
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import Callable, Dict, List, Optional, Tuple
 
 import pytest
@@ -282,6 +283,16 @@ def test_system_launch_with_build(
     assert system_with_two_components._builder.store.int_plus_str == 3
     assert system_with_two_components._builder.store.float_plus_bool == 1.2
     system_with_two_components.launch()
+    assert system_with_two_components._builder.store.global_config == SimpleNamespace(
+        multi_process=True,
+        name="system",
+        nodes_on_gpu=[],
+        num_executors=1,
+        param_0=2,
+        param_1="1",
+        param_2=1.2,
+        param_3=False,
+    )
 
 
 def test_launch_when_not_built(
@@ -306,6 +317,16 @@ def test_system_update_with_existing_component(
     system_with_two_components.build()
     assert system_with_two_components._builder.store.float_plus_bool == 2.2
     assert system_with_two_components._builder.store.str_plus_bool == 3
+    assert system_with_two_components._builder.store.global_config == SimpleNamespace(
+        multi_process=True,
+        name="system",
+        nodes_on_gpu=[],
+        num_executors=1,
+        param_2=1.2,
+        param_3=True,
+        param_4="2",
+        param_5=True,
+    )
 
 
 def test_system_update_when_built(
@@ -355,6 +376,16 @@ def test_system_add_with_non_existing_component(
     system_with_one_component.build()
     assert system_with_one_component._builder.store.int_plus_str == 2
     assert system_with_one_component._builder.store.float_plus_bool == 2.2
+    assert system_with_one_component._builder.store.global_config == SimpleNamespace(
+        multi_process=True,
+        name="system",
+        nodes_on_gpu=[],
+        num_executors=1,
+        param_0=1,
+        param_1="1",
+        param_2=1.2,
+        param_3=True,
+    )
 
 
 def test_system_update_twice(system_with_two_components: System) -> None:
@@ -368,6 +399,16 @@ def test_system_update_twice(system_with_two_components: System) -> None:
     system_with_two_components.build()
     assert system_with_two_components._builder.store.int_plus_str == 2
     assert system_with_two_components._builder.store.float_plus_bool == 2.2
+    assert system_with_two_components._builder.store.global_config == SimpleNamespace(
+        multi_process=True,
+        name="system",
+        nodes_on_gpu=[],
+        num_executors=1,
+        param_0=1,
+        param_1="1",
+        param_2=1.2,
+        param_3=True,
+    )
 
 
 def test_system_add_twice(system_with_zero_components: System) -> None:
@@ -381,6 +422,16 @@ def test_system_add_twice(system_with_zero_components: System) -> None:
     system_with_zero_components.build()
     assert system_with_zero_components._builder.store.float_plus_bool == 2.2
     assert system_with_zero_components._builder.store.str_plus_bool == 3
+    assert system_with_zero_components._builder.store.global_config == SimpleNamespace(
+        multi_process=True,
+        name="system",
+        nodes_on_gpu=[],
+        num_executors=1,
+        param_2=1.2,
+        param_3=True,
+        param_4="2",
+        param_5=True,
+    )
 
 
 def test_system_add_and_update(system_with_zero_components: System) -> None:
@@ -393,6 +444,14 @@ def test_system_add_and_update(system_with_zero_components: System) -> None:
     system_with_zero_components.update(ComponentTwo)
     system_with_zero_components.build()
     assert system_with_zero_components._builder.store.str_plus_bool == 3
+    assert system_with_zero_components._builder.store.global_config == SimpleNamespace(
+        multi_process=True,
+        name="system",
+        nodes_on_gpu=[],
+        num_executors=1,
+        param_4="2",
+        param_5=True,
+    )
 
 
 def test_add_when_built(system_with_one_component: System) -> None:
@@ -415,6 +474,16 @@ def test_system_build_one_component_params(
     system_with_two_components.build(param_0=2, param_1="2")
     assert system_with_two_components._builder.store.int_plus_str == 4
     assert system_with_two_components._builder.store.float_plus_bool == 2.2
+    assert system_with_two_components._builder.store.global_config == SimpleNamespace(
+        multi_process=True,
+        name="system",
+        nodes_on_gpu=[],
+        num_executors=1,
+        param_0=2,
+        param_1="2",
+        param_2=1.2,
+        param_3=True,
+    )
 
 
 def test_system_build_two_component_params(
@@ -428,3 +497,13 @@ def test_system_build_two_component_params(
     system_with_two_components.build(param_0=2, param_3=False)
     assert system_with_two_components._builder.store.int_plus_str == 3
     assert system_with_two_components._builder.store.float_plus_bool == 1.2
+    assert system_with_two_components._builder.store.global_config == SimpleNamespace(
+        multi_process=True,
+        name="system",
+        nodes_on_gpu=[],
+        num_executors=1,
+        param_0=2,
+        param_1="1",
+        param_2=1.2,
+        param_3=False,
+    )
