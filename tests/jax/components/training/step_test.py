@@ -1,6 +1,23 @@
+# python3
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Tests for Step components jax-based Mava systems"""
+
 import time
 from types import SimpleNamespace
-
+from typing import Any, Dict
 import jax.numpy as jnp
 import pytest
 
@@ -11,7 +28,7 @@ from mava.components.jax.training.step import (
 from mava.systems.jax.trainer import Trainer
 
 
-def step_fn(sample: int):
+def step_fn(sample: int)->Dict[str,int]:
     """step_fn to test DefaultTrainerStep component
 
     Args:
@@ -25,10 +42,10 @@ def step_fn(sample: int):
 class MockTrainerLogger:
     """Mock of TrainerLogger to test DefaultTrainerStep component"""
 
-    def __init__(self):
+    def __init__(self)->None:
         self.written = None
 
-    def write(self, results):
+    def write(self, results:Any)->None:
         self.written = results
 
 
@@ -42,7 +59,7 @@ class MockParameterClient:
         }
         self.call_set_and_get_async = False
 
-    def add_async(self, params) -> None:
+    def add_async(self, params: Any) -> None:
         self.params = params
 
     def set_and_get_async(self) -> None:
@@ -146,7 +163,7 @@ def test_mapg_with_trust_region_step_initiator() -> None:
     assert mapg_with_trust_region_step.config.discount == 0.99
 
 
-def test_on_training_init_start(mock_trainer: MockTrainer):
+def test_on_training_init_start(mock_trainer: MockTrainer)->None:
     mapg_with_trust_region_step = MAPGWithTrustRegionStep()
     mapg_with_trust_region_step.on_training_init_start(trainer=mock_trainer)
 
@@ -157,7 +174,7 @@ def test_on_training_init_start(mock_trainer: MockTrainer):
     )
 
 
-def test_on_training_step_fn(mock_trainer: MockTrainer):
+def test_on_training_step_fn(mock_trainer: MockTrainer)->None:
     """Test on_training_init_start method from MAPGWITHTrustRegionStep component"""
     mapg_with_trust_region_step = MAPGWithTrustRegionStep()
     del mock_trainer.store.step_fn
