@@ -401,7 +401,7 @@ def test_copy_tuple_with_device(parameter_client: ParameterClient) -> None:
     parameter_client._parameters.update({"tuple_key_0": [1, 2]})
     local_devices = jax.local_devices()
     parameter_client._devices = {
-        "tuple_key_0": (local_devices[0], local_devices[0])  # type : ignore noqa : E501
+        "tuple_key_0": (local_devices[0], local_devices[0])  # type: ignore
     }
 
     parameter_client._copy(
