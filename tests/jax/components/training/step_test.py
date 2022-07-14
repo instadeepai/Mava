@@ -18,6 +18,7 @@
 import time
 from types import SimpleNamespace
 from typing import Any, Dict
+
 import jax.numpy as jnp
 import pytest
 
@@ -28,7 +29,7 @@ from mava.components.jax.training.step import (
 from mava.systems.jax.trainer import Trainer
 
 
-def step_fn(sample: int)->Dict[str,int]:
+def step_fn(sample: int) -> Dict[str, int]:
     """step_fn to test DefaultTrainerStep component
 
     Args:
@@ -42,10 +43,10 @@ def step_fn(sample: int)->Dict[str,int]:
 class MockTrainerLogger:
     """Mock of TrainerLogger to test DefaultTrainerStep component"""
 
-    def __init__(self)->None:
+    def __init__(self) -> None:
         self.written = None
 
-    def write(self, results:Any)->None:
+    def write(self, results: Any) -> None:
         self.written = results
 
 
@@ -163,7 +164,7 @@ def test_mapg_with_trust_region_step_initiator() -> None:
     assert mapg_with_trust_region_step.config.discount == 0.99
 
 
-def test_on_training_init_start(mock_trainer: MockTrainer)->None:
+def test_on_training_init_start(mock_trainer: MockTrainer) -> None:
     mapg_with_trust_region_step = MAPGWithTrustRegionStep()
     mapg_with_trust_region_step.on_training_init_start(trainer=mock_trainer)
 
@@ -174,7 +175,7 @@ def test_on_training_init_start(mock_trainer: MockTrainer)->None:
     )
 
 
-def test_on_training_step_fn(mock_trainer: MockTrainer)->None:
+def test_on_training_step_fn(mock_trainer: MockTrainer) -> None:
     """Test on_training_init_start method from MAPGWITHTrustRegionStep component"""
     mapg_with_trust_region_step = MAPGWithTrustRegionStep()
     del mock_trainer.store.step_fn
