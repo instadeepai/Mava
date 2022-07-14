@@ -152,6 +152,8 @@ def test_on_policy_data_server_no_sequence_length(
     table = mock_builder.store.data_tables[0]
 
     assert table.info.max_size == 1000
+    assert table.info.name == "trainer"
+    assert type(table.info.signature).__name__ == "Transition"
 
 
 def test_on_policy_data_server_with_sequence_length(
@@ -172,3 +174,5 @@ def test_on_policy_data_server_with_sequence_length(
     table = mock_builder.store.data_tables[0]
 
     assert table.info.max_size == 1000
+    assert table.info.name == "trainer"
+    assert type(table.info.signature).__name__ == "Step"
