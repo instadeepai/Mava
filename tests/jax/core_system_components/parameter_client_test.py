@@ -15,9 +15,11 @@
 
 """Tests for parameter client class for Jax-based Mava systems"""
 
+import copy
 from types import SimpleNamespace
 from typing import Any, Dict, List, Sequence, Set, Union
 
+import jax
 import numpy as np
 import pytest
 
@@ -68,7 +70,7 @@ class MockParameterServer(ParameterServer):
         self.store._set_params = set_params
 
         for key in set_params:
-            self.store.parameters[key] = set_params[key]
+            self.store.parameters[key] = copy.deepcopy(set_params[key])
 
 
 def increment_set_parameters(
@@ -293,12 +295,10 @@ def test_set_and_get_async(parameter_client: ParameterClient) -> None:
 
     parameter_client.set_and_get_async()
 
-    # TODO: fix weird bug where set is not working properly and
-    # settings parameters to 0.
     assert parameter_client._parameters == {
-        "key_0": np.array(0, dtype=np.int32),
+        "key_0": np.array(1, dtype=np.int32),
         "key_1": np.array(2, dtype=np.float32),
-        "key_2": np.array(0, dtype=np.int32),
+        "key_2": np.array(3, dtype=np.int32),
         "key_3": np.array(4, dtype=np.int32),
         "key_4": np.array(5, dtype=np.int32),
         "networks-network_key_0": {"layer_0": {"weights": 1, "biases": 1}},
@@ -308,6 +308,21 @@ def test_set_and_get_async(parameter_client: ParameterClient) -> None:
     }
 
     assert parameter_client._set_get_call_counter == 0
+
+    parameter_client.set_and_get_async()
+
+    assert parameter_client._set_get_future is None
+
+
+@pytest.mark.skip(reason="not working")
+def test_add_async(parameter_client: ParameterClient) -> None:
+    """Test add async method."""
+    parameter_client.add_async(params={"new_key": "new_value"})
+    assert parameter_client._add_future is not None
+
+    parameter_client.add_async(params={"new_key": "new_value"})
+
+    parameter_client.add_async(params={"new_key": "new_value"})
 
 
 def test__copy(parameter_client: ParameterClient) -> None:
@@ -339,11 +354,52 @@ def test__copy_not_implemented_error(parameter_client: ParameterClient) -> None:
         )
 
 
-def test__adjust_and_request(parameter_client: ParameterClient) -> None:
-    """Test adjust and request method"""
-    # increment set parameters
-    increment_set_parameters(
-        params=parameter_client._parameters, names=parameter_client._set_keys
+def test__copy_device_not_implemented_error(parameter_client: ParameterClient) -> None:
+    """Test that NotImplementedError is raised when a new parameter of the wrong \
+        type is passed in."""
+
+    parameter_client._devices = {"device_1": "dummy_device"}
+
+    with pytest.raises(NotImplementedError):
+        parameter_client._copy(
+            new_parameters={
+                "networks-network_key_0": {
+                    "layer_0": {"weights": "new_weights", "biases": "new_biases"}
+                }
+            },
+        )
+
+
+def test_copy_array_with_device(parameter_client: ParameterClient) -> None:
+    """Test that new parameters are set on a device when a device \
+        is give."""
+    local_devices = jax.local_devices()
+    parameter_client._devices = {"key_1": local_devices[0]}
+
+    parameter_client._copy(new_parameters={"key_1": np.array([0])})
+
+    assert type(parameter_client._parameters["key_1"]).__name__ == "DeviceArray"
+    assert parameter_client._parameters["key_1"] == jax.numpy.array([0])
+
+
+def test_copy_tuple_with_device(parameter_client: ParameterClient) -> None:
+    """Test that new parameters are set on a device when a device \
+        is give."""
+    parameter_client._parameters.update({"tuple_key_0": [1, 2]})
+    local_devices = jax.local_devices()
+    parameter_client._devices = {"tuple_key_0": (local_devices[0], local_devices[0])}
+
+    parameter_client._copy(
+        new_parameters={"tuple_key_0": (np.array([11]), np.array([22]))}
     )
 
-    parameter_client._adjust_and_request()
+    assert (
+        type(parameter_client._parameters["tuple_key_0"][0]).__name__ == "DeviceArray"
+    )
+    assert (
+        type(parameter_client._parameters["tuple_key_0"][1]).__name__ == "DeviceArray"
+    )
+    assert parameter_client._parameters["tuple_key_0"] == [
+        jax.numpy.array([11]),
+        jax.numpy.array([22]),
+    ]
