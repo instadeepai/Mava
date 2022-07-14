@@ -133,8 +133,8 @@ def test_off_policy_data_server(
     assert table.info.max_size == 100000
     assert table.info.max_times_sampled == 0
 
-    # TODO: signature type test
-    # assert issubclass(table.info.signature, types.Transition)
+    # check table signature type
+    assert type(table.info.signature).__name__ == "Transition"
 
 
 def test_on_policy_data_server_no_sequence_length(
