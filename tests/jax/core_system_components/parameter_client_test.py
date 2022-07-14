@@ -321,6 +321,22 @@ def test_add_async(parameter_client: ParameterClient) -> None:
     assert parameter_client._client.store._add_to_params == {"new_key": "new_value"}
     assert parameter_client._async_add_buffer == {}
 
+    # set add_future to dummy variable other than none
+    parameter_client._add_future._state = "not_done"  # type: ignore
+    parameter_client._async_add_buffer = {"new_key_1": 1}
+
+    parameter_client.add_async(params={"new_key_1": 1})
+
+    assert parameter_client._async_add_buffer == {"new_key_1": 2}
+
+    # set add_future to dummy variable other than none
+    # assert that new parameter is added to async buffer
+    parameter_client._add_future._state = "not_done"  # type: ignore
+    parameter_client._async_add_buffer = {}
+    parameter_client.add_async(params={"new_key_2": 1})
+
+    assert parameter_client._async_add_buffer == {"new_key_2": 1}
+
 
 def test__copy(parameter_client: ParameterClient) -> None:
     """Test _copy method with different kinds of new parameters"""
