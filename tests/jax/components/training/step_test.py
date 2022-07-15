@@ -18,6 +18,7 @@
 import time
 from types import SimpleNamespace
 from typing import Any, Dict
+from mava.types import OLT
 
 import jax.numpy as jnp
 import pytest
@@ -27,6 +28,7 @@ from mava.components.jax.training.step import (
     MAPGWithTrustRegionStep,
 )
 from mava.systems.jax.trainer import Trainer
+import jax
 
 
 def step_fn(sample: int) -> Dict[str, int]:
@@ -66,7 +68,13 @@ class MockParameterClient:
     def set_and_get_async(self) -> None:
         self.call_set_and_get_async = True
 
+def apply(a,b):
+    """apply function"""
+    return a,b
 
+def add(a,b,c):
+    """add function"""
+    return jnp.array([0.0, 0.0, 0.0]),jnp.array([0.0, 0.0, 0.0])
 class MockTrainer(Trainer):
     """Mock of Trainer"""
 
@@ -78,12 +86,16 @@ class MockTrainer(Trainer):
         }
         networks = {
             "networks": {
-                "network_agent_0": SimpleNamespace(params=jnp.array([0.0, 0.0, 0.0])),
-                "network_agent_1": SimpleNamespace(params=jnp.array([1.0, 1.0, 1.0])),
-                "network_agent_2": SimpleNamespace(params=jnp.array([2.0, 2.0, 2.0])),
+                "network_agent_0": SimpleNamespace(params=jnp.array([0.0, 0.0, 0.0]),network=SimpleNamespace(apply=apply)),
+                "network_agent_1": SimpleNamespace(params=jnp.array([1.0, 1.0, 1.0]),network=SimpleNamespace(apply=apply)),
+                "network_agent_2": SimpleNamespace(params=jnp.array([2.0, 2.0, 2.0]), network=SimpleNamespace(apply=apply)),
             }
         }
-
+        opt_states={
+            "network_agent_0":0,
+            "network_agent_1":1,
+            "network_agent_2":2,
+        }
         store = SimpleNamespace(
             dataset_iterator=iter([1, 2, 3]),
             step_fn=step_fn,
@@ -95,7 +107,10 @@ class MockTrainer(Trainer):
             sequence_length=20,
             trainer_agent_net_keys=trainer_agent_net_keys,
             networks=networks,
-            gae_fn=jnp.add,
+            gae_fn=add,
+            opt_states=opt_states,
+            key=jax.random.PRNGKey(5),
+            num_minibatches=1,
         )
         self.store = store
 
@@ -105,6 +120,48 @@ def mock_trainer() -> MockTrainer:
     """Build fixture from MockTrainer"""
     return MockTrainer()
 
+class DummySample:
+    def __init__(self):
+        self.data=SimpleNamespace(
+            observations={
+            "agent_0": OLT(
+                observation=jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
+                legal_actions=jnp.array([[1], [1], [1], [1]]),
+                terminal=jnp.array([[1], [1]]),
+            ),
+            "agent_1": OLT(
+                observation=jnp.array([[0.8, 0.3, 0.7], [1.8, 1.3, 1.7]]),
+                legal_actions=jnp.array([[1], [1], [1], [1]]),
+                terminal=jnp.array([[1], [1]]),
+            ),
+            "agent_2": OLT(
+                observation=jnp.array([[0.9, 0.9, 0.8], [1.9, 1.9, 1.8]]),
+                legal_actions=jnp.array([[1], [1], [1], [1]]),
+                terminal=jnp.array([[1], [1]]),
+            ),
+            },
+            actions={
+                "agent_0": jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
+                "agent_1": jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
+                "agent_2": jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
+            },
+            rewards={
+                "agent_0": jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
+                "agent_1": jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
+                "agent_2": jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
+            },
+            discounts={
+                "agent_0": jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
+                "agent_1": jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
+                "agent_2": jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
+            },
+            extras={
+                "policy_info":jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),}
+        )
+
+@pytest.fixture
+def dummy_sample()->DummySample:
+    return DummySample()
 
 def test_default_trainer_step_initiator() -> None:
     """Test constructor of DefaultTrainerStep component"""
@@ -184,8 +241,9 @@ def test_on_training_step_fn(mock_trainer: MockTrainer) -> None:
     assert callable(mock_trainer.store.step_fn)
 
 
-"""def test_step(mock_trainer:MockTrainer, mock_sample: MockSample)->None:
+"""def test_step(mock_trainer:MockTrainer, dummy_sample: DummySample)->None:
     mapg_with_trust_region_step=MAPGWithTrustRegionStep()
     del mock_trainer.store.step_fn
     mapg_with_trust_region_step.on_training_step_fn(trainer=mock_trainer)
-"""
+    with jax.disable_jit(): 
+        mock_trainer.store.step_fn(dummy_sample)"""
