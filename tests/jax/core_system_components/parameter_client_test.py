@@ -320,6 +320,7 @@ def test_add_async(parameter_client: ParameterClient) -> None:
     assert parameter_client._add_future is not None
     assert parameter_client._client.store._add_to_params == {"new_key": "new_value"}
     assert parameter_client._async_add_buffer == {}
+    assert parameter_client._add_future.done()
 
     # set add_future to dummy variable other than none
     parameter_client._add_future._state = "not_done"  # type: ignore
