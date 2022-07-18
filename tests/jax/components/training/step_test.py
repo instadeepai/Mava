@@ -17,18 +17,20 @@
 
 import time
 from types import SimpleNamespace
-from typing import Any, Dict
-from mava.types import OLT
+from typing import Any, Dict, Tuple
 
+import jax
 import jax.numpy as jnp
 import pytest
+from acme.jax import utils
+from optax._src import numerics
 
 from mava.components.jax.training.step import (
     DefaultTrainerStep,
     MAPGWithTrustRegionStep,
 )
 from mava.systems.jax.trainer import Trainer
-import jax
+from mava.types import OLT
 
 
 def step_fn(sample: int) -> Dict[str, int]:
@@ -40,6 +42,23 @@ def step_fn(sample: int) -> Dict[str, int]:
         Dictionary
     """
     return {"sample": sample}
+
+
+def apply(params: Any, observations: Any) -> Tuple:
+    """apply function used to test step_fn"""
+    return params, jnp.array([[0.1, 0.5], [0.1, 0.5]])
+
+
+def gae_advantages(
+    rewards: jnp.ndarray, discounts: jnp.ndarray, values: jnp.ndarray
+) -> Tuple:
+    """Uses GAE to compute advantages."""
+    return jnp.array([1]), jnp.array([1])
+
+
+def epoch_update(carry: Tuple, unused_t: Tuple[()]) -> Tuple:
+    """Performs model updates based on one epoch of data."""
+    return carry, {}
 
 
 class MockTrainerLogger:
@@ -68,13 +87,7 @@ class MockParameterClient:
     def set_and_get_async(self) -> None:
         self.call_set_and_get_async = True
 
-def apply(a,b):
-    """apply function"""
-    return a,b
 
-def add(a,b,c):
-    """add function"""
-    return jnp.array([0.0, 0.0, 0.0]),jnp.array([0.0, 0.0, 0.0])
 class MockTrainer(Trainer):
     """Mock of Trainer"""
 
@@ -86,15 +99,24 @@ class MockTrainer(Trainer):
         }
         networks = {
             "networks": {
-                "network_agent_0": SimpleNamespace(params=jnp.array([0.0, 0.0, 0.0]),network=SimpleNamespace(apply=apply)),
-                "network_agent_1": SimpleNamespace(params=jnp.array([1.0, 1.0, 1.0]),network=SimpleNamespace(apply=apply)),
-                "network_agent_2": SimpleNamespace(params=jnp.array([2.0, 2.0, 2.0]), network=SimpleNamespace(apply=apply)),
+                "network_agent_0": SimpleNamespace(
+                    params={"key": jnp.array([0.0, 0.0, 0.0])},
+                    network=SimpleNamespace(apply=apply),
+                ),
+                "network_agent_1": SimpleNamespace(
+                    params={"key": jnp.array([1.0, 1.0, 1.0])},
+                    network=SimpleNamespace(apply=apply),
+                ),
+                "network_agent_2": SimpleNamespace(
+                    params={"key": jnp.array([2.0, 2.0, 2.0])},
+                    network=SimpleNamespace(apply=apply),
+                ),
             }
         }
-        opt_states={
-            "network_agent_0":0,
-            "network_agent_1":1,
-            "network_agent_2":2,
+        opt_states = {
+            "network_agent_0": 0,
+            "network_agent_1": 1,
+            "network_agent_2": 2,
         }
         store = SimpleNamespace(
             dataset_iterator=iter([1, 2, 3]),
@@ -103,16 +125,192 @@ class MockTrainer(Trainer):
             trainer_parameter_client=MockParameterClient(),
             trainer_counts={"next_sample": 2},
             trainer_logger=MockTrainerLogger(),
-            sample_batch_size=5,
-            sequence_length=20,
+            sample_batch_size=2,
+            sequence_length=3,
             trainer_agent_net_keys=trainer_agent_net_keys,
             networks=networks,
-            gae_fn=add,
+            gae_fn=gae_advantages,
             opt_states=opt_states,
             key=jax.random.PRNGKey(5),
             num_minibatches=1,
+            epoch_update_fn=epoch_update,
+            num_epochs=2,
         )
         self.store = store
+
+
+class DummySample:
+    """Dummy Sample for step function from MAPGWITHTrustRegionStep component"""
+
+    def __init__(self) -> None:
+        self.data = SimpleNamespace(
+            observations={
+                "agent_0": OLT(
+                    observation=jnp.array(
+                        [
+                            [
+                                [0.1, 0.5, 0.7, 0.1, 0.5, 0.7],
+                                [0.1, 0.5, 0.7, 1.1, 1.5, 1.7],
+                            ],
+                            [
+                                [0.1, 0.5, 0.7, 0.1, 0.5, 0.7],
+                                [0.1, 0.5, 0.7, 1.1, 1.5, 1.7],
+                            ],
+                        ]
+                    ),
+                    legal_actions=jnp.array(
+                        [
+                            [
+                                [0.1, 0.5, 0.7, 0.1, 0.5, 0.7],
+                                [0.1, 0.5, 0.7, 1.1, 1.5, 1.7],
+                            ],
+                            [
+                                [0.1, 0.5, 0.7, 0.1, 0.5, 0.7],
+                                [0.1, 0.5, 0.7, 1.1, 1.5, 1.7],
+                            ],
+                        ]
+                    ),
+                    terminal=jnp.array(
+                        [
+                            [
+                                [0.1, 0.5, 0.7, 0.1, 0.5, 0.7],
+                                [0.1, 0.5, 0.7, 1.1, 1.5, 1.7],
+                            ],
+                            [
+                                [0.1, 0.5, 0.7, 0.1, 0.5, 0.7],
+                                [0.1, 0.5, 0.7, 1.1, 1.5, 1.7],
+                            ],
+                        ]
+                    ),
+                ),
+                "agent_1": OLT(
+                    observation=jnp.array(
+                        [
+                            [
+                                [0.1, 0.5, 0.7, 0.8, 0.3, 0.7],
+                                [0.1, 0.5, 0.7, 1.8, 1.3, 1.7],
+                            ],
+                            [
+                                [0.1, 0.5, 0.7, 0.1, 0.5, 0.7],
+                                [0.1, 0.5, 0.7, 1.1, 1.5, 1.7],
+                            ],
+                        ]
+                    ),
+                    legal_actions=jnp.array(
+                        [
+                            [
+                                [0.1, 0.5, 0.7, 0.1, 0.5, 0.7],
+                                [0.1, 0.5, 0.7, 1.1, 1.5, 1.7],
+                            ],
+                            [
+                                [0.1, 0.5, 0.7, 0.1, 0.5, 0.7],
+                                [0.1, 0.5, 0.7, 1.1, 1.5, 1.7],
+                            ],
+                        ]
+                    ),
+                    terminal=jnp.array(
+                        [
+                            [
+                                [0.1, 0.5, 0.7, 0.1, 0.5, 0.7],
+                                [0.1, 0.5, 0.7, 1.1, 1.5, 1.7],
+                            ],
+                            [
+                                [0.1, 0.5, 0.7, 0.1, 0.5, 0.7],
+                                [0.1, 0.5, 0.7, 1.1, 1.5, 1.7],
+                            ],
+                        ]
+                    ),
+                ),
+                "agent_2": OLT(
+                    observation=jnp.array(
+                        [
+                            [
+                                [0.1, 0.5, 0.7, 0.9, 0.9, 0.8],
+                                [0.1, 0.5, 0.7, 1.9, 1.9, 1.8],
+                            ],
+                            [
+                                [0.1, 0.5, 0.7, 0.1, 0.5, 0.7],
+                                [0.1, 0.5, 0.7, 1.1, 1.5, 1.7],
+                            ],
+                        ]
+                    ),
+                    legal_actions=jnp.array(
+                        [
+                            [
+                                [0.1, 0.5, 0.7, 0.1, 0.5, 0.7],
+                                [0.1, 0.5, 0.7, 1.1, 1.5, 1.7],
+                            ],
+                            [
+                                [0.1, 0.5, 0.7, 0.1, 0.5, 0.7],
+                                [0.1, 0.5, 0.7, 1.1, 1.5, 1.7],
+                            ],
+                        ]
+                    ),
+                    terminal=jnp.array(
+                        [
+                            [
+                                [0.1, 0.5, 0.7, 0.1, 0.5, 0.7],
+                                [0.1, 0.5, 0.7, 1.1, 1.5, 1.7],
+                            ],
+                            [
+                                [0.1, 0.5, 0.7, 0.1, 0.5, 0.7],
+                                [0.1, 0.5, 0.7, 1.1, 1.5, 1.7],
+                            ],
+                        ]
+                    ),
+                ),
+            },
+            actions={
+                "agent_0": jnp.array(
+                    [
+                        [[1, 1, 1, 1, 1, 1], [0, 0, 0, 0, 0, 0]],
+                        [[1, 1, 1, 1, 1, 1], [0, 0, 0, 0, 0, 0]],
+                    ]
+                ),
+                "agent_1": jnp.array(
+                    [
+                        [[0, 0, 0, 0, 0, 0], [1, 1, 1, 1, 1, 1]],
+                        [[1, 1, 1, 1, 1, 1], [0, 0, 0, 0, 0, 0]],
+                    ]
+                ),
+                "agent_2": jnp.array(
+                    [
+                        [[1, 1, 1, 1, 0, 1], [0, 0, 0, 0, 0, 0]],
+                        [[1, 1, 1, 1, 0, 1], [0, 0, 0, 0, 0, 0]],
+                    ]
+                ),
+            },
+            rewards={
+                "agent_0": jnp.array([[1, 2], [1, 2]]),
+                "agent_1": jnp.array([[2, 3], [2, 3]]),
+                "agent_2": jnp.array([[3, 5], [3, 5]]),
+            },
+            discounts={
+                "agent_0": jnp.array(
+                    [[0.1, 0.5, 0.7, 0.1, 0.5, 0.7], [0.1, 0.5, 0.7, 1.1, 1.5, 1.7]]
+                ),
+                "agent_1": jnp.array(
+                    [[0.1, 0.5, 0.7, 0.1, 0.5, 0.7], [0.1, 0.5, 0.7, 1.1, 1.5, 1.7]]
+                ),
+                "agent_2": jnp.array(
+                    [[0.1, 0.5, 0.7, 0.1, 0.5, 0.7], [0.1, 0.5, 0.7, 1.1, 1.5, 1.7]]
+                ),
+            },
+            extras={
+                "policy_info": jnp.array(
+                    [
+                        [
+                            [3.1, 0.5, 0.7, 0.1, 0.5, 0.7],
+                            [3.1, 0.5, 0.7, 1.1, 1.5, 1.7],
+                        ],
+                        [
+                            [3.1, 0.5, 0.7, 0.1, 0.5, 0.7],
+                            [3.1, 0.5, 0.7, 1.1, 1.5, 1.7],
+                        ],
+                    ]
+                ),
+            },
+        )
 
 
 @pytest.fixture
@@ -120,48 +318,12 @@ def mock_trainer() -> MockTrainer:
     """Build fixture from MockTrainer"""
     return MockTrainer()
 
-class DummySample:
-    def __init__(self):
-        self.data=SimpleNamespace(
-            observations={
-            "agent_0": OLT(
-                observation=jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
-                legal_actions=jnp.array([[1], [1], [1], [1]]),
-                terminal=jnp.array([[1], [1]]),
-            ),
-            "agent_1": OLT(
-                observation=jnp.array([[0.8, 0.3, 0.7], [1.8, 1.3, 1.7]]),
-                legal_actions=jnp.array([[1], [1], [1], [1]]),
-                terminal=jnp.array([[1], [1]]),
-            ),
-            "agent_2": OLT(
-                observation=jnp.array([[0.9, 0.9, 0.8], [1.9, 1.9, 1.8]]),
-                legal_actions=jnp.array([[1], [1], [1], [1]]),
-                terminal=jnp.array([[1], [1]]),
-            ),
-            },
-            actions={
-                "agent_0": jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
-                "agent_1": jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
-                "agent_2": jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
-            },
-            rewards={
-                "agent_0": jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
-                "agent_1": jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
-                "agent_2": jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
-            },
-            discounts={
-                "agent_0": jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
-                "agent_1": jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
-                "agent_2": jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
-            },
-            extras={
-                "policy_info":jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),}
-        )
 
 @pytest.fixture
-def dummy_sample()->DummySample:
+def dummy_sample() -> DummySample:
+    """Build fixture from DUmmySample"""
     return DummySample()
+
 
 def test_default_trainer_step_initiator() -> None:
     """Test constructor of DefaultTrainerStep component"""
@@ -222,6 +384,7 @@ def test_mapg_with_trust_region_step_initiator() -> None:
 
 
 def test_on_training_init_start(mock_trainer: MockTrainer) -> None:
+    """Test on_training_init_start method from MAPGWITHTrustRegionStep component"""
     mapg_with_trust_region_step = MAPGWithTrustRegionStep()
     mapg_with_trust_region_step.on_training_init_start(trainer=mock_trainer)
 
@@ -233,7 +396,7 @@ def test_on_training_init_start(mock_trainer: MockTrainer) -> None:
 
 
 def test_on_training_step_fn(mock_trainer: MockTrainer) -> None:
-    """Test on_training_init_start method from MAPGWITHTrustRegionStep component"""
+    """Test on_training_step_fn method from MAPGWITHTrustRegionStep component"""
     mapg_with_trust_region_step = MAPGWithTrustRegionStep()
     del mock_trainer.store.step_fn
     mapg_with_trust_region_step.on_training_step_fn(trainer=mock_trainer)
@@ -241,9 +404,59 @@ def test_on_training_step_fn(mock_trainer: MockTrainer) -> None:
     assert callable(mock_trainer.store.step_fn)
 
 
-"""def test_step(mock_trainer:MockTrainer, dummy_sample: DummySample)->None:
-    mapg_with_trust_region_step=MAPGWithTrustRegionStep()
+def test_step(mock_trainer: MockTrainer, dummy_sample: DummySample) -> None:
+    """Test step function"""
+    mapg_with_trust_region_step = MAPGWithTrustRegionStep()
     del mock_trainer.store.step_fn
     mapg_with_trust_region_step.on_training_step_fn(trainer=mock_trainer)
-    with jax.disable_jit(): 
-        mock_trainer.store.step_fn(dummy_sample)"""
+    old_key = mock_trainer.store.key
+    with jax.disable_jit():
+        metrics = mock_trainer.store.step_fn(dummy_sample)
+
+    assert list(metrics.keys()) == [
+        "norm_params",
+        "observations_mean",
+        "observations_std",
+        "rewards_mean",
+        "rewards_std",
+    ]
+
+    updates = {
+        net_key: mock_trainer.store.networks["networks"][net_key].params
+        for net_key in mock_trainer.store.networks["networks"].keys()
+    }
+    assert metrics["norm_params"] == jnp.sqrt(
+        sum([jnp.sum(numerics.abs_sq(x)) for x in jax.tree_leaves(updates)])
+    )
+
+    observations = jax.tree_map(lambda x: x[:, :-1], dummy_sample.data.observations)
+    assert metrics["observations_mean"] == jnp.mean(
+        utils.batch_concat(
+            jax.tree_map(lambda x: jnp.abs(jnp.mean(x, axis=(0, 1))), observations),
+            num_batch_dims=0,
+        )
+    )
+
+    assert metrics["observations_std"] == jnp.mean(
+        utils.batch_concat(
+            jax.tree_map(lambda x: jnp.std(x, axis=(0, 1)), observations),
+            num_batch_dims=0,
+        )
+    )
+
+    assert metrics["rewards_mean"] == jax.tree_map(
+        lambda x: jnp.mean(jnp.abs(jnp.mean(x, axis=(0, 1)))), dummy_sample.data.rewards
+    )
+
+    assert metrics["rewards_std"] == jax.tree_map(
+        lambda x: jnp.std(x, axis=(0, 1)), dummy_sample.data.rewards
+    )
+
+    random_key, _ = jax.random.split(old_key)
+    assert list(mock_trainer.store.key) == list(random_key)
+
+    assert mock_trainer.store.opt_states == {
+        "network_agent_0": 0,
+        "network_agent_1": 1,
+        "network_agent_2": 2,
+    }
