@@ -32,7 +32,7 @@ from mava.systems.jax.trainer import Trainer
 from mava.types import OLT
 
 
-def fake_grad_fn(
+def fake_ppo_grad_fn(
     params: Any,
     observations: Any,
     actions: Dict[str, jnp.ndarray],
@@ -54,14 +54,11 @@ def fake_grad_fn(
         gradient: fake gradient
         agent_metrics: fake metrics dictionary
     """
-    gradient = {
-        "agent_0": jnp.array([5.0, 5.0, 5.0]),
-        "agent_1": jnp.array([5.0, 5.0, 5.0]),
-        "agent_2": jnp.array([5.0, 5.0, 5.0]),
-    }
 
+    gradient: Dict[str, Any] = {}
     agent_metrics: Dict[str, Any] = {}
     for agent_key in actions.keys():
+        gradient[agent_key]=jnp.array([5.0, 5.0, 5.0])
         agent_metrics[agent_key] = {}
 
     return (gradient, agent_metrics)
@@ -86,7 +83,7 @@ class MockTrainer(Trainer):
         }
         self.store = SimpleNamespace(
             networks=networks,
-            grad_fn=fake_grad_fn,
+            grad_fn=fake_ppo_grad_fn,
             trainer_agents=trainer_agents,
             trainer_agent_net_keys=trainer_agent_net_keys,
             full_batch_size=2,
