@@ -13,90 +13,166 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for config class for Jax-based Mava systems"""
-from typing import Any, Dict
+"""Tests for data server components of Jax-based Mava systems"""
+
+from types import SimpleNamespace
+from typing import Any, List
 
 import pytest
-from reverb import item_selectors, pybind, reverb_types
+import reverb
 
+from mava.adders import reverb as reverb_adders
+from mava.callbacks.base import Callback
+from mava.components.jax.building.data_server import (
+    OffPolicyDataServer,
+    OnPolicyDataServer,
+)
+from mava.components.jax.building.environments import (
+    EnvironmentSpec,
+    EnvironmentSpecConfig,
+)
+from mava.systems.jax.builder import Builder
 from mava.utils import enums
-from tests.jax.mocks import return_test_system
-from tests.jax.utils import assert_if_value_is_not_none
+from tests.jax.mocks import make_fake_environment_factory
 
-from .data_server_test_data import transition_adder_data_server_test_cases
+
+class MockBuilder(Builder):
+    def __init__(
+        self,
+        components: List[Callback],
+        global_config: SimpleNamespace = SimpleNamespace(),
+    ) -> None:
+        """Initialize mock builder for tests."""
+        super().__init__(components, global_config)
+
+
+@pytest.fixture
+def mock_builder() -> Builder:
+    """Creates mock builder.
+
+    Here the system has shared weights and fixed network sampling.
+
+    Returns:
+        Builder: Mava builder
+    """
+
+    # Create environment spec for adding to builder
+    environment_spec = EnvironmentSpec(
+        EnvironmentSpecConfig(environment_factory=make_fake_environment_factory())
+    )
+
+    builder = MockBuilder(
+        components=[],
+        global_config=SimpleNamespace(
+            network_sampling_setup_type=enums.NetworkSampler.fixed_agent_networks
+        ),
+    )
+
+    # Add environment spec to builder
+    environment_spec.on_building_init_start(builder)
+
+    builder.store.table_network_config = {
+        "trainer": ["network_agent", "network_agent", "network_agent"]
+    }
+    builder.store.agent_net_keys = {
+        "agent_0": "network_agent",
+        "agent_1": "network_agent",
+        "agent_2": "network_agent",
+    }
+    builder.store.extras_spec = {}
+
+    return builder
 
 
 @pytest.mark.parametrize(
-    "components",
-    transition_adder_data_server_test_cases,
+    "sampler, remover, sampler_field, remover_field",
+    [
+        (reverb.selectors.Uniform(), reverb.selectors.Lifo(), "uniform", "lifo"),
+        (reverb.selectors.MinHeap(), reverb.selectors.Fifo(), "heap", "fifo"),
+        (
+            reverb.selectors.Prioritized(0.5),
+            reverb.selectors.Lifo(),
+            "prioritized",
+            "lifo",
+        ),
+    ],
 )
-class TestDataServer:
-    # Adapted from
-    # https://github.com/deepmind/reverb/blob/c5ea7c37118d0de4ff2320bf5519ba79ad1d4284/reverb/server_test.py#L102
-    def _check_selector_proto(
-        self, expected_selector: reverb_types.SelectorType, proto_msg: Any
-    ) -> None:
-        if isinstance(expected_selector, item_selectors.Uniform):
-            assert proto_msg.HasField("uniform")
-        elif isinstance(expected_selector, item_selectors.Prioritized):
-            assert proto_msg.HasField("prioritized")
-        elif isinstance(expected_selector, pybind.HeapSelector):
-            assert proto_msg.HasField("heap")
-        elif isinstance(expected_selector, item_selectors.Fifo):
-            assert proto_msg.HasField("fifo")
-        elif isinstance(expected_selector, item_selectors.Lifo):
-            assert proto_msg.HasField("lifo")
-        else:
-            raise ValueError(f"Unknown selector: {expected_selector}")
+def test_off_policy_data_server(
+    mock_builder: Builder,
+    sampler: Any,
+    remover: Any,
+    sampler_field: str,
+    remover_field: str,
+) -> None:
+    """First test for data server.
 
-    def test_data_server(
-        self,
-        components: Dict[str, Dict],
-    ) -> None:
-        """Test if system builder instantiates processes as expected."""
-        # Get specified component
-        test_system = return_test_system(components["component"])
-        system_config = components["system_config"]
-        test_system.build(**system_config)
+    Args:
+        mock_builder : Mava builder
+        sampler: reverb sampler
+        remover: reverb remover
+        sampler_field: string to test remover type
+        remover_field: string to test remover type
+    """
 
-        # Manually add needed parameter to global config
-        test_system._builder.store.global_config.network_sampling_setup_type = (
-            enums.NetworkSampler.fixed_agent_networks
-        )
+    mock_builder.store.rate_limiter_fn = lambda: reverb.rate_limiters.MinSize(1000)
+    mock_builder.store.adder_signature_fn = (
+        lambda x, y: reverb_adders.ParallelNStepTransitionAdder.signature(x, y)
+    )
+    mock_builder.store.sampler_fn = lambda: sampler
+    mock_builder.store.remover_fn = lambda: remover
 
-        test_system._builder.data_server()
+    data_server = OffPolicyDataServer()
+    data_server.on_building_data_server(mock_builder)
 
-        # Assuming a single table for now
-        table = test_system._builder.store.data_tables[0]
-        table_info = table.info
+    table = mock_builder.store.data_tables[0]
 
-        # Testing table is set correctly
-        assert (
-            table_info.name
-            == list(test_system._builder.store.table_network_config.keys())[
-                0
-            ]  # noqa:E501
-        ), f"{table_info.name} {list(test_system._builder.store.table_network_config.keys())[0]}"  # noqa: E501
+    assert table.info.name == "trainer"
+    assert table.info.rate_limiter_info.min_size_to_sample == 1000
+    assert table.info.sampler_options.HasField(sampler_field)
+    assert table.info.remover_options.HasField(remover_field)
+    assert table.info.max_size == 100000
+    assert table.info.max_times_sampled == 0
 
-        # Off policy params
-        assert_if_value_is_not_none(system_config.get("max_size"), table_info.max_size)
-        assert_if_value_is_not_none(
-            system_config.get("max_times_sampled"), table_info.max_times_sampled
-        )
-        assert_if_value_is_not_none(
-            system_config.get("min_data_server_size"),
-            table_info.rate_limiter_info.min_size_to_sample,
-        )
-        if system_config.get("sampler"):
-            self._check_selector_proto(
-                system_config["sampler"], table_info.sampler_options
-            )
-        if system_config.get("remover"):
-            self._check_selector_proto(
-                system_config["remover"], table_info.remover_options
-            )
+    # check table signature type
+    assert type(table.info.signature).__name__ == "Transition"
 
-        # On policy params
-        assert_if_value_is_not_none(
-            system_config.get("max_queue_size"), table_info.max_size
-        )
+
+def test_on_policy_data_server_no_sequence_length(
+    mock_builder: Builder,
+) -> None:
+    """Tests on policy data server when no sequence length is given"""
+
+    mock_builder.store.adder_signature_fn = lambda env_specs, extras_specs: reverb_adders.ParallelNStepTransitionAdder.signature(  # noqa: E501
+        env_specs, extras_specs
+    )
+
+    data_server = OnPolicyDataServer()
+    data_server.on_building_data_server(mock_builder)
+
+    table = mock_builder.store.data_tables[0]
+
+    assert table.info.max_size == 1000
+    assert table.info.name == "trainer"
+    assert type(table.info.signature).__name__ == "Transition"
+
+
+def test_on_policy_data_server_with_sequence_length(
+    mock_builder: Builder,
+) -> None:
+    """Tests on policy data server when sequence length and \
+        sequence adder is given"""
+
+    mock_builder.store.adder_signature_fn = lambda env_specs, seq_length, extras_specs: reverb_adders.ParallelSequenceAdder.signature(  # noqa: E501
+        env_specs, seq_length, extras_specs
+    )
+
+    mock_builder.store.sequence_length = 20
+
+    data_server = OnPolicyDataServer()
+    data_server.on_building_data_server(mock_builder)
+
+    table = mock_builder.store.data_tables[0]
+
+    assert table.info.max_size == 1000
+    assert table.info.name == "trainer"
+    assert type(table.info.signature).__name__ == "Step"
