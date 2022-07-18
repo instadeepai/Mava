@@ -58,7 +58,7 @@ def fake_ppo_grad_fn(
     gradient: Dict[str, Any] = {}
     agent_metrics: Dict[str, Any] = {}
     for agent_key in actions.keys():
-        gradient[agent_key]=jnp.array([5.0, 5.0, 5.0])
+        gradient[agent_key] = jnp.array([5.0, 5.0, 5.0])
         agent_metrics[agent_key] = {}
 
     return (gradient, agent_metrics)
