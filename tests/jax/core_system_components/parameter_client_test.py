@@ -397,7 +397,7 @@ def test_copy_array_with_device(parameter_client: ParameterClient) -> None:
 
 def test_copy_tuple_with_device(parameter_client: ParameterClient) -> None:
     """Test that new parameters are set on a device when a device \
-        is give."""
+        is given."""
     parameter_client._parameters.update({"tuple_key_0": [1, 2]})
     local_devices = jax.local_devices()
     parameter_client._devices = {
