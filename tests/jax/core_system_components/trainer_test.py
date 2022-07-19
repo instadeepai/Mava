@@ -26,6 +26,8 @@ from tests.jax.hook_order_tracking import HookOrderTracking
 
 
 class TestTrainer(HookOrderTracking, Trainer):
+    __test__ = False
+
     def __init__(
         self,
         config: SimpleNamespace,

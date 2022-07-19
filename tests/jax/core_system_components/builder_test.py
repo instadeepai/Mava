@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2022 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,94 +13,231 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for config class for Jax-based Mava systems"""
+from types import SimpleNamespace
+from typing import List
 
-from typing import Dict, Tuple
-
-import acme
 import pytest
 
-from mava.components.jax.building.adders import ParallelTransitionAdderSignature
-from mava.components.jax.building.environments import EnvironmentSpec
-from mava.components.jax.building.system_init import FixedNetworkSystemInit
-from mava.specs import DesignSpec
-from mava.systems.jax import ParameterServer, Trainer
-from mava.systems.jax.system import System
-from tests.jax import mocks
+from mava.callbacks import Callback
+from mava.components.jax.building import Logger
+from mava.systems.jax import Builder, Executor, ParameterServer, Trainer
+from tests.jax.hook_order_tracking import HookOrderTracking
 
 
-class TestSystem(System):
-    def design(self) -> Tuple[DesignSpec, Dict]:
-        """Mock system design with zero components.
+class TestBuilder(HookOrderTracking, Builder):
+    __test__ = False
 
-        Returns:
-            system callback components
-        """
-        components = DesignSpec(
-            system_init=FixedNetworkSystemInit,
-            environment_spec=EnvironmentSpec,
-            data_server=mocks.MockOnPolicyDataServer,
-            data_server_signature=ParallelTransitionAdderSignature,
-            parameter_server=mocks.MockParameterServer,
-            executor_parameter_client=mocks.MockExecutorParameterClient,
-            trainer_parameter_client=mocks.MockTrainerParameterClient,
-            logger=mocks.MockLogger,
-            executor=mocks.MockExecutor,
-            executor_adder=mocks.MockAdder,
-            executor_environment_loop=mocks.MockExecutorEnvironmentLoop,
-            trainer=mocks.MockTrainer,
-            trainer_dataset=mocks.MockTrainerDataset,
-            distributor=mocks.MockDistributor,
-        )
-        return components, {}
+    def __init__(
+        self,
+        components: List[Callback],
+        global_config: SimpleNamespace,
+    ) -> None:
+        """Initialise the builder."""
+        self.reset_hook_list()
+
+        super().__init__(components=components, global_config=global_config)
+        self.store.data_tables = ["data_table_1", "data_table_2"]
+        self.store.system_executor = "system_executor"
+        self.store.adder = "adder"
 
 
 @pytest.fixture
-def test_system() -> System:
-    """Dummy system with zero components."""
-    return TestSystem()
+def test_builder() -> Builder:
+    """Dummy builder with no components."""
+    return TestBuilder(
+        components=[Logger()],
+        global_config=SimpleNamespace(config_key="config_value"),
+    )
 
 
-# TODO Rewrite test
-def test_builder(
-    test_system: System,
-) -> None:
-    """Test if system builder instantiates processes as expected."""
-    test_system.build(environment_factory=mocks.make_fake_environment_factory())
-    (
-        data_server,
-        parameter_server,
-        executor,
-        evaluator,
-        trainer,
-    ) = test_system._builder.store.system_build
+def test_global_config_loaded(test_builder: TestBuilder) -> None:
+    """Test that global config is loaded into the store during init()."""
+    assert test_builder.store.global_config.config_key == "config_value"
+    assert len(test_builder.callbacks) == 1
+    assert isinstance(test_builder.callbacks[0], Logger)
 
+
+def test_data_server_store(test_builder: TestBuilder) -> None:
+    """Test that store is handled correctly in data_server()."""
+    assert test_builder.data_server() == ["data_table_1", "data_table_2"]
+
+
+def test_parameter_server_store(test_builder: TestBuilder) -> None:
+    """Test that store is handled correctly in parameter_server()."""
+    parameter_server = test_builder.parameter_server()
     assert isinstance(parameter_server, ParameterServer)
+    assert parameter_server.store == test_builder.store
 
-    assert isinstance(executor, acme.core.Worker)
-    # exec_data_client, env, exec = executor
-    # exec_logger, exec_logger_param = env
-    # assert exec_data_client == data_server
-    # assert exec_logger_param == "param"
-    # assert exec_logger == 1
 
-    # exec_id, exec_adder, exec_param_client, exec_param = exec
-    # assert exec_id == "executor"
-    # assert type(exec_param_client[0]) == ParameterServer
-    # assert exec_param_client[1] == 1
-    # assert exec_adder == 2.7
-    # assert exec_param == 1
+def test_executor_store_when_is_evaluator(test_builder: TestBuilder) -> None:
+    """Test that store is handled correctly in executor() when it's an evaluator."""
+    executor_id = "evaluator"
+    data_server_client = "data_server_client"
+    parameter_server_client = "parameter_server_client"
+    assert (
+        test_builder.executor(
+            executor_id=executor_id,
+            data_server_client=data_server_client,
+            parameter_server_client=parameter_server_client,
+        )
+        == "system_executor"
+    )
 
-    assert isinstance(evaluator, acme.core.Worker)
-    # eval_env, eval_exec = evaluator
-    # eval_id, eval_param_client, eval_exec_param = eval_exec
-    # assert eval_env == env
-    # assert eval_id == "evaluator"
-    # assert eval_param_client == exec_param_client
-    # assert eval_exec_param == exec_param
+    assert test_builder.store.executor_id == executor_id
+    assert test_builder.store.data_server_client == data_server_client
+    assert test_builder.store.parameter_server_client == parameter_server_client
+    assert test_builder.store.is_evaluator
+    assert test_builder.store.adder is None
 
+    assert isinstance(test_builder.store.executor, Executor)
+    assert test_builder.store.executor.store == test_builder.store
+
+
+def test_executor_store_when_executor(test_builder: TestBuilder) -> None:
+    """Test that store is handled correctly in executor() when it's an executor."""
+    executor_id = "executor"
+    data_server_client = "data_server_client"
+    parameter_server_client = "parameter_server_client"
+    assert (
+        test_builder.executor(
+            executor_id=executor_id,
+            data_server_client=data_server_client,
+            parameter_server_client=parameter_server_client,
+        )
+        == "system_executor"
+    )
+
+    assert test_builder.store.executor_id == executor_id
+    assert test_builder.store.data_server_client == data_server_client
+    assert test_builder.store.parameter_server_client == parameter_server_client
+    assert not test_builder.store.is_evaluator
+    assert test_builder.store.adder == "adder"
+
+    assert isinstance(test_builder.store.executor, Executor)
+    assert test_builder.store.executor.store == test_builder.store
+
+
+def test_trainer_store(test_builder: TestBuilder) -> None:
+    """Test that store is handled correctly in trainer()."""
+    trainer_id = "trainer"
+    data_server_client = "data_server_client"
+    parameter_server_client = "parameter_server_client"
+
+    trainer = test_builder.trainer(
+        trainer_id=trainer_id,
+        data_server_client=data_server_client,
+        parameter_server_client=parameter_server_client,
+    )
     assert isinstance(trainer, Trainer)
-    # assert train_id == "trainer"
-    # assert train_logger == 1
-    # assert train_dataset == 5
-    # assert train_param_client == (2, "param")
+    assert trainer.store == test_builder.store
+
+    assert test_builder.store.trainer_id == trainer_id
+    assert test_builder.store.data_server_client == data_server_client
+    assert test_builder.store.parameter_server_client == parameter_server_client
+
+
+def test_init_hook_order(test_builder: TestBuilder) -> None:
+    """Test if init() hooks are called in the correct order."""
+    assert test_builder.hook_list == [
+        "on_building_init_start",
+        "on_building_init",
+        "on_building_init_end",
+    ]
+
+
+def test_data_server_hook_order(test_builder: TestBuilder) -> None:
+    """Test if data_server() hooks are called in the correct order."""
+    test_builder.reset_hook_list()
+    test_builder.data_server()
+    assert test_builder.hook_list == [
+        "on_building_data_server_start",
+        "on_building_data_server_adder_signature",
+        "on_building_data_server_rate_limiter",
+        "on_building_data_server",
+        "on_building_data_server_end",
+    ]
+
+
+def test_parameter_server_hook_order(test_builder: TestBuilder) -> None:
+    """Test if parameter_server() hooks are called in the correct order."""
+    test_builder.reset_hook_list()
+    test_builder.parameter_server()
+    assert test_builder.hook_list == [
+        "on_building_parameter_server_start",
+        "on_building_parameter_server",
+        "on_building_parameter_server_end",
+    ]
+
+
+def test_executor_hook_order_when_executor(test_builder: TestBuilder) -> None:
+    """Test if executor() hooks are called in the correct order when executor."""
+    test_builder.reset_hook_list()
+    test_builder.executor(
+        executor_id="executor", data_server_client="", parameter_server_client=""
+    )
+    assert test_builder.hook_list == [
+        "on_building_executor_start",
+        "on_building_executor_adder_priority",
+        "on_building_executor_adder",
+        "on_building_executor_logger",
+        "on_building_executor_parameter_client",
+        "on_building_executor",
+        "on_building_executor_environment",
+        "on_building_executor_environment_loop",
+        "on_building_executor_end",
+    ]
+
+
+def test_executor_hook_order_when_evaluator(test_builder: TestBuilder) -> None:
+    """Test if executor() hooks are called in the correct order when evaluator."""
+    test_builder.reset_hook_list()
+    test_builder.executor(
+        executor_id="evaluator", data_server_client="", parameter_server_client=""
+    )
+    assert test_builder.hook_list == [
+        "on_building_executor_start",
+        "on_building_executor_logger",
+        "on_building_executor_parameter_client",
+        "on_building_executor",
+        "on_building_executor_environment",
+        "on_building_executor_environment_loop",
+        "on_building_executor_end",
+    ]
+
+
+def test_trainer_hook_order(test_builder: TestBuilder) -> None:
+    """Test if trainer() hooks are called in the correct order."""
+    test_builder.reset_hook_list()
+    test_builder.trainer(
+        trainer_id="trainer", data_server_client="", parameter_server_client=""
+    )
+    assert test_builder.hook_list == [
+        "on_building_trainer_start",
+        "on_building_trainer_logger",
+        "on_building_trainer_dataset",
+        "on_building_trainer_parameter_client",
+        "on_building_trainer",
+        "on_building_trainer_end",
+    ]
+
+
+def test_build_hook_order(test_builder: TestBuilder) -> None:
+    """Test if build() hooks are called in the correct order."""
+    test_builder.reset_hook_list()
+    test_builder.build()
+    assert test_builder.hook_list == [
+        "on_building_start",
+        "on_building_program_nodes",
+        "on_building_end",
+    ]
+
+
+def test_launch_hook_order(test_builder: TestBuilder) -> None:
+    """Test if launch() hooks are called in the correct order."""
+    test_builder.reset_hook_list()
+    test_builder.launch()
+    assert test_builder.hook_list == [
+        "on_building_launch_start",
+        "on_building_launch",
+        "on_building_launch_end",
+    ]
