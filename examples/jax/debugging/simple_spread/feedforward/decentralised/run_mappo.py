@@ -33,7 +33,7 @@ flags.DEFINE_string(
 )
 flags.DEFINE_string(
     "action_space",
-    "discrete",
+    "continuous",
     "Environment action space type (str).",
 )
 
@@ -75,7 +75,7 @@ def main(_: Any) -> None:
     logger_factory = functools.partial(
         logger_utils.make_logger,
         directory=FLAGS.base_dir,
-        to_terminal=False,
+        to_terminal=True,
         to_tensorboard=True,
         time_stamp=FLAGS.mava_id,
         time_delta=log_every,

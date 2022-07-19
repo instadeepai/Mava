@@ -52,18 +52,15 @@ class ClippedGaussianDistribution:
         return self._guassian_dist.entropy()
 
     def sample(self, seed):
-        # print(self._guassian_dist)
-        # return self.clip_fn(self._guassian_dist).sample(seed=seed)
-        return self._guassian_dist.sample(seed=seed)
+        
+        dist_sample = self._guassian_dist.sample(seed=seed)
+        return self.clip_fn(dist_sample)
 
     def log_prob(self, action):
-        # return self.clip_fn(self._guassian_dist).log_prob(action)
-        return self._guassian_dist.log_prob(action)
+       
+        unclipped_log_prob = self._guassian_dist.log_prob(action)
+        return self.clip_fn(unclipped_log_prob)
 
-    def batch_reshape(self, dims, name: str = "reshaped") -> None:
-        self._guassian_dist = tfd.BatchReshape(
-            self._guassian_dist, batch_shape=dims, name=name
-        )
 
 
 class ClippedGaussianHead(hk.Module):
@@ -98,7 +95,7 @@ class PPONetworks:
         self.entropy = entropy
         self.sample = sample
 
-        # @jit
+        @jit
         def forward_fn(
             params: Dict[str, jnp.ndarray],
             observations: networks_lib.Observation,
@@ -112,11 +109,9 @@ class PPONetworks:
             # if mask is not None:
             # distribution = action_mask_categorical_policies(distribution, mask)
             # print(distribution)
-            # exit()
             actions = jax.numpy.squeeze(distribution.sample(seed=key))
-            print(actions)
             log_prob = distribution.log_prob(actions)
-            # print(log_prob)
+            
             return actions, log_prob
 
         self.forward_fn = forward_fn
@@ -130,8 +125,8 @@ class PPONetworks:
         """TODO: Add description here."""
         actions, log_prob = self.forward_fn(self.params, observations, key, mask)
         # actions = np.array(actions, dtype=np.int64)
-        # Continuous actions a re floats
-        actions = np.array(actions, dtype=np.float64)
+        # Continuous actions are floats
+        actions = np.array(actions, dtype=np.float32)
         log_prob = np.squeeze(np.array(log_prob, dtype=np.float32))
         return actions, {"log_prob": log_prob}
 
@@ -261,9 +256,6 @@ def make_continuous_networks(
 
         action_distribution = policy_network(inputs)
         value = value_network(inputs)
-        # print("*****ACTION*****")
-        # print(action_distribution)
-        # exit()
         return (action_distribution, value)
 
     # Transform into pure functions.
