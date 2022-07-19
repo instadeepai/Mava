@@ -25,48 +25,42 @@ from reverb import server as reverb_server
 from mava.systems.jax.launcher import Launcher, NodeType
 
 
-def data_server() -> List[Any]:
-    """data_server
-
-    Returns:
-            tables: fake table composed of reverb_server tables
-    """
-    return [
-        reverb_server.Table(
-            name="table_0",
-            sampler=item_selectors.Prioritized(priority_exponent=1),
-            remover=item_selectors.Fifo(),
-            max_size=1000,
-            rate_limiter=rate_limiters.MinSize(1),
-        )
-    ]
-
-
 @pytest.fixture
 def mock_data_server_fn() -> Callable:
     """call data_server function"""
+    def data_server() -> List[Any]:
+        """data_server
+
+        Returns:
+                tables: fake table composed of reverb_server tables
+        """
+        return [
+            reverb_server.Table(
+                name="table_0",
+                sampler=item_selectors.Prioritized(priority_exponent=1),
+                remover=item_selectors.Fifo(),
+                max_size=1000,
+                rate_limiter=rate_limiters.MinSize(1),
+            )
+        ]
     return data_server
-
-
-def parameter_server() -> str:
-    """Fake parameter server function"""
-    return "test_parameter_server"
 
 
 @pytest.fixture
 def mock_parameter_server_fn() -> Callable:
     """call parameter_server function"""
+    def parameter_server() -> str:
+        """Fake parameter server function"""
+        return "test_parameter_server"
     return parameter_server
-
-
-def parameter_server_second() -> str:
-    """ANother fake parameter server function"""
-    return "test_parameter_server_second_mock"
 
 
 @pytest.fixture
 def mock_parameter_server_second_fn() -> Callable:
     """call the second parameter_server function"""
+    def parameter_server_second() -> str:
+        """Another fake parameter server function"""
+        return "test_parameter_server_second_mock"
     return parameter_server_second
 
 
@@ -234,7 +228,7 @@ def test_add_non_multi_process_reverb_node(mock_data_server_fn: Callable) -> Non
         mock_data_server_fn
     """
     launcher = Launcher(multi_process=False)
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         data_server = launcher.add(
             mock_data_server_fn,
             node_type=NodeType.reverb,
@@ -270,7 +264,7 @@ def test_add_non_multi_process_courier_node(mock_parameter_server_fn: Callable) 
         mock_parameter_server_fn
     """
     launcher = Launcher(multi_process=False)
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         parameter_server = launcher.add(
             mock_parameter_server_fn,
             node_type=NodeType.corrier,
@@ -346,7 +340,7 @@ def test_add_non_multi_process_two_add_same_name(
         node_type=NodeType.corrier,
         name="parameter_server",
     )
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         parameter_server_2 = launcher.add(
             mock_parameter_server_second_fn,
             node_type=NodeType.corrier,
@@ -357,7 +351,7 @@ def test_add_non_multi_process_two_add_same_name(
 def test_get_nodes_multi_process() -> None:
     """Test get_nodes method in case of multi process"""
     launcher = Launcher(multi_process=True)
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         launcher.get_nodes()
 
 
