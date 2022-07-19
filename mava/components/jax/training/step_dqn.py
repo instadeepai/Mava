@@ -42,8 +42,8 @@ class MADQNStepConfig:
 
 class MADQNStep(Step):
     def __init__(
-            self,
-            config: MADQNStepConfig = MADQNStepConfig(),
+        self,
+        config: MADQNStepConfig = MADQNStepConfig(),
     ):
         """_summary_
 
@@ -57,7 +57,7 @@ class MADQNStep(Step):
 
         # @jit
         def sgd_step(
-                states: TrainingState, sample: reverb.ReplaySample
+            states: TrainingState, sample: reverb.ReplaySample
         ) -> Tuple[TrainingState, Dict[str, jnp.ndarray]]:
             """Performs a minibatch SGD step, returning new state and metrics."""
 
@@ -90,18 +90,36 @@ class MADQNStep(Step):
             batch = trajectories
 
             # Calling epoch_update_fn on the batch data to update network parameters.
-            with jax.disable_jit():
-                (new_key, new_params, new_target_params, new_opt_states, _,), metrics \
-                    = jax.lax.scan(
-                    trainer.store.epoch_update_fn,
-                    (states.random_key, states.params, states.target_params,
-                     states.opt_states, batch), {},
-                    length=trainer.store.num_epochs,
-                )
+            # with jax.disable_jit():
+            #     (new_key, new_params, new_target_params, new_opt_states, _,), metrics \
+            #         = jax.lax.scan(
+            #         trainer.store.epoch_update_fn,
+            #         (states.random_key, states.params, states.target_params,
+            #             states.opt_states, batch), {},
+            #         length=trainer.store.num_epochs,
+            #     )
+            # jax.disable_jit() - makes this work. There must be a bug in epoch_update!
+            # with jax.disable_jit():
+            (
+                new_key,
+                new_params,
+                new_target_params,
+                new_opt_states,
+                _,
+            ), metrics = trainer.store.epoch_update_fn(
+                (
+                    states.random_key,
+                    states.params,
+                    states.target_params,
+                    states.opt_states,
+                    batch,
+                ),
+                {},
+            )
             # removed the lax.scan in the following
 
             # Periodically update the target network to the updated network
-            new_target_params = rlax.periodic_update(
+            new_target_params = optax.periodic_update(
                 new_params,
                 new_target_params,
                 trainer.store.training_steps,

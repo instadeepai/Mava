@@ -36,8 +36,8 @@ class MADQNMinibatchUpdateConfig:
 
 class MADQNMinibatchUpdate(Utility):
     def __init__(
-            self,
-            config: MADQNMinibatchUpdateConfig = MADQNMinibatchUpdateConfig(),
+        self,
+        config: MADQNMinibatchUpdateConfig = MADQNMinibatchUpdateConfig(),
     ):
         """_summary_
 
@@ -50,8 +50,8 @@ class MADQNMinibatchUpdate(Utility):
         """_summary_"""
 
         def model_update_minibatch(
-                carry: Tuple[networks_lib.Params, networks_lib.Params, optax.OptState],
-                minibatch: Batch,
+            carry: Tuple[networks_lib.Params, networks_lib.Params, optax.OptState],
+            minibatch: Batch,
         ) -> Tuple[Tuple[Any, Any, optax.OptState], Dict[str, Any]]:
             """Performs model update for a single minibatch."""
             params, target_params, opt_states = carry
@@ -112,7 +112,7 @@ class MADQNMinibatchUpdate(Utility):
 
 @dataclass
 class MADQNEpochUpdateConfig:
-    num_epochs: int = 2 # not used in the implementation whichout scan
+    num_epochs: int = 2  # not used in the implementation whichout scan
     batch_size: int = 128
     learning_rate: float = 1e-3
     adam_epsilon: float = 1e-5
@@ -122,8 +122,8 @@ class MADQNEpochUpdateConfig:
 
 class MADQNEpochUpdate(Utility):
     def __init__(
-            self,
-            config: MADQNEpochUpdateConfig = MADQNEpochUpdateConfig(),
+        self,
+        config: MADQNEpochUpdateConfig = MADQNEpochUpdateConfig(),
     ):
         """_summary_
 
@@ -139,7 +139,7 @@ class MADQNEpochUpdate(Utility):
         if not self.config.optimizer:
             trainer.store.optimizer = optax.chain(
                 optax.clip_by_global_norm(self.config.max_gradient_norm),
-                optax.adam(self.config.learning_rate)
+                optax.adam(self.config.learning_rate),
             )
         else:
             trainer.store.optimizer = self.config.optimizer
@@ -152,8 +152,8 @@ class MADQNEpochUpdate(Utility):
             )  # pytype: disable=attribute-error
 
         def model_update_epoch(
-                carry: Tuple[KeyArray, Any, Any, optax.OptState, Batch],
-                unused_t: Tuple[()],
+            carry: Tuple[KeyArray, Any, Any, optax.OptState, Batch],
+            unused_t: Tuple[()],
         ) -> Tuple[
             Tuple[KeyArray, Any, Any, optax.OptState, Batch],
             Dict[str, jnp.ndarray],
@@ -163,14 +163,16 @@ class MADQNEpochUpdate(Utility):
             new_key, subkey = jax.random.split(key)
 
             # Calculate the gradients and agent metrics.
-            with jax.disable_jit():
-                gradients, agent_metrics = trainer.store.grad_fn(params, target_params,
-                                                                 batch.observations,
-                                                                 batch.next_observations,
-                                                                 batch.actions,
-                                                                 batch.discounts,
-                                                                 batch.rewards,
-                                                                 )
+            # with jax.disable_jit():
+            gradients, agent_metrics = trainer.store.grad_fn(
+                params,
+                target_params,
+                batch.observations,
+                batch.next_observations,
+                batch.actions,
+                batch.discounts,
+                batch.rewards,
+            )
 
             # Update the networks and optimizers.
             metrics = {}
