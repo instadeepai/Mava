@@ -316,6 +316,9 @@ def test_set_and_get_async(parameter_client: ParameterClient) -> None:
 
 def test_add_async(parameter_client: ParameterClient) -> None:
     """Test add async method."""
+
+    assert parameter_client._add_future is None
+
     parameter_client.add_async(params={"new_key": "new_value"})
     assert parameter_client._add_future is not None
     assert parameter_client._client.store._add_to_params == {"new_key": "new_value"}
