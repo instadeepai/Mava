@@ -43,6 +43,46 @@ class MockBaseParameterClient(BaseParameterClient):
         return "dummy_base_parameter_client_name"
 
 
+# data for checking that the components have been initialized correctly
+expected_count_keys = {
+    "evaluator_episodes",
+    "evaluator_steps",
+    "executor_episodes",
+    "executor_steps",
+    "trainer_steps",
+    "trainer_walltime",
+}
+
+expected_network_keys = {
+    "networks-network_agent_0",
+    "networks-network_agent_1",
+    "networks-network_agent_2",
+}
+
+expected_keys = expected_count_keys.union(expected_network_keys)
+
+initial_count_parameters = {
+    "trainer_steps": np.array(0, dtype=np.int32),
+    "trainer_walltime": np.array(0.0, dtype=np.float32),
+    "evaluator_steps": np.array(0, dtype=np.int32),
+    "evaluator_episodes": np.array(0, dtype=np.int32),
+    "executor_episodes": np.array(0, dtype=np.int32),
+    "executor_steps": np.array(0, dtype=np.int32),
+}
+
+initial_parameters = {
+    "networks-network_agent_0": {"weights": 0, "biases": 0},
+    "networks-network_agent_1": {"weights": 1, "biases": 1},
+    "networks-network_agent_2": {"weights": 2, "biases": 2},
+    "trainer_steps": np.array(0, dtype=np.int32),
+    "trainer_walltime": np.array(0.0, dtype=np.float32),
+    "evaluator_steps": np.array(0, dtype=np.int32),
+    "evaluator_episodes": np.array(0, dtype=np.int32),
+    "executor_episodes": np.array(0, dtype=np.int32),
+    "executor_steps": np.array(0, dtype=np.int32),
+}
+
+
 @pytest.fixture
 def mock_builder_with_parameter_client() -> Builder:
     """Create a mock builder for testing that has a parameter client."""
@@ -78,23 +118,9 @@ def test_base_parameter_client() -> None:
 
     keys, params = mock_client._set_up_count_parameters(params={})
 
-    assert keys == [
-        "trainer_steps",
-        "trainer_walltime",
-        "evaluator_steps",
-        "evaluator_episodes",
-        "executor_episodes",
-        "executor_steps",
-    ]
+    assert all([key in expected_keys for key in keys])
 
-    assert params == {
-        "trainer_steps": np.array(0, dtype=np.int32),
-        "trainer_walltime": np.array(0, dtype=np.float32),
-        "evaluator_steps": np.array(0, dtype=np.int32),
-        "evaluator_episodes": np.array(0, dtype=np.int32),
-        "executor_episodes": np.array(0, dtype=np.int32),
-        "executor_steps": np.array(0, dtype=np.int32),
-    }
+    assert params == initial_count_parameters
 
 
 def test_executor_parameter_client_no_evaluator_with_parameter_client(
@@ -113,43 +139,26 @@ def test_executor_parameter_client_no_evaluator_with_parameter_client(
     )
     exec_param_client.on_building_executor_parameter_client(builder=mock_builder)
 
-    assert mock_builder.store.executor_parameter_client._all_keys == [
-        "evaluator_episodes",
-        "evaluator_steps",
-        "executor_episodes",
-        "executor_steps",
-        "networks-network_agent_0",
-        "networks-network_agent_1",
-        "networks-network_agent_2",
-        "trainer_steps",
-        "trainer_walltime",
-    ]
-    assert mock_builder.store.executor_parameter_client._get_keys == [
-        "networks-network_agent_0",
-        "networks-network_agent_1",
-        "networks-network_agent_2",
-        "trainer_steps",
-        "trainer_walltime",
-        "evaluator_steps",
-        "evaluator_episodes",
-        "executor_episodes",
-        "executor_steps",
-    ]
+    assert all(
+        [
+            key in expected_keys
+            for key in mock_builder.store.executor_parameter_client._all_keys
+        ]
+    )
+    assert all(
+        [
+            key in expected_keys
+            for key in mock_builder.store.executor_parameter_client._get_keys
+        ]
+    )
+
     assert mock_builder.store.executor_parameter_client._set_keys == [
         "executor_episodes",
         "executor_steps",
     ]
-    assert mock_builder.store.executor_parameter_client._parameters == {
-        "networks-network_agent_0": {"weights": 0, "biases": 0},
-        "networks-network_agent_1": {"weights": 1, "biases": 1},
-        "networks-network_agent_2": {"weights": 2, "biases": 2},
-        "trainer_steps": np.array(0, dtype=np.int32),
-        "trainer_walltime": np.array(0.0, dtype=np.float32),
-        "evaluator_steps": np.array(0, dtype=np.int32),
-        "evaluator_episodes": np.array(0, dtype=np.int32),
-        "executor_episodes": np.array(0, dtype=np.int32),
-        "executor_steps": np.array(0, dtype=np.int32),
-    }
+    assert (
+        mock_builder.store.executor_parameter_client._parameters == initial_parameters
+    )
     assert mock_builder.store.executor_parameter_client._get_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_get_call_counter == 0
@@ -157,6 +166,8 @@ def test_executor_parameter_client_no_evaluator_with_parameter_client(
     assert isinstance(
         mock_builder.store.executor_parameter_client._client, ParameterServer
     )
+
+    assert mock_builder.store.executor_counts == initial_count_parameters
 
 
 def test_executor_parameter_client_evaluator_with_parameter_client(
@@ -177,44 +188,26 @@ def test_executor_parameter_client_evaluator_with_parameter_client(
 
     assert hasattr(mock_builder.store, "executor_parameter_client")
 
-    assert mock_builder.store.executor_parameter_client._all_keys == [
-        "evaluator_episodes",
-        "evaluator_steps",
-        "executor_episodes",
-        "executor_steps",
-        "networks-network_agent_0",
-        "networks-network_agent_1",
-        "networks-network_agent_2",
-        "trainer_steps",
-        "trainer_walltime",
-    ]
+    assert all(
+        [
+            key in expected_keys
+            for key in mock_builder.store.executor_parameter_client._all_keys
+        ]
+    )
+    assert all(
+        [
+            key in expected_keys
+            for key in mock_builder.store.executor_parameter_client._get_keys
+        ]
+    )
 
-    assert mock_builder.store.executor_parameter_client._get_keys == [
-        "networks-network_agent_0",
-        "networks-network_agent_1",
-        "networks-network_agent_2",
-        "trainer_steps",
-        "trainer_walltime",
-        "evaluator_steps",
-        "evaluator_episodes",
-        "executor_episodes",
-        "executor_steps",
-    ]
     assert mock_builder.store.executor_parameter_client._set_keys == [
         "evaluator_steps",
         "evaluator_episodes",
     ]
-    assert mock_builder.store.executor_parameter_client._parameters == {
-        "networks-network_agent_0": {"weights": 0, "biases": 0},
-        "networks-network_agent_1": {"weights": 1, "biases": 1},
-        "networks-network_agent_2": {"weights": 2, "biases": 2},
-        "trainer_steps": np.array(0, dtype=np.int32),
-        "trainer_walltime": np.array(0.0, dtype=np.float32),
-        "evaluator_steps": np.array(0, dtype=np.int32),
-        "evaluator_episodes": np.array(0, dtype=np.int32),
-        "executor_episodes": np.array(0, dtype=np.int32),
-        "executor_steps": np.array(0, dtype=np.int32),
-    }
+    assert (
+        mock_builder.store.executor_parameter_client._parameters == initial_parameters
+    )
     assert mock_builder.store.executor_parameter_client._get_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_get_call_counter == 0
@@ -222,6 +215,8 @@ def test_executor_parameter_client_evaluator_with_parameter_client(
     assert isinstance(
         mock_builder.store.executor_parameter_client._client, ParameterServer
     )
+
+    assert mock_builder.store.executor_counts == initial_count_parameters
 
 
 def test_executor_parameter_client_with_no_parameter_client(
@@ -255,42 +250,25 @@ def test_trainer_parameter_client(
     trainer_param_client = TrainerParameterClient()
     trainer_param_client.on_building_trainer_parameter_client(mock_builder)
 
-    assert mock_builder.store.trainer_parameter_client._all_keys == [
-        "evaluator_episodes",
-        "evaluator_steps",
-        "executor_episodes",
-        "executor_steps",
-        "networks-network_agent_0",
-        "networks-network_agent_1",
-        "networks-network_agent_2",
-        "trainer_steps",
-        "trainer_walltime",
-    ]
+    assert all(
+        [
+            key in expected_keys
+            for key in mock_builder.store.trainer_parameter_client._all_keys
+        ]
+    )
+    assert all(
+        [
+            key in expected_count_keys
+            for key in mock_builder.store.trainer_parameter_client._get_keys
+        ]
+    )
 
-    assert mock_builder.store.trainer_parameter_client._get_keys == [
-        "trainer_steps",
-        "trainer_walltime",
-        "evaluator_steps",
-        "evaluator_episodes",
-        "executor_episodes",
-        "executor_steps",
-    ]
     assert mock_builder.store.trainer_parameter_client._set_keys == [
         "networks-network_agent_0",
         "networks-network_agent_1",
         "networks-network_agent_2",
     ]
-    assert mock_builder.store.trainer_parameter_client._parameters == {
-        "networks-network_agent_0": {"weights": 0, "biases": 0},
-        "networks-network_agent_1": {"weights": 1, "biases": 1},
-        "networks-network_agent_2": {"weights": 2, "biases": 2},
-        "trainer_steps": np.array(0, dtype=np.int32),
-        "trainer_walltime": np.array(0.0, dtype=np.float32),
-        "evaluator_steps": np.array(0, dtype=np.int32),
-        "evaluator_episodes": np.array(0, dtype=np.int32),
-        "executor_episodes": np.array(0, dtype=np.int32),
-        "executor_steps": np.array(0, dtype=np.int32),
-    }
+    assert mock_builder.store.trainer_parameter_client._parameters == initial_parameters
     assert mock_builder.store.trainer_parameter_client._get_call_counter == 0
     assert mock_builder.store.trainer_parameter_client._set_call_counter == 0
     assert mock_builder.store.trainer_parameter_client._set_get_call_counter == 0
@@ -298,6 +276,8 @@ def test_trainer_parameter_client(
     assert isinstance(
         mock_builder.store.trainer_parameter_client._client, ParameterServer
     )
+
+    assert mock_builder.store.trainer_counts == initial_count_parameters
 
 
 def test_trainer_parameter_client_with_no_parameter_client(
