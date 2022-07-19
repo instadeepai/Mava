@@ -338,7 +338,7 @@ def test_system_update_with_existing_component(
 def test_system_update_when_built(
     system_with_two_components: System,
 ) -> None:
-    """Test that exception is raised when system is updated are being built."""
+    """Test that exception is raised when system is updated after being built."""
     system_with_two_components.build()
 
     with pytest.raises(Exception):
