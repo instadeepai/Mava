@@ -233,7 +233,7 @@ class CustomTrainerInit(BaseTrainerInit):
         # Setup trainer_networks
         if not isinstance(trainer_networks, dict) or trainer_networks == {}:
 
-            raise ValueError("trainer_networks must be a dictionary.")
+            raise ValueError("trainer_networks must be a non-empty dictionary.")
 
         builder.store.trainer_networks = trainer_networks
 
