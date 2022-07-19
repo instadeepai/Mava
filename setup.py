@@ -68,7 +68,7 @@ testing_formatting_requirements = [
     "types-six",
 ]
 
-record_episode_requirements = ["array2gif"]
+record_episode_requirements = ["array2gif", "pyglet"]
 
 flatland_requirements = ["flatland-rl==3.0.1"]
 open_spiel_requirements = ["open_spiel"]

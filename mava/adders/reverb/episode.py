@@ -21,16 +21,17 @@
 This implements full episode adders, potentially with padding.
 """
 
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import dm_env
 import reverb
 import tensorflow as tf
 import tree
-from acme import specs, types
+from acme import types
 from acme.adders.reverb import utils as acme_utils
 from acme.adders.reverb.episode import EpisodeAdder, _PaddingFn
 
+from mava import specs
 from mava.adders.reverb import base
 from mava.adders.reverb import utils as mava_utils
 from mava.adders.reverb.base import ReverbParallelAdder
@@ -136,12 +137,12 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
     @classmethod
     def signature(
         cls,
-        environment_spec: specs.EnvironmentSpec,
+        ma_environment_spec: specs.MAEnvironmentSpec,
         sequence_length: Optional[int] = None,
-        extras_spec: types.NestedSpec = (),
+        extras_specs: Dict[str, Any] = {},
     ) -> tf.TypeSpec:
         return mava_utils.trajectory_signature(
-            environment_spec=environment_spec,
+            ma_environment_spec=ma_environment_spec,
             sequence_length=sequence_length,
-            extras_spec=extras_spec,
+            extras_specs=extras_specs,
         )

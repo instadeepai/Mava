@@ -42,6 +42,7 @@ def calc_nstep_return(
     r_t: Dict[str, float], discounts: list, rewards: list
 ) -> Dict[str, float]:
     """Function that calculates n_step_return as follows:
+
     R_{t:t+n} := r_t + d_t * r_{t+1} + ...    + d_t * ... * d_{t+n-2} * r_{t+n-1}.
 
     Args:
@@ -62,6 +63,7 @@ def calc_nstep_return(
 
 class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
     """A helper mixin for testing Reverb adders.
+
     Note that any test inheriting from this mixin must also inherit from something
     that provides the Python unittest assert methods.
     """
@@ -78,8 +80,8 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
         end_behavior: EndBehavior = EndBehavior.ZERO_PAD,
         item_transform: Optional[Callable[[Sequence[np.ndarray]], Any]] = None,
     ) -> None:
-        """
-        Runs a unit test case for the adder.
+        """Runs a unit test case for the adder.
+
         Args:
                 adder: The instance of `base.ReverbAdder` that is being tested.
                 first: The first `dm_env.TimeStep` that is used to call
@@ -92,15 +94,18 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
                 agents: Dict containing agent names, e.g.
                     agents = {"agent_0", "agent_1", "agent_2"}.
                 repeat_episode_times: How many times to run an episode.
-                    end_behavior: How end of episode should be handled.
+                end_behavior: How end of episode should be handled.
+
+        Returns:
+            None
         """
 
         if not steps:
             raise ValueError("At least one step must be given.")
 
-        agent_specs = {}
+        agent_environment_specs = {}
         for agent in agents:
-            agent_specs[agent] = EnvironmentSpec(
+            agent_environment_specs[agent] = EnvironmentSpec(
                 observations=test_utils._numeric_to_spec(
                     steps[0][1].observation[agent]
                 ),
@@ -112,15 +117,19 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
         has_extras = len(steps[0]) >= 3
 
         if has_extras:
-            extras_spec = tree.map_structure(test_utils._numeric_to_spec, steps[0][2])
+            extras_specs = tree.map_structure(test_utils._numeric_to_spec, steps[0][2])
         else:
-            extras_spec = {}
+            extras_specs = {}
 
         ma_spec = specs.MAEnvironmentSpec(
-            environment=None, specs=agent_specs, extra_specs=extras_spec
+            environment=None,
+            agent_environment_specs=agent_environment_specs,
+            extras_specs=extras_specs,
         )
 
-        signature = adder.signature(ma_spec, extras_spec=extras_spec)
+        signature = adder.signature(
+            ma_environment_spec=ma_spec, extras_specs=extras_specs
+        )
 
         for episode_id in range(repeat_episode_times):
             # Add all the data up to the final step.
@@ -191,8 +200,10 @@ def make_trajectory(
     agents: Set[str] = {"agent_0", "agent_1", "agent_2"},
 ) -> Any:
     """Make a simple trajectory from a sequence of observations.
-    Arguments:
+
+    Args:
         observations: a sequence of observations.
+
     Returns:
         a tuple (first, steps) where first contains the initial dm_env.TimeStep
         object and steps contains a list of (action, step) tuples. The length of
