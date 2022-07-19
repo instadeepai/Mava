@@ -28,6 +28,7 @@ from mava.systems.jax.launcher import Launcher, NodeType
 @pytest.fixture
 def mock_data_server_fn() -> Callable:
     """call data_server function"""
+
     def data_server() -> List[Any]:
         """data_server
 
@@ -43,24 +44,29 @@ def mock_data_server_fn() -> Callable:
                 rate_limiter=rate_limiters.MinSize(1),
             )
         ]
+
     return data_server
 
 
 @pytest.fixture
 def mock_parameter_server_fn() -> Callable:
     """call parameter_server function"""
+
     def parameter_server() -> str:
         """Fake parameter server function"""
         return "test_parameter_server"
+
     return parameter_server
 
 
 @pytest.fixture
 def mock_parameter_server_second_fn() -> Callable:
     """call the second parameter_server function"""
+
     def parameter_server_second() -> str:
         """Another fake parameter server function"""
         return "test_parameter_server_second_mock"
+
     return parameter_server_second
 
 
