@@ -156,7 +156,7 @@ def test_add_multi_process_two_add_calls(
     )
     parameter_server = launcher.add(
         mock_parameter_server_fn,
-        node_type=NodeType.corrier,
+        node_type=NodeType.courier,
         name="parameter_server_test",
     )
 
@@ -198,12 +198,12 @@ def test_add_multi_process_two_add_same_name(
 
     parameter_server_1 = launcher.add(
         mock_parameter_server_fn,
-        node_type=NodeType.corrier,
+        node_type=NodeType.courier,
         name="parameter_server_test",
     )
     parameter_server_2 = launcher.add(
         mock_parameter_server_second_fn,
-        node_type=NodeType.corrier,
+        node_type=NodeType.courier,
         name="parameter_server_test",
     )
 
@@ -264,7 +264,7 @@ def test_add_non_multi_process_reverb_node(mock_data_server_fn: Callable) -> Non
 
 
 def test_add_non_multi_process_courier_node(mock_parameter_server_fn: Callable) -> None:
-    """Test the add method for the case of one process and for node_type corrier
+    """Test the add method for the case of one process and for node_type courier
 
     Args:
         mock_parameter_server_fn
@@ -273,12 +273,12 @@ def test_add_non_multi_process_courier_node(mock_parameter_server_fn: Callable) 
     with pytest.raises(ValueError):
         parameter_server = launcher.add(
             mock_parameter_server_fn,
-            node_type=NodeType.corrier,
+            node_type=NodeType.courier,
             name="parameter_server_test",
         )
     parameter_server = launcher.add(
         mock_parameter_server_fn,
-        node_type=NodeType.corrier,
+        node_type=NodeType.courier,
         name="parameter_server",
     )
 
@@ -308,7 +308,7 @@ def test_add_non_multi_process_two_add_calls(
     )
     parameter_server = launcher.add(
         mock_parameter_server_fn,
-        node_type=NodeType.corrier,
+        node_type=NodeType.courier,
         name="parameter_server",
     )
 
@@ -343,13 +343,13 @@ def test_add_non_multi_process_two_add_same_name(
 
     parameter_server_1 = launcher.add(
         mock_parameter_server_fn,
-        node_type=NodeType.corrier,
+        node_type=NodeType.courier,
         name="parameter_server",
     )
     with pytest.raises(ValueError):
         parameter_server_2 = launcher.add(
             mock_parameter_server_second_fn,
-            node_type=NodeType.corrier,
+            node_type=NodeType.courier,
             name="parameter_server",
         )
 
@@ -386,7 +386,7 @@ def test_get_nodes_non_multi_process(
     )
     parameter_server = launcher.add(
         mock_parameter_server_fn,
-        node_type=NodeType.corrier,
+        node_type=NodeType.courier,
         name="parameter_server",
     )
 
