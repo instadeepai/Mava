@@ -103,9 +103,9 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
         if not steps:
             raise ValueError("At least one step must be given.")
 
-        agent_specs = {}
+        agent_environment_specs = {}
         for agent in agents:
-            agent_specs[agent] = EnvironmentSpec(
+            agent_environment_specs[agent] = EnvironmentSpec(
                 observations=test_utils._numeric_to_spec(
                     steps[0][1].observation[agent]
                 ),
@@ -117,15 +117,19 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
         has_extras = len(steps[0]) >= 3
 
         if has_extras:
-            extras_spec = tree.map_structure(test_utils._numeric_to_spec, steps[0][2])
+            extras_specs = tree.map_structure(test_utils._numeric_to_spec, steps[0][2])
         else:
-            extras_spec = {}
+            extras_specs = {}
 
         ma_spec = specs.MAEnvironmentSpec(
-            environment=None, specs=agent_specs, extra_specs=extras_spec
+            environment=None,
+            agent_environment_specs=agent_environment_specs,
+            extras_specs=extras_specs,
         )
 
-        signature = adder.signature(ma_spec, extras_spec=extras_spec)
+        signature = adder.signature(
+            ma_environment_spec=ma_spec, extras_specs=extras_specs
+        )
 
         for episode_id in range(repeat_episode_times):
             # Add all the data up to the final step.

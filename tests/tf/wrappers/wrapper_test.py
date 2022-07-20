@@ -140,7 +140,7 @@ class TestEnvWrapper:
     # Test that observations from petting zoo get converted to
     #   dm observations correctly. This only runs
     #   if wrapper has a _convert_observations or _convert_observation functions.
-    def test_covert_env_to_dm_env_0_no_action_mask(
+    def test_convert_env_to_dm_env_0_no_action_mask(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
         if env_spec is None:
@@ -199,7 +199,7 @@ class TestEnvWrapper:
 
     # Test that observations from petting zoo get converted to
     #   dm observations correctly when empty obs are returned.
-    def test_covert_env_to_dm_env_0_empty_obs(
+    def test_convert_env_to_dm_env_0_empty_obs(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
         if env_spec is None:
@@ -260,7 +260,7 @@ class TestEnvWrapper:
     # Test that observations **with actions masked** from petting zoo get
     #   converted to dm observations correctly. This only runs
     #   if wrapper has a _convert_observations or _convert_observation functions.
-    def test_covert_env_to_dm_env_2_with_action_mask(
+    def test_convert_env_to_dm_env_2_with_action_mask(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
         if env_spec is None:

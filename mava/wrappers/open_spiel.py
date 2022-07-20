@@ -276,7 +276,7 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
             )
         return discount_specs
 
-    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+    def extras_spec(self) -> Dict[str, specs.BoundedArray]:
         """Extra data spec.
 
         Returns:

@@ -17,7 +17,7 @@ BASE_FLAGS=-it --rm  -v ${PWD}:/home/app/mava -w /home/app/mava
 RUN_FLAGS=$(GPUS) $(BASE_FLAGS)
 RUN_FLAGS_TENSORBOARD=$(GPUS) -p 6006:6006 $(BASE_FLAGS)
 
-# Default version is tf-core
+# Default version is jax-core
 version = jax-core
 DOCKER_IMAGE_NAME = mava
 DOCKER_IMAGE_TAG = $(version)
@@ -77,10 +77,10 @@ bash:
 	$(DOCKER_RUN) bash
 
 run-tests:
-	$(DOCKER_RUN) /bin/bash bash_scripts/tests.sh
+	$(DOCKER_RUN) /bin/bash bash_scripts/local_tests.sh
 
 run-integration-tests:
-	$(DOCKER_RUN) /bin/bash bash_scripts/tests.sh true
+	$(DOCKER_RUN) /bin/bash bash_scripts/local_tests.sh true
 
 run-checks:
 	$(DOCKER_RUN) /bin/bash bash_scripts/check_format.sh

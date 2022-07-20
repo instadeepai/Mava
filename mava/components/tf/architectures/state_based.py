@@ -56,7 +56,7 @@ class StateBasedPolicyActor(DecentralisedPolicyActor):
         agents_by_type = self._env_spec.get_agents_by_type()
 
         for agent_type, agents in agents_by_type.items():
-            actor_state_shape = self._env_spec.get_extra_specs()["s_t"].shape
+            actor_state_shape = self._env_spec.get_extras_specs()["s_t"].shape
             obs_specs_per_type[agent_type] = tf.TensorSpec(
                 shape=actor_state_shape,
                 dtype=tf.dtypes.float32,
@@ -99,7 +99,7 @@ class StateBasedQValueCritic(DecentralisedQValueActorCritic):
 
         # Create one critic per agent. Each critic gets
         # absolute state information of the environment.
-        critic_env_state_spec = self._env_spec.get_extra_specs()["s_t"]
+        critic_env_state_spec = self._env_spec.get_extras_specs()["s_t"]
         if type(critic_env_state_spec) == dict:
             critic_env_state_spec = list(critic_env_state_spec.values())[0]
 
@@ -193,7 +193,7 @@ class StateBasedValueActorCritic(DecentralisedValueActorCritic):  # type: ignore
         # Create one critic per agent. Each critic gets
         # absolute state information of the environment.
 
-        critic_env_state_spec = self._env_spec.get_extra_specs()["s_t"]
+        critic_env_state_spec = self._env_spec.get_extras_specs()["s_t"]
         if type(critic_env_state_spec) == dict:
             critic_env_state_spec = list(critic_env_state_spec.values())[0]
 
@@ -255,7 +255,7 @@ class StateBasedQValueSingleActionCritic(DecentralisedQValueActorCritic):
 
         # Create one critic per agent. Each critic gets
         # absolute state information of the environment.
-        critic_env_state_spec = self._env_spec.get_extra_specs()["s_t"]
+        critic_env_state_spec = self._env_spec.get_extras_specs()["s_t"]
         if type(critic_env_state_spec) == dict:
             critic_env_state_spec = list(critic_env_state_spec.values())[0]
 

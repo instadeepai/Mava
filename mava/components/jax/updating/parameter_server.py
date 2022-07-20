@@ -29,7 +29,7 @@ from mava.core_jax import SystemParameterServer
 @dataclass
 class ParameterServerConfig:
     checkpoint: bool = True
-    checkpoint_subpath: str = "~/mava/"
+    experiment_path: str = "~/mava/"
     checkpoint_minute_interval: int = 5
     non_blocking_sleep_seconds: int = 10
 
@@ -143,7 +143,7 @@ class DefaultParameterServer(ParameterServer):
                 if not (type(var) == tuple and len(var) == 0):
                     save_variables[key] = var
             server.store.system_checkpointer = savers.Checkpointer(
-                save_variables, self.config.checkpoint_subpath, time_delta_minutes=0
+                save_variables, self.config.experiment_path, time_delta_minutes=0
             )
 
     # Get
