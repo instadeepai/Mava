@@ -63,6 +63,7 @@ def main(_: Any) -> None:
         return mappo.make_default_networks(  # type: ignore
             policy_layer_sizes=(254, 254, 254),
             critic_layer_sizes=(512, 512, 256),
+            single_network=False,
             *args,
             **kwargs,
         )
@@ -82,12 +83,16 @@ def main(_: Any) -> None:
     )
 
     # Optimizer.
-    optimizer = optax.chain(
+    policy_optimizer = optax.chain(
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+    )
+
+    critic_optimizer = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
     # Create the system.
-    system = mappo.MAPPOSystem()
+    system = mappo.MAPPOSystemSeparateNetworks()
 
     # Build the system.
     system.build(
@@ -95,13 +100,13 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         checkpoint_subpath=checkpoint_subpath,
-        optimizer=optimizer,
+        policy_optimizer=policy_optimizer,
+        critic_optimizer=critic_optimizer,
         run_evaluator=True,
         sample_batch_size=5,
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        clip_value=False,
     )
 
     # Launch the system.
