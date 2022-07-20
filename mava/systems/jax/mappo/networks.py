@@ -38,7 +38,7 @@ Array = dm_specs.Array
 BoundedArray = dm_specs.BoundedArray
 DiscreteArray = dm_specs.DiscreteArray
 EntropyFn = Callable[[Any], jnp.ndarray]
-
+hk_init = hk.initializers
 
 class ClippedGaussianDistribution:
     def __init__(self, guassian_dist: Any, action_specs: Any):
@@ -52,15 +52,11 @@ class ClippedGaussianDistribution:
         return self._guassian_dist.entropy()
 
     def sample(self, seed):
+        return self.clip_fn(self._guassian_dist).sample(seed=seed)
         
-        dist_sample = self._guassian_dist.sample(seed=seed)
-        return self.clip_fn(dist_sample)
 
     def log_prob(self, action):
-       
-        unclipped_log_prob = self._guassian_dist.log_prob(action)
-        return self.clip_fn(unclipped_log_prob)
-
+        return self.clip_fn(self._guassian_dist).log_prob(action)
 
 
 class ClippedGaussianHead(hk.Module):
@@ -82,6 +78,7 @@ class PPONetworks:
 
     def __init__(
         self,
+        spec: specs.EnvironmentSpec,
         network: networks_lib.FeedForwardNetwork,
         params: networks_lib.Params,
         log_prob: Optional[networks_lib.LogProbFn] = None,
@@ -94,6 +91,7 @@ class PPONetworks:
         self.log_prob = log_prob
         self.entropy = entropy
         self.sample = sample
+        self.spec = spec
 
         @jit
         def forward_fn(
@@ -106,9 +104,9 @@ class PPONetworks:
             # The parameters of the network might change. So it has to
             # be fed into the jitted function.
             distribution, _ = self.network.apply(params, observations)
-            # if mask is not None:
-            # distribution = action_mask_categorical_policies(distribution, mask)
-            # print(distribution)
+            if mask is not None and isinstance(self.spec, DiscreteArray):
+                distribution = action_mask_categorical_policies(distribution, mask)
+           
             actions = jax.numpy.squeeze(distribution.sample(seed=key))
             log_prob = distribution.log_prob(actions)
             
@@ -124,9 +122,10 @@ class PPONetworks:
     ) -> Tuple[np.ndarray, Dict]:
         """TODO: Add description here."""
         actions, log_prob = self.forward_fn(self.params, observations, key, mask)
-        # actions = np.array(actions, dtype=np.int64)
-        # Continuous actions are floats
-        actions = np.array(actions, dtype=np.float32)
+        if isinstance(self.spec, specs.DiscreteArray):
+            actions = np.array(actions, dtype=np.int64)
+        else:
+            actions = np.array(actions, dtype=np.float32)
         log_prob = np.squeeze(np.array(log_prob, dtype=np.float32))
         return actions, {"log_prob": log_prob}
 
@@ -137,10 +136,11 @@ class PPONetworks:
 
 
 def make_ppo_network(
-    network: networks_lib.FeedForwardNetwork, params: Dict[str, jnp.ndarray]
+    network: networks_lib.FeedForwardNetwork, params: Dict[str, jnp.ndarray],spec=None
 ) -> PPONetworks:
     """TODO: Add description here."""
     return PPONetworks(
+        spec = spec,
         network=network,
         params=params,
         log_prob=lambda distribution, action: distribution.log_prob(action),
@@ -201,7 +201,7 @@ def make_discrete_networks(
             [
                 observation_network,
                 hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
-                networks_lib.CategoricalValueHead(num_values=num_actions),
+                networks_lib.CategoricalValueHead(num_values=1),
             ]
         )
         return policy_value_network(inputs)
@@ -239,11 +239,11 @@ def make_continuous_networks(
                 utils.batch_concat,
                 observation_network,
                 hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
-                networks_lib.MultivariateNormalDiagHead(num_dimensions),
+                networks_lib.MultivariateNormalDiagHead(specs,num_dimensions),
                 ClippedGaussianHead(specs),
             ]
         )
-
+        #ClippedGaussianHead(specs),
         value_network = hk.Sequential(
             [
                 utils.batch_concat,
@@ -268,7 +268,7 @@ def make_continuous_networks(
     params = forward_fn.init(network_key, dummy_obs)  # type: ignore
 
     # Create PPONetworks to add functionality required by the agent.
-    return make_ppo_network(network=forward_fn, params=params)
+    return make_ppo_network(spec=specs,network=forward_fn, params=params,)
 
 
 def make_default_networks(
