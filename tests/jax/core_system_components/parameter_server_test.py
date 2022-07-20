@@ -15,53 +15,15 @@
 
 """Tests for parameter server class for Jax-based Mava systems"""
 
-import functools
 import time
 from types import SimpleNamespace
-from typing import Dict, List, Tuple
+from typing import List
 
-import numpy as np
 import pytest
 
 from mava.callbacks import Callback
-from mava.components.jax import building
-from mava.components.jax.building.adders import ParallelTransitionAdderSignature
-from mava.components.jax.updating.parameter_server import DefaultParameterServer
-from mava.specs import DesignSpec
-from mava.systems.jax import ParameterServer, mappo
-from mava.systems.jax.system import System
-from mava.utils.environments import debugging_utils
-from tests.jax import mocks
+from mava.systems.jax import ParameterServer
 from tests.jax.hook_order_tracking import HookOrderTracking
-
-
-class TestSystem(System):
-    __test__ = False
-
-    def design(self) -> Tuple[DesignSpec, Dict]:
-        """Mock system design with zero components.
-
-        Returns:
-            system callback components
-        """
-        components = DesignSpec(
-            environment_spec=building.EnvironmentSpec,
-            system_init=building.FixedNetworkSystemInit,
-            data_server=mocks.MockOnPolicyDataServer,
-            data_server_adder_signature=ParallelTransitionAdderSignature,
-            parameter_server=DefaultParameterServer,
-            executor_parameter_client=mocks.MockExecutorParameterClient,
-            trainer_parameter_client=mocks.MockTrainerParameterClient,
-            logger=mocks.MockLogger,
-            executor=mocks.MockExecutor,
-            executor_adder=mocks.MockAdder,
-            executor_environment_loop=mocks.MockExecutorEnvironmentLoop,
-            networks=mocks.MockNetworks,
-            trainer=mocks.MockTrainer,
-            trainer_dataset=mocks.MockTrainerDataset,
-            distributor=mocks.MockDistributor,
-        )
-        return components, {}
 
 
 class TestParameterServer(HookOrderTracking, ParameterServer):
@@ -79,70 +41,21 @@ class TestParameterServer(HookOrderTracking, ParameterServer):
 
 
 @pytest.fixture
-def test_system() -> System:
-    """Dummy system with zero components."""
-    return TestSystem()
-
-
-@pytest.fixture
 def test_parameter_server() -> ParameterServer:
     """Dummy parameter server with no components"""
     return TestParameterServer(
         store=SimpleNamespace(
-            config_key="expected_value",
-            non_blocking_sleep_seconds=1,
-            get_parameters="parameter_list",
+            store_key="expected_value",
             global_config=SimpleNamespace(non_blocking_sleep_seconds=1),
+            get_parameters="parameter_list",
         ),
         components=[],
     )
 
 
-def test_parameter_server_process_instantiate(
-    test_system: System,
-) -> None:
-    """Test if the parameter server instantiates processes as expected."""
-    # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name="simple_spread",
-        action_space="discrete",
-    )
-
-    # Networks.
-    network_factory = mappo.make_default_networks
-
-    test_system.build(
-        environment_factory=environment_factory,
-        network_factory=network_factory,
-        non_blocking_sleep_seconds=0,
-    )
-    (
-        data_server,
-        parameter_server,
-        executor,
-        evaluator,
-        trainer,
-    ) = test_system._builder.store.system_build
-    assert type(parameter_server) == ParameterServer
-
-    step_var = parameter_server.get_parameters("trainer_steps")
-    assert type(step_var) == np.ndarray
-    assert step_var[0] == 0
-
-    parameter_server.set_parameters({"trainer_steps": np.ones(1, dtype=np.int32)})
-    assert parameter_server.get_parameters("trainer_steps")[0] == 1
-
-    parameter_server.add_to_parameters({"trainer_steps": np.ones(1, dtype=np.int32)})
-    assert parameter_server.get_parameters("trainer_steps")[0] == 2
-
-    # Step the parameter sever
-    parameter_server.step()
-
-
-def test_config_loaded(test_parameter_server: TestParameterServer) -> None:
-    """Test that config is loaded into the store during init"""
-    assert test_parameter_server.store.config_key == "expected_value"
+def test_store_loaded(test_parameter_server: TestParameterServer) -> None:
+    """Test that store is loaded during init"""
+    assert test_parameter_server.store.store_key == "expected_value"
 
 
 def test_get_parameters_store(test_parameter_server: TestParameterServer) -> None:
