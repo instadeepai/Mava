@@ -26,10 +26,10 @@ import tensorflow_probability as tfp
 from acme import specs
 from acme.jax import networks as networks_lib
 from acme.jax import utils
-from acme.jax.networks.rescaling import TanhToSpec
+#from acme.jax.networks.rescaling import TanhToSpec
 from dm_env import specs as dm_specs
 from jax import jit
-
+from mava.utils.jax_training_utils import TanhToSpec
 from mava import specs as mava_specs
 from mava.utils.jax_training_utils import action_mask_categorical_policies
 
