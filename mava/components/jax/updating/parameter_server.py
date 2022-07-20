@@ -259,5 +259,5 @@ class ParameterServerSeparateNetworks(DefaultParameterServer):
                 if not (type(var) == tuple and len(var) == 0):
                     save_variables[key] = var
             server.store.system_checkpointer = savers.Checkpointer(
-                save_variables, self.config.checkpoint_subpath, time_delta_minutes=0
+                save_variables, self.config.experiment_path, time_delta_minutes=0
             )

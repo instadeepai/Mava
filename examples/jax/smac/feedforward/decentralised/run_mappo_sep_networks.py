@@ -90,7 +90,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        checkpoint_subpath=checkpoint_subpath,
+        experiment_path=checkpoint_subpath,
         policy_optimizer=policy_optimizer,
         critic_optimizer=critic_optimizer,
         run_evaluator=True,
@@ -98,7 +98,7 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        clip_value=False,
+        clip_value=True,
     )
 
     # Launch the system.
