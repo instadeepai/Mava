@@ -26,12 +26,13 @@ import tensorflow_probability as tfp
 from acme import specs
 from acme.jax import networks as networks_lib
 from acme.jax import utils
-#from acme.jax.networks.rescaling import TanhToSpec
+
+# from acme.jax.networks.rescaling import TanhToSpec
 from dm_env import specs as dm_specs
 from jax import jit
-from mava.utils.jax_training_utils import TanhToSpec
+
 from mava import specs as mava_specs
-from mava.utils.jax_training_utils import action_mask_categorical_policies
+from mava.utils.jax_training_utils import TanhToSpec, action_mask_categorical_policies
 
 tfd = tfp.distributions
 Array = dm_specs.Array
@@ -40,22 +41,28 @@ DiscreteArray = dm_specs.DiscreteArray
 EntropyFn = Callable[[Any], jnp.ndarray]
 hk_init = hk.initializers
 
+
 class ClippedGaussianDistribution:
+    """A clipped multivariate gaussian distribution"""
+
     def __init__(self, guassian_dist: Any, action_specs: Any):
+        """Initialises clipped multivariate gaussian distribution"""
         self._guassian_dist = guassian_dist
         self.clip_fn = TanhToSpec(action_specs)
 
-    def entropy(self):
+    def entropy(self) -> jnp.ndarray:
+        """Get unclipped entropy of distribution"""
         # Note (dries): This calculates the approximate entropy of the
         # clipped Gaussian distribution by setting it to the
         # unclipped guassian entropy.
         return self._guassian_dist.entropy()
 
-    def sample(self, seed):
+    def sample(self, seed: networks_lib.PRNGKey) -> jnp.ndarray:
+        """Get sample from clipped distribution"""
         return self.clip_fn(self._guassian_dist).sample(seed=seed)
-        
 
-    def log_prob(self, action):
+    def log_prob(self, action: jnp.ndarray) -> jnp.ndarray:
+        """Get log prob from clipped distribution"""
         return self.clip_fn(self._guassian_dist).log_prob(action)
 
 
@@ -65,16 +72,18 @@ class ClippedGaussianHead(hk.Module):
         action_specs: Any,
         name: Optional[str] = None,
     ):
+        """Initialise clipped multivariate gaussian head"""
         super().__init__(name=name)
         self._action_specs = action_specs
 
     def __call__(self, x: Any) -> ClippedGaussianDistribution:
+        """Clipped multivariate gaussian call"""
         return ClippedGaussianDistribution(x, action_specs=self._action_specs)
 
 
 @dataclasses.dataclass
 class PPONetworks:
-    """TODO: Add description here."""
+    """IPPO network class"""
 
     def __init__(
         self,
@@ -85,7 +94,8 @@ class PPONetworks:
         entropy: Optional[EntropyFn] = None,
         sample: Optional[networks_lib.SampleFn] = None,
     ) -> None:
-        """TODO: Add description here."""
+        """Intialialise the system executor"""
+
         self.network = network
         self.params = params
         self.log_prob = log_prob
@@ -106,10 +116,10 @@ class PPONetworks:
             distribution, _ = self.network.apply(params, observations)
             if mask is not None and isinstance(self.spec, DiscreteArray):
                 distribution = action_mask_categorical_policies(distribution, mask)
-           
+
             actions = jax.numpy.squeeze(distribution.sample(seed=key))
             log_prob = distribution.log_prob(actions)
-            
+
             return actions, log_prob
 
         self.forward_fn = forward_fn
@@ -120,7 +130,8 @@ class PPONetworks:
         key: networks_lib.PRNGKey,
         mask: chex.Array = None,
     ) -> Tuple[np.ndarray, Dict]:
-        """TODO: Add description here."""
+        """Select an action for a single agent in the system."""
+
         actions, log_prob = self.forward_fn(self.params, observations, key, mask)
         if isinstance(self.spec, specs.DiscreteArray):
             actions = np.array(actions, dtype=np.int64)
@@ -130,17 +141,20 @@ class PPONetworks:
         return actions, {"log_prob": log_prob}
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
-        """TODO: Add description here."""
+        """Get value for single observation"""
+
         _, value = self.network.apply(self.params, observations)
         return value
 
 
 def make_ppo_network(
-    network: networks_lib.FeedForwardNetwork, params: Dict[str, jnp.ndarray],spec=None
+    network: networks_lib.FeedForwardNetwork,
+    params: Dict[str, jnp.ndarray],
+    spec: specs.EnvironmentSpec,
 ) -> PPONetworks:
-    """TODO: Add description here."""
+    """Creates IPPO network."""
     return PPONetworks(
-        spec = spec,
+        spec=spec,
         network=network,
         params=params,
         log_prob=lambda distribution, action: distribution.log_prob(action),
@@ -160,7 +174,7 @@ def make_networks(
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
     observation_network: Callable = utils.batch_concat,
 ) -> PPONetworks:
-    """TODO: Add description here."""
+    """Creates IPPO network."""
     if isinstance(spec.actions, specs.DiscreteArray):
         return make_discrete_networks(
             environment_spec=spec,
@@ -188,7 +202,7 @@ def make_discrete_networks(
     observation_network: Callable = utils.batch_concat,
     # default behaviour is to flatten observations
 ) -> PPONetworks:
-    """TODO: Add description here."""
+    """Creates discrete IPPO network."""
 
     num_actions = environment_spec.actions.num_values
 
@@ -201,7 +215,7 @@ def make_discrete_networks(
             [
                 observation_network,
                 hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
-                networks_lib.CategoricalValueHead(num_values=1),
+                networks_lib.CategoricalValueHead(num_values=num_actions),
             ]
         )
         return policy_value_network(inputs)
@@ -216,7 +230,11 @@ def make_discrete_networks(
     params = forward_fn.init(network_key, dummy_obs)  # type: ignore
 
     # Create PPONetworks to add functionality required by the agent.
-    return make_ppo_network(network=forward_fn, params=params)
+    return make_ppo_network(
+        spec=environment_spec.actions,
+        network=forward_fn,
+        params=params,
+    )
 
 
 def make_continuous_networks(
@@ -227,7 +245,7 @@ def make_continuous_networks(
     observation_network: Callable = utils.batch_concat,
     # default behaviour is to flatten observations
 ) -> PPONetworks:
-    """TODO: Add description here."""
+    """Creates continuous IPPO network."""
     specs = environment_spec.actions
     # agent_environment_specs
     # Get total number of action dimensions from action spec.
@@ -239,11 +257,11 @@ def make_continuous_networks(
                 utils.batch_concat,
                 observation_network,
                 hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
-                networks_lib.MultivariateNormalDiagHead(specs,num_dimensions),
+                networks_lib.MultivariateNormalDiagHead(specs, num_dimensions),
                 ClippedGaussianHead(specs),
             ]
         )
-        #ClippedGaussianHead(specs),
+
         value_network = hk.Sequential(
             [
                 utils.batch_concat,
@@ -268,7 +286,11 @@ def make_continuous_networks(
     params = forward_fn.init(network_key, dummy_obs)  # type: ignore
 
     # Create PPONetworks to add functionality required by the agent.
-    return make_ppo_network(spec=specs,network=forward_fn, params=params,)
+    return make_ppo_network(
+        spec=specs,
+        network=forward_fn,
+        params=params,
+    )
 
 
 def make_default_networks(
@@ -284,7 +306,7 @@ def make_default_networks(
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
     observation_network: Callable = utils.batch_concat,
 ) -> Dict[str, Any]:
-    """Description here"""
+    """Create default networks"""
 
     # Create agent_type specs.
     specs = environment_spec.get_agent_environment_specs()
