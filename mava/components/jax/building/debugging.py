@@ -169,7 +169,6 @@ class ComponentDependencyDebugger(Component):
             bbox_inches="tight",
             pad_inches=0.5,
         )
-        raise Exception("TODO: remove")
 
     def _component_to_str(self, component: Callback) -> str:
         """Convert a component to a string representation."""
