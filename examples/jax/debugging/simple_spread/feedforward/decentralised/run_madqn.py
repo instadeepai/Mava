@@ -17,7 +17,7 @@
 import functools
 from datetime import datetime
 from typing import Any
-import numpy as np
+
 import optax
 from absl import app, flags
 
@@ -78,13 +78,13 @@ def main(_: Any) -> None:
     )
 
     # Optimizer.
+    lr = 1e-3
     optimizer = optax.chain(
-        optax.clip_by_global_norm(40.0),
-        optax.adam(learning_rate=1e-3),
-        # optax.scale_by_adam(), optax.scale(-1e-4)
+        optax.adam(learning_rate=lr),
     )
+
     # epsilon scheduler
-    epsilon_scheduler = LinearEpsilonScheduler(1.0, 0.1, 1000)
+    epsilon_scheduler = LinearEpsilonScheduler(1.0, 0.05, 2000)
     # Create the system.
     system = madqn.MADQNSystem()
 
@@ -102,9 +102,10 @@ def main(_: Any) -> None:
         num_executors=1,
         # use_next_extras=False,
         sample_batch_size=256,
-        target_update_period=10,
-        num_epochs=5, # why was this so high?
-        min_data_server_size=2000,
+        target_update_period=100,
+        num_epochs=5,  # TODO not used any more - remove
+        min_data_server_size=1_000,
+        n_step=1,
     )
 
     # Launch the system.
