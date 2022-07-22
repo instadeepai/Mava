@@ -140,9 +140,6 @@ class System(BaseSystem):
                 component(config=self.config.get_local_config(component))
             )
 
-        # Check component requirements
-        self.check_component_requirements()
-
         # Build system
         self._builder = Builder(components=self.components, global_config=system_config)
         self._builder.build()
@@ -157,24 +154,3 @@ class System(BaseSystem):
 
         # Launch system
         self._builder.launch()
-
-    def check_component_requirements(self) -> None:
-        """Check that all component requirements are satisfied"""
-        for component in self.components:
-            for required_component in component.required_components():
-                required_component_present = False
-
-                for system_component in self.components:
-                    if isinstance(system_component, required_component):
-                        required_component_present = True
-                        break
-
-                if not required_component_present:
-                    raise Exception(
-                        f"""
-                        Component {component} requires other components
-                        {component.required_components()}
-                        to be present in the system.
-                        Component {required_component} is not in the system.
-                        """
-                    )

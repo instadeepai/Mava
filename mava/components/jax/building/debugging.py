@@ -10,7 +10,7 @@ from mava.core_jax import SystemBuilder
 
 
 @dataclass
-class ComponentDependenciesConfig:
+class ComponentDependencyDebuggerConfig:
     show_full_component_path: bool = False
     fig_width_ratios = [1, 5]
     fig_inch_width: float = 18.5
@@ -32,7 +32,7 @@ class ComponentDependenciesConfig:
 class ComponentDependencyDebugger(Component):
     def __init__(
         self,
-        config: ComponentDependenciesConfig,
+        config: ComponentDependencyDebuggerConfig,
     ):
         """Save the config"""
         self.config = config
@@ -204,7 +204,7 @@ class ComponentDependencyDebugger(Component):
         Returns:
             config class/dataclass for component.
         """
-        return ComponentDependenciesConfig
+        return ComponentDependencyDebuggerConfig
 
     @staticmethod
     def required_components() -> List[Type[Callback]]:
