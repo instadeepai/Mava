@@ -119,7 +119,7 @@ class AdderSignature(Component):
 
 @dataclass
 class ParallelTransitionAdderConfig:
-    n_step: int = 1
+    n_step: int = 5
     discount: float = 0.99
     # use_next_extras: bool = False
 

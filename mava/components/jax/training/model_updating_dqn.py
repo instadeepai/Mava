@@ -14,7 +14,6 @@
 # limitations under the License.
 
 """Trainer components for system updating."""
-import copy
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Tuple
 
@@ -151,6 +150,7 @@ class MADQNEpochUpdate(Utility):
                 trainer.store.networks["networks"][net_key].params
             )  # pytype: disable=attribute-error
 
+        @jax.jit
         def model_update_epoch(
             carry: Tuple[KeyArray, Any, Any, optax.OptState, Batch],
             unused_t: Tuple[()],
@@ -159,11 +159,9 @@ class MADQNEpochUpdate(Utility):
             Dict[str, jnp.ndarray],
         ]:
             """Performs model updates based on one epoch of data."""
-            key, params, target_params, opt_states, batch = carry
-            new_key, subkey = jax.random.split(key)
+            key, params, target_params, opt_states, batch, steps = carry
 
             # Calculate the gradients and agent metrics.
-            # with jax.disable_jit():
             gradients, agent_metrics = trainer.store.grad_fn(
                 params,
                 target_params,
@@ -177,7 +175,10 @@ class MADQNEpochUpdate(Utility):
             # Update the networks and optimizers.
             metrics = {}
             new_params = {}
+            new_target_params = {}
             new_opt_states = {}
+
+            steps += 1
 
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
@@ -197,9 +198,20 @@ class MADQNEpochUpdate(Utility):
                 agent_metrics[agent_key]["norm_updates"] = optax.global_norm(updates)
                 metrics[agent_key] = agent_metrics
 
-            # new_target_params = target_params
+                new_target_params[agent_net_key] = optax.periodic_update(
+                    new_params[agent_net_key],
+                    target_params[agent_net_key],
+                    steps,
+                    self.config.target_update_period,
+                )
 
-            return (new_key, new_params, target_params, new_opt_states, batch), metrics
+            return (
+                new_params,
+                new_target_params,
+                new_opt_states,
+                batch,
+                steps,
+            ), metrics
 
         trainer.store.epoch_update_fn = model_update_epoch
 

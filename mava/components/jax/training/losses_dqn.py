@@ -15,9 +15,11 @@
 
 """Trainer components for calculating losses."""
 
+import functools
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Tuple
 
+import chex
 import jax
 import jax.numpy as jnp
 import rlax
@@ -57,7 +59,9 @@ class MADQNLoss(Loss):
     def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
         """Creates the grad function of the loss and adds it to the trainer.store."""
 
+        @chex.assert_max_traces(n=1)
         def loss_grad_fn(
+            trainer_network: Any,
             params: Any,
             target_params: Any,
             observations: Any,
@@ -83,10 +87,11 @@ class MADQNLoss(Loss):
             """
 
             grads = {}
+            loss = {}
             loss_info = {}
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
-                network = trainer.store.networks["networks"][agent_net_key]
+                network = trainer_network[agent_net_key]
 
                 # Note (dries): This is placed here to set the networks correctly in
                 # the case of non-shared weights.
@@ -123,14 +128,12 @@ class MADQNLoss(Loss):
                     td_error = batch_error(q_tm1, tmp_actions, r_t, d_t, q_t)
                     batch_loss = jnp.square(td_error)
                     loss = jnp.mean(batch_loss)
-                    loss_info = {"what": jnp.array(0.0)}  # TODO (Nima): check whether
-                    # there is sth more
-                    # useful
+                    loss_info = {}  # TODO (Nima): check whether
                     return loss, loss_info
 
-                grads[agent_key], loss_info[agent_key] = jax.grad(
-                    loss_fn, has_aux=True
-                )(
+                (loss[agent_key], loss_info[agent_key]), grads[
+                    agent_key
+                ] = jax.value_and_grad(loss_fn, has_aux=True)(
                     params[agent_net_key],
                     target_params[agent_net_key],
                     observations[agent_key].observation,
@@ -139,10 +142,14 @@ class MADQNLoss(Loss):
                     discounts[agent_key],
                     rewards[agent_key],
                 )
+                loss_info["total_loss"] = loss[agent_key]
+
             return grads, loss_info
 
         # Save the gradient function.
-        trainer.store.grad_fn = loss_grad_fn
+        trainer.store.grad_fn = jax.jit(
+            functools.partial(loss_grad_fn, trainer.store.networks["networks"])
+        )
 
     @staticmethod
     def config_class() -> Callable:

@@ -105,8 +105,7 @@ class DataServer(Component):
 class OffPolicyDataServerConfig:
     sampler: reverb_types.SelectorType = reverb.item_selectors.Uniform
     remover: reverb_types.SelectorType = reverb.item_selectors.Fifo
-    max_size: int = 10000
-    max_times_sampled: int = 0
+    max_size: int = 1_000_000
 
 
 class OffPolicyDataServer(DataServer):

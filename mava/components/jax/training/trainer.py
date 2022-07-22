@@ -118,10 +118,6 @@ class TrainerInit(Component):
         """Set up the counter for training steps."""
         trainer.store.training_steps = np.array(0, dtype=np.int64)
 
-    def on_training_step_end(self, trainer: SystemTrainer) -> None:
-        """Increment the training step."""
-        trainer.store.training_steps += 1
-
     @staticmethod
     def name() -> str:
         """_summary_"""

@@ -62,6 +62,7 @@ class TrainingState(NamedTuple):
     params: Any
     opt_states: Dict[str, optax.OptState]
     random_key: Any
+    steps: int
     # values needed for Q-learning family of methods.
     target_params: Any = {}
 

@@ -15,21 +15,19 @@
 
 """Trainer components for gradient step calculations."""
 
-import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Tuple
+from typing import Callable, Dict, Tuple
 
+import chex
 import jax
 import jax.numpy as jnp
 import optax
 import reverb
-import rlax
 import tree
 from acme.jax import utils
 from jax import jit
 
-from mava.components.jax import Component
-from mava.components.jax.training import Batch, Step, TrainingState
+from mava.components.jax.training import Step, TrainingState
 from mava.components.jax.training.base import BatchDQN
 from mava.core_jax import SystemTrainer
 
@@ -55,16 +53,16 @@ class MADQNStep(Step):
     def on_training_step_fn(self, trainer: SystemTrainer) -> None:
         """_summary_"""
 
-        # @jit
+        @jit
+        @chex.assert_max_traces(n=1)
         def sgd_step(
             states: TrainingState, sample: reverb.ReplaySample
         ) -> Tuple[TrainingState, Dict[str, jnp.ndarray]]:
             """Performs a minibatch SGD step, returning new state and metrics."""
-
             # Extract the data.
             data = sample.data
 
-            observations, new_observations, actions, rewards, discounts, extra = (
+            observations, new_observations, actions, rewards, discounts, _ = (
                 data.observations,
                 data.next_observations,
                 data.actions,
@@ -89,41 +87,23 @@ class MADQNStep(Step):
 
             batch = trajectories
 
-            # Calling epoch_update_fn on the batch data to update network parameters.
-            # with jax.disable_jit():
-            #     (new_key, new_params, new_target_params, new_opt_states, _,), metrics \
-            #         = jax.lax.scan(
-            #         trainer.store.epoch_update_fn,
-            #         (states.random_key, states.params, states.target_params,
-            #             states.opt_states, batch), {},
-            #         length=trainer.store.num_epochs,
-            #     )
-            # jax.disable_jit() - makes this work. There must be a bug in epoch_update!
-            # with jax.disable_jit():
+            next_rng_key, rng_key = jax.random.split(states.random_key)
             (
-                new_key,
                 new_params,
                 new_target_params,
                 new_opt_states,
                 _,
+                steps,
             ), metrics = trainer.store.epoch_update_fn(
                 (
-                    states.random_key,
+                    rng_key,
                     states.params,
                     states.target_params,
                     states.opt_states,
                     batch,
+                    states.steps,
                 ),
                 {},
-            )
-            # removed the lax.scan in the following
-
-            # Periodically update the target network to the updated network
-            new_target_params = optax.periodic_update(
-                new_params,
-                new_target_params,
-                trainer.store.training_steps,
-                self.config.target_update_period,
             )
 
             # Update the training states.
@@ -131,12 +111,13 @@ class MADQNStep(Step):
                 params=new_params,
                 target_params=new_target_params,
                 opt_states=new_opt_states,
-                random_key=new_key,
+                random_key=next_rng_key,
+                steps=steps,
             )
 
             # Set the metrics
             metrics = jax.tree_map(jnp.mean, metrics)
-            metrics["norm_params"] = optax.global_norm(states.params)
+            metrics["norm_params"] = optax.global_norm(new_states.params)
             metrics["observations_mean"] = jnp.mean(
                 utils.batch_concat(
                     jax.tree_map(
@@ -173,12 +154,14 @@ class MADQNStep(Step):
             }
             opt_states = trainer.store.opt_states
             random_key, _ = jax.random.split(trainer.store.key)
+            steps = trainer.store.training_steps
 
             states = TrainingState(
                 params=params,
                 target_params=target_params,
                 opt_states=opt_states,
                 random_key=random_key,
+                steps=steps,
             )
 
             new_states, metrics = sgd_step(states, sample)
@@ -221,6 +204,8 @@ class MADQNStep(Step):
 
             # Set the metrics
             trainer.store.metrics = metrics
+
+            trainer.store.training_steps = new_states.steps
 
             return metrics
 
