@@ -26,7 +26,7 @@ from mava.callbacks import Callback
 from mava.components.jax import Component
 from mava.components.jax.building.adders import AdderSignature
 from mava.components.jax.building.environments import EnvironmentSpec
-from mava.components.jax.building.reverb_components import RateLimiter
+from mava.components.jax.building.reverb_components import RateLimiter, Remover, Sampler
 from mava.components.jax.building.system_init import BaseSystemInit
 from mava.core_jax import SystemBuilder
 from mava.utils import enums
@@ -198,11 +198,13 @@ class OffPolicyDataServer(DataServer):
         """List of other Components required in the system for this Component to function.
 
         RateLimiter required to set up builder.store.rate_limiter_fn.
+        Remover required to set up builder.store.remover_fn.
+        Sampler required to set up builder.store.sampler_fn.
 
         Returns:
             List of required component classes.
         """
-        return DataServer.required_components() + [RateLimiter]
+        return DataServer.required_components() + [RateLimiter, Remover, Sampler]
 
 
 @dataclass

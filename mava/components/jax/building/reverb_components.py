@@ -178,6 +178,17 @@ class Sampler(Component):
         """
         return SamplerConfig
 
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        None required.
+
+        Returns:
+            List of required component classes.
+        """
+        return []
+
 
 class UniformSampler(Sampler):
     def on_building_data_server_start(self, builder: SystemBuilder) -> None:
@@ -271,6 +282,17 @@ class Remover(Component):
             config class/dataclass for component.
         """
         return RemoverConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        None required.
+
+        Returns:
+            List of required component classes.
+        """
+        return []
 
 
 class FIFORemover(Remover):
