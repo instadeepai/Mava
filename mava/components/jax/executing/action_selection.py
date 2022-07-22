@@ -26,7 +26,7 @@ from mava.callbacks import Callback
 from mava.components.jax import Component
 from mava.components.jax.building.networks import Networks
 from mava.components.jax.building.system_init import BaseSystemInit
-from mava.components.jax.training.trainer import TrainerInit
+from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemExecutor
 
 
@@ -73,14 +73,14 @@ class ExecutorSelectAction(Component):
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
-        TrainerInit required to set up executor.store.networks.
+        BaseTrainerInit required to set up executor.store.networks.
         BaseSystemInit required to set up executor.store.agent_net_keys.
         Networks required to set up executor.store.key.
 
         Returns:
             List of required component classes.
         """
-        return [TrainerInit, BaseSystemInit, Networks]
+        return [BaseTrainerInit, BaseSystemInit, Networks]
 
 
 class FeedforwardExecutorSelectAction(ExecutorSelectAction):

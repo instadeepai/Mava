@@ -13,255 +13,234 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for executor class for Jax-based Mava systems"""
+"""Tests for executor class for Jax-based Mava systems."""
+from types import SimpleNamespace
+from typing import Dict, List
 
-import functools
-from typing import Dict, Tuple
-
-import acme
+import dm_env
 import numpy as np
 import pytest
 
-from mava.components.jax import building, executing
-from mava.components.jax.building.adders import ParallelSequenceAdderSignature
-from mava.components.jax.building.data_server import OnPolicyDataServer
-from mava.components.jax.building.distributor import Distributor
-from mava.components.jax.building.parameter_client import ExecutorParameterClient
-from mava.components.jax.updating.parameter_server import DefaultParameterServer
-from mava.specs import DesignSpec
-from mava.systems.jax import mappo
-from mava.systems.jax.mappo.components import ExtrasLogProbSpec
-from mava.systems.jax.system import System
-from mava.utils.environments import debugging_utils
-from tests.jax import mocks
-
-system_init = DesignSpec(
-    environment_spec=building.EnvironmentSpec,
-    system_init=building.FixedNetworkSystemInit,
-).get()
-executor = DesignSpec(
-    executor_init=executing.ExecutorInit,
-    executor_observe=executing.FeedforwardExecutorObserve,
-    executor_select_action=executing.FeedforwardExecutorSelectAction,
-    executor_adder=building.ParallelSequenceAdder,
-    executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
-    networks=building.DefaultNetworks,
-).get()
+from mava.callbacks import Callback
+from mava.systems.jax import Executor
+from mava.types import NestedArray
+from tests.jax.hook_order_tracking import HookOrderTracking
 
 
-#########################################################################
-# Test executor in isolation.
-class TestSystemExecutor(System):
-    def design(self) -> Tuple[DesignSpec, Dict]:
-        """Mock system design with zero components.
+class TestExecutor(HookOrderTracking, Executor):
+    def __init__(
+        self,
+        store: SimpleNamespace,
+        components: List[Callback],
+    ) -> None:
+        """Initialise the parameter server."""
+        self.reset_hook_list()
 
-        Returns:
-            system callback components
-        """
-        components = DesignSpec(
-            **system_init,
-            data_server=mocks.MockOnPolicyDataServer,
-            data_server_signature=ParallelSequenceAdderSignature,
-            parameter_server=mocks.MockParameterServer,
-            executor_parameter_client=mocks.MockExecutorParameterClient,
-            trainer_parameter_client=mocks.MockTrainerParameterClient,
-            logger=mocks.MockLogger,
-            **executor,
-            trainer=mocks.MockTrainer,
-            trainer_dataset=mocks.MockTrainerDataset,
-            distributor=mocks.MockDistributor,
-        )
-        return components, {}
+        super().__init__(store, components)
 
 
 @pytest.fixture
-def test_exector_system() -> System:
-    """Add description here."""
-    return TestSystemExecutor()
-
-
-def test_executor(
-    test_exector_system: System,
-) -> None:
-    """Test if the parameter server instantiates processes as expected."""
-
-    # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name="simple_spread",
-        action_space="discrete",
+def test_executor() -> Executor:
+    """Dummy Executor with no components."""
+    return TestExecutor(
+        store=SimpleNamespace(
+            store_key="expected_value",
+            is_evaluator=False,
+        ),
+        components=[],
     )
-
-    # Networks.
-    network_factory = mappo.make_default_networks
-
-    # Build the system
-    test_exector_system.build(
-        environment_factory=environment_factory, network_factory=network_factory
-    )
-
-    (
-        data_server,
-        parameter_server,
-        executor,
-        evaluator,
-        trainer,
-    ) = test_exector_system._builder.store.system_build
-
-    assert isinstance(executor, acme.core.Worker)
-
-    # Run an episode
-    executor.run_episode()
-
-
-#########################################################################
-# Intergration test for the executor, variable_client and variable_server.
-class TestSystemExecutorAndParameterSever(System):
-    def design(self) -> Tuple[DesignSpec, Dict]:
-        """Mock system design with zero components.
-
-        Returns:
-            system callback components
-        """
-        components = DesignSpec(
-            **system_init,
-            data_server=mocks.MockOnPolicyDataServer,
-            data_server_signature=ParallelSequenceAdderSignature,
-            parameter_server=DefaultParameterServer,
-            executor_parameter_client=ExecutorParameterClient,
-            trainer_parameter_client=mocks.MockTrainerParameterClient,
-            logger=mocks.MockLogger,
-            **executor,
-            trainer=mocks.MockTrainer,
-            trainer_dataset=mocks.MockTrainerDataset,
-            distributor=mocks.MockDistributor,
-        )
-        return components, {}
 
 
 @pytest.fixture
-def test_executor_parameter_server_system() -> System:
-    """Add description here."""
-    return TestSystemExecutorAndParameterSever()
-
-
-def test_executor_parameter_server(
-    test_executor_parameter_server_system: System,
-) -> None:
-    """Test if the parameter server instantiates processes as expected."""
-
-    # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name="simple_spread",
-        action_space="discrete",
+def dummy_time_step() -> dm_env.TimeStep:
+    """Dummy TimeStep."""
+    return dm_env.TimeStep(
+        step_type="type1", reward=-100, discount=0.9, observation=np.array([1, 2, 3])
     )
-
-    # Networks.
-    network_factory = mappo.make_default_networks
-
-    # Build the system
-    test_executor_parameter_server_system.build(
-        environment_factory=environment_factory,
-        network_factory=network_factory,
-        executor_parameter_update_period=20,
-    )
-
-    (
-        data_server,
-        parameter_server,
-        executor,
-        evaluator,
-        trainer,
-    ) = test_executor_parameter_server_system._builder.store.system_build
-
-    assert isinstance(executor, acme.core.Worker)
-
-    # Save the executor policy
-
-    parameters = executor._executor.store.executor_parameter_client._parameters
-
-    # Change a variable in the policy network
-    parameter_server.set_parameters(
-        {"evaluator_steps": np.full(1, 1234, dtype=np.int32)}
-    )
-
-    # Step the executor
-    executor.run_episode()
-
-    # Check if the executor variable has changed.
-    parameters = executor._executor.store.executor_parameter_client._parameters
-    assert parameters["evaluator_steps"] == 1234
-
-
-#########################################################################
-# Intergration test for the executor, adder, data_server, variable_client
-# and variable_server.
-class TestSystemExceptTrainer(System):
-    def design(self) -> Tuple[DesignSpec, Dict]:
-        """Mock system design with zero components.
-
-        Returns:
-            system callback components
-        """
-        components = DesignSpec(
-            **system_init,
-            data_server=OnPolicyDataServer,
-            data_server_adder_signature=ParallelSequenceAdderSignature,
-            extras_spec=ExtrasLogProbSpec,
-            parameter_server=DefaultParameterServer,
-            executor_parameter_client=ExecutorParameterClient,
-            **executor,
-            distributor=Distributor,
-            trainer_parameter_client=mocks.MockTrainerParameterClient,
-            logger=mocks.MockLogger,
-            trainer=mocks.MockTrainer,
-            trainer_dataset=mocks.MockTrainerDataset,
-        )
-        return components, {}
 
 
 @pytest.fixture
-def test_system_except_trainer() -> System:
-    """Add description here."""
-    return TestSystemExceptTrainer()
+def dummy_extras() -> Dict[str, NestedArray]:
+    """Dummy extras."""
+    return {"extras_key": "extras_value"}
 
 
-def test_except_trainer(
-    test_system_except_trainer: System,
+@pytest.fixture
+def dummy_actions() -> Dict[str, NestedArray]:
+    """Dummy actions."""
+    return {"actions_key": "actions_value"}
+
+
+def test_store_loaded(test_executor: Executor) -> None:
+    """Test that store is loaded during init."""
+    assert test_executor.store.store_key == "expected_value"
+    assert not test_executor.store.is_evaluator
+    assert test_executor._evaluator == test_executor.store.is_evaluator
+
+
+def test_observe_first_store(
+    test_executor: Executor,
+    dummy_time_step: dm_env.TimeStep,
+    dummy_extras: Dict[str, NestedArray],
 ) -> None:
-    """Test if the parameter server instantiates processes as expected."""
+    """Test that store is handled properly in observe_first"""
+    test_executor.observe_first(timestep=dummy_time_step, extras=dummy_extras)
+    assert test_executor.store.timestep == dummy_time_step
+    assert test_executor.store.extras == dummy_extras
 
-    # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name="simple_spread",
-        action_space="discrete",
+
+def test_observe_store(
+    test_executor: Executor,
+    dummy_actions: Dict[str, NestedArray],
+    dummy_time_step: dm_env.TimeStep,
+    dummy_extras: Dict[str, NestedArray],
+) -> None:
+    """Test that store is handled properly in observe"""
+    test_executor.observe(
+        actions=dummy_actions, next_timestep=dummy_time_step, next_extras=dummy_extras
+    )
+    assert test_executor.store.actions == dummy_actions
+    assert test_executor.store.next_timestep == dummy_time_step
+    assert test_executor.store.next_extras == dummy_extras
+
+
+def test_select_action_store(
+    test_executor: Executor,
+) -> None:
+    """Test that store is handled properly in select_action"""
+    agent = "agent_0"
+    observation = np.array([1, 2, 3, 4])
+    state = np.array([5, 6, 7, 8])
+
+    # Manually load info into store
+    test_executor.store.action_info = "action_info"
+    test_executor.store.policy_info = "policy_info"
+
+    assert test_executor.select_action(
+        agent=agent, observation=observation, state=state
+    ) == ("action_info", "policy_info")
+
+    assert test_executor.store.agent == agent
+    assert (test_executor.store.observation == observation).all()
+    assert (test_executor.store.state == state).all()
+
+
+def test_select_actions_store(
+    test_executor: Executor,
+) -> None:
+    """Test that store is handled properly in select_actions"""
+    observations = {
+        "agent_0": np.array([1, 2, 3, 4]),
+        "agent_1": np.array([5, 6, 7, 8]),
+    }
+
+    # Manually load info into store
+    actions_info = {"agent_0": "actions_info_0", "agent_1": "actions_info_1"}
+    policies_info = {"agent_0": "policies_info_0", "agent_1": "policies_info_1"}
+
+    test_executor.store.actions_info = actions_info
+    test_executor.store.policies_info = policies_info
+
+    assert test_executor.select_actions(observations=observations) == (
+        actions_info,
+        policies_info,
     )
 
-    # Networks.
-    network_factory = mappo.make_default_networks
+    assert test_executor.store.observations == observations
 
-    # Build the system
-    test_system_except_trainer.build(
-        environment_factory=environment_factory,
-        network_factory=network_factory,
-        executor_parameter_update_period=20,
-        multi_process=False,
-        run_evaluator=True,
-        num_executors=1,
-        use_next_extras=False,
+
+def test_update_store(
+    test_executor: Executor,
+) -> None:
+    """Test that store is handled properly in update"""
+    test_executor.update(wait=False)
+    assert not test_executor.store._wait
+    test_executor.update(wait=True)
+    assert test_executor.store._wait
+
+
+def test_init_hook_order(test_executor: TestExecutor) -> None:
+    """Test if init hooks are called in the correct order"""
+    assert test_executor.hook_list == [
+        "on_execution_init_start",
+        "on_execution_init",
+        "on_execution_init_end",
+    ]
+
+
+def test_observe_first_hook_order(
+    test_executor: TestExecutor,
+    dummy_time_step: dm_env.TimeStep,
+    dummy_extras: Dict[str, NestedArray],
+) -> None:
+    """Test if observe_first hooks are called in the correct order"""
+    test_executor.reset_hook_list()
+    test_executor.observe_first(timestep=dummy_time_step, extras=dummy_extras)
+    assert test_executor.hook_list == [
+        "on_execution_observe_first_start",
+        "on_execution_observe_first",
+        "on_execution_observe_first_end",
+    ]
+
+
+def test_observe_hook_order(
+    test_executor: TestExecutor,
+    dummy_actions: Dict[str, NestedArray],
+    dummy_time_step: dm_env.TimeStep,
+    dummy_extras: Dict[str, NestedArray],
+) -> None:
+    """Test if observe hooks are called in the correct order"""
+    test_executor.reset_hook_list()
+    test_executor.observe(
+        actions=dummy_actions, next_timestep=dummy_time_step, next_extras=dummy_extras
     )
+    assert test_executor.hook_list == [
+        "on_execution_observe_start",
+        "on_execution_observe",
+        "on_execution_observe_end",
+    ]
 
-    (
-        data_server,
-        parameter_server,
-        executor,
-        evaluator,
-        trainer,
-    ) = test_system_except_trainer._builder.store.system_build
 
-    assert isinstance(executor, acme.core.Worker)
+def test_select_action_hook_order(
+    test_executor: TestExecutor,
+) -> None:
+    """Test if select_action hooks are called in the correct order"""
+    test_executor.reset_hook_list()
+    test_executor.store.action_info = None
+    test_executor.store.policy_info = None
+    test_executor.select_action(agent="", observation=[], state=None)
+    assert test_executor.hook_list == [
+        "on_execution_select_action_start",
+        "on_execution_select_action_preprocess",
+        "on_execution_select_action_compute",
+        "on_execution_select_action_sample",
+        "on_execution_select_action_end",
+    ]
 
-    # Step the executor
-    executor.run_episode()
+
+def test_select_actions_hook_order(
+    test_executor: TestExecutor,
+) -> None:
+    """Test if select_actions hooks are called in the correct order"""
+    test_executor.reset_hook_list()
+    test_executor.store.actions_info = None
+    test_executor.store.policies_info = None
+    test_executor.select_actions(observations={})
+    assert test_executor.hook_list == [
+        "on_execution_select_actions_start",
+        "on_execution_select_actions",
+        "on_execution_select_actions_end",
+    ]
+
+
+def test_update_hook_order(
+    test_executor: TestExecutor,
+) -> None:
+    """Test if update hooks are called in the correct order"""
+    test_executor.reset_hook_list()
+    test_executor.update()
+    assert test_executor.hook_list == [
+        "on_execution_update_start",
+        "on_execution_update",
+        "on_execution_update_end",
+    ]

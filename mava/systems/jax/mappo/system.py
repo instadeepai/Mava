@@ -47,13 +47,14 @@ class MAPPOSystem(System):
             executor_observe=executing.FeedforwardExecutorObserve,
             executor_select_action=executing.FeedforwardExecutorSelectAction,
             executor_adder=building.ParallelSequenceAdder,
+            adder_priority=building.UniformAdderPriority,
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
             networks=building.DefaultNetworks,
         ).get()
 
         # Trainer
         trainer_process = DesignSpec(
-            trainer_init=training.TrainerInit,
+            trainer_init=training.SingleTrainerInit,
             gae_fn=training.GAE,
             loss=training.MAPGWithTrustRegionClippingLoss,
             epoch_update=training.MAPGEpochUpdate,

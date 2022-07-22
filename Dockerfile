@@ -19,7 +19,7 @@ RUN pip install --upgrade pip setuptools wheel
 ARG folder=/home/app/mava
 ## working directory
 WORKDIR ${folder}
-## Copy code from current path.
+## Copy code from current path
 COPY . /home/app/mava
 # For box2d
 RUN apt-get install swig -y

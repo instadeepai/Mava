@@ -37,7 +37,7 @@ from mava.components.jax.building.networks import Networks
 from mava.components.jax.building.parameter_client import TrainerParameterClient
 from mava.components.jax.training.advantage_estimation import GAE
 from mava.components.jax.training.base import Batch, TrainingState
-from mava.components.jax.training.trainer import TrainerInit
+from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
 
 
@@ -155,7 +155,7 @@ class Step(Component):
 
         TrainerDataset required for config sample_batch_size.
         ParallelSequenceAdder required for config sequence_length.
-        TrainerInit required to set up trainer.store.networks
+        BaseTrainerInit required to set up trainer.store.networks
         and trainer.store.trainer_agent_net_keys.
         EpochUpdate required to set up trainer.store.epoch_update_fn.
         MinibatchUpdate required to set up trainer.store.opt_states.
@@ -167,7 +167,7 @@ class Step(Component):
         return [
             TrainerDataset,
             mava.components.jax.building.adders.ParallelSequenceAdder,
-            TrainerInit,
+            BaseTrainerInit,
             mava.components.jax.training.model_updating.EpochUpdate,
             mava.components.jax.training.model_updating.MinibatchUpdate,
             Networks,

@@ -19,7 +19,7 @@ from typing import Callable, List, Optional, Type, Union
 
 from mava.callbacks import Callback
 from mava.components.jax import Component
-from mava.components.jax.training.trainer import TrainerInit
+from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemBuilder
 from mava.systems.jax.launcher import Launcher, NodeType
 
@@ -68,7 +68,7 @@ class Distributor(Component):
         # variable server node
         parameter_server = builder.store.program.add(
             builder.parameter_server,
-            node_type=NodeType.corrier,
+            node_type=NodeType.courier,
             name="parameter_server",
         )
 
@@ -77,7 +77,7 @@ class Distributor(Component):
             builder.store.program.add(
                 builder.executor,
                 [f"executor_{executor_id}", data_server, parameter_server],
-                node_type=NodeType.corrier,
+                node_type=NodeType.courier,
                 name="executor",
             )
 
@@ -86,7 +86,7 @@ class Distributor(Component):
             builder.store.program.add(
                 builder.executor,
                 ["evaluator", data_server, parameter_server],
-                node_type=NodeType.corrier,
+                node_type=NodeType.courier,
                 name="evaluator",
             )
 
@@ -95,7 +95,7 @@ class Distributor(Component):
             builder.store.program.add(
                 builder.trainer,
                 [trainer_id, data_server, parameter_server],
-                node_type=NodeType.corrier,
+                node_type=NodeType.courier,
                 name="trainer",
             )
 
@@ -128,9 +128,9 @@ class Distributor(Component):
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
-        TrainerInit required to set up builder.store.trainer_networks.
+        BaseTrainerInit required to set up builder.store.trainer_networks.
 
         Returns:
             List of required component classes.
         """
-        return [TrainerInit]
+        return [BaseTrainerInit]

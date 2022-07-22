@@ -25,4 +25,8 @@ from mava.components.jax.training.step import (
     DefaultTrainerStep,
     MAPGWithTrustRegionStep,
 )
-from mava.components.jax.training.trainer import TrainerInit
+from mava.components.jax.training.trainer import (
+    CustomTrainerInit,
+    OneTrainerPerNetworkInit,
+    SingleTrainerInit,
+)

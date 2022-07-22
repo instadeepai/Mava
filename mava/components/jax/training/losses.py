@@ -24,7 +24,7 @@ import rlax
 
 from mava.callbacks import Callback
 from mava.components.jax import Component
-from mava.components.jax.training.trainer import TrainerInit
+from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
 
 
@@ -46,13 +46,13 @@ class Loss(Component):
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
-        TrainerInit required to set up trainer.store.trainer_agents,
+        BaseTrainerInit required to set up trainer.store.trainer_agents,
         trainer.store.trainer_agent_net_keys and trainer.store.networks.
 
         Returns:
             List of required component classes.
         """
-        return [TrainerInit]
+        return [BaseTrainerInit]
 
 
 @dataclass

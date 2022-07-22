@@ -30,7 +30,7 @@ from mava.callbacks import Callback
 from mava.components.jax.training.base import Batch, Utility
 from mava.components.jax.training.losses import Loss
 from mava.components.jax.training.step import Step
-from mava.components.jax.training.trainer import TrainerInit
+from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
 
 
@@ -57,14 +57,14 @@ class MinibatchUpdate(Utility):
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
-        TrainerInit required to set up trainer.store.networks,
+        BaseTrainerInit required to set up trainer.store.networks,
         trainer.store.trainer_agents, and trainer.store.trainer_agent_net_keys.
         Loss required to set up trainer.store.grad_fn.
 
         Returns:
             List of required component classes.
         """
-        return [TrainerInit, Loss]
+        return [BaseTrainerInit, Loss]
 
 
 @dataclass
@@ -130,7 +130,6 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
             )
 
             # Update the networks and optimizors.
-            metrics = {}
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
                 # Apply updates
@@ -147,8 +146,7 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
                     gradients[agent_key]
                 )
                 agent_metrics[agent_key]["norm_updates"] = optax.global_norm(updates)
-                metrics[agent_key] = agent_metrics
-            return (params, opt_states), metrics
+            return (params, opt_states), agent_metrics
 
         trainer.store.minibatch_update_fn = model_update_minibatch
 

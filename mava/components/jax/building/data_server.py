@@ -20,19 +20,17 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Type
 
 import reverb
-from reverb import rate_limiters, reverb_types
 
 from mava import specs
 from mava.callbacks import Callback
 from mava.components.jax import Component
 from mava.components.jax.building.adders import AdderSignature
 from mava.components.jax.building.environments import EnvironmentSpec
-from mava.components.jax.building.rate_limiters import RateLimiter
+from mava.components.jax.building.reverb_components import RateLimiter
 from mava.components.jax.building.system_init import BaseSystemInit
-from mava.components.jax.training import TrainerInit
 from mava.core_jax import SystemBuilder
 from mava.utils import enums
-from mava.utils.builder_utils import covert_specs
+from mava.utils.builder_utils import convert_specs
 from mava.utils.sort_utils import sort_str_num
 
 
@@ -63,25 +61,35 @@ class DataServer(Component):
             not the {builder.store.global_config.network_sampling_setup} setting."
 
         for table_key in builder.store.table_network_config.keys():
-            # TODO (dries): Clean the below coverter code up.
+            # TODO (dries): Clean the below converter code up.
             # Convert a Mava spec
             num_networks = len(builder.store.table_network_config[table_key])
-            env_spec = copy.deepcopy(builder.store.environment_spec)
-            env_spec._specs = covert_specs(
-                builder.store.agent_net_keys, env_spec._specs, num_networks
+            env_specs = copy.deepcopy(builder.store.ma_environment_spec)
+            env_specs.set_agent_environment_specs(
+                convert_specs(
+                    builder.store.agent_net_keys,
+                    env_specs.get_agent_environment_specs(),
+                    num_networks,
+                )
             )
 
-            env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
-            if env_spec.extra_specs is not None:
-                env_spec.extra_specs = covert_specs(
-                    builder.store.agent_net_keys, env_spec.extra_specs, num_networks
+            env_specs._keys = list(
+                sort_str_num(env_specs.get_agent_environment_specs().keys())
+            )
+            if env_specs.get_extras_specs() is not None:
+                env_specs.set_extras_specs(
+                    convert_specs(
+                        builder.store.agent_net_keys,
+                        env_specs.get_extras_specs(),
+                        num_networks,
+                    )
                 )
-            extras_spec = covert_specs(
+            extras_specs = convert_specs(
                 builder.store.agent_net_keys,
                 builder.store.extras_spec,
                 num_networks,
             )
-            table = self.table(table_key, env_spec, extras_spec, builder)
+            table = self.table(table_key, env_specs, extras_specs, builder)
             data_tables.append(table)
         return data_tables
 
@@ -89,8 +97,8 @@ class DataServer(Component):
     def table(
         self,
         table_key: str,
-        environment_spec: specs.MAEnvironmentSpec,
-        extras_spec: Dict[str, Any],
+        environment_specs: specs.MAEnvironmentSpec,
+        extras_specs: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
         """_summary_"""
@@ -108,24 +116,21 @@ class DataServer(Component):
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
-        BaseSystemInit required to set up builder.store.agent_net_keys.
+        BaseSystemInit required to set up builder.store.agent_net_keys
+        and for config network_sampling_setup.
         EnvironmentSpec required to set up builder.store.environment_spec
         and builder.store.extras_spec.
         AdderSignature required to set up builder.store.adder_signature_fn.
-        BaseSystemInit required for config network_sampling_setup.
 
         Returns:
             List of required component classes.
         """
-        return [TrainerInit, EnvironmentSpec, AdderSignature, BaseSystemInit]
+        return [EnvironmentSpec, AdderSignature, BaseSystemInit]
 
 
 @dataclass
 class OffPolicyDataServerConfig:
-    sampler: reverb_types.SelectorType = reverb.selectors.Uniform()
-    remover: reverb_types.SelectorType = reverb.selectors.Fifo()
     max_size: int = 100000
-    rate_limiter: rate_limiters.RateLimiter = None
     max_times_sampled: int = 0
 
 
@@ -144,27 +149,37 @@ class OffPolicyDataServer(DataServer):
     def table(
         self,
         table_key: str,
-        environment_spec: specs.MAEnvironmentSpec,
-        extras_spec: Dict[str, Any],
+        environment_specs: specs.MAEnvironmentSpec,
+        extras_specs: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
         """_summary_
 
         Args:
             table_key : _description_
-            environment_spec : _description_
-            extras_spec : _description_
+            environment_specs : _description_
+            extras_specs : _description_
             builder : _description_
         Returns:
             _description_
         """
+        if not hasattr(builder.store, "sampler_fn"):
+            raise ValueError(
+                "A sampler component for the dataserver has not been given"
+            )
+
+        if not hasattr(builder.store, "remover_fn"):
+            raise ValueError(
+                "A remover component for the dataserver has not been given"
+            )
+
         table = reverb.Table(
             name=table_key,
-            sampler=self.config.sampler,
-            remover=self.config.remover,
+            sampler=builder.store.sampler_fn(),
+            remover=builder.store.remover_fn(),
             max_size=self.config.max_size,
             rate_limiter=builder.store.rate_limiter_fn(),
-            signature=builder.store.adder_signature_fn(environment_spec, extras_spec),
+            signature=builder.store.adder_signature_fn(environment_specs, extras_specs),
             max_times_sampled=self.config.max_times_sampled,
         )
         return table
@@ -211,28 +226,30 @@ class OnPolicyDataServer(DataServer):
     def table(
         self,
         table_key: str,
-        environment_spec: specs.MAEnvironmentSpec,
-        extras_spec: Dict[str, Any],
+        environment_specs: specs.MAEnvironmentSpec,
+        extras_specs: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
         """_summary_
 
         Args:
             table_key : _description_
-            environment_spec : _description_
-            extras_spec : _description_
+            environment_specs : _description_
+            extras_specs : _description_
             builder : _description_
         Returns:
             _description_
         """
         if hasattr(builder.store.global_config, "sequence_length"):
             signature = builder.store.adder_signature_fn(
-                environment_spec,
+                environment_specs,
                 builder.store.global_config.sequence_length,
-                extras_spec,
+                extras_specs,
             )
         else:
-            signature = builder.store.adder_signature_fn(environment_spec, extras_spec)
+            signature = builder.store.adder_signature_fn(
+                environment_specs, extras_specs
+            )
         table = reverb.Table.queue(
             name=table_key,
             max_size=self.config.max_queue_size,

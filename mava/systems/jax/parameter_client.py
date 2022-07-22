@@ -244,6 +244,6 @@ class ParameterClient:
                     else:
                         self._parameters[key][i] = new_parameters[key][i]
             else:
-                NotImplementedError(
+                raise NotImplementedError(
                     f"Parameter type of {type(new_parameters[key])} not implemented."
                 )

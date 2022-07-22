@@ -46,7 +46,7 @@ apt-get -y install git
 apt-get install swig -y
 
 # Install depedencies
-pip install .[tf,envs,reverb,testing_formatting,record_episode]
+pip install .[jax,envs,reverb,testing_formatting,record_episode]
 
 # For atari envs
 apt-get -y install unrar-free
@@ -54,13 +54,15 @@ pip install autorom
 AutoROM -v
 
 N_CPU=$(grep -c ^processor /proc/cpuinfo)
+# Use only 75% of local CPU cores
+N_CPU_INTEGRATION=`expr $N_CPU \* 3 / 4`
 
 if [ "$integration" = "true" ]; then \
     # Run all tests
-    pytest -n "${N_CPU}" tests/tf ;
+    pytest -n "${N_CPU_INTEGRATION}" tests ;
 else
     # Run all unit tests (non integration tests).
-    pytest --durations=10 -n "${N_CPU}" tests/tf --ignore-glob="*/*system_test.py" ;
+    pytest --durations=10 -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
 fi
 
 # Clean-up.

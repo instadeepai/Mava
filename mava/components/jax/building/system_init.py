@@ -62,8 +62,12 @@ class BaseSystemInit(Component):
 
 
 @dataclass
-class FixedNetworkSystemInitConfig:
+class BaseSystemInitConfig:
     shared_weights: bool = True
+
+
+@dataclass
+class FixedNetworkSystemInitConfig(BaseSystemInitConfig):
     network_sampling_setup: enums.NetworkSampler = (
         enums.NetworkSampler.fixed_agent_networks
     )
@@ -108,7 +112,7 @@ class FixedNetworkSystemInit(BaseSystemInit):
 
         # Check that the environment and agent_net_keys has the same amount of agents
         sample_length = len(builder.store.network_sampling_setup[0])
-        agent_ids = builder.store.environment_spec.get_agent_ids()
+        agent_ids = builder.store.ma_environment_spec.get_agent_ids()
         assert len(agent_ids) == len(builder.store.agent_net_keys.keys())
 
         # Check if the samples are of the same length and that they perfectly fit
@@ -182,7 +186,7 @@ class RandomSamplingSystemInit(BaseSystemInit):
 
         # Check that the environment and agent_net_keys has the same amount of agents
         sample_length = len(builder.store.network_sampling_setup[0])
-        agent_ids = builder.store.environment_spec.get_agent_ids()
+        agent_ids = builder.store.ma_environment_spec.get_agent_ids()
         assert len(agent_ids) == len(builder.store.agent_net_keys.keys())
 
         # Check if the samples are of the same length and that they perfectly fit
@@ -213,11 +217,10 @@ class RandomSamplingSystemInit(BaseSystemInit):
 
 
 @dataclass
-class CustomSamplingSystemInitConfig:
+class CustomSamplingSystemInitConfig(BaseSystemInitConfig):
     network_sampling_setup: Union[List, enums.NetworkSampler] = field(
         default_factory=lambda: []
     )
-    shared_weights: bool = False
 
 
 class CustomSamplingSystemInit(BaseSystemInit):
@@ -248,7 +251,7 @@ class CustomSamplingSystemInit(BaseSystemInit):
 
         # Check that the environment and agent_net_keys has the same amount of agents
         sample_length = len(self.config.network_sampling_setup[0])
-        agent_ids = builder.store.environment_spec.get_agent_ids()
+        agent_ids = builder.store.ma_environment_spec.get_agent_ids()
         assert len(agent_ids) == len(builder.store.agent_net_keys.keys())
 
         # Check if the samples are of the same length and that they perfectly fit
