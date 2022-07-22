@@ -62,7 +62,7 @@ class MADQNSystem(System):
             executor_adder_priority=building.adders.UniformAdderPriority,
             data_server=building.OffPolicyDataServer,
             executor_adder=building.ParallelTransitionAdder,
-            data_server_rate_limiter=building.MinSizeRateLimiter,
+            data_server_rate_limiter=building.SampleToInsertRateLimiter,
             data_server_adder_signature=building.ParallelTransitionAdderSignature,
             extras_spec=ExtrasActionInfo,
         ).get()
