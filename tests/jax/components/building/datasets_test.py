@@ -15,40 +15,42 @@
 
 """Tests for TransitionDataset and TrajectoryDataset classes for Jax-based Mava systems"""
 
-from typing import Dict, Any
 from types import SimpleNamespace
-from tensorflow.python.framework import dtypes, ops
+from typing import Any, Dict
+
 import pytest
 import reverb
+from tensorflow.python.framework import dtypes, ops
 
-from mava.components.jax.building.datasets import TransitionDataset, TrajectoryDataset
-from mava.systems.jax.builder import Builder
 from mava import specs
 from mava.adders import reverb as reverb_adders
+from mava.components.jax.building.datasets import TrajectoryDataset, TransitionDataset
+from mava.systems.jax.builder import Builder
 from tests.jax.mocks import make_fake_env_specs
 
-
 env_spec = make_fake_env_specs()
+
+
 def adder_signature_fn(
-            ma_environment_spec: specs.MAEnvironmentSpec,
-            extras_specs: Dict[str, Any],
-        ) -> Any:
-        """signature function that helps in building a simple server"""
-        return reverb_adders.ParallelNStepTransitionAdder.signature(
-                ma_environment_spec=ma_environment_spec, extras_specs=extras_specs
-            )
+    ma_environment_spec: specs.MAEnvironmentSpec,
+    extras_specs: Dict[str, Any],
+) -> Any:
+    """signature function that helps in building a simple server"""
+    return reverb_adders.ParallelNStepTransitionAdder.signature(
+        ma_environment_spec=ma_environment_spec, extras_specs=extras_specs
+    )
+
 
 class MockBuilder(Builder):
     """Mock Builder component"""
+
     def __init__(self) -> None:
         self.simple_server = reverb.Server(
             [
                 reverb.Table.queue(
                     name="table_0",
                     max_size=100,
-                    signature=adder_signature_fn(
-                        env_spec, {}
-                    ),
+                    signature=adder_signature_fn(env_spec, {}),
                 )
             ]
         )
@@ -78,7 +80,9 @@ def test_init_transition_dataset() -> None:
     assert transition_dataset.config.postprocess == None
 
 
-def test_on_building_trainer_dataset_transition_dataset(mock_builder: MockBuilder)->None:
+def test_on_building_trainer_dataset_transition_dataset(
+    mock_builder: MockBuilder,
+) -> None:
     """Test on_building_trainer_dataset of TransitionDataset Component
 
     Args:
@@ -86,28 +90,39 @@ def test_on_building_trainer_dataset_transition_dataset(mock_builder: MockBuilde
     """
     transition_dataset = TransitionDataset()
     transition_dataset.on_building_trainer_dataset(builder=mock_builder)
-    
-    dataset= mock_builder.store.dataset._dataset._map_func._func(1)._dataset
-    assert dataset._input_dataset._server_address==mock_builder.store.data_server_client.server_address
-    assert dataset._input_dataset._table=="table_0"
-    assert dataset._batch_size==256
-    assert dataset._input_dataset._max_in_flight_samples_per_worker== 2*transition_dataset.config.sample_batch_size
-    assert mock_builder.store.dataset._dataset._num_parallel_calls== ops.convert_to_tensor(12, dtype=dtypes.int64, name="num_parallel_calls")
+
+    dataset = mock_builder.store.dataset._dataset._map_func._func(1)._dataset
+    assert (
+        dataset._input_dataset._server_address
+        == mock_builder.store.data_server_client.server_address
+    )
+    assert dataset._input_dataset._table == "table_0"
+    assert dataset._batch_size == 256
+    assert (
+        dataset._input_dataset._max_in_flight_samples_per_worker
+        == 2 * transition_dataset.config.sample_batch_size
+    )
+    assert (
+        mock_builder.store.dataset._dataset._num_parallel_calls
+        == ops.convert_to_tensor(12, dtype=dtypes.int64, name="num_parallel_calls")
+    )
 
 
 def test_init_trajectory_dataset() -> None:
     """Test initiator of TrajectoryDataset component"""
     trajectory_dataset = TrajectoryDataset()
 
-    assert trajectory_dataset.config.sample_batch_size==256
-    assert trajectory_dataset.config.max_in_flight_samples_per_worker==512
-    assert trajectory_dataset.config.num_workers_per_iterator==-1
-    assert trajectory_dataset.config.max_samples_per_stream==-1
-    assert trajectory_dataset.config.rate_limiter_timeout_ms==-1
-    assert trajectory_dataset.config.get_signature_timeout_secs==None
+    assert trajectory_dataset.config.sample_batch_size == 256
+    assert trajectory_dataset.config.max_in_flight_samples_per_worker == 512
+    assert trajectory_dataset.config.num_workers_per_iterator == -1
+    assert trajectory_dataset.config.max_samples_per_stream == -1
+    assert trajectory_dataset.config.rate_limiter_timeout_ms == -1
+    assert trajectory_dataset.config.get_signature_timeout_secs == None
 
 
-def test_on_building_trainer_dataset_trajectory_dataset(mock_builder: MockBuilder)->None:
+def test_on_building_trainer_dataset_trajectory_dataset(
+    mock_builder: MockBuilder,
+) -> None:
     """Test on_building_trainer_dataset of TrajectoryDataset Component
 
     Args:
@@ -116,16 +131,15 @@ def test_on_building_trainer_dataset_trajectory_dataset(mock_builder: MockBuilde
     trajectory_dataset = TrajectoryDataset()
     trajectory_dataset.on_building_trainer_dataset(builder=mock_builder)
 
-    assert mock_builder.store.sample_batch_size==256
+    assert mock_builder.store.sample_batch_size == 256
 
-    dataset=mock_builder.store.dataset_iterator._iterator._dataset
-    assert dataset._input_dataset._server_address== mock_builder.store.data_server_client.server_address
-    assert dataset._input_dataset._table=="table_0"
-    assert dataset._input_dataset._max_in_flight_samples_per_worker== 2*256
-    assert dataset._input_dataset._num_workers_per_iterator==-1
-    assert dataset._input_dataset._max_samples_per_stream==-1
-    assert dataset._input_dataset._rate_limiter_timeout_ms==-1
-
-
-
-  
+    dataset = mock_builder.store.dataset_iterator._iterator._dataset
+    assert (
+        dataset._input_dataset._server_address
+        == mock_builder.store.data_server_client.server_address
+    )
+    assert dataset._input_dataset._table == "table_0"
+    assert dataset._input_dataset._max_in_flight_samples_per_worker == 2 * 256
+    assert dataset._input_dataset._num_workers_per_iterator == -1
+    assert dataset._input_dataset._max_samples_per_stream == -1
+    assert dataset._input_dataset._rate_limiter_timeout_ms == -1
