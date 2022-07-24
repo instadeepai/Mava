@@ -495,7 +495,9 @@ class MockLoggerConfig:
 class MockLoggerClass:
     def __init__(self) -> None:
         """Mock logger component."""
-        pass
+        self._label = "logger_label"
+        self._directory = "logger_directory"
+        self._logger_info = (True, False, False, 10, print, 0)
 
     def write(self, data: Dict) -> None:
         """_summary_"""
