@@ -17,9 +17,14 @@
 
 import abc
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, List, Type
 
+from mava.callbacks import Callback
 from mava.components.jax import Component
+from mava.components.jax.building.adders import Adder
+from mava.components.jax.building.parameter_client import ExecutorParameterClient
+from mava.components.jax.building.system_init import BaseSystemInit
+from mava.components.jax.executing.action_selection import ExecutorSelectAction
 from mava.core_jax import SystemExecutor
 from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 
@@ -70,6 +75,23 @@ class ExecutorObserve(Component):
         """_summary_"""
         return "executor_observe"
 
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        Adder required to set up executor.store.adder.
+        BaseSystemInit required to set up executor.store.agent_net_keys,
+        executor.store.network_sampling_setup, and executor.store.net_keys_to_ids.
+        ExecutorSelectAction required to assign executor.store.actions_info
+        and executor.store.policies_info.
+        ExecutorParameterClient required to set up
+        executor.store.executor_parameter_client.
+
+        Returns:
+            List of required component classes.
+        """
+        return [Adder, BaseSystemInit, ExecutorSelectAction, ExecutorParameterClient]
+
 
 class FeedforwardExecutorObserve(ExecutorObserve):
     def __init__(self, config: ExecutorObserveConfig = ExecutorObserveConfig()):
@@ -100,10 +122,12 @@ class FeedforwardExecutorObserve(ExecutorObserve):
             executor.store.network_sampling_setup,
             executor.store.net_keys_to_ids,
         )
+        # executor.store.extras set by Executor
         executor.store.extras[
             "network_int_keys"
         ] = executor.store.network_int_keys_extras
 
+        # executor.store.timestep set by Executor
         executor.store.adder.add_first(executor.store.timestep, executor.store.extras)
 
     # Observe
@@ -120,6 +144,7 @@ class FeedforwardExecutorObserve(ExecutorObserve):
         policies_info = executor.store.policies_info
 
         adder_actions: Dict[str, Any] = {}
+        # executor.store.next_extras set by Executor
         executor.store.next_extras["policy_info"] = {}
         for agent in actions_info.keys():
             adder_actions[agent] = {
@@ -131,6 +156,7 @@ class FeedforwardExecutorObserve(ExecutorObserve):
             "network_int_keys"
         ] = executor.store.network_int_keys_extras
 
+        # executor.store.next_timestep set by Executor
         executor.store.adder.add(
             adder_actions, executor.store.next_timestep, executor.store.next_extras
         )

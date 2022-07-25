@@ -166,7 +166,7 @@ def test_on_policy_data_server_with_sequence_length(
         env_specs, seq_length, extras_specs
     )
 
-    mock_builder.store.sequence_length = 20
+    mock_builder.store.global_config = SimpleNamespace(sequence_length=20)
 
     data_server = OnPolicyDataServer()
     data_server.on_building_data_server(mock_builder)

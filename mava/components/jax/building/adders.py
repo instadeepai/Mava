@@ -16,11 +16,14 @@
 """Commonly used adder components for system builders"""
 import abc
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional, Type
 
 from mava import specs
 from mava.adders import reverb as reverb_adders
+from mava.callbacks import Callback
 from mava.components.jax import Component
+from mava.components.jax.building.system_init import BaseSystemInit
+from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemBuilder
 
 
@@ -37,6 +40,18 @@ class Adder(Component):
             _description_
         """
         return "executor_adder"
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        BaseTrainerInit required to set up builder.store.table_network_config.
+        BaseSystemInit required to set up builder.store.unique_net_keys.
+
+        Returns:
+            List of required component classes.
+        """
+        return [BaseTrainerInit, BaseSystemInit]
 
 
 @dataclass
@@ -83,6 +98,17 @@ class AdderPriority(Component):
             config class/dataclass for component.
         """
         return AdderPriorityConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        BaseTrainerInit required to set up builder.store.table_network_config.
+
+        Returns:
+            List of required component classes.
+        """
+        return [BaseTrainerInit]
 
 
 @dataclass
@@ -152,7 +178,7 @@ class ParallelTransitionAdder(Adder):
 
         adder = reverb_adders.ParallelNStepTransitionAdder(
             priority_fns=builder.store.priority_fns,
-            client=builder.store.data_server_client,
+            client=builder.store.data_server_client,  # Created by builder
             net_ids_to_keys=builder.store.unique_net_keys,
             n_step=self.config.n_step,
             table_network_config=builder.store.table_network_config,
@@ -221,14 +247,6 @@ class ParallelSequenceAdder(Adder):
         """
         self.config = config
 
-    def on_building_init_start(self, builder: SystemBuilder) -> None:
-        """_summary_
-
-        Args:
-            builder : _description_
-        """
-        builder.store.sequence_length = self.config.sequence_length
-
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """_summary_
 
@@ -238,7 +256,7 @@ class ParallelSequenceAdder(Adder):
 
         adder = reverb_adders.ParallelSequenceAdder(
             priority_fns=builder.store.priority_fns,
-            client=builder.store.data_server_client,
+            client=builder.store.data_server_client,  # Created by builder
             net_ids_to_keys=builder.store.unique_net_keys,
             sequence_length=self.config.sequence_length,
             table_network_config=builder.store.table_network_config,

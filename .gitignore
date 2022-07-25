@@ -157,3 +157,6 @@ mava_testing
 .idea/
 
 meltingpot/
+
+# Created by debugging component
+component_dependency_map.png

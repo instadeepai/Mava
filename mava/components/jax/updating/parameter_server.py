@@ -17,11 +17,13 @@
 import abc
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Type, Union
 
 import numpy as np
 from acme.jax import savers
 
+from mava.callbacks import Callback
+from mava.components.jax.building.networks import Networks
 from mava.components.jax.component import Component
 from mava.core_jax import SystemParameterServer
 
@@ -96,6 +98,17 @@ class ParameterServer(Component):
         """
         return ParameterServerConfig
 
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        Networks required to set up server.store.network_factory.
+
+        Returns:
+            List of required component classes.
+        """
+        return [Networks]
+
 
 class DefaultParameterServer(ParameterServer):
     def __init__(
@@ -149,6 +162,7 @@ class DefaultParameterServer(ParameterServer):
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
         """_summary_"""
+        # server.store._param_names set by Parameter Server
         names: Union[str, Sequence[str]] = server.store._param_names
 
         if type(names) == str:
@@ -162,6 +176,7 @@ class DefaultParameterServer(ParameterServer):
     # Set
     def on_parameter_server_set_parameters(self, server: SystemParameterServer) -> None:
         """_summary_"""
+        # server.store._set_params set by Parameter Server
         params: Dict[str, Any] = server.store._set_params
         names = params.keys()
 
@@ -180,6 +195,7 @@ class DefaultParameterServer(ParameterServer):
         self, server: SystemParameterServer
     ) -> None:
         """_summary_"""
+        # server.store._add_to_params set by Parameter Server
         params: Dict[str, Any] = server.store._add_to_params
         names = params.keys()
 
