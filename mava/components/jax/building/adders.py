@@ -56,7 +56,7 @@ class AdderPriority(Component):
         self,
         config: AdderPriorityConfig = AdderPriorityConfig(),
     ):
-        """Init AdderPriority.
+        """Component creates priority functions for reverb adders.
 
         Args:
             config: AdderPriorityConfig.
@@ -101,7 +101,7 @@ class AdderSignature(Component):
         self,
         config: AdderSignatureConfig = AdderSignatureConfig(),
     ):
-        """Init AdderSignature.
+        """Component creates an adder signature for reverb adders.
 
         Args:
             config: AdderSignatureConfig.
@@ -145,7 +145,7 @@ class ParallelTransitionAdder(Adder):
         self,
         config: ParallelTransitionAdderConfig = ParallelTransitionAdderConfig(),
     ):
-        """Init ParallelTransitionAdder.
+        """Creates a reverb ParallelNStepTransitionAdder.
 
         Args:
             config: ParallelTransitionAdderConfig.
@@ -185,10 +185,13 @@ class ParallelTransitionAdder(Adder):
 
 class UniformAdderPriority(AdderPriority):
     def on_building_executor_adder_priority(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Create and store the adder priority functions.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
         builder.store.priority_fns = {
             table_key: lambda x: 1.0
@@ -238,7 +241,7 @@ class ParallelSequenceAdder(Adder):
     def __init__(
         self, config: ParallelSequenceAdderConfig = ParallelSequenceAdderConfig()
     ):
-        """Init ParallelSequenceAdder.
+        """Component creates a reverb ParallelSequenceAdder.
 
         Args:
             config: ParallelSequenceAdderConfig.

@@ -39,7 +39,7 @@ class EnvironmentSpecConfig:
 
 class EnvironmentSpec(Component):
     def __init__(self, config: EnvironmentSpecConfig = EnvironmentSpecConfig()):
-        """Init EnvironmentSpec.
+        """Component creates a multi-agent environment spec.
 
         Args:
             config: EnvironmentSpecConfig.
@@ -92,7 +92,7 @@ class ExecutorEnvironmentLoop(Component):
     def __init__(
         self, config: ExecutorEnvironmentLoopConfig = ExecutorEnvironmentLoopConfig()
     ):
-        """Init ExecutorEnvironmentLoop.
+        """Component creates an executor environment loop.
 
         Args:
             config: ExecutorEnvironmentLoopConfig.
@@ -180,7 +180,7 @@ class MonitorExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
         self,
         config: MonitorExecutorEnvironmentLoopConfig = MonitorExecutorEnvironmentLoopConfig(),  # noqa
     ):
-        """Component for visualising environment progress"""
+        """Component for visualising environment progress."""
         super().__init__(config=config)
         self.config = config
 

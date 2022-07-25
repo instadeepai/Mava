@@ -33,7 +33,7 @@ class TrainerDataset(Component):
         self,
         config: Any,
     ):
-        """Init TrainerDataset.
+        """Component creates a reverb table for the trainer.
 
         Args:
             config: Any.
@@ -73,7 +73,7 @@ class TransitionDataset(TrainerDataset):
         self,
         config: TransitionDatasetConfig = TransitionDatasetConfig(),
     ):
-        """Init TransitionDataset.
+        """Component creates a reverb transition dataset for the trainer.
 
         Args:
             config: TransitionDatasetConfig.
@@ -129,7 +129,7 @@ class TrajectoryDataset(TrainerDataset):
         self,
         config: TrajectoryDatasetConfig = TrajectoryDatasetConfig(),
     ):
-        """Init TrajectoryDataset.
+        """Component creates a reverb trajectory dataset for the trainer.
 
         Args:
             config: TrajectoryDatasetConfig.

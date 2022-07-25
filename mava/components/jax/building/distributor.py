@@ -34,7 +34,7 @@ class DistributorConfig:
 
 class Distributor(Component):
     def __init__(self, config: DistributorConfig = DistributorConfig()):
-        """Init Distributor.
+        """Component builds launchpad program nodes and launches the program.
 
         Args:
             config: DistributorConfig.

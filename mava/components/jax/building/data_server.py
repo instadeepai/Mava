@@ -34,7 +34,7 @@ class DataServer(Component):
         self,
         config: Any,
     ) -> None:
-        """Init DataServer.
+        """Component sets up a reverb Table for each trainer.
 
         Args:
             config: Any.
@@ -147,7 +147,7 @@ class OffPolicyDataServer(DataServer):
     def __init__(
         self, config: OffPolicyDataServerConfig = OffPolicyDataServerConfig()
     ) -> None:
-        """Init OffPolicyDataServer.
+        """Component creates an off-policy data server.
 
         Args:
             config: OffPolicyDataServerConfig.
@@ -216,7 +216,7 @@ class OnPolicyDataServer(DataServer):
         self,
         config: OnPolicyDataServerConfig = OnPolicyDataServerConfig(),
     ) -> None:
-        """Init OnPolicyDataServer.
+        """Component creates an on-policy data server.
 
         Args:
             config: OnPolicyDataServerConfig.
