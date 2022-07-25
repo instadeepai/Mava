@@ -33,29 +33,28 @@ class TrainerDataset(Component):
         self,
         config: Any,
     ):
-        """_summary_
+        """Init TrainerDataset.
 
         Args:
-            config : _description_.
+            config: Any.
         """
         self.config = config
 
     @abc.abstractmethod
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Abstract method defining hook to be overridden.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
         pass
 
     @staticmethod
     def name() -> str:
-        """_summary_
-
-        Returns:
-            _description_
-        """
+        """Component type name, e.g. 'dataset' or 'executor'."""
         return "trainer_dataset"
 
 
@@ -74,18 +73,21 @@ class TransitionDataset(TrainerDataset):
         self,
         config: TransitionDatasetConfig = TransitionDatasetConfig(),
     ):
-        """_summary_
+        """Init TransitionDataset.
 
         Args:
-            config : _description_.
+            config: TransitionDatasetConfig.
         """
         self.config = config
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Build a transition dataset and save it to the store.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
         max_in_flight_samples_per_worker = self.config.max_in_flight_samples_per_worker
         dataset = datasets.make_reverb_dataset(
@@ -127,18 +129,23 @@ class TrajectoryDataset(TrainerDataset):
         self,
         config: TrajectoryDatasetConfig = TrajectoryDatasetConfig(),
     ):
-        """_summary_
+        """Init TrajectoryDataset.
 
         Args:
-            config : _description_.
+            config: TrajectoryDatasetConfig.
         """
         self.config = config
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Build a trajectory dataset and save it to the store.
+
+        Automatically adds a batch dimension to the dataset.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
         dataset = reverb.TrajectoryDataset.from_table_signature(
             server_address=builder.store.data_server_client.server_address,
