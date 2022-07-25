@@ -54,7 +54,7 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 
 For details on how to add your own environment, see [here](https://github.com/instadeepai/Mava/blob/develop/mava/wrappers/README.md).
 
-|<img  src="docs/images/multiw_animation.gif" width="1300px"/> | <img src="docs/images/sc2_animation.gif" width="1500px"/>  | <img src="docs/images/flatland.gif" />  |
+|<img  src="docs/images/multiw_animation.gif" width="350px"/> | <img src="docs/images/sc2_animation.gif" width="350px"/>  | <img src="docs/images/flatland.gif" width="350px" />  |
 |:---:|:---:|:---:|
 |MAD4PG on PettingZoo's Multi-Walker environment. | VDN on the SMAC 3m map.| MADQN on Flatland. |
 
