@@ -32,9 +32,9 @@ class MockLauncher(Launcher):
         name: str = "System",
         terminal: str = "current_terminal",
     ) -> None:
-        """Create mock launcer component in order to be able to \
-            overwrite the launch method which enables for testing \
-                a full distribured Mava system."""
+        """Create mock launcher component in order to be able to \
+            overwrite the launch method which enables the testing of \
+                a full distributed Mava system."""
         super().__init__(
             multi_process,
             nodes_on_gpu,
