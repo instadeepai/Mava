@@ -83,6 +83,12 @@ class MockLauncher(Launcher):
                 executor_steps += executor_stats["episode_length"]
 
 
+# The code for the distributor is available in
+# mava/components/jax/building/distributor.py the reason
+# for creating a mock distibuto here is so that the launch method of the Launcher
+# component can be overwritten such that launch_type may be set to 'test_mt' in
+# the lp.launch method. It is important to note that this code should be
+# updated if the code for the Distributor component changes.
 class MockDistributor(Distributor):
     def __init__(self, config: DistributorConfig = DistributorConfig()):
         """Initialize mock distributor component."""
