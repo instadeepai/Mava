@@ -32,27 +32,19 @@ class Terminator(Component):
         self,
         config: Any,
     ):
-        """_summary_
-
-        Args:
-            config : _description_.
-        """
+        """Component handles when a system / run should terminate."""
         self.config = config
 
     @abc.abstractmethod
     def on_parameter_server_run_loop_termination(
         self, parameter_sever: SystemParameterServer
     ) -> None:
-        """_summary_"""
+        """Terminate system if some condition is met."""
         pass
 
     @staticmethod
     def name() -> str:
-        """_summary_
-
-        Returns:
-            _description_
-        """
+        """Component type name, e.g. 'dataset' or 'executor'."""
         return "termination_condition"
 
 
