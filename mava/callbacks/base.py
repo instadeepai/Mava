@@ -173,84 +173,90 @@ class Callback(ABC):
     # system executor hooks
     #######################
 
+    # INIT
     def on_execution_init_start(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """Start of executor initialisation."""
         pass
 
     def on_execution_init(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """Executor initialisation."""
         pass
 
     def on_execution_init_end(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """End of executor initialisation."""
         pass
 
+    # SELECT ACTION
     def on_execution_select_action_start(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """Start of executor selecting an action for agent."""
         pass
 
     def on_execution_select_action_preprocess(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """Preprocessing when executor selecting an action for agent."""
         pass
 
     def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """Call to agent networks when executor selecting an action for agent."""
         pass
 
     def on_execution_select_action_sample(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """Sample an action when executor selecting an action for agent."""
         pass
 
     def on_execution_select_action_end(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """End of executor selecting an action for agent."""
         pass
 
+    # OBSERVE FIRST
     def on_execution_observe_first_start(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """Start of executor observing the first time in an episode."""
         pass
 
     def on_execution_observe_first(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """Executor observing the first time in an episode."""
         pass
 
     def on_execution_observe_first_end(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """End of executor observing the first time in an episode."""
         pass
 
+    # OBSERVE
     def on_execution_observe_start(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """Start of executor observing."""
         pass
 
     def on_execution_observe(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """Executor observing."""
         pass
 
     def on_execution_observe_end(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """End of executor observing."""
         pass
 
+    # SELECT ACTIONS
     def on_execution_select_actions_start(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """Start of executor selecting actions for all agents in the system."""
         pass
 
     def on_execution_select_actions(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """Executor selecting actions for all agents in the system."""
         pass
 
     def on_execution_select_actions_end(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """End of executor selecting actions for all agents in the system."""
         pass
 
+    # UPDATE
     def on_execution_update_start(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """Start of updating executor parameters."""
         pass
 
     def on_execution_update(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """Update executor parameters."""
         pass
 
     def on_execution_update_end(self, executor: SystemExecutor) -> None:
-        """[summary]"""
+        """End of updating executor parameters."""
         pass
 
     ######################
