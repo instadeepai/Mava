@@ -27,7 +27,7 @@ class Config:
     """Config handler for Jax-based Mava systems."""
 
     def __init__(self) -> None:
-        """Initialise config"""
+        """Initialise config."""
         self._config: Dict = {}
         self._current_params: List = []
         self._built = False
@@ -39,10 +39,13 @@ class Config:
     def add(self, **kwargs: Any) -> None:
         """Add a component config dataclass.
 
+        Args:
+            **kwargs: dictionary with format {name: dataclass}.
+
         Raises:
-            Exception: if a config for an identically named component already exists
-            Exception: if a config shares a parameter name with another config
-            Exception: if a config is not a dataclass object
+            Exception: if a config for an identically named component already exists.
+            Exception: if a config shares a parameter name with another config.
+            Exception: if a config is not a dataclass object.
         """
         if self._built:
             raise Exception(
@@ -90,12 +93,15 @@ class Config:
                 )
 
     def update(self, **kwargs: Any) -> None:
-        """Update a component config dataclass.
+        """Update the given component config dataclasses based on their names.
+
+        Args:
+            **kwargs: dictionary with format {name: dataclass}.
 
         Raises:
-            Exception: if a config shares a parameter name with another config
-            Exception: if a config is not already part of the system
-            Exception: if a config is not a dataclass object
+            Exception: if a config shares a parameter name with another config.
+            Exception: if a config is not already part of the system.
+            Exception: if a config is not a dataclass object.
         """
         if self._built:
             raise Exception(
@@ -136,7 +142,11 @@ class Config:
                 raise Exception("Component configs must be a dataclass.")
 
     def build(self) -> None:
-        """Build the config file, i.e. unwrap dataclass nested dictionaries"""
+        """Build the config file, i.e. unwrap dataclass nested dictionaries.
+
+        Returns:
+            None.
+        """
         if self._built:
             raise Exception("Config has already been built, this can only happen once.")
 
@@ -148,7 +158,10 @@ class Config:
         self._built = True
 
     def set_parameters(self, **kwargs: Any) -> None:
-        """Set a specific hyperparameter of a built config.
+        """Set specific hyperparameters of a built config.
+
+        Args:
+            **kwargs: dictionary with format {name: parameter value}.
 
         Raises:
             Exception: if a set is attempted on a config not yet built.
@@ -180,9 +193,10 @@ class Config:
         """Get built config for feeding to a Mava system.
 
         Raises:
-            Exception: if trying to get without having first built the config
+            Exception: if trying to get without having first built the config.
+
         Returns:
-            built config
+            Built config as a SimpleNamespace.
         """
         if not self._built:
             raise Exception(
@@ -198,7 +212,7 @@ class Config:
             component: component to provide config for.
 
         Returns:
-            built config for a single component.
+            Built config for a single component.
         """
         if not self._built:
             raise Exception(
