@@ -77,7 +77,7 @@ def main(_: Any) -> None:
     optimizer = optax.chain(optax.clip_by_global_norm(20.0), optimizer)
 
     # epsilon scheduler
-    epsilon_scheduler = LinearEpsilonScheduler(1.0, 0.05, 50000)
+    epsilon_scheduler = LinearEpsilonScheduler(1.0, 0.05, 150000)
 
     # Create the system.
     system = madqn.MADQNSystem()
