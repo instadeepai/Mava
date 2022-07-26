@@ -305,98 +305,104 @@ class Callback(ABC):
     # system parameter server hooks
     ###############################
 
+    # INIT
     def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
-        """[summary]"""
+        """Start of parameter server initialisation."""
         pass
 
     def on_parameter_server_init(self, server: SystemParameterServer) -> None:
-        """[summary]"""
+        """Parameter server initialisation."""
         pass
 
     def on_parameter_server_init_checkpointer(
         self, server: SystemParameterServer
     ) -> None:
-        """[summary]"""
+        """Create checkpointer during parameter server initialisation."""
         pass
 
     def on_parameter_server_init_end(self, server: SystemParameterServer) -> None:
-        """[summary]"""
+        """End of parameter server initialisation."""
         pass
 
+    # GET PARAMETERS
     def on_parameter_server_get_parameters_start(
         self, server: SystemParameterServer
     ) -> None:
-        """[summary]"""
+        """Start of getting parameters from parameter server."""
         pass
 
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
-        """[summary]"""
+        """Get parameters from parameter server."""
         pass
 
     def on_parameter_server_get_parameters_end(
         self, server: SystemParameterServer
     ) -> None:
-        """[summary]"""
+        """End of getting parameters from parameter server."""
         pass
 
+    # SET PARAMETERS
     def on_parameter_server_set_parameters_start(
         self, server: SystemParameterServer
     ) -> None:
-        """[summary]"""
+        """Start of setting parameters in parameter server."""
         pass
 
     def on_parameter_server_set_parameters(self, server: SystemParameterServer) -> None:
-        """[summary]"""
+        """Set parameters in parameter server."""
         pass
 
     def on_parameter_server_set_parameters_end(
         self, server: SystemParameterServer
     ) -> None:
-        """[summary]"""
+        """End of setting parameters in parameter server."""
         pass
 
+    # ADD TO PARAMETERS
     def on_parameter_server_add_to_parameters_start(
         self, server: SystemParameterServer
     ) -> None:
-        """[summary]"""
+        """Start of adding to parameters in parameter server."""
         pass
 
     def on_parameter_server_add_to_parameters(
         self, server: SystemParameterServer
     ) -> None:
-        """[summary]"""
+        """Add to parameters in parameter server."""
         pass
 
     def on_parameter_server_add_to_parameters_end(
         self, server: SystemParameterServer
     ) -> None:
-        """[summary]"""
+        """End of adding to parameters in parameter server."""
         pass
 
+    # RUN
     def on_parameter_server_run_start(self, server: SystemParameterServer) -> None:
-        """[summary]"""
+        """Called when the parameter server starts running."""
         pass
 
+    # STEP
     def on_parameter_server_run_loop_start(self, server: SystemParameterServer) -> None:
-        """[summary]"""
+        """Start of parameter server run loop."""
         pass
 
     def on_parameter_server_run_loop_checkpoint(
         self, server: SystemParameterServer
     ) -> None:
-        """[summary]"""
+        """Checkpoint during parameter server run loop."""
         pass
 
     def on_parameter_server_run_loop(self, server: SystemParameterServer) -> None:
-        """[summary]"""
+        """Parameter server run loop."""
         pass
 
     def on_parameter_server_run_loop_termination(
         self, server: SystemParameterServer
     ) -> None:
-        """[summary]"""
+        """Check for termination during parameter server run loop."""
         pass
 
     def on_parameter_server_run_loop_end(self, server: SystemParameterServer) -> None:
-        """[summary]"""
+        """End of parameter server run loop."""
         pass
