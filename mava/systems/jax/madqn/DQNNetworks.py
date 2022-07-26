@@ -1,11 +1,15 @@
 import dataclasses
 from typing import Dict, Tuple
 
+import chex
 import jax.numpy as jnp
 import numpy as np
-import rlax
 from acme.jax import networks as networks_lib
 from jax import jit
+
+from mava.components.jax.networks.distributions.epsilon_greedy import (
+    EpsilonGreedyWithMask,
+)
 
 
 @dataclasses.dataclass
@@ -26,7 +30,7 @@ class DQNNetworks:
         self.network = network
         self.params = params
 
-        # @jit
+        @jit
         def forward_fn(
             params: Dict[str, jnp.ndarray], observations: networks_lib.Observation
         ) -> jnp.ndarray:
@@ -42,6 +46,7 @@ class DQNNetworks:
             # The parameters of the network might change. So it has to
             # be fed into the jitted function.
             q_values = self.network.apply(params, observations)
+
             return q_values
 
         self.forward_fn = forward_fn
@@ -51,6 +56,7 @@ class DQNNetworks:
         observations: networks_lib.Observation,
         key: networks_lib.PRNGKey,
         epsilon: float,
+        mask: chex.Array = None,
     ) -> Tuple[np.ndarray, Dict]:
         """Taking actions using epsilon greedy approach.
 
@@ -64,10 +70,13 @@ class DQNNetworks:
             the actions and a dictionary with q-values
         """
         action_values = self.forward_fn(self.params, observations)
-        actions = rlax.epsilon_greedy(epsilon=epsilon).sample(key, action_values)
+        actions = EpsilonGreedyWithMask(
+            preferences=action_values, epsilon=epsilon, mask=mask
+        ).sample(seed=key)
         assert len(actions) == 1, "Only one action is allowed."
         actions = np.array(actions, dtype=np.int64)
         actions = np.squeeze(actions)
+
         return actions, {"action_values": np.squeeze(action_values)}
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:

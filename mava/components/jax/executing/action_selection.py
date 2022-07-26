@@ -18,6 +18,7 @@
 from dataclasses import dataclass
 
 import jax
+from acme.jax import utils
 
 from mava.components.jax import Component
 from mava.core_jax import SystemExecutor
@@ -121,7 +122,10 @@ class FeedforwardExecutorSelectActionValueBased(Component):
         epsilon = executor.store.epsilon_scheduler.epsilon
 
         executor.store.action_info, executor.store.policy_info = network.get_action(
-            observation, rng_key, epsilon=epsilon
+            observation,
+            rng_key,
+            epsilon=epsilon,
+            mask=utils.add_batch_dim(executor.store.observation.legal_actions),
         )
 
     @staticmethod
