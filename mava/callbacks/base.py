@@ -263,40 +263,42 @@ class Callback(ABC):
     # system trainer hooks
     ######################
 
+    # INIT
     def on_training_init_start(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
-        pass
-
-    def on_training_init(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
-        pass
-
-    def on_training_init_end(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
+        """Start of trainer initialisation."""
         pass
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
+        """Create utility functions during trainer initialisation."""
         pass
 
     def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
+        """Create loss functions during trainer initialisation."""
         pass
 
     def on_training_step_fn(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
+        """Create step function during trainer initialisation."""
         pass
 
+    def on_training_init(self, trainer: SystemTrainer) -> None:
+        """Trainer initialisation."""
+        pass
+
+    def on_training_init_end(self, trainer: SystemTrainer) -> None:
+        """End of trainer initialisation."""
+        pass
+
+    # STEP
     def on_training_step_start(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
+        """Start of trainer step."""
         pass
 
     def on_training_step(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
+        """Trainer step."""
         pass
 
     def on_training_step_end(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
+        """End of trainer step."""
         pass
 
     ###############################
