@@ -37,10 +37,11 @@ if _found_smac:
         concat_agent_id: bool = True,
         evaluation: bool = False,
         random_seed: Optional[int] = None,
+        return_state_info: bool = True,
     ) -> Any:
         env = StarCraft2Env(map_name=map_name, seed=random_seed)
 
-        env = SMACWrapper(env)
+        env = SMACWrapper(env, return_state_info=return_state_info)
 
         if concat_prev_actions:
             env = ConcatPrevActionToObservation(env)
