@@ -36,16 +36,16 @@ class ExtrasSpec(Component):
         """_summary_
 
         Args:
-            config : _description_.
+            config : configuration for current algorithm
         """
         self.config = config
 
     @staticmethod
     def name() -> str:
-        """_summary_
+        """Returns name of ExtrasSpec class
 
         Returns:
-            _description_
+            "extras_spec": name of ExtrasSpec class
         """
         return "extras_spec"
 
@@ -55,15 +55,23 @@ class ExtrasLogProbSpec(ExtrasSpec):
         self,
         config: ExtrasLogProbSpecConfig = ExtrasLogProbSpecConfig(),
     ):
-        """_summary_
+        """Class that adds log probs to the extras spec
 
         Args:
-            config : _description_.
+            config : configuration for current algorithm
         """
         self.config = config
 
     def on_building_init_end(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Create extra specs after builder has been initialised
+
+        Args:
+            builder: builds system
+
+        Returns:
+            None.
+
+        """
         agent_specs = builder.store.ma_environment_spec.get_agent_environment_specs()
         builder.store.extras_spec = {"policy_info": {}}
 
