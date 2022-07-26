@@ -1,8 +1,13 @@
 import functools
+from datetime import datetime
+from typing import Any
 
-import acme
+import launchpad as lp
 import optax
 import pytest
+from launchpad.launch.test_multi_threading import (
+    address_builder as test_address_builder,
+)
 
 from mava.systems.jax import mappo
 from mava.systems.jax.system import System
@@ -15,16 +20,14 @@ from mava.utils.loggers import logger_utils
 
 @pytest.fixture
 def test_full_system() -> System:
-    """Add description here."""
+    """Full mava system fixture for testing"""
     return mappo.MAPPOSystem()
 
 
-# TODO: fix test
-@pytest.mark.skip(reason="test is currently breaking ci pipeline")
-def test_except_trainer(
+def test_mappo(
     test_full_system: System,
 ) -> None:
-    """Test if the parameter server instantiates processes as expected."""
+    """Full integration test of mappo system."""
 
     # Environment.
     environment_factory = functools.partial(
@@ -34,11 +37,17 @@ def test_except_trainer(
     )
 
     # Networks.
-    network_factory = mappo.make_default_networks
+    def network_factory(*args: Any, **kwargs: Any) -> Any:
+        return mappo.make_default_networks(  # type: ignore
+            policy_layer_sizes=(32, 32),
+            critic_layer_sizes=(64, 64),
+            *args,
+            **kwargs,
+        )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir.
     base_dir = "~/mava"
-    mava_id = "12345"
+    mava_id = str(datetime.now())
     checkpoint_subpath = f"{base_dir}/{mava_id}"
 
     # Log every [log_every] seconds.
@@ -54,7 +63,8 @@ def test_except_trainer(
 
     # Optimizer.
     optimizer = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+        optax.clip_by_global_norm(40.0),
+        optax.adam(1e-4),
     )
 
     # Build the system
@@ -62,28 +72,27 @@ def test_except_trainer(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        checkpoint_subpath=checkpoint_subpath,
+        experiment_path=checkpoint_subpath,
         optimizer=optimizer,
-        executor_parameter_update_period=20,
-        multi_process=False,
-        run_evaluator=True,
+        executor_parameter_update_period=1,
+        multi_process=True,
+        run_evaluator=False,
         num_executors=1,
         use_next_extras=False,
-        sample_batch_size=2,
+        sample_batch_size=5,
+        checkpoint=True,
+        nodes_on_gpu=[],
+        lp_launch_type=lp.LaunchType.TEST_MULTI_THREADING,
     )
 
-    (
-        data_server,
-        parameter_server,
-        executor,
-        evaluator,
-        trainer,
-    ) = test_full_system._builder.store.system_build
+    (trainer_node,) = test_full_system._builder.store.program._program._groups[
+        "trainer"
+    ]
+    trainer_node.disable_run()
+    test_address_builder.bind_addresses([trainer_node])
 
-    assert isinstance(executor, acme.core.Worker)
+    test_full_system.launch()
+    trainer_run = trainer_node.create_handle().dereference()
 
-    # Step the executor
-    executor.run_episode()
-
-    # Step the trainer
-    trainer.step()
+    for _ in range(2):
+        trainer_run.step()
