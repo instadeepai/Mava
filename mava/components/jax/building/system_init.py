@@ -43,7 +43,7 @@ class BaseSystemInit(Component):
 
     @staticmethod
     def name() -> str:
-        """_summary_"""
+        """Component type name, e.g. 'dataset' or 'executor'."""
         return "system_init"
 
 
