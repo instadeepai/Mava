@@ -212,6 +212,7 @@ def make_ppo_networks(
 
 
 def make_networks(
+    agent_keys: List[str],
     spec: specs.EnvironmentSpec,
     key: networks_lib.PRNGKey,
     policy_layer_sizes: Sequence[int] = (
@@ -226,6 +227,7 @@ def make_networks(
     """TODO: Add description here."""
     if isinstance(spec.actions, specs.DiscreteArray):
         return make_discrete_networks(
+            agent_keys=agent_keys,
             environment_spec=spec,
             key=key,
             policy_layer_sizes=policy_layer_sizes,
@@ -243,6 +245,7 @@ def make_networks(
 
 
 def make_discrete_networks(
+    agent_keys: List[str],
     environment_spec: specs.EnvironmentSpec,
     key: networks_lib.PRNGKey,
     policy_layer_sizes: Sequence[int],
@@ -258,77 +261,55 @@ def make_discrete_networks(
     # than having a policy_fn and critic_fn. Maybe jit solves
     # this issue. Having one function makes obs network calculations
     # easier.
+    print(agent_keys)
 
-    if single_network:
-
-        def forward_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
-            policy_value_network = hk.Sequential(
-                [
-                    observation_network,
-                    hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
-                    networks_lib.CategoricalValueHead(num_values=num_actions),
-                ]
-            )
-            return policy_value_network(inputs)
-
-        # Transform into pure functions.
-        forward_fn = hk.without_apply_rng(hk.transform(forward_fn))
-
-        dummy_obs = utils.zeros_like(environment_spec.observations.observation)
-        dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
-
-        network_key, key = jax.random.split(key)
-        params = forward_fn.init(network_key, dummy_obs)  # type: ignore
-
-        # Create PPONetworks to add functionality required by the agent.
-        return make_ppo_network(network=forward_fn, params=params)
-
-    else:
-        # print(environment_spec)
-        # exit()
-        def policy_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
-            policy_network = hk.Sequential(
-                [
-                    observation_network,
-                    hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
-                    networks_lib.CategoricalHead(num_values=num_actions),
-                ]
-            )
-            return policy_network(inputs)
-
-        def critic_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
-            critic_network = hk.Sequential(
-                [
-                    observation_network,
-                    hk.nets.MLP(critic_layer_sizes, activation=jax.nn.relu),
-                    ValueHead(),
-                ]
-            )
-            return critic_network(inputs)
-
-        # Transform into pure functions.
-        policy_fn = hk.without_apply_rng(hk.transform(policy_fn))
-        critic_fn = hk.without_apply_rng(hk.transform(critic_fn))
-
-        dummy_obs = utils.zeros_like(environment_spec.observations.observation)
-        dummy_obs_critic = jax.numpy.concatenate([dummy_obs, dummy_obs, dummy_obs])
-
-        dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
-        dummy_obs_critic = utils.add_batch_dim(dummy_obs_critic)
-
-        network_key, key = jax.random.split(key)
-        policy_params = policy_fn.init(network_key, dummy_obs)  # type: ignore
-
-        network_key, key = jax.random.split(key)
-        critic_params = critic_fn.init(network_key, dummy_obs_critic)  # type: ignore
-
-        # Create PPONetworks to add functionality required by the agent.
-        return make_ppo_networks(
-            policy_network=policy_fn,
-            policy_params=policy_params,
-            critic_network=critic_fn,
-            critic_params=critic_params,
+    def policy_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+        policy_network = hk.Sequential(
+            [
+                observation_network,
+                hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
+                networks_lib.CategoricalHead(num_values=num_actions),
+            ]
         )
+        return policy_network(inputs)
+
+    def critic_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+        critic_network = hk.Sequential(
+            [
+                observation_network,
+                hk.nets.MLP(critic_layer_sizes, activation=jax.nn.relu),
+                ValueHead(),
+            ]
+        )
+        return critic_network(inputs)
+
+    # Transform into pure functions.
+    policy_fn = hk.without_apply_rng(hk.transform(policy_fn))
+    critic_fn = hk.without_apply_rng(hk.transform(critic_fn))
+
+    dummy_obs = utils.zeros_like(environment_spec.observations.observation)
+    dummy_obs_critic = dummy_obs
+
+    agent_num = len(agent_keys)
+    for i in range(agent_num - 1):
+        dummy_obs_critic = jax.numpy.concatenate([dummy_obs_critic, dummy_obs])
+
+    dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
+    dummy_obs_critic = utils.add_batch_dim(dummy_obs_critic)
+
+    network_key, key = jax.random.split(key)
+    policy_params = policy_fn.init(network_key, dummy_obs)  # type: ignore
+
+    network_key, key = jax.random.split(key)
+    critic_params = critic_fn.init(network_key, dummy_obs_critic)  # type: ignore
+
+    # Create PPONetworks to add functionality required by the agent.
+    return make_ppo_networks(
+        policy_network=policy_fn,
+        policy_params=policy_params,
+        critic_network=critic_fn,
+        critic_params=critic_params,
+    )
 
 
 def make_default_networks(
@@ -365,14 +346,18 @@ def make_default_networks(
 
     # Create agent_type specs.
     specs = environment_spec.get_agent_environment_specs()
+    agent_keys = None
     if not net_spec_keys:
+        agent_keys = list(specs.keys())
         specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
     else:
+        agent_keys = list(net_spec_keys)
         specs = {net_key: specs[value] for net_key, value in net_spec_keys.items()}
 
     networks: Dict[str, Any] = {}
     for net_key in specs.keys():
         networks[net_key] = make_networks(
+            agent_keys,
             specs[net_key],
             key=rng_key,
             policy_layer_sizes=policy_layer_sizes,
