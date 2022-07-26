@@ -7,7 +7,7 @@ import numpy as np
 from acme.jax import networks as networks_lib
 from jax import jit
 
-from mava.components.jax.networks.distributions.epsilon_greedy import (
+from mava.components.jax.executing.epsilon_greedy import (
     EpsilonGreedyWithMask,
 )
 
