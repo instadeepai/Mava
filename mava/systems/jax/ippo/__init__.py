@@ -13,13 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Updating components for Mava systems."""
-
-from mava.components.jax.updating.parameter_server import (
-    DefaultParameterServer,
-    ParameterServerSeparateNetworks,
-)
-from mava.components.jax.updating.terminators import (
-    CountConditionTerminator,
-    TimeTerminator,
-)
+"""Jax MAPPO system."""
+from mava.systems.jax.ippo.networks import make_default_networks
+from mava.systems.jax.ippo.system import MAPPOSystem, MAPPOSystemSeparateNetworks

@@ -21,9 +21,12 @@ from typing import Any
 import optax
 from absl import app, flags
 
-from mava.systems.jax import mappo
+from mava.systems.jax import ippo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
+
+# from jax.config import config
+# config.update('jax_disable_jit', True)
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -60,7 +63,7 @@ def main(_: Any) -> None:
 
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
-        return mappo.make_default_networks(  # type: ignore
+        return ippo.make_default_networks(  # type: ignore
             policy_layer_sizes=(254, 254, 254),
             critic_layer_sizes=(512, 512, 256),
             *args,
@@ -87,7 +90,7 @@ def main(_: Any) -> None:
     )
 
     # Create the system.
-    system = mappo.MAPPOSystem()
+    system = ippo.MAPPOSystem()
 
     # Build the system.
     system.build(
@@ -98,7 +101,7 @@ def main(_: Any) -> None:
         optimizer=optimizer,
         run_evaluator=True,
         sample_batch_size=5,
-        num_epochs=15,
+        num_epochs=2,
         num_executors=1,
         multi_process=True,
         clip_value=False,

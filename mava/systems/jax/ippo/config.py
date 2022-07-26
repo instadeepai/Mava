@@ -13,13 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Updating components for Mava systems."""
+"""Default hyperparameters for MAPPO system."""
+from dataclasses import dataclass
 
-from mava.components.jax.updating.parameter_server import (
-    DefaultParameterServer,
-    ParameterServerSeparateNetworks,
-)
-from mava.components.jax.updating.terminators import (
-    CountConditionTerminator,
-    TimeTerminator,
-)
+
+@dataclass
+class MAPPODefaultConfig:
+    sample_batch_size: int = 512
+    sequence_length: int = 20
+    period: int = 10
+    use_next_extras: bool = False

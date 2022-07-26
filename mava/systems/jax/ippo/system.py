@@ -30,6 +30,7 @@ class MAPPOSystemSeparateNetworks(System):
         Returns:
             system callback components
         """
+
         # Set the default configs
         default_params = MAPPODefaultConfig()
 
@@ -55,10 +56,10 @@ class MAPPOSystemSeparateNetworks(System):
         trainer_process = DesignSpec(
             trainer_init=training.SingleTrainerInit,
             gae_fn=training.GAE,
-            loss=training.MAPGWithTrustRegionClippingLossSeparateNetworks,
-            epoch_update=training.MAPGEpochUpdateSeparateNetworks,
-            minibatch_update=training.MAPGMinibatchUpdateSeparateNetworks,
-            sgd_step=training.MAPGWithTrustRegionStepSeparateNetworks,
+            loss=training.MAPPOLossSeparateNetworks,
+            epoch_update=training.MAPPOEpochUpdateSeparateNetworks,
+            minibatch_update=training.MAPPOMinibatchUpdateSeparateNetworks,
+            sgd_step=training.MAPPOStepSeparateNetworks,
             step=training.DefaultTrainerStep,
             trainer_dataset=building.TrajectoryDataset,
         ).get()
