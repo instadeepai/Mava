@@ -17,6 +17,8 @@
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Union
 
+import launchpad as lp
+
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 from mava.systems.jax.launcher import Launcher, NodeType
@@ -30,6 +32,7 @@ class DistributorConfig:
     run_evaluator: bool = True
     distributor_name: str = "System"
     terminal: str = "current_terminal"
+    lp_launch_type: Union[str, lp.LaunchType] = lp.LaunchType.LOCAL_MULTI_PROCESSING
 
 
 class Distributor(Component):
@@ -54,6 +57,7 @@ class Distributor(Component):
             nodes_on_gpu=self.config.nodes_on_gpu,
             name=self.config.distributor_name,
             terminal=self.config.terminal,
+            lp_launch_type=self.config.lp_launch_type,
         )
 
         # tables node
