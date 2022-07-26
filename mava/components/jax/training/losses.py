@@ -175,6 +175,7 @@ class MAPGTrustRegionClippingLossSeparateNetworksConfig:
     clip_value: bool = True
     entropy_cost: float = 0.01
     value_cost: float = 0.5
+    use_adaptive_entropy: bool = False
 
 
 class MAPGWithTrustRegionClippingLossSeparateNetworks(Loss):
@@ -232,6 +233,19 @@ class MAPGWithTrustRegionClippingLossSeparateNetworks(Loss):
 
                     # Entropy regulariser.
                     entropy_loss = -jnp.mean(entropy)
+
+                    # For adaptive entropy
+                    # https://arxiv.org/pdf/2007.02529.pdf - LICA
+                    use_adaptive_entropy = self.config.use_adaptive_entropy
+                    if use_adaptive_entropy:
+                        logits = distribution_params.parameters["logits"]
+                        probs = jax.nn.softmax(logits)
+                        log_information = jax.lax.log(probs)
+                        normalising_term = jax.numpy.linalg.norm(
+                            log_information, axis=-1
+                        )
+                        adaptive_entropy = -jnp.mean(normalising_term)
+                        entropy_loss = entropy_loss / adaptive_entropy
 
                     total_policy_loss = (
                         policy_loss + entropy_loss * self.config.entropy_cost
@@ -345,6 +359,7 @@ class MAPPOLossNetworksConfig:
     clip_value: bool = True
     entropy_cost: float = 0.01
     value_cost: float = 0.5
+    use_adaptive_entropy: bool = False
 
 
 class MAPPOLossSeparateNetworks(Loss):
@@ -402,6 +417,19 @@ class MAPPOLossSeparateNetworks(Loss):
 
                     # Entropy regulariser.
                     entropy_loss = -jnp.mean(entropy)
+
+                    # For adaptive entropy
+                    # https://arxiv.org/pdf/2007.02529.pdf - LICA
+                    use_adaptive_entropy = self.config.use_adaptive_entropy
+                    if use_adaptive_entropy:
+                        logits = distribution_params.parameters["logits"]
+                        probs = jax.nn.softmax(logits)
+                        log_information = jax.lax.log(probs)
+                        normalising_term = jax.numpy.linalg.norm(
+                            log_information, axis=-1
+                        )
+                        adaptive_entropy = -jnp.mean(normalising_term)
+                        entropy_loss = entropy_loss / adaptive_entropy
 
                     total_policy_loss = (
                         policy_loss + entropy_loss * self.config.entropy_cost
