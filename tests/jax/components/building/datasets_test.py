@@ -92,7 +92,7 @@ class TrajectoryDatasetConfigTest:
 
 def test_init_transition_dataset() -> None:
     """Test initiator of TransitionDataset component"""
-    transition_dataset = TransitionDataset(config=TransitionDatasetConfigTest) # type: ignore
+    transition_dataset = TransitionDataset(config=TransitionDatasetConfigTest)  # type: ignore
 
     assert transition_dataset.config.sample_batch_size == 512
     assert transition_dataset.config.prefetch_size == None
@@ -149,7 +149,7 @@ def test_on_building_trainer_dataset_transition_dataset(
 
 def test_init_trajectory_dataset() -> None:
     """Test initiator of TrajectoryDataset component"""
-    trajectory_dataset = TrajectoryDataset(config=TrajectoryDatasetConfigTest) # type: ignore
+    trajectory_dataset = TrajectoryDataset(config=TrajectoryDatasetConfigTest)  # type: ignore
 
     assert trajectory_dataset.config.sample_batch_size == 512
     assert trajectory_dataset.config.max_in_flight_samples_per_worker == 1024
