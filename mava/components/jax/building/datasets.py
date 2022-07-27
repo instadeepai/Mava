@@ -29,11 +29,10 @@ Transform = Callable[[reverb.ReplaySample], reverb.ReplaySample]
 @dataclass
 class TransitionDatasetConfig:
     sample_batch_size: int = 256
-    prefetch_size: Optional[int] = None
+    prefetch_size: Optional[int] = 4
     num_parallel_calls: int = 12
     max_in_flight_samples_per_worker: Optional[int] = None
     postprocess: Optional[Transform] = None
-    # dataset_name: str = "transition_dataset"
 
 
 class TransitionDataset(Component):
@@ -54,22 +53,31 @@ class TransitionDataset(Component):
         Args:
             builder : _description_
         """
-        max_in_flight_samples_per_worker = self.config.max_in_flight_samples_per_worker
         dataset = datasets.make_reverb_dataset(
             table=builder.store.trainer_id,
             server_address=builder.store.data_server_client.server_address,
             batch_size=self.config.sample_batch_size,
             prefetch_size=self.config.prefetch_size,
             num_parallel_calls=self.config.num_parallel_calls,
-            max_in_flight_samples_per_worker=max_in_flight_samples_per_worker,
-            postprocess=self.config.postprocess,
+            max_in_flight_samples_per_worker=self.config.max_in_flight_samples_per_worker,
+            # This doesn't exist in our version of acme yet.
+            # postprocess=self.config.postprocess,
         )
 
-        builder.store.dataset = iter(dataset)
+        builder.store.dataset_iterator = dataset.as_numpy_iterator()
 
     @staticmethod
     def config_class() -> Callable:
         return TransitionDatasetConfig
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "transition_dataset"
 
 
 @dataclass

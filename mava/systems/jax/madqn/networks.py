@@ -76,8 +76,8 @@ def make_discrete_networks(
         policy_value_network = hk.Sequential(
             [
                 utils.batch_concat,
-                hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
-                hk.nets.MLP((num_actions,), activation=jax.nn.relu),
+                networks_lib.LayerNormMLP(policy_layer_sizes, activate_final=True),
+                networks_lib.NearZeroInitializedLinear(num_actions),
             ]
         )
         return policy_value_network(inputs)

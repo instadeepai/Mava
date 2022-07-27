@@ -176,8 +176,7 @@ class UniformAdderPriority(AdderPriority):
             builder : _description_
         """
         builder.store.priority_fns = {
-            table_key: lambda x: 1.0
-            for table_key in builder.store.table_network_config.keys()
+            table_key: None for table_key in builder.store.table_network_config.keys()
         }
 
 

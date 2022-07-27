@@ -54,7 +54,7 @@ class MADQNSystem(System):
             sgd_step=training.MADQNStep,
             loss=training.MADQNLoss,
             epoch_update=training.MADQNEpochUpdate,
-            trainer_dataset=building.TrajectoryDataset,
+            trainer_dataset=building.TransitionDataset,
         ).get()
 
         # Data Server

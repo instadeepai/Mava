@@ -96,39 +96,33 @@ class MADQNLoss(Loss):
                 # Note (dries): This is placed here to set the networks correctly in
                 # the case of non-shared weights.
                 def loss_fn(
-                    tmp_params: Any,
-                    tmp_target_params: Any,
-                    tmp_observations: Any,
-                    tmp_next_observations: Any,
-                    tmp_actions: jnp.ndarray,
-                    tmp_discount: Any,
-                    tmp_rewards: Any,
+                    params: Any,
+                    target_params: Any,
+                    observations: Any,
+                    next_observations: Any,
+                    actions: jnp.ndarray,
+                    discount: Any,
+                    rewards: Any,
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
                     # Forward pass.
-                    q_tm1 = network.forward_fn(tmp_params, tmp_observations)
-                    q_t = network.forward_fn(tmp_target_params, tmp_next_observations)
-
-                    # Discount calculation
-                    # The discount part should be handled better. Here we have
-                    # assumed the discount is scalar and its value is same for all the
-                    # agents.
-
-                    # ToDo: replace the 0.99 with the discount value from the trainer
-
-                    d_t = (tmp_discount * 0.99).astype(jnp.float32)
+                    q_tm1 = network.forward_fn(params, observations)
+                    q_t_value = network.forward_fn(target_params, next_observations)
+                    q_t_selector = network.forward_fn(params, next_observations)
+                    d_t = (discount * self.config.discount).astype(jnp.float32)
                     # Cast and clip rewards.
                     r_t = jnp.clip(
-                        tmp_rewards,
+                        rewards,
                         -self.config.max_abs_reward,
                         self.config.max_abs_reward,
                     ).astype(jnp.float32)
 
                     # Compute Q-learning TD-error.
-                    batch_error = jax.vmap(rlax.q_learning)
-                    td_error = batch_error(q_tm1, tmp_actions, r_t, d_t, q_t)
-                    batch_loss = jnp.square(td_error)
-                    loss = jnp.mean(batch_loss)
-                    loss_info = {}  # TODO (Nima): check whether
+                    batch_error = jax.vmap(rlax.double_q_learning)
+                    td_error = batch_error(
+                        q_tm1, actions, r_t, d_t, q_t_value, q_t_selector
+                    )
+                    loss = jnp.mean(rlax.l2_loss(td_error))
+                    loss_info = {}
                     return loss, loss_info
 
                 (loss[agent_key], loss_info[agent_key]), grads[
