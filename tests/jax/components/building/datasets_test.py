@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for TransitionDataset and TrajectoryDataset classes for Jax-based Mava systems"""
+"""Tests for TransitionDataset and TrajectoryDataset classes for Jax-based Mava"""
 
 from dataclasses import dataclass
 from types import SimpleNamespace
@@ -92,7 +92,7 @@ class TrajectoryDatasetConfigTest:
 
 def test_init_transition_dataset() -> None:
     """Test initiator of TransitionDataset component"""
-    transition_dataset = TransitionDataset(config=TransitionDatasetConfigTest)
+    transition_dataset = TransitionDataset(config=TransitionDatasetConfigTest) # type: ignore
 
     assert transition_dataset.config.sample_batch_size == 512
     assert transition_dataset.config.prefetch_size == None
@@ -116,14 +116,15 @@ def test_on_building_trainer_dataset_transition_dataset(
         mock_builder.store.dataset._dataset: Change dataset from iterator to a dataset,
         mock_builder.store.dataset._dataset._map_func: Call map_func attribute from
     ParallelInterleaveDataset which is a `Dataset` that maps a function over its input
-    and interleaves the result. And map_func is structured_function.StructuredFunctionWrapper
-        mock_builder.store.dataset._dataset._map_func._func(1): Call the function wrapped inside
-    map_func which is _make_dataset
-            _make_dataset: is a method that return tf.data.Dataset, and since we have batch_size
-    it calls dataset.batch(batch_size, drop_remainder=True) that returns ParallelBatchDataset because
-    in the config there is num_parallel_calls.
-        mock_builder.store.dataset._dataset._map_func._func(1)._dataset: to get the inputs we gave
-    the program from ParallelBatchDataset we need to call this attribute _dataset._input_dataset
+    and interleaves the result. map_func is structured_function.StructuredFunctionWrapper
+        mock_builder.store.dataset._dataset._map_func._func(1): Call the function wrapped
+    inside map_func which is _make_dataset
+            _make_dataset: is a method that return tf.data.Dataset, and since batch_size
+    it calls dataset.batch(batch_size, drop_remainder=True) that returns
+    ParallelBatchDataset because in the config there is num_parallel_calls.
+        mock_builder.store.dataset._dataset._map_func._func(1)._dataset: to get the inputs
+    we gave the program from ParallelBatchDataset we need to call this attribute
+    _dataset._input_dataset
     """
     dataset = mock_builder.store.dataset._dataset._map_func._func(1)._dataset
     assert (
@@ -148,7 +149,7 @@ def test_on_building_trainer_dataset_transition_dataset(
 
 def test_init_trajectory_dataset() -> None:
     """Test initiator of TrajectoryDataset component"""
-    trajectory_dataset = TrajectoryDataset(config=TrajectoryDatasetConfigTest)
+    trajectory_dataset = TrajectoryDataset(config=TrajectoryDatasetConfigTest) # type: ignore
 
     assert trajectory_dataset.config.sample_batch_size == 512
     assert trajectory_dataset.config.max_in_flight_samples_per_worker == 1024
@@ -175,12 +176,12 @@ def test_on_building_trainer_dataset_trajectory_dataset(
     )
 
     """
-        mock_builder.store.dataset_iterator._iterator._dataset: since we have dataset.as_numpy_iterator()
-    to get the main dataset we need to call ._iterator that returns iter(dataset) which we call for it
-    ._dataset to get the inside of it
-        mock_builder.store.dataset_iterator._iterator._dataset._input_dataset:_input_dataset is an attribute
-         of the dataset.batch output which is BatchDataset
-    because we don't have num_parallel_calls in config
+        mock_builder.store.dataset_iterator._iterator._dataset: since we have
+    dataset.as_numpy_iterator() to get the main dataset we need to call ._iterator
+    that returns iter(dataset) which we call for itwe have ._dataset to get the inside of it
+        mock_builder.store.dataset_iterator._iterator._dataset._input_dataset:_input_dataset
+    is an attribute of the dataset.batch output which is BatchDataset because we don't have
+    num_parallel_calls in config
     """
     dataset = mock_builder.store.dataset_iterator._iterator._dataset
     assert (
