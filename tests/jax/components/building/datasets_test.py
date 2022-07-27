@@ -16,7 +16,8 @@
 """Tests for TransitionDataset and TrajectoryDataset classes for Jax-based Mava systems"""
 
 from types import SimpleNamespace
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Callable
+from dataclasses import dataclass
 
 import pytest
 import reverb
@@ -29,6 +30,7 @@ from mava.systems.jax.builder import Builder
 from tests.jax.mocks import make_fake_env_specs
 
 env_spec = make_fake_env_specs()
+Transform = Callable[[reverb.ReplaySample], reverb.ReplaySample]
 
 
 def adder_signature_fn(
@@ -69,13 +71,31 @@ def mock_builder() -> MockBuilder:
     return MockBuilder()
 
 
+@dataclass
+class TransitionDatasetConfigTest:
+    sample_batch_size: int = 512
+    prefetch_size: Optional[int] = None
+    num_parallel_calls: int = 24
+    max_in_flight_samples_per_worker: Optional[int] = None
+    postprocess: Optional[Transform] = None
+
+@dataclass
+class TrajectoryDatasetConfigTest:
+    sample_batch_size: int = 512
+    max_in_flight_samples_per_worker: int = 1024
+    num_workers_per_iterator: int = -2
+    max_samples_per_stream: int = -2
+    rate_limiter_timeout_ms: int = -2
+    get_signature_timeout_secs: Optional[int] = None
+
+
 def test_init_transition_dataset() -> None:
     """Test initiator of TransitionDataset component"""
-    transition_dataset = TransitionDataset()
+    transition_dataset = TransitionDataset(config=TransitionDatasetConfigTest)
 
-    assert transition_dataset.config.sample_batch_size == 256
+    assert transition_dataset.config.sample_batch_size == 512
     assert transition_dataset.config.prefetch_size == None
-    assert transition_dataset.config.num_parallel_calls == 12
+    assert transition_dataset.config.num_parallel_calls == 24
     assert transition_dataset.config.max_in_flight_samples_per_worker == None
     assert transition_dataset.config.postprocess == None
 
@@ -110,13 +130,13 @@ def test_on_building_trainer_dataset_transition_dataset(
 
 def test_init_trajectory_dataset() -> None:
     """Test initiator of TrajectoryDataset component"""
-    trajectory_dataset = TrajectoryDataset()
+    trajectory_dataset = TrajectoryDataset(config=TrajectoryDatasetConfigTest)
 
-    assert trajectory_dataset.config.sample_batch_size == 256
-    assert trajectory_dataset.config.max_in_flight_samples_per_worker == 512
-    assert trajectory_dataset.config.num_workers_per_iterator == -1
-    assert trajectory_dataset.config.max_samples_per_stream == -1
-    assert trajectory_dataset.config.rate_limiter_timeout_ms == -1
+    assert trajectory_dataset.config.sample_batch_size == 512
+    assert trajectory_dataset.config.max_in_flight_samples_per_worker == 1024
+    assert trajectory_dataset.config.num_workers_per_iterator == -2
+    assert trajectory_dataset.config.max_samples_per_stream == -2
+    assert trajectory_dataset.config.rate_limiter_timeout_ms == -2
     assert trajectory_dataset.config.get_signature_timeout_secs == None
 
 
