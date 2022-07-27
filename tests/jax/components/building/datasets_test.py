@@ -15,9 +15,9 @@
 
 """Tests for TransitionDataset and TrajectoryDataset classes for Jax-based Mava systems"""
 
-from types import SimpleNamespace
-from typing import Any, Dict, Optional, Callable
 from dataclasses import dataclass
+from types import SimpleNamespace
+from typing import Any, Callable, Dict, Optional
 
 import pytest
 import reverb
@@ -78,6 +78,7 @@ class TransitionDatasetConfigTest:
     num_parallel_calls: int = 24
     max_in_flight_samples_per_worker: Optional[int] = None
     postprocess: Optional[Transform] = None
+
 
 @dataclass
 class TrajectoryDatasetConfigTest:
