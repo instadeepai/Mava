@@ -112,6 +112,13 @@ def test_on_building_trainer_dataset_transition_dataset(
     transition_dataset = TransitionDataset()
     transition_dataset.on_building_trainer_dataset(builder=mock_builder)
 
+    """ 
+        mock_builder.store.dataset._dataset: Change dataset from iterator to a dataset,
+        mock_builder.store.dataset._dataset._map_func: Call map_func attribute from ParallelInterleaveDataset which is a `Dataset` that maps a function over its input and interleaves the result. And map_func is structured_function.StructuredFunctionWrapper
+        mock_builder.store.dataset._dataset._map_func._func(1): Call the function wrapped inside map_func which is _make_dataset
+            _make_dataset: is a method that return tf.data.Dataset, and since we have batch_size it calls dataset.batch(batch_size, drop_remainder=True) that returns ParallelBatchDataset because in the config there is num_parallel_calls.
+        mock_builder.store.dataset._dataset._map_func._func(1)._dataset: to get the inputs we gave the program from ParallelBatchDataset we need to call this attribute _dataset._input_dataset
+    """
     dataset = mock_builder.store.dataset._dataset._map_func._func(1)._dataset
     assert (
         dataset._input_dataset._server_address
@@ -161,6 +168,10 @@ def test_on_building_trainer_dataset_trajectory_dataset(
         == trajectory_dataset.config.sample_batch_size
     )
 
+    """ 
+        mock_builder.store.dataset_iterator._iterator._dataset: since we have dataset.as_numpy_iterator() to get the main dataset we need to call ._iterator that returns iter(dataset) which we call for it ._dataset to get the inside of it
+        mock_builder.store.dataset_iterator._iterator._dataset._input_dataset: _input_dataset is an attribute of the dataset.batch output which is BatchDataset because we don't have num_parallel_calls in config 
+    """
     dataset = mock_builder.store.dataset_iterator._iterator._dataset
     assert (
         dataset._input_dataset._server_address
