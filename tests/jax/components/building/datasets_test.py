@@ -117,15 +117,15 @@ def test_on_building_trainer_dataset_transition_dataset(
         dataset._input_dataset._server_address
         == mock_builder.store.data_server_client.server_address
     )
-    assert dataset._input_dataset._table == "table_0"
-    assert dataset._batch_size == 256
+    assert dataset._input_dataset._table == mock_builder.store.trainer_id
+    assert dataset._batch_size == transition_dataset.config.sample_batch_size
     assert (
         dataset._input_dataset._max_in_flight_samples_per_worker
         == 2 * transition_dataset.config.sample_batch_size
     )
     assert (
         mock_builder.store.dataset._dataset._num_parallel_calls
-        == ops.convert_to_tensor(12, dtype=dtypes.int64, name="num_parallel_calls")
+        == ops.convert_to_tensor(transition_dataset.config.num_parallel_calls, dtype=dtypes.int64, name="num_parallel_calls")
     )
 
 
@@ -152,15 +152,15 @@ def test_on_building_trainer_dataset_trajectory_dataset(
     trajectory_dataset = TrajectoryDataset()
     trajectory_dataset.on_building_trainer_dataset(builder=mock_builder)
 
-    assert mock_builder.store.sample_batch_size == 256
+    assert mock_builder.store.sample_batch_size == trajectory_dataset.config.sample_batch_size
 
     dataset = mock_builder.store.dataset_iterator._iterator._dataset
     assert (
         dataset._input_dataset._server_address
         == mock_builder.store.data_server_client.server_address
     )
-    assert dataset._input_dataset._table == "table_0"
-    assert dataset._input_dataset._max_in_flight_samples_per_worker == 2 * 256
-    assert dataset._input_dataset._num_workers_per_iterator == -1
-    assert dataset._input_dataset._max_samples_per_stream == -1
-    assert dataset._input_dataset._rate_limiter_timeout_ms == -1
+    assert dataset._input_dataset._table == mock_builder.store.trainer_id
+    assert dataset._input_dataset._max_in_flight_samples_per_worker == 2 * trajectory_dataset.config.sample_batch_size
+    assert dataset._input_dataset._num_workers_per_iterator == trajectory_dataset.config.num_workers_per_iterator
+    assert dataset._input_dataset._max_samples_per_stream == trajectory_dataset.config.max_samples_per_stream
+    assert dataset._input_dataset._rate_limiter_timeout_ms == trajectory_dataset.config.rate_limiter_timeout_ms
