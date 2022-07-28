@@ -26,21 +26,17 @@ from mava.components.jax.training.base import (
 from mava.components.jax.training.losses import (
     MAPGWithTrustRegionClippingLoss,
     MAPGWithTrustRegionClippingLossSeparateNetworks,
-    MAPPOLossSeparateNetworks,
 )
 from mava.components.jax.training.model_updating import (
     MAPGEpochUpdate,
     MAPGEpochUpdateSeparateNetworks,
     MAPGMinibatchUpdate,
     MAPGMinibatchUpdateSeparateNetworks,
-    MAPPOEpochUpdateSeparateNetworks,
-    MAPPOMinibatchUpdateSeparateNetworks,
 )
 from mava.components.jax.training.step import (
     DefaultTrainerStep,
     MAPGWithTrustRegionStep,
     MAPGWithTrustRegionStepSeparateNetworks,
-    MAPPOStepSeparateNetworks,
 )
 from mava.components.jax.training.trainer import (
     CustomTrainerInit,
