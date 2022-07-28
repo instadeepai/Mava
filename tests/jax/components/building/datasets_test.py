@@ -37,16 +37,15 @@ def adder_signature_fn(
     ma_environment_spec: specs.MAEnvironmentSpec,
     extras_specs: Dict[str, Any],
 ) -> Any:
-    """signature function that helps in building a simple server"""
+    """Signature function that helps in building a simple server"""
     return reverb_adders.ParallelNStepTransitionAdder.signature(
         ma_environment_spec=ma_environment_spec, extras_specs=extras_specs
     )
 
 
 class MockBuilder(Builder):
-    """Mock Builder component"""
-
     def __init__(self) -> None:
+        """Creates a mock builder for testing"""
         self.simple_server = reverb.Server(
             [
                 reverb.Table.queue(
@@ -95,10 +94,10 @@ def test_init_transition_dataset() -> None:
     transition_dataset = TransitionDataset(config=TransitionDatasetConfigTest)  # type: ignore
 
     assert transition_dataset.config.sample_batch_size == 512
-    assert transition_dataset.config.prefetch_size == None
+    assert transition_dataset.config.prefetch_size is None
     assert transition_dataset.config.num_parallel_calls == 24
-    assert transition_dataset.config.max_in_flight_samples_per_worker == None
-    assert transition_dataset.config.postprocess == None
+    assert transition_dataset.config.max_in_flight_samples_per_worker is None
+    assert transition_dataset.config.postprocess is None
 
 
 def test_on_building_trainer_dataset_transition_dataset(
@@ -112,21 +111,11 @@ def test_on_building_trainer_dataset_transition_dataset(
     transition_dataset = TransitionDataset()
     transition_dataset.on_building_trainer_dataset(builder=mock_builder)
 
-    """
-        mock_builder.store.dataset._dataset: Change dataset from iterator to a dataset,
-        mock_builder.store.dataset._dataset._map_func: Call map_func attribute from
-    ParallelInterleaveDataset which is a `Dataset` that maps a function over its input
-    and interleaves the result. map_func is structured_function.StructuredFunctionWrapper
-        mock_builder.store.dataset._dataset._map_func._func(1): Call the function wrapped
-    inside map_func which is _make_dataset
-            _make_dataset: is a method that return tf.data.Dataset, and since batch_size
-    it calls dataset.batch(batch_size, drop_remainder=True) that returns
-    ParallelBatchDataset because in the config there is num_parallel_calls.
-        mock_builder.store.dataset._dataset._map_func._func(1)._dataset: to get the inputs
-    we gave the program from ParallelBatchDataset we need to call this attribute
-    _dataset._input_dataset
-    """
-    dataset = mock_builder.store.dataset._dataset._map_func._func(1)._dataset
+    # mock_builder.store.dataset_iterator._dataset._map_func._func(1)._dataset \
+    # is needed to check the parameters i.e. obtain the dataset from the \
+    # tf.data.Dataset dataset iterator
+
+    dataset = mock_builder.store.dataset_iterator._dataset._map_func._func(1)._dataset
     assert (
         dataset._input_dataset._server_address
         == mock_builder.store.data_server_client.server_address
@@ -138,7 +127,7 @@ def test_on_building_trainer_dataset_transition_dataset(
         == 2 * transition_dataset.config.sample_batch_size
     )
     assert (
-        mock_builder.store.dataset._dataset._num_parallel_calls
+        mock_builder.store.dataset_iterator._dataset._num_parallel_calls
         == ops.convert_to_tensor(
             transition_dataset.config.num_parallel_calls,
             dtype=dtypes.int64,
@@ -156,7 +145,7 @@ def test_init_trajectory_dataset() -> None:
     assert trajectory_dataset.config.num_workers_per_iterator == -2
     assert trajectory_dataset.config.max_samples_per_stream == -2
     assert trajectory_dataset.config.rate_limiter_timeout_ms == -2
-    assert trajectory_dataset.config.get_signature_timeout_secs == None
+    assert trajectory_dataset.config.get_signature_timeout_secs is None
 
 
 def test_on_building_trainer_dataset_trajectory_dataset(
@@ -175,14 +164,10 @@ def test_on_building_trainer_dataset_trajectory_dataset(
         == trajectory_dataset.config.sample_batch_size
     )
 
-    """
-        mock_builder.store.dataset_iterator._iterator._dataset: since we have
-    dataset.as_numpy_iterator() to get the main dataset we need to call ._iterator
-    that returns iter(dataset) which we call for itwe have ._dataset to get the inside of it
-        mock_builder.store.dataset_iterator._iterator._dataset._input_dataset:_input_dataset
-    is an attribute of the dataset.batch output which is BatchDataset because we don't have
-    num_parallel_calls in config
-    """
+    # mock_builder.store.dataset_iterator._iterator._dataset is needed \
+    # to check the parameters i.e. obtain the dataset from the numpy \
+    # dataset iterator
+
     dataset = mock_builder.store.dataset_iterator._iterator._dataset
     assert (
         dataset._input_dataset._server_address
