@@ -60,7 +60,7 @@ class MAPPOSystemSeparateNetworks(System):
             minibatch_update=training.MAPGMinibatchUpdateSeparateNetworks,
             sgd_step=training.MAPGWithTrustRegionStepSeparateNetworks,
             step=training.DefaultTrainerStep,
-            trainer_dataset=building.TransitionDataset,
+            trainer_dataset=building.TrajectoryDataset,
         ).get()
 
         # Data Server
