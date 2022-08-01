@@ -344,7 +344,15 @@ class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
                 advantages,
             )
 
-            # Update the policy networks and optimizors.
+            # Calculate the gradients and agent metrics.
+            critic_gradients, critic_agent_metrics = trainer.store.critic_grad_fn(
+                critic_params,
+                minibatch.observations,
+                minibatch.target_values,
+                minibatch.behavior_values,
+            )
+
+            # Update the policy networks and optimizers.
             metrics = {}
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
@@ -370,19 +378,7 @@ class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
                 # TODO (Ruan): Double check that this is done correctly
                 metrics[agent_key] = policy_agent_metrics[agent_key]
 
-            # Calculate the gradients and agent metrics.
-            critic_gradients, critic_agent_metrics = trainer.store.critic_grad_fn(
-                critic_params,
-                minibatch.observations,
-                minibatch.target_values,
-                minibatch.behavior_values,
-            )
-
-            # Update the critic networks and optimizors.
-            # Metrics must not be an empty dict anymore
-            # metrics = {}
-            for agent_key in trainer.store.trainer_agents:
-                agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
+                # Update the critic networks and optimizers.
                 # Apply updates
                 # TODO (dries): Use one optimizer per network type here and not
                 # just one.
