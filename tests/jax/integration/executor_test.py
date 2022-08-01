@@ -16,12 +16,13 @@
 """Tests for executor class for Jax-based Mava systems"""
 
 import functools
-from typing import Dict, Tuple
+from types import SimpleNamespace
+from typing import Any, Dict, Tuple
 
 import acme
 import numpy as np
 import pytest
-
+from mava.core_jax import SystemBuilder
 from mava.components.jax import building, executing
 from mava.components.jax.building.adders import (
     ParallelSequenceAdderSignature,
@@ -41,6 +42,7 @@ from mava.systems.jax.system import System
 from mava.utils.environments import debugging_utils
 from mava.wrappers.environment_loop_wrappers import DetailedPerAgentStatistics
 from tests.jax import mocks
+import jax.numpy as jnp
 
 system_init = DesignSpec(
     environment_spec=building.EnvironmentSpec,
@@ -65,6 +67,21 @@ class MockExecutorParameterClient(ExecutorParameterClient):
         config: ExecutorParameterClientConfig = ExecutorParameterClientConfig(),
     ) -> None:
         super().__init__(config)
+        self.call_get_async: bool =False
+        self.call_add_async: bool = False
+
+    
+    def get_async(self) -> None:
+        self.call_get_async = True
+
+    def add_async(self, added_async: Any) -> None:
+        self.added_async=added_async
+        self.call_add_async = True
+
+    def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
+        builder.store.executor_counts={'trainer_steps': jnp.array(0), 'trainer_walltime': jnp.array(0.), 'evaluator_steps': jnp.array(0), 'evaluator_episodes': jnp.array(0), 'executor_episodes': jnp.array(0), 'executor_steps': jnp.array(0)}
+        builder.store.executor_parameter_client = SimpleNamespace(get_async=self.get_async, add_async=self.add_async)
+
 
 
 class TestSystemExecutor(System):
@@ -76,10 +93,10 @@ class TestSystemExecutor(System):
         """
         components = DesignSpec(
             **system_init,
-            data_server=OnPolicyDataServer,
+            data_server=mocks.MockOnPolicyDataServer,
             data_server_adder_signature=ParallelSequenceAdderSignature,
-            parameter_server=DefaultParameterServer,
-            executor_parameter_client=ExecutorParameterClient,
+            parameter_server=mocks.MockParameterServer,
+            executor_parameter_client=MockExecutorParameterClient,
             trainer_parameter_client=mocks.MockTrainerParameterClient,
             logger=mocks.MockLogger,
             **executor,
@@ -190,7 +207,6 @@ def test_executor_parameter_server_system() -> System:
     return TestSystemExecutorAndParameterSever()
 
 
-# Skip failing test for now
 def test_executor_parameter_server(
     test_executor_parameter_server_system: System,
 ) -> None:
@@ -229,8 +245,36 @@ def test_executor_parameter_server(
         {"evaluator_steps": np.full(1, 1234, dtype=np.int32)}
     )
 
-    # Step the executor
+    assert isinstance(executor, DetailedPerAgentStatistics)
+
+    # Run an episode
     executor.run_episode()
+
+    # Observe first (without adder)
+    assert not hasattr(executor._executor.store.adder, "_add_first_called")
+
+    # Select actions and select action
+    assert list(executor._executor.store.actions_info.keys()) == [
+        "agent_0",
+        "agent_1",
+        "agent_2",
+    ]
+    assert list(executor._executor.store.policies_info.keys()) == [
+        "agent_0",
+        "agent_1",
+        "agent_2",
+    ]
+    assert (
+        lambda: x in range(0, len(executor._executor.store.observations.legal_actions))
+        for x in list(executor._executor.store.actions_info.values())
+    )
+    assert (
+        lambda: key == "log_prob"
+        for key in executor._executor.store.policies_info.values()
+    )
+
+    # Observe (without adder)
+    assert not hasattr(executor._executor.store.adder, "add")
 
     # Check if the executor variable has changed.
     parameters = executor._executor.store.executor_parameter_client._parameters
