@@ -78,11 +78,11 @@ def mock_builder() -> MockBuilder:
 @pytest.fixture
 def transition_dataset() -> TransitionDataset:
     config = TransitionDatasetConfig()
-    config.sample_batch_size: int = 512
-    config.prefetch_size: Optional[int] = None
-    config.num_parallel_calls: int = 24
-    config.max_in_flight_samples_per_worker: Optional[int] = None
-    config.postprocess: Optional[Transform] = None
+    config.sample_batch_size= 512
+    config.prefetch_size = None
+    config.num_parallel_calls = 24
+    config.max_in_flight_samples_per_worker = None
+    config.postprocess = None
 
     transition_dataset = TransitionDataset(config=config)
     return transition_dataset
@@ -91,12 +91,12 @@ def transition_dataset() -> TransitionDataset:
 @pytest.fixture
 def trajectory_dataset() -> TrajectoryDataset:
     config = TrajectoryDatasetConfig()
-    config.sample_batch_size: int = 512
-    config.max_in_flight_samples_per_worker: int = 1024
-    config.num_workers_per_iterator: int = -2
-    config.max_samples_per_stream: int = -2
-    config.rate_limiter_timeout_ms: int = -2
-    config.get_signature_timeout_secs: Optional[int] = None
+    config.sample_batch_size= 512
+    config.max_in_flight_samples_per_worker= 1024
+    config.num_workers_per_iterator= -2
+    config.max_samples_per_stream= -2
+    config.rate_limiter_timeout_ms= -2
+    config.get_signature_timeout_secs = None
 
     trajectory_dataset = TrajectoryDataset(config=config)
     return trajectory_dataset
