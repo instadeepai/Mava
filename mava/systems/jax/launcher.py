@@ -23,6 +23,8 @@ from mava.utils import lp_utils
 
 
 class NodeType:
+    """Specify launchpad node types that systems can use."""
+
     reverb = lp.ReverbNode
     courier = lp.CourierNode
 
