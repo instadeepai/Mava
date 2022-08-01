@@ -197,7 +197,7 @@ class TrainerParameterClient(BaseParameterClient):
 
 
 ####################
-# SEPARATE NETOWORKS
+# SEPARATE NETWORKS
 ###################
 
 
