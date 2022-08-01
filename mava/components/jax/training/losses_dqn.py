@@ -103,11 +103,19 @@ class MADQNLoss(Loss):
                     actions: jnp.ndarray,
                     discount: Any,
                     rewards: Any,
+                    next_legal_actions: Any,
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
                     # Forward pass.
                     q_tm1 = network.forward_fn(params, observations)
                     q_t_value = network.forward_fn(target_params, next_observations)
                     q_t_selector = network.forward_fn(params, next_observations)
+
+                    q_t_selector = jnp.where(
+                        next_legal_actions.astype(bool),
+                        q_t_selector,
+                        jnp.finfo(q_t_selector.dtype).min,
+                    )
+
                     d_t = (discount * self.config.discount).astype(jnp.float32)
                     # Cast and clip rewards.
                     r_t = jnp.clip(
@@ -135,6 +143,8 @@ class MADQNLoss(Loss):
                     actions[agent_key],
                     discounts[agent_key],
                     rewards[agent_key],
+                    next_observations[agent_key].legal_actions
+                    
                 )
                 loss_info["total_loss"] = loss[agent_key]
 

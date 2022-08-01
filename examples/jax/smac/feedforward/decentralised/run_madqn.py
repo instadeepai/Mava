@@ -73,10 +73,11 @@ def main(_: Any) -> None:
     )
 
     # Optim
-    optimizer = optax.adam(learning_rate=0.0005, eps=1e-8)
+    optimizer = optax.rmsprop(learning_rate=0.0005, eps=0.00001, decay=0.99)
+    optimizer = optax.chain(optax.clip_by_global_norm(20.0), optimizer)
 
     # epsilon scheduler
-    epsilon_scheduler = LinearEpsilonScheduler(1.0, 0.05, 150000)
+    epsilon_scheduler = LinearEpsilonScheduler(1.0, 0.05, 200000)
 
     # Create the system.
     system = madqn.MADQNSystem()
