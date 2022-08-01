@@ -27,9 +27,10 @@ from mava.components.jax.building.adders import (
     ParallelSequenceAdderSignature,
     UniformAdderPriority,
 )
+from mava.wrappers.environment_loop_wrappers import DetailedPerAgentStatistics
 from mava.components.jax.building.data_server import OnPolicyDataServer
 from mava.components.jax.building.distributor import Distributor
-from mava.components.jax.building.parameter_client import ExecutorParameterClient
+from mava.components.jax.building.parameter_client import ExecutorParameterClient, ExecutorParameterClientConfig
 from mava.components.jax.updating.parameter_server import DefaultParameterServer
 from mava.specs import DesignSpec
 from mava.systems.jax import mappo
@@ -55,6 +56,9 @@ executor = DesignSpec(
 
 #########################################################################
 # Test executor in isolation.
+class MockExecutorParameterClient(ExecutorParameterClient):
+    def __init__(self,config: ExecutorParameterClientConfig = ExecutorParameterClientConfig(),) -> None:
+        super().__init__(config)
 class TestSystemExecutor(System):
     def design(self) -> Tuple[DesignSpec, Dict]:
         """Mock system design with zero components.
@@ -64,10 +68,10 @@ class TestSystemExecutor(System):
         """
         components = DesignSpec(
             **system_init,
-            data_server=mocks.MockOnPolicyDataServer,
+            data_server=OnPolicyDataServer,
             data_server_adder_signature=ParallelSequenceAdderSignature,
-            parameter_server=mocks.MockParameterServer,
-            executor_parameter_client=mocks.MockExecutorParameterClient,
+            parameter_server=DefaultParameterServer,
+            executor_parameter_client=ExecutorParameterClient,
             trainer_parameter_client=mocks.MockTrainerParameterClient,
             logger=mocks.MockLogger,
             **executor,
@@ -79,17 +83,18 @@ class TestSystemExecutor(System):
 
 
 @pytest.fixture
-def test_exector_system() -> System:
+def test_executor_system() -> System:
     """Add description here."""
     return TestSystemExecutor()
 
 
-# Skip failing test for now
-@pytest.mark.skip
 def test_executor(
-    test_exector_system: System,
+    test_executor_system: System,
 ) -> None:
-    """Test if the parameter server instantiates processes as expected."""
+    """Test if the parameter server instantiates processes as expected.
+    Args:
+        test_exec
+    """
 
     # Environment.
     environment_factory = functools.partial(
@@ -102,7 +107,7 @@ def test_executor(
     network_factory = mappo.make_default_networks
 
     # Build the system
-    test_exector_system.build(
+    test_executor_system.build(
         environment_factory=environment_factory, network_factory=network_factory
     )
 
@@ -112,14 +117,25 @@ def test_executor(
         executor,
         evaluator,
         trainer,
-    ) = test_exector_system._builder.store.system_build
-
-    assert isinstance(executor, acme.core.Worker)
+    ) = test_executor_system._builder.store.system_build
+    
+    assert isinstance(executor, DetailedPerAgentStatistics)
 
     # Run an episode
     executor.run_episode()
 
+    #Observe first (without adder)
+    assert not hasattr(executor._executor.store.adder,"_add_first_called")
+    
+    #Select actions and select action
+    assert list(executor._executor.store.actions_info.keys())==['agent_0','agent_1','agent_2']
+    assert list(executor._executor.store.policies_info.keys())==['agent_0','agent_1','agent_2']
+    assert (lambda: x in range(0,len(executor._executor.store.observations.legal_actions)) for x in list(executor._executor.store.actions_info.values()))
+    assert (lambda: key=='log_prob' for key in executor._executor.store.policies_info.values())
 
+    #Observe (without adder)
+    assert not hasattr(executor._executor.store.adder, "add")
+    
 #########################################################################
 # Integration test for the executor, variable_client and variable_server.
 class TestSystemExecutorAndParameterSever(System):
