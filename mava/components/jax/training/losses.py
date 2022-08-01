@@ -267,8 +267,6 @@ class MAPGWithTrustRegionClippingLossSeparateNetworks(Loss):
 
                     values = network.critic_network.apply(critic_params, observations)
 
-                    # values = jnp.squeeze(values, axis=-1)
-
                     # Value function loss. Exclude the bootstrap value
                     unclipped_value_error = target_values - values
                     unclipped_value_loss = unclipped_value_error**2
@@ -276,9 +274,7 @@ class MAPGWithTrustRegionClippingLossSeparateNetworks(Loss):
                     value_clip_parameter = self.config.value_clip_parameter
                     if self.config.clip_value:
                         # Clip values to reduce variablility during critic training.
-                        # TODO (Ruan): Updated the value clipping fix this
-                        # normal implementation as well check that this is also
-                        # done in TF implementation
+
                         clipped_values = behavior_values + jnp.clip(
                             values - behavior_values,
                             -value_clip_parameter,
