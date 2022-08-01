@@ -25,7 +25,12 @@ from tensorflow.python.framework import dtypes, ops
 
 from mava import specs
 from mava.adders import reverb as reverb_adders
-from mava.components.jax.building.datasets import TrajectoryDataset, TransitionDataset, TransitionDatasetConfig, TrajectoryDatasetConfig
+from mava.components.jax.building.datasets import (
+    TrajectoryDataset,
+    TrajectoryDatasetConfig,
+    TransitionDataset,
+    TransitionDatasetConfig,
+)
 from mava.systems.jax.builder import Builder
 from tests.jax.mocks import make_fake_env_specs
 
@@ -67,11 +72,12 @@ class MockBuilder(Builder):
 @pytest.fixture
 def mock_builder() -> MockBuilder:
     """Create builder mock"""
-    return MockBuilder() 
-    
+    return MockBuilder()
+
+
 @pytest.fixture
-def transition_dataset()->TransitionDataset:
-    config=TransitionDatasetConfig()
+def transition_dataset() -> TransitionDataset:
+    config = TransitionDatasetConfig()
     config.sample_batch_size: int = 512
     config.prefetch_size: Optional[int] = None
     config.num_parallel_calls: int = 24
@@ -81,9 +87,10 @@ def transition_dataset()->TransitionDataset:
     transition_dataset = TransitionDataset(config=config)
     return transition_dataset
 
+
 @pytest.fixture
-def trajectory_dataset()->TrajectoryDataset:
-    config=TrajectoryDatasetConfig()
+def trajectory_dataset() -> TrajectoryDataset:
+    config = TrajectoryDatasetConfig()
     config.sample_batch_size: int = 512
     config.max_in_flight_samples_per_worker: int = 1024
     config.num_workers_per_iterator: int = -2
@@ -94,7 +101,8 @@ def trajectory_dataset()->TrajectoryDataset:
     trajectory_dataset = TrajectoryDataset(config=config)
     return trajectory_dataset
 
-def test_init_transition_dataset(transition_dataset:TransitionDataset) -> None:
+
+def test_init_transition_dataset(transition_dataset: TransitionDataset) -> None:
     """Test initiator of TransitionDataset component"""
     assert transition_dataset.config.sample_batch_size == 512
     assert transition_dataset.config.prefetch_size is None
