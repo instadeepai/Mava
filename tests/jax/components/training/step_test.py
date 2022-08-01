@@ -19,6 +19,7 @@ import time
 from types import SimpleNamespace
 from typing import Any, Dict, Tuple
 
+import optax
 import jax
 import jax.numpy as jnp
 import pytest
@@ -445,32 +446,24 @@ def test_step(mock_trainer: MockTrainer, dummy_sample: DummySample) -> None:
         net_key: mock_trainer.store.networks["networks"][net_key].params
         for net_key in mock_trainer.store.networks["networks"].keys()
     }
-    assert metrics["norm_params"] == jnp.sqrt(
-        sum([jnp.sum(numerics.abs_sq(x)) for x in jax.tree_leaves(updates)])
-    )
+    
+    assert metrics["norm_params"]==optax.global_norm(jax.tree_leaves(updates))
 
     observations = jax.tree_map(lambda x: x[:, :-1], dummy_sample.data.observations)
-    assert metrics["observations_mean"] == jnp.mean(
-        utils.batch_concat(
-            jax.tree_map(lambda x: jnp.abs(jnp.mean(x, axis=(0, 1))), observations),
-            num_batch_dims=0,
-        )
-    )
+    assert metrics["observations_mean"] == 0.47703704
+    
+    assert metrics["observations_std"] == 0.18814814
 
-    assert metrics["observations_std"] == jnp.mean(
-        utils.batch_concat(
-            jax.tree_map(lambda x: jnp.std(x, axis=(0, 1)), observations),
-            num_batch_dims=0,
-        )
-    )
-
-    assert metrics["rewards_mean"] == jax.tree_map(
-        lambda x: jnp.mean(jnp.abs(jnp.mean(x, axis=(0, 1)))), dummy_sample.data.rewards
-    )
-
-    assert metrics["rewards_std"] == jax.tree_map(
-        lambda x: jnp.std(x, axis=(0, 1)), dummy_sample.data.rewards
-    )
+    assert metrics["rewards_mean"] == {
+        "agent_0":jnp.array([0.465]),
+        "agent_1":jnp.array([0.41]),
+        "agent_2":jnp.array([0.39]),
+    }
+    
+    assert list(metrics["rewards_std"].keys()) == ['agent_0', 'agent_1', 'agent_2']
+    assert float(list(metrics["rewards_std"].values())[0])== 0.2899568974971771
+    assert float(list(metrics["rewards_std"].values())[1])== 0.25149551033973694
+    assert float(list(metrics["rewards_std"].values())[2])== 0.08124038577079773
 
     random_key, _ = jax.random.split(old_key)
     assert list(mock_trainer.store.key) == list(random_key)
