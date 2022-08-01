@@ -33,7 +33,7 @@ class ExtrasLogProbSpecConfig:
 class ExtrasSpec(Component):
     @abc.abstractmethod
     def __init__(self, config: Any) -> None:
-        """_summary_
+        """Initialise extra specs
 
         Args:
             config : configuration for current algorithm

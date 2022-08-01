@@ -74,7 +74,18 @@ class PPONetworks:
             key: networks_lib.PRNGKey,
             mask: chex.Array = None,
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
-            """TODO: Add description here."""
+            """Forward function for PPO network
+
+            Args:
+                params: values parameterising the network.
+                observations: agent observations
+                key: pseudo-random value used to initialise distributions
+                mask: action mask which removes illegal actions
+
+            Returns:
+                actions: agent action
+                log_prob: log prob of the chosen action
+            """
             # The parameters of the network might change. So it has to
             # be fed into the jitted function.
             distribution, _ = self.network.apply(params, observations)
@@ -164,7 +175,7 @@ def make_networks(
         key: pseudo-random value used to initialise distributions
         policy_layer_sizes: size of each layer of the policy network
         critic_layer_sizes: size of each layer of the critic network
-        observation_network: TODO:(not entirely sure what this is)
+        observation_network: Network used for feature extraction layers
 
     Returns:
         make_discrete_networks: function to create a discrete network
@@ -202,7 +213,7 @@ def make_discrete_networks(
         key: pseudo-random value used to initialise distributions
         policy_layer_sizes: size of each layer of the policy network
         critic_layer_sizes: size of each layer of the critic network
-        observation_network: TODO:(not entirely sure what this is)
+        observation_network: Network used for feature extraction layers
 
     Returns:
         make_ppo_network: function to create a ppo network
@@ -259,7 +270,7 @@ def make_default_networks(
         net_spec_keys: keys for each agent network
         policy_layer_sizes: size of each layer of the policy network
         critic_layer_sizes: size of each layer of the critic network
-        observation_network: TODO:(not entirely sure what this is)
+        observation_network: Network used for feature extraction layers
 
     Returns:
         networks: networks created to given spec
