@@ -95,8 +95,10 @@ class PPONetworks:
         return value
 
 
-# This class is made to replicate the behaviour of the categorical vlaue head
-# whcih squeezes the value inside the __call__ method.
+# This class is made to replicate the behaviour of the categorical value head
+# which squeezes the value inside the __call__ method before returning it.
+# please see
+# https://github.com/deepmind/acme/blob/70e1e6b694d79d94f1bed13d55cda5c1837a10f3/acme/jax/networks/distributional.py#L284 # noqa: E501
 class ValueHead(hk.Module):
     """Network head that produces a value."""
 
@@ -173,7 +175,6 @@ class PPOSeparateNetworks:
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
         """TODO: Add description here."""
         value = self.critic_network.apply(self.critic_params, observations)
-        value = jnp.squeeze(value, axis=-1)
         return value
 
 
@@ -343,7 +344,7 @@ def make_default_networks(
 
     Args:
         environment_spec: mava multi-agent environment spec
-        agent_net_keys: dicitonary specifiying which networks are
+        agent_net_keys: dictionary specifiying which networks are
                         used by which agent
         rng_key: jax random key to be used for network initialization
         net_spec_keys: TODO (Ruan) find these details
