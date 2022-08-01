@@ -240,8 +240,6 @@ class ParameterServerSeparateNetworks(DefaultParameterServer):
                     f"policy_{net_type_key}-{agent_net_key}"
                 ] = networks[net_type_key][agent_net_key].policy_params
 
-        for net_type_key in networks.keys():
-            for agent_net_key in networks[net_type_key].keys():
                 # Ensure obs and target networks are sonnet modules
                 server.store.parameters[
                     f"critic_{net_type_key}-{agent_net_key}"
