@@ -204,7 +204,7 @@ class ParameterClient:
                     self._async_add_buffer[name] = params[name]
 
     def add_and_wait(self, params: Dict[str, Any]) -> None:
-        """Add to given parameters in the server. Wait for completion.
+        """Add to the given parameters in the server. Wait for completion.
 
         Adds the specified parameters to the corresponding parameters in server
         and waits for the process to complete before continuing.
