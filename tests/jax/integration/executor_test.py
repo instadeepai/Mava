@@ -20,9 +20,10 @@ from types import SimpleNamespace
 from typing import Any, Dict, Tuple
 
 import acme
+import jax.numpy as jnp
 import numpy as np
 import pytest
-from mava.core_jax import SystemBuilder
+
 from mava.components.jax import building, executing
 from mava.components.jax.building.adders import (
     ParallelSequenceAdderSignature,
@@ -35,6 +36,7 @@ from mava.components.jax.building.parameter_client import (
     ExecutorParameterClientConfig,
 )
 from mava.components.jax.updating.parameter_server import DefaultParameterServer
+from mava.core_jax import SystemBuilder
 from mava.specs import DesignSpec
 from mava.systems.jax import mappo
 from mava.systems.jax.mappo.components import ExtrasLogProbSpec
@@ -42,7 +44,6 @@ from mava.systems.jax.system import System
 from mava.utils.environments import debugging_utils
 from mava.wrappers.environment_loop_wrappers import DetailedPerAgentStatistics
 from tests.jax import mocks
-import jax.numpy as jnp
 
 system_init = DesignSpec(
     environment_spec=building.EnvironmentSpec,
@@ -62,26 +63,34 @@ executor = DesignSpec(
 #########################################################################
 # Test executor in isolation.
 class MockExecutorParameterClient(ExecutorParameterClient):
+    """Mock ExecutorParameterClient"""
     def __init__(
         self,
         config: ExecutorParameterClientConfig = ExecutorParameterClientConfig(),
     ) -> None:
         super().__init__(config)
-        self.call_get_async: bool =False
+        self.call_get_async: bool = False
         self.call_add_async: bool = False
 
-    
     def get_async(self) -> None:
         self.call_get_async = True
 
     def add_async(self, added_async: Any) -> None:
-        self.added_async=added_async
+        self.added_async = added_async
         self.call_add_async = True
 
     def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
-        builder.store.executor_counts={'trainer_steps': jnp.array(0), 'trainer_walltime': jnp.array(0.), 'evaluator_steps': jnp.array(0), 'evaluator_episodes': jnp.array(0), 'executor_episodes': jnp.array(0), 'executor_steps': jnp.array(0)}
-        builder.store.executor_parameter_client = SimpleNamespace(get_async=self.get_async, add_async=self.add_async)
-
+        builder.store.executor_counts = {
+            "trainer_steps": jnp.array(0),
+            "trainer_walltime": jnp.array(0.0),
+            "evaluator_steps": jnp.array(0),
+            "evaluator_episodes": jnp.array(0),
+            "executor_episodes": jnp.array(0),
+            "executor_steps": jnp.array(0),
+        }
+        builder.store.executor_parameter_client = SimpleNamespace(
+            get_async=self.get_async, add_async=self.add_async
+        )
 
 
 class TestSystemExecutor(System):
@@ -313,6 +322,7 @@ def test_system_except_trainer() -> System:
     """Add description here."""
     return TestSystemExceptTrainer()
 
+
 def test_except_trainer(
     test_system_except_trainer: System,
 ) -> None:
@@ -346,7 +356,6 @@ def test_except_trainer(
         evaluator,
         trainer,
     ) = test_system_except_trainer._builder.store.system_build
-
 
     assert isinstance(executor, DetailedPerAgentStatistics)
 
