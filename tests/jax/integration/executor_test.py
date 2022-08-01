@@ -191,7 +191,6 @@ def test_executor_parameter_server_system() -> System:
 
 
 # Skip failing test for now
-@pytest.mark.skip
 def test_executor_parameter_server(
     test_executor_parameter_server_system: System,
 ) -> None:
@@ -222,10 +221,7 @@ def test_executor_parameter_server(
         trainer,
     ) = test_executor_parameter_server_system._builder.store.system_build
 
-    assert isinstance(executor, acme.core.Worker)
-
     # Save the executor policy
-
     parameters = executor._executor.store.executor_parameter_client._parameters
 
     # Change a variable in the policy network
@@ -273,9 +269,6 @@ def test_system_except_trainer() -> System:
     """Add description here."""
     return TestSystemExceptTrainer()
 
-
-# Skip failing test for now
-@pytest.mark.skip
 def test_except_trainer(
     test_system_except_trainer: System,
 ) -> None:
@@ -310,7 +303,34 @@ def test_except_trainer(
         trainer,
     ) = test_system_except_trainer._builder.store.system_build
 
-    assert isinstance(executor, acme.core.Worker)
 
-    # Step the executor
+    assert isinstance(executor, DetailedPerAgentStatistics)
+
+    # Run an episode
     executor.run_episode()
+
+    # Observe first (without adder)
+    assert not hasattr(executor._executor.store.adder, "_add_first_called")
+
+    # Select actions and select action
+    assert list(executor._executor.store.actions_info.keys()) == [
+        "agent_0",
+        "agent_1",
+        "agent_2",
+    ]
+    assert list(executor._executor.store.policies_info.keys()) == [
+        "agent_0",
+        "agent_1",
+        "agent_2",
+    ]
+    assert (
+        lambda: x in range(0, len(executor._executor.store.observations.legal_actions))
+        for x in list(executor._executor.store.actions_info.values())
+    )
+    assert (
+        lambda: key == "log_prob"
+        for key in executor._executor.store.policies_info.values()
+    )
+
+    # Observe (without adder)
+    assert not hasattr(executor._executor.store.adder, "add")
