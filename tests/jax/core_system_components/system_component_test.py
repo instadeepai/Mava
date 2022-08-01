@@ -14,6 +14,7 @@
 # limitations under the License.
 """Tests for Jax-based Mava system implementation."""
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import Callable, Dict, List, Optional, Tuple
 
 import pytest
@@ -162,6 +163,11 @@ class DistributorDefaultConfig:
     name: str = "system"
 
 
+# Instantiate DistributorDefaultConfig to have access
+# to nodes_on_gpu attribute
+distributor_default_config = DistributorDefaultConfig()
+
+
 class MockDistributorComponent(Component):
     def __init__(
         self, config: DistributorDefaultConfig = DistributorDefaultConfig()
@@ -272,16 +278,37 @@ def system_with_two_components() -> System:
 def test_system_launch_with_build(
     system_with_two_components: System,
 ) -> None:
-    """Test if system can launch having had changed (buildd) the default \
+    """Test if system can launch having had changed (build) the default \
         config.
 
     Args:
         system_with_two_components : mock system
     """
+
     system_with_two_components.build(param_0=2, param_3=False)
     assert system_with_two_components._builder.store.int_plus_str == 3
     assert system_with_two_components._builder.store.float_plus_bool == 1.2
     system_with_two_components.launch()
+    assert system_with_two_components._builder.store.global_config == SimpleNamespace(
+        multi_process=DistributorDefaultConfig.multi_process,
+        name=DistributorDefaultConfig.name,
+        nodes_on_gpu=distributor_default_config.nodes_on_gpu,
+        num_executors=DistributorDefaultConfig.num_executors,
+        param_0=2,
+        param_1=ComponentZeroDefaultConfig.param_1,
+        param_2=ComponentOneDefaultConfig.param_2,
+        param_3=False,
+    )
+
+
+def test_launch_when_not_built(
+    system_with_two_components: System,
+) -> None:
+    """Test that exception is thrown when launch is called before a system\
+        has been built."""
+
+    with pytest.raises(Exception):
+        system_with_two_components.launch()
 
 
 def test_system_update_with_existing_component(
@@ -296,6 +323,26 @@ def test_system_update_with_existing_component(
     system_with_two_components.build()
     assert system_with_two_components._builder.store.float_plus_bool == 2.2
     assert system_with_two_components._builder.store.str_plus_bool == 3
+    assert system_with_two_components._builder.store.global_config == SimpleNamespace(
+        multi_process=DistributorDefaultConfig.multi_process,
+        name=DistributorDefaultConfig.name,
+        nodes_on_gpu=distributor_default_config.nodes_on_gpu,
+        num_executors=DistributorDefaultConfig.num_executors,
+        param_2=ComponentOneDefaultConfig.param_2,
+        param_3=ComponentOneDefaultConfig.param_3,
+        param_4=ComponentTwoDefaultConfig.param_4,
+        param_5=ComponentTwoDefaultConfig.param_5,
+    )
+
+
+def test_system_update_when_built(
+    system_with_two_components: System,
+) -> None:
+    """Test that exception is raised when system is updated after being built."""
+    system_with_two_components.build()
+
+    with pytest.raises(Exception):
+        system_with_two_components.update(ComponentTwo)
 
 
 def test_system_update_with_non_existing_component(
@@ -335,6 +382,16 @@ def test_system_add_with_non_existing_component(
     system_with_one_component.build()
     assert system_with_one_component._builder.store.int_plus_str == 2
     assert system_with_one_component._builder.store.float_plus_bool == 2.2
+    assert system_with_one_component._builder.store.global_config == SimpleNamespace(
+        multi_process=DistributorDefaultConfig.multi_process,
+        name=DistributorDefaultConfig.name,
+        nodes_on_gpu=distributor_default_config.nodes_on_gpu,
+        num_executors=DistributorDefaultConfig.num_executors,
+        param_0=ComponentZeroDefaultConfig.param_0,
+        param_1=ComponentZeroDefaultConfig.param_1,
+        param_2=ComponentOneDefaultConfig.param_2,
+        param_3=ComponentOneDefaultConfig.param_3,
+    )
 
 
 def test_system_update_twice(system_with_two_components: System) -> None:
@@ -348,6 +405,16 @@ def test_system_update_twice(system_with_two_components: System) -> None:
     system_with_two_components.build()
     assert system_with_two_components._builder.store.int_plus_str == 2
     assert system_with_two_components._builder.store.float_plus_bool == 2.2
+    assert system_with_two_components._builder.store.global_config == SimpleNamespace(
+        multi_process=DistributorDefaultConfig.multi_process,
+        name=DistributorDefaultConfig.name,
+        nodes_on_gpu=distributor_default_config.nodes_on_gpu,
+        num_executors=DistributorDefaultConfig.num_executors,
+        param_0=ComponentZeroDefaultConfig.param_0,
+        param_1=ComponentZeroDefaultConfig.param_1,
+        param_2=ComponentOneDefaultConfig.param_2,
+        param_3=ComponentOneDefaultConfig.param_3,
+    )
 
 
 def test_system_add_twice(system_with_zero_components: System) -> None:
@@ -361,6 +428,16 @@ def test_system_add_twice(system_with_zero_components: System) -> None:
     system_with_zero_components.build()
     assert system_with_zero_components._builder.store.float_plus_bool == 2.2
     assert system_with_zero_components._builder.store.str_plus_bool == 3
+    assert system_with_zero_components._builder.store.global_config == SimpleNamespace(
+        multi_process=DistributorDefaultConfig.multi_process,
+        name=DistributorDefaultConfig.name,
+        nodes_on_gpu=distributor_default_config.nodes_on_gpu,
+        num_executors=DistributorDefaultConfig.num_executors,
+        param_2=ComponentOneDefaultConfig.param_2,
+        param_3=ComponentOneDefaultConfig.param_3,
+        param_4=ComponentTwoDefaultConfig.param_4,
+        param_5=ComponentTwoDefaultConfig.param_5,
+    )
 
 
 def test_system_add_and_update(system_with_zero_components: System) -> None:
@@ -373,6 +450,23 @@ def test_system_add_and_update(system_with_zero_components: System) -> None:
     system_with_zero_components.update(ComponentTwo)
     system_with_zero_components.build()
     assert system_with_zero_components._builder.store.str_plus_bool == 3
+    assert system_with_zero_components._builder.store.global_config == SimpleNamespace(
+        multi_process=DistributorDefaultConfig.multi_process,
+        name=DistributorDefaultConfig.name,
+        nodes_on_gpu=distributor_default_config.nodes_on_gpu,
+        num_executors=DistributorDefaultConfig.num_executors,
+        param_4=ComponentTwoDefaultConfig.param_4,
+        param_5=ComponentTwoDefaultConfig.param_5,
+    )
+
+
+def test_add_when_built(system_with_one_component: System) -> None:
+    """Test that exception is raised when trying to add to a system that has\
+        already been built."""
+
+    system_with_one_component.build()
+    with pytest.raises(Exception):
+        system_with_one_component.add(ComponentOne)
 
 
 def test_system_build_one_component_params(
@@ -386,6 +480,16 @@ def test_system_build_one_component_params(
     system_with_two_components.build(param_0=2, param_1="2")
     assert system_with_two_components._builder.store.int_plus_str == 4
     assert system_with_two_components._builder.store.float_plus_bool == 2.2
+    assert system_with_two_components._builder.store.global_config == SimpleNamespace(
+        multi_process=DistributorDefaultConfig.multi_process,
+        name=DistributorDefaultConfig.name,
+        nodes_on_gpu=distributor_default_config.nodes_on_gpu,
+        num_executors=DistributorDefaultConfig.num_executors,
+        param_0=2,
+        param_1="2",
+        param_2=ComponentOneDefaultConfig.param_2,
+        param_3=ComponentOneDefaultConfig.param_3,
+    )
 
 
 def test_system_build_two_component_params(
@@ -399,3 +503,13 @@ def test_system_build_two_component_params(
     system_with_two_components.build(param_0=2, param_3=False)
     assert system_with_two_components._builder.store.int_plus_str == 3
     assert system_with_two_components._builder.store.float_plus_bool == 1.2
+    assert system_with_two_components._builder.store.global_config == SimpleNamespace(
+        multi_process=DistributorDefaultConfig.multi_process,
+        name=DistributorDefaultConfig.name,
+        nodes_on_gpu=distributor_default_config.nodes_on_gpu,
+        num_executors=DistributorDefaultConfig.num_executors,
+        param_0=2,
+        param_1=ComponentZeroDefaultConfig.param_1,
+        param_2=ComponentOneDefaultConfig.param_2,
+        param_3=False,
+    )
