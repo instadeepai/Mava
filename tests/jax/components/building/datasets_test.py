@@ -25,7 +25,7 @@ from tensorflow.python.framework import dtypes, ops
 
 from mava import specs
 from mava.adders import reverb as reverb_adders
-from mava.components.jax.building.datasets import TrajectoryDataset, TransitionDataset
+from mava.components.jax.building.datasets import TrajectoryDataset, TransitionDataset, TransitionDatasetConfig, TrajectoryDatasetConfig
 from mava.systems.jax.builder import Builder
 from tests.jax.mocks import make_fake_env_specs
 
@@ -67,32 +67,35 @@ class MockBuilder(Builder):
 @pytest.fixture
 def mock_builder() -> MockBuilder:
     """Create builder mock"""
-    return MockBuilder()
+    return MockBuilder() 
+    
+@pytest.fixture
+def transition_dataset()->TransitionDataset:
+    config=TransitionDatasetConfig()
+    config.sample_batch_size: int = 512
+    config.prefetch_size: Optional[int] = None
+    config.num_parallel_calls: int = 24
+    config.max_in_flight_samples_per_worker: Optional[int] = None
+    config.postprocess: Optional[Transform] = None
 
+    transition_dataset = TransitionDataset(config=config)
+    return transition_dataset
 
-@dataclass
-class TransitionDatasetConfigTest:
-    sample_batch_size: int = 512
-    prefetch_size: Optional[int] = None
-    num_parallel_calls: int = 24
-    max_in_flight_samples_per_worker: Optional[int] = None
-    postprocess: Optional[Transform] = None
+@pytest.fixture
+def trajectory_dataset()->TrajectoryDataset:
+    config=TrajectoryDatasetConfig()
+    config.sample_batch_size: int = 512
+    config.max_in_flight_samples_per_worker: int = 1024
+    config.num_workers_per_iterator: int = -2
+    config.max_samples_per_stream: int = -2
+    config.rate_limiter_timeout_ms: int = -2
+    config.get_signature_timeout_secs: Optional[int] = None
 
+    trajectory_dataset = TrajectoryDataset(config=config)
+    return trajectory_dataset
 
-@dataclass
-class TrajectoryDatasetConfigTest:
-    sample_batch_size: int = 512
-    max_in_flight_samples_per_worker: int = 1024
-    num_workers_per_iterator: int = -2
-    max_samples_per_stream: int = -2
-    rate_limiter_timeout_ms: int = -2
-    get_signature_timeout_secs: Optional[int] = None
-
-
-def test_init_transition_dataset() -> None:
+def test_init_transition_dataset(transition_dataset:TransitionDataset) -> None:
     """Test initiator of TransitionDataset component"""
-    transition_dataset = TransitionDataset(config=TransitionDatasetConfigTest)  # type: ignore
-
     assert transition_dataset.config.sample_batch_size == 512
     assert transition_dataset.config.prefetch_size is None
     assert transition_dataset.config.num_parallel_calls == 24
@@ -136,10 +139,8 @@ def test_on_building_trainer_dataset_transition_dataset(
     )
 
 
-def test_init_trajectory_dataset() -> None:
+def test_init_trajectory_dataset(trajectory_dataset: TrajectoryDataset) -> None:
     """Test initiator of TrajectoryDataset component"""
-    trajectory_dataset = TrajectoryDataset(config=TrajectoryDatasetConfigTest)  # type: ignore
-
     assert trajectory_dataset.config.sample_batch_size == 512
     assert trajectory_dataset.config.max_in_flight_samples_per_worker == 1024
     assert trajectory_dataset.config.num_workers_per_iterator == -2
