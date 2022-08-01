@@ -64,6 +64,7 @@ executor = DesignSpec(
 # Test executor in isolation.
 class MockExecutorParameterClient(ExecutorParameterClient):
     """Mock ExecutorParameterClient"""
+
     def __init__(
         self,
         config: ExecutorParameterClientConfig = ExecutorParameterClientConfig(),
