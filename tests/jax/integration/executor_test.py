@@ -19,7 +19,6 @@ import functools
 from types import SimpleNamespace
 from typing import Any, Dict, Tuple
 
-import acme
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -28,7 +27,9 @@ from mava.components.jax import building, executing
 from mava.components.jax.building.adders import (
     ParallelSequenceAdderSignature,
     UniformAdderPriority,
+    ParallelTransitionAdder
 )
+
 from mava.components.jax.building.data_server import OnPolicyDataServer
 from mava.components.jax.building.distributor import Distributor
 from mava.components.jax.building.parameter_client import (
@@ -93,7 +94,6 @@ class MockExecutorParameterClient(ExecutorParameterClient):
             get_async=self.get_async, add_async=self.add_async
         )
 
-
 class TestSystemExecutor(System):
     def design(self) -> Tuple[DesignSpec, Dict]:
         """Mock system design with zero components.
@@ -122,11 +122,10 @@ def test_executor_system() -> System:
     """Add description here."""
     return TestSystemExecutor()
 
-
-def test_executor(
+def test_executor_without_adder(
     test_executor_system: System,
 ) -> None:
-    """Test if the parameter server instantiates processes as expected.
+    """Test if the executor instantiates processes as expected in the case without adder.
     Args:
         test_exec
     """
@@ -185,6 +184,71 @@ def test_executor(
     # Observe (without adder)
     assert not hasattr(executor._executor.store.adder, "add")
 
+@pytest.mark.skip
+def test_executor_with_adder(
+    test_executor_system: System,
+) -> None:
+    """Test if the executor instantiates processes as expected.
+    Args:
+        test_exec
+    """
+
+    # Environment.
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name="simple_spread",
+        action_space="discrete",
+    )
+
+    # Networks.
+    network_factory = mappo.make_default_networks
+    
+    # Build the system
+    test_executor_system.build(
+        environment_factory=environment_factory, network_factory=network_factory
+    )
+    #Adder
+    adder=ParallelTransitionAdder()
+    adder.on_building_executor_adder(test_executor_system._builder)
+
+    (
+        data_server,
+        parameter_server,
+        executor,
+        evaluator,
+        trainer,
+    ) = test_executor_system._builder.store.system_build
+
+    assert isinstance(executor, DetailedPerAgentStatistics)
+
+    # Run an episode
+    executor.run_episode()
+
+    # Observe first 
+    assert executor._executor.store.adder._add_first_called==True
+
+    # Select actions and select action
+    assert list(executor._executor.store.actions_info.keys()) == [
+        "agent_0",
+        "agent_1",
+        "agent_2",
+    ]
+    assert list(executor._executor.store.policies_info.keys()) == [
+        "agent_0",
+        "agent_1",
+        "agent_2",
+    ]
+    assert (
+        lambda: x in range(0, len(executor._executor.store.observations.legal_actions))
+        for x in list(executor._executor.store.actions_info.values())
+    )
+    assert (
+        lambda: key == "log_prob"
+        for key in executor._executor.store.policies_info.values()
+    )
+
+    # Observe 
+    assert not hasattr(executor._executor.store.adder, "add")
 
 #########################################################################
 # Integration test for the executor, variable_client and variable_server.
@@ -254,7 +318,6 @@ def test_executor_parameter_server(
     parameter_server.set_parameters(
         {"evaluator_steps": np.full(1, 1234, dtype=np.int32)}
     )
-
     assert isinstance(executor, DetailedPerAgentStatistics)
 
     # Run an episode
