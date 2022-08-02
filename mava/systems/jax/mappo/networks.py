@@ -106,19 +106,19 @@ class ValueHead(hk.Module):
         self,
         name: Optional[str] = None,
     ):
-        """_summary_"""
+        """Initialize the class"""
         super().__init__(name=name)
         self._value_layer = hk.Linear(1)
 
     def __call__(self, inputs: jnp.ndarray) -> Any:
-        """_summary_"""
+        """Return output given network inputs."""
         value = jnp.squeeze(self._value_layer(inputs), axis=-1)
         return value
 
 
 @dataclasses.dataclass
 class PPOSeparateNetworks:
-    """TODO: Add description here."""
+    """Separate policy and critic networks for IPPO."""
 
     def __init__(
         self,
@@ -130,7 +130,23 @@ class PPOSeparateNetworks:
         entropy: Optional[EntropyFn] = None,
         sample: Optional[networks_lib.SampleFn] = None,
     ) -> None:
-        """TODO: Add description here."""
+        """Initiliaze networks class
+
+        Args:
+            policy_network: network to be used by the policy
+            policy_params: parameters for the policy network
+            critic_network: network to be used by the critic
+            critic_params: parameters for the critic network
+            log_prob: lambda function for getting the log probability of
+                a particular action from a distribution.
+                Defaults to None.
+            entropy: lambda function for getting the entropy of
+                a particular distribution.
+                Defaults to None.
+            sample: lambda function for sampling an action
+                from a distribution.
+                Defaults to None.
+        """
         self.policy_network = policy_network
         self.policy_params = policy_params
         self.critic_network = critic_network
@@ -146,7 +162,21 @@ class PPOSeparateNetworks:
             key: networks_lib.PRNGKey,
             mask: chex.Array = None,
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
-            """TODO: Add description here."""
+            """Get actions and relevant log probabilities from the \
+                policy network given some observations.
+
+            Args:
+                policy_params: parameters of the policy network
+                observations: agent observations
+                key: jax random key for sampling from the policy
+                    distribution
+                mask: optional mask for selecting only legal actions
+                    Defaults to None.
+
+            Returns:
+                Tuple (actions, log_prob): sampled actions and relevant
+                    log probabilities of sampled actions
+            """
             # The parameters of the network might change. So it has to
             # be fed into the jitted function.
             distribution = self.policy_network.apply(policy_params, observations)
@@ -166,14 +196,14 @@ class PPOSeparateNetworks:
         key: networks_lib.PRNGKey,
         mask: chex.Array = None,
     ) -> Tuple[np.ndarray, Dict]:
-        """TODO: Add description here."""
+        """Get actions from policy network given observations."""
         actions, log_prob = self.forward_fn(self.policy_params, observations, key, mask)
         actions = np.array(actions, dtype=np.int64)
         log_prob = np.squeeze(np.array(log_prob, dtype=np.float32))
         return actions, {"log_prob": log_prob}
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
-        """TODO: Add description here."""
+        """Get state value from critic network given observations."""
         value = self.critic_network.apply(self.critic_params, observations)
         return value
 
@@ -181,7 +211,8 @@ class PPOSeparateNetworks:
 def make_ppo_network(
     network: networks_lib.FeedForwardNetwork, params: Dict[str, jnp.ndarray]
 ) -> PPONetworks:
-    """TODO: Add description here."""
+    """Instantiate PPO network class which has shared hidden layers with unique\
+        policy and value heads."""
     return PPONetworks(
         network=network,
         params=params,
@@ -197,7 +228,8 @@ def make_ppo_networks(
     critic_network: networks_lib.FeedForwardNetwork,
     critic_params: Dict[str, jnp.ndarray],
 ) -> PPOSeparateNetworks:
-    """TODO: Add description here."""
+    """Instantiate PPO networks class which has separate policy and \
+        critic networks."""
     return PPOSeparateNetworks(
         policy_network=policy_network,
         policy_params=policy_params,
@@ -221,7 +253,11 @@ def make_networks(
     observation_network: Callable = utils.batch_concat,
     single_network: bool = True,
 ) -> Union[PPONetworks, PPOSeparateNetworks]:
-    """TODO: Add description here."""
+    """Function for creating PPO networks to be used.
+
+    These networks will be different depending on whether the
+    environment has a discrete or continuous action space.
+    """
     if isinstance(spec.actions, specs.DiscreteArray):
         return make_discrete_networks(
             environment_spec=spec,
@@ -249,7 +285,23 @@ def make_discrete_networks(
     single_network: bool = True,
     # default behaviour is to flatten observations
 ) -> Union[PPONetworks, PPOSeparateNetworks]:
-    """TODO: Add description here."""
+    """Create PPO network for environments with discrete action spaces.
+
+    Args:
+        environment_spec: environment spec
+        key: jax random key for initializing network parameters
+        policy_layer_sizes: sizes of hidden layers for the policy network
+        critic_layer_sizes: sizes of hidden layers for the critic network
+        observation_network: optional network for processing observations.
+            Defaults to utils.batch_concat.
+        single_network: True if shared layer network with separate heads should be used
+            for policy and critic and False if separate policy and critic networks
+            should be used.
+            Defaults to True.
+
+    Returns:
+        PPONetworks class
+    """
 
     num_actions = environment_spec.actions.num_values
 
@@ -354,7 +406,7 @@ def make_default_networks(
                              defaults to flattening observations but could be
                              a CNN or similar observation processing network
         single_network: details whether a single network with a policy and value
-                        heads should be used if true or whether separate policy
+                        head should be used if true or whether separate policy
                         and critic networks should be used if false.
     """
 
