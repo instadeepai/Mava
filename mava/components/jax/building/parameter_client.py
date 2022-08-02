@@ -224,18 +224,19 @@ class ExecutorParameterClientSeparateNetworks(BaseParameterClient):
         params = {}
         get_keys = []
         net_type_key = "networks"
+
         for agent_net_key in builder.store.networks[net_type_key].keys():
-            param_key = f"policy_{net_type_key}-{agent_net_key}"
-            params[param_key] = builder.store.networks[net_type_key][
+            policy_param_key = f"policy_{net_type_key}-{agent_net_key}"
+            params[policy_param_key] = builder.store.networks[net_type_key][
                 agent_net_key
             ].policy_params
-            get_keys.append(param_key)
-        for agent_net_key in builder.store.networks[net_type_key].keys():
-            param_key = f"critic_{net_type_key}-{agent_net_key}"
-            params[param_key] = builder.store.networks[net_type_key][
+            get_keys.append(policy_param_key)
+
+            critic_param_key = f"critic_{net_type_key}-{agent_net_key}"
+            params[critic_param_key] = builder.store.networks[net_type_key][
                 agent_net_key
             ].critic_params
-            get_keys.append(param_key)
+            get_keys.append(critic_param_key)
 
         count_names, params = self._set_up_count_parameters(params=params)
 
