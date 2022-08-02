@@ -177,6 +177,10 @@ def make_networks(
     Returns:
         make_discrete_networks: function to create a discrete network
         make_continuous_networks: function to create a continuous network
+
+    Raises:
+        NotImplementedError: Raises an error if continous network is not
+                        available
     """
     if isinstance(spec.actions, specs.DiscreteArray):
         return make_discrete_networks(
