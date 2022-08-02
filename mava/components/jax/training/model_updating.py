@@ -352,10 +352,10 @@ class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
                 minibatch.behavior_values,
             )
 
-            # Update the policy networks and optimizers.
             metrics = {}
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
+                # Update the policy networks and optimizers.
                 # Apply updates
                 # TODO (dries): Use one optimizer per network type here and not
                 # just one.
@@ -398,8 +398,8 @@ class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
                 critic_agent_metrics[agent_key][
                     "norm_critic_updates"
                 ] = optax.global_norm(critic_updates)
-                # TODO: double check that this was done correctly
-                metrics[agent_key].update(critic_agent_metrics)
+                # TODO (Ruan): double check that this was done correctly
+                metrics[agent_key].update(critic_agent_metrics[agent_key])
 
             return (
                 policy_params,
