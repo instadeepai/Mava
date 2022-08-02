@@ -57,9 +57,6 @@ class PPONetworks:
             log_prob: function used to calculate the log prob of an agent's action.
             entropy: function used to calculate the entropy of the agent policy.
             sample: function used to select an action from the policy.
-
-        Returns:
-            None.
         """
         self.network = network
         self.params = params
