@@ -26,10 +26,9 @@ import pytest
 from mava.components.jax import building, executing
 from mava.components.jax.building.adders import (
     ParallelSequenceAdderSignature,
+    ParallelTransitionAdder,
     UniformAdderPriority,
-    ParallelTransitionAdder
 )
-
 from mava.components.jax.building.data_server import OnPolicyDataServer
 from mava.components.jax.building.distributor import Distributor
 from mava.components.jax.building.parameter_client import (
@@ -94,6 +93,7 @@ class MockExecutorParameterClient(ExecutorParameterClient):
             get_async=self.get_async, add_async=self.add_async
         )
 
+
 class TestSystemExecutor(System):
     def design(self) -> Tuple[DesignSpec, Dict]:
         """Mock system design with zero components.
@@ -121,6 +121,7 @@ class TestSystemExecutor(System):
 def test_executor_system() -> System:
     """Add description here."""
     return TestSystemExecutor()
+
 
 def test_executor_without_adder(
     test_executor_system: System,
@@ -184,6 +185,7 @@ def test_executor_without_adder(
     # Observe (without adder)
     assert not hasattr(executor._executor.store.adder, "add")
 
+
 @pytest.mark.skip
 def test_executor_with_adder(
     test_executor_system: System,
@@ -202,13 +204,13 @@ def test_executor_with_adder(
 
     # Networks.
     network_factory = mappo.make_default_networks
-    
+
     # Build the system
     test_executor_system.build(
         environment_factory=environment_factory, network_factory=network_factory
     )
-    #Adder
-    adder=ParallelTransitionAdder()
+    # Adder
+    adder = ParallelTransitionAdder()
     adder.on_building_executor_adder(test_executor_system._builder)
 
     (
@@ -224,8 +226,8 @@ def test_executor_with_adder(
     # Run an episode
     executor.run_episode()
 
-    # Observe first 
-    assert executor._executor.store.adder._add_first_called==True
+    # Observe first
+    assert executor._executor.store.adder._add_first_called == True
 
     # Select actions and select action
     assert list(executor._executor.store.actions_info.keys()) == [
@@ -247,8 +249,9 @@ def test_executor_with_adder(
         for key in executor._executor.store.policies_info.values()
     )
 
-    # Observe 
+    # Observe
     assert not hasattr(executor._executor.store.adder, "add")
+
 
 #########################################################################
 # Integration test for the executor, variable_client and variable_server.
