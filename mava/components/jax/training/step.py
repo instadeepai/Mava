@@ -515,8 +515,8 @@ class MAPGWithTrustRegionStepSeparateNetworks(Step):
             # server.
             trainer.store.key = new_states.random_key
 
-            # TODO (Ruan): this could probably be done in one loop
-            # instead of a different policy and critic loop to save time
+            # These updates must remain separate for loops since the policy and critic
+            # networks could have different layers.
             networks = trainer.store.networks["networks"]
 
             policy_params = {
