@@ -25,10 +25,10 @@ from mava.systems.jax.mappo.config import MAPPODefaultConfig
 
 class MAPPOSystemSeparateNetworks(System):
     def design(self) -> Tuple[DesignSpec, Any]:
-        """Mock system design with zero components.
+        """System design for PPO with separate policy and critic networks.
 
         Returns:
-            system callback components
+            system callback components, default system parameters
         """
         # Set the default configs
         default_params = MAPPODefaultConfig()

@@ -206,19 +206,25 @@ class ExecutorParameterClientSeparateNetworks(BaseParameterClient):
         self,
         config: ExecutorParameterClientConfig = ExecutorParameterClientConfig(),
     ) -> None:
-        """Parameter client
+        """Component creates a parameter client for the executor.
+
+        Particularly for a PPO system with separate networks for the
+        policy and critic.
 
         Args:
-            config : parameter client config
+            config: ExecutorParameterClientConfig.
         """
 
         self.config = config
 
     def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Create and store the executor parameter client.
+
+        Gets network parameters from store and registers them for tracking.
+        Also works for the evaluator.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
         """
         # Create policy parameters
         params = {}
@@ -289,19 +295,24 @@ class TrainerParameterClientSeparateNetworks(BaseParameterClient):
         self,
         config: TrainerParameterClientConfig = TrainerParameterClientConfig(),
     ) -> None:
-        """Parameter client
+        """Component creates a parameter client for the trainer.
+
+        Particularly for a PPO system with separate networks for the
+        policy and critic.
 
         Args:
-            config : parameter client config
+            config : TrainerParameterClientConfig.
         """
 
         self.config = config
 
     def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Create and store the trainer parameter client.
+
+        Gets network parameters from store and registers them for tracking.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
         """
         # Create parameter client
         params = {}

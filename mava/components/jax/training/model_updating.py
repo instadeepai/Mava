@@ -272,15 +272,28 @@ class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
         self,
         config: MAPGMinibatchUpdateSeparateNetworksConfig = MAPGMinibatchUpdateSeparateNetworksConfig(),  # noqa: E501
     ):
-        """_summary_
+        """Component defines a multi-agent policy gradient mini-batch update.
+
+        Particularly for a PPO system with separate networks for the
+        policy and critic.
 
         Args:
-            config : _description_.
+            config : MAPGMinibatchUpdateSeparateNetworksConfig
         """
         self.config = config
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """_summary_"""
+        """Create and store MAPG mini-batch update function.
+
+        Creates a default critic and policy optimizers if none
+        are provided in the config.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
 
         if not self.config.policy_optimizer:
             trainer.store.policy_optimizer = optax.chain(
@@ -431,15 +444,25 @@ class MAPGEpochUpdateSeparateNetworks(EpochUpdate):
         self,
         config: MAPGEpochUpdateSeparateNetworksConfig = MAPGEpochUpdateSeparateNetworksConfig(),  # noqa: E501
     ):
-        """_summary_
+        """Component defines a multi-agent policy gradient epoch-level update.
+
+        Particularly for a PPO system with separate networks
+        for the policy and critic.
 
         Args:
-            config : _description_.
+            config: MAPGEpochUpdateSeparateNetworksConfig
         """
         self.config = config
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """_summary_"""
+        """Define and store the epoch update function.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
         trainer.store.num_epochs = self.config.num_epochs
         trainer.store.num_minibatches = self.config.num_minibatches
 

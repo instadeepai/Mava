@@ -168,15 +168,25 @@ class MAPGWithTrustRegionClippingLossSeparateNetworks(Loss):
         self,
         config: MAPGTrustRegionClippingLossSeparateNetworksConfig = MAPGTrustRegionClippingLossSeparateNetworksConfig(),  # noqa: E501
     ):
-        """_summary_
+        """Component defines a MAPGWithTrustRegionClipping loss function.
+
+        Specifically for a PPO system where the policy and critic networks
+        are separate.
 
         Args:
-            config : _description_.
+            config : MAPGTrustRegionClippingLossSeparateNetworksConfig
         """
         self.config = config
 
     def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
-        """_summary_"""
+        """Create and store MAPGWithTrustRegionClippingLossSeparateNetworks loss function.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
 
         def policy_loss_grad_fn(
             policy_params: Any,
@@ -185,7 +195,19 @@ class MAPGWithTrustRegionClippingLossSeparateNetworks(Loss):
             behaviour_log_probs: Dict[str, jnp.ndarray],
             advantages: Dict[str, jnp.ndarray],
         ) -> Tuple[Dict[str, jnp.ndarray], Dict[str, Dict[str, jnp.ndarray]]]:
-            """Surrogate loss using clipped probability ratios."""
+            """Surrogate loss using clipped probability ratios.
+
+            Args:
+                policy_params: policy network parameters.
+                observations: agent observations.
+                actions: actions the agents took.
+                behaviour_log_probs: Log probabilities of actions taken by
+                    current policy in the environment.
+                advantages: advantage estimation values per agent.
+
+            Returns:
+                Tuple[policy gradients, policy loss information]
+            """
 
             policy_grads = {}
             loss_info_policy = {}
@@ -202,6 +224,7 @@ class MAPGWithTrustRegionClippingLossSeparateNetworks(Loss):
                     behaviour_log_probs: jnp.ndarray,
                     advantages: jnp.ndarray,
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
+                    """Inner policy loss function: see outer function for parameters."""
                     distribution_params = network.policy_network.apply(
                         policy_params, observations
                     )
@@ -250,7 +273,20 @@ class MAPGWithTrustRegionClippingLossSeparateNetworks(Loss):
             target_values: Dict[str, jnp.ndarray],
             behavior_values: Dict[str, jnp.ndarray],
         ) -> Tuple[Dict[str, jnp.ndarray], Dict[str, Dict[str, jnp.ndarray]]]:
-            """Surrogate loss using clipped probability ratios."""
+            """Clipped critic loss.
+
+            Args:
+                critic_params: critic network parameters.
+                observations: agent observations.
+                actions: actions the agents took.
+                target_values: target values to be used for optimizing the
+                    critic network.
+                behaviour_values: state values computed for observations
+                    using the current critic network in the environment.
+
+            Returns:
+                Tuple[critic gradients, critic loss information]
+            """
 
             critic_grads = {}
             loss_info_critic = {}
@@ -264,6 +300,7 @@ class MAPGWithTrustRegionClippingLossSeparateNetworks(Loss):
                     target_values: jnp.ndarray,
                     behavior_values: jnp.ndarray,
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
+                    """Inner critic loss function: see outer function for parameters."""
 
                     values = network.critic_network.apply(critic_params, observations)
 

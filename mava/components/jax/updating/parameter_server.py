@@ -211,18 +211,30 @@ class ParameterServerSeparateNetworks(DefaultParameterServer):
         self,
         config: ParameterServerConfig = ParameterServerConfig(),
     ) -> None:
-        """Mock system Component."""
+        """Mava parameter server.
+
+        For a system with separate networks for the policy
+        and critic.
+
+        Registers count parameters and network params for tracking.
+        Creates the checkpointer.
+        Handles the getting, setting, and adding of parameters.
+        Handles periodic checkpointing of parameters.
+
+        Args:
+            config: ParameterServerConfig.
+        """
         self.config = config
 
     def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
-        """_summary_
+        """Register parameters and network params to track. Create checkpointer.
 
         Args:
-            server : _description_
+            server: SystemParameterServer.
         """
         networks = server.store.network_factory()
 
-        # # Create parameters
+        # Create parameters
         server.store.parameters = {
             "trainer_steps": np.zeros(1, dtype=np.int32),
             "trainer_walltime": np.zeros(1, dtype=np.float32),
