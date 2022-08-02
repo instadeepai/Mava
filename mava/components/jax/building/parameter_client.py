@@ -312,22 +312,20 @@ class TrainerParameterClientSeparateNetworks(BaseParameterClient):
 
         for net_type_key in builder.store.networks.keys():
             for net_key in builder.store.networks[net_type_key].keys():
+
                 params[f"policy_{net_type_key}-{net_key}"] = builder.store.networks[
                     net_type_key
                 ][net_key].policy_params
-                if net_key in set(trainer_networks):
-                    set_keys.append(f"policy_{net_type_key}-{net_key}")
-                else:
-                    get_keys.append(f"policy_{net_type_key}-{net_key}")
 
-        for net_type_key in builder.store.networks.keys():
-            for net_key in builder.store.networks[net_type_key].keys():
                 params[f"critic_{net_type_key}-{net_key}"] = builder.store.networks[
                     net_type_key
                 ][net_key].critic_params
+
                 if net_key in set(trainer_networks):
+                    set_keys.append(f"policy_{net_type_key}-{net_key}")
                     set_keys.append(f"critic_{net_type_key}-{net_key}")
                 else:
+                    get_keys.append(f"policy_{net_type_key}-{net_key}")
                     get_keys.append(f"critic_{net_type_key}-{net_key}")
 
         # Add the optimizers to the variable server.
