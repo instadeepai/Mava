@@ -59,7 +59,6 @@ class MAPPOSystemSeparateNetworks(System):
             epoch_update=training.MAPGEpochUpdateSeparateNetworks,
             minibatch_update=training.MAPGMinibatchUpdateSeparateNetworks,
             sgd_step=training.MAPGWithTrustRegionStepSeparateNetworks,
-            # still look at merging for loops for above component
             step=training.DefaultTrainerStep,
             trainer_dataset=building.TrajectoryDataset,
         ).get()
@@ -75,9 +74,7 @@ class MAPPOSystemSeparateNetworks(System):
         parameter_server_process = DesignSpec(
             parameter_server=updating.ParameterServerSeparateNetworks,
             executor_parameter_client=building.ExecutorParameterClientSeparateNetworks,
-            # still look at merging for loops for above component
             trainer_parameter_client=building.TrainerParameterClientSeparateNetworks,
-            # still look at merging for loops for above component
             termination_condition=updating.CountConditionTerminator,
         ).get()
 
