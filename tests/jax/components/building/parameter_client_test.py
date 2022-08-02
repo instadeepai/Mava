@@ -103,7 +103,9 @@ def mock_builder_with_parameter_client() -> Builder:
     builder.store.trainer_id = "trainer_0"
 
     builder.store.parameter_server_client = ParameterServer(
-        store=SimpleNamespace(get_parameters={"key_1": 1}),
+        store=SimpleNamespace(
+            get_parameters={"trainer_steps": np.array(0, dtype=np.int32)}
+        ),
         components=[],
     )
 
