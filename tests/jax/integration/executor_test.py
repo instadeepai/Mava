@@ -16,17 +16,12 @@
 """Tests for executor class for Jax-based Mava systems"""
 
 import functools
-from types import SimpleNamespace
-from typing import Any, Dict, Tuple
-from dm_env import TimeStep
-import jax.numpy as jnp
-import numpy as np
+from typing import Dict, Tuple
 import pytest
-
+from mava.types import OLT
 from mava.components.jax import building, executing
 from mava.components.jax.building.adders import (
     ParallelSequenceAdderSignature,
-    ParallelSequenceAdder,
     UniformAdderPriority,
 )
 from mava.components.jax.building.data_server import OnPolicyDataServer
@@ -36,13 +31,11 @@ from mava.components.jax.building.parameter_client import (
     ExecutorParameterClientConfig,
 )
 from mava.components.jax.updating.parameter_server import DefaultParameterServer
-from mava.core_jax import SystemBuilder
 from mava.specs import DesignSpec
 from mava.systems.jax import mappo
 from mava.systems.jax.mappo.components import ExtrasLogProbSpec
 from mava.systems.jax.system import System
 from mava.utils.environments import debugging_utils
-from mava.wrappers.environment_loop_wrappers import DetailedPerAgentStatistics
 from tests.jax import mocks
 
 system_init = DesignSpec(
@@ -60,399 +53,9 @@ executor = DesignSpec(
 ).get()
 
 
-#########################################################################
-# Test executor in isolation.
-class MockExecutorParameterClient(ExecutorParameterClient):
-    """Mock ExecutorParameterClient"""
-
-    def __init__(
-        self,
-        config: ExecutorParameterClientConfig = ExecutorParameterClientConfig(),
-    ) -> None:
-        super().__init__(config)
-        self.call_get_async: bool = False
-        self.call_add_async: bool = False
-
-    def get_async(self) -> None:
-        self.call_get_async = True
-
-    def add_async(self, added_async: Any) -> None:
-        self.added_async = added_async
-        self.call_add_async = True
-
-    def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
-        builder.store.executor_counts = {
-            "trainer_steps": jnp.array(0),
-            "trainer_walltime": jnp.array(0.0),
-            "evaluator_steps": jnp.array(0),
-            "evaluator_episodes": jnp.array(0),
-            "executor_episodes": jnp.array(0),
-            "executor_steps": jnp.array(0),
-        }
-        builder.store.executor_parameter_client = SimpleNamespace(
-            get_async=self.get_async, add_async=self.add_async
-        )
-
-class MockAdder:
-    def __init__(self) -> None:
-        self._add_first_called =False
-        self._add_called=False
-
-    def add_first(self, timestep: TimeStep, extras: Dict[str, Any]) -> None:
-        self._add_first_called= True
-
-    def add(
-        self,
-        actions: Dict[str, Any],
-        next_timestep: TimeStep,
-        next_extras: Dict[str, Any],
-    ) -> None:
-        self._add_called=True
-
-class TestSystemExecutor(System):
-    def design(self) -> Tuple[DesignSpec, Dict]:
-        """Mock system design with zero components.
-
-        Returns:
-            system callback components
-        """
-        components = DesignSpec(
-            **system_init,
-            data_server=mocks.MockOnPolicyDataServer,
-            data_server_adder_signature=ParallelSequenceAdderSignature,
-            parameter_server=mocks.MockParameterServer,
-            executor_parameter_client=MockExecutorParameterClient,
-            trainer_parameter_client=mocks.MockTrainerParameterClient,
-            logger=mocks.MockLogger,
-            **executor,
-            trainer=mocks.MockTrainer,
-            trainer_dataset=mocks.MockTrainerDataset,
-            distributor=mocks.MockDistributor,
-        )
-        return components, {}
-
-
-@pytest.fixture
-def test_executor_system() -> System:
-    """Add description here."""
-    return TestSystemExecutor()
-
-
-def test_executor_without_adder(
-    test_executor_system: System,
-) -> None:
-    """Test if the executor instantiates processes as expected in the case without adder.
-    Args:
-        test_exec
-    """
-
-    # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name="simple_spread",
-        action_space="discrete",
-    )
-
-    # Networks.
-    network_factory = mappo.make_default_networks
-
-    # Build the system
-    test_executor_system.build(
-        environment_factory=environment_factory, network_factory=network_factory
-    )
-
-    (
-        data_server,
-        parameter_server,
-        executor,
-        evaluator,
-        trainer,
-    ) = test_executor_system._builder.store.system_build
-
-    assert isinstance(executor, DetailedPerAgentStatistics)
-
-    # Run an episode
-    executor.run_episode()
-
-    # Observe first (without adder)
-    assert not hasattr(executor._executor.store.adder, "_add_first_called")
-
-    # Select actions and select action
-    assert list(executor._executor.store.actions_info.keys()) == [
-        "agent_0",
-        "agent_1",
-        "agent_2",
-    ]
-    assert list(executor._executor.store.policies_info.keys()) == [
-        "agent_0",
-        "agent_1",
-        "agent_2",
-    ]
-    assert (
-        lambda: x in range(0, len(executor._executor.store.observations.legal_actions))
-        for x in list(executor._executor.store.actions_info.values())
-    )
-    assert (
-        lambda: key == "log_prob"
-        for key in executor._executor.store.policies_info.values()
-    )
-
-    # Observe (without adder)
-    assert not hasattr(executor._executor.store.adder, "add")
-
-
-def test_executor_with_adder(
-    test_executor_system: System,
-) -> None:
-    """Test if the executor instantiates processes as expected.
-    Args:
-        test_exec
-    """
-
-    # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name="simple_spread",
-        action_space="discrete",
-    )
-
-    # Networks.
-    network_factory = mappo.make_default_networks
-
-    # Build the system
-    test_executor_system.build(
-        environment_factory=environment_factory, network_factory=network_factory
-    )
-    (
-        data_server,
-        parameter_server,
-        executor,
-        evaluator,
-        trainer,
-    ) = test_executor_system._builder.store.system_build
-
-    assert isinstance(executor, DetailedPerAgentStatistics)
-
-    # Adder
-    adder=MockAdder()
-    executor._executor.store.adder=adder
-    # Run an episode
-    executor.run_episode()
-
-    # Observe first
-    assert executor._executor.store.adder._add_first_called == True
-
-    # Select actions and select action
-    assert list(executor._executor.store.actions_info.keys()) == [
-        "agent_0",
-        "agent_1",
-        "agent_2",
-    ]
-    assert list(executor._executor.store.policies_info.keys()) == [
-        "agent_0",
-        "agent_1",
-        "agent_2",
-    ]
-    assert (
-        lambda: x in range(0, len(executor._executor.store.observations.legal_actions))
-        for x in list(executor._executor.store.actions_info.values())
-    )
-    assert (
-        lambda: key == "log_prob"
-        for key in executor._executor.store.policies_info.values()
-    )
-
-    # Observe
-    assert executor._executor.store.adder._add_called == True
-
-
-#########################################################################
-# Integration test for the executor, variable_client and variable_server.
-class TestSystemExecutorAndParameterSever(System):
-    def design(self) -> Tuple[DesignSpec, Dict]:
-        """Mock system design with zero components.
-
-        Returns:
-            system callback components
-        """
-        components = DesignSpec(
-            **system_init,
-            data_server=mocks.MockOnPolicyDataServer,
-            data_server_adder_signature=ParallelSequenceAdderSignature,
-            parameter_server=DefaultParameterServer,
-            executor_parameter_client=ExecutorParameterClient,
-            trainer_parameter_client=mocks.MockTrainerParameterClient,
-            logger=mocks.MockLogger,
-            **executor,
-            trainer=mocks.MockTrainer,
-            trainer_dataset=mocks.MockTrainerDataset,
-            distributor=mocks.MockDistributor,
-        )
-        return components, {}
-
-
-@pytest.fixture
-def test_executor_parameter_server_system() -> System:
-    """Add description here."""
-    return TestSystemExecutorAndParameterSever()
-
-
-def test_executor_parameter_server_without_adder(
-    test_executor_parameter_server_system: System,
-) -> None:
-    """Test if the parameter server and executor instantiates processes 
-    as expected Case without adder"""
-
-    # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name="simple_spread",
-        action_space="discrete",
-    )
-
-    # Networks.
-    network_factory = mappo.make_default_networks
-
-    # Build the system
-    test_executor_parameter_server_system.build(
-        environment_factory=environment_factory,
-        network_factory=network_factory,
-        executor_parameter_update_period=20,
-    )
-
-    (
-        data_server,
-        parameter_server,
-        executor,
-        evaluator,
-        trainer,
-    ) = test_executor_parameter_server_system._builder.store.system_build
-
-    # Save the executor policy
-    parameters = executor._executor.store.executor_parameter_client._parameters
-
-    # Change a variable in the policy network
-    parameter_server.set_parameters(
-        {"evaluator_steps": np.full(1, 1234, dtype=np.int32)}
-    )
-    assert isinstance(executor, DetailedPerAgentStatistics)
-
-    # Run an episode
-    executor.run_episode()
-
-    # Observe first (without adder)
-    assert not hasattr(executor._executor.store.adder, "_add_first_called")
-
-    # Select actions and select action
-    assert list(executor._executor.store.actions_info.keys()) == [
-        "agent_0",
-        "agent_1",
-        "agent_2",
-    ]
-    assert list(executor._executor.store.policies_info.keys()) == [
-        "agent_0",
-        "agent_1",
-        "agent_2",
-    ]
-    assert (
-        lambda: x in range(0, len(executor._executor.store.observations.legal_actions))
-        for x in list(executor._executor.store.actions_info.values())
-    )
-    assert (
-        lambda: key == "log_prob"
-        for key in executor._executor.store.policies_info.values()
-    )
-
-    # Observe (without adder)
-    assert not hasattr(executor._executor.store.adder, "add")
-
-    # Check if the executor variable has changed.
-    parameters = executor._executor.store.executor_parameter_client._parameters
-    assert parameters["evaluator_steps"] == 1234
-
-def test_executor_parameter_server(
-    test_executor_parameter_server_system: System,
-) -> None:
-    """Test if the parameter server and executor instantiates processes 
-    as expected Case with adder"""
-
-    # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name="simple_spread",
-        action_space="discrete",
-    )
-
-    # Networks.
-    network_factory = mappo.make_default_networks
-
-    # Build the system
-    test_executor_parameter_server_system.build(
-        environment_factory=environment_factory,
-        network_factory=network_factory,
-        executor_parameter_update_period=20,
-    )
-
-    #Adder
-    adder = ParallelSequenceAdder()
-    adder.on_building_executor_adder(test_executor_parameter_server_system._builder)
-    
-
-    (
-        data_server,
-        parameter_server,
-        executor,
-        evaluator,
-        trainer,
-    ) = test_executor_parameter_server_system._builder.store.system_build
-
-    # Save the executor policy
-    parameters = executor._executor.store.executor_parameter_client._parameters
-
-    # Change a variable in the policy network
-    parameter_server.set_parameters(
-        {"evaluator_steps": np.full(1, 1234, dtype=np.int32)}
-    )
-    assert isinstance(executor, DetailedPerAgentStatistics)
-
-    # Run an episode
-    executor.run_episode()
-
-    # Observe first (without adder)
-    assert not hasattr(executor._executor.store.adder, "_add_first_called")
-
-    # Select actions and select action
-    assert list(executor._executor.store.actions_info.keys()) == [
-        "agent_0",
-        "agent_1",
-        "agent_2",
-    ]
-    assert list(executor._executor.store.policies_info.keys()) == [
-        "agent_0",
-        "agent_1",
-        "agent_2",
-    ]
-    assert (
-        lambda: x in range(0, len(executor._executor.store.observations.legal_actions))
-        for x in list(executor._executor.store.actions_info.values())
-    )
-    assert (
-        lambda: key == "log_prob"
-        for key in executor._executor.store.policies_info.values()
-    )
-
-    # Observe (without adder)
-    assert not hasattr(executor._executor.store.adder, "add")
-
-    # Check if the executor variable has changed.
-    parameters = executor._executor.store.executor_parameter_client._parameters
-    assert parameters["evaluator_steps"] == 1234
-#########################################################################
-# Integration test for the executor, adder, data_server, variable_client
-# and variable_server.
 class TestSystemExceptTrainer(System):
     def design(self) -> Tuple[DesignSpec, Dict]:
-        """Mock system design with zero components.
+        """Mock system without trainer
 
         Returns:
             system callback components
@@ -474,16 +77,17 @@ class TestSystemExceptTrainer(System):
         return components, {}
 
 
+
 @pytest.fixture
 def test_system_except_trainer() -> System:
-    """Add description here."""
+    """Create system mock"""
     return TestSystemExceptTrainer()
 
 
-def test_except_trainer(
+def test_executor_behavior_witohut_adder(
     test_system_except_trainer: System,
 ) -> None:
-    """Test if the parameter server instantiates processes as expected."""
+    """Test if the executor instantiates processes as expected."""
 
     # Environment.
     environment_factory = functools.partial(
@@ -501,7 +105,7 @@ def test_except_trainer(
         network_factory=network_factory,
         executor_parameter_update_period=20,
         multi_process=False,
-        run_evaluator=True,
+        run_evaluator=True, #run evaluator will remove the adder
         num_executors=1,
         use_next_extras=False,
     )
@@ -514,13 +118,11 @@ def test_except_trainer(
         trainer,
     ) = test_system_except_trainer._builder.store.system_build
 
-    assert isinstance(executor, DetailedPerAgentStatistics)
-
     # Run an episode
     executor.run_episode()
 
     # Observe first (without adder)
-    assert not hasattr(executor._executor.store.adder, "_add_first_called")
+    assert executor._executor.store.adder is None
 
     # Select actions and select action
     assert list(executor._executor.store.actions_info.keys()) == [
@@ -544,3 +146,70 @@ def test_except_trainer(
 
     # Observe (without adder)
     assert not hasattr(executor._executor.store.adder, "add")
+
+
+def test_executor_behavior(
+    test_system_except_trainer: System,
+) -> None:
+    """Test if the executor instantiates processes as expected."""
+
+    # Environment.
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name="simple_spread",
+        action_space="discrete",
+    )
+
+    # Networks.
+    network_factory = mappo.make_default_networks
+
+    # Build the system
+    test_system_except_trainer.build(
+        environment_factory=environment_factory,
+        network_factory=network_factory,
+        executor_parameter_update_period=20,
+        multi_process=False,
+        run_evaluator=False,
+        num_executors=1,
+        use_next_extras=False,
+    )
+
+    (
+        data_server,
+        parameter_server,
+        executor,
+        trainer,
+    ) = test_system_except_trainer._builder.store.system_build
+
+    # Run an episode
+    executor.run_episode()
+
+    # Observe first 
+    #assert executor._executor.store.adder._add_first_called == True
+    assert list(executor._executor.store.adder._writer.history.keys())==['observations','start_of_episode','actions','rewards','discounts','extras']
+    assert list(executor._executor.store.adder._writer.history['observations'].keys())==[
+        'agent_0','agent_1', 'agent_2']
+    assert type(executor._executor.store.adder._writer.history['observations']['agent_0'])==OLT
+
+    # Select actions and select action
+    assert list(executor._executor.store.actions_info.keys()) == [
+        "agent_0",
+        "agent_1",
+        "agent_2",
+    ]
+    assert list(executor._executor.store.policies_info.keys()) == [
+        "agent_0",
+        "agent_1",
+        "agent_2",
+    ]
+    assert (
+        lambda: x in range(0, len(executor._executor.store.observations.legal_actions))
+        for x in list(executor._executor.store.actions_info.values())
+    )
+    assert (
+        lambda: key == "log_prob"
+        for key in executor._executor.store.policies_info.values()
+    )
+
+    # Observe 
+    assert hasattr(executor._executor.store.adder, "add")
