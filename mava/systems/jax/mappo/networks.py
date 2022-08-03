@@ -256,7 +256,7 @@ def make_continuous_networks(
             [
                 observation_network,
                 hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
-                networks_lib.MultivariateNormalDiagHead(specs, num_dimensions),
+                networks_lib.MultivariateNormalDiagHead(num_dimensions),
                 ClippedGaussianHead(specs),
             ]
         )
@@ -281,6 +281,8 @@ def make_continuous_networks(
     dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
 
     # print(dummy_obs.shape)
+    # print(dummy_obs)
+    # exit()
     # exit()
     network_key, key = jax.random.split(key)
     params = forward_fn.init(network_key, dummy_obs)  # type: ignore

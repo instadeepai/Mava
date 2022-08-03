@@ -101,7 +101,7 @@ def main(_: Any) -> None:
         run_evaluator=True,
         sample_batch_size=5,
         num_epochs=15,
-        num_executors=1,
+        num_executors=4,
         multi_process=True,
     )
 
