@@ -17,9 +17,11 @@
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Union
 
+import launchpad as lp
+
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
-from mava.systems.jax.launcher import Launcher, NodeType
+from mava.systems.jax.launcher import Launcher, NodeType, copy_store
 
 
 @dataclass
@@ -30,6 +32,7 @@ class DistributorConfig:
     run_evaluator: bool = True
     distributor_name: str = "System"
     terminal: str = "current_terminal"
+    lp_launch_type: Union[str, lp.LaunchType] = lp.LaunchType.LOCAL_MULTI_PROCESSING
 
 
 class Distributor(Component):
@@ -54,18 +57,19 @@ class Distributor(Component):
             nodes_on_gpu=self.config.nodes_on_gpu,
             name=self.config.distributor_name,
             terminal=self.config.terminal,
+            lp_launch_type=self.config.lp_launch_type,
         )
 
         # tables node
         data_server = builder.store.program.add(
-            builder.data_server,
+            copy_store(builder).data_server,
             node_type=NodeType.reverb,
             name="data_server",
         )
 
         # variable server node
         parameter_server = builder.store.program.add(
-            builder.parameter_server,
+            copy_store(builder).parameter_server,
             node_type=NodeType.courier,
             name="parameter_server",
         )
@@ -73,7 +77,7 @@ class Distributor(Component):
         # executor nodes
         for executor_id in range(self.config.num_executors):
             builder.store.program.add(
-                builder.executor,
+                copy_store(builder).executor,
                 [f"executor_{executor_id}", data_server, parameter_server],
                 node_type=NodeType.courier,
                 name="executor",
@@ -82,7 +86,7 @@ class Distributor(Component):
         if self.config.run_evaluator:
             # evaluator node
             builder.store.program.add(
-                builder.executor,
+                copy_store(builder).executor,
                 ["evaluator", data_server, parameter_server],
                 node_type=NodeType.courier,
                 name="evaluator",
@@ -91,7 +95,7 @@ class Distributor(Component):
         # trainer nodes
         for trainer_id in builder.store.trainer_networks.keys():
             builder.store.program.add(
-                builder.trainer,
+                copy_store(builder).trainer,
                 [trainer_id, data_server, parameter_server],
                 node_type=NodeType.courier,
                 name="trainer",

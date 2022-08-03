@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Union
 
 import launchpad as lp
 import reverb
+import copy
 
 from mava.utils import lp_utils
 
@@ -26,6 +27,10 @@ class NodeType:
     reverb = lp.ReverbNode
     courier = lp.CourierNode
 
+def copy_store(builder):
+    buildercopy = copy.copy(builder)
+    builder.store = copy.copy(builder.store)
+    return builder
 
 class Launcher:
     """This mava launcher can be used to launch multi-node systems using either single \
@@ -39,9 +44,11 @@ class Launcher:
         sp_evaluator_period: int = 10,
         name: str = "System",
         terminal: str = "current_terminal",
+        lp_launch_type: Union[
+            str, lp.LaunchType
+        ] = lp.LaunchType.LOCAL_MULTI_PROCESSING,
     ) -> None:
         """_summary_
-
         Args:
             multi_process : _description_.
             nodes_on_gpu : _description_.
@@ -49,12 +56,14 @@ class Launcher:
             sp_evaluator_period : _description_.
             name : _description_.
             terminal : terminal for launchpad processes to be shown on
+            lp_launch_type: launchpad launch type to be used by system
         """
         self._multi_process = multi_process
         self._name = name
         self._sp_trainer_period = sp_trainer_period
         self._sp_evaluator_period = sp_evaluator_period
         self._terminal = terminal
+        self._lp_launch_type = lp_launch_type
         if multi_process:
             self._program = lp.Program(name=name)
             self._nodes_on_gpu = nodes_on_gpu
@@ -76,13 +85,11 @@ class Launcher:
         name: str = "Node",
     ) -> Any:
         """_summary_
-
         Args:
             node_fn : _description_
             arguments : _description_.
             node_type : _description_.
             name : _description_.
-
         Raises:
             NotImplementedError: _description_
         Returns:
@@ -127,7 +134,6 @@ class Launcher:
 
     def launch(self) -> None:
         """_summary_
-
         Raises:
             NotImplementedError: _description_
         """
@@ -139,7 +145,7 @@ class Launcher:
 
             lp.launch(
                 self._program,
-                lp.LaunchType.LOCAL_MULTI_PROCESSING,
+                launch_type=self._lp_launch_type,
                 terminal=self._terminal,
                 local_resources=local_resources,
             )
