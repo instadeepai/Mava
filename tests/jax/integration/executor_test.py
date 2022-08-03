@@ -17,8 +17,9 @@
 
 import functools
 from typing import Dict, Tuple
+
 import pytest
-from mava.types import OLT
+
 from mava.components.jax import building, executing
 from mava.components.jax.building.adders import (
     ParallelSequenceAdderSignature,
@@ -35,6 +36,7 @@ from mava.specs import DesignSpec
 from mava.systems.jax import mappo
 from mava.systems.jax.mappo.components import ExtrasLogProbSpec
 from mava.systems.jax.system import System
+from mava.types import OLT
 from mava.utils.environments import debugging_utils
 from tests.jax import mocks
 
@@ -77,7 +79,6 @@ class TestSystemExceptTrainer(System):
         return components, {}
 
 
-
 @pytest.fixture
 def test_system_except_trainer() -> System:
     """Create system mock"""
@@ -105,7 +106,7 @@ def test_executor_behavior_witohut_adder(
         network_factory=network_factory,
         executor_parameter_update_period=20,
         multi_process=False,
-        run_evaluator=True, #run evaluator will remove the adder
+        run_evaluator=True,  # run evaluator will remove the adder
         num_executors=1,
         use_next_extras=False,
     )
@@ -184,12 +185,23 @@ def test_executor_behavior(
     # Run an episode
     executor.run_episode()
 
-    # Observe first 
-    #assert executor._executor.store.adder._add_first_called == True
-    assert list(executor._executor.store.adder._writer.history.keys())==['observations','start_of_episode','actions','rewards','discounts','extras']
-    assert list(executor._executor.store.adder._writer.history['observations'].keys())==[
-        'agent_0','agent_1', 'agent_2']
-    assert type(executor._executor.store.adder._writer.history['observations']['agent_0'])==OLT
+    # Observe first
+    # assert executor._executor.store.adder._add_first_called == True
+    assert list(executor._executor.store.adder._writer.history.keys()) == [
+        "observations",
+        "start_of_episode",
+        "actions",
+        "rewards",
+        "discounts",
+        "extras",
+    ]
+    assert list(
+        executor._executor.store.adder._writer.history["observations"].keys()
+    ) == ["agent_0", "agent_1", "agent_2"]
+    assert (
+        type(executor._executor.store.adder._writer.history["observations"]["agent_0"])
+        == OLT
+    )
 
     # Select actions and select action
     assert list(executor._executor.store.actions_info.keys()) == [
@@ -211,5 +223,5 @@ def test_executor_behavior(
         for key in executor._executor.store.policies_info.values()
     )
 
-    # Observe 
+    # Observe
     assert hasattr(executor._executor.store.adder, "add")
