@@ -146,6 +146,7 @@ def test_on_building_trainer_dataset_transition_dataset_non_max_in_flight(
         )
     )
 
+
 def test_on_building_trainer_dataset_transition_dataset_non_max_in_flight_non_batch(
     mock_builder: MockBuilder,
 ) -> None:
@@ -160,14 +161,10 @@ def test_on_building_trainer_dataset_transition_dataset_non_max_in_flight_non_ba
 
     dataset = mock_builder.store.dataset_iterator._dataset._map_func._func(1)
     assert (
-        dataset._server_address
-        == mock_builder.store.data_server_client.server_address
+        dataset._server_address == mock_builder.store.data_server_client.server_address
     )
     assert dataset._table == mock_builder.store.trainer_id
-    assert (
-        dataset._max_in_flight_samples_per_worker
-        == 100
-    )
+    assert dataset._max_in_flight_samples_per_worker == 100
     assert (
         mock_builder.store.dataset_iterator._dataset._num_parallel_calls
         == ops.convert_to_tensor(
@@ -176,6 +173,7 @@ def test_on_building_trainer_dataset_transition_dataset_non_max_in_flight_non_ba
             name="num_parallel_calls",
         )
     )
+
 
 def test_on_building_trainer_dataset_transition_dataset(
     mock_builder: MockBuilder,
@@ -187,7 +185,7 @@ def test_on_building_trainer_dataset_transition_dataset(
     """
     transition_dataset = TransitionDataset()
     transition_dataset.config.sample_batch_size = 512
-    transition_dataset.config.max_in_flight_samples_per_worker=120
+    transition_dataset.config.max_in_flight_samples_per_worker = 120
     transition_dataset.on_building_trainer_dataset(builder=mock_builder)
 
     # mock_builder.store.dataset_iterator._dataset._map_func._func(1)._dataset \
@@ -201,10 +199,7 @@ def test_on_building_trainer_dataset_transition_dataset(
     )
     assert dataset._input_dataset._table == mock_builder.store.trainer_id
     assert dataset._batch_size == transition_dataset.config.sample_batch_size
-    assert (
-        dataset._input_dataset._max_in_flight_samples_per_worker
-        == 120
-    )
+    assert dataset._input_dataset._max_in_flight_samples_per_worker == 120
     assert (
         mock_builder.store.dataset_iterator._dataset._num_parallel_calls
         == ops.convert_to_tensor(
@@ -213,6 +208,7 @@ def test_on_building_trainer_dataset_transition_dataset(
             name="num_parallel_calls",
         )
     )
+
 
 def test_init_trajectory_dataset(trajectory_dataset: TrajectoryDataset) -> None:
     """Test initiator of TrajectoryDataset component"""
