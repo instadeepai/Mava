@@ -29,7 +29,6 @@ from mava.components.jax.building.data_server import OnPolicyDataServer
 from mava.components.jax.building.distributor import Distributor
 from mava.components.jax.building.parameter_client import (
     ExecutorParameterClient,
-    ExecutorParameterClientConfig,
 )
 from mava.components.jax.updating.parameter_server import DefaultParameterServer
 from mava.specs import DesignSpec
@@ -184,11 +183,17 @@ def test_executor_behavior(
         trainer,
     ) = test_system_except_trainer._builder.store.system_build
 
+    #_writer.append needs to be called once to get _writer.history
+    #_writer.append called in observe_first and observe
+    with pytest.raises(RuntimeError):
+        assert executor._executor.store.adder._writer.history
+
     # Run an episode
     executor.run_episode()
 
     # Observe first
     # assert executor._executor.store.adder._add_first_called == True
+    assert executor._executor.store.adder._writer.history
     assert list(executor._executor.store.adder._writer.history.keys()) == [
         "observations",
         "start_of_episode",
