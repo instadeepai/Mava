@@ -30,7 +30,7 @@ class NodeType:
 
 def copy_store(builder):
     buildercopy = copy.copy(builder)
-    builder.store = copy.copy(builder.store)
+    buildercopy.store = copy.copy(builder.store)
     return buildercopy
 
 
