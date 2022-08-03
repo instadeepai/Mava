@@ -14,11 +14,11 @@
 # limitations under the License.
 
 """General launcher for systems"""
+import copy
 from typing import Any, Dict, List, Union
 
 import launchpad as lp
 import reverb
-import copy
 
 from mava.utils import lp_utils
 
@@ -27,10 +27,12 @@ class NodeType:
     reverb = lp.ReverbNode
     courier = lp.CourierNode
 
+
 def copy_store(builder):
     buildercopy = copy.copy(builder)
     builder.store = copy.copy(builder.store)
-    return builder
+    return buildercopy
+
 
 class Launcher:
     """This mava launcher can be used to launch multi-node systems using either single \
