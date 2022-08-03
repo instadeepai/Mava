@@ -15,9 +15,8 @@
 
 """Tests for TransitionDataset and TrajectoryDataset classes for Jax-based Mava"""
 
-from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict
 
 import pytest
 import reverb
