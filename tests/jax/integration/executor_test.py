@@ -136,9 +136,9 @@ def test_executor_behavior_witohut_adder(
         "agent_1",
         "agent_2",
     ]
-    num_possible_actions= environment_factory().action_spec()['agent_0'].num_values
+    num_possible_actions = environment_factory().action_spec()["agent_0"].num_values
     assert (
-        lambda: x in range(0,num_possible_actions)
+        lambda: x in range(0, num_possible_actions)
         for x in list(executor._executor.store.actions_info.values())
     )
 
@@ -216,9 +216,9 @@ def test_executor_behavior(
         "agent_1",
         "agent_2",
     ]
-    num_possible_actions= environment_factory().action_spec()['agent_0'].num_values
+    num_possible_actions = environment_factory().action_spec()["agent_0"].num_values
     assert (
-        lambda: x in range(0,num_possible_actions)
+        lambda: x in range(0, num_possible_actions)
         for x in list(executor._executor.store.actions_info.values())
     )
     assert (
