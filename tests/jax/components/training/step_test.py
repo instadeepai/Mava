@@ -342,7 +342,7 @@ def mock_trainer() -> MockTrainer:
 
 @pytest.fixture
 def dummy_sample() -> DummySample:
-    """Build fixture from DUmmySample"""
+    """Build fixture from DummySample"""
     return DummySample()
 
 
