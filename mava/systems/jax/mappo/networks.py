@@ -254,7 +254,6 @@ def make_continuous_networks(
     def forward_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
         policy_network = hk.Sequential(
             [
-                utils.batch_concat,
                 observation_network,
                 hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
                 networks_lib.MultivariateNormalDiagHead(specs, num_dimensions),
@@ -264,7 +263,6 @@ def make_continuous_networks(
 
         value_network = hk.Sequential(
             [
-                utils.batch_concat,
                 observation_network,
                 hk.nets.MLP(critic_layer_sizes, activate_final=True),
                 hk.Linear(1),
@@ -282,6 +280,8 @@ def make_continuous_networks(
     dummy_obs = utils.zeros_like(environment_spec.observations.observation)
     dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
 
+    # print(dummy_obs.shape)
+    # exit()
     network_key, key = jax.random.split(key)
     params = forward_fn.init(network_key, dummy_obs)  # type: ignore
 
