@@ -24,28 +24,23 @@ from mava.core_jax import SystemBuilder
 from mava.utils.sort_utils import sort_str_num
 
 
-def copy_builder(builder: SystemBuilder, multi_process: bool) -> SystemBuilder:
+def copy_builder(builder: SystemBuilder) -> SystemBuilder:
     """Creates a copy of the builder.
 
     Args:
         builder: Mava builder object
-        multi_process: Flag indicating whether the system is
-            running in a distributed fashion or not
 
     Returns:
         SystemBuilder: Mava builder object
     """
-    if multi_process:
-        # Note: It is unnecessary to copy when Launchpad is used.
-        return builder
-    else:
+
         # Note: Add store.program to the memo to avoid copying
         # it.
-        memo = {}
-        memo[id(builder.store.program)] = builder.store.program
-        buildercopy = copy.deepcopy(builder, memo=memo)
+    memo = {}
+    memo[id(builder.store.program)] = builder.store.program
+    buildercopy = copy.deepcopy(builder, memo=memo)
 
-        return buildercopy
+    return buildercopy
 
 
 def convert_specs(

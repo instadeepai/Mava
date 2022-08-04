@@ -23,7 +23,6 @@ from reverb import Client, item_selectors, pybind, rate_limiters
 from reverb import server as reverb_server
 
 from mava.systems.jax.launcher import Launcher, NodeType
-from mava.utils.builder_utils import copy_builder
 from tests.jax.components.building.distributor_test import MockBuilder
 
 
@@ -412,14 +411,3 @@ def test_copy_builder_multi_process(mock_builder: MockBuilder) -> None:
     builder = copy_builder(builder=mock_builder, multi_process=True)
 
     assert builder == mock_builder
-
-
-def test_copy_builder_single_process(mock_builder: MockBuilder) -> None:
-    """Test copy_builder util function in the case of single_process
-
-    Args:
-        mock_builder: Builder
-    """
-    builder_copy = copy_builder(builder=mock_builder, multi_process=False)
-
-    assert builder_copy != mock_builder
