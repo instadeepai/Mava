@@ -70,6 +70,7 @@ def mock_parameter_server_second_fn() -> Callable:
 
     return parameter_server_second
 
+
 @pytest.fixture
 def mock_builder() -> MockBuilder:
     """Mock builder"""
@@ -400,23 +401,24 @@ def test_get_nodes_non_multi_process(
 
     assert nodes == [data_server, parameter_server]
 
-def test_copy_store_multi_process(mock_builder: MockBuilder)->None:
+
+def test_copy_store_multi_process(mock_builder: MockBuilder) -> None:
     """Test copy_store util function in the case of multi_process
-    
+
     Args:
         mock_builder: Builder
     """
-    builder=copy_store(builder=mock_builder, multi_process=True)
+    builder = copy_store(builder=mock_builder, multi_process=True)
 
-    assert builder==mock_builder
+    assert builder == mock_builder
 
 
-def test_copy_store_single_process(mock_builder: MockBuilder)->None:
+def test_copy_store_single_process(mock_builder: MockBuilder) -> None:
     """Test copy_store util function in the case of single_process
-    
+
     Args:
         mock_builder: Builder
     """
-    builder_copy=copy_store(builder=mock_builder, multi_process=False)
+    builder_copy = copy_store(builder=mock_builder, multi_process=False)
 
-    assert builder_copy!=mock_builder
+    assert builder_copy != mock_builder
