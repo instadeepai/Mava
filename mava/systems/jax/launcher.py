@@ -190,13 +190,19 @@ class Launcher:
 
             while True:
                 # if the queue is too full we skip the executor to ensure that the
-                # trainer won't hang when trying to sample
+                # executor won't hang when trying to push experience
                 if data_server.server_info()["trainer"].current_size < int(
                     queue_threshold * 0.75
                 ):
                     executor_stats = executor.run_episode_and_log()
 
-                if episode % self._sp_trainer_period == 0:
+                # if the queue has less than sample_batch_size samples in it we skip
+                # the trainer to ensure that the trainer won't hang
+                if (
+                    data_server.server_info()["trainer"].current_size
+                    > trainer.store.sample_batch_size
+                    and episode % self._sp_trainer_period == 0
+                ):
                     _ = trainer.step()  # logging done in trainer
                     print("Performed trainer step.")
                 if episode % self._sp_evaluator_period == 0:
