@@ -33,8 +33,8 @@ def copy_store(builder: SystemBuilder, multi_process: bool) -> SystemBuilder:
         # Note: It is unnecessary to copy when Launchpad is used.
         return builder
     else: 
-        # Note: Set up the memo for the deepcopy to avoid copying
-        # the program. 
+        # Note: Add program to the memo avoid copying
+        # it. 
         memo = {}
         memo[id(builder.store.program)] = builder.store.program
         buildercopy = copy.deepcopy(builder, memo=memo)
