@@ -14,43 +14,17 @@
 # limitations under the License.
 
 """General launcher for systems"""
-import copy
 from typing import Any, Dict, List, Union
 
 import launchpad as lp
 import reverb
 
-from mava.core_jax import SystemBuilder
 from mava.utils import lp_utils
 
 
 class NodeType:
     reverb = lp.ReverbNode
     courier = lp.CourierNode
-
-
-def copy_store(builder: SystemBuilder, multi_process: bool) -> SystemBuilder:
-    """Creates a copy of the builder store.
-
-    Args:
-        builder: Mava builder object
-        multi_process: Flag indicating whether the system is
-            running in a distributed fashion or not
-
-    Returns:
-        SystemBuilder: Mava builder object
-    """
-    if multi_process:
-        # Note: It is unnecessary to copy when Launchpad is used.
-        return builder
-    else:
-        # Note: Add store.program to the memo to avoid copying
-        # it.
-        memo = {}
-        memo[id(builder.store.program)] = builder.store.program
-        buildercopy = copy.deepcopy(builder, memo=memo)
-
-        return buildercopy
 
 
 class Launcher:

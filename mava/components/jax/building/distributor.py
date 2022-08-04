@@ -21,7 +21,8 @@ import launchpad as lp
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
-from mava.systems.jax.launcher import Launcher, NodeType, copy_store
+from mava.systems.jax.launcher import Launcher, NodeType
+from mava.utils.builder_utils import copy_builder
 
 
 @dataclass
@@ -62,14 +63,14 @@ class Distributor(Component):
 
         # tables node
         data_server = builder.store.program.add(
-            copy_store(builder, self.config.multi_process).data_server,
+            copy_builder(builder, self.config.multi_process).data_server,
             node_type=NodeType.reverb,
             name="data_server",
         )
 
         # variable server node
         parameter_server = builder.store.program.add(
-            copy_store(builder, self.config.multi_process).parameter_server,
+            copy_builder(builder, self.config.multi_process).parameter_server,
             node_type=NodeType.courier,
             name="parameter_server",
         )
@@ -77,7 +78,7 @@ class Distributor(Component):
         # executor nodes
         for executor_id in range(self.config.num_executors):
             builder.store.program.add(
-                copy_store(builder, self.config.multi_process).executor,
+                copy_builder(builder, self.config.multi_process).executor,
                 [f"executor_{executor_id}", data_server, parameter_server],
                 node_type=NodeType.courier,
                 name="executor",
@@ -86,7 +87,7 @@ class Distributor(Component):
         if self.config.run_evaluator:
             # evaluator node
             builder.store.program.add(
-                copy_store(builder, self.config.multi_process).executor,
+                copy_builder(builder, self.config.multi_process).executor,
                 ["evaluator", data_server, parameter_server],
                 node_type=NodeType.courier,
                 name="evaluator",
@@ -95,7 +96,7 @@ class Distributor(Component):
         # trainer nodes
         for trainer_id in builder.store.trainer_networks.keys():
             builder.store.program.add(
-                copy_store(builder, self.config.multi_process).trainer,
+                copy_builder(builder, self.config.multi_process).trainer,
                 [trainer_id, data_server, parameter_server],
                 node_type=NodeType.courier,
                 name="trainer",
