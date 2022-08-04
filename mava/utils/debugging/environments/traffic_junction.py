@@ -3,7 +3,8 @@
 """
 Simulate a traffic junction environment.
 Used to test if MARL communication is working.
-Each agent can observe its last action, its route id, its location, and a vision square around itself.
+Each agent can observe its last action, its route id, its location,
+and a vision square around itself.
 
 Design Decisions:
     - Memory cheaper than time (compute)
@@ -17,7 +18,8 @@ Design Decisions:
 """
 
 import math
-import curses
+from typing import Any, Dict, List, Tuple
+
 import gym
 import numpy as np
 from gym import spaces
@@ -38,8 +40,8 @@ class TrafficJunctionEnv(gym.Env):
         add_rate_max: float = 0.3,
         curr_start: int = 0,
         curr_end: int = 0,
-        difficulty: str = 'easy',
-        vocab_type: str = 'bool',
+        difficulty: str = "easy",
+        vocab_type: str = "bool",
         comm_range: float = 3,
     ):
         """Create a Traffic Junction environment.
@@ -95,16 +97,21 @@ class TrafficJunctionEnv(gym.Env):
         self.car_route_loc = None
         self.stat = None
 
+        # Set during step
+        self.is_completed = None
+
         # Check that environment dimensions are licit
-        self.dims = dims = (self.dim, self.dim)
+        self.dims = dims = [self.dim, self.dim]
 
-        if difficulty in ['medium', 'easy']:
-            assert dims[0] % 2 == 0, 'Only even dimension supported for medium / easy Traffic Junction'
-            assert dims[0] >= 4 + vision, 'Min dim: 4 + vision'
+        if difficulty in ["medium", "easy"]:
+            assert (
+                dims[0] % 2 == 0
+            ), "Only even dimension supported for medium / easy Traffic Junction"
+            assert dims[0] >= 4 + vision, "Min dim: 4 + vision"
 
-        if difficulty == 'hard':
-            assert dims[0] >= 9, 'Min dim: 9'
-            assert dims[0] % 3 == 0, 'Hard version works for multiple of 3. dim. only.'
+        if difficulty == "hard":
+            assert dims[0] >= 9, "Min dim: 9"
+            assert dims[0] % 3 == 0, "Hard version works for multiple of 3. dim. only."
 
         # For computing add rate
         self.exact_rate = self.add_rate = self.add_rate_min
@@ -116,17 +123,15 @@ class TrafficJunctionEnv(gym.Env):
         self.action_space = spaces.Discrete(self.n_actions)
 
         # Make number of dims odd for easy case.
-        if difficulty == 'easy':
+        if difficulty == "easy":
             self.dims = list(dims)
             for i in range(len(self.dims)):
                 self.dims[i] += 1
 
         # Set up number of paths
-        n_roads = {'easy': 2,
-                   'medium': 4,
-                   'hard': 8}
+        n_roads = {"easy": 2, "medium": 4, "hard": 8}
 
-        def n_pick_r(n, r):
+        def n_pick_r(n: int, r: int) -> int:
             """Compute nPr."""
             f = math.factorial
             return f(n) // f(n - r)
@@ -135,124 +140,137 @@ class TrafficJunctionEnv(gym.Env):
 
         # Setting max vocab size for 1-hot encoding
         dim_sum = dims[0] + dims[1]
-        base = {'easy': dim_sum,
-                'medium': 2 * dim_sum,
-                'hard': 4 * dim_sum}
+        base = {"easy": dim_sum, "medium": 2 * dim_sum, "hard": 4 * dim_sum}
 
-        if self.vocab_type == 'bool':
+        if self.vocab_type == "bool":
             self.OUTSIDE_CLASS += base[difficulty]
             self.CAR_CLASS += base[difficulty]
 
             # car_type + base + outside + 0-index
             self.vocab_size = 1 + base[difficulty] + 1 + 1
 
-            # Observation for each agent will be 4-tuple of (r_i, last_act, vision * vision * vocab)
-            self.observation_space = spaces.Tuple((
-                                     spaces.Discrete(self.n_actions),
-                                     spaces.Discrete(self.n_paths),
-                                     spaces.MultiBinary(
-                                        (2 * vision + 1, 2 * vision + 1, self.vocab_size)
-                                     )))
+            # Observation for each agent will be 4-tuple of:
+            # (r_i, last_act, vision * vision * vocab)
+            self.observation_space = spaces.Tuple(
+                (
+                    spaces.Discrete(self.n_actions),
+                    spaces.Discrete(self.n_paths),
+                    spaces.MultiBinary(
+                        (2 * vision + 1, 2 * vision + 1, self.vocab_size)
+                    ),
+                )
+            )
         else:
             # r_i, (x,y), vocab = [road class + car]
             self.vocab_size = 1 + 1
 
-            # Observation for each agent will be 4-tuple of (r_i, last_act, len(dims), vision * vision * vocab)
-            self.observation_space = spaces.Tuple((
-                                     spaces.Discrete(self.n_actions),
-                                     spaces.Discrete(self.n_paths),
-                                     spaces.MultiDiscrete(self.dims),
-                                     spaces.MultiBinary(
-                                        (2 * vision + 1, 2 * vision + 1, self.vocab_size)
-                                     )))
-            # Actual observation will be of the shape 1 * num_agents * ((x,y) , (2v+1) * (2v+1) * vocab_size)
+            # Observation for each agent will be 4-tuple of:
+            # (r_i, last_act, len(dims), vision * vision * vocab)
+            self.observation_space = spaces.Tuple(
+                (
+                    spaces.Discrete(self.n_actions),
+                    spaces.Discrete(self.n_paths),
+                    spaces.MultiDiscrete(self.dims),
+                    spaces.MultiBinary(
+                        (2 * vision + 1, 2 * vision + 1, self.vocab_size)
+                    ),
+                )
+            )
+            # Actual observation will be of the shape:
+            # 1 * num_agents * ((x,y) , (2v+1) * (2v+1) * vocab_size)
 
         # Create the grid
         self._set_grid()
 
         # Create the paths
-        if difficulty == 'easy':
+        if difficulty == "easy":
             self._set_paths_easy()
         else:
             self._set_paths(difficulty)
 
-    def _set_grid(self):
-        self.grid = np.full(self.dims[0] * self.dims[1], self.OUTSIDE_CLASS, dtype=int).reshape(self.dims)
+    def _set_grid(self) -> None:
+        self.grid = np.full(
+            self.dims[0] * self.dims[1], self.OUTSIDE_CLASS, dtype=int
+        ).reshape(self.dims)
         width, height = self.dims
 
         # Mark the roads
         roads = self._get_road_blocks(width, height)
         for road in roads:
             self.grid[road] = self.ROAD_CLASS
-        if self.vocab_type == 'bool':
+        if self.vocab_type == "bool":
             self.route_grid = self.grid.copy()
             start = 0
             for road in roads:
                 sz = int(np.prod(self.grid[road].shape))
-                self.grid[road] = np.arange(start, start + sz).reshape(self.grid[road].shape)
+                self.grid[road] = np.arange(start, start + sz).reshape(
+                    self.grid[road].shape
+                )
                 start += sz
 
         # Padding for vision
-        self.pad_grid = np.pad(self.grid, self.vision, 'constant', constant_values=self.OUTSIDE_CLASS)
+        self.pad_grid = np.pad(
+            self.grid, self.vision, "constant", constant_values=self.OUTSIDE_CLASS
+        )
 
         self.empty_bool_base_grid = self._onehot_initialization(self.pad_grid)
 
-    def _get_road_blocks(self,
-                         width,
-                         height,
-                         ):
+    def _get_road_blocks(
+        self,
+        width: int,
+        height: int,
+    ) -> List[np.s_]:
 
         # assuming 1 is the lane width for each direction.
         road_blocks = {
-            'easy': [np.s_[height // 2, :],
-                     np.s_[:, width // 2]],
-
-            'medium': [np.s_[height // 2 - 1: height // 2 + 1, :],
-                       np.s_[:, width // 2 - 1: width // 2 + 1]],
-
-            'hard': [np.s_[height // 3 - 2: height // 3, :],
-                     np.s_[2 * height // 3: 2 * height // 3 + 2, :],
-
-                     np.s_[:, width // 3 - 2: width // 3],
-                     np.s_[:, 2 * height // 3: 2 * height // 3 + 2]],
+            "easy": [np.s_[height // 2, :], np.s_[:, width // 2]],
+            "medium": [
+                np.s_[height // 2 - 1 : height // 2 + 1, :],
+                np.s_[:, width // 2 - 1 : width // 2 + 1],
+            ],
+            "hard": [
+                np.s_[height // 3 - 2 : height // 3, :],
+                np.s_[2 * height // 3 : 2 * height // 3 + 2, :],
+                np.s_[:, width // 3 - 2 : width // 3],
+                np.s_[:, 2 * height // 3 : 2 * height // 3 + 2],
+            ],
         }
 
         return road_blocks[self.difficulty]
 
-    def _onehot_initialization(self, a):
-        if self.vocab_type == 'bool':
+    def _onehot_initialization(self, a: np.ndarray) -> np.ndarray:
+        if self.vocab_type == "bool":
             ncols = self.vocab_size
         else:
-            ncols = self.vocab_size + 1  # 1 is for outside class which will be removed later.
+            ncols = (
+                self.vocab_size + 1
+            )  # 1 is for outside class which will be removed later.
         out = np.zeros(a.shape + (ncols,), dtype=int)
         out[self._all_idx(a, axis=2)] = 1
         return out
 
     @staticmethod
-    def _all_idx(idx, axis):
+    def _all_idx(idx: np.ndarray, axis: int) -> Tuple:
         grid = np.ogrid[tuple(map(slice, idx.shape))]
         grid.insert(axis, idx)
         return tuple(grid)
 
-    def _set_paths_easy(self):
+    def _set_paths_easy(self) -> None:
         h, w = self.dims
-        self.routes = {
-            'TOP': [],
-            'LEFT': []
-        }
+        routes: Dict[str, List[np.ndarray]] = {"TOP": [], "LEFT": []}
 
         # 0 refers to UP to DOWN, type 0
-        full = [(i, w//2) for i in range(h)]
-        self.routes['TOP'].append(np.array([*full]))
+        full = [(i, w // 2) for i in range(h)]
+        routes["TOP"].append(np.array([*full]))
 
         # 1 refers to LEFT to RIGHT, type 0
-        full = [(h//2, i) for i in range(w)]
-        self.routes['LEFT'].append(np.array([*full]))
+        full = [(h // 2, i) for i in range(w)]
+        routes["LEFT"].append(np.array([*full]))
 
-        self.routes = list(self.routes.values())
+        self.routes: List[List[np.ndarray]] = list(routes.values())
 
-    def _set_paths(self, difficulty):
-        route_grid = self.route_grid if self.vocab_type == 'bool' else self.grid
+    def _set_paths(self, difficulty: str) -> None:
+        route_grid = self.route_grid if self.vocab_type == "bool" else self.grid
         self.routes = self._get_routes(route_grid, difficulty)
 
         # Convert/unroll routes which is a list of list of paths
@@ -268,7 +286,7 @@ class TrafficJunctionEnv(gym.Env):
         assert self._unittest_path(paths)
 
     @staticmethod
-    def _unittest_path(paths):
+    def _unittest_path(paths: List[List[Tuple[int, int]]]) -> bool:
         for i, p in enumerate(paths[:-1]):
             next_dif = p - np.row_stack([p[1:], p[-1]])
             next_dif = np.abs(next_dif[:-1])
@@ -279,18 +297,17 @@ class TrafficJunctionEnv(gym.Env):
                 return False
         return True
 
-    def _get_routes(self,
-                    grid,
-                    difficulty
-                    ):
+    def _get_routes(self, grid, difficulty) -> List[List[List[Tuple[int, int]]]]:
         grid.dtype = int
 
-        assert difficulty == 'medium' or difficulty == 'hard'
+        assert difficulty == "medium" or difficulty == "hard"
 
-        arrival_points, finish_points, road_dir, junction = self._get_add_mat(grid, difficulty)
+        arrival_points, finish_points, road_dir, junction = self._get_add_mat(
+            grid, difficulty
+        )
 
         n_turn1 = 3  # 0 - straight, 1-right, 2-left
-        n_turn2 = 1 if difficulty == 'medium' else 3
+        n_turn2 = 1 if difficulty == "medium" else 3
 
         routes = []
         # routes for each arrival point
@@ -312,7 +329,14 @@ class TrafficJunctionEnv(gym.Env):
                     while not self._goal_reached(i, current, finish_points):
                         visited.add(current)
                         current, turn_prog, turn_completed = self._next_move(
-                            current, curr_turn, turn_step, start, grid, road_dir, junction, visited
+                            current,
+                            curr_turn,
+                            turn_step,
+                            start,
+                            grid,
+                            road_dir,
+                            junction,
+                            visited,
                         )
                         if curr_turn == 2 and turn_prog:
                             turn_step += 1
@@ -332,26 +356,29 @@ class TrafficJunctionEnv(gym.Env):
             routes.append(paths)
         return routes
 
-    def _get_add_mat(self,
-                     grid,
-                     difficulty
-                     ):
+    def _get_add_mat(
+        self, grid, difficulty
+    ) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]], np.ndarray, np.ndarray]:
         h, w = self.dims
 
         road_dir = grid.copy()
         junction = np.zeros_like(grid)
         arrival_points, finish_points = None, None
 
-        if difficulty == 'medium':
-            arrival_points = [(0, w // 2 - 1),  # TOP
-                              (h - 1, w // 2),  # BOTTOM
-                              (h // 2, 0),  # LEFT
-                              (h // 2 - 1, w - 1)]  # RIGHT
+        if difficulty == "medium":
+            arrival_points = [
+                (0, w // 2 - 1),  # TOP
+                (h - 1, w // 2),  # BOTTOM
+                (h // 2, 0),  # LEFT
+                (h // 2 - 1, w - 1),
+            ]  # RIGHT
 
-            finish_points = [(0, w // 2),  # TOP
-                             (h - 1, w // 2 - 1),  # BOTTOM
-                             (h // 2 - 1, 0),  # LEFT
-                             (h // 2, w - 1)]  # RIGHT
+            finish_points = [
+                (0, w // 2),  # TOP
+                (h - 1, w // 2 - 1),  # BOTTOM
+                (h // 2 - 1, 0),  # LEFT
+                (h // 2, w - 1),
+            ]  # RIGHT
 
             # mark road direction
             road_dir[h // 2, :] = 2
@@ -359,32 +386,30 @@ class TrafficJunctionEnv(gym.Env):
             road_dir[:, w // 2] = 4
 
             # mark the Junction
-            junction[h // 2 - 1:h // 2 + 1, w // 2 - 1:w // 2 + 1] = 1
+            junction[h // 2 - 1 : h // 2 + 1, w // 2 - 1 : w // 2 + 1] = 1
 
-        elif difficulty == 'hard':
-            arrival_points = [(0, w // 3 - 2),  # TOP-left
-                              (0, 2 * w // 3),  # TOP-right
+        elif difficulty == "hard":
+            arrival_points = [
+                (0, w // 3 - 2),  # TOP-left
+                (0, 2 * w // 3),  # TOP-right
+                (h // 3 - 1, 0),  # LEFT-top
+                (2 * h // 3 + 1, 0),  # LEFT-bottom
+                (h - 1, w // 3 - 1),  # BOTTOM-left
+                (h - 1, 2 * w // 3 + 1),  # BOTTOM-right
+                (h // 3 - 2, w - 1),  # RIGHT-top
+                (2 * h // 3, w - 1),
+            ]  # RIGHT-bottom
 
-                              (h // 3 - 1, 0),  # LEFT-top
-                              (2 * h // 3 + 1, 0),  # LEFT-bottom
-
-                              (h - 1, w // 3 - 1),  # BOTTOM-left
-                              (h - 1, 2 * w // 3 + 1),  # BOTTOM-right
-
-                              (h // 3 - 2, w - 1),  # RIGHT-top
-                              (2 * h // 3, w - 1)]  # RIGHT-bottom
-
-            finish_points = [(0, w // 3 - 1),  # TOP-left
-                             (0, 2 * w // 3 + 1),  # TOP-right
-
-                             (h // 3 - 2, 0),  # LEFT-top
-                             (2 * h // 3, 0),  # LEFT-bottom
-
-                             (h - 1, w // 3 - 2),  # BOTTOM-left
-                             (h - 1, 2 * w // 3),  # BOTTOM-right
-
-                             (h // 3 - 1, w - 1),  # RIGHT-top
-                             (2 * h // 3 + 1, w - 1)]  # RIGHT-bottom
+            finish_points = [
+                (0, w // 3 - 1),  # TOP-left
+                (0, 2 * w // 3 + 1),  # TOP-right
+                (h // 3 - 2, 0),  # LEFT-top
+                (2 * h // 3, 0),  # LEFT-bottom
+                (h - 1, w // 3 - 2),  # BOTTOM-left
+                (h - 1, 2 * w // 3),  # BOTTOM-right
+                (h // 3 - 1, w - 1),  # RIGHT-top
+                (2 * h // 3 + 1, w - 1),
+            ]  # RIGHT-bottom
 
             # mark road direction
             road_dir[h // 3 - 1, :] = 2
@@ -397,31 +422,22 @@ class TrafficJunctionEnv(gym.Env):
             road_dir[:, 2 * w // 3 + 1] = 8
 
             # mark the Junctions
-            junction[h // 3 - 2:h // 3, w // 3 - 2:w // 3] = 1
-            junction[2 * h // 3:2 * h // 3 + 2, w // 3 - 2:w // 3] = 1
+            junction[h // 3 - 2 : h // 3, w // 3 - 2 : w // 3] = 1
+            junction[2 * h // 3 : 2 * h // 3 + 2, w // 3 - 2 : w // 3] = 1
 
-            junction[h // 3 - 2:h // 3, 2 * w // 3:2 * w // 3 + 2] = 1
-            junction[2 * h // 3:2 * h // 3 + 2, 2 * w // 3:2 * w // 3 + 2] = 1
+            junction[h // 3 - 2 : h // 3, 2 * w // 3 : 2 * w // 3 + 2] = 1
+            junction[2 * h // 3 : 2 * h // 3 + 2, 2 * w // 3 : 2 * w // 3 + 2] = 1
 
         return arrival_points, finish_points, road_dir, junction
 
     @staticmethod
-    def _goal_reached(place_i,
-                      curr,
-                      finish_points
-                      ):
-        return curr in finish_points[:place_i] + finish_points[place_i + 1:]
+    def _goal_reached(place_i, curr, finish_points) -> bool:
+        return curr in finish_points[:place_i] + finish_points[place_i + 1 :]
 
     @staticmethod
-    def _next_move(curr,
-                   turn,
-                   turn_step,
-                   start,
-                   grid,
-                   road_dir,
-                   junction,
-                   visited
-                   ):
+    def _next_move(
+        curr, turn, turn_step, start, grid, road_dir, junction, visited
+    ) -> Tuple[Tuple[int, int], bool, bool]:
         move = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
         h, w = grid.shape
@@ -431,10 +447,17 @@ class TrafficJunctionEnv(gym.Env):
         for m in move:
             # check lane while taking left turn
             n = (curr[0] + m[0], curr[1] + m[1])
-            if 0 <= n[0] <= h - 1 and 0 <= n[1] <= w - 1 and grid[n] and n not in visited:
+            if (
+                0 <= n[0] <= h - 1
+                and 0 <= n[1] <= w - 1
+                and grid[n]
+                and n not in visited
+            ):
                 # On Junction, use turns
                 if junction[n] == junction[curr] == 1:
-                    if (turn == 0 or turn == 2) and ((n[0] == start[0]) or (n[1] == start[1])):
+                    if (turn == 0 or turn == 2) and (
+                        (n[0] == start[0]) or (n[1] == start[1])
+                    ):
                         # Straight on junction for either left or straight
                         neigh.append(n)
                         if turn == 2:
@@ -450,8 +473,13 @@ class TrafficJunctionEnv(gym.Env):
                         pass
 
                 # Completing left turn on junction
-                elif junction[curr] and not junction[n] and turn == 2 and turn_step == 2 \
-                        and (abs(start[0] - n[0]) == 2 or abs(start[1] - n[1]) == 2):
+                elif (
+                    junction[curr]
+                    and not junction[n]
+                    and turn == 2
+                    and turn_step == 2
+                    and (abs(start[0] - n[0]) == 2 or abs(start[1] - n[1]) == 2)
+                ):
                     neigh.append(n)
                     turn_completed = True
 
@@ -475,14 +503,14 @@ class TrafficJunctionEnv(gym.Env):
 
         if neigh:
             return neigh[0], turn_prog, turn_completed
-        if len(neigh) != 1:
-            raise RuntimeError("next move should be of len 1. Reached ambiguous situation.")
+
+        raise RuntimeError("next move should be of len 1. Reached ambiguous situation.")
 
     #
     # END OF ENVIRONMENT INIT METHODS
     #
 
-    def reset(self, epoch=None):
+    def reset(self, epoch=None) -> Tuple[Tuple, np.ndarray]:
         """
         Reset the state of the environment and returns an initial observation.
 
@@ -509,18 +537,25 @@ class TrafficJunctionEnv(gym.Env):
         self.car_ids = np.arange(self.CAR_CLASS, self.CAR_CLASS + self.num_agents)
 
         # Starting loc of car: a place where everything is outside class
-        self.car_loc = np.zeros((self.num_agents, len(self.dims)),dtype=int)
-        self.car_last_act = np.zeros(self.num_agents, dtype=int) # last act GAS when awake
+        self.car_loc = np.zeros((self.num_agents, len(self.dims)), dtype=int)
+        self.car_last_act = np.zeros(
+            self.num_agents, dtype=int
+        )  # last act GAS when awake
 
-        self.car_route_loc = np.full(self.num_agents, - 1)
+        self.car_route_loc = np.full(self.num_agents, -1)
 
         # stat - like success ratio
         self.stat = dict()
 
         # set add rate according to the curriculum
-        epoch_range = (self.curr_end - self.curr_start)
-        add_rate_range = (self.add_rate_max - self.add_rate_min)
-        if epoch is not None and epoch_range > 0 and add_rate_range > 0 and epoch > self.epoch_last_update:
+        epoch_range = self.curr_end - self.curr_start
+        add_rate_range = self.add_rate_max - self.add_rate_min
+        if (
+            epoch is not None
+            and epoch_range > 0
+            and add_rate_range > 0
+            and epoch > self.epoch_last_update
+        ):
             self.curriculum(epoch)
             self.epoch_last_update = epoch
 
@@ -528,15 +563,17 @@ class TrafficJunctionEnv(gym.Env):
         obs = self._get_obs()
         return obs, self._get_env_graph()
 
-    def curriculum(self, epoch):
+    def curriculum(self, epoch) -> None:
         step_size = 0.01
-        step = (self.add_rate_max - self.add_rate_min) / (self.curr_end - self.curr_start)
+        step = (self.add_rate_max - self.add_rate_min) / (
+            self.curr_end - self.curr_start
+        )
 
         if self.curr_start <= epoch < self.curr_end:
             self.exact_rate = self.exact_rate + step
             self.add_rate = step_size * (self.exact_rate // step_size)
 
-    def step(self, action):
+    def step(self, action) -> Tuple[Tuple, np.ndarray, bool, Dict[str, Any]]:
         """
         The agents(car) take a step in the environment.
 
@@ -548,7 +585,7 @@ class TrafficJunctionEnv(gym.Env):
         -------
         obs, reward, episode_over, info : tuple
             obs (object) :
-            reward (num_agents x 1) : PENALTY for each timestep when in sys & CRASH PENALTY on crashes.
+            reward (num_agents x 1) : PENALTY if in env & CRASH PENALTY on crashes.
             episode_over (bool) : Will be true when episode gets over.
             info (dict) : diagnostic information useful for debugging.
         """
@@ -558,9 +595,13 @@ class TrafficJunctionEnv(gym.Env):
         # Expected shape: either num_agents or num_agents x 1
         action = np.array(action).squeeze()
 
-        assert np.all(action <= self.n_actions), "Actions should be in the range [0,naction)."
+        assert np.all(
+            action <= self.n_actions
+        ), "Actions should be in the range [0,naction)."
 
-        assert len(action) == self.num_agents, "Action for each agent should be provided."
+        assert (
+            len(action) == self.num_agents
+        ), "Action for each agent should be provided."
 
         # No one is completed before taking action
         self.is_completed = np.zeros(self.num_agents)
@@ -574,19 +615,21 @@ class TrafficJunctionEnv(gym.Env):
         env_graph = self._get_env_graph()
         reward = self._get_reward()
 
-        extras = {'car_loc':self.car_loc,
-                  'alive_mask': np.copy(self.alive_mask),
-                  'wait': self.wait,
-                  'cars_in_sys': self.cars_in_sys,
-                  'is_completed': np.copy(self.is_completed),
-                  'env_graph': env_graph}
+        extras = {
+            "car_loc": self.car_loc,
+            "alive_mask": np.copy(self.alive_mask),
+            "wait": self.wait,
+            "cars_in_sys": self.cars_in_sys,
+            "is_completed": np.copy(self.is_completed),
+            "env_graph": env_graph,
+        }
 
-        self.stat['success'] = 1 - self.has_failed
-        self.stat['add_rate'] = self.add_rate
+        self.stat["success"] = 1 - self.has_failed
+        self.stat["add_rate"] = self.add_rate
 
         return obs, reward, self.episode_over, extras
 
-    def _take_action(self, idx, act):
+    def _take_action(self, idx, act) -> None:
         # non-active car
         if self.alive_mask[idx] == 0:
             return
@@ -600,8 +643,7 @@ class TrafficJunctionEnv(gym.Env):
             return
 
         # GAS or move
-        if act==0:
-            prev = self.car_route_loc[idx]
+        if act == 0:
             self.car_route_loc[idx] += 1
             curr = self.car_route_loc[idx]
 
@@ -612,23 +654,21 @@ class TrafficJunctionEnv(gym.Env):
                 self.wait[idx] = 0
 
                 # put it at dead loc
-                self.car_loc[idx] = np.zeros(len(self.dims),dtype=int)
+                self.car_loc[idx] = np.zeros(len(self.dims), dtype=int)
                 self.is_completed[idx] = 1
                 return
 
             elif curr > len(self.chosen_path[idx]):
                 raise RuntimeError("Out of bound car path")
 
-            prev = self.chosen_path[idx][prev]
             curr = self.chosen_path[idx][curr]
 
-            # assert abs(curr[0] - prev[0]) + abs(curr[1] - prev[1]) == 1 or curr_path = 0
             self.car_loc[idx] = curr
 
             # Change last act for color:
             self.car_last_act[idx] = 0
 
-    def _add_cars(self):
+    def _add_cars(self) -> None:
         for r_i, routes in enumerate(self.routes):
             if self.cars_in_sys >= self.num_agents:
                 return
@@ -654,23 +694,25 @@ class TrafficJunctionEnv(gym.Env):
                 # increase count
                 self.cars_in_sys += 1
 
-    def _choose_dead(self):
+    def _choose_dead(self) -> np.ndarray:
         # all idx
         car_idx = np.arange(len(self.alive_mask))
         # random choice of idx from dead ones.
         return np.random.choice(car_idx[self.alive_mask == 0])
 
-    def _get_obs(self):
+    def _get_obs(self) -> Tuple:
         h, w = self.dims
         self.bool_base_grid = self.empty_bool_base_grid.copy()
 
         # Mark cars' location in Bool grid
         for i, p in enumerate(self.car_loc):
-            self.bool_base_grid[p[0] + self.vision, p[1] + self.vision, self.CAR_CLASS] += 1
+            self.bool_base_grid[
+                p[0] + self.vision, p[1] + self.vision, self.CAR_CLASS
+            ] += 1
 
         # remove the outside class.
-        if self.vocab_type == 'scalar':
-            self.bool_base_grid = self.bool_base_grid[:,:,1:]
+        if self.vocab_type == "scalar":
+            self.bool_base_grid = self.bool_base_grid[:, :, 1:]
 
         obs = []
         for i, p in enumerate(self.car_loc):
@@ -681,7 +723,7 @@ class TrafficJunctionEnv(gym.Env):
             r_i = self.route_id[i] / (self.n_paths - 1)
 
             # loc
-            p_norm = p / (h-1, w-1)
+            p_norm = p / (h - 1, w - 1)
 
             # vision square
             slice_y = slice(p[0], p[0] + (2 * self.vision) + 1)
@@ -695,7 +737,7 @@ class TrafficJunctionEnv(gym.Env):
                 p_norm = np.zeros_like(p_norm)
                 v_sq = np.zeros_like(v_sq)
 
-            if self.vocab_type == 'bool':
+            if self.vocab_type == "bool":
                 o = tuple((act, r_i, v_sq))
             else:
                 o = tuple((act, r_i, p_norm, v_sq))
@@ -705,8 +747,10 @@ class TrafficJunctionEnv(gym.Env):
         return obs
 
     # Get communication graph -> just use distance for now
-    def _get_env_graph(self):
-        adj = np.zeros((1, self.num_agents, self.num_agents))  # 1 if agents can communicate
+    def _get_env_graph(self) -> np.ndarray:
+        adj = np.zeros(
+            (1, self.num_agents, self.num_agents)
+        )  # 1 if agents can communicate
         for i in range(self.num_agents):
             if not self.alive_mask[i]:
                 continue
@@ -715,24 +759,28 @@ class TrafficJunctionEnv(gym.Env):
                     continue
                 car_loc1 = self.car_loc[i]
                 car_loc2 = self.car_loc[j]
-                squared_distance = (car_loc1[0] - car_loc2[0]) ** 2 + (car_loc1[1] - car_loc2[1]) ** 2
-                if squared_distance <= self.comm_range ** 2:
+                squared_distance = (car_loc1[0] - car_loc2[0]) ** 2 + (
+                    car_loc1[1] - car_loc2[1]
+                ) ** 2
+                if squared_distance <= self.comm_range**2:
                     adj[0][i][j] = 1
                     adj[0][j][i] = 1
 
         return adj
 
-    def _get_reward(self):
+    def _get_reward(self) -> np.ndarray:
         reward = np.full(self.num_agents, self.TIMESTEP_PENALTY) * self.wait
 
         for i, l in enumerate(self.car_loc):
-            if (len(np.where(np.all(self.car_loc[:i] == l,axis=1))[0]) or
-                    len(np.where(np.all(self.car_loc[i+1:] == l, axis=1))[0])) and l.any():
+            if (
+                len(np.where(np.all(self.car_loc[:i] == l, axis=1))[0])
+                or len(np.where(np.all(self.car_loc[i + 1 :] == l, axis=1))[0])
+            ) and l.any():
                 reward[i] += self.CRASH_PENALTY
                 self.has_failed = 1
 
         reward = self.alive_mask * reward
         return reward
 
-    def reward_terminal(self):
+    def reward_terminal(self) -> np.ndarray:
         return np.zeros_like(self._get_reward())
