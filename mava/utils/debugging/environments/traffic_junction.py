@@ -83,6 +83,18 @@ class TrafficJunctionEnv(gym.Env):
         self.episode_over = False
         self.has_failed = 0
 
+        # Set during reset
+        self.alive_mask = None
+        self.wait = None
+        self.cars_in_sys = None
+        self.chosen_path = None
+        self.route_id = None
+        self.car_ids = None
+        self.car_loc = None
+        self.car_last_act = None
+        self.car_route_loc = None
+        self.stat = None
+
         # Check that environment dimensions are licit
         self.dims = dims = (self.dim, self.dim)
 
@@ -216,7 +228,8 @@ class TrafficJunctionEnv(gym.Env):
         out[self._all_idx(a, axis=2)] = 1
         return out
 
-    def _all_idx(self, idx, axis):
+    @staticmethod
+    def _all_idx(idx, axis):
         grid = np.ogrid[tuple(map(slice, idx.shape))]
         grid.insert(axis, idx)
         return tuple(grid)
@@ -315,6 +328,7 @@ class TrafficJunctionEnv(gym.Env):
 
         road_dir = grid.copy()
         junction = np.zeros_like(grid)
+        arrival_points, finish_points = None, None
 
         if difficulty == 'medium':
             arrival_points = [(0, w // 2 - 1),  # TOP
@@ -425,12 +439,12 @@ class TrafficJunctionEnv(gym.Env):
 
                 # Completing left turn on junction
                 elif junction[curr] and not junction[n] and turn == 2 and turn_step == 2 \
-                    and (abs(start[0] - n[0]) == 2 or abs(start[1] - n[1]) == 2):
+                        and (abs(start[0] - n[0]) == 2 or abs(start[1] - n[1]) == 2):
                     neigh.append(n)
                     turn_completed = True
 
                 # junction seen, get onto it;
-                elif (junction[n] and not junction[curr]):
+                elif junction[n] and not junction[curr]:
                     neigh.append(n)
 
                 # right from junction
