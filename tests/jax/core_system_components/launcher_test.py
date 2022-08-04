@@ -70,6 +70,11 @@ def mock_parameter_server_second_fn() -> Callable:
 
     return parameter_server_second
 
+@pytest.fixture
+def mock_builder() -> MockBuilder:
+    """Mock builder"""
+    return MockBuilder()
+
 
 def test_initiator_multi_process() -> None:
     """Test the constructor of Launcher in the case of multi process"""
@@ -228,25 +233,24 @@ def test_add_multi_process_two_add_same_name(
     assert not hasattr(launcher, "_node_dict")
 
 
-def test_add_non_multi_process_reverb_node(mock_data_server_fn: Callable) -> None:
+def test_add_non_multi_process_reverb_node(mock_builder:MockBuilder) -> None:
     """Test the add method for the case of one process and for node_type reverb
 
     Args:
-        mock_data_server_fn
+        mock_builder
     """
     launcher = Launcher(multi_process=False)
     with pytest.raises(ValueError):
         data_server = launcher.add(
-            mock_data_server_fn,
+            mock_builder.data_server,
             node_type=NodeType.reverb,
             name="data_server_test",
-            builder=MockBuilder(),
+
         )
     data_server = launcher.add(
-        mock_data_server_fn,
+        mock_builder.data_server,
         node_type=NodeType.reverb,
         name="data_server",
-        builder=MockBuilder(),
     )
 
     assert not hasattr(launcher, "_program")
@@ -266,25 +270,23 @@ def test_add_non_multi_process_reverb_node(mock_data_server_fn: Callable) -> Non
     assert launcher._node_dict["data_server"]._signature_cache == {}
 
 
-def test_add_non_multi_process_courier_node(mock_parameter_server_fn: Callable) -> None:
+def test_add_non_multi_process_courier_node(mock_builder: MockBuilder) -> None:
     """Test the add method for the case of one process and for node_type courier
 
     Args:
-        mock_parameter_server_fn
+        mock_builder
     """
     launcher = Launcher(multi_process=False)
     with pytest.raises(ValueError):
         parameter_server = launcher.add(
-            mock_parameter_server_fn,
+            mock_builder.parameter_server,
             node_type=NodeType.courier,
             name="parameter_server_test",
-            builder=MockBuilder(),
         )
     parameter_server = launcher.add(
-        mock_parameter_server_fn,
+        mock_builder.parameter_server,
         node_type=NodeType.courier,
         name="parameter_server",
-        builder=MockBuilder(),
     )
 
     assert not hasattr(launcher, "_program")
@@ -296,27 +298,23 @@ def test_add_non_multi_process_courier_node(mock_parameter_server_fn: Callable) 
     assert parameter_server == "Parameter Server Test"
 
 
-def test_add_non_multi_process_two_add_calls(
-    mock_data_server_fn: Callable, mock_parameter_server_fn: Callable
+def test_add_non_multi_process_two_add_calls( mock_builder:MockBuilder
 ) -> None:
     """Test calling twice add method for the case of one process
 
     Args:
-        mock_data_server_fn
-        mock_parameter_server_fn
+        mock_builder
     """
     launcher = Launcher(multi_process=False)
     data_server = launcher.add(
-        mock_data_server_fn,
+        mock_builder.data_server,
         node_type=NodeType.reverb,
         name="data_server",
-        builder=MockBuilder(),
     )
     parameter_server = launcher.add(
-        mock_parameter_server_fn,
+        mock_builder.parameter_server,
         node_type=NodeType.courier,
         name="parameter_server",
-        builder=MockBuilder(),
     )
 
     assert not hasattr(launcher, "_program")
@@ -339,27 +337,25 @@ def test_add_non_multi_process_two_add_calls(
 
 
 def test_add_non_multi_process_two_add_same_name(
-    mock_parameter_server_fn: Callable, mock_parameter_server_second_fn: Callable
+    mock_builder:MockBuilder
 ) -> None:
     """Test calling twice add method for two nodes with same name and for the case of one process and for node_type reverb
 
     Args:
-        mock_data_server_fn
+        mock_builder
     """
     launcher = Launcher(multi_process=False)
 
     parameter_server_1 = launcher.add(
-        mock_parameter_server_fn,
+        mock_builder.parameter_server,
         node_type=NodeType.courier,
         name="parameter_server",
-        builder=MockBuilder(),
     )
     with pytest.raises(ValueError):
         parameter_server_2 = launcher.add(
-            mock_parameter_server_second_fn,
+           mock_builder.parameter_server,
             node_type=NodeType.courier,
             name="parameter_server",
-            builder=MockBuilder(),
         )
 
 
@@ -379,26 +375,23 @@ def test_get_nodes_non_multi_process_empty() -> None:
 
 
 def test_get_nodes_non_multi_process(
-    mock_data_server_fn: Callable, mock_parameter_server_fn: Callable
+    mock_builder: MockBuilder
 ) -> None:
     """Test get_nodes method in the case of one process with two nodes
 
     Args:
-        mock_data_server_fn
-        mock_parameter_server_fn
+        mock_builder
     """
     launcher = Launcher(multi_process=False)
     data_server = launcher.add(
-        mock_data_server_fn,
+        mock_builder.data_server,
         node_type=NodeType.reverb,
         name="data_server",
-        builder=MockBuilder(),
     )
     parameter_server = launcher.add(
-        mock_parameter_server_fn,
+        mock_builder.parameter_server,
         node_type=NodeType.courier,
         name="parameter_server",
-        builder=MockBuilder(),
     )
 
     nodes = launcher.get_nodes()
