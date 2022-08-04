@@ -34,8 +34,8 @@ def copy_builder(builder: SystemBuilder) -> SystemBuilder:
         SystemBuilder: Mava builder object
     """
 
-        # Note: Add store.program to the memo to avoid copying
-        # it.
+    # Note: Add store.program to the memo to avoid copying
+    # it.
     memo = {}
     memo[id(builder.store.program)] = builder.store.program
     buildercopy = copy.deepcopy(builder, memo=memo)

@@ -16,12 +16,11 @@
 """General launcher for systems"""
 from typing import Any, Dict, List, Union
 
-from pyparsing import Optional
-from mava.core_jax import SystemBuilder
-
 import launchpad as lp
 import reverb
+from pyparsing import Optional
 
+from mava.core_jax import SystemBuilder
 from mava.utils import lp_utils
 from mava.utils.builder_utils import copy_builder
 
@@ -83,7 +82,7 @@ class Launcher:
         arguments: Any = [],
         node_type: Union[lp.ReverbNode, lp.CourierNode] = NodeType.courier,
         name: str = "Node",
-        builder: SystemBuilder  = None
+        builder: SystemBuilder = None,
     ) -> Any:
         """_summary_
 
@@ -124,16 +123,16 @@ class Launcher:
                     f"Missing attribute: add the current builder into parameters"
                 )
             else:
-                copy_store_builder=copy_builder(builder=builder)
-                if name=="data_server":
-                    node_fn=copy_store_builder.data_server
-                if name=="parameter_server":
-                    node_fn=copy_store_builder.parameter_server
-                if name=="executor" or name=="evaluator":
-                    node_fn=copy_store_builder.executor
-                if name=="trainer":
-                    node_fn=copy_store_builder.trainer
-                    
+                copy_store_builder = copy_builder(builder=builder)
+                if name == "data_server":
+                    node_fn = copy_store_builder.data_server
+                if name == "parameter_server":
+                    node_fn = copy_store_builder.parameter_server
+                if name == "executor" or name == "evaluator":
+                    node_fn = copy_store_builder.executor
+                if name == "trainer":
+                    node_fn = copy_store_builder.trainer
+
             process = node_fn(*arguments)
             if node_type == lp.ReverbNode:
                 # Assigning server to self to keep it alive.
