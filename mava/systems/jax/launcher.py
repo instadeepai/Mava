@@ -30,6 +30,16 @@ class NodeType:
 
 
 def copy_store(builder: SystemBuilder, multi_process: bool) -> SystemBuilder:
+    """Creates a copy of the builder store.
+
+    Args:
+        builder: Mava builder object
+        multi_process: Flag indicating whether the system is
+            running in a distributed fashion or not
+
+    Returns:
+        SystemBuilder: Mava builder object
+    """
     if multi_process:
         # Note: It is unnecessary to copy when Launchpad is used.
         return builder
@@ -59,7 +69,8 @@ class Launcher:
             str, lp.LaunchType
         ] = lp.LaunchType.LOCAL_MULTI_PROCESSING,
     ) -> None:
-        """_summary_
+        """Initialize the launcher
+
         Args:
             multi_process : _description_.
             nodes_on_gpu : _description_.
@@ -96,13 +107,16 @@ class Launcher:
         name: str = "Node",
     ) -> Any:
         """_summary_
+
         Args:
             node_fn : _description_
             arguments : _description_.
             node_type : _description_.
             name : _description_.
+
         Raises:
             NotImplementedError: _description_
+
         Returns:
             _description_
         """
@@ -145,6 +159,7 @@ class Launcher:
 
     def launch(self) -> None:
         """_summary_
+
         Raises:
             NotImplementedError: _description_
         """
@@ -164,14 +179,22 @@ class Launcher:
             episode = 1
             executor_steps = 0
 
-            _ = self._node_dict["data_server"]
+            data_server = self._node_dict["data_server"]
             _ = self._node_dict["parameter_server"]
             executor = self._node_dict["executor"]
             evaluator = self._node_dict["evaluator"]
             trainer = self._node_dict["trainer"]
 
+            # getting the maximum queue size
+            queue_threshold = data_server.server_info()["trainer"].max_size
+
             while True:
-                executor_stats = executor.run_episode_and_log()
+                # if the queue is too full we skip the executor to ensure that the
+                # trainer won't hang when trying to sample
+                if data_server.server_info()["trainer"].current_size < int(
+                    queue_threshold * 0.75
+                ):
+                    executor_stats = executor.run_episode_and_log()
 
                 if episode % self._sp_trainer_period == 0:
                     _ = trainer.step()  # logging done in trainer
