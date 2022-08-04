@@ -1,25 +1,24 @@
 import functools
 from datetime import datetime
 from typing import Any
-import pytest
+
 import jax.numpy as jnp
 import launchpad as lp
 import optax
+import pytest
 
-from mava.systems.jax import System
-from mava.systems.jax import mappo
+from mava.systems.jax import System, mappo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
 
 @pytest.fixture
-def test_system()->System:
+def test_system() -> System:
     """Dummy system with zero components."""
     return mappo.MAPPOSystem()
 
-def test_parameter_server_process_instantiate(
-    test_system: System
-) -> None:
+
+def test_parameter_server_process_instantiate(test_system: System) -> None:
     """Main script for running system."""
 
     # Environment.
@@ -90,21 +89,21 @@ def test_parameter_server_process_instantiate(
         trainer,
     ) = test_system._builder.store.system_build
 
-    for i in range(0,4):
+    for i in range(0, 4):
         executor.run_episode()
 
-    #Before run step method
+    # Before run step method
     for net_key in trainer.store.networks["networks"].keys():
-        mu=trainer.store.opt_states[net_key][1][0][-1] #network
+        mu = trainer.store.opt_states[net_key][1][0][-1]  # network
         for categorical_value_head in mu.values():
-            assert jnp.all(categorical_value_head['b']==0)
-            assert jnp.all(categorical_value_head['w']==0)
-    
+            assert jnp.all(categorical_value_head["b"] == 0)
+            assert jnp.all(categorical_value_head["w"] == 0)
+
     trainer.step()
-   
-    #After run step method
+
+    # After run step method
     for net_key in trainer.store.networks["networks"].keys():
-        mu=trainer.store.opt_states[net_key][1][0][-1]
+        mu = trainer.store.opt_states[net_key][1][0][-1]
         for categorical_value_head in mu.values():
-            assert not jnp.all(categorical_value_head['b']==0)
-            assert not jnp.all(categorical_value_head['w']==0)
+            assert not jnp.all(categorical_value_head["b"] == 0)
+            assert not jnp.all(categorical_value_head["w"] == 0)
