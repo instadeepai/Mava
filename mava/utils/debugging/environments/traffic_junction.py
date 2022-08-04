@@ -267,6 +267,18 @@ class TrafficJunctionEnv(gym.Env):
         # Test all paths
         assert self._unittest_path(paths)
 
+    @staticmethod
+    def _unittest_path(paths):
+        for i, p in enumerate(paths[:-1]):
+            next_dif = p - np.row_stack([p[1:], p[-1]])
+            next_dif = np.abs(next_dif[:-1])
+            step_jump = np.sum(next_dif, axis=1)
+            if np.any(step_jump != 1):
+                return False
+            if not np.all(step_jump == 1):
+                return False
+        return True
+
     def _get_routes(self,
                     grid,
                     difficulty
@@ -516,23 +528,13 @@ class TrafficJunctionEnv(gym.Env):
         obs = self._get_obs()
         return obs, self._get_env_graph()
 
-    # Get communication graph -> just use distance for now
-    def _get_env_graph(self):
-        adj = np.zeros((1, self.num_agents, self.num_agents))  # 1 if agents can communicate
-        for i in range(self.num_agents):
-            if not self.alive_mask[i]:
-                continue
-            for j in range(i + 1, self.num_agents):
-                if not self.alive_mask[j]:
-                    continue
-                car_loc1 = self.car_loc[i]
-                car_loc2 = self.car_loc[j]
-                squared_distance = (car_loc1[0] - car_loc2[0])**2 + (car_loc1[1] - car_loc2[1])**2
-                if squared_distance <= self.comm_range**2:
-                    adj[0][i][j] = 1
-                    adj[0][j][i] = 1
+    def curriculum(self, epoch):
+        step_size = 0.01
+        step = (self.add_rate_max - self.add_rate_min) / (self.curr_end - self.curr_start)
 
-        return adj
+        if self.curr_start <= epoch < self.curr_end:
+            self.exact_rate = self.exact_rate + step
+            self.add_rate = step_size * (self.exact_rate // step_size)
 
     def step(self, action):
         """
@@ -584,137 +586,6 @@ class TrafficJunctionEnv(gym.Env):
 
         return obs, reward, self.episode_over, extras
 
-    def render(self, mode='human', close=False):
-
-        grid = self.grid.copy().astype(object)
-        # grid = np.zeros(self.dims[0]*self.dims[1], dtypeobject).reshape(self.dims)
-        grid[grid != self.OUTSIDE_CLASS] = '_'
-        grid[grid == self.OUTSIDE_CLASS] = ''
-        self.stdscr.clear()
-        for i, p in enumerate(self.car_loc):
-            if self.car_last_act[i] == 0: # GAS
-                if grid[p[0]][p[1]] != 0:
-                    grid[p[0]][p[1]] = str(grid[p[0]][p[1]]).replace('_','') + '<>'
-                else:
-                    grid[p[0]][p[1]] = '<>'
-            else: # BRAKE
-                if grid[p[0]][p[1]] != 0:
-                    grid[p[0]][p[1]] = str(grid[p[0]][p[1]]).replace('_','') + '<b>'
-                else:
-                    grid[p[0]][p[1]] = '<b>'
-
-        for row_num, row in enumerate(grid):
-            for idx, item in enumerate(row):
-                if row_num == idx == 0:
-                    continue
-                if item != '_':
-                    if '<>' in item and len(item) > 3: #CRASH, one car accelerates
-                        self.stdscr.addstr(row_num, idx * 4, item.replace('b','').center(3), curses.color_pair(2))
-                    elif '<>' in item: #GAS
-                        self.stdscr.addstr(row_num, idx * 4, item.center(3), curses.color_pair(1))
-                    elif 'b' in item and len(item) > 3: #CRASH
-                        self.stdscr.addstr(row_num, idx * 4, item.replace('b','').center(3), curses.color_pair(2))
-                    elif 'b' in item:
-                        self.stdscr.addstr(row_num, idx * 4, item.replace('b','').center(3), curses.color_pair(5))
-                    else:
-                        self.stdscr.addstr(row_num, idx * 4, item.center(3),  curses.color_pair(2))
-                else:
-                    self.stdscr.addstr(row_num, idx * 4, '_'.center(3), curses.color_pair(4))
-
-        self.stdscr.addstr(len(grid), 0, '\n')
-        self.stdscr.refresh()
-
-    def exit_render(self):
-        curses.endwin()
-
-    def seed(self):
-        return
-
-    def _get_obs(self):
-        h, w = self.dims
-        self.bool_base_grid = self.empty_bool_base_grid.copy()
-
-        # Mark cars' location in Bool grid
-        for i, p in enumerate(self.car_loc):
-            self.bool_base_grid[p[0] + self.vision, p[1] + self.vision, self.CAR_CLASS] += 1
-
-
-        # remove the outside class.
-        if self.vocab_type == 'scalar':
-            self.bool_base_grid = self.bool_base_grid[:,:,1:]
-
-
-        obs = []
-        for i, p in enumerate(self.car_loc):
-            # most recent action
-            act = self.car_last_act[i] / (self.n_actions - 1)
-
-            # route id
-            r_i = self.route_id[i] / (self.n_paths - 1)
-
-            # loc
-            p_norm = p / (h-1, w-1)
-
-            # vision square
-            slice_y = slice(p[0], p[0] + (2 * self.vision) + 1)
-            slice_x = slice(p[1], p[1] + (2 * self.vision) + 1)
-            v_sq = self.bool_base_grid[slice_y, slice_x]
-
-            # when dead, all obs are 0. But should be masked by trainer.
-            if self.alive_mask[i] == 0:
-                act = np.zeros_like(act)
-                r_i = np.zeros_like(r_i)
-                p_norm = np.zeros_like(p_norm)
-                v_sq = np.zeros_like(v_sq)
-
-            if self.vocab_type == 'bool':
-                o = tuple((act, r_i, v_sq))
-            else:
-                o = tuple((act, r_i, p_norm, v_sq))
-            obs.append(o)
-
-        obs = tuple(obs)
-        return obs
-
-
-    def _add_cars(self):
-        for r_i, routes in enumerate(self.routes):
-            if self.cars_in_sys >= self.num_agents:
-                return
-
-            # Add car to system and set on path
-            if np.random.uniform() <= self.add_rate:
-
-                # chose dead car on random
-                idx = self._choose_dead()
-                # make it alive
-                self.alive_mask[idx] = 1
-
-                # choose path randomly & set it
-                p_i = np.random.choice(len(routes))
-                # make sure all self.routes have equal len/ same no. of routes
-                self.route_id[idx] = p_i + r_i * len(routes)
-                self.chosen_path[idx] = routes[p_i]
-
-                # set its start loc
-                self.car_route_loc[idx] = 0
-                self.car_loc[idx] = routes[p_i][0]
-
-                # increase count
-                self.cars_in_sys += 1
-
-    def _unittest_path(self,paths):
-        for i, p in enumerate(paths[:-1]):
-            next_dif = p - np.row_stack([p[1:], p[-1]])
-            next_dif = np.abs(next_dif[:-1])
-            step_jump = np.sum(next_dif, axis =1)
-            if np.any(step_jump != 1):
-                return False
-            if not np.all(step_jump == 1):
-                return False
-        return True
-
-
     def _take_action(self, idx, act):
         # non-active car
         if self.alive_mask[idx] == 0:
@@ -757,22 +628,31 @@ class TrafficJunctionEnv(gym.Env):
             # Change last act for color:
             self.car_last_act[idx] = 0
 
+    def _add_cars(self):
+        for r_i, routes in enumerate(self.routes):
+            if self.cars_in_sys >= self.num_agents:
+                return
 
+            # Add car to system and set on path
+            if np.random.uniform() <= self.add_rate:
 
-    def _get_reward(self):
-        reward = np.full(self.num_agents, self.TIMESTEP_PENALTY) * self.wait
+                # chose dead car on random
+                idx = self._choose_dead()
+                # make it alive
+                self.alive_mask[idx] = 1
 
-        for i, l in enumerate(self.car_loc):
-            if (len(np.where(np.all(self.car_loc[:i] == l,axis=1))[0]) or \
-               len(np.where(np.all(self.car_loc[i+1:] == l,axis=1))[0])) and l.any():
-               reward[i] += self.CRASH_PENALTY
-               self.has_failed = 1
+                # choose path randomly & set it
+                p_i = np.random.choice(len(routes))
+                # make sure all self.routes have equal len/ same no. of routes
+                self.route_id[idx] = p_i + r_i * len(routes)
+                self.chosen_path[idx] = routes[p_i]
 
-        reward = self.alive_mask * reward
-        return reward
+                # set its start loc
+                self.car_route_loc[idx] = 0
+                self.car_loc[idx] = routes[p_i][0]
 
-    def reward_terminal(self):
-        return np.zeros_like(self._get_reward())
+                # increase count
+                self.cars_in_sys += 1
 
     def _choose_dead(self):
         # all idx
@@ -780,10 +660,79 @@ class TrafficJunctionEnv(gym.Env):
         # random choice of idx from dead ones.
         return np.random.choice(car_idx[self.alive_mask == 0])
 
-    def curriculum(self, epoch):
-        step_size = 0.01
-        step = (self.add_rate_max - self.add_rate_min) / (self.curr_end - self.curr_start)
+    def _get_obs(self):
+        h, w = self.dims
+        self.bool_base_grid = self.empty_bool_base_grid.copy()
 
-        if self.curr_start <= epoch < self.curr_end:
-            self.exact_rate = self.exact_rate + step
-            self.add_rate = step_size * (self.exact_rate // step_size)
+        # Mark cars' location in Bool grid
+        for i, p in enumerate(self.car_loc):
+            self.bool_base_grid[p[0] + self.vision, p[1] + self.vision, self.CAR_CLASS] += 1
+
+        # remove the outside class.
+        if self.vocab_type == 'scalar':
+            self.bool_base_grid = self.bool_base_grid[:,:,1:]
+
+        obs = []
+        for i, p in enumerate(self.car_loc):
+            # most recent action
+            act = self.car_last_act[i] / (self.n_actions - 1)
+
+            # route id
+            r_i = self.route_id[i] / (self.n_paths - 1)
+
+            # loc
+            p_norm = p / (h-1, w-1)
+
+            # vision square
+            slice_y = slice(p[0], p[0] + (2 * self.vision) + 1)
+            slice_x = slice(p[1], p[1] + (2 * self.vision) + 1)
+            v_sq = self.bool_base_grid[slice_y, slice_x]
+
+            # when dead, all obs are 0. But should be masked by trainer.
+            if self.alive_mask[i] == 0:
+                act = np.zeros_like(act)
+                r_i = np.zeros_like(r_i)
+                p_norm = np.zeros_like(p_norm)
+                v_sq = np.zeros_like(v_sq)
+
+            if self.vocab_type == 'bool':
+                o = tuple((act, r_i, v_sq))
+            else:
+                o = tuple((act, r_i, p_norm, v_sq))
+            obs.append(o)
+
+        obs = tuple(obs)
+        return obs
+
+    # Get communication graph -> just use distance for now
+    def _get_env_graph(self):
+        adj = np.zeros((1, self.num_agents, self.num_agents))  # 1 if agents can communicate
+        for i in range(self.num_agents):
+            if not self.alive_mask[i]:
+                continue
+            for j in range(i + 1, self.num_agents):
+                if not self.alive_mask[j]:
+                    continue
+                car_loc1 = self.car_loc[i]
+                car_loc2 = self.car_loc[j]
+                squared_distance = (car_loc1[0] - car_loc2[0]) ** 2 + (car_loc1[1] - car_loc2[1]) ** 2
+                if squared_distance <= self.comm_range ** 2:
+                    adj[0][i][j] = 1
+                    adj[0][j][i] = 1
+
+        return adj
+
+    def _get_reward(self):
+        reward = np.full(self.num_agents, self.TIMESTEP_PENALTY) * self.wait
+
+        for i, l in enumerate(self.car_loc):
+            if (len(np.where(np.all(self.car_loc[:i] == l,axis=1))[0]) or
+                    len(np.where(np.all(self.car_loc[i+1:] == l, axis=1))[0])) and l.any():
+                reward[i] += self.CRASH_PENALTY
+                self.has_failed = 1
+
+        reward = self.alive_mask * reward
+        return reward
+
+    def reward_terminal(self):
+        return np.zeros_like(self._get_reward())
