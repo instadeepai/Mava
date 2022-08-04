@@ -28,18 +28,20 @@ class NodeType:
     reverb = lp.ReverbNode
     courier = lp.CourierNode
 
+
 def copy_store(builder: SystemBuilder, multi_process: bool) -> SystemBuilder:
     if multi_process:
         # Note: It is unnecessary to copy when Launchpad is used.
         return builder
-    else: 
+    else:
         # Note: Add store.program to the memo to avoid copying
-        # it. 
+        # it.
         memo = {}
         memo[id(builder.store.program)] = builder.store.program
         buildercopy = copy.deepcopy(builder, memo=memo)
-        
+
         return buildercopy
+
 
 class Launcher:
     """This mava launcher can be used to launch multi-node systems using either single \
