@@ -26,7 +26,6 @@ from mava.systems.jax.launcher import Launcher, NodeType
 from tests.jax.components.building.distributor_test import MockBuilder
 
 
-
 @pytest.fixture
 def mock_data_server_fn() -> Callable:
     """call data_server function"""
@@ -241,13 +240,13 @@ def test_add_non_multi_process_reverb_node(mock_data_server_fn: Callable) -> Non
             mock_data_server_fn,
             node_type=NodeType.reverb,
             name="data_server_test",
-            builder=MockBuilder()
+            builder=MockBuilder(),
         )
     data_server = launcher.add(
         mock_data_server_fn,
         node_type=NodeType.reverb,
         name="data_server",
-        builder=MockBuilder()     
+        builder=MockBuilder(),
     )
 
     assert not hasattr(launcher, "_program")
@@ -279,13 +278,13 @@ def test_add_non_multi_process_courier_node(mock_parameter_server_fn: Callable) 
             mock_parameter_server_fn,
             node_type=NodeType.courier,
             name="parameter_server_test",
-            builder=MockBuilder()  
+            builder=MockBuilder(),
         )
     parameter_server = launcher.add(
         mock_parameter_server_fn,
         node_type=NodeType.courier,
         name="parameter_server",
-        builder=MockBuilder()  
+        builder=MockBuilder(),
     )
 
     assert not hasattr(launcher, "_program")
@@ -311,13 +310,13 @@ def test_add_non_multi_process_two_add_calls(
         mock_data_server_fn,
         node_type=NodeType.reverb,
         name="data_server",
-        builder=MockBuilder()  
+        builder=MockBuilder(),
     )
     parameter_server = launcher.add(
         mock_parameter_server_fn,
         node_type=NodeType.courier,
         name="parameter_server",
-        builder=MockBuilder()  
+        builder=MockBuilder(),
     )
 
     assert not hasattr(launcher, "_program")
@@ -353,14 +352,14 @@ def test_add_non_multi_process_two_add_same_name(
         mock_parameter_server_fn,
         node_type=NodeType.courier,
         name="parameter_server",
-        builder=MockBuilder()  
+        builder=MockBuilder(),
     )
     with pytest.raises(ValueError):
         parameter_server_2 = launcher.add(
             mock_parameter_server_second_fn,
             node_type=NodeType.courier,
             name="parameter_server",
-            builder=MockBuilder()  
+            builder=MockBuilder(),
         )
 
 
@@ -393,16 +392,15 @@ def test_get_nodes_non_multi_process(
         mock_data_server_fn,
         node_type=NodeType.reverb,
         name="data_server",
-        builder=MockBuilder()  
+        builder=MockBuilder(),
     )
     parameter_server = launcher.add(
         mock_parameter_server_fn,
         node_type=NodeType.courier,
         name="parameter_server",
-        builder=MockBuilder()  
+        builder=MockBuilder(),
     )
 
     nodes = launcher.get_nodes()
 
     assert nodes == [data_server, parameter_server]
-
