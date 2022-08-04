@@ -22,7 +22,8 @@ import pytest
 from reverb import Client, item_selectors, pybind, rate_limiters
 from reverb import server as reverb_server
 
-from mava.systems.jax.launcher import Launcher, NodeType
+from mava.systems.jax.launcher import Launcher, NodeType, copy_store
+from tests.jax.components.building.distributor_test import MockBuilder
 
 
 @pytest.fixture
@@ -68,6 +69,11 @@ def mock_parameter_server_second_fn() -> Callable:
         return "test_parameter_server_second_mock"
 
     return parameter_server_second
+
+@pytest.fixture
+def mock_builder() -> MockBuilder:
+    """Mock builder"""
+    return MockBuilder()
 
 
 def test_initiator_multi_process() -> None:
@@ -393,3 +399,24 @@ def test_get_nodes_non_multi_process(
     nodes = launcher.get_nodes()
 
     assert nodes == [data_server, parameter_server]
+
+def test_copy_store_multi_process(mock_builder: MockBuilder)->None:
+    """Test copy_store util function in the case of multi_process
+    
+    Args:
+        mock_builder: Builder
+    """
+    builder=copy_store(builder=mock_builder, multi_process=True)
+
+    assert builder==mock_builder
+
+
+def test_copy_store_single_process(mock_builder: MockBuilder)->None:
+    """Test copy_store util function in the case of single_process
+    
+    Args:
+        mock_builder: Builder
+    """
+    builder_copy=copy_store(builder=mock_builder, multi_process=False)
+
+    assert builder_copy!=mock_builder
