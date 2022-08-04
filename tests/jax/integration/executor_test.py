@@ -189,8 +189,7 @@ def test_executor_behavior(
     # Run an episode
     executor.run_episode()
 
-    # Observe first
-    # assert executor._executor.store.adder._add_first_called == True
+    # Observe first and observe
     assert executor._executor.store.adder._writer.history
     assert list(executor._executor.store.adder._writer.history.keys()) == [
         "observations",
@@ -207,6 +206,8 @@ def test_executor_behavior(
         type(executor._executor.store.adder._writer.history["observations"]["agent_0"])
         == OLT
     )
+
+    assert len(executor._executor.store.adder._writer._column_history)!=0
 
     # Select actions and select action
     assert list(executor._executor.store.actions_info.keys()) == [
@@ -227,7 +228,4 @@ def test_executor_behavior(
     assert (
         lambda: key == "log_prob"
         for key in executor._executor.store.policies_info.values()
-    )
-
-    # Observe
-    assert hasattr(executor._executor.store.adder, "add")
+    )   
