@@ -20,9 +20,9 @@ from types import SimpleNamespace
 from typing import Any, List
 
 import pytest
+from reverb import client as reverb_client
 from reverb import item_selectors, rate_limiters
 from reverb import server as reverb_server
-from reverb import client as reverb_client
 
 from mava.components.jax.building.distributor import Distributor
 from mava.systems.jax.builder import Builder
@@ -68,17 +68,17 @@ class MockBuilder(Builder):
 
     def executor(
         self, executor_id: str, data_server_client: Any, parameter_server_client: Any
-    ) -> None:
+    ) -> str:
         """Executor to test no multi_process in on_building_program_nodes method"""
         if executor_id == "evaluator":
             return "Evaluator Test"
-            
+
         else:
             return "Executor Test"
 
     def trainer(
         self, trainer_id: str, data_server_client: Any, parameter_server_client: Any
-    ) -> None:
+    ) -> str:
         """Trainer to test no multi_process in on_building_program_nodes method"""
         return "Trainer Test"
 
@@ -203,28 +203,16 @@ def test_on_building_program_nodes(
         evaluator,
         trainer,
     ) = mock_builder.store.system_build
-    
-    assert isinstance(data_server,reverb_client.Client)
-    
-    assert (
-        parameter_server
-        == "Parameter Server Test"
-    )
 
-    assert (
-        executor
-        == "Executor Test"
-    )
+    assert isinstance(data_server, reverb_client.Client)
 
-    assert (
-        evaluator
-        == "Evaluator Test"
-    )
+    assert parameter_server == "Parameter Server Test"
 
-    assert (
-        trainer
-        == "Trainer Test"
-    )
+    assert executor == "Executor Test"
+
+    assert evaluator == "Evaluator Test"
+
+    assert trainer == "Trainer Test"
 
 
 def test_on_building_program_nodes_no_evaluator(
@@ -244,23 +232,15 @@ def test_on_building_program_nodes_no_evaluator(
         executor,
         trainer,
     ) = mock_builder.store.system_build
-    
-    assert isinstance(data_server,reverb_client.Client)
-    
-    assert (
-        parameter_server
-        == "Parameter Server Test"
-    )
 
-    assert (
-        executor
-        == "Executor Test"
-    )
+    assert isinstance(data_server, reverb_client.Client)
 
-    assert (
-        trainer
-        == "Trainer Test"
-    )
+    assert parameter_server == "Parameter Server Test"
+
+    assert executor == "Executor Test"
+
+    assert trainer == "Trainer Test"
+
 
 def test_on_building_launch(
     mock_builder: MockBuilder, distributor: Distributor
