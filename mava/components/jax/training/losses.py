@@ -71,10 +71,10 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                 params: network parameters.
                 observations: agent observations.
                 actions: actions the agents took.
-                behaviour_log_probs: TODO(Matthew): not sure what this is.
+                behaviour_log_probs: log probablity of action taken.
                 target_values: values computed using target networks.
                 advantages: advantage estimation values per agent.
-                behavior_values: TODO(Matthew): not sure what this is
+                behavior_values: estimated value from the critic.
 
             Returns:
                 Tuple[gradients, loss info]
