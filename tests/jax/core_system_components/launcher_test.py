@@ -70,6 +70,7 @@ def mock_parameter_server_second_fn() -> Callable:
 
     return parameter_server_second
 
+
 @pytest.fixture
 def mock_builder() -> MockBuilder:
     """Mock builder"""
@@ -233,7 +234,7 @@ def test_add_multi_process_two_add_same_name(
     assert not hasattr(launcher, "_node_dict")
 
 
-def test_add_non_multi_process_reverb_node(mock_builder:MockBuilder) -> None:
+def test_add_non_multi_process_reverb_node(mock_builder: MockBuilder) -> None:
     """Test the add method for the case of one process and for node_type reverb
 
     Args:
@@ -245,7 +246,6 @@ def test_add_non_multi_process_reverb_node(mock_builder:MockBuilder) -> None:
             mock_builder.data_server,
             node_type=NodeType.reverb,
             name="data_server_test",
-
         )
     data_server = launcher.add(
         mock_builder.data_server,
@@ -298,8 +298,7 @@ def test_add_non_multi_process_courier_node(mock_builder: MockBuilder) -> None:
     assert parameter_server == "Parameter Server Test"
 
 
-def test_add_non_multi_process_two_add_calls( mock_builder:MockBuilder
-) -> None:
+def test_add_non_multi_process_two_add_calls(mock_builder: MockBuilder) -> None:
     """Test calling twice add method for the case of one process
 
     Args:
@@ -336,9 +335,7 @@ def test_add_non_multi_process_two_add_calls( mock_builder:MockBuilder
     assert launcher._node_dict["parameter_server"] == "Parameter Server Test"
 
 
-def test_add_non_multi_process_two_add_same_name(
-    mock_builder:MockBuilder
-) -> None:
+def test_add_non_multi_process_two_add_same_name(mock_builder: MockBuilder) -> None:
     """Test calling twice add method for two nodes with same name and for the case of one process and for node_type reverb
 
     Args:
@@ -353,7 +350,7 @@ def test_add_non_multi_process_two_add_same_name(
     )
     with pytest.raises(ValueError):
         parameter_server_2 = launcher.add(
-           mock_builder.parameter_server,
+            mock_builder.parameter_server,
             node_type=NodeType.courier,
             name="parameter_server",
         )
@@ -374,9 +371,7 @@ def test_get_nodes_non_multi_process_empty() -> None:
     assert nodes == []
 
 
-def test_get_nodes_non_multi_process(
-    mock_builder: MockBuilder
-) -> None:
+def test_get_nodes_non_multi_process(mock_builder: MockBuilder) -> None:
     """Test get_nodes method in the case of one process with two nodes
 
     Args:

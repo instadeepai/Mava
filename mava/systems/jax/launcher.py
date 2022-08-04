@@ -117,11 +117,11 @@ class Launcher:
                     f"Node named {name} initialised more than onces."
                     + "Single process currently only supports one node per type."
                 )
-            
+
             copy_store_builder = copy_builder(builder=node_fn.__self__)
 
             # Execute the function from the copied builder.
-            function_name = str(repr(node_fn).split(' ')[2].split('.')[-1])
+            function_name = str(repr(node_fn).split(" ")[2].split(".")[-1])
             node_fn = getattr(copy_store_builder, function_name)
 
             process = node_fn(*arguments)
