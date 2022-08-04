@@ -82,7 +82,6 @@ class Launcher:
         arguments: Any = [],
         node_type: Union[lp.ReverbNode, lp.CourierNode] = NodeType.courier,
         name: str = "Node",
-        builder: SystemBuilder = None,
     ) -> Any:
         """_summary_
 
@@ -118,20 +117,12 @@ class Launcher:
                     f"Node named {name} initialised more than onces."
                     + "Single process currently only supports one node per type."
                 )
-            if builder is None:
-                raise ValueError(
-                    f"Missing attribute: add the current builder into parameters"
-                )
-            else:
-                copy_store_builder = copy_builder(builder=builder)
-                if name == "data_server":
-                    node_fn = copy_store_builder.data_server
-                if name == "parameter_server":
-                    node_fn = copy_store_builder.parameter_server
-                if name == "executor" or name == "evaluator":
-                    node_fn = copy_store_builder.executor
-                if name == "trainer":
-                    node_fn = copy_store_builder.trainer
+            
+            copy_store_builder = copy_builder(builder=node_fn.__self__)
+
+            # Execute the function from the copied builder.
+            function_name = str(repr(node_fn).split(' ')[2].split('.')[-1])
+            node_fn = getattr(copy_store_builder, function_name)
 
             process = node_fn(*arguments)
             if node_type == lp.ReverbNode:

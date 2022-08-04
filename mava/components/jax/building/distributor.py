@@ -65,7 +65,6 @@ class Distributor(Component):
             builder.data_server,
             node_type=NodeType.reverb,
             name="data_server",
-            builder=builder,
         )
 
         # variable server node
@@ -73,7 +72,6 @@ class Distributor(Component):
             builder.parameter_server,
             node_type=NodeType.courier,
             name="parameter_server",
-            builder=builder,
         )
 
         # executor nodes
@@ -83,7 +81,6 @@ class Distributor(Component):
                 [f"executor_{executor_id}", data_server, parameter_server],
                 node_type=NodeType.courier,
                 name="executor",
-                builder=builder,
             )
 
         if self.config.run_evaluator:
@@ -93,7 +90,6 @@ class Distributor(Component):
                 ["evaluator", data_server, parameter_server],
                 node_type=NodeType.courier,
                 name="evaluator",
-                builder=builder,
             )
 
         # trainer nodes
@@ -103,7 +99,6 @@ class Distributor(Component):
                 [trainer_id, data_server, parameter_server],
                 node_type=NodeType.courier,
                 name="trainer",
-                builder=builder,
             )
 
         if not self.config.multi_process:
