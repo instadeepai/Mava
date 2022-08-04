@@ -72,7 +72,7 @@ class ExecutorParameterClient(BaseParameterClient):
     def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
         """Create and store the executor parameter client.
 
-        Gets network parameters from store and registers them for tracking.
+        Gets network parameters from store and registers them for updating.
         Also works for the evaluator.
 
         Args:
@@ -159,7 +159,7 @@ class TrainerParameterClient(BaseParameterClient):
     def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
         """Create and store the trainer parameter client.
 
-        Gets network parameters from store and registers them for tracking.
+        Gets network parameters from store and registers them for updating.
 
         Args:
             builder: SystemBuilder.

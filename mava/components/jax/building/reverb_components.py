@@ -245,7 +245,7 @@ class Remover(Component):
     def on_building_data_server_start(self, builder: SystemBuilder) -> None:
         """Hook for adding reverb selector to builder store.
 
-        This determines how experience will be experience from the replay table.
+        This determines how experience will be sampled from the replay table.
 
         Args:
             builder: SystemBuilder.
