@@ -207,7 +207,7 @@ def test_executor_behavior(
         == OLT
     )
 
-    assert len(executor._executor.store.adder._writer._column_history)!=0
+    assert len(executor._executor.store.adder._writer._column_history) != 0
 
     # Select actions and select action
     assert list(executor._executor.store.actions_info.keys()) == [
@@ -228,4 +228,4 @@ def test_executor_behavior(
     assert (
         lambda: key == "log_prob"
         for key in executor._executor.store.policies_info.values()
-    )   
+    )
