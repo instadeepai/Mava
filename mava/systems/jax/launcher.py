@@ -30,7 +30,7 @@ class NodeType:
 
 def copy_store(builder: SystemBuilder, multi_process: bool) -> SystemBuilder:
     if multi_process:
-        # Not: It is unnecessary to copy when Launchpad is used.
+        # Note: It is unnecessary to copy when Launchpad is used.
         return builder
     else: 
         # Note: Set up the memo for the deepcopy to avoid copying
