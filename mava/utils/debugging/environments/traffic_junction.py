@@ -86,19 +86,19 @@ class TrafficJunctionEnv(gym.Env):
         self.has_failed = 0
 
         # Set during reset
-        self.alive_mask = None
-        self.wait = None
-        self.cars_in_sys = None
-        self.chosen_path = None
-        self.route_id = None
-        self.car_ids = None
-        self.car_loc = None
-        self.car_last_act = None
-        self.car_route_loc = None
-        self.stat = None
+        self.alive_mask: np.ndarray
+        self.wait: np.ndarray
+        self.cars_in_sys: int
+        self.chosen_path: List[int]
+        self.route_id = List[int]
+        self.car_ids: np.ndarray
+        self.car_loc: np.ndarray
+        self.car_last_act: np.ndarray
+        self.car_route_loc: np.ndarray
+        self.stat: Dict[str, Any]
 
         # Set during step
-        self.is_completed = None
+        self.is_completed: np.ndarray
 
         # Check that environment dimensions are licit
         self.dims = dims = [self.dim, self.dim]
@@ -297,7 +297,9 @@ class TrafficJunctionEnv(gym.Env):
                 return False
         return True
 
-    def _get_routes(self, grid, difficulty) -> List[List[List[Tuple[int, int]]]]:
+    def _get_routes(
+        self, grid: np.ndarray, difficulty: str
+    ) -> List[List[List[Tuple[int, int]]]]:
         grid.dtype = int
 
         assert difficulty == "medium" or difficulty == "hard"
@@ -357,13 +359,13 @@ class TrafficJunctionEnv(gym.Env):
         return routes
 
     def _get_add_mat(
-        self, grid, difficulty
+        self, grid: np.ndarray, difficulty: str
     ) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]], np.ndarray, np.ndarray]:
         h, w = self.dims
 
         road_dir = grid.copy()
         junction = np.zeros_like(grid)
-        arrival_points, finish_points = None, None
+        arrival_points, finish_points = [], []
 
         if difficulty == "medium":
             arrival_points = [
@@ -431,12 +433,21 @@ class TrafficJunctionEnv(gym.Env):
         return arrival_points, finish_points, road_dir, junction
 
     @staticmethod
-    def _goal_reached(place_i, curr, finish_points) -> bool:
+    def _goal_reached(
+        place_i: int, curr: Tuple[int, int], finish_points: List[Tuple[int, int]]
+    ) -> bool:
         return curr in finish_points[:place_i] + finish_points[place_i + 1 :]
 
     @staticmethod
     def _next_move(
-        curr, turn, turn_step, start, grid, road_dir, junction, visited
+        curr: Tuple[int, int],
+        turn: int,
+        turn_step: int,
+        start: Tuple[int, int],
+        grid,
+        road_dir,
+        junction,
+        visited,
     ) -> Tuple[Tuple[int, int], bool, bool]:
         move = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
@@ -510,7 +521,7 @@ class TrafficJunctionEnv(gym.Env):
     # END OF ENVIRONMENT INIT METHODS
     #
 
-    def reset(self, epoch=None) -> Tuple[Tuple, np.ndarray]:
+    def reset(self, epoch: int = None) -> Tuple[Tuple, np.ndarray]:
         """
         Reset the state of the environment and returns an initial observation.
 
