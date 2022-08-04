@@ -26,6 +26,7 @@ from mava.systems.jax.launcher import Launcher, NodeType
 from tests.jax.components.building.distributor_test import MockBuilder
 
 
+
 @pytest.fixture
 def mock_data_server_fn() -> Callable:
     """call data_server function"""
@@ -69,12 +70,6 @@ def mock_parameter_server_second_fn() -> Callable:
         return "test_parameter_server_second_mock"
 
     return parameter_server_second
-
-
-@pytest.fixture
-def mock_builder() -> MockBuilder:
-    """Mock builder"""
-    return MockBuilder()
 
 
 def test_initiator_multi_process() -> None:
@@ -246,11 +241,13 @@ def test_add_non_multi_process_reverb_node(mock_data_server_fn: Callable) -> Non
             mock_data_server_fn,
             node_type=NodeType.reverb,
             name="data_server_test",
+            builder=MockBuilder()
         )
     data_server = launcher.add(
         mock_data_server_fn,
         node_type=NodeType.reverb,
         name="data_server",
+        builder=MockBuilder()     
     )
 
     assert not hasattr(launcher, "_program")
@@ -282,11 +279,13 @@ def test_add_non_multi_process_courier_node(mock_parameter_server_fn: Callable) 
             mock_parameter_server_fn,
             node_type=NodeType.courier,
             name="parameter_server_test",
+            builder=MockBuilder()  
         )
     parameter_server = launcher.add(
         mock_parameter_server_fn,
         node_type=NodeType.courier,
         name="parameter_server",
+        builder=MockBuilder()  
     )
 
     assert not hasattr(launcher, "_program")
@@ -295,7 +294,7 @@ def test_add_non_multi_process_courier_node(mock_parameter_server_fn: Callable) 
     assert launcher._nodes[-1] == launcher._node_dict["parameter_server"]
     assert parameter_server == launcher._nodes[-1]
 
-    assert parameter_server == "test_parameter_server"
+    assert parameter_server == "Parameter Server Test"
 
 
 def test_add_non_multi_process_two_add_calls(
@@ -312,11 +311,13 @@ def test_add_non_multi_process_two_add_calls(
         mock_data_server_fn,
         node_type=NodeType.reverb,
         name="data_server",
+        builder=MockBuilder()  
     )
     parameter_server = launcher.add(
         mock_parameter_server_fn,
         node_type=NodeType.courier,
         name="parameter_server",
+        builder=MockBuilder()  
     )
 
     assert not hasattr(launcher, "_program")
@@ -335,7 +336,7 @@ def test_add_non_multi_process_two_add_calls(
     assert isinstance(launcher._node_dict["data_server"]._client, pybind.Client)
     assert launcher._node_dict["data_server"]._signature_cache == {}
 
-    assert launcher._node_dict["parameter_server"] == "test_parameter_server"
+    assert launcher._node_dict["parameter_server"] == "Parameter Server Test"
 
 
 def test_add_non_multi_process_two_add_same_name(
@@ -352,12 +353,14 @@ def test_add_non_multi_process_two_add_same_name(
         mock_parameter_server_fn,
         node_type=NodeType.courier,
         name="parameter_server",
+        builder=MockBuilder()  
     )
     with pytest.raises(ValueError):
         parameter_server_2 = launcher.add(
             mock_parameter_server_second_fn,
             node_type=NodeType.courier,
             name="parameter_server",
+            builder=MockBuilder()  
         )
 
 
@@ -390,24 +393,16 @@ def test_get_nodes_non_multi_process(
         mock_data_server_fn,
         node_type=NodeType.reverb,
         name="data_server",
+        builder=MockBuilder()  
     )
     parameter_server = launcher.add(
         mock_parameter_server_fn,
         node_type=NodeType.courier,
         name="parameter_server",
+        builder=MockBuilder()  
     )
 
     nodes = launcher.get_nodes()
 
     assert nodes == [data_server, parameter_server]
 
-
-def test_copy_builder_multi_process(mock_builder: MockBuilder) -> None:
-    """Test copy_builder util function in the case of multi_process
-
-    Args:
-        mock_builder: Builder
-    """
-    builder = copy_builder(builder=mock_builder, multi_process=True)
-
-    assert builder == mock_builder
