@@ -63,7 +63,7 @@ class ClippedGaussianDistribution:
 
     def log_prob(self, action: jnp.ndarray) -> jnp.ndarray:
         """Get log prob from clipped distribution"""
-        return self.clip_fn(self._guassian_dist).log_prob(action)
+        return self.clip_fn(self._guassian_dist).log_prob(action + 1e-9)
 
 
 class ClippedGaussianHead(hk.Module):
