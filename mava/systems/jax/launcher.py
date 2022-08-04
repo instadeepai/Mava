@@ -34,6 +34,19 @@ def copy_store(builder: SystemBuilder) -> SystemBuilder:
     buildercopy.store = copy.copy(builder.store)
     return buildercopy
 
+def deepcopy_store(builder: SystemBuilder) -> SystemBuilder:
+    buildercopy = copy.copy(builder)
+
+    # Note: Set up the memo for the deepcopy to avoid copying
+    # the program and Tables. 
+    memo = {}
+    memo[id(builder.store.program)] = builder.store.program
+    memo[id(builder.store.Tables)] = builder.store.Tables
+    
+    buildercopy.store = copy.deepcopy(builder.store, memo=memo)
+    
+    return buildercopy
+
 
 class Launcher:
     """This mava launcher can be used to launch multi-node systems using either single \
