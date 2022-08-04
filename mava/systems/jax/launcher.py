@@ -30,7 +30,7 @@ class NodeType:
 
 def copy_store(builder: SystemBuilder) -> SystemBuilder:
     # Note: Set up the memo for the deepcopy to avoid copying
-    # the program and data_tables. 
+    # the program. 
     memo = {}
     memo[id(builder.store.program)] = builder.store.program
     buildercopy = copy.deepcopy(builder, memo=memo)
