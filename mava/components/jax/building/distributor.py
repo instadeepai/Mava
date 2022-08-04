@@ -119,7 +119,7 @@ class Distributor(Component):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "distributor"
 
     @staticmethod

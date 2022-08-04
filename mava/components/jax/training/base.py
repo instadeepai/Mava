@@ -60,7 +60,7 @@ class Loss(Component):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "loss"
 
 
@@ -71,5 +71,5 @@ class Step(Component):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "sgd_step"

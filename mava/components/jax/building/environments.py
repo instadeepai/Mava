@@ -67,7 +67,7 @@ class EnvironmentSpec(Component):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "environment_spec"
 
     @staticmethod
@@ -126,7 +126,7 @@ class ExecutorEnvironmentLoop(Component):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "executor_environment_loop"
 
     @staticmethod

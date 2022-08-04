@@ -38,7 +38,7 @@ class MinibatchUpdate(Utility):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "minibatch_update"
 
 
@@ -153,7 +153,7 @@ class EpochUpdate(Utility):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "epoch_update"
 
 

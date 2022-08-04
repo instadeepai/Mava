@@ -125,7 +125,7 @@ class ExecutorParameterClient(BaseParameterClient):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "executor_parameter_client"
 
     @staticmethod
@@ -214,5 +214,5 @@ class TrainerParameterClient(BaseParameterClient):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "trainer_parameter_client"

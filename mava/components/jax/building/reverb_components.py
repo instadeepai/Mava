@@ -42,7 +42,7 @@ class RateLimiter(Component):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "rate_limiter"
 
     @staticmethod
@@ -153,7 +153,7 @@ class Sampler(Component):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
 
         return "data_server_sampler"
 
@@ -256,7 +256,7 @@ class Remover(Component):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
 
         return "data_server_remover"
 
