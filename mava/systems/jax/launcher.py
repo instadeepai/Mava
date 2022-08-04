@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Union
 import launchpad as lp
 import reverb
 
+from mava.core_jax import SystemBuilder
 from mava.utils import lp_utils
 
 
@@ -28,7 +29,7 @@ class NodeType:
     courier = lp.CourierNode
 
 
-def copy_store(builder):
+def copy_store(builder: SystemBuilder) -> SystemBuilder:
     buildercopy = copy.copy(builder)
     buildercopy.store = copy.copy(builder.store)
     return buildercopy
