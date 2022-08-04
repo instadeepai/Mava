@@ -74,6 +74,9 @@ class System(BaseSystem):
 
         Args:
             component: system callback component.
+
+        Returns:
+            None.
         """
         if self._built:
             raise Exception(
@@ -99,6 +102,9 @@ class System(BaseSystem):
 
         Args:
             component: system callback component.
+
+        Returns:
+            None.
         """
         if self._built:
             raise Exception(
@@ -163,6 +169,9 @@ class System(BaseSystem):
 
         Raises:
             Exception: if system has not already been built.
+
+        Returns:
+            None.
         """
         if not self._built:
             raise Exception(

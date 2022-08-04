@@ -35,9 +35,6 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
         Args:
             store: builder store.
             components: components in the system.
-
-        Returns:
-            None.
         """
         super().__init__()
 
