@@ -22,7 +22,8 @@ import pytest
 from reverb import Client, item_selectors, pybind, rate_limiters
 from reverb import server as reverb_server
 
-from mava.systems.jax.launcher import Launcher, NodeType, copy_store
+from mava.systems.jax.launcher import Launcher, NodeType
+from mava.utils.builder_utils import copy_builder
 from tests.jax.components.building.distributor_test import MockBuilder
 
 
@@ -402,23 +403,23 @@ def test_get_nodes_non_multi_process(
     assert nodes == [data_server, parameter_server]
 
 
-def test_copy_store_multi_process(mock_builder: MockBuilder) -> None:
-    """Test copy_store util function in the case of multi_process
+def test_copy_builder_multi_process(mock_builder: MockBuilder) -> None:
+    """Test copy_builder util function in the case of multi_process
 
     Args:
         mock_builder: Builder
     """
-    builder = copy_store(builder=mock_builder, multi_process=True)
+    builder = copy_builder(builder=mock_builder, multi_process=True)
 
     assert builder == mock_builder
 
 
-def test_copy_store_single_process(mock_builder: MockBuilder) -> None:
-    """Test copy_store util function in the case of single_process
+def test_copy_builder_single_process(mock_builder: MockBuilder) -> None:
+    """Test copy_builder util function in the case of single_process
 
     Args:
         mock_builder: Builder
     """
-    builder_copy = copy_store(builder=mock_builder, multi_process=False)
+    builder_copy = copy_builder(builder=mock_builder, multi_process=False)
 
     assert builder_copy != mock_builder
