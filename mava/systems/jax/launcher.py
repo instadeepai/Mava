@@ -28,22 +28,12 @@ class NodeType:
     reverb = lp.ReverbNode
     courier = lp.CourierNode
 
-
 def copy_store(builder: SystemBuilder) -> SystemBuilder:
-    buildercopy = copy.copy(builder)
-    buildercopy.store = copy.copy(builder.store)
-    return buildercopy
-
-def deepcopy_store(builder: SystemBuilder) -> SystemBuilder:
-    buildercopy = copy.copy(builder)
-
     # Note: Set up the memo for the deepcopy to avoid copying
-    # the program and Tables. 
+    # the program and data_tables. 
     memo = {}
     memo[id(builder.store.program)] = builder.store.program
-    memo[id(builder.store.Tables)] = builder.store.Tables
-    
-    buildercopy.store = copy.deepcopy(builder.store, memo=memo)
+    buildercopy = copy.deepcopy(builder, memo=memo)
     
     return buildercopy
 
