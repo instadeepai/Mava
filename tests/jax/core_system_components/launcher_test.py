@@ -240,13 +240,11 @@ def test_add_non_multi_process_reverb_node(mock_data_server_fn: Callable) -> Non
             mock_data_server_fn,
             node_type=NodeType.reverb,
             name="data_server_test",
-            builder=MockBuilder(),
         )
     data_server = launcher.add(
         mock_data_server_fn,
         node_type=NodeType.reverb,
         name="data_server",
-        builder=MockBuilder(),
     )
 
     assert not hasattr(launcher, "_program")
@@ -278,13 +276,11 @@ def test_add_non_multi_process_courier_node(mock_parameter_server_fn: Callable) 
             mock_parameter_server_fn,
             node_type=NodeType.courier,
             name="parameter_server_test",
-            builder=MockBuilder(),
         )
     parameter_server = launcher.add(
         mock_parameter_server_fn,
         node_type=NodeType.courier,
         name="parameter_server",
-        builder=MockBuilder(),
     )
 
     assert not hasattr(launcher, "_program")
@@ -310,13 +306,11 @@ def test_add_non_multi_process_two_add_calls(
         mock_data_server_fn,
         node_type=NodeType.reverb,
         name="data_server",
-        builder=MockBuilder(),
     )
     parameter_server = launcher.add(
         mock_parameter_server_fn,
         node_type=NodeType.courier,
         name="parameter_server",
-        builder=MockBuilder(),
     )
 
     assert not hasattr(launcher, "_program")
@@ -352,14 +346,12 @@ def test_add_non_multi_process_two_add_same_name(
         mock_parameter_server_fn,
         node_type=NodeType.courier,
         name="parameter_server",
-        builder=MockBuilder(),
     )
     with pytest.raises(ValueError):
         parameter_server_2 = launcher.add(
             mock_parameter_server_second_fn,
             node_type=NodeType.courier,
             name="parameter_server",
-            builder=MockBuilder(),
         )
 
 
@@ -392,13 +384,11 @@ def test_get_nodes_non_multi_process(
         mock_data_server_fn,
         node_type=NodeType.reverb,
         name="data_server",
-        builder=MockBuilder(),
     )
     parameter_server = launcher.add(
         mock_parameter_server_fn,
         node_type=NodeType.courier,
         name="parameter_server",
-        builder=MockBuilder(),
     )
 
     nodes = launcher.get_nodes()
