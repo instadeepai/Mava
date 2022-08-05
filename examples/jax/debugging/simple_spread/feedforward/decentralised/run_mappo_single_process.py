@@ -20,12 +20,30 @@ from typing import Any
 
 import launchpad as lp
 import optax
-from absl import app
+from absl import app, flags
 
 from mava.systems.jax import mappo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
+FLAGS = flags.FLAGS
+flags.DEFINE_string(
+    "env_name",
+    "simple_spread",
+    "Debugging environment name (str).",
+)
+flags.DEFINE_string(
+    "action_space",
+    "discrete",
+    "Environment action space type (str).",
+)
+
+flags.DEFINE_string(
+    "mava_id",
+    str(datetime.now()),
+    "Experiment identifier that can be used to continue experiments.",
+)
+flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 def main(_: Any) -> None:
     """Main script for running system."""
@@ -48,18 +66,17 @@ def main(_: Any) -> None:
             **kwargs,
         )
 
-    # Checkpointer appends "Checkpoints" to checkpoint_dir.
-    base_dir = "~/mava"
-    mava_id = str(datetime.now())
-    checkpoint_subpath = f"{base_dir}/{mava_id}"
+     # Used for checkpoints, tensorboard logging and env monitoring
+    experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+
     # Log every [log_every] seconds.
-    log_every = 1
+    log_every = 10
     logger_factory = functools.partial(
         logger_utils.make_logger,
-        directory=base_dir,
+        directory=FLAGS.base_dir,
         to_terminal=True,
         to_tensorboard=True,
-        time_stamp=mava_id,
+        time_stamp=FLAGS.mava_id,
         time_delta=log_every,
     )
     # Optimizer.
@@ -72,7 +89,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        experiment_path=checkpoint_subpath,
+        experiment_path=experiment_path,
         optimizer=optimizer,
         executor_parameter_update_period=10,
         multi_process=False,
