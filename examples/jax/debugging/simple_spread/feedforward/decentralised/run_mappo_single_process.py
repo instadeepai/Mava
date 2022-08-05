@@ -45,6 +45,7 @@ flags.DEFINE_string(
 )
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
+
 def main(_: Any) -> None:
     """Main script for running system."""
 
@@ -66,7 +67,7 @@ def main(_: Any) -> None:
             **kwargs,
         )
 
-     # Used for checkpoints, tensorboard logging and env monitoring
+    # Used for checkpoints, tensorboard logging and env monitoring
     experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.

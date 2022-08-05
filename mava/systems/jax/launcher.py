@@ -18,9 +18,7 @@ from typing import Any, Dict, List, Union
 
 import launchpad as lp
 import reverb
-from pyparsing import Optional
 
-from mava.core_jax import SystemBuilder
 from mava.utils import lp_utils
 from mava.utils.builder_utils import copy_builder
 
