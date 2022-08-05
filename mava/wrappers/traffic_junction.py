@@ -2,7 +2,10 @@ from typing import Dict, Tuple, Union
 
 import dm_env
 import numpy as np
+from acme import specs
+from acme.wrappers.gym_wrapper import _convert_to_spec
 
+from mava.types import OLT
 from mava.utils.environments.traffic_junction import TrafficJunctionEnv
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers import PettingZooParallelEnvWrapper
@@ -111,3 +114,31 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
     def _observation_dict_from_tuple(self, observation_tuple):
         return {agent_id: observation_tuple[self.agent_ids.index(agent_id)]
                 for agent_id in self.agent_ids}
+
+    # Convert Debugging environment observation so it's dm_env compatible.
+    # Also, the list of legal actions must be converted to a legal actions mask.
+    def _convert_observations(
+        self, observes: Dict[str, np.ndarray], dones: Dict[str, bool]
+    ) -> Dict[str, OLT]:
+        observations: Dict[str, OLT] = {}
+        for agent, observation in observes.items():
+            observations[agent] = OLT(
+                observation=observation,
+                legal_actions=np.ones(2),
+                terminal=np.asarray([dones[agent]], dtype=np.float32),
+            )
+
+        return observations
+
+    def observation_spec(self) -> Dict[str, OLT]:
+        observation_specs = {}
+        for agent in self.agent_ids:
+            observation_specs[agent] = OLT(
+                observation=_convert_to_spec(
+                    self._environment.observation_spaces[agent]
+                ),
+                legal_actions=np.ones(2),
+                terminal=specs.Array((1,), np.float32),
+            )
+
+        return observation_specs
