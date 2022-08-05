@@ -33,7 +33,7 @@ class TrainerDataset(Component):
         self,
         config: Any,
     ):
-        """Component creates a reverb table for the trainer.
+        """Component creates an iterable dataset from existing reverb table.
 
         Args:
             config: Any.
