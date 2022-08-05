@@ -540,7 +540,10 @@ class DummySample:
                     ],
                     dtype=float32,
                 ),
-                "agent_2": array([[0.0, 0.0, 0.0], [0.0897511, 0.14813632, 0.19152136]], dtype=float32),
+                "agent_2": array(
+                    [[0.0, 0.0, 0.0], [0.0897511, 0.14813632, 0.19152136]],
+                    dtype=float32,
+                ),
             },
             discounts={
                 "agent_0": array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=float32),
