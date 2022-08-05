@@ -754,8 +754,34 @@ class TrafficJunctionEnv(gym.Env):
                 o = tuple((act, r_i, p_norm, v_sq))
             obs.append(o)
 
-        obs = tuple(obs)
+        obs = self._flatten_obs(obs)
         return obs
+
+    def _flatten_obs(self, obs: List):
+        _obs = []
+        for agent in obs:  # list/tuple of observations.
+            ag_obs = []
+            for obs_kind in agent:
+                ag_obs.append(np.array(obs_kind).flatten())
+            _obs.append(np.concatenate(ag_obs))
+        obs = np.stack(_obs)
+
+        obs = obs.reshape(-1, self.observation_dim)
+        return obs
+
+    @property
+    def observation_dim(self):
+        # tuple space
+        if hasattr(self.observation_space, "spaces"):
+            total_obs_dim = 0
+            for space in self.observation_space.spaces:
+                if hasattr(self.action_space, "shape"):
+                    total_obs_dim += int(np.prod(space.shape))
+                else:  # Discrete
+                    total_obs_dim += 1
+            return total_obs_dim
+        else:
+            return int(np.prod(self.observation_space.shape))
 
     # Get communication graph -> just use distance for now
     def _get_env_graph(self) -> np.ndarray:

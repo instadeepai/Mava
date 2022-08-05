@@ -20,7 +20,9 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
     def __init__(self, environment: TrafficJunctionEnv, max_steps: int = 20):
         super().__init__(environment=environment)
 
-        self._reset_next_step = False  # Whether environment should reset before next step
+        self._reset_next_step = (
+            False  # Whether environment should reset before next step
+        )
         self.max_steps = max_steps  # Max number of steps in an episode before resetting
 
         # Env specs
@@ -36,7 +38,9 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
 
         for agent_id in self.agent_ids:
             self.environment.action_spaces[agent_id] = environment.action_space
-            self.environment.observation_spaces[agent_id] = environment.observation_space
+            self.environment.observation_spaces[
+                agent_id
+            ] = environment.observation_space
 
         # Compute discounts
         discount_spec = self.discount_spec()
@@ -49,14 +53,18 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
         self.n_steps = 0  # Track number of steps in episode
 
         # Reset the env
-        self.reset()
+        obs, graph = self.reset()
+        print("\n\n\n\n\nOBS", obs)
 
-    def step(self, actions: Dict[str, np.ndarray]) -> Tuple[dm_env.TimeStep, np.ndarray]:
+    def step(
+        self, actions: Dict[str, np.ndarray]
+    ) -> Tuple[dm_env.TimeStep, np.ndarray]:
         """Steps the environment."""
         if self._reset_next_step:
             self._reset_next_step = False
             self.reset()
 
+        actions = self._action_array_from_dict(actions)
         observations, rewards, episode_over, extras = self._environment.step(actions)
 
         # End the episode if max steps are reached
@@ -64,11 +72,19 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
         if self.n_steps >= self.max_steps:
             episode_over = True
 
-        dones = {agent_id: False for agent_id in self.agent_ids}  # No agents are ever fully done
-        observations = self._observation_dict_from_tuple(observations)
+        dones = {
+            agent_id: False for agent_id in self.agent_ids
+        }  # No agents are ever fully done
+
+        # Convert obs
+        observations = self._reward_dict_from_array(observations)
         observations = self._convert_observations(observations, dones)
 
-        communication_graph = extras['env_graph']
+        # Convert rewards
+        rewards = self._reward_dict_from_array(rewards)
+        rewards = self._convert_reward(rewards)
+
+        communication_graph = extras["env_graph"]
 
         if episode_over:
             self._step_type = dm_env.StepType.LAST
@@ -94,8 +110,10 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
         self.n_episodes += 1
         self.n_steps = 0
 
-        observations, communication_graph = self.environment.reset(epoch=self.n_episodes)
-        observations = self._observation_dict_from_tuple(observations)
+        observations, communication_graph = self.environment.reset(
+            epoch=self.n_episodes
+        )
+        observations = self._reward_dict_from_array(observations)
         observations = self._convert_observations(
             observations, {agent_id: False for agent_id in self.agent_ids}
         )
@@ -111,9 +129,14 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
             communication_graph,
         )
 
-    def _observation_dict_from_tuple(self, observation_tuple):
-        return {agent_id: observation_tuple[self.agent_ids.index(agent_id)]
-                for agent_id in self.agent_ids}
+    def _action_array_from_dict(self, action_dict: Dict):
+        return np.array([action_dict[agent] for agent in self.agent_ids])
+
+    def _reward_dict_from_array(self, observation_tuple):
+        return {
+            agent_id: observation_tuple[self.agent_ids.index(agent_id)]
+            for agent_id in self.agent_ids
+        }
 
     # Convert Debugging environment observation so it's dm_env compatible.
     # Also, the list of legal actions must be converted to a legal actions mask.
@@ -131,14 +154,22 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
         return observations
 
     def observation_spec(self) -> Dict[str, OLT]:
+        """Observation spec.
+
+        Returns:
+            types.Observation: spec for environment.
+        """
+        self._environment.reset()
+
+        observations = self._environment._get_obs()
+
         observation_specs = {}
-        for agent in self.agent_ids:
+        for i, agent in enumerate(self.agent_ids):
+
             observation_specs[agent] = OLT(
-                observation=_convert_to_spec(
-                    self._environment.observation_spaces[agent]
-                ),
+                observation=observations[i],
                 legal_actions=np.ones(2),
-                terminal=specs.Array((1,), np.float32),
+                terminal=np.asarray([True], dtype=np.float32),
             )
 
         return observation_specs
