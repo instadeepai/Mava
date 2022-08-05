@@ -27,6 +27,21 @@ from gym import spaces
 
 class TrafficJunctionEnv(gym.Env):
 
+    # Set during reset
+    alive_mask: np.ndarray
+    wait: np.ndarray
+    cars_in_sys: int
+    chosen_path: List[int]
+    route_id = List[int]
+    car_ids: np.ndarray
+    car_loc: np.ndarray
+    car_last_act: np.ndarray
+    car_route_loc: np.ndarray
+    stat: Dict[str, Any]
+
+    # Set during step
+    is_completed: np.ndarray
+
     #
     # START OF ENVIRONMENT INIT METHODS
     #
@@ -84,21 +99,6 @@ class TrafficJunctionEnv(gym.Env):
         # For tracking during episodes
         self.episode_over = False
         self.has_failed = 0
-
-        # Set during reset
-        self.alive_mask: np.ndarray
-        self.wait: np.ndarray
-        self.cars_in_sys: int
-        self.chosen_path: List[int]
-        self.route_id = List[int]
-        self.car_ids: np.ndarray
-        self.car_loc: np.ndarray
-        self.car_last_act: np.ndarray
-        self.car_route_loc: np.ndarray
-        self.stat: Dict[str, Any]
-
-        # Set during step
-        self.is_completed: np.ndarray
 
         # Check that environment dimensions are licit
         self.dims = dims = [self.dim, self.dim]

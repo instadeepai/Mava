@@ -10,10 +10,11 @@ from mava.wrappers import PettingZooParallelEnvWrapper
 class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
     """Environment wrapper for Traffic Junction MARL environment."""
 
+    _step_type: dm_env.StepType  # For tracking step type during step
+
     def __init__(self, environment: TrafficJunctionEnv):
         super().__init__(environment=environment)
 
-        self._step_type: dm_env.StepType  # For tracking step type during step
         self._reset_next_step = False  # Whether environment should reset before next step
 
         # Env specs
