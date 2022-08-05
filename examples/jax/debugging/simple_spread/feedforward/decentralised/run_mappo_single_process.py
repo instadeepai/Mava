@@ -61,8 +61,8 @@ def main(_: Any) -> None:
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return mappo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(32, 32),
-            critic_layer_sizes=(64, 64),
+            policy_layer_sizes=(254, 254, 254),
+            critic_layer_sizes=(512, 512, 256),
             *args,
             **kwargs,
         )
@@ -92,21 +92,12 @@ def main(_: Any) -> None:
         logger_factory=logger_factory,
         experiment_path=experiment_path,
         optimizer=optimizer,
-        executor_parameter_update_period=10,
         multi_process=False,
         run_evaluator=True,
         num_executors=1,
-        use_next_extras=False,
-        max_queue_size=5000,
-        sample_batch_size=2,
-        max_in_flight_samples_per_worker=4,
-        num_workers_per_iterator=-1,
-        rate_limiter_timeout_ms=-1,
-        checkpoint=True,
-        nodes_on_gpu=[],
+        max_queue_size=500,
+        sample_batch_size=5,
         lp_launch_type=lp.LaunchType.LOCAL_MULTI_PROCESSING,
-        sequence_length=4,
-        period=4,
     )
     system.launch()
 

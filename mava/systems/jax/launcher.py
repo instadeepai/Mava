@@ -36,7 +36,7 @@ class Launcher:
         self,
         multi_process: bool,
         nodes_on_gpu: List = [],
-        sp_trainer_period: int = 10,
+        sp_trainer_period: int = 1,
         sp_evaluator_period: int = 10,
         name: str = "System",
         terminal: str = "current_terminal",
@@ -172,9 +172,6 @@ class Launcher:
             while True:
                 # if the queue is too full we skip the executor to ensure that the
                 # executor won't hang when trying to push experience
-                cur = data_server.server_info()["trainer"].current_size
-                max = data_server.server_info()["trainer"].max_size
-                print(f"Queue size: {cur}/{max}")
                 if data_server.server_info()["trainer"].current_size < int(
                     queue_threshold * 0.75
                 ):
