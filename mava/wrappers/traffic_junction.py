@@ -14,10 +14,11 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
     _step_type: dm_env.StepType  # For tracking step type during step
     _discounts: Dict[str, Union[int, float]]  # Agent discounts
 
-    def __init__(self, environment: TrafficJunctionEnv):
+    def __init__(self, environment: TrafficJunctionEnv, max_steps: int = 20):
         super().__init__(environment=environment)
 
         self._reset_next_step = False  # Whether environment should reset before next step
+        self.max_steps = max_steps  # Max number of steps in an episode before resetting
 
         # Env specs
         self.environment.action_spaces = {}
@@ -41,8 +42,8 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
             for agent in self._environment.possible_agents
         }
 
-        # Track number of episodes in env
-        self.n_episodes = 0
+        self.n_episodes = 0  # Track number of episodes in env
+        self.n_steps = 0  # Track number of steps in episode
 
         # Reset the env
         self.reset()
@@ -54,6 +55,11 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
             self.reset()
 
         observations, rewards, episode_over, extras = self._environment.step(actions)
+
+        # End the episode if max steps are reached
+        self.n_steps += 1
+        if self.n_steps >= self.max_steps:
+            episode_over = True
 
         dones = {agent_id: False for agent_id in self.agent_ids}  # No agents are ever fully done
         observations = self._observation_dict_from_tuple(observations)
@@ -81,7 +87,9 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
         """Resets the episode."""
         self._reset_next_step = False
         self._step_type = dm_env.StepType.FIRST
+
         self.n_episodes += 1
+        self.n_steps = 0
 
         observations, communication_graph = self.environment.reset(epoch=self.n_episodes)
         observations = self._observation_dict_from_tuple(observations)
