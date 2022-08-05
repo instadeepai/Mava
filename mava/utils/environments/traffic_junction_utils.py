@@ -1,6 +1,6 @@
 import dm_env
 
-from mava.utils.debugging.environments.traffic_junction import TrafficJunctionEnv
+from mava.utils.environments.traffic_junction import TrafficJunctionEnv
 from mava.wrappers.traffic_junction import TrafficJunctionWrapper
 
 

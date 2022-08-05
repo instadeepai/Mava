@@ -3,7 +3,7 @@ from typing import Dict, Tuple, Union
 import dm_env
 import numpy as np
 
-from mava.utils.debugging.environments.traffic_junction import TrafficJunctionEnv
+from mava.utils.environments.traffic_junction import TrafficJunctionEnv
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers import PettingZooParallelEnvWrapper
 
