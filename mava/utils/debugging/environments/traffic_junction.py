@@ -219,7 +219,7 @@ class TrafficJunctionEnv(gym.Env):
         self,
         width: int,
         height: int,
-    ) -> List[np.s_]:
+    ) -> List[Any]:
 
         # assuming 1 is the lane width for each direction.
         road_blocks = {
