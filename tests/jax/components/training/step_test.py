@@ -182,10 +182,9 @@ def test_on_training_step_with_timestamp(mock_trainer: Trainer) -> None:
         "trainer_walltime",
     ]
     assert mock_trainer.store.trainer_parameter_client.params["trainer_steps"] == 1
-    
+
     assert (
-        int(mock_trainer.store.trainer_parameter_client.params["trainer_walltime"])
-        > 0
+        int(mock_trainer.store.trainer_parameter_client.params["trainer_walltime"]) > 0
     )
 
     assert mock_trainer.store.trainer_parameter_client.call_set_and_get_async == True
