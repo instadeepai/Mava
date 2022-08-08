@@ -70,9 +70,7 @@ def gae_advantages(
 
 def epoch_update(carry: Tuple, unused_t: Tuple[()]) -> Tuple:
     """Performs model updates based on one epoch of data."""
-    results=jax.tree_map(
-                lambda x: x+1, carry
-    )
+    results = jax.tree_map(lambda x: x + 1, carry)
     return results, {}
 
 
@@ -276,7 +274,9 @@ def test_step(mock_trainer: MockTrainer, dummy_sample: DummySample) -> None:
 
     assert list(mock_trainer.store.key) != list(old_key)
 
-    assert sorted(list(mock_trainer.store.opt_states.keys()))==sorted(["network_agent_0","network_agent_1","network_agent_2"])
+    assert sorted(list(mock_trainer.store.opt_states.keys())) == sorted(
+        ["network_agent_0", "network_agent_1", "network_agent_2"]
+    )
     assert mock_trainer.store.opt_states != {
         "network_agent_0": 0,
         "network_agent_1": 1,
