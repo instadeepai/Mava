@@ -175,7 +175,7 @@ def test_on_training_step_with_timestamp(mock_trainer: Trainer) -> None:
     old_timestamp = mock_trainer.store.timestamp
     trainer_step.on_training_step(trainer=mock_trainer)
 
-    assert int(mock_trainer.store.timestamp) == int(time.time())
+    assert mock_trainer.store.timestamp > old_timestamp
 
     assert list(mock_trainer.store.trainer_parameter_client.params.keys()) == [
         "trainer_steps",
@@ -199,7 +199,7 @@ def test_on_training_step_without_timestamp(mock_trainer: Trainer) -> None:
     del mock_trainer.store.timestamp
     trainer_step.on_training_step(trainer=mock_trainer)
 
-    assert int(mock_trainer.store.timestamp) == int(time.time())
+    assert mock_trainer.store.timestamp!=0
 
     assert list(mock_trainer.store.trainer_parameter_client.params.keys()) == [
         "trainer_steps",
