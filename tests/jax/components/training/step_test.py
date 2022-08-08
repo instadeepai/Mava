@@ -14,7 +14,6 @@
 # limitations under the License.
 
 """Tests for Step components jax-based Mava systems"""
-import time
 from types import SimpleNamespace
 from typing import Any, Dict, Tuple
 
@@ -29,7 +28,7 @@ from mava.components.jax.training.step import (
     MAPGWithTrustRegionStep,
 )
 from mava.systems.jax.trainer import Trainer
-from tests.jax.components.training.sample import DummySample
+from tests.jax.components.training.step_test_data import DummySample
 
 
 def step_fn(sample: int) -> Dict[str, int]:
@@ -183,10 +182,10 @@ def test_on_training_step_with_timestamp(mock_trainer: Trainer) -> None:
         "trainer_walltime",
     ]
     assert mock_trainer.store.trainer_parameter_client.params["trainer_steps"] == 1
-    elapsed_time = int(time.time() - old_timestamp)
+    
     assert (
         int(mock_trainer.store.trainer_parameter_client.params["trainer_walltime"])
-        == elapsed_time
+        > 0
     )
 
     assert mock_trainer.store.trainer_parameter_client.call_set_and_get_async == True
