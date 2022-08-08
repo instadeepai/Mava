@@ -255,12 +255,7 @@ def test_step(mock_trainer: MockTrainer, dummy_sample: DummySample) -> None:
         "rewards_std",
     ]
 
-    updates = {
-        net_key: mock_trainer.store.networks["networks"][net_key].params
-        for net_key in mock_trainer.store.networks["networks"].keys()
-    }
-
-    assert metrics["norm_params"] == optax.global_norm(jax.tree_leaves(updates))
+    assert metrics["norm_params"] == 3.8729835
 
     assert metrics["observations_mean"] == 0.5667871
 
