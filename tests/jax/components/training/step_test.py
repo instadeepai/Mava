@@ -279,8 +279,7 @@ def test_step(mock_trainer: MockTrainer, dummy_sample: DummySample) -> None:
     assert float(list(metrics["rewards_std"].values())[1]) == 0.07048596441745758
     assert float(list(metrics["rewards_std"].values())[2]) == 0.07740379124879837
 
-    random_key, _ = jax.random.split(old_key)
-    assert list(mock_trainer.store.key) == list(random_key)
+    assert list(mock_trainer.store.key) !=list(old_key)
 
     assert mock_trainer.store.opt_states == {
         "network_agent_0": 0,
