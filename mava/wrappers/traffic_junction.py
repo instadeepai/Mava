@@ -1,4 +1,4 @@
-from typing import Dict, Tuple, Union
+from typing import Dict, Tuple, Union, Any
 
 import dm_env
 import numpy as np
@@ -58,7 +58,7 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
 
     def step(
         self, actions: Dict[str, np.ndarray]
-    ) -> Tuple[dm_env.TimeStep, np.ndarray]:
+    ) -> Tuple[dm_env.TimeStep, Dict[str, Any]]:
         """Steps the environment."""
         if self._reset_next_step:
             self._reset_next_step = False
@@ -84,8 +84,6 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
         rewards = self._reward_dict_from_array(rewards)
         rewards = self._convert_reward(rewards)
 
-        communication_graph = extras["env_graph"]
-
         if episode_over:
             self._step_type = dm_env.StepType.LAST
             self._reset_next_step = True
@@ -99,10 +97,10 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
                 discount=self._discounts,
                 step_type=self._step_type,
             ),
-            communication_graph,
+            {'communication_graph': extras['env_graph']},
         )
 
-    def reset(self) -> Tuple[dm_env.TimeStep, np.ndarray]:
+    def reset(self) -> Tuple[dm_env.TimeStep, Dict[str, Any]]:
         """Resets the episode."""
         self._reset_next_step = False
         self._step_type = dm_env.StepType.FIRST
@@ -126,7 +124,7 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
 
         return (
             parameterized_restart(rewards, self._discounts, observations),
-            communication_graph,
+            {'communication_graph': communication_graph},
         )
 
     def _action_array_from_dict(self, action_dict: Dict):
