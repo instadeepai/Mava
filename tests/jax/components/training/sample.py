@@ -1,4 +1,4 @@
-from jax.numpy import array, float32, int32
+import jax.numpy as jnp
 from mava.types import OLT
 from types import SimpleNamespace
 
@@ -7,7 +7,7 @@ class DummySample:
         self.data = SimpleNamespace(
             observations={
                 "agent_0": OLT(
-                    observation=array(
+                    observation=jnp.array(
                         [
                             [
                                 [
@@ -116,20 +116,20 @@ class DummySample:
                                 ],
                             ],
                         ],
-                        dtype=float32,
+                        dtype=jnp.float32,
                     ),
-                    legal_actions=array(
+                    legal_actions=jnp.array(
                         [
                             [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
                             [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
                         ]
                     ),
-                    terminal=array(
-                        [[[0.0], [0.0], [0.0]], [[0.0], [0.0], [0.0]]], dtype=float32
+                    terminal=jnp.array(
+                        [[[0.0], [0.0], [0.0]], [[0.0], [0.0], [0.0]]], dtype=jnp.float32
                     ),
                 ),
                 "agent_1": OLT(
-                    observation=array(
+                    observation=jnp.array(
                         [
                             [
                                 [
@@ -238,20 +238,20 @@ class DummySample:
                                 ],
                             ],
                         ],
-                        dtype=float32,
+                        dtype=jnp.float32,
                     ),
-                    legal_actions=array(
+                    legal_actions=jnp.array(
                         [
                             [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
                             [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
                         ]
                     ),
-                    terminal=array(
-                        [[[0.0], [0.0], [0.0]], [[0.0], [0.0], [0.0]]], dtype=float32
+                    terminal=jnp.array(
+                        [[[0.0], [0.0], [0.0]], [[0.0], [0.0], [0.0]]], dtype=jnp.float32
                     ),
                 ),
                 "agent_2": OLT(
-                    observation=array(
+                    observation=jnp.array(
                         [
                             [
                                 [
@@ -360,71 +360,71 @@ class DummySample:
                                 ],
                             ],
                         ],
-                        dtype=float32,
+                        dtype=jnp.float32,
                     ),
-                    legal_actions=array(
+                    legal_actions=jnp.array(
                         [
                             [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
                             [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
                         ]
                     ),
-                    terminal=array(
-                        [[[0.0], [0.0], [0.0]], [[0.0], [0.0], [0.0]]], dtype=float32
+                    terminal=jnp.array(
+                        [[[0.0], [0.0], [0.0]], [[0.0], [0.0], [0.0]]], dtype=jnp.float32
                     ),
                 ),
             },
             actions={
-                "agent_0": array([[3, 2, 0], [4, 0, 3]]),
-                "agent_1": array([[1, 0, 3], [0, 2, 0]]),
-                "agent_2": array([[0, 0, 4], [3, 4, 2]]),
+                "agent_0": jnp.array([[3, 2, 0], [4, 0, 3]]),
+                "agent_1": jnp.array([[1, 0, 3], [0, 2, 0]]),
+                "agent_2": jnp.array([[0, 0, 4], [3, 4, 2]]),
             },
             rewards={
-                "agent_0": array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], dtype=float32),
-                "agent_1": array(
+                "agent_0": jnp.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], dtype=jnp.float32),
+                "agent_1": jnp.array(
                     [
                         [0.0897511, 0.14813632, 0.19152136],
                         [0.06387269, 0.00243677, 0.0],
                     ],
-                    dtype=float32,
+                    dtype=jnp.float32,
                 ),
-                "agent_2": array(
+                "agent_2": jnp.array(
                     [[0.0, 0.0, 0.0], [0.0897511, 0.14813632, 0.19152136]],
-                    dtype=float32,
+                    dtype=jnp.float32,
                 ),
             },
             discounts={
-                "agent_0": array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=float32),
-                "agent_1": array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=float32),
-                "agent_2": array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=float32),
+                "agent_0": jnp.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=jnp.float32),
+                "agent_1": jnp.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=jnp.float32),
+                "agent_2": jnp.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=jnp.float32),
             },
-            start_of_episode=array([[True, False, False], [False, False, False]]),
+            start_of_episode=jnp.array([[True, False, False], [False, False, False]]),
             extras={
                 "network_keys": {
-                    "agent_0": array([[0, 0, 0], [0, 0, 0]], dtype=int32),
-                    "agent_1": array([[0, 0, 0], [0, 0, 0]], dtype=int32),
-                    "agent_2": array([[0, 0, 0], [0, 0, 0]], dtype=int32),
+                    "agent_0": jnp.array([[0, 0, 0], [0, 0, 0]], dtype=jnp.int32),
+                    "agent_1": jnp.array([[0, 0, 0], [0, 0, 0]], dtype=jnp.int32),
+                    "agent_2": jnp.array([[0, 0, 0], [0, 0, 0]], dtype=jnp.int32),
                 },
                 "policy_info": {
-                    "agent_0": array(
+                    "agent_0": jnp.array(
                         [
                             [-1.5010276, -1.5574824, -1.7098966],
                             [-1.6839617, -1.8447837, -1.4597069],
                         ],
-                        dtype=float32,
+                        dtype=jnp.float32,
                     ),
-                    "agent_1": array(
+                    "agent_1": jnp.array(
                         [
                             [-1.6333038, -1.7833046, -1.4482918],
                             [-1.6957064, -1.4800832, -1.66526],
                         ],
-                        dtype=float32,
+                        dtype=jnp.float32,
                     ),
-                    "agent_2": array(
+                    "agent_2": jnp.array(
                         [
                             [-1.4521754, -1.4560769, -1.8592778],
                             [-1.4220893, -1.78906, -1.5569873],
                         ],
-                        dtype=float32,
+                        dtype=jnp.float32,
                     ),
                 },
             },

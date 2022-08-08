@@ -17,16 +17,11 @@
 import time
 from types import SimpleNamespace
 from typing import Any, Dict, Tuple
-
 import jax
 import jax.numpy as jnp
 import optax
 import pytest
 import rlax
-from acme.jax import utils
-from jax.numpy import array, float32, int32
-from optax._src import numerics
-from reverb import ReplaySample
 
 from mava.components.jax.training.step import (
     DefaultTrainerStep,
