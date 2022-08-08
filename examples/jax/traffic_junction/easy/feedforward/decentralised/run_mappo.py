@@ -26,7 +26,7 @@ import optax
 from absl import app, flags
 
 from mava.systems.jax import mappo
-from mava.utils.environments import debugging_utils, traffic_junction_utils
+from mava.utils.environments import traffic_junction_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
@@ -48,7 +48,7 @@ def main(_: Any) -> None:
     """Run main script
 
     Args:
-        _ : _
+        _ : Do not use args.
     """
     # Environment.
     environment_factory = functools.partial(

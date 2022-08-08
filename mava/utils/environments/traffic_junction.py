@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-Simulate a traffic junction environment.
+"""Simulate a traffic junction environment.
+
 Used to test if MARL communication is working.
 Each agent can observe its last action, its route id, its location,
 and a vision square around itself.
@@ -18,7 +18,7 @@ Design Decisions:
 """
 
 import math
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Set, Tuple
 
 import gym
 import numpy as np
@@ -31,8 +31,8 @@ class TrafficJunctionEnv(gym.Env):
     alive_mask: np.ndarray
     wait: np.ndarray
     cars_in_sys: int
-    chosen_path: List[int]
-    route_id = List[int]
+    chosen_path: List[List[int]]
+    route_id: List[int]
     car_ids: np.ndarray
     car_loc: np.ndarray
     car_last_act: np.ndarray
@@ -189,6 +189,11 @@ class TrafficJunctionEnv(gym.Env):
             self._set_paths(difficulty)
 
     def _set_grid(self) -> None:
+        """Create the environment base grid.
+
+        Returns:
+            None.
+        """
         self.grid = np.full(
             self.dims[0] * self.dims[1], self.OUTSIDE_CLASS, dtype=int
         ).reshape(self.dims)
@@ -220,6 +225,15 @@ class TrafficJunctionEnv(gym.Env):
         width: int,
         height: int,
     ) -> List[Any]:
+        """Get grid ranges for each of the roads.
+
+        Args:
+            width: env width.
+            height: env height.
+
+        Returns:
+            List of roads. Each road is a np.IndexExpression.
+        """
 
         # assuming 1 is the lane width for each direction.
         road_blocks = {
@@ -239,6 +253,14 @@ class TrafficJunctionEnv(gym.Env):
         return road_blocks[self.difficulty]
 
     def _onehot_initialization(self, a: np.ndarray) -> np.ndarray:
+        """Create a one-hot version of the given array.
+
+        Args:
+            a: Array to convert to a one-hot encoding.
+
+        Returns:
+            One-hot encoding of input array.
+        """
         if self.vocab_type == "bool":
             ncols = self.vocab_size
         else:
@@ -251,11 +273,25 @@ class TrafficJunctionEnv(gym.Env):
 
     @staticmethod
     def _all_idx(idx: np.ndarray, axis: int) -> Tuple:
+        """Convert array of numbers to index locations.
+
+        Args:
+            idx: Array of numbers to use for index locations.
+            axis: Axis of array to index on.
+
+        Returns:
+            Tuple of index locations.
+        """
         grid = np.ogrid[tuple(map(slice, idx.shape))]
         grid.insert(axis, idx)
         return tuple(grid)
 
     def _set_paths_easy(self) -> None:
+        """Set the environment paths for the easy version.
+
+        Returns:
+            None.
+        """
         h, w = self.dims
         routes: Dict[str, List[np.ndarray]] = {"TOP": [], "LEFT": []}
 
@@ -270,6 +306,11 @@ class TrafficJunctionEnv(gym.Env):
         self.routes: List[List[np.ndarray]] = list(routes.values())
 
     def _set_paths(self, difficulty: str) -> None:
+        """Set the environment paths for the medium or hard version.
+
+        Returns:
+            None.
+        """
         route_grid = self.route_grid if self.vocab_type == "bool" else self.grid
         self.routes = self._get_routes(route_grid, difficulty)
 
@@ -287,6 +328,14 @@ class TrafficJunctionEnv(gym.Env):
 
     @staticmethod
     def _unittest_path(paths: List[List[Tuple[int, int]]]) -> bool:
+        """Check if paths are valid.
+
+        Args:
+            paths: Environment roads, as lists of points.
+
+        Returns:
+            Whether the paths are all valid.
+        """
         for i, p in enumerate(paths[:-1]):
             next_dif = p - np.row_stack([p[1:], p[-1]])
             next_dif = np.abs(next_dif[:-1])
@@ -300,6 +349,15 @@ class TrafficJunctionEnv(gym.Env):
     def _get_routes(
         self, grid: np.ndarray, difficulty: str
     ) -> List[List[List[Tuple[int, int]]]]:
+        """Get the environment routes for medium or hard env.
+
+        Args:
+            grid: Environment grid.
+            difficulty: Medium or hard.
+
+        Returns:
+            List of paths, each expressed as a list of points.
+        """
         grid.dtype = int
 
         assert difficulty == "medium" or difficulty == "hard"
@@ -361,6 +419,15 @@ class TrafficJunctionEnv(gym.Env):
     def _get_add_mat(
         self, grid: np.ndarray, difficulty: str
     ) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]], np.ndarray, np.ndarray]:
+        """Get a sequence of information needed to create roads.
+
+        Args:
+            grid: environment grid.
+            difficulty: 'medium' or 'hard'
+
+        Returns:
+            Tuple[car arrival points, finish points, road directions, junctions]
+        """
         h, w = self.dims
 
         road_dir = grid.copy()
@@ -436,6 +503,16 @@ class TrafficJunctionEnv(gym.Env):
     def _goal_reached(
         place_i: int, curr: Tuple[int, int], finish_points: List[Tuple[int, int]]
     ) -> bool:
+        """Check whether location is at the end of a road.
+
+        Args:
+            place_i: Arrival point.
+            curr: Location.
+            finish_points: List of finish points.
+
+        Returns:
+            Whether curr is at the end of a road.
+        """
         return curr in finish_points[:place_i] + finish_points[place_i + 1 :]
 
     @staticmethod
@@ -444,11 +521,26 @@ class TrafficJunctionEnv(gym.Env):
         turn: int,
         turn_step: int,
         start: Tuple[int, int],
-        grid,
-        road_dir,
-        junction,
-        visited,
+        grid: np.ndarray,
+        road_dir: np.ndarray,
+        junction: np.ndarray,
+        visited: Set[Tuple[int, int]],
     ) -> Tuple[Tuple[int, int], bool, bool]:
+        """Get the next location of a road cell.
+
+        Args:
+            curr: Current car location.
+            turn: How many turns made so far.
+            turn_step: Step number in current turn.
+            start: Start location of current path.
+            grid: Environment grid.
+            road_dir: Road directions.
+            junction: Environment junctions.
+            visited: Points already visited.
+
+        Returns:
+            Tuple[New car loc, if currently in turn, if turn completed].
+        """
         move = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
         h, w = grid.shape
@@ -522,12 +614,10 @@ class TrafficJunctionEnv(gym.Env):
     #
 
     def reset(self, epoch: int = None) -> Tuple[Tuple, np.ndarray]:
-        """
-        Reset the state of the environment and returns an initial observation.
+        """Reset the state of the environment and returns an initial observation.
 
-        Returns
-        -------
-        observation (object): the initial observation of the space.
+        Returns:
+            Tuple[initial observation, communication graph].
         """
         self.episode_over = False
         self.has_failed = 0
@@ -537,7 +627,7 @@ class TrafficJunctionEnv(gym.Env):
         self.cars_in_sys = 0
 
         # Chosen path for each car:
-        self.chosen_path = [0] * self.num_agents
+        self.chosen_path = [[] for _ in range(self.num_agents)]
         # when dead => no route, must be masked by trainer.
         self.route_id = [-1] * self.num_agents
 
@@ -574,7 +664,15 @@ class TrafficJunctionEnv(gym.Env):
         obs = self._get_obs()
         return obs, self._get_env_graph()
 
-    def curriculum(self, epoch) -> None:
+    def curriculum(self, epoch: int) -> None:
+        """Adjust add rate based on current epoch.
+
+        Args:
+            epoch: Epoch number (usually just episode number).
+
+        Returns:
+            None.
+        """
         step_size = 0.01
         step = (self.add_rate_max - self.add_rate_min) / (
             self.curr_end - self.curr_start
@@ -584,21 +682,16 @@ class TrafficJunctionEnv(gym.Env):
             self.exact_rate = self.exact_rate + step
             self.add_rate = step_size * (self.exact_rate // step_size)
 
-    def step(self, action) -> Tuple[Tuple, np.ndarray, bool, Dict[str, Any]]:
-        """
-        The agents(car) take a step in the environment.
+    def step(
+        self, action: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray, bool, Dict[str, Any]]:
+        """Step the cars in the environment.
 
-        Parameters
-        ----------
-        action : shape - either num_agents or num_agents x 1
+        Args:
+            action: Action given for each agent in np array.
 
-        Returns
-        -------
-        obs, reward, episode_over, info : tuple
-            obs (object) :
-            reward (num_agents x 1) : PENALTY if in env & CRASH PENALTY on crashes.
-            episode_over (bool) : Will be true when episode gets over.
-            info (dict) : diagnostic information useful for debugging.
+        Returns:
+            Tuple[obs, rewards, if episode over, extras dict]
         """
         if self.episode_over:
             raise RuntimeError("Episode is done")
@@ -640,7 +733,16 @@ class TrafficJunctionEnv(gym.Env):
 
         return obs, reward, self.episode_over, extras
 
-    def _take_action(self, idx, act) -> None:
+    def _take_action(self, idx: int, act: int) -> None:
+        """Take action for particular car.
+
+        Args:
+            idx: Car id.
+            act: Car action.
+
+        Returns:
+            None.
+        """
         # non-active car
         if self.alive_mask[idx] == 0:
             return
@@ -706,12 +808,22 @@ class TrafficJunctionEnv(gym.Env):
                 self.cars_in_sys += 1
 
     def _choose_dead(self) -> np.ndarray:
+        """Return a random car which is currently not in the environment.
+
+        Returns:
+            ID of random car not currently in environment.
+        """
         # all idx
         car_idx = np.arange(len(self.alive_mask))
         # random choice of idx from dead ones.
         return np.random.choice(car_idx[self.alive_mask == 0])
 
-    def _get_obs(self) -> Tuple:
+    def _get_obs(self) -> np.ndarray:
+        """Get all car observations.
+
+        Returns:
+            Agent observations as a np array.
+        """
         h, w = self.dims
         self.bool_base_grid = self.empty_bool_base_grid.copy()
 
@@ -757,20 +869,33 @@ class TrafficJunctionEnv(gym.Env):
         obs = self._flatten_obs(obs)
         return obs
 
-    def _flatten_obs(self, obs: List):
+    def _flatten_obs(self, obs: List) -> np.ndarray:
+        """Get flattened agent observations.
+
+        Args:
+            obs: Observations for each agent.
+
+        Returns:
+            Flatten agent observations as a np array.
+        """
         _obs = []
         for agent in obs:  # list/tuple of observations.
             ag_obs = []
             for obs_kind in agent:
                 ag_obs.append(np.array(obs_kind).flatten())
             _obs.append(np.concatenate(ag_obs))
-        obs = np.stack(_obs)
+        obs_flat = np.stack(_obs)
 
-        obs = obs.reshape(-1, self.observation_dim)
-        return obs
+        obs_flat = obs_flat.reshape(-1, self.observation_dim)
+        return obs_flat
 
     @property
-    def observation_dim(self):
+    def observation_dim(self) -> int:
+        """The total number of elements in an agent observation.
+
+        Returns:
+            Number of elements.
+        """
         # tuple space
         if hasattr(self.observation_space, "spaces"):
             total_obs_dim = 0
@@ -785,6 +910,11 @@ class TrafficJunctionEnv(gym.Env):
 
     # Get communication graph -> just use distance for now
     def _get_env_graph(self) -> np.ndarray:
+        """Get communication graph based on agent distances.
+
+        Returns:
+            Adjacency matrix of graph.
+        """
         adj = np.zeros(
             (1, self.num_agents, self.num_agents)
         )  # 1 if agents can communicate
@@ -806,6 +936,11 @@ class TrafficJunctionEnv(gym.Env):
         return adj
 
     def _get_reward(self) -> np.ndarray:
+        """Get reward for all agents.
+
+        Returns:
+            Reward for all agents as a np array with shape [num_agents]
+        """
         reward = np.full(self.num_agents, self.TIMESTEP_PENALTY) * self.wait
 
         for i, l in enumerate(self.car_loc):
@@ -820,4 +955,9 @@ class TrafficJunctionEnv(gym.Env):
         return reward
 
     def reward_terminal(self) -> np.ndarray:
+        """Reward given when environment is terminal.
+
+        Returns:
+            Zeros np array in shape of rewards.
+        """
         return np.zeros_like(self._get_reward())

@@ -8,7 +8,16 @@ def make_environment(
     difficulty: str = "easy",
     evaluation: bool = False,
 ) -> dm_env.Environment:
-    assert difficulty in {"easy", "medium", "hard"}
+    """Create a wrapped Traffic Junction environment.
+
+    Args:
+        difficulty: 'easy', 'medium', or 'hard'.
+        evaluation: Whether environment is used by the evaluator.
+
+    Returns:
+        Wrapped Traffic Junction environment.
+    """
+    assert difficulty in {"easy", "medium", "hard"}, "Unsupported difficulty provided."
 
     del evaluation  # Not used for now
 
