@@ -303,7 +303,7 @@ class TrafficJunctionEnv(gym.Env):
         full = [(h // 2, i) for i in range(w)]
         routes["LEFT"].append(np.array([*full]))
 
-        self.routes: List[List[np.ndarray]] = list(routes.values())
+        self.routes = list(routes.values())
 
     def _set_paths(self, difficulty: str) -> None:
         """Set the environment paths for the medium or hard version.
@@ -358,8 +358,6 @@ class TrafficJunctionEnv(gym.Env):
         Returns:
             List of paths, each expressed as a list of points.
         """
-        grid.dtype = int
-
         assert difficulty == "medium" or difficulty == "hard"
 
         arrival_points, finish_points, road_dir, junction = self._get_add_mat(
@@ -613,7 +611,7 @@ class TrafficJunctionEnv(gym.Env):
     # END OF ENVIRONMENT INIT METHODS
     #
 
-    def reset(self, epoch: int = None) -> Tuple[Tuple, np.ndarray]:
+    def reset(self, epoch: int = None) -> Tuple[np.ndarray, np.ndarray]:
         """Reset the state of the environment and returns an initial observation.
 
         Returns:
