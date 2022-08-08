@@ -42,6 +42,9 @@ class TrafficJunctionEnv(gym.Env):
     # Set during step
     is_completed: np.ndarray
 
+    # Set during init constructing routes
+    routes: List[List[List[Tuple[int, int]]]]
+
     #
     # START OF ENVIRONMENT INIT METHODS
     #
@@ -236,7 +239,7 @@ class TrafficJunctionEnv(gym.Env):
         """
 
         # assuming 1 is the lane width for each direction.
-        road_blocks = {
+        road_blocks: Dict[str, List[Any]] = {
             "easy": [np.s_[height // 2, :], np.s_[:, width // 2]],
             "medium": [
                 np.s_[height // 2 - 1 : height // 2 + 1, :],
