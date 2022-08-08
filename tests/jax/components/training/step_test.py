@@ -272,11 +272,8 @@ def test_step(mock_trainer: MockTrainer, dummy_sample: DummySample) -> None:
 
     assert list(mock_trainer.store.key) != list(old_key)
 
-    assert sorted(list(mock_trainer.store.opt_states.keys())) == sorted(
-        ["network_agent_0", "network_agent_1", "network_agent_2"]
-    )
-    assert mock_trainer.store.opt_states != {
-        "network_agent_0": 0,
-        "network_agent_1": 1,
-        "network_agent_2": 2,
+    assert mock_trainer.store.opt_states == {
+        "network_agent_0": 2,
+        "network_agent_1": 3,
+        "network_agent_2": 4,
     }
