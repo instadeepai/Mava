@@ -19,7 +19,6 @@ from typing import Any, Dict, Tuple
 
 import jax
 import jax.numpy as jnp
-import optax
 import pytest
 import rlax
 
@@ -187,7 +186,7 @@ def test_on_training_step_with_timestamp(mock_trainer: Trainer) -> None:
         int(mock_trainer.store.trainer_parameter_client.params["trainer_walltime"]) > 0
     )
 
-    assert mock_trainer.store.trainer_parameter_client.call_set_and_get_async == True
+    assert mock_trainer.store.trainer_parameter_client.call_set_and_get_async is True
 
     assert mock_trainer.store.trainer_logger.written == {"next_sample": 2, "sample": 1}
 
@@ -209,7 +208,7 @@ def test_on_training_step_without_timestamp(mock_trainer: Trainer) -> None:
         int(mock_trainer.store.trainer_parameter_client.params["trainer_walltime"]) == 0
     )
 
-    assert mock_trainer.store.trainer_parameter_client.call_set_and_get_async == True
+    assert mock_trainer.store.trainer_parameter_client.call_set_and_get_async is True
 
     assert mock_trainer.store.trainer_logger.written == {"next_sample": 2, "sample": 1}
 
