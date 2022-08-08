@@ -43,9 +43,8 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
             ] = environment.observation_space
 
         # Compute discounts
-        discount_spec = self.discount_spec()
         self._discounts = {
-            agent: convert_np_type(discount_spec[agent].dtype, 1)
+            agent: np.array(0, dtype='float32')
             for agent in self._environment.possible_agents
         }
 
@@ -77,24 +76,27 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
         }  # No agents are ever fully done
 
         # Convert obs
-        observations = self._reward_dict_from_array(observations)
         observations = self._convert_observations(observations, dones)
 
         # Convert rewards
-        rewards = self._reward_dict_from_array(rewards)
-        rewards = self._convert_reward(rewards)
+        rewards = self._agent_dict_from_array(rewards)
 
         if episode_over:
             self._step_type = dm_env.StepType.LAST
             self._reset_next_step = True
+            discount = {
+                agent: np.array(0, dtype='float32')
+                for agent in self._environment.possible_agents
+            }
         else:
             self._step_type = dm_env.StepType.MID
+            discount = self._discounts
 
         return (
             dm_env.TimeStep(
                 observation=observations,
                 reward=rewards,
-                discount=self._discounts,
+                discount=discount,
                 step_type=self._step_type,
             ),
             {'communication_graph': extras['env_graph']},
@@ -111,7 +113,6 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
         observations, communication_graph = self.environment.reset(
             epoch=self.n_episodes
         )
-        observations = self._reward_dict_from_array(observations)
         observations = self._convert_observations(
             observations, {agent_id: False for agent_id in self.agent_ids}
         )
@@ -130,17 +131,12 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
     def _action_array_from_dict(self, action_dict: Dict):
         return np.array([action_dict[agent] for agent in self.agent_ids])
 
-    def _reward_dict_from_array(self, observation_tuple):
-        return {
-            agent_id: observation_tuple[self.agent_ids.index(agent_id)]
-            for agent_id in self.agent_ids
-        }
-
     # Convert Debugging environment observation so it's dm_env compatible.
     # Also, the list of legal actions must be converted to a legal actions mask.
     def _convert_observations(
-        self, observes: Dict[str, np.ndarray], dones: Dict[str, bool]
+        self, observes: np.array, dones: Dict[str, bool]
     ) -> Dict[str, OLT]:
+        self.observes = self._agent_dict_from_array(observes)
         observations: Dict[str, OLT] = {}
         for agent, observation in observes.items():
             observations[agent] = OLT(
@@ -151,23 +147,46 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
 
         return observations
 
+    def _agent_dict_from_array(self, array):
+        return {
+            agent_id: array[self.agent_ids.index(agent_id)]
+            for agent_id in self.agent_ids
+        }
+
     def observation_spec(self) -> Dict[str, OLT]:
         """Observation spec.
 
         Returns:
             types.Observation: spec for environment.
         """
-        self._environment.reset()
-
         observations = self._environment._get_obs()
+        return self._convert_observations(observes=observations, dones=[False] * self.environment.num_agents)
 
-        observation_specs = {}
-        for i, agent in enumerate(self.agent_ids):
+    def extra_spec(self) -> Dict[str, np.array]:
+        return {'communication_graph': self.environment._get_env_graph()}
 
-            observation_specs[agent] = OLT(
-                observation=observations[i],
-                legal_actions=np.ones(2),
-                terminal=np.asarray([True], dtype=np.float32),
-            )
+    def action_spec(
+        self,
+    ) -> Dict[str, Union[specs.DiscreteArray, specs.BoundedArray]]:
+        """Action spec.
 
-        return observation_specs
+        Returns:
+            spec for actions.
+        """
+        return {agent_id: np.array(1, dtype=int) for agent_id in self.agent_ids}
+
+    def reward_spec(self) -> Dict[str, np.array]:
+        """Reward spec.
+
+        Returns:
+            Dict[str, specs.Array]: spec for rewards.
+        """
+        return {agent_id: np.array(1, dtype='float32') for agent_id in self.agent_ids}
+
+    def discount_spec(self) -> Dict[str, np.array]:
+        """Discount spec.
+
+        Returns:
+            Dict[str, specs.BoundedArray]: spec for discounts.
+        """
+        return {agent_id: np.array(1, dtype='float32') for agent_id in self.agent_ids}
