@@ -17,6 +17,7 @@
 import time
 from types import SimpleNamespace
 from typing import Any, Dict, Tuple
+
 import jax
 import jax.numpy as jnp
 import optax
@@ -150,7 +151,6 @@ class MockTrainer(Trainer):
         self.store = store
 
 
-
 @pytest.fixture
 def mock_trainer() -> MockTrainer:
     """Build fixture from MockTrainer"""
@@ -199,7 +199,7 @@ def test_on_training_step_without_timestamp(mock_trainer: Trainer) -> None:
     del mock_trainer.store.timestamp
     trainer_step.on_training_step(trainer=mock_trainer)
 
-    assert mock_trainer.store.timestamp!=0
+    assert mock_trainer.store.timestamp != 0
 
     assert list(mock_trainer.store.trainer_parameter_client.params.keys()) == [
         "trainer_steps",
@@ -226,10 +226,7 @@ def test_on_training_init_start(mock_trainer: MockTrainer) -> None:
     mapg_with_trust_region_step = MAPGWithTrustRegionStep()
     mapg_with_trust_region_step.on_training_init_start(trainer=mock_trainer)
 
-    assert (
-        mock_trainer.store.full_batch_size
-        == 4
-    )
+    assert mock_trainer.store.full_batch_size == 4
 
 
 def test_on_training_step_fn(mock_trainer: MockTrainer) -> None:
@@ -279,7 +276,7 @@ def test_step(mock_trainer: MockTrainer, dummy_sample: DummySample) -> None:
     assert float(list(metrics["rewards_std"].values())[1]) == 0.07048596441745758
     assert float(list(metrics["rewards_std"].values())[2]) == 0.07740379124879837
 
-    assert list(mock_trainer.store.key) !=list(old_key)
+    assert list(mock_trainer.store.key) != list(old_key)
 
     assert mock_trainer.store.opt_states == {
         "network_agent_0": 0,

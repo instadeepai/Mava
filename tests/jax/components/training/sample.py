@@ -1,6 +1,9 @@
-import jax.numpy as jnp
-from mava.types import OLT
 from types import SimpleNamespace
+
+import jax.numpy as jnp
+
+from mava.types import OLT
+
 
 class DummySample:
     def __init__(self) -> None:
@@ -125,7 +128,8 @@ class DummySample:
                         ]
                     ),
                     terminal=jnp.array(
-                        [[[0.0], [0.0], [0.0]], [[0.0], [0.0], [0.0]]], dtype=jnp.float32
+                        [[[0.0], [0.0], [0.0]], [[0.0], [0.0], [0.0]]],
+                        dtype=jnp.float32,
                     ),
                 ),
                 "agent_1": OLT(
@@ -247,7 +251,8 @@ class DummySample:
                         ]
                     ),
                     terminal=jnp.array(
-                        [[[0.0], [0.0], [0.0]], [[0.0], [0.0], [0.0]]], dtype=jnp.float32
+                        [[[0.0], [0.0], [0.0]], [[0.0], [0.0], [0.0]]],
+                        dtype=jnp.float32,
                     ),
                 ),
                 "agent_2": OLT(
@@ -369,7 +374,8 @@ class DummySample:
                         ]
                     ),
                     terminal=jnp.array(
-                        [[[0.0], [0.0], [0.0]], [[0.0], [0.0], [0.0]]], dtype=jnp.float32
+                        [[[0.0], [0.0], [0.0]], [[0.0], [0.0], [0.0]]],
+                        dtype=jnp.float32,
                     ),
                 ),
             },
@@ -379,7 +385,9 @@ class DummySample:
                 "agent_2": jnp.array([[0, 0, 4], [3, 4, 2]]),
             },
             rewards={
-                "agent_0": jnp.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], dtype=jnp.float32),
+                "agent_0": jnp.array(
+                    [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], dtype=jnp.float32
+                ),
                 "agent_1": jnp.array(
                     [
                         [0.0897511, 0.14813632, 0.19152136],
@@ -393,9 +401,15 @@ class DummySample:
                 ),
             },
             discounts={
-                "agent_0": jnp.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=jnp.float32),
-                "agent_1": jnp.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=jnp.float32),
-                "agent_2": jnp.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=jnp.float32),
+                "agent_0": jnp.array(
+                    [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=jnp.float32
+                ),
+                "agent_1": jnp.array(
+                    [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=jnp.float32
+                ),
+                "agent_2": jnp.array(
+                    [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=jnp.float32
+                ),
             },
             start_of_episode=jnp.array([[True, False, False], [False, False, False]]),
             extras={
@@ -429,4 +443,3 @@ class DummySample:
                 },
             },
         )
-
