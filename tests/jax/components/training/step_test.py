@@ -228,8 +228,7 @@ def test_on_training_init_start(mock_trainer: MockTrainer) -> None:
 
     assert (
         mock_trainer.store.full_batch_size
-        == mock_trainer.store.sample_batch_size
-        * (mock_trainer.store.sequence_length - 1)
+        == 4
     )
 
 
