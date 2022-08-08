@@ -273,10 +273,10 @@ def test_step(mock_trainer: MockTrainer, dummy_sample: DummySample) -> None:
 
     for i, net_key in enumerate(mock_trainer.store.networks["networks"]):
         assert jnp.array_equal(
-            mock_trainer.store.networks["networks"][net_key].params['key'], 
-            jnp.array([i+2.0, i+2.0, i+2.0])
+            mock_trainer.store.networks["networks"][net_key].params["key"],
+            jnp.array([i + 2.0, i + 2.0, i + 2.0]),
         )
-    
+
     assert mock_trainer.store.opt_states == {
         "network_agent_0": 2,
         "network_agent_1": 3,
