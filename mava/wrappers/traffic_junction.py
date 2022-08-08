@@ -52,8 +52,7 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
         self.n_steps = 0  # Track number of steps in episode
 
         # Reset the env
-        obs, graph = self.reset()
-        print("\n\n\n\n\nOBS", obs)
+        self.reset()
 
     def step(
         self, actions: Dict[str, np.ndarray]
@@ -79,7 +78,7 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
         observations = self._convert_observations(observations, dones)
 
         # Convert rewards
-        rewards = self._agent_dict_from_array(rewards)
+        rewards = self._agent_dict_from_array(rewards.astype('float32'))
 
         if episode_over:
             self._step_type = dm_env.StepType.LAST
@@ -136,7 +135,7 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
     def _convert_observations(
         self, observes: np.array, dones: Dict[str, bool]
     ) -> Dict[str, OLT]:
-        self.observes = self._agent_dict_from_array(observes)
+        observes = self._agent_dict_from_array(observes)
         observations: Dict[str, OLT] = {}
         for agent, observation in observes.items():
             observations[agent] = OLT(
@@ -160,9 +159,9 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
             types.Observation: spec for environment.
         """
         observations = self._environment._get_obs()
-        return self._convert_observations(observes=observations, dones=[False] * self.environment.num_agents)
+        return self._convert_observations(observes=observations, dones={agent_id: False for agent_id in self.agent_ids})
 
-    def extra_spec(self) -> Dict[str, np.array]:
+    def extras_spec(self) -> Dict[str, np.array]:
         return {'communication_graph': self.environment._get_env_graph()}
 
     def action_spec(
@@ -173,7 +172,7 @@ class TrafficJunctionWrapper(PettingZooParallelEnvWrapper):
         Returns:
             spec for actions.
         """
-        return {agent_id: np.array(1, dtype=int) for agent_id in self.agent_ids}
+        return {agent_id: specs.DiscreteArray(2, dtype='int64') for agent_id in self.agent_ids}
 
     def reward_spec(self) -> Dict[str, np.array]:
         """Reward spec.
