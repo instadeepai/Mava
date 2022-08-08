@@ -29,24 +29,38 @@ class ExecutorInitConfig:
 
 class ExecutorInit(Component):
     def __init__(self, config: ExecutorInitConfig = ExecutorInitConfig()):
-        """_summary_
+        """Component for initialising store parameters required for executor components.
 
         Args:
-            config : _description_.
+            config: ExecutorInitConfig.
         """
         self.config = config
 
     def on_building_init(self, builder: SystemBuilder) -> None:
-        """Summary"""
+        """Create and save the networks from the factory.
+
+        Args:
+            builder: SystemBuilder.
+
+        Returns:
+            None.
+        """
         builder.store.networks = builder.store.network_factory()
 
     def on_execution_init_start(self, executor: SystemExecutor) -> None:
-        """_summary_"""
+        """Save the interval from the config to the executor.
+
+        Args:
+            executor: SystemExecutor.
+
+        Returns:
+            None.
+        """
         executor._interval = self.config.interval  # type: ignore
 
     @staticmethod
     def name() -> str:
-        """_summary_"""
+        """Static method that returns component name."""
         return "executor_init"
 
     @staticmethod
