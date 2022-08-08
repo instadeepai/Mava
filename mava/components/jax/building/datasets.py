@@ -100,7 +100,7 @@ class TransitionDataset(TrainerDataset):
             postprocess=self.config.postprocess,
         )
 
-        builder.store.dataset = iter(dataset)
+        builder.store.dataset_iterator = iter(dataset)
 
     @staticmethod
     def config_class() -> Optional[Callable]:
