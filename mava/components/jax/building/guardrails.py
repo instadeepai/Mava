@@ -102,10 +102,10 @@ class ComponentDependencyDebugger(Component):
         components: List = builder.callbacks[:]
 
         # Add required components to list
-        additional_required_components = []
+        all_required_components = []
         for component in components:
-            additional_required_components.extend(component.required_components())
-        components.extend(additional_required_components)
+            all_required_components.extend(component.required_components())
+        components.extend(all_required_components)
 
         # Sort components alphabetically and remove duplicates
         unique_component_strings = []
