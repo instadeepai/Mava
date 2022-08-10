@@ -41,32 +41,28 @@ class ExecutorSelectAction(Component):
         self,
         config: ExecutorSelectActionConfig = ExecutorSelectActionConfig(),
     ):
-        """_summary_
+        """Component defines hooks to override for executor action selection.
 
         Args:
-            config : _description_.
+            config: ExecutorSelectActionConfig.
         """
         self.config = config
 
     # Select actions
     @abc.abstractmethod
     def on_execution_select_actions(self, executor: SystemExecutor) -> None:
-        """Summary"""
+        """Hook to override for selecting actions for each agent."""
         pass
 
     # Select action
     @abc.abstractmethod
     def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
-        """Summary"""
+        """Hook to override for selecting an action for a single agent."""
         pass
 
     @staticmethod
     def name() -> str:
-        """_summary_
-
-        Returns:
-            _description_
-        """
+        """Static method that returns component name."""
         return "executor_select_action"
 
     @staticmethod
@@ -88,16 +84,23 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
         self,
         config: ExecutorSelectActionConfig = ExecutorSelectActionConfig(),
     ):
-        """_summary_
+        """Component defines hooks for the executor selecting actions.
 
         Args:
-            config : _description_.
+            config: ExecutorSelectActionConfig.
         """
         self.config = config
 
     # Select actions
     def on_execution_select_actions(self, executor: SystemExecutor) -> None:
-        """Summary"""
+        """Select actions for each agent and save info in store.
+
+        Args:
+            executor: SystemExecutor.
+
+        Returns:
+            None.
+        """
         executor.store.actions_info = {}
         executor.store.policies_info = {}
         # executor.store.observations set by Executor
@@ -108,7 +111,14 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
 
     # Select action
     def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
-        """Summary"""
+        """Select action for a single agent and save in store.
+
+        Args:
+            executor: SystemExecutor.
+
+        Returns:
+            None.
+        """
 
         agent = executor.store.agent  # Set by Executor
         network = executor.store.networks["networks"][

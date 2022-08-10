@@ -34,29 +34,28 @@ class TrainerDataset(Component):
         self,
         config: Any,
     ):
-        """_summary_
+        """Component creates an iterable dataset from existing reverb table.
 
         Args:
-            config : _description_.
+            config: Any.
         """
         self.config = config
 
     @abc.abstractmethod
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Abstract method defining hook to be overridden.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
         pass
 
     @staticmethod
     def name() -> str:
-        """_summary_
-
-        Returns:
-            _description_
-        """
+        """Static method that returns component name."""
         return "trainer_dataset"
 
     @staticmethod
@@ -86,18 +85,21 @@ class TransitionDataset(TrainerDataset):
         self,
         config: TransitionDatasetConfig = TransitionDatasetConfig(),
     ):
-        """_summary_
+        """Component creates a reverb transition dataset for the trainer.
 
         Args:
-            config : _description_.
+            config: TransitionDatasetConfig.
         """
         self.config = config
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Build a transition dataset and save it to the store.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
         max_in_flight_samples_per_worker = self.config.max_in_flight_samples_per_worker
         dataset = datasets.make_reverb_dataset(
@@ -111,7 +113,7 @@ class TransitionDataset(TrainerDataset):
             postprocess=self.config.postprocess,
         )
 
-        builder.store.dataset = iter(dataset)
+        builder.store.dataset_iterator = iter(dataset)
 
     @staticmethod
     def config_class() -> Optional[Callable]:
@@ -140,18 +142,23 @@ class TrajectoryDataset(TrainerDataset):
         self,
         config: TrajectoryDatasetConfig = TrajectoryDatasetConfig(),
     ):
-        """_summary_
+        """Component creates a reverb trajectory dataset for the trainer.
 
         Args:
-            config : _description_.
+            config: TrajectoryDatasetConfig.
         """
         self.config = config
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Build a trajectory dataset and save it to the store.
+
+        Automatically adds a batch dimension to the dataset.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
         dataset = reverb.TrajectoryDataset.from_table_signature(
             server_address=builder.store.data_server_client.server_address,

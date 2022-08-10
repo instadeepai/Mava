@@ -34,27 +34,19 @@ class Terminator(Component):
         self,
         config: Any,
     ):
-        """_summary_
-
-        Args:
-            config : _description_.
-        """
+        """Component handles when a system / run should terminate."""
         self.config = config
 
     @abc.abstractmethod
     def on_parameter_server_run_loop_termination(
         self, parameter_sever: SystemParameterServer
     ) -> None:
-        """_summary_"""
+        """Terminate system if some condition is met."""
         pass
 
     @staticmethod
     def name() -> str:
-        """_summary_
-
-        Returns:
-            _description_
-        """
+        """Static method that returns component name."""
         return "termination_condition"
 
     @staticmethod
@@ -80,10 +72,10 @@ class CountConditionTerminator(Terminator):
         self,
         config: CountConditionTerminatorConfig = CountConditionTerminatorConfig(),
     ):
-        """_summary_
+        """Component terminates a run when a count parameter reaches a threshold.
 
         Args:
-            config : _description_.
+            config: CountConditionTerminatorConfig.
         """
         self.config = config
 
@@ -96,7 +88,14 @@ class CountConditionTerminator(Terminator):
         self,
         parameter_sever: SystemParameterServer,
     ) -> None:
-        """_summary_"""
+        """Terminate a run when a parameter exceeds the given threshold.
+
+        Args:
+            parameter_sever: SystemParameterServer.
+
+        Returns:
+            None.
+        """
         if (
             self.config.termination_condition is not None
             and parameter_sever.store.parameters[self.termination_key]
@@ -110,7 +109,11 @@ class CountConditionTerminator(Terminator):
 
     @staticmethod
     def config_class() -> Type[CountConditionTerminatorConfig]:
-        """_summary_"""
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return CountConditionTerminatorConfig
 
     @staticmethod
@@ -136,22 +139,36 @@ class TimeTerminator(Terminator):
         self,
         config: TimeTerminatorConfig = TimeTerminatorConfig(),
     ):
-        """_summary_
+        """Component terminates a run when it reaches a time limit.
 
         Args:
-            config : _description_.
+            config: TimeTerminatorConfig.
         """
         self.config = config
         self._start_time = 0.0
 
     def on_parameter_server_init(self, parameter_sever: SystemParameterServer) -> None:
-        """_summary_"""
+        """Store the time at which the system was initialised.
+
+        Args:
+            parameter_sever: SystemParameterServer.
+
+        Returns:
+            None.
+        """
         self._start_time = time.time()
 
     def on_parameter_server_run_loop_termination(
         self, parameter_sever: SystemParameterServer
     ) -> None:
-        """_summary_"""
+        """Terminate the system if the time elapsed has exceeded the limit.
+
+        Args:
+            parameter_sever: SystemParameterServer.
+
+        Returns:
+            None.
+        """
         if time.time() - self._start_time > self.config.run_seconds:
             print(
                 f"Run time of {self.config.run_seconds} seconds reached, terminating."
@@ -160,5 +177,9 @@ class TimeTerminator(Terminator):
 
     @staticmethod
     def config_class() -> Type[TimeTerminatorConfig]:
-        """_summary_"""
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return TimeTerminatorConfig

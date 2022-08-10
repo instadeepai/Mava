@@ -50,4 +50,4 @@ class TrainingState(NamedTuple):
 class Utility(Component):
     @abc.abstractmethod
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
+        """Hook to override to define training utility functions."""
