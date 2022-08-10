@@ -159,8 +159,6 @@ class Step(Component):
         ParallelSequenceAdder required for config sequence_length.
         BaseTrainerInit required to set up trainer.store.networks
         and trainer.store.trainer_agent_net_keys.
-        EpochUpdate required to set up trainer.store.epoch_update_fn.
-        MinibatchUpdate required to set up trainer.store.opt_states.
         Networks required to set up trainer.store.key.
 
         Returns:
@@ -170,8 +168,6 @@ class Step(Component):
             TrainerDataset,
             mava.components.jax.building.adders.ParallelSequenceAdder,
             BaseTrainerInit,
-            mava.components.jax.training.model_updating.EpochUpdate,
-            mava.components.jax.training.model_updating.MinibatchUpdate,
             Networks,
         ]
 
@@ -409,7 +405,9 @@ class MAPGWithTrustRegionStep(Step):
         """List of other Components required in the system for this Component to function.
 
         GAE required to set up trainer.store.gae_fn.
-        MAPGEpochUpdate required for config num_epochs and num_minibatches.
+        MAPGEpochUpdate required for config num_epochs, num_minibatches,
+        and trainer.store.epoch_update_fn.
+        MinibatchUpdate required to set up trainer.store.opt_states.
 
         Returns:
             List of required component classes.
@@ -417,4 +415,5 @@ class MAPGWithTrustRegionStep(Step):
         return Step.required_components() + [
             GAE,
             mava.components.jax.training.model_updating.MAPGEpochUpdate,
+            mava.components.jax.training.model_updating.MinibatchUpdate,
         ]
