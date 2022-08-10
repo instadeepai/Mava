@@ -3,3 +3,4 @@ mkdocstrings
 mkdocs-material
 pymdown-extensions
 mkdocs-git-revision-date-plugin
+mkdocstrings-python
