@@ -40,28 +40,24 @@ class ParameterServer(Component):
         self,
         config: ParameterServerConfig = ParameterServerConfig(),
     ) -> None:
-        """Mock system Component."""
+        """Component defining hooks to override when creating a parameter server."""
         self.config = config
 
     @abc.abstractmethod
     def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
-        """_summary_
-
-        Args:
-            server : _description_
-        """
+        """Register parameters and network params to track. Create checkpointer."""
         pass
 
     # Get
     @abc.abstractmethod
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
-        """_summary_"""
+        """Fetch the parameters from the server specified in the store."""
         pass
 
     # Set
     @abc.abstractmethod
     def on_parameter_server_set_parameters(self, server: SystemParameterServer) -> None:
-        """_summary_"""
+        """Set the parameters in the server to the values specified in the store."""
         pass
 
     # Add
@@ -69,22 +65,18 @@ class ParameterServer(Component):
     def on_parameter_server_add_to_parameters(
         self, server: SystemParameterServer
     ) -> None:
-        """_summary_"""
+        """Increment the server parameters by the amount specified in the store."""
         pass
 
     # Save variables using checkpointer
     @abc.abstractmethod
     def on_parameter_server_run_loop(self, server: SystemParameterServer) -> None:
-        """_summary_
-
-        Args:
-            server : _description_
-        """
+        """Intermittently checkpoint the server parameters."""
         pass
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "parameter_server"
 
     @staticmethod
@@ -102,18 +94,30 @@ class DefaultParameterServer(ParameterServer):
         self,
         config: ParameterServerConfig = ParameterServerConfig(),
     ) -> None:
-        """Mock system Component."""
+        """Default Mava parameter server.
+
+        Registers count parameters and network params for tracking.
+        Creates the checkpointer.
+        Handles the getting, setting, and adding of parameters.
+        Handles periodic checkpointing of parameters.
+
+        Args:
+            config: ParameterServerConfig.
+        """
         self.config = config
 
     def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
-        """_summary_
+        """Register parameters and network params to track. Create checkpointer.
 
         Args:
-            server : _description_
+            server: SystemParameterServer.
+
+        Returns:
+            None.
         """
         networks = server.store.network_factory()
 
-        # # Create parameters
+        # Create parameters
         server.store.parameters = {
             "trainer_steps": np.zeros(1, dtype=np.int32),
             "trainer_walltime": np.zeros(1, dtype=np.float32),
@@ -148,7 +152,14 @@ class DefaultParameterServer(ParameterServer):
 
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
-        """_summary_"""
+        """Fetch the parameters from the server specified in the store.
+
+        Args:
+            server: SystemParameterServer.
+
+        Returns:
+            None.
+        """
         names: Union[str, Sequence[str]] = server.store._param_names
 
         if type(names) == str:
@@ -161,7 +172,14 @@ class DefaultParameterServer(ParameterServer):
 
     # Set
     def on_parameter_server_set_parameters(self, server: SystemParameterServer) -> None:
-        """_summary_"""
+        """Set the parameters in the server to the values specified in the store.
+
+        Args:
+            server: SystemParameterServer.
+
+        Returns:
+            None.
+        """
         params: Dict[str, Any] = server.store._set_params
         names = params.keys()
 
@@ -179,7 +197,14 @@ class DefaultParameterServer(ParameterServer):
     def on_parameter_server_add_to_parameters(
         self, server: SystemParameterServer
     ) -> None:
-        """_summary_"""
+        """Increment the server parameters by the amount specified in the store.
+
+        Args:
+            server: SystemParameterServer.
+
+        Returns:
+            None.
+        """
         params: Dict[str, Any] = server.store._add_to_params
         names = params.keys()
 
@@ -189,10 +214,13 @@ class DefaultParameterServer(ParameterServer):
 
     # Save variables using checkpointer
     def on_parameter_server_run_loop(self, server: SystemParameterServer) -> None:
-        """_summary_
+        """Intermittently checkpoint the server parameters.
 
         Args:
-            server : _description_
+            server: SystemParameterServer.
+
+        Returns:
+            None.
         """
         if (
             self.config.checkpoint
