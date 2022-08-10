@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """General launcher for systems"""
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import launchpad as lp
 import reverb
@@ -40,6 +40,7 @@ class Launcher:
         nodes_on_gpu: List = [],
         sp_trainer_period: int = 1,
         sp_evaluator_period: int = 10,
+        sp_max_episodes: Optional[int] = None,
         name: str = "System",
         terminal: str = "current_terminal",
         lp_launch_type: Union[
@@ -56,6 +57,7 @@ class Launcher:
             nodes_on_gpu : which nodes should be run on the GPU.
             sp_trainer_period : number of episodes between single process trainer steps.
             sp_evaluator_period : num episodes between single process evaluator steps.
+            sp_max_episodes: maximum number of episodes to run before termination.
             name : launchpad program name.
             terminal : terminal for launchpad processes to be shown on.
         """
@@ -63,6 +65,7 @@ class Launcher:
         self._name = name
         self._sp_trainer_period = sp_trainer_period
         self._sp_evaluator_period = sp_evaluator_period
+        self._sp_max_episodes = sp_max_episodes
         self._terminal = terminal
         self._lp_launch_type = lp_launch_type
         if multi_process:
@@ -187,13 +190,14 @@ class Launcher:
             # getting the maximum queue size
             queue_threshold = data_server.server_info()["trainer"].max_size
 
-            while True:
+            while self._sp_max_episodes is None or episode <= self._sp_max_episodes:
                 # if the queue is too full we skip the executor to ensure that the
                 # executor won't hang when trying to push experience
                 if data_server.server_info()["trainer"].current_size < int(
                     queue_threshold * 0.75
                 ):
                     executor_stats = executor.run_episode_and_log()
+                    executor_steps += executor_stats["episode_length"]
 
                 # if the queue has less than sample_batch_size samples in it we skip
                 # the trainer to ensure that the trainer won't hang
@@ -210,4 +214,3 @@ class Launcher:
 
                 print(f"Episode {episode} completed.")
                 episode += 1
-                executor_steps += executor_stats["episode_length"]
