@@ -62,7 +62,7 @@ For details on how to add your own environment, see [here](https://github.com/in
 |:---:|:---:|
 |MAD4PG on the 2D RoboCup environment using 6 executors.| MADQN on a melting pot clean up scenario |
 
-## System Implementations
+## Tensorflow System Implementations
 
 | **Name**         | **Recurrent**      | **Continuous** | **Discrete**  | **Centralised training**  | **Multi Processing**   |
 | ------------------- | ------------------ | ------------------ | ------------------ | ------------------- | ------------------- |
@@ -73,11 +73,17 @@ For details on how to add your own environment, see [here](https://github.com/in
 | VDN   | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | QMIX   | :heavy_check_mark: | :x: | :heavy_check_mark:                | :heavy_check_mark: | :heavy_check_mark: |
 
-As we develop Mava further, we aim to have all systems well tested on a wide variety of environments.
+## Jax System Implementations
+
+| **Name**         | **Recurrent**      | **Continuous** | **Discrete**  | **Centralised training**  | **Multi Processing**   |
+| ------------------- | ------------------ | ------------------ | ------------------ | ------------------- | ------------------- |
+| MAPPO   | :x: | :x: | :heavy_check_mark: | :x: | :heavy_check_mark: |
+
+As we develop Mava further, we aim to have all systems well tested on a wide variety of environments. The team is also hard at work at expanding the systems that are implemented in Jax using the callback design approach.
 
 ## Usage
 
-To get a sense of how Mava systems are used we provide the following simplified example of launching a distributed MADQN system.
+To get a sense of how Mava systems are used we provide the following simplified example of launching a Tensorflow based distributed MADQN system.
 
 ```python
 # Mava imports
@@ -101,6 +107,31 @@ launchpad.launch(
     program,
     launchpad.LaunchType.LOCAL_MULTI_PROCESSING,
 )
+```
+
+We also illustrate how a Jax based MAPPO system may be implemented.
+
+```python
+# Mava imports
+from mava.systems.jax import mappo
+from mava.utils.environments import debugging_utils
+from mava.utils.loggers import logger_utils
+
+# Create the system.
+system = mappo.MAPPOSystem()
+
+# Build the distributed system.
+system.build(
+    environment_factory=environment_factory,
+    network_factory=network_factory,
+    sample_batch_size=5,
+    num_epochs=15,
+    num_executors=1,
+    multi_process=True,
+)
+
+# Launch the system
+system.launch()
 ```
 
 The first two arguments to the program are environment and network factory functions.
