@@ -47,6 +47,8 @@ nav:
       - mappo: systems/tf/mappo.md
       - madqn: systems/tf/madqn.md
       - vdn and qmix: systems/tf/value_decomposition.md
+    - Jax:
+      - mappo: systems/jax/mappo/README.md
   - Environments:
     - General: environments/general.md
     - Supported Environments:
