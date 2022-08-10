@@ -270,7 +270,9 @@ def test_step(mock_trainer: MockTrainer, dummy_sample: DummySample) -> None:
     assert float(list(metrics["rewards_std"].values())[2]) == 0.07740379124879837
 
     assert list(mock_trainer.store.key) != list(old_key)
-    num_expected_update_steps = mock_trainer.store.num_epochs * mock_trainer.store.num_minibatches
+    num_expected_update_steps = (
+        mock_trainer.store.num_epochs * mock_trainer.store.num_minibatches
+    )
     for i, net_key in enumerate(mock_trainer.store.networks["networks"]):
         assert jnp.array_equal(
             mock_trainer.store.networks["networks"][net_key].params["key"],
