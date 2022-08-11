@@ -245,6 +245,7 @@ def test_step(mock_trainer: MockTrainer, dummy_sample: DummySample) -> None:
     with jax.disable_jit():
         metrics = mock_trainer.store.step_fn(dummy_sample)
 
+    # Check that metrics were correctly computed
     assert list(metrics.keys()) == [
         "norm_params",
         "observations_mean",
@@ -269,10 +270,13 @@ def test_step(mock_trainer: MockTrainer, dummy_sample: DummySample) -> None:
     assert float(list(metrics["rewards_std"].values())[1]) == 0.07048596441745758
     assert float(list(metrics["rewards_std"].values())[2]) == 0.07740379124879837
 
+    # check that trainer random key has been updated
     assert list(mock_trainer.store.key) != list(old_key)
     num_expected_update_steps = (
         mock_trainer.store.num_epochs * mock_trainer.store.num_minibatches
     )
+
+    # check that network parameters and optimizer states were updated the correct number of times
     for i, net_key in enumerate(mock_trainer.store.networks["networks"]):
         assert jnp.array_equal(
             mock_trainer.store.networks["networks"][net_key].params["key"],
