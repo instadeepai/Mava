@@ -276,7 +276,8 @@ def test_step(mock_trainer: MockTrainer, dummy_sample: DummySample) -> None:
         mock_trainer.store.num_epochs * mock_trainer.store.num_minibatches
     )
 
-    # check that network parameters and optimizer states were updated the correct number of times
+    # check that network parameters and optimizer states were updated the correct 
+    # number of times
     for i, net_key in enumerate(mock_trainer.store.networks["networks"]):
         assert jnp.array_equal(
             mock_trainer.store.networks["networks"][net_key].params["key"],
