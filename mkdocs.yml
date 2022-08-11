@@ -49,6 +49,9 @@ nav:
       - vdn and qmix: systems/tf/value_decomposition.md
     - Jax:
       - mappo: systems/jax/mappo.md
+  - System Components:
+    - General: components/components.md
+    - Build Components: components/build_components.md
   - Environments:
     - General: environments/general.md
     - Supported Environments:
