@@ -51,25 +51,3 @@ class Utility(Component):
     @abc.abstractmethod
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """Hook to override to define training utility functions."""
-
-
-class Loss(Component):
-    @abc.abstractmethod
-    def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
-        """Hook to override to create loss function."""
-
-    @staticmethod
-    def name() -> str:
-        """Static method that returns component name."""
-        return "loss"
-
-
-class Step(Component):
-    @abc.abstractmethod
-    def on_training_step_fn(self, trainer: SystemTrainer) -> None:
-        """Hook to override to create SGD step function."""
-
-    @staticmethod
-    def name() -> str:
-        """Static method that returns component name."""
-        return "sgd_step"

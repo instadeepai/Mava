@@ -15,9 +15,11 @@
 
 """Commonly used distributor components for system builders"""
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Union
+from typing import Callable, List, Optional, Type, Union
 
+from mava.callbacks import Callback
 from mava.components.jax import Component
+from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemBuilder
 from mava.systems.jax.launcher import Launcher, NodeType
 
@@ -130,3 +132,14 @@ class Distributor(Component):
             config class/dataclass for component.
         """
         return DistributorConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        BaseTrainerInit required to set up builder.store.trainer_networks.
+
+        Returns:
+            List of required component classes.
+        """
+        return [BaseTrainerInit]

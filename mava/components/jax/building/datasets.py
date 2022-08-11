@@ -16,11 +16,12 @@
 """Commonly used dataset components for system builders"""
 import abc
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any, Callable, List, Optional, Type
 
 import reverb
 from acme import datasets
 
+from mava.callbacks import Callback
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 
@@ -57,6 +58,17 @@ class TrainerDataset(Component):
         """Static method that returns component name."""
         return "trainer_dataset"
 
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        None required.
+
+        Returns:
+            List of required component classes.
+        """
+        return []
+
 
 @dataclass
 class TransitionDatasetConfig:
@@ -91,7 +103,8 @@ class TransitionDataset(TrainerDataset):
         """
         max_in_flight_samples_per_worker = self.config.max_in_flight_samples_per_worker
         dataset = datasets.make_reverb_dataset(
-            table=builder.store.trainer_id,
+            table=builder.store.trainer_id,  # Set by builder
+            # Set by builder
             server_address=builder.store.data_server_client.server_address,
             batch_size=self.config.sample_batch_size,
             prefetch_size=self.config.prefetch_size,
@@ -160,7 +173,6 @@ class TrajectoryDataset(TrainerDataset):
 
         # Add batch dimension.
         dataset = dataset.batch(self.config.sample_batch_size, drop_remainder=True)
-        builder.store.sample_batch_size = self.config.sample_batch_size
 
         builder.store.dataset_iterator = dataset.as_numpy_iterator()
 

@@ -16,12 +16,14 @@
 """Terminator component for Mava systems."""
 import abc
 import time
-from typing import Any, Callable, Dict, Optional, Type
+from typing import Any, Callable, Dict, List, Optional, Type
 
 import launchpad as lp
 from chex import dataclass
 
+from mava.callbacks import Callback
 from mava.components.jax.component import Component
+from mava.components.jax.updating.parameter_server import ParameterServer
 from mava.core_jax import SystemParameterServer
 from mava.utils.training_utils import check_count_condition
 
@@ -46,6 +48,17 @@ class Terminator(Component):
     def name() -> str:
         """Static method that returns component name."""
         return "termination_condition"
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        None required.
+
+        Returns:
+            List of required component classes.
+        """
+        return []
 
 
 @dataclass
@@ -102,6 +115,17 @@ class CountConditionTerminator(Terminator):
             config class/dataclass for component.
         """
         return CountConditionTerminatorConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        ParameterServer required to set parameter_sever.store.parameters.
+
+        Returns:
+            List of required component classes.
+        """
+        return Terminator.required_components() + [ParameterServer]
 
 
 @dataclass

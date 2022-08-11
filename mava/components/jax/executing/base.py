@@ -16,10 +16,11 @@
 """Execution components for system builders"""
 
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, List, Optional, Type
 
+from mava.callbacks import Callback
 from mava.components.jax import Component
-from mava.core_jax import SystemBuilder, SystemExecutor
+from mava.core_jax import SystemExecutor
 
 
 @dataclass
@@ -35,17 +36,6 @@ class ExecutorInit(Component):
             config: ExecutorInitConfig.
         """
         self.config = config
-
-    def on_building_init(self, builder: SystemBuilder) -> None:
-        """Create and save the networks from the factory.
-
-        Args:
-            builder: SystemBuilder.
-
-        Returns:
-            None.
-        """
-        builder.store.networks = builder.store.network_factory()
 
     def on_execution_init_start(self, executor: SystemExecutor) -> None:
         """Save the interval from the config to the executor.
@@ -71,3 +61,14 @@ class ExecutorInit(Component):
             config class/dataclass for component.
         """
         return ExecutorInitConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        None required.
+
+        Returns:
+            List of required component classes.
+        """
+        return []

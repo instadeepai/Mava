@@ -17,7 +17,7 @@
 
 import abc
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 import jax
 import jax.numpy as jnp
@@ -26,7 +26,11 @@ from acme.jax import networks as networks_lib
 from jax.random import KeyArray
 from optax._src import base as optax_base
 
-from mava.components.jax.training import Batch, Utility
+from mava.callbacks import Callback
+from mava.components.jax.training.base import Batch, Utility
+from mava.components.jax.training.losses import Loss
+from mava.components.jax.training.step import Step
+from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
 
 
@@ -40,6 +44,19 @@ class MinibatchUpdate(Utility):
     def name() -> str:
         """Static method that returns component name."""
         return "minibatch_update"
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        BaseTrainerInit required to set up trainer.store.networks,
+        trainer.store.trainer_agents, and trainer.store.trainer_agent_net_keys.
+        Loss required to set up trainer.store.grad_fn.
+
+        Returns:
+            List of required component classes.
+        """
+        return [BaseTrainerInit, Loss]
 
 
 @dataclass
@@ -156,6 +173,18 @@ class EpochUpdate(Utility):
         """Static method that returns component name."""
         return "epoch_update"
 
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        Step required to set up trainer.store.full_batch_size.
+        MinibatchUpdate required to set up trainer.store.minibatch_update_fn.
+
+        Returns:
+            List of required component classes.
+        """
+        return [Step, MinibatchUpdate]
+
 
 @dataclass
 class MAPGEpochUpdateConfig:
@@ -184,8 +213,6 @@ class MAPGEpochUpdate(EpochUpdate):
         Returns:
             None.
         """
-        trainer.store.num_epochs = self.config.num_epochs
-        trainer.store.num_minibatches = self.config.num_minibatches
 
         def model_update_epoch(
             carry: Tuple[KeyArray, Any, optax.OptState, Batch],

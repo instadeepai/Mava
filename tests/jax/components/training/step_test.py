@@ -136,16 +136,15 @@ class MockTrainer(Trainer):
             trainer_parameter_client=MockParameterClient(),
             trainer_counts={"next_sample": 2},
             trainer_logger=MockTrainerLogger(),
-            sample_batch_size=2,
-            sequence_length=3,
             trainer_agent_net_keys=trainer_agent_net_keys,
             networks=networks,
             gae_fn=gae_advantages,
             opt_states=opt_states,
             key=jax.random.PRNGKey(5),
-            num_minibatches=1,
             epoch_update_fn=epoch_update,
-            num_epochs=2,
+            global_config=SimpleNamespace(
+                num_minibatches=1, num_epochs=2, sample_batch_size=2, sequence_length=3
+            ),
         )
         self.store = store
 
@@ -266,7 +265,8 @@ def test_step(mock_trainer: MockTrainer) -> None:
     # check that trainer random key has been updated
     assert list(mock_trainer.store.key) != list(old_key)
     num_expected_update_steps = (
-        mock_trainer.store.num_epochs * mock_trainer.store.num_minibatches
+        mock_trainer.store.global_config.num_epochs
+        * mock_trainer.store.global_config.num_minibatches
     )
 
     # check that network parameters and optimizer states were updated the correct
