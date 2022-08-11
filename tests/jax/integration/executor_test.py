@@ -14,7 +14,6 @@
 # limitations under the License.
 
 """Tests for executor class for Jax-based Mava systems"""
-
 import functools
 from typing import Dict, Tuple
 
@@ -41,6 +40,7 @@ system_init = DesignSpec(
     environment_spec=building.EnvironmentSpec,
     system_init=building.FixedNetworkSystemInit,
 ).get()
+
 executor = DesignSpec(
     executor_init=executing.ExecutorInit,
     executor_observe=executing.FeedforwardExecutorObserve,
@@ -55,7 +55,6 @@ executor = DesignSpec(
 class TestSystemExceptTrainer(System):
     def design(self) -> Tuple[DesignSpec, Dict]:
         """Mock system without trainer
-
         Returns:
             system callback components
         """
@@ -103,7 +102,7 @@ def test_executor_behavior_witohut_adder(
         network_factory=network_factory,
         executor_parameter_update_period=20,
         multi_process=False,
-        run_evaluator=True,  # run evaluator will remove the adder
+        run_evaluator=True,
         num_executors=1,
         use_next_extras=False,
     )
@@ -116,6 +115,8 @@ def test_executor_behavior_witohut_adder(
         trainer,
     ) = test_system_except_trainer._builder.store.system_build
 
+    # Remove adder
+    executor._executor.store.adder = None
     # Run an episode
     executor.run_episode()
 
@@ -169,7 +170,7 @@ def test_executor_behavior(
         network_factory=network_factory,
         executor_parameter_update_period=20,
         multi_process=False,
-        run_evaluator=False,
+        run_evaluator=True,
         num_executors=1,
         use_next_extras=False,
     )
@@ -178,6 +179,7 @@ def test_executor_behavior(
         data_server,
         parameter_server,
         executor,
+        evaluator,
         trainer,
     ) = test_system_except_trainer._builder.store.system_build
 
