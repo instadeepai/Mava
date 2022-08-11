@@ -27,7 +27,7 @@ from mava.components.jax.training.step import (
     MAPGWithTrustRegionStep,
 )
 from mava.systems.jax.trainer import Trainer
-from tests.jax.components.training.step_test_data import DummySample
+from tests.jax.components.training.step_test_data import dummy_sample
 
 
 def step_fn(sample: int) -> Dict[str, int]:
@@ -156,12 +156,6 @@ def mock_trainer() -> MockTrainer:
     return MockTrainer()
 
 
-@pytest.fixture
-def dummy_sample() -> DummySample:
-    """Build fixture from DummySample"""
-    return DummySample()
-
-
 def test_default_trainer_step_initiator() -> None:
     """Test constructor of DefaultTrainerStep component"""
     trainer_step = DefaultTrainerStep()
@@ -236,14 +230,13 @@ def test_on_training_step_fn(mock_trainer: MockTrainer) -> None:
     assert callable(mock_trainer.store.step_fn)
 
 
-def test_step(mock_trainer: MockTrainer, dummy_sample: DummySample) -> None:
+def test_step(mock_trainer: MockTrainer) -> None:
     """Test step function"""
     mapg_with_trust_region_step = MAPGWithTrustRegionStep()
     del mock_trainer.store.step_fn
     mapg_with_trust_region_step.on_training_step_fn(trainer=mock_trainer)
     old_key = mock_trainer.store.key
-    with jax.disable_jit():
-        metrics = mock_trainer.store.step_fn(dummy_sample)
+    metrics = mock_trainer.store.step_fn(dummy_sample)
 
     # Check that metrics were correctly computed
     assert list(metrics.keys()) == [
@@ -262,7 +255,7 @@ def test_step(mock_trainer: MockTrainer, dummy_sample: DummySample) -> None:
 
     assert list(metrics["rewards_mean"].keys()) == ["agent_0", "agent_1", "agent_2"]
     assert float(list(metrics["rewards_mean"].values())[0]) == 0.0
-    assert float(list(metrics["rewards_mean"].values())[1]) == 0.08261970430612564
+    assert float(list(metrics["rewards_mean"].values())[1]) == 0.08261971175670624
     assert float(list(metrics["rewards_mean"].values())[2]) == 0.07156813144683838
 
     assert list(metrics["rewards_std"].keys()) == ["agent_0", "agent_1", "agent_2"]
@@ -276,7 +269,7 @@ def test_step(mock_trainer: MockTrainer, dummy_sample: DummySample) -> None:
         mock_trainer.store.num_epochs * mock_trainer.store.num_minibatches
     )
 
-    # check that network parameters and optimizer states were updated the correct 
+    # check that network parameters and optimizer states were updated the correct
     # number of times
     for i, net_key in enumerate(mock_trainer.store.networks["networks"]):
         assert jnp.array_equal(
