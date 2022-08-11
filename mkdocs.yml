@@ -39,7 +39,7 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Mava in 15 minutes: overview.md
+  - Getting started: overview.md
   - Systems:
     - General: systems/general.md
     - Tensorflow:
