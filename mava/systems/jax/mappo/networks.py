@@ -52,7 +52,7 @@ class PPONetworks:
         """Initialises the PPO network Class.
 
         Args:
-            network: feedforward network representing the agent policy function.
+            network: neural network representing the agent policy function.
             params: values parameterising the network.
             log_prob: function used to calculate the log prob of an agent's action.
             entropy: function used to calculate the entropy of the agent policy.

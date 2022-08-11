@@ -36,7 +36,7 @@ class ExtrasSpec(Component):
         """Initialise extra specs
 
         Args:
-            config : configuration for current algorithm
+            config : ExtrasSpecConfig
         """
         self.config = config
 
@@ -58,7 +58,7 @@ class ExtrasLogProbSpec(ExtrasSpec):
         """Class that adds log probs to the extras spec
 
         Args:
-            config : configuration for current algorithm
+            config : ExtrasLogProbSpecConfig
         """
         self.config = config
 
@@ -66,7 +66,7 @@ class ExtrasLogProbSpec(ExtrasSpec):
         """Create extra specs after builder has been initialised
 
         Args:
-            builder: builds system
+            builder: SystemBuilder
 
         Returns:
             None.
