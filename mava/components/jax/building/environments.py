@@ -16,7 +16,7 @@
 """Execution components for system builders"""
 import abc
 from dataclasses import dataclass
-from typing import Callable, Optional, Type
+from typing import Callable, Optional, Tuple, Type, Union
 
 import acme
 
@@ -28,6 +28,7 @@ from mava.utils.sort_utils import sort_str_num
 from mava.wrappers.environment_loop_wrappers import (
     DetailedPerAgentStatistics,
     EnvironmentLoopStatisticsBase,
+    MonitorParallelEnvironmentLoop,
 )
 
 
@@ -38,24 +39,35 @@ class EnvironmentSpecConfig:
 
 class EnvironmentSpec(Component):
     def __init__(self, config: EnvironmentSpecConfig = EnvironmentSpecConfig()):
-        """[summary]"""
+        """Component creates a multi-agent environment spec.
+
+        Args:
+            config: EnvironmentSpecConfig.
+        """
         self.config = config
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Using the env factory in config, create and store the env spec and agents.
 
-        builder.store.environment_spec = specs.MAEnvironmentSpec(
+        Args:
+            builder: SystemBuilder.
+
+        Returns:
+            None.
+        """
+
+        builder.store.ma_environment_spec = specs.MAEnvironmentSpec(
             self.config.environment_factory()
         )
 
         builder.store.agents = sort_str_num(
-            builder.store.environment_spec.get_agent_ids()
+            builder.store.ma_environment_spec.get_agent_ids()
         )
         builder.store.extras_spec = {}
 
     @staticmethod
     def name() -> str:
-        """_summary_"""
+        """Static method that returns component name."""
         return "environment_spec"
 
     @staticmethod
@@ -80,18 +92,21 @@ class ExecutorEnvironmentLoop(Component):
     def __init__(
         self, config: ExecutorEnvironmentLoopConfig = ExecutorEnvironmentLoopConfig()
     ):
-        """[summary]"""
-        self.config = config
-
-    def on_building_init_start(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-        pass
-
-    def on_building_executor_environment(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Component creates an executor environment loop.
 
         Args:
-            builder : _description_
+            config: ExecutorEnvironmentLoopConfig.
+        """
+        self.config = config
+
+    def on_building_executor_environment(self, builder: SystemBuilder) -> None:
+        """Create and store the executor environment from the factory in config.
+
+        Args:
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
         # Global config set by EnvironmentSpec component
         builder.store.executor_environment = (
@@ -100,11 +115,18 @@ class ExecutorEnvironmentLoop(Component):
 
     @abc.abstractmethod
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Abstract method for overriding: should create executor environment loop.
+
+        Args:
+            builder: SystemBuilder.
+
+        Returns:
+            None.
+        """
 
     @staticmethod
     def name() -> str:
-        """_summary_"""
+        """Static method that returns component name."""
         return "executor_environment_loop"
 
     @staticmethod
@@ -119,10 +141,13 @@ class ExecutorEnvironmentLoop(Component):
 
 class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Create and store a parallel environment loop.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
         executor_environment_loop = ParallelEnvironmentLoop(
             environment=builder.store.executor_environment,
@@ -137,3 +162,75 @@ class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
                 executor_environment_loop
             )
         builder.store.system_executor = executor_environment_loop
+
+
+@dataclass
+class MonitorExecutorEnvironmentLoopConfig(ExecutorEnvironmentLoopConfig):
+    filename: str = "agents"
+    label: str = "parallel_environment_loop"
+    record_every: int = 1000
+    fps: int = 15
+    counter_str: str = "evaluator_episodes"
+    format: str = "video"
+    figsize: Union[float, Tuple[int, int]] = (360, 640)
+
+
+class MonitorExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
+    def __init__(
+        self,
+        config: MonitorExecutorEnvironmentLoopConfig = MonitorExecutorEnvironmentLoopConfig(),  # noqa
+    ):
+        """Component for visualising environment progress."""
+        super().__init__(config=config)
+        self.config = config
+
+    def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
+        """Monitors environments and produces videos of episodes.
+
+        Builds a `ParallelEnvironmentLoop` on the evaluator and a
+        `MonitorParallelEnvironmentLoop` on all executors and stores it
+        in the `builder.store.system_executor`.
+
+        Args:
+            builder: SystemBuilder
+        """
+        if builder.store.is_evaluator:
+            executor_environment_loop = MonitorParallelEnvironmentLoop(
+                environment=builder.store.executor_environment,
+                executor=builder.store.executor,
+                logger=builder.store.executor_logger,
+                should_update=self.config.should_update,
+                filename=self.config.filename,
+                label=self.config.label,
+                record_every=self.config.record_every,
+                path=builder.store.global_config.experiment_path,
+                fps=self.config.fps,
+                counter_str=self.config.counter_str,
+                format=self.config.format,
+                figsize=self.config.figsize,
+            )
+        else:
+            executor_environment_loop = ParallelEnvironmentLoop(
+                environment=builder.store.executor_environment,
+                executor=builder.store.executor,
+                logger=builder.store.executor_logger,
+                should_update=self.config.should_update,
+            )
+
+        del builder.store.executor_logger
+
+        if self.config.executor_stats_wrapper_class:
+            executor_environment_loop = self.config.executor_stats_wrapper_class(
+                executor_environment_loop
+            )
+
+        builder.store.system_executor = executor_environment_loop
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            MonitorExecutorEnvironmentLoopConfig.
+        """
+        return MonitorExecutorEnvironmentLoopConfig

@@ -307,7 +307,7 @@ class SpecWrapper(dm_env.Environment):
             )
         return discount_specs
 
-    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+    def extras_spec(self) -> Dict[str, specs.BoundedArray]:
         return {"s_t": self._state_spec}
 
     def _proc_robocup_obs(

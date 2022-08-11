@@ -54,11 +54,11 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 
 For details on how to add your own environment, see [here](https://github.com/instadeepai/Mava/blob/develop/mava/wrappers/README.md).
 
-|<img  src="docs/images/multiw_animation.gif" width="1300px"/> | <img src="docs/images/sc2_animation.gif" width="1500px"/>  | <img src="docs/images/flatland.gif" />  |
+|<img  src="docs/images/multiw_animation.gif" width="300px"/> | <img src="docs/images/sc2_animation.gif" width="200px"/>  | <img src="docs/images/flatland.gif" width="200px" />  |
 |:---:|:---:|:---:|
 |MAD4PG on PettingZoo's Multi-Walker environment. | VDN on the SMAC 3m map.| MADQN on Flatland. |
 
-|<img  src="docs/images/robocup_animation.gif" width="350px"/> |<img  src="docs/images/madqn_meltingpot_cleanup_scenario.gif" width="350px"/> |
+|<img  src="docs/images/robocup_animation.gif" width="300px"/> |<img  src="docs/images/madqn_meltingpot_cleanup_scenario.gif" width="300px"/> |
 |:---:|:---:|
 |MAD4PG on the 2D RoboCup environment using 6 executors.| MADQN on a melting pot clean up scenario |
 
@@ -272,7 +272,12 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
     pip install git+https://github.com/instadeepai/Mava#egg=id-mava[reverb,tf]
     ```
 
-    **For the jax version of mava, please replace `tf` with `jax`, e.g. `pip install id-mava[jax,reverb]`**
+    **For the jax version of mava, please replace `tf` with `jax`, e.g. `pip install id-mava[jax,reverb]`**.
+
+    **If you are using `jax` and `CUDA`, you also need to run the following:**
+    ```bash
+    pip install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+    ```
 
     1.2 For **optional** environments:
     * PettingZoo:
@@ -333,7 +338,7 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
 
         If this fails, follow instructions [here](https://github.com/deepmind/meltingpot#installation).
 
-2. Run an example:
+3. Run an example:
 
     ```
     python dir/to/example/example.py

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,16 +31,38 @@ python --version
 pip install --upgrade pip setuptools
 pip --version
 
-# Install pytest
-pip install pytest
-pip install pytest-xdist
+# Set up a virtual environment.
+pip install virtualenv
+virtualenv mava_testing
+source mava_testing/bin/activate
+
+# Fix module 'enum' has no attribute 'IntFlag' for py3.6
+pip uninstall -y enum34
+
+# For smac
+apt-get -y install git
+
+# For box2d
+apt-get install swig -y
+
+# Install depedencies
+pip install .[jax,envs,reverb,testing_formatting,record_episode]
+
+# For atari envs
+apt-get -y install unrar-free
+pip install autorom
+AutoROM -v
 
 N_CPU=$(grep -c ^processor /proc/cpuinfo)
 
 if [ "$integration" = "true" ]; then \
     # Run all tests
-    pytest -n "${N_CPU}" tests/jax ;
+    pytest -n "${N_CPU}" tests ;
 else
     # Run all unit tests (non integration tests).
-    pytest --durations=10 -n "${N_CPU}" tests/jax --ignore-glob="*/*system_test.py" ;
+    pytest --durations=10 -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
 fi
+
+# Clean-up.
+deactivate
+rm -rf mava_testing/

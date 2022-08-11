@@ -28,6 +28,17 @@ class BaseParameterClient(Component):
     def _set_up_count_parameters(
         self, params: Dict[str, Any]
     ) -> Tuple[List[str], Dict[str, Any]]:
+        """Registers parameters to count and store.
+
+        Counts trainer_steps, trainer_walltime, evaluator_steps,
+        evaluator_episodes, executor_episodes, executor_steps.
+
+        Args:
+            params: Network parameters.
+
+        Returns:
+            Tuple of count parameters and network parameters.
+        """
         add_params = {
             "trainer_steps": np.array(0, dtype=np.int32),
             "trainer_walltime": np.array(0, dtype=np.float32),
@@ -50,19 +61,25 @@ class ExecutorParameterClient(BaseParameterClient):
         self,
         config: ExecutorParameterClientConfig = ExecutorParameterClientConfig(),
     ) -> None:
-        """Parameter client
+        """Component creates a parameter client for the executor.
 
         Args:
-            config : parameter client config
+            config: ExecutorParameterClientConfig.
         """
 
         self.config = config
 
     def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Create and store the executor parameter client.
+
+        Gets network parameters from store and registers them for updating.
+        Also works for the evaluator.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
         # Create policy parameters
         params = {}
@@ -108,7 +125,7 @@ class ExecutorParameterClient(BaseParameterClient):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "executor_parameter_client"
 
     @staticmethod
@@ -131,19 +148,24 @@ class TrainerParameterClient(BaseParameterClient):
         self,
         config: TrainerParameterClientConfig = TrainerParameterClientConfig(),
     ) -> None:
-        """Parameter client
+        """Component creates a parameter client for the trainer.
 
         Args:
-            config : parameter client config
+            config: TrainerParameterClientConfig.
         """
 
         self.config = config
 
     def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Create and store the trainer parameter client.
+
+        Gets network parameters from store and registers them for updating.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
         # Create parameter client
         params = {}
@@ -192,5 +214,5 @@ class TrainerParameterClient(BaseParameterClient):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "trainer_parameter_client"
