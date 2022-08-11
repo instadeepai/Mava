@@ -1,7 +1,9 @@
 # Examples
 
-We include a non-exhaustive number of examples, showing common use-cases for Mava. We also have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-Agent System.
+We include a non-exhaustive number of examples for both Jax-based systems and Tensorflow-based systems, showing common use-cases for Mava. We also have a [Tensorflow Quickstart notebook][tf_quickstart] and [Jax Quickstart notebook][tf_quickstart] that can be used to quickly create and train your first Multi-Agent System.
 
+# Tensorflow examples
+We have various examples using the Tensorflow-based implementation of Mava.
 ## Continuous control
 
 We include a number of systems running on continuous control tasks.
@@ -136,8 +138,43 @@ We also include a number of systems running on discrete action space environment
   - *Feedforward*
     - [decentralised][openspiel_madqn_ff_dec].
 
+# Jax examples
+We also have various Jax-based exmaples which make use of the callback design paradigm. Our pre-implemented Jax-based systems are continually expanding so please check back often to see new implemented systems.
+
+## Discrete control
+
+### Debugging Environment - Simple Spread
+
+- **MAPPO**:
+    a MAPPO system running on the discrete action space simple_spread MPE environment.
+  - *Feedforward*
+    - [decentralised][debug_mappo_ff_dec_jax]
+
+### Flatland
+
+- **MAPPO**:
+    a MAPPO system running on the discrete action space simple_spread MPE environment.
+  - *Feedforward*
+    - [decentralised][flatland_mappo_ff_dec_jax]
+
+### Pettingzoo - Cooperative pong
+
+- **MAPPO**:
+    a MAPPO system running on the discrete action space simple_spread MPE environment.
+  - *Feedforward*
+    - [decentralised][pz_coop_pong_mappo_ff_dec_jax]
+
+### SMAC - StarCraft Multi-Agent Challenge
+
+- **MAPPO**:
+    a MAPPO system running on the discrete action space simple_spread MPE environment.
+  - *Feedforward*
+    - [decentralised][smac_mappo_ff_dec_jax]
+
+
+
 <!-- Examples -->
-[quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/quickstart.ipynb
+[tf_quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/quickstart.ipynb
 <!-- Continous -->
 [debug_maddpg_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/debugging/simple_spread/feedforward/decentralised/run_maddpg.py
 [debug_maddpg_ff_dec_record]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/debugging/simple_spread/feedforward/decentralised/run_maddpg_record.py
@@ -198,3 +235,8 @@ We also include a number of systems running on discrete action space environment
 [smac_vdn_rec_cen]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/smac/recurrent/centralised/run_vdn.py
 
 [openspiel_madqn_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/openspiel/tic_tac_toe/feedforward/decentralised/run_madqn.py
+
+[debug_mappo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_mappo.py
+[flatland_mappo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/flatland/feedforward/decentralised/run_mappo.py
+[pz_coop_pong_mappo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/petting_zoo/butterfly/cooperative_pong/feedforward/decentralised/run_mappo.py
+[smac_mappo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/smac/feedforward/decentralised/run_mappo.py
