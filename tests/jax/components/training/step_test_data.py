@@ -1,5 +1,4 @@
-from types import SimpleNamespace
-
+from typing import Any, Tuple
 import jax.numpy as jnp
 import reverb
 from jax.tree_util import register_pytree_node_class
@@ -12,7 +11,13 @@ class MockStep:
     """Mock Step for data sampling"""
 
     def __init__(
-        self, observations, actions, rewards, discounts, start_of_episode, extras
+        self,
+        observations: Any,
+        actions: Any,
+        rewards: Any,
+        discounts: Any,
+        start_of_episode: Any,
+        extras: Any,
     ) -> None:
         self.observations = observations
         self.actions = actions
@@ -21,7 +26,7 @@ class MockStep:
         self.start_of_episode = start_of_episode
         self.extras = extras
 
-    def tree_flatten(self):
+    def tree_flatten(self) -> Tuple:
         children = (
             self.observations,
             self.actions,
@@ -34,7 +39,7 @@ class MockStep:
         return (children, aux_data)
 
     @classmethod
-    def tree_unflatten(cls, aux_data, children):
+    def tree_unflatten(cls, aux_data: Any, children: Any) -> Any:
         return cls(*children)
 
 
