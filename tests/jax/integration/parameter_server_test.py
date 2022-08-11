@@ -169,12 +169,12 @@ def test_parameter_server(test_system: System) -> None:
         )
 
     # set non existing param
-    param1 : Dict[str,str] = {"wrong_param": "test"}
+    param1: Dict[str, str] = {"wrong_param": "test"}
     with pytest.raises(AssertionError):
         assert parameter_server.set_parameters(param1)
 
     ############################add_to_parameters_test#####################################
-    param2 : Dict[str, Any]= {
+    param2: Dict[str, Any] = {
         "trainer_steps": jnp.array([1, 3]),
     }
     parameter_server.add_to_parameters(param2)
