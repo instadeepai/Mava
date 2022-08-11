@@ -39,6 +39,7 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Mava in 15 minutes: overview.md
   - Systems:
     - General: systems/general.md
     - Tensorflow:
@@ -49,8 +50,9 @@ nav:
       - vdn and qmix: systems/tf/value_decomposition.md
     - Jax:
       - mappo: systems/jax/mappo.md
-  - System Components:
+  - Components:
     - General: components/components.md
+    - Core Components: components/core_components.md
     - Build Components: components/build_components.md
     - Training Components: components/train_components.md
     - Executing Components: components/executing_components.md
