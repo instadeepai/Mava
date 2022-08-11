@@ -1,4 +1,4 @@
-# Build level components
+# Build components
 
 ## Adder components
 ::: mava.components.jax.building.adders

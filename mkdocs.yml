@@ -52,6 +52,9 @@ nav:
   - System Components:
     - General: components/components.md
     - Build Components: components/build_components.md
+    - Training Components: components/train_components.md
+    - Executing Components: components/executing_components.md
+    - Updating Components: components/updating_components.md
   - Environments:
     - General: environments/general.md
     - Supported Environments:
