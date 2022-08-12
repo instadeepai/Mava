@@ -17,6 +17,7 @@
 from typing import Any, Tuple
 
 from mava.components.jax import building, executing, training, updating
+from mava.components.jax.building.guardrails import ComponentDependencyGuardrails
 from mava.specs import DesignSpec
 from mava.systems.jax import System
 from mava.systems.jax.mappo.components import ExtrasLogProbSpec
@@ -86,5 +87,6 @@ class MAPPOSystem(System):
             **trainer_process,
             distributor=building.Distributor,
             logger=building.Logger,
+            component_dependency_guardrails=ComponentDependencyGuardrails,
         )
         return system, default_params

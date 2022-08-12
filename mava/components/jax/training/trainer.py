@@ -18,9 +18,13 @@
 import abc
 from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional, Type
 
+from mava.callbacks import Callback
 from mava.components.jax import Component
+from mava.components.jax.building.environments import EnvironmentSpec
+from mava.components.jax.building.networks import Networks
+from mava.components.jax.building.system_init import BaseSystemInit
 from mava.core_jax import SystemBuilder, SystemTrainer
 from mava.utils.sort_utils import sort_str_num
 
@@ -31,7 +35,7 @@ class BaseTrainerInit(Component):
         self,
         config: Any,
     ):
-        """Initialise system init components.
+        """Component sets up trainer networks.
 
         Args:
             config : a dataclass specifying the component parameters.
@@ -40,12 +44,12 @@ class BaseTrainerInit(Component):
 
     @abc.abstractmethod
     def on_building_init_end(self, builder: SystemBuilder) -> None:
-        """Summary."""
+        """Set up the networks during the build."""
         pass
 
     @abc.abstractmethod
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """Summary."""
+        """Set up trainer agents."""
         pass
 
     @staticmethod
@@ -53,6 +57,20 @@ class BaseTrainerInit(Component):
         """Component name."""
 
         return "trainer_init"
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        BaseSystemInit required to set up builder.store.unique_net_keys
+        and builder.store.network_sampling_setup.
+        EnvironmentSpec required to set up builder.store.agents.
+        Networks required to set up builder.store.network_factory.
+
+        Returns:
+            List of required component classes.
+        """
+        return [BaseSystemInit, EnvironmentSpec, Networks]
 
 
 class SingleTrainerInit(BaseTrainerInit):
@@ -110,13 +128,21 @@ class SingleTrainerInit(BaseTrainerInit):
                     matches = most_matches
                     builder.store.table_network_config[trainer_key] = sample
 
+        # TODO (Matthew): networks need to be created on the nodes instead?
         builder.store.networks = builder.store.network_factory()
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """_summary_"""
+        """Set up trainer agents.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
         # Convert network keys for the trainer.
         trainer.store.trainer_table_entry = trainer.store.table_network_config[
-            trainer.store.trainer_id
+            trainer.store.trainer_id  # Set by the Builder
         ]
         trainer.store.trainer_agents = trainer.store.agents[
             : len(trainer.store.trainer_table_entry)
@@ -139,7 +165,7 @@ class OneTrainerPerNetworkInit(BaseTrainerInit):
         self.config = config
 
     def on_building_init_end(self, builder: SystemBuilder) -> None:
-        """.
+        """Set up trainer networks.
 
         Args:
             builder : the system builder
@@ -186,7 +212,14 @@ class OneTrainerPerNetworkInit(BaseTrainerInit):
         builder.store.networks = builder.store.network_factory()
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """_summary_"""
+        """Set up trainer agents.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
         # Convert network keys for the trainer.
         trainer.store.trainer_table_entry = trainer.store.table_network_config[
             trainer.store.trainer_id
@@ -269,7 +302,14 @@ class CustomTrainerInit(BaseTrainerInit):
         builder.store.networks = builder.store.network_factory()
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """_summary_"""
+        """Set up and store trainer agents.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
         # Convert network keys for the trainer.
         trainer.store.trainer_table_entry = trainer.store.table_network_config[
             trainer.store.trainer_id

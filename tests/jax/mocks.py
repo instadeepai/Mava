@@ -101,7 +101,7 @@ class MockAdder(Component):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "executor_adder"
 
 
@@ -309,7 +309,7 @@ class MockDataServer(Component):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "data_server"
 
     @staticmethod
@@ -480,7 +480,7 @@ class MockParameterServer(Component):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "parameter_server"
 
 
@@ -522,7 +522,7 @@ class MockLogger(Component):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "logger"
 
 
@@ -548,7 +548,7 @@ class MockExecutorParameterClient(Component):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "executor_parameter_client"
 
 
@@ -574,7 +574,7 @@ class MockTrainerParameterClient(Component):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "trainer_parameter_client"
 
     @staticmethod
@@ -612,7 +612,7 @@ class MockExecutor(Component):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "executor"
 
 
@@ -658,7 +658,7 @@ class MockExecutorEnvironmentLoop(Component):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "executor_environment_loop"
 
     @staticmethod
@@ -743,7 +743,7 @@ class MockTrainerDataset(Component):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "trainer_dataset"
 
     @staticmethod
@@ -790,7 +790,7 @@ class MockTrainer(Component):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "trainer"
 
 
