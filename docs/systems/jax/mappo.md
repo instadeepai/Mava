@@ -1,3 +1,7 @@
+<hr>
+**Note:** This only applies to the callback redesign of Mava.
+<hr>
+
 --8<-- "mava/systems/jax/mappo/README.md"
 
 ::: mava.systems.jax.mappo.system

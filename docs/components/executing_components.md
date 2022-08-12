@@ -1,5 +1,9 @@
 # Execution components
 
+<hr>
+**Note:** This only applies to the callback redesign of Mava.
+<hr>
+
 TODO (docs): SHORT DESCRIPTION GOES HERE
 
 ## Action selection components

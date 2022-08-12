@@ -1,4 +1,9 @@
 # The store
+
+<hr>
+**Note:** This only applies to the callback redesign of Mava.
+<hr>
+
 The store is a key element that acts as a container for assigning the variables of the various components dynamically and that vary as the system operates.
 
 The store is a `SimpleNameSpace` instance, which allows users to store values as attributes without having to create their own class, which is usually required to be almost empty.

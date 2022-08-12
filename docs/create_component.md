@@ -1,4 +1,9 @@
 # Creating your own component
+
+<hr>
+**Note:** This only applies to the callback redesign of Mava.
+<hr>
+
 If a desired functionality does not exist in Mava, it can easily be extended by creating a new component. In order to create component a class must be created that inherits from the base [`Component`](https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/components/jax/component.py#L24) class with the relevant hooks overwritten.
 
 Each component requires:

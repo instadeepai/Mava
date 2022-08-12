@@ -1,5 +1,9 @@
 # Creating a system in Mava
 
+<hr>
+**Note:** This only applies to the callback redesign of Mava.
+<hr>
+
 In order to create a new system in Mava, a system class must be defined that inherits from the base [`System`](https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/systems/jax/system.py#L28) class. The `design` method must then be overwritten return a [`DesignSpec`](https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/specs.py#L161) object containing all the components to be used by a particular system. A default system config may also be created as a `dataclass` which contains the default system hyperparameters to be used.
 
 Please consider the following example where a MAPPO system is created:
