@@ -83,8 +83,8 @@ def test_initiator_multi_process() -> None:
 
     assert launcher._multi_process == True
     assert launcher._name == "System"
-    assert launcher._sp_trainer_period == 1
-    assert launcher._sp_evaluator_period == 10
+    assert launcher._single_process_trainer_period == 1
+    assert launcher._single_process_evaluator_period == 10
     assert launcher._terminal == "current_terminal"
 
     assert launcher._nodes_on_gpu == []
@@ -103,8 +103,8 @@ def test_initiator_non_multi_process() -> None:
 
     assert launcher._multi_process == False
     assert launcher._name == "System"
-    assert launcher._sp_trainer_period == 1
-    assert launcher._sp_evaluator_period == 10
+    assert launcher._single_process_trainer_period == 1
+    assert launcher._single_process_evaluator_period == 10
     assert launcher._terminal == "current_terminal"
 
     assert launcher._nodes == []
