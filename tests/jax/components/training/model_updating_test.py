@@ -229,7 +229,8 @@ def mock_minibatch_update_fn() -> Callable:
 def test_on_training_utility_fns_empty_config_optimizer(
     mock_trainer: MockTrainer,
 ) -> None:
-    """Test on_training_utility_fns from MAPGMinibatchUpdate with MAPGMinibatchUpdateConfig does not include optimizer
+    """Test on_training_utility_fns
+    from MAPGMinibatchUpdate with MAPGMinibatchUpdateConfig does not include optimizer
 
     Args:
         mock_trainer: Trainer
@@ -238,7 +239,7 @@ def test_on_training_utility_fns_empty_config_optimizer(
     mini_batch_update.config.optimizer = None
     mini_batch_update.on_training_utility_fns(trainer=mock_trainer)
 
-    assert mock_trainer.store.optimizer != None
+    assert mock_trainer.store.optimizer is not None
     assert isinstance(mock_trainer.store.optimizer, optax.GradientTransformation)
 
     assert list(mock_trainer.store.opt_states.keys()) == [
@@ -341,10 +342,6 @@ def test_on_training_utility_fns_epoch(mock_trainer: MockTrainer) -> None:
     mini_epoch_update = MAPGEpochUpdate()
     mini_epoch_update.on_training_utility_fns(trainer=mock_trainer)
 
-    assert mock_trainer.store.num_epochs == mini_epoch_update.config.num_epochs
-    assert (
-        mock_trainer.store.num_minibatches == mini_epoch_update.config.num_minibatches
-    )
     assert callable(mock_trainer.store.epoch_update_fn)
 
 

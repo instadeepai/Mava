@@ -217,4 +217,3 @@ class Launcher:
                     print("Performed evaluator run.")
 
                 step += 1
-                

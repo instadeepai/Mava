@@ -16,7 +16,7 @@
 """Base components for system builder"""
 
 import abc
-from typing import Any, Callable, Optional
+from typing import Any, Callable, List, Optional, Type
 
 from mava.callbacks import Callback
 
@@ -45,3 +45,12 @@ class Component(Callback):
             config class/dataclass for component.
         """
         pass
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        Returns:
+            List of required component classes.
+        """
+        return []

@@ -16,12 +16,14 @@
 """Execution components for system builders"""
 import abc
 from dataclasses import dataclass
-from typing import Callable, Optional, Tuple, Type, Union
+from typing import Callable, List, Optional, Tuple, Type, Union
 
 import acme
 
 from mava import specs
+from mava.callbacks import Callback
 from mava.components.jax import Component
+from mava.components.jax.building.loggers import Logger
 from mava.core_jax import SystemBuilder
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.utils.sort_utils import sort_str_num
@@ -78,6 +80,17 @@ class EnvironmentSpec(Component):
             config class/dataclass for component.
         """
         return EnvironmentSpecConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        None required.
+
+        Returns:
+            List of required component classes.
+        """
+        return []
 
 
 @dataclass
@@ -138,6 +151,18 @@ class ExecutorEnvironmentLoop(Component):
         """
         return ExecutorEnvironmentLoopConfig
 
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        Logger required to set up builder.store.executor_logger.
+        EnvironmentSpec required for config environment_factory.
+
+        Returns:
+            List of required component classes.
+        """
+        return [Logger, EnvironmentSpec]
+
 
 class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
@@ -151,7 +176,7 @@ class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
         """
         executor_environment_loop = ParallelEnvironmentLoop(
             environment=builder.store.executor_environment,
-            executor=builder.store.executor,
+            executor=builder.store.executor,  # Set up by builder
             logger=builder.store.executor_logger,
             should_update=self.config.should_update,
         )

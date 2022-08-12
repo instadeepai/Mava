@@ -17,12 +17,17 @@
 import abc
 import copy
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Type
 
 import reverb
 
 from mava import specs
+from mava.callbacks import Callback
 from mava.components.jax import Component
+from mava.components.jax.building.adders import AdderSignature
+from mava.components.jax.building.environments import EnvironmentSpec
+from mava.components.jax.building.reverb_components import RateLimiter, Remover, Sampler
+from mava.components.jax.building.system_init import BaseSystemInit
 from mava.core_jax import SystemBuilder
 from mava.utils import enums
 from mava.utils.builder_utils import convert_specs
@@ -62,10 +67,10 @@ class DataServer(Component):
                 "table_0": sort_str_num(builder.store.agent_net_keys.values())
             }
             assert (
-                builder.store.global_config.network_sampling_setup_type
+                builder.store.global_config.network_sampling_setup
                 == enums.NetworkSampler.fixed_agent_networks
             ), f"We only have a default config for the fixed_agent_networks sampler setting, \
-            not the {builder.store.global_config.network_sampling_setup_type} setting."
+            not the {builder.store.global_config.network_sampling_setup} setting."
 
         for table_key in builder.store.table_network_config.keys():
             # TODO (dries): Clean the below converter code up.
@@ -136,6 +141,21 @@ class DataServer(Component):
         """Static method that returns component name."""
         return "data_server"
 
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        BaseSystemInit required to set up builder.store.agent_net_keys
+        and for config network_sampling_setup.
+        EnvironmentSpec required to set up builder.store.environment_spec
+        and builder.store.extras_spec.
+        AdderSignature required to set up builder.store.adder_signature_fn.
+
+        Returns:
+            List of required component classes.
+        """
+        return [EnvironmentSpec, AdderSignature, BaseSystemInit]
+
 
 @dataclass
 class OffPolicyDataServerConfig:
@@ -205,6 +225,19 @@ class OffPolicyDataServer(DataServer):
         """
         return OffPolicyDataServerConfig
 
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        RateLimiter required to set up builder.store.rate_limiter_fn.
+        Remover required to set up builder.store.remover_fn.
+        Sampler required to set up builder.store.sampler_fn.
+
+        Returns:
+            List of required component classes.
+        """
+        return DataServer.required_components() + [RateLimiter, Remover, Sampler]
+
 
 @dataclass
 class OnPolicyDataServerConfig:
@@ -244,9 +277,11 @@ class OnPolicyDataServer(DataServer):
         Returns:
             A new reverb table.
         """
-        if builder.store.__dict__.get("sequence_length"):
+        if hasattr(builder.store.global_config, "sequence_length"):
             signature = builder.store.adder_signature_fn(
-                environment_specs, builder.store.sequence_length, extras_specs
+                environment_specs,
+                builder.store.global_config.sequence_length,
+                extras_specs,
             )
         else:
             signature = builder.store.adder_signature_fn(
