@@ -1,0 +1,3 @@
+# Gotchas
+
+## Debugging

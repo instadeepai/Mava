@@ -45,6 +45,7 @@ nav:
     - The store: store.md
     - The config: config.md
     - Creating a new component: create_component.md
+    - Gotchas: gotchas.md
   - Systems:
     - General: systems/general.md
     - Tensorflow:
