@@ -38,9 +38,9 @@ class Launcher:
         self,
         multi_process: bool,
         nodes_on_gpu: List = [],
-        sp_trainer_period: int = 1,
-        sp_evaluator_period: int = 10,
-        sp_max_episodes: Optional[int] = None,
+        single_process_trainer_period: int = 1,
+        single_process_evaluator_period: int = 10,
+        single_process_max_episodes: Optional[int] = None,
         name: str = "System",
         terminal: str = "current_terminal",
         lp_launch_type: Union[
@@ -55,17 +55,17 @@ class Launcher:
         Args:
             multi_process : whether to use launchpad to run nodes on separate processes.
             nodes_on_gpu : which nodes should be run on the GPU.
-            sp_trainer_period : number of episodes between single process trainer steps.
-            sp_evaluator_period : num episodes between single process evaluator steps.
-            sp_max_episodes: maximum number of episodes to run before termination.
+            single_process_trainer_period : number of episodes between single process trainer steps.
+            single_process_evaluator_period : num episodes between single process evaluator steps.
+            single_process_max_episodes: maximum number of episodes to run before termination.
             name : launchpad program name.
             terminal : terminal for launchpad processes to be shown on.
         """
         self._multi_process = multi_process
         self._name = name
-        self._sp_trainer_period = sp_trainer_period
-        self._sp_evaluator_period = sp_evaluator_period
-        self._sp_max_episodes = sp_max_episodes
+        self._single_process_trainer_period = single_process_trainer_period
+        self._single_process_evaluator_period = single_process_evaluator_period
+        self._single_process_max_episodes = single_process_max_episodes
         self._terminal = terminal
         self._lp_launch_type = lp_launch_type
         if multi_process:
@@ -191,7 +191,7 @@ class Launcher:
             # getting the maximum queue size
             queue_threshold = data_server.server_info()["trainer"].max_size
 
-            while self._sp_max_episodes is None or episode <= self._sp_max_episodes:
+            while self._single_process_max_episodes is None or episode <= self._single_process_max_episodes:
                 # if the queue is too full we skip the executor to ensure that the
                 # executor won't hang when trying to push experience
                 if data_server.server_info()["trainer"].current_size < int(
@@ -208,11 +208,11 @@ class Launcher:
                 if (
                     data_server.server_info()["trainer"].current_size
                     >= trainer.store.sample_batch_size
-                    and step % self._sp_trainer_period == 0
+                    and step % self._single_process_trainer_period == 0
                 ):
                     _ = trainer.step()  # logging done in trainer
                     print("Performed trainer step.")
-                if step % self._sp_evaluator_period == 0:
+                if step % self._single_process_evaluator_period == 0:
                     _ = evaluator.run_episode_and_log()
                     print("Performed evaluator run.")
 
