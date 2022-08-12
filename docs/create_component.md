@@ -1,5 +1,14 @@
 # Creating your own component
-If a desired functionality does not exist in Mava, it can easily be extended by creating a new component. In order to create component a class must be created that inherits from the base [`Component`](https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/components/jax/component.py#L24) class with the relevant hooks overwritten. TODO (docs) EXPLAIN THE STORE. As an example, consider the following component which creates a function for computing the generalized advantage estimate:
+If a desired functionality does not exist in Mava, it can easily be extended by creating a new component. In order to create component a class must be created that inherits from the base [`Component`](https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/components/jax/component.py#L24) class with the relevant hooks overwritten.
+
+Each component requires:
+
+* An associated `dataclass` which defines a component specific config with parameters to be used by it. Parameters from this component config `dataclass` can also be overwritten at a system level.
+* A `name` static method which defines the component name. This name gets used to verify that two components with the same functionaltiy are not simultaneously presetn in the system.
+* A `config_class` static method which returns the component config `dataclass`
+* Defining any relevant hooks to be overwritten by that component where each overwritten hooks take the process associated with a particular component as its input.
+
+As an example, please consider the following component which creates a function for computing the generalized advantage estimate and adds that function to the trainer store so that it may be executed later. Notice that this component inherits from the `Component` via the class called [`Utility`](https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/components/jax/training/base.py#L50).
 
 ```python
 @dataclass
