@@ -2,7 +2,7 @@
 
 > 🚧 **Note:** This only applies to the callback redesign of Mava.
 
-TODO (docs): SHORT DESCRIPTION GOES HERE
+Componets related to the trainer process of a system.
 
 ## Advantage estimation components
 ::: mava.components.jax.training.advantage_estimation

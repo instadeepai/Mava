@@ -2,7 +2,7 @@
 
 > 🚧 **Note:** This only applies to the callback redesign of Mava.
 
-TODO (docs): SHORT DESCRIPTION GOES HERE
+Components relating to agent execution in an environment.
 
 ## Action selection components
 ::: mava.components.jax.executing.action_selection

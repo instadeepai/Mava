@@ -2,7 +2,7 @@
 
 > 🚧 **Note:** This only applies to the callback redesign of Mava.
 
-TODO (docs): SHORT DESCRIPTION HERE
+Components used during build time to set up a system.
 
 ## Adder components
 ::: mava.components.jax.building.adders

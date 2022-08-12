@@ -2,7 +2,7 @@
 
 > 🚧 **Note:** This only applies to the callback redesign of Mava.
 
-TODO (docs): SHORT DESCRIPTION HERE
+Core Mava components needed for creating a system.
 
 ## Builder component
 ::: mava.systems.jax.builder
