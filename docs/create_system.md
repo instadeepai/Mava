@@ -73,4 +73,4 @@ class MAPPOSystem(System):
         return system, default_params
 ```
 
-In the above example certain processes are grouped together, which has been done for readability but is not strictly required.
+In the above example certain processes are grouped together, which has been done for readability but is not strictly required. For an example of how a full system may be launched on a particular environment and with logging included, please see [here](https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_mappo.py).
