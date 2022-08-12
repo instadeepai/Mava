@@ -207,7 +207,7 @@ class Launcher:
                 # the trainer to ensure that the trainer won't hang
                 if (
                     data_server.server_info()["trainer"].current_size
-                    >= trainer.store.sample_batch_size
+                    >= trainer.store.global_config.sample_batch_size
                     and step % self._single_process_trainer_period == 0
                 ):
                     _ = trainer.step()  # logging done in trainer
