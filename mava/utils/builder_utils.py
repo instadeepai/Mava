@@ -20,27 +20,22 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
     BaseExplorationTimestepScheduler,
     ConstantScheduler,
 )
-from mava.core_jax import SystemBuilder
 from mava.utils.sort_utils import sort_str_num
 
 
-def copy_builder(builder: SystemBuilder) -> SystemBuilder:
-    """Creates a copy of the builder.
+def copy_node_fn(fn: Callable) -> Callable:
+    """Creates a copy of a node function.
 
     Args:
-        builder: Mava builder object
+        fn : node function.
 
     Returns:
-        SystemBuilder: Mava builder object
+        copied node function.
     """
-
-    # Note: Add store.program to the memo to avoid copying
-    # it.
     memo = {}
-    memo[id(builder.store.program)] = builder.store.program
-    buildercopy = copy.deepcopy(builder, memo=memo)
-
-    return buildercopy
+    memo[id(fn.__self__.store.program)] = fn.__self__.store.program  # type: ignore
+    copied_fn = copy.deepcopy(fn, memo=memo)
+    return copied_fn
 
 
 def convert_specs(

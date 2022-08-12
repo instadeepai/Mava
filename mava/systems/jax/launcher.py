@@ -20,7 +20,7 @@ import launchpad as lp
 import reverb
 
 from mava.utils import lp_utils
-from mava.utils.builder_utils import copy_builder
+from mava.utils.builder_utils import copy_node_fn
 
 
 class NodeType:
@@ -55,11 +55,15 @@ class Launcher:
         Args:
             multi_process : whether to use launchpad to run nodes on separate processes.
             nodes_on_gpu : which nodes should be run on the GPU.
-            single_process_trainer_period : number of episodes between single process trainer steps.
-            single_process_evaluator_period : num episodes between single process evaluator steps.
-            single_process_max_episodes: maximum number of episodes to run before termination.
+            single_process_trainer_period : number of episodes between single process
+                trainer steps.
+            single_process_evaluator_period : num episodes between single process
+                evaluator steps.
+            single_process_max_episodes: maximum number of episodes to run
+                before termination.
             name : launchpad program name.
             terminal : terminal for launchpad processes to be shown on.
+            lp_launch_type: launchpad launch type.
         """
         self._multi_process = multi_process
         self._name = name
@@ -130,12 +134,7 @@ class Launcher:
                     + "Single process currently only supports one node per type."
                 )
 
-            copy_store_builder = copy_builder(builder=node_fn.__self__)
-
-            # Execute the function from the copied builder.
-            function_name = str(repr(node_fn).split(" ")[2].split(".")[-1])
-            node_fn = getattr(copy_store_builder, function_name)
-
+            node_fn = copy_node_fn(node_fn)
             process = node_fn(*arguments)
             if node_type == lp.ReverbNode:
                 # Assigning server to self to keep it alive.
@@ -191,7 +190,10 @@ class Launcher:
             # getting the maximum queue size
             queue_threshold = data_server.server_info()["trainer"].max_size
 
-            while self._single_process_max_episodes is None or episode <= self._single_process_max_episodes:
+            while (
+                self._single_process_max_episodes is None
+                or episode <= self._single_process_max_episodes
+            ):
                 # if the queue is too full we skip the executor to ensure that the
                 # executor won't hang when trying to push experience
                 if data_server.server_info()["trainer"].current_size < int(
