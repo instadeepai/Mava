@@ -1,6 +1,6 @@
 # Training components
 
-SHORT DESCRIPTION GOES HERE
+TODO (docs): SHORT DESCRIPTION GOES HERE
 
 ## Advantage estimation components
 ::: mava.components.jax.training.advantage_estimation

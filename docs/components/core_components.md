@@ -1,6 +1,6 @@
 # Core Mava components
 
-SHORT DESCRIPTION HERE
+TODO (docs): SHORT DESCRIPTION HERE
 
 ## Builder component
 ::: mava.systems.jax.builder

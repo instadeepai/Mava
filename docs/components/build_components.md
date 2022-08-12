@@ -1,5 +1,7 @@
 # Build components
 
+TODO (docs): SHORT DESCRIPTION HERE
+
 ## Adder components
 ::: mava.components.jax.building.adders
 

@@ -1,6 +1,6 @@
 # Updating components
 
-SHORT DESCRIPTION GOES HERE
+TODO (docs): SHORT DESCRIPTION GOES HERE
 
 ## Checkpointing components
 ::: mava.components.jax.updating.checkpointers
