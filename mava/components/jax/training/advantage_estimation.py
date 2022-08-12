@@ -16,13 +16,14 @@
 """Trainer components for advantage calculations."""
 
 from dataclasses import dataclass
-from typing import Callable, Optional, Tuple
+from typing import Callable, List, Optional, Tuple, Type
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import rlax
 
+from mava.callbacks import Callback
 from mava.components.jax.training.base import Utility
 from mava.core_jax import SystemTrainer
 
@@ -38,20 +39,36 @@ class GAE(Utility):
         self,
         config: GAEConfig = GAEConfig(),
     ):
-        """_summary_
+        """Component defines advantage estimation function.
 
         Args:
-            config : _description_.
+            config: GAEConfig.
         """
         self.config = config
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """_summary_"""
+        """Create and store a GAE advantage function.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
 
         def gae_advantages(
             rewards: jnp.ndarray, discounts: jnp.ndarray, values: jnp.ndarray
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
-            """Uses truncated GAE to compute advantages."""
+            """Use truncated GAE to compute advantages.
+
+            Args:
+                rewards: Agent rewards.
+                discounts: Agent discount factors.
+                values: Agent value estimations.
+
+            Returns:
+                Tuple of advantage values, target values.
+            """
 
             # Apply reward clipping.
             max_abs_reward = self.config.max_abs_reward
@@ -72,11 +89,7 @@ class GAE(Utility):
 
     @staticmethod
     def name() -> str:
-        """_summary_
-
-        Returns:
-            _description_
-        """
+        """Static method that returns component name."""
         return "gae_fn"
 
     @staticmethod
@@ -87,3 +100,14 @@ class GAE(Utility):
             config class/dataclass for component.
         """
         return GAEConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        None required.
+
+        Returns:
+            List of required component classes.
+        """
+        return []

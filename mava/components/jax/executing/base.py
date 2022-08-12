@@ -16,10 +16,11 @@
 """Execution components for system builders"""
 
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, List, Optional, Type
 
+from mava.callbacks import Callback
 from mava.components.jax import Component
-from mava.core_jax import SystemBuilder, SystemExecutor
+from mava.core_jax import SystemExecutor
 
 
 @dataclass
@@ -29,24 +30,27 @@ class ExecutorInitConfig:
 
 class ExecutorInit(Component):
     def __init__(self, config: ExecutorInitConfig = ExecutorInitConfig()):
-        """_summary_
+        """Component for initialising store parameters required for executor components.
 
         Args:
-            config : _description_.
+            config: ExecutorInitConfig.
         """
         self.config = config
 
-    def on_building_init(self, builder: SystemBuilder) -> None:
-        """Summary"""
-        builder.store.networks = builder.store.network_factory()
-
     def on_execution_init_start(self, executor: SystemExecutor) -> None:
-        """_summary_"""
+        """Save the interval from the config to the executor.
+
+        Args:
+            executor: SystemExecutor.
+
+        Returns:
+            None.
+        """
         executor._interval = self.config.interval  # type: ignore
 
     @staticmethod
     def name() -> str:
-        """_summary_"""
+        """Static method that returns component name."""
         return "executor_init"
 
     @staticmethod
@@ -57,3 +61,14 @@ class ExecutorInit(Component):
             config class/dataclass for component.
         """
         return ExecutorInitConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        None required.
+
+        Returns:
+            List of required component classes.
+        """
+        return []

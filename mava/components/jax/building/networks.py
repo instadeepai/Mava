@@ -17,12 +17,15 @@
 
 import abc
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, List, Optional, Type
 
 import dm_env
 import jax
 
+from mava.callbacks import Callback
 from mava.components.jax import Component
+from mava.components.jax.building.environments import EnvironmentSpec
+from mava.components.jax.building.system_init import BaseSystemInit
 from mava.core_jax import SystemBuilder
 
 
@@ -38,17 +41,28 @@ class Networks(Component):
         self,
         config: NetworksConfig = NetworksConfig(),
     ):
-        """[summary]"""
+        """Abstract component defines the skeleton for initialising networks.
+
+        Args:
+            config: NetworksConfig.
+        """
         self.config = config
 
     @abc.abstractmethod
     def on_building_init_start(self, builder: SystemBuilder) -> None:
-        """Summary"""
+        """Create and store the network factory from the config.
+
+        Args:
+            builder: SystemBuilder.
+
+        Returns:
+            None.
+        """
         pass
 
     @staticmethod
     def name() -> str:
-        """_summary_"""
+        """Static method that returns component name."""
         return "networks"
 
 
@@ -57,11 +71,24 @@ class DefaultNetworks(Networks):
         self,
         config: NetworksConfig = NetworksConfig(),
     ):
-        """[summary]"""
+        """Component defines the default way to initialise networks.
+
+        Args:
+            config: NetworksConfig.
+        """
         self.config = config
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
-        """Summary"""
+        """Create and store the network factory from the config.
+
+        Also manages keys, creating and storing a key from the config seed.
+
+        Args:
+            builder: SystemBuilder.
+
+        Returns:
+            None.
+        """
         # Setup the jax key for network initialisations
         builder.store.key = jax.random.PRNGKey(self.config.seed)
 
@@ -81,3 +108,15 @@ class DefaultNetworks(Networks):
             config class/dataclass for component.
         """
         return NetworksConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        EnvironmentSpec required to set up builder.store.environment_spec.
+        BaseSystemInit required to set up builder.store.agent_net_keys.
+
+        Returns:
+            List of required component classes.
+        """
+        return [EnvironmentSpec, BaseSystemInit]

@@ -15,9 +15,13 @@
 
 """Commonly used distributor components for system builders"""
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Union
+from typing import Callable, List, Optional, Type, Union
 
+import launchpad as lp
+
+from mava.callbacks import Callback
 from mava.components.jax import Component
+from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemBuilder
 from mava.systems.jax.launcher import Launcher, NodeType
 
@@ -30,30 +34,40 @@ class DistributorConfig:
     run_evaluator: bool = True
     distributor_name: str = "System"
     terminal: str = "current_terminal"
+    lp_launch_type: Union[str, lp.LaunchType] = lp.LaunchType.LOCAL_MULTI_PROCESSING
+    single_process_max_episodes: Optional[int] = None
 
 
 class Distributor(Component):
     def __init__(self, config: DistributorConfig = DistributorConfig()):
-        """_summary_
+        """Component builds launchpad program nodes and launches the program.
 
         Args:
-            config : _description_.
+            config: DistributorConfig.
         """
         if isinstance(config.nodes_on_gpu, str):
             config.nodes_on_gpu = [config.nodes_on_gpu]
         self.config = config
 
     def on_building_program_nodes(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Create nodes for the program and save the program in the store.
+
+        Create data server, parameter server, executor, trainer, and evaluator nodes.
+        Handles both single-process and multi-process.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
         builder.store.program = Launcher(
             multi_process=self.config.multi_process,
             nodes_on_gpu=self.config.nodes_on_gpu,
             name=self.config.distributor_name,
             terminal=self.config.terminal,
+            lp_launch_type=self.config.lp_launch_type,
+            single_process_max_episodes=self.config.single_process_max_episodes,
         )
 
         # tables node
@@ -101,16 +115,19 @@ class Distributor(Component):
             builder.store.system_build = builder.store.program.get_nodes()
 
     def on_building_launch(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Start the launchpad program saved in the store.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
         builder.store.program.launch()
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "distributor"
 
     @staticmethod
@@ -121,3 +138,14 @@ class Distributor(Component):
             config class/dataclass for component.
         """
         return DistributorConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        BaseTrainerInit required to set up builder.store.trainer_networks.
+
+        Returns:
+            List of required component classes.
+        """
+        return [BaseTrainerInit]

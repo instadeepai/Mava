@@ -13,13 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Execution components for system builders"""
+"""Observation components for system builders"""
 
 import abc
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, List, Type
 
+from mava.callbacks import Callback
 from mava.components.jax import Component
+from mava.components.jax.building.adders import Adder
+from mava.components.jax.building.parameter_client import ExecutorParameterClient
+from mava.components.jax.building.system_init import BaseSystemInit
+from mava.components.jax.executing.action_selection import ExecutorSelectAction
 from mava.core_jax import SystemExecutor
 from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 
@@ -32,65 +37,75 @@ class ExecutorObserveConfig:
 class ExecutorObserve(Component):
     @abc.abstractmethod
     def __init__(self, config: ExecutorObserveConfig = ExecutorObserveConfig()):
-        """_summary_
+        """Abstract component parses observations and updates executor variables.
 
         Args:
-            config : _description_.
+            config: ExecutorObserveConfig.
         """
         self.config = config
 
-    # Observe first
     @abc.abstractmethod
     def on_execution_observe_first(self, executor: SystemExecutor) -> None:
-        """_summary_
-
-        Args:
-            executor : _description_
-        """
+        """Handle first executor observation in episode."""
         pass
 
-    # Observe
     @abc.abstractmethod
     def on_execution_observe(self, executor: SystemExecutor) -> None:
-        """_summary_
-
-        Args:
-            executor : _description_
-        """
+        """Handle observations in executor."""
         pass
 
-    # Update the executor variables.
     @abc.abstractmethod
     def on_execution_update(self, executor: SystemExecutor) -> None:
-        """Update the policy variables."""
+        """Update the executor variables."""
         pass
 
     @staticmethod
     def name() -> str:
-        """_summary_"""
+        """Static method that returns component name."""
         return "executor_observe"
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        Adder required to set up executor.store.adder.
+        BaseSystemInit required to set up executor.store.agent_net_keys,
+        executor.store.network_sampling_setup, and executor.store.net_keys_to_ids.
+        ExecutorSelectAction required to assign executor.store.actions_info
+        and executor.store.policies_info.
+        ExecutorParameterClient required to set up
+        executor.store.executor_parameter_client.
+
+        Returns:
+            List of required component classes.
+        """
+        return [Adder, BaseSystemInit, ExecutorSelectAction, ExecutorParameterClient]
 
 
 class FeedforwardExecutorObserve(ExecutorObserve):
     def __init__(self, config: ExecutorObserveConfig = ExecutorObserveConfig()):
-        """_summary_
+        """Component handles observations for a feedforward executor.
 
         Args:
-            config : _description_.
+            config: ExecutorObserveConfig.
         """
         self.config = config
 
-    # Observe first
     def on_execution_observe_first(self, executor: SystemExecutor) -> None:
-        """_summary_
+        """Handle first observation in episode and give to adder.
+
+        Also selects networks to be used for episode.
 
         Args:
-            executor : _description_
+            executor: SystemExecutor.
+
+        Returns:
+            None.
         """
         if not executor.store.adder:
             return
 
-        "Select new networks from the sampler at the start of each episode."
+        # Select new networks from the sampler at the start of each episode.
         agents = sort_str_num(list(executor.store.agent_net_keys.keys()))
         (
             executor.store.network_int_keys_extras,
@@ -100,18 +115,22 @@ class FeedforwardExecutorObserve(ExecutorObserve):
             executor.store.network_sampling_setup,
             executor.store.net_keys_to_ids,
         )
+        # executor.store.extras set by Executor
         executor.store.extras[
             "network_int_keys"
         ] = executor.store.network_int_keys_extras
 
+        # executor.store.timestep set by Executor
         executor.store.adder.add_first(executor.store.timestep, executor.store.extras)
 
-    # Observe
     def on_execution_observe(self, executor: SystemExecutor) -> None:
-        """_summary_
+        """Handle observations and pass along to the adder.
 
         Args:
-            executor : _description_
+            executor: SystemExecutor.
+
+        Returns:
+            None.
         """
         if not executor.store.adder:
             return
@@ -120,6 +139,7 @@ class FeedforwardExecutorObserve(ExecutorObserve):
         policies_info = executor.store.policies_info
 
         adder_actions: Dict[str, Any] = {}
+        # executor.store.next_extras set by Executor
         executor.store.next_extras["policy_info"] = {}
         for agent in actions_info.keys():
             adder_actions[agent] = {
@@ -131,12 +151,12 @@ class FeedforwardExecutorObserve(ExecutorObserve):
             "network_int_keys"
         ] = executor.store.network_int_keys_extras
 
+        # executor.store.next_timestep set by Executor
         executor.store.adder.add(
             adder_actions, executor.store.next_timestep, executor.store.next_extras
         )
 
-    # Update the executor variables.
     def on_execution_update(self, executor: SystemExecutor) -> None:
-        """Update the policy variables."""
+        """Update the executor variables."""
         if executor.store.executor_parameter_client:
             executor.store.executor_parameter_client.get_async()
