@@ -35,7 +35,7 @@ class DistributorConfig:
     distributor_name: str = "System"
     terminal: str = "current_terminal"
     lp_launch_type: Union[str, lp.LaunchType] = lp.LaunchType.LOCAL_MULTI_PROCESSING
-    sp_max_episodes: Optional[int] = None
+    single_process_max_episodes: Optional[int] = None
 
 
 class Distributor(Component):
@@ -67,7 +67,7 @@ class Distributor(Component):
             name=self.config.distributor_name,
             terminal=self.config.terminal,
             lp_launch_type=self.config.lp_launch_type,
-            sp_max_episodes=self.config.sp_max_episodes,
+            single_process_max_episodes=self.config.single_process_max_episodes,
         )
 
         # tables node
