@@ -2,7 +2,7 @@
 
 > 🚧 **Note:** This only applies to the callback redesign of Mava.
 
-Going from papers to to code is one of the main challenges faced by reinformcement learning researchers. Mava aims to remove this constraint and to be the to go-to framework for fast iteration and experimentation. Mava also handles distributed computation by leveraging [Launcpad](https://github.com/deepmind/launchpad).
+Going from papers to to code is one of the main challenges faced by reinformcement learning researchers. Mava aims to remove this constraint and to be the to go-to framework for fast iteration and experimentation. Mava also handles distributed computation by leveraging [Launchpad](https://github.com/deepmind/launchpad).
 
 ### Design Paradigm
 
