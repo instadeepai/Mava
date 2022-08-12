@@ -179,6 +179,7 @@ class Launcher:
             )
         else:
             episode = 1
+            step = 1
             executor_steps = 0
 
             data_server = self._node_dict["data_server"]
@@ -199,18 +200,21 @@ class Launcher:
                     executor_stats = executor.run_episode_and_log()
                     executor_steps += executor_stats["episode_length"]
 
+                    print(f"Episode {episode} completed.")
+                    episode += 1
+
                 # if the queue has less than sample_batch_size samples in it we skip
                 # the trainer to ensure that the trainer won't hang
                 if (
                     data_server.server_info()["trainer"].current_size
                     >= trainer.store.sample_batch_size
-                    and episode % self._sp_trainer_period == 0
+                    and step % self._sp_trainer_period == 0
                 ):
                     _ = trainer.step()  # logging done in trainer
                     print("Performed trainer step.")
-                if episode % self._sp_evaluator_period == 0:
+                if step % self._sp_evaluator_period == 0:
                     _ = evaluator.run_episode_and_log()
                     print("Performed evaluator run.")
 
-                print(f"Episode {episode} completed.")
-                episode += 1
+                step += 1
+                
