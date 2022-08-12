@@ -9,7 +9,7 @@ Each component requires:
 * An associated `dataclass` which defines a component specific config with parameters to be used by it. Parameters from this component config `dataclass` can also be overwritten at a system level.
 * A `name` static method which defines the component name. This name gets used to verify that two components with the same functionaltiy are not simultaneously presetn in the system.
 * A `config_class` static method which returns the component config `dataclass`
-* Defining any relevant hooks to be overwritten by that component where each overwritten hooks take the process associated with a particular component as its input.
+* Defining any relevant hooks to be overwritten by that component where each overwritten hook takes the process associated with a particular component as its input.
 
 As an example, please consider the following component which creates a function for computing the generalized advantage estimate and adds that function to the trainer store so that it may be executed later. Notice that this component inherits from the `Component` via the class called [`Utility`](https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/components/jax/training/base.py#L50).
 
