@@ -1,1 +1,76 @@
 # Creating a system in Mava
+
+In order to create a new system in Mava, a system class must be defined that inherits from the base [`System`](https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/systems/jax/system.py#L28) class. The `design` method must then be overwritten return a [`DesignSpec`](https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/specs.py#L161) object containing all the components to be used by a particular system. A default system config may also be created as a `dataclass` which contains the default system hyperparameters to be used.
+
+Please consider the following example where a MAPPO system is created:
+
+```python
+class MAPPOSystem(System):
+    def design(self) -> Tuple[DesignSpec, Any]:
+        """Design for MAPPO system.
+        Returns:
+            system: system callback components
+            default_params: system default parameters
+        """
+        # Set the default configs
+        default_params = MAPPODefaultConfig()
+
+        # Default system processes
+        # System initialization
+        system_init = DesignSpec(
+            environment_spec=building.EnvironmentSpec,
+            system_init=building.FixedNetworkSystemInit,
+        ).get()
+
+        # Executor
+        executor_process = DesignSpec(
+            executor_init=executing.ExecutorInit,
+            executor_observe=executing.FeedforwardExecutorObserve,
+            executor_select_action=executing.FeedforwardExecutorSelectAction,
+            executor_adder=building.ParallelSequenceAdder,
+            adder_priority=building.UniformAdderPriority,
+            executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
+            networks=building.DefaultNetworks,
+        ).get()
+
+        # Trainer
+        trainer_process = DesignSpec(
+            trainer_init=training.SingleTrainerInit,
+            gae_fn=training.GAE,
+            loss=training.MAPGWithTrustRegionClippingLoss,
+            epoch_update=training.MAPGEpochUpdate,
+            minibatch_update=training.MAPGMinibatchUpdate,
+            sgd_step=training.MAPGWithTrustRegionStep,
+            step=training.DefaultTrainerStep,
+            trainer_dataset=building.TrajectoryDataset,
+        ).get()
+
+        # Data Server
+        data_server_process = DesignSpec(
+            data_server=building.OnPolicyDataServer,
+            data_server_adder_signature=building.ParallelSequenceAdderSignature,
+            extras_spec=ExtrasLogProbSpec,
+        ).get()
+
+        # Parameter Server
+        parameter_server_process = DesignSpec(
+            parameter_server=updating.DefaultParameterServer,
+            executor_parameter_client=building.ExecutorParameterClient,
+            trainer_parameter_client=building.TrainerParameterClient,
+            termination_condition=updating.CountConditionTerminator,
+        ).get()
+
+        system = DesignSpec(
+            **system_init,
+            **data_server_process,
+            **parameter_server_process,
+            **executor_process,
+            **trainer_process,
+            distributor=building.Distributor,
+            logger=building.Logger,
+            component_dependency_guardrails=ComponentDependencyGuardrails,
+        )
+        return system, default_params
+```
+
+In the above example certain processes are grouped together, which has been done for readability but is not strictly required.
