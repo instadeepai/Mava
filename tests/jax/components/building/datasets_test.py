@@ -230,11 +230,6 @@ def test_on_building_trainer_dataset_trajectory_dataset(
     trajectory_dataset = TrajectoryDataset()
     trajectory_dataset.on_building_trainer_dataset(builder=mock_builder)
 
-    assert (
-        mock_builder.store.sample_batch_size
-        == trajectory_dataset.config.sample_batch_size
-    )
-
     # mock_builder.store.dataset_iterator._iterator._dataset is needed \
     # to check the parameters i.e. obtain the dataset from the numpy \
     # dataset iterator

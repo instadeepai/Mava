@@ -17,7 +17,7 @@
 import abc
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 import jax
 import jax.numpy as jnp
@@ -27,8 +27,17 @@ import tree
 from acme.jax import utils
 from jax import jit
 
+import mava.components.jax.building.adders  # To avoid circular imports
+import mava.components.jax.training.model_updating  # To avoid circular imports
+from mava.callbacks import Callback
 from mava.components.jax import Component
-from mava.components.jax.training import Batch, Step, TrainingState
+from mava.components.jax.building.datasets import TrainerDataset, TrajectoryDataset
+from mava.components.jax.building.loggers import Logger
+from mava.components.jax.building.networks import Networks
+from mava.components.jax.building.parameter_client import TrainerParameterClient
+from mava.components.jax.training.advantage_estimation import GAE
+from mava.components.jax.training.base import Batch, TrainingState
+from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
 
 
@@ -43,11 +52,7 @@ class TrainerStep(Component):
         self,
         config: TrainerStepConfig = TrainerStepConfig(),
     ):
-        """_summary_
-
-        Args:
-            config : _description_.
-        """
+        """Defines the hooks to override to step the trainer."""
         self.config = config
 
     @abc.abstractmethod
@@ -57,12 +62,23 @@ class TrainerStep(Component):
 
     @staticmethod
     def name() -> str:
-        """_summary_
+        """Static method that returns component name."""
+        return "step"
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        TrajectoryDataset required to set up trainer.store.dataset_iterator.
+        Step required to set up trainer.store.step_fn.
+        TrainerParameterClient required to set up trainer.store.trainer_parameter_client
+        and trainer.store.trainer_counts.
+        Logger required to set up trainer.store.trainer_logger.
 
         Returns:
-            _description_
+            List of required component classes.
         """
-        return "step"
+        return [TrajectoryDataset, Step, TrainerParameterClient, Logger]
 
 
 class DefaultTrainerStep(TrainerStep):
@@ -70,15 +86,25 @@ class DefaultTrainerStep(TrainerStep):
         self,
         config: TrainerStepConfig = TrainerStepConfig(),
     ):
-        """_summary_
+        """Component defines the default trainer step.
+
+        Sample -> execute step function -> sync parameter client
+        -> update counts -> log.
 
         Args:
-            config : _description_.
+            config: TrainerStepConfig.
         """
         self.config = config
 
     def on_training_step(self, trainer: SystemTrainer) -> None:
-        """Does a step of SGD and logs the results."""
+        """Does a step of SGD and logs the results.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
 
         # Do a batch of SGD.
         sample = next(trainer.store.dataset_iterator)
@@ -111,6 +137,39 @@ class DefaultTrainerStep(TrainerStep):
         trainer.store.trainer_logger.write({**results})
 
 
+class Step(Component):
+    @abc.abstractmethod
+    def on_training_step_fn(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "sgd_step"
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        TrainerDataset required for config sample_batch_size.
+        BaseTrainerInit required to set up trainer.store.networks
+        and trainer.store.trainer_agent_net_keys.
+        Networks required to set up trainer.store.key.
+
+        Returns:
+            List of required component classes.
+        """
+        return [
+            TrainerDataset,
+            BaseTrainerInit,
+            Networks,
+        ]
+
+
 @dataclass
 class MAPGWithTrustRegionStepConfig:
     discount: float = 0.99
@@ -121,27 +180,51 @@ class MAPGWithTrustRegionStep(Step):
         self,
         config: MAPGWithTrustRegionStepConfig = MAPGWithTrustRegionStepConfig(),
     ):
-        """_summary_
+        """Component defines the MAPGWithTrustRegion SGD step.
 
         Args:
-            config : _description_.
+            config: MAPGWithTrustRegionStepConfig.
         """
         self.config = config
 
     def on_training_init_start(self, trainer: SystemTrainer) -> None:
+        """Compute and store full batch size.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
         # Note (dries): Assuming the batch and sequence dimensions are flattened.
-        trainer.store.full_batch_size = trainer.store.sample_batch_size * (
-            trainer.store.sequence_length - 1
+        trainer.store.full_batch_size = (
+            trainer.store.global_config.sample_batch_size
+            * (trainer.store.global_config.sequence_length - 1)
         )
 
     def on_training_step_fn(self, trainer: SystemTrainer) -> None:
-        """_summary_"""
+        """Define and store the SGD step function for MAPGWithTrustRegion.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
 
         @jit
         def sgd_step(
             states: TrainingState, sample: reverb.ReplaySample
         ) -> Tuple[TrainingState, Dict[str, jnp.ndarray]]:
-            """Performs a minibatch SGD step, returning new state and metrics."""
+            """Performs a minibatch SGD step.
+
+            Args:
+                states: Training states (network params and optimiser states).
+                sample: Reverb sample.
+
+            Returns:
+                Tuple[new state, metrics].
+            """
 
             # Extract the data.
             data = sample.data
@@ -165,6 +248,7 @@ class MAPGWithTrustRegionStep(Step):
             def get_behavior_values(
                 net_key: Any, reward: Any, observation: Any
             ) -> jnp.ndarray:
+                """Gets behaviour values from the agent networks and observations."""
                 o = jax.tree_map(
                     lambda x: jnp.reshape(x, [-1] + list(x.shape[2:])), observation
                 )
@@ -215,10 +299,10 @@ class MAPGWithTrustRegionStep(Step):
             num_sequences = agent_0_t_vals.shape[0]
             num_steps = agent_0_t_vals.shape[1]
             batch_size = num_sequences * num_steps
-            assert batch_size % trainer.store.num_minibatches == 0, (
+            assert batch_size % trainer.store.global_config.num_minibatches == 0, (
                 "Num minibatches must divide batch size. Got batch_size={}"
                 " num_minibatches={}."
-            ).format(batch_size, trainer.store.num_minibatches)
+            ).format(batch_size, trainer.store.global_config.num_minibatches)
             batch = jax.tree_map(
                 lambda x: x.reshape((batch_size,) + x.shape[2:]), trajectories
             )
@@ -227,7 +311,7 @@ class MAPGWithTrustRegionStep(Step):
                 trainer.store.epoch_update_fn,
                 (states.random_key, states.params, states.opt_states, batch),
                 (),
-                length=trainer.store.num_epochs,
+                length=trainer.store.global_config.num_epochs,
             )
 
             # Set the metrics
@@ -260,6 +344,14 @@ class MAPGWithTrustRegionStep(Step):
             return new_states, metrics
 
         def step(sample: reverb.ReplaySample) -> Tuple[Dict[str, jnp.ndarray]]:
+            """Step over the reverb sample and update the parameters / optimiser states.
+
+            Args:
+                sample: Reverb sample.
+
+            Returns:
+                Metrics from SGD step.
+            """
 
             # Repeat training for the given number of epoch, taking a random
             # permutation for every epoch.
@@ -305,3 +397,23 @@ class MAPGWithTrustRegionStep(Step):
             config class/dataclass for component.
         """
         return MAPGWithTrustRegionStepConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        GAE required to set up trainer.store.gae_fn.
+        MAPGEpochUpdate required for config num_epochs, num_minibatches,
+        and trainer.store.epoch_update_fn.
+        MinibatchUpdate required to set up trainer.store.opt_states.
+        ParallelSequenceAdder required for config sequence_length.
+
+        Returns:
+            List of required component classes.
+        """
+        return Step.required_components() + [
+            GAE,
+            mava.components.jax.training.model_updating.MAPGEpochUpdate,
+            mava.components.jax.training.model_updating.MinibatchUpdate,
+            mava.components.jax.building.adders.ParallelSequenceAdder,
+        ]

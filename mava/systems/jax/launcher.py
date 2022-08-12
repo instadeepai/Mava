@@ -14,15 +14,18 @@
 # limitations under the License.
 
 """General launcher for systems"""
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import launchpad as lp
 import reverb
 
 from mava.utils import lp_utils
+from mava.utils.builder_utils import copy_node_fn
 
 
 class NodeType:
+    """Specify launchpad node types that systems can use."""
+
     reverb = lp.ReverbNode
     courier = lp.CourierNode
 
@@ -35,26 +38,40 @@ class Launcher:
         self,
         multi_process: bool,
         nodes_on_gpu: List = [],
-        sp_trainer_period: int = 10,
-        sp_evaluator_period: int = 10,
+        single_process_trainer_period: int = 1,
+        single_process_evaluator_period: int = 10,
+        single_process_max_episodes: Optional[int] = None,
         name: str = "System",
         terminal: str = "current_terminal",
+        lp_launch_type: Union[
+            str, lp.LaunchType
+        ] = lp.LaunchType.LOCAL_MULTI_PROCESSING,
     ) -> None:
-        """_summary_
+        """Initialise the launcher.
+
+        If multi-process, set up the launchpad program.
+        Otherwise, create a dictionary for the nodes in the system.
 
         Args:
-            multi_process : _description_.
-            nodes_on_gpu : _description_.
-            sp_trainer_period : _description_.
-            sp_evaluator_period : _description_.
-            name : _description_.
-            terminal : terminal for launchpad processes to be shown on
+            multi_process : whether to use launchpad to run nodes on separate processes.
+            nodes_on_gpu : which nodes should be run on the GPU.
+            single_process_trainer_period : number of episodes between single process
+                trainer steps.
+            single_process_evaluator_period : num episodes between single process
+                evaluator steps.
+            single_process_max_episodes: maximum number of episodes to run
+                before termination.
+            name : launchpad program name.
+            terminal : terminal for launchpad processes to be shown on.
+            lp_launch_type: launchpad launch type.
         """
         self._multi_process = multi_process
         self._name = name
-        self._sp_trainer_period = sp_trainer_period
-        self._sp_evaluator_period = sp_evaluator_period
+        self._single_process_trainer_period = single_process_trainer_period
+        self._single_process_evaluator_period = single_process_evaluator_period
+        self._single_process_max_episodes = single_process_max_episodes
         self._terminal = terminal
+        self._lp_launch_type = lp_launch_type
         if multi_process:
             self._program = lp.Program(name=name)
             self._nodes_on_gpu = nodes_on_gpu
@@ -75,18 +92,26 @@ class Launcher:
         node_type: Union[lp.ReverbNode, lp.CourierNode] = NodeType.courier,
         name: str = "Node",
     ) -> Any:
-        """_summary_
+        """Add a node to the system.
+
+        If multi-processing, add a node to the existing launchpad program,
+        grouped under the given name.
+        This means that when multi-processing,
+        you can have multiple nodes of the same name (e.g. executor).
+        If system is single-process, only one node per name is allowed in the system.
 
         Args:
-            node_fn : _description_
-            arguments : _description_.
-            node_type : _description_.
-            name : _description_.
+            node_fn : Function returning the system process that will run on the node.
+            arguments : Arguments used when initialising the system process.
+            node_type : Type of launchpad node to use.
+            name : Node name (e.g. executor).
 
         Raises:
-            NotImplementedError: _description_
+            ValueError: if single-process and node name is not supported.
+            ValueError: if single-process and trying to init a node more than once.
+
         Returns:
-            _description_
+            The system process or launchpad node.
         """
         # Create a list of arguments
         if type(arguments) is not list:
@@ -105,10 +130,11 @@ class Launcher:
                 )
             elif self._node_dict[name] is not None:
                 raise ValueError(
-                    f"Node named {name} initialised more than onces."
+                    f"Node named {name} initialised more than once."
                     + "Single process currently only supports one node per type."
                 )
 
+            node_fn = copy_node_fn(node_fn)
             process = node_fn(*arguments)
             if node_type == lp.ReverbNode:
                 # Assigning server to self to keep it alive.
@@ -119,17 +145,24 @@ class Launcher:
             return process
 
     def get_nodes(self) -> List[Any]:
-        """TODO: Add description here."""
+        """Get the nodes of a single-process system.
+
+        Raises:
+            ValueError: if system is multi-process.
+
+        Returns:
+            System nodes.
+        """
         if self._multi_process:
             raise ValueError("Get nodes only implemented for single process setups.")
 
         return self._nodes
 
     def launch(self) -> None:
-        """_summary_
+        """Launch the launchpad program or start the single-process system loop.
 
-        Raises:
-            NotImplementedError: _description_
+        Returns:
+            None.
         """
         if self._multi_process:
             local_resources = lp_utils.to_device(
@@ -139,30 +172,50 @@ class Launcher:
 
             lp.launch(
                 self._program,
-                lp.LaunchType.LOCAL_MULTI_PROCESSING,
+                launch_type=self._lp_launch_type,
                 terminal=self._terminal,
                 local_resources=local_resources,
             )
         else:
             episode = 1
+            step = 1
             executor_steps = 0
 
-            _ = self._node_dict["data_server"]
+            data_server = self._node_dict["data_server"]
             _ = self._node_dict["parameter_server"]
             executor = self._node_dict["executor"]
             evaluator = self._node_dict["evaluator"]
             trainer = self._node_dict["trainer"]
 
-            while True:
-                executor_stats = executor.run_episode_and_log()
+            # getting the maximum queue size
+            queue_threshold = data_server.server_info()["trainer"].max_size
 
-                if episode % self._sp_trainer_period == 0:
+            while (
+                self._single_process_max_episodes is None
+                or episode <= self._single_process_max_episodes
+            ):
+                # if the queue is too full we skip the executor to ensure that the
+                # executor won't hang when trying to push experience
+                if data_server.server_info()["trainer"].current_size < int(
+                    queue_threshold * 0.75
+                ):
+                    executor_stats = executor.run_episode_and_log()
+                    executor_steps += executor_stats["episode_length"]
+
+                    print(f"Episode {episode} completed.")
+                    episode += 1
+
+                # if the queue has less than sample_batch_size samples in it we skip
+                # the trainer to ensure that the trainer won't hang
+                if (
+                    data_server.server_info()["trainer"].current_size
+                    >= trainer.store.global_config.sample_batch_size
+                    and step % self._single_process_trainer_period == 0
+                ):
                     _ = trainer.step()  # logging done in trainer
                     print("Performed trainer step.")
-                if episode % self._sp_evaluator_period == 0:
+                if step % self._single_process_evaluator_period == 0:
                     _ = evaluator.run_episode_and_log()
                     print("Performed evaluator run.")
 
-                print(f"Episode {episode} completed.")
-                episode += 1
-                executor_steps += executor_stats["episode_length"]
+                step += 1
