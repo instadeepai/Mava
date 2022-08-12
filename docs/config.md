@@ -1,8 +1,6 @@
 # The config
 
-<hr>
-**Note:** This only applies to the callback redesign of Mava.
-<hr>
+> 🚧 **Note:** This only applies to the callback redesign of Mava.
 
 The `config` is an attribute that exists in various components; it is the container of the configuration of the components that needs to be adjusted at their initialization (e.g the learning rate for the model updating).
 

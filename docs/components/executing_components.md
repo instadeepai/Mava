@@ -1,8 +1,6 @@
 # Execution components
 
-<hr>
-**Note:** This only applies to the callback redesign of Mava.
-<hr>
+> 🚧 **Note:** This only applies to the callback redesign of Mava.
 
 TODO (docs): SHORT DESCRIPTION GOES HERE
 

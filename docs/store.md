@@ -1,8 +1,6 @@
 # The store
 
-<hr>
-**Note:** This only applies to the callback redesign of Mava.
-<hr>
+> 🚧 **Note:** This only applies to the callback redesign of Mava.
 
 The store is a key element that acts as a container for assigning the variables of the various components dynamically and that vary as the system operates.
 
