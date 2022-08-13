@@ -149,11 +149,6 @@ def test_parallel_sequence_adder(
     assert parallel_sequence_adder.config.use_next_extras is True
 
     parallel_sequence_adder.on_building_init_start(builder=mock_builder)
-    assert (
-        mock_builder.store.sequence_length
-        == parallel_sequence_adder.config.sequence_length
-    )
-
     parallel_sequence_adder.on_building_executor_adder(builder=mock_builder)
     assert type(mock_builder.store.adder) == reverb_adders.ParallelSequenceAdder
 
