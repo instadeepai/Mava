@@ -76,8 +76,9 @@ def test_mappo(
         optimizer=optimizer,
         executor_parameter_update_period=1,
         multi_process=True,
-        run_evaluator=False,
+        run_evaluator=True,
         num_executors=1,
+        max_queue_size=500,
         use_next_extras=False,
         sample_batch_size=5,
         checkpoint=True,
@@ -94,5 +95,5 @@ def test_mappo(
     test_full_system.launch()
     trainer_run = trainer_node.create_handle().dereference()
 
-    for _ in range(2):
+    for _ in range(5):
         trainer_run.step()
