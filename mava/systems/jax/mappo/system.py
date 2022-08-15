@@ -17,6 +17,7 @@
 from typing import Any, Tuple
 
 from mava.components.jax import building, executing, training, updating
+from mava.components.jax.building.guardrails import ComponentDependencyGuardrails
 from mava.specs import DesignSpec
 from mava.systems.jax import System
 from mava.systems.jax.mappo.components import ExtrasLogProbSpec
@@ -92,10 +93,14 @@ class MAPPOSystemSeparateNetworks(System):
 
 class MAPPOSystem(System):
     def design(self) -> Tuple[DesignSpec, Any]:
-        """Mock system design with zero components.
+        """System design for IPPO with single optimiser.
+
+        Args:
+            None.
 
         Returns:
-            system callback components
+            system: design spec for IPPO
+            default_params: default IPPO configuration
         """
         # Set the default configs
         default_params = MAPPODefaultConfig()
@@ -153,5 +158,6 @@ class MAPPOSystem(System):
             **trainer_process,
             distributor=building.Distributor,
             logger=building.Logger,
+            component_dependency_guardrails=ComponentDependencyGuardrails,
         )
         return system, default_params

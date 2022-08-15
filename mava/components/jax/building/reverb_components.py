@@ -16,10 +16,11 @@
 """Commonly used rate limiter, sampler and remover components for system builders"""
 import abc
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, List, Optional, Type
 
 import reverb
 
+from mava.callbacks import Callback
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 
@@ -42,7 +43,7 @@ class RateLimiter(Component):
 
     @staticmethod
     def name() -> str:
-        """Assigns name to component"""
+        """Static method that returns component name."""
         return "rate_limiter"
 
     @staticmethod
@@ -53,6 +54,17 @@ class RateLimiter(Component):
             config class/dataclass for component.
         """
         return RateLimiterConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        None required.
+
+        Returns:
+            List of required component classes.
+        """
+        return []
 
 
 class MinSizeRateLimiter(RateLimiter):
@@ -153,7 +165,7 @@ class Sampler(Component):
 
     @staticmethod
     def name() -> str:
-        """Assigns name to component"""
+        """Static method that returns component name."""
 
         return "data_server_sampler"
 
@@ -166,13 +178,24 @@ class Sampler(Component):
         """
         return SamplerConfig
 
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        None required.
+
+        Returns:
+            List of required component classes.
+        """
+        return []
+
 
 class UniformSampler(Sampler):
     def on_building_data_server_start(self, builder: SystemBuilder) -> None:
         """Sample data from the table uniformly"""
 
         def sampler_fn() -> reverb.selectors:
-            """Function to retrieve sampler."""
+            """Function to retrieve uniform reverb sampler."""
             return reverb.selectors.Uniform()
 
         builder.store.sampler_fn = sampler_fn
@@ -235,6 +258,9 @@ class Remover(Component):
 
         These functions dictate how experience will be removed form the
         replay table once the maximum replay table size is reached.
+
+        Args:
+            config: RemoverConfig.
         """
         self.config = config
 
@@ -242,12 +268,18 @@ class Remover(Component):
     def on_building_data_server_start(self, builder: SystemBuilder) -> None:
         """Hook for adding reverb selector to builder store.
 
-        This determines how experience will be experience from the replay table.
+        This determines how experience will be sampled from the replay table.
+
+        Args:
+            builder: SystemBuilder.
+
+        Returns:
+            config class/dataclass for component.
         """
 
     @staticmethod
     def name() -> str:
-        """Assigns name to component"""
+        """Static method that returns component name."""
 
         return "data_server_remover"
 
@@ -260,12 +292,29 @@ class Remover(Component):
         """
         return RemoverConfig
 
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        None required.
+
+        Returns:
+            List of required component classes.
+        """
+        return []
+
 
 class FIFORemover(Remover):
     def on_building_data_server_start(self, builder: SystemBuilder) -> None:
         """First In First Out remover.
 
         The experience that was added to the replay table earlier is removed first.
+
+        Args:
+            builder: SystemBuilder.
+
+        Returns:
+            config class/dataclass for component.
         """
 
         def remover_fn() -> reverb.selectors:
@@ -279,6 +328,12 @@ class LIFORemover(Remover):
         """Last In First Out remover.
 
         The experience that was added to the replay table later is removed first.
+
+        Args:
+            builder: SystemBuilder.
+
+        Returns:
+            config class/dataclass for component.
         """
 
         def remover_fn() -> reverb.selectors:

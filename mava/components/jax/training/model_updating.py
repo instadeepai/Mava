@@ -17,7 +17,7 @@
 
 import abc
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 import jax
 import jax.numpy as jnp
@@ -26,28 +26,37 @@ from acme.jax import networks as networks_lib
 from jax.random import KeyArray
 from optax._src import base as optax_base
 
-from mava.components.jax.training import Batch, Utility
+from mava.callbacks import Callback
+from mava.components.jax.training.base import Batch, Utility
+from mava.components.jax.training.losses import Loss
+from mava.components.jax.training.step import Step
+from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
 
 
 class MinibatchUpdate(Utility):
     @abc.abstractmethod
     def __init__(self, config: Any) -> None:
-        """_summary_
-
-        Args:
-            config : _description_.
-        """
+        """Abstract component defining a mini-batch update."""
         self.config = config
 
     @staticmethod
     def name() -> str:
-        """_summary_
+        """Static method that returns component name."""
+        return "minibatch_update"
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        BaseTrainerInit required to set up trainer.store.networks,
+        trainer.store.trainer_agents, and trainer.store.trainer_agent_net_keys.
+        Loss required to set up trainer.store.grad_fn.
 
         Returns:
-            _description_
+            List of required component classes.
         """
-        return "minibatch_update"
+        return [BaseTrainerInit, Loss]
 
 
 #######################
@@ -69,15 +78,25 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
         self,
         config: MAPGMinibatchUpdateConfig = MAPGMinibatchUpdateConfig(),
     ):
-        """_summary_
+        """Component defines a multi-agent policy gradient mini-batch update.
 
         Args:
-            config : _description_.
+            config: MAPGMinibatchUpdateConfig.
         """
         self.config = config
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """_summary_"""
+        """Create and store MAPG mini-batch update function.
+
+        Creates a default optimizer if none is provided in the config.
+        Creates an optimizer for each trainer.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
 
         if not self.config.optimizer:
             trainer.store.optimizer = optax.chain(
@@ -155,21 +174,25 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
 class EpochUpdate(Utility):
     @abc.abstractmethod
     def __init__(self, config: Any) -> None:
-        """_summary_
-
-        Args:
-            config : _description_.
-        """
+        """Abstract component for performing model updates from an entire epoch."""
         self.config = config
 
     @staticmethod
     def name() -> str:
-        """_summary_
+        """Static method that returns component name."""
+        return "epoch_update"
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        Step required to set up trainer.store.full_batch_size.
+        MinibatchUpdate required to set up trainer.store.minibatch_update_fn.
 
         Returns:
-            _description_
+            List of required component classes.
         """
-        return "epoch_update"
+        return [Step, MinibatchUpdate]
 
 
 @dataclass
@@ -183,17 +206,22 @@ class MAPGEpochUpdate(EpochUpdate):
         self,
         config: MAPGEpochUpdateConfig = MAPGEpochUpdateConfig(),
     ):
-        """_summary_
+        """Component defines a multi-agent policy gradient epoch-level update.
 
         Args:
-            config : _description_.
+            config: MAPGEpochUpdateConfig.
         """
         self.config = config
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """_summary_"""
-        trainer.store.num_epochs = self.config.num_epochs
-        trainer.store.num_minibatches = self.config.num_minibatches
+        """Define and store the epoch update function.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
 
         def model_update_epoch(
             carry: Tuple[KeyArray, Any, optax.OptState, Batch],

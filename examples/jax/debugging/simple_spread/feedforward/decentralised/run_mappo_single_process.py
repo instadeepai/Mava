@@ -19,6 +19,7 @@ import os
 from datetime import datetime
 from typing import Any
 
+import launchpad as lp
 import optax
 from absl import app, flags
 
@@ -49,16 +50,15 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Run main script
+    """Main script for running system."""
 
-    Args:
-        _ : _
-    """
+    system = mappo.MAPPOSystem()
+
     # Environment.
     environment_factory = functools.partial(
         debugging_utils.make_environment,
-        env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
+        env_name="simple_spread",
+        action_space="discrete",
     )
 
     # Networks.
@@ -83,31 +83,25 @@ def main(_: Any) -> None:
         time_stamp=FLAGS.mava_id,
         time_delta=log_every,
     )
-
     # Optimizer.
     optimizer = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+        optax.clip_by_global_norm(40.0),
+        optax.adam(1e-4),
     )
-
-    # Create the system.
-    system = mappo.MAPPOSystem()
-
-    # Build the system.
+    # Build the system
     system.build(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
         experiment_path=experiment_path,
         optimizer=optimizer,
+        multi_process=False,
         run_evaluator=True,
-        sample_batch_size=5,
-        num_epochs=15,
         num_executors=1,
-        multi_process=True,
-        clip_value=False,
+        max_queue_size=500,
+        sample_batch_size=5,
+        lp_launch_type=lp.LaunchType.LOCAL_MULTI_PROCESSING,
     )
-
-    # Launch the system.
     system.launch()
 
 
