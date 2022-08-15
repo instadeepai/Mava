@@ -27,10 +27,10 @@ from jax.random import KeyArray
 from optax._src import base as optax_base
 
 from mava.callbacks import Callback
-from mava.components.jax import training
 from mava.components.jax.training.base import Batch, Utility
 from mava.components.jax.training.losses import Loss
 from mava.components.jax.training.step import Step
+from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
 
 
@@ -56,7 +56,7 @@ class MinibatchUpdate(Utility):
         Returns:
             List of required component classes.
         """
-        return [training.BaseTrainerInit, Loss]
+        return [BaseTrainerInit, Loss]
 
 
 @dataclass
