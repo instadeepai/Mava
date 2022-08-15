@@ -15,11 +15,13 @@
 
 """Parameter client for system builders"""
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 import numpy as np
 
+from mava.callbacks import Callback
 from mava.components.jax import Component
+from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemBuilder
 from mava.systems.jax import ParameterClient
 
@@ -28,6 +30,17 @@ class BaseParameterClient(Component):
     def _set_up_count_parameters(
         self, params: Dict[str, Any]
     ) -> Tuple[List[str], Dict[str, Any]]:
+        """Registers parameters to count and store.
+
+        Counts trainer_steps, trainer_walltime, evaluator_steps,
+        evaluator_episodes, executor_episodes, executor_steps.
+
+        Args:
+            params: Network parameters.
+
+        Returns:
+            Tuple of count parameters and network parameters.
+        """
         add_params = {
             "trainer_steps": np.array(0, dtype=np.int32),
             "trainer_walltime": np.array(0, dtype=np.float32),
@@ -38,6 +51,18 @@ class BaseParameterClient(Component):
         }
         params.update(add_params)
         return list(add_params.keys()), params
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        BaseTrainerInit required to set up builder.store.networks
+        and builder.store.trainer_networks.
+
+        Returns:
+            List of required component classes.
+        """
+        return [BaseTrainerInit]
 
 
 @dataclass
@@ -50,19 +75,25 @@ class ExecutorParameterClient(BaseParameterClient):
         self,
         config: ExecutorParameterClientConfig = ExecutorParameterClientConfig(),
     ) -> None:
-        """Parameter client
+        """Component creates a parameter client for the executor.
 
         Args:
-            config : parameter client config
+            config: ExecutorParameterClientConfig.
         """
 
         self.config = config
 
     def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Create and store the executor parameter client.
+
+        Gets network parameters from store and registers them for updating.
+        Also works for the evaluator.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
         # Create policy parameters
         params = {}
@@ -84,13 +115,13 @@ class ExecutorParameterClient(BaseParameterClient):
         set_keys = get_keys.copy()
 
         # Executors should only be able to update relevant params.
-        if builder.store.is_evaluator is True:
+        if builder.store.is_evaluator is True:  # Set by builder
             set_keys = [x for x in set_keys if x.startswith("evaluator")]
         else:
             set_keys = [x for x in set_keys if x.startswith("executor")]
 
         parameter_client = None
-        if builder.store.parameter_server_client:
+        if builder.store.parameter_server_client:  # Created by builder
             # Create parameter client
             parameter_client = ParameterClient(
                 client=builder.store.parameter_server_client,
@@ -108,7 +139,7 @@ class ExecutorParameterClient(BaseParameterClient):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "executor_parameter_client"
 
     @staticmethod
@@ -131,19 +162,24 @@ class TrainerParameterClient(BaseParameterClient):
         self,
         config: TrainerParameterClientConfig = TrainerParameterClientConfig(),
     ) -> None:
-        """Parameter client
+        """Component creates a parameter client for the trainer.
 
         Args:
-            config : parameter client config
+            config: TrainerParameterClientConfig.
         """
 
         self.config = config
 
     def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Create and store the trainer parameter client.
+
+        Gets network parameters from store and registers them for updating.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
         # Create parameter client
         params = {}
@@ -151,6 +187,7 @@ class TrainerParameterClient(BaseParameterClient):
         get_keys = []
         # TODO (dries): Only add the networks this trainer is working with.
         # Not all of them.
+        # builder.store.trainer_id set by builder
         trainer_networks = builder.store.trainer_networks[builder.store.trainer_id]
         for net_type_key in builder.store.networks.keys():
             for net_key in builder.store.networks[net_type_key].keys():
@@ -192,5 +229,5 @@ class TrainerParameterClient(BaseParameterClient):
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "trainer_parameter_client"
