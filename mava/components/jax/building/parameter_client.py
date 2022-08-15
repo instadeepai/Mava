@@ -20,7 +20,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 import numpy as np
 
 from mava.callbacks import Callback
-from mava.components.jax import Component, training
+from mava.components.jax import Component
+from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemBuilder
 from mava.systems.jax import ParameterClient
 
@@ -61,7 +62,7 @@ class BaseParameterClient(Component):
         Returns:
             List of required component classes.
         """
-        return [training.BaseTrainerInit]
+        return [BaseTrainerInit]
 
 
 @dataclass
