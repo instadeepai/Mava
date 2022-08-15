@@ -39,7 +39,7 @@ EntropyFn = Callable[[Any], jnp.ndarray]
 
 @dataclasses.dataclass
 class PPONetworks:
-    """TODO: Add description here."""
+    """Class to implement the networks for the PPO algorithm"""
 
     def __init__(
         self,
@@ -49,7 +49,15 @@ class PPONetworks:
         entropy: Optional[EntropyFn] = None,
         sample: Optional[networks_lib.SampleFn] = None,
     ) -> None:
-        """TODO: Add description here."""
+        """Initialises the PPO network Class.
+
+        Args:
+            network: neural network representing the agent policy function.
+            params: values parameterising the network.
+            log_prob: function used to calculate the log prob of an agent's action.
+            entropy: function used to calculate the entropy of the agent policy.
+            sample: function used to select an action from the policy.
+        """
         self.network = network
         self.params = params
         self.log_prob = log_prob
@@ -63,7 +71,18 @@ class PPONetworks:
             key: networks_lib.PRNGKey,
             mask: chex.Array = None,
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
-            """TODO: Add description here."""
+            """Forward function for PPO network
+
+            Args:
+                params: values parameterising the network.
+                observations: agent observations
+                key: pseudo-random value used to initialise distributions
+                mask: action mask which removes illegal actions
+
+            Returns:
+                actions: agent action
+                log_prob: log prob of the chosen action
+            """
             # The parameters of the network might change. So it has to
             # be fed into the jitted function.
             distribution, _ = self.network.apply(params, observations)
@@ -83,14 +102,33 @@ class PPONetworks:
         key: networks_lib.PRNGKey,
         mask: chex.Array = None,
     ) -> Tuple[np.ndarray, Dict]:
-        """TODO: Add description here."""
+        """Gets an action from the network from given observation
+
+        Args:
+           observations: agent observations
+           key: pseudo-random value used to initialise distributions
+           mask: action mask which removes illegal actions
+
+        Returns:
+            actions: agent action
+            log_prob: log prob of the chosen action
+
+        """
         actions, log_prob = self.forward_fn(self.params, observations, key, mask)
         actions = np.array(actions, dtype=np.int64)
         log_prob = np.squeeze(np.array(log_prob, dtype=np.float32))
         return actions, {"log_prob": log_prob}
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
-        """TODO: Add description here."""
+        """Gets value of observation
+
+        Args:
+            observations: agent observations
+
+        Returns:
+            value: estimated value of observation
+
+        """
         _, value = self.network.apply(self.params, observations)
         return value
 
@@ -98,7 +136,15 @@ class PPONetworks:
 def make_ppo_network(
     network: networks_lib.FeedForwardNetwork, params: Dict[str, jnp.ndarray]
 ) -> PPONetworks:
-    """TODO: Add description here."""
+    """Makes generic PPO network
+
+    Args:
+        network: feedforward network representing the agent policy function
+        params: values parameterising the network.
+
+    Returns:
+        PPONetworks: PPO network class
+    """
     return PPONetworks(
         network=network,
         params=params,
@@ -119,7 +165,23 @@ def make_networks(
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
     observation_network: Callable = utils.batch_concat,
 ) -> PPONetworks:
-    """TODO: Add description here."""
+    """Calls functions to make discrete or continuous network
+
+    Args:
+        spec: specifications of training environment
+        key: pseudo-random value used to initialise distributions
+        policy_layer_sizes: size of each layer of the policy network
+        critic_layer_sizes: size of each layer of the critic network
+        observation_network: Network used for feature extraction layers
+
+    Returns:
+        make_discrete_networks: function to create a discrete network
+        make_continuous_networks: function to create a continuous network
+
+    Raises:
+        NotImplementedError: Raises an error if continous network is not
+                        available
+    """
     if isinstance(spec.actions, specs.DiscreteArray):
         return make_discrete_networks(
             environment_spec=spec,
@@ -145,7 +207,18 @@ def make_discrete_networks(
     observation_network: Callable = utils.batch_concat,
     # default behaviour is to flatten observations
 ) -> PPONetworks:
-    """TODO: Add description here."""
+    """Make discrete PPO network
+
+    Args:
+        environment_spec: specifications of training environment
+        key: pseudo-random value used to initialise distributions
+        policy_layer_sizes: size of each layer of the policy network
+        critic_layer_sizes: size of each layer of the critic network
+        observation_network: Network used for feature extraction layers
+
+    Returns:
+        make_ppo_network: function to create a ppo network
+    """
 
     num_actions = environment_spec.actions.num_values
 
@@ -189,7 +262,20 @@ def make_default_networks(
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
     observation_network: Callable = utils.batch_concat,
 ) -> Dict[str, Any]:
-    """Description here"""
+    """Call to create one of default Mava network types
+
+    Args:
+        environment_spec: specifications of training environment
+        agent_net_keys: keys for each agent network
+        rng_key: pseudo-random value used to initialise distributions
+        net_spec_keys: keys for each agent network
+        policy_layer_sizes: size of each layer of the policy network
+        critic_layer_sizes: size of each layer of the critic network
+        observation_network: Network used for feature extraction layers
+
+    Returns:
+        networks: networks created to given spec
+    """
 
     # Create agent_type specs.
     specs = environment_spec.get_agent_environment_specs()

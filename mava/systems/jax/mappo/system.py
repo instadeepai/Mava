@@ -26,10 +26,14 @@ from mava.systems.jax.mappo.config import MAPPODefaultConfig
 
 class MAPPOSystem(System):
     def design(self) -> Tuple[DesignSpec, Any]:
-        """Mock system design with zero components.
+        """System design for IPPO with single optimiser.
+
+        Args:
+            None.
 
         Returns:
-            system callback components
+            system: design spec for IPPO
+            default_params: default IPPO configuration
         """
         # Set the default configs
         default_params = MAPPODefaultConfig()
