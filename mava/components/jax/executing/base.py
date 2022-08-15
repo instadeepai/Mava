@@ -19,9 +19,9 @@ import copy
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Type
 
+from mava.callbacks import Callback
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder, SystemExecutor
-from mava.callbacks import Callback
 
 
 @dataclass
@@ -73,6 +73,7 @@ class ExecutorInit(Component):
             config class/dataclass for component.
         """
         return ExecutorInitConfig
+
 
 @dataclass
 class ExecutorTargetNetInitConfig:

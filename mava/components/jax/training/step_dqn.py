@@ -154,10 +154,12 @@ class MADQNStep(Step):
             }
             opt_states = trainer.store.opt_states
             random_key, _ = jax.random.split(trainer.store.key)
-            #executor.store.executor_counts['training_steps']#
-            #print(trainer.store)
-            #exit()
-            steps = trainer.store.trainer_counts['trainer_steps']#trainer.store.training_steps
+            # executor.store.executor_counts['training_steps']#
+            # print(trainer.store)
+            # exit()
+            steps = trainer.store.trainer_counts[
+                "trainer_steps"
+            ]  # trainer.store.training_steps
 
             states = TrainingStateQ(
                 params=params,

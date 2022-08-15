@@ -127,9 +127,9 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
 
     def _write(self) -> None:
         # Convenient getters for use in tree operations.
-        #print(self._first_idx)
-        #print(self._last_idx)
-        #exit()
+        # print(self._first_idx)
+        # print(self._last_idx)
+        # exit()
         def get_first(x: np.ndarray) -> np.ndarray:
             return x[self._first_idx]
 
@@ -141,13 +141,12 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         def get_all_np(x: np.ndarray) -> np.ndarray:
             return x[self._first_idx : self._last_idx].numpy()
 
-
         history = self._writer.history
         s, e, a = tree.map_structure(
             get_first, (history["observations"], history["extras"], history["actions"])
         )
 
-        #Next observations.
+        # Next observations.
         s_ = tree.map_structure(get_last, history["observations"])
         s_, e_ = tree.map_structure(
             get_last, (history["observations"], history["extras"])
@@ -171,10 +170,8 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
                 }
             )
         """
-        
-        
-        
-        #e_ = tree.map_structure(get_first, history["extras"])
+
+        # e_ = tree.map_structure(get_first, history["extras"])
 
         # # Maybe get extras to add to the transition later.
         # if 'extras' in history:

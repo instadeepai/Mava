@@ -42,7 +42,9 @@ class EpsilonScheduler(Component):
 
     def on_execution_update(self, executor: SystemExecutor) -> None:
         """Updates the epsilon value for the epsilon scheduler."""
-        total_steps = executor.store.executor_counts['executor_steps']#executor.store.steps_count
+        total_steps = executor.store.executor_counts[
+            "executor_steps"
+        ]  # executor.store.steps_count
         executor.store.epsilon_scheduler.update(step=total_steps)
 
     @staticmethod

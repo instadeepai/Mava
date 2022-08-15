@@ -143,8 +143,7 @@ class MADQNLoss(Loss):
                     actions[agent_key],
                     discounts[agent_key],
                     rewards[agent_key],
-                    next_observations[agent_key].legal_actions
-                    
+                    next_observations[agent_key].legal_actions,
                 )
                 loss_info["total_loss"] = loss[agent_key]
 

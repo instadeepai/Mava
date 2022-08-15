@@ -17,7 +17,7 @@
 
 import abc
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Callable
+from typing import Any, Callable, Dict, Optional
 
 from mava.components.jax import Component
 from mava.core_jax import SystemExecutor
@@ -48,6 +48,7 @@ class ExtrasFinder(Component):
     def config_class() -> Optional[Callable]:
         """Returns class config."""
         return ExtrasFinderConfig
+
 
 @dataclass
 class ExecutorObserveConfig:
@@ -121,8 +122,8 @@ class FeedforwardExecutorObserve(ExecutorObserve):
         executor.store.extras[
             "network_int_keys"
         ] = executor.store.network_int_keys_extras
-        #print(executor.store.extras)
-        #exit()
+        # print(executor.store.extras)
+        # exit()
         executor.store.adder.add_first(executor.store.timestep, executor.store.extras)
 
     def on_execution_observe(self, executor: SystemExecutor) -> None:

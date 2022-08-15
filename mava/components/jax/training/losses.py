@@ -175,6 +175,3 @@ class MAPGWithTrustRegionClippingLoss(Loss):
             config class/dataclass for component.
         """
         return MAPGTrustRegionClippingLossConfig
-
-
-

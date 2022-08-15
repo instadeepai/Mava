@@ -64,7 +64,7 @@ def main(_: Any) -> None:
         return madqn.make_default_networks(policy_layer_sizes=(254, 254, 254), **kwargs)
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
-    #checkpoint_subpath = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+    # checkpoint_subpath = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
     log_every = 10
@@ -94,7 +94,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        #checkpoint_subpath=checkpoint_subpath,
+        # checkpoint_subpath=checkpoint_subpath,
         optimizer=optimizer,
         executor_parameter_update_period=10,
         multi_process=True,

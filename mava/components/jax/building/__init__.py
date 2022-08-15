@@ -22,7 +22,10 @@ from mava.components.jax.building.adders import (
     ParallelTransitionAdderSignature,
     UniformAdderPriority,
 )
-from mava.components.jax.building.data_server import OnPolicyDataServer, OffPolicyDataServer
+from mava.components.jax.building.data_server import (
+    OffPolicyDataServer,
+    OnPolicyDataServer,
+)
 from mava.components.jax.building.datasets import TrajectoryDataset, TransitionDataset
 from mava.components.jax.building.distributor import Distributor
 from mava.components.jax.building.environments import (
@@ -35,19 +38,13 @@ from mava.components.jax.building.parameter_client import (
     ExecutorParameterClient,
     TrainerParameterClient,
 )
+from mava.components.jax.building.rate_limiters import (
+    MinSizeRateLimiter,
+    SampleToInsertRateLimiter,
+)
+from mava.components.jax.building.reverb_components import Remover, Sampler
 from mava.components.jax.building.system_init import (
     CustomSamplingSystemInit,
     FixedNetworkSystemInit,
     RandomSamplingSystemInit,
 )
-
-from mava.components.jax.building.rate_limiters import (
-    MinSizeRateLimiter,
-    SampleToInsertRateLimiter,
-    )
-    
-from mava.components.jax.building.reverb_components import (
-   Sampler,
-   Remover,
-   )
-

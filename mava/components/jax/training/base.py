@@ -46,6 +46,7 @@ class TrainingState(NamedTuple):
     opt_states: Dict[str, optax.OptState]
     random_key: Any
 
+
 class TrainingStateQ(NamedTuple):
     """Training state consists of network parameters and optimiser state."""
 
@@ -83,6 +84,7 @@ class Step(Component):
     def name() -> str:
         """Static method that returns component name."""
         return "sgd_step"
+
 
 class BatchDQN(NamedTuple):
     """A batch of data; all shapes are expected to be [B, ...]."""

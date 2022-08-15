@@ -44,10 +44,10 @@ class System(BaseSystem):
 
         # Enforce that design keys match component names
         for key, value in self._design.get().items():
-            #print(key)
-            #print(value)
+            # print(key)
+            # print(value)
             if key != value.name():
-                #print(key)
+                # print(key)
                 raise Exception(
                     f"Component '{key}' has mismatching name '{value.name()}'"
                 )
@@ -59,7 +59,7 @@ class System(BaseSystem):
             None.
         """
         for component in self._design.get().values():
-            #print(component)
+            # print(component)
             config_class = component.config_class()
             if config_class:
                 input = {component.name(): config_class()}
@@ -138,7 +138,7 @@ class System(BaseSystem):
             None.
         """
 
-        #print(**kwargs)
+        # print(**kwargs)
         if self._built:
             raise Exception("System already built.")
 

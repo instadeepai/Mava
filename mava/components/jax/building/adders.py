@@ -213,7 +213,7 @@ class ParallelTransitionAdderSignature(AdderSignature):
         def adder_sig_fn(
             ma_environment_spec: specs.MAEnvironmentSpec,
             extras_specs: Dict[str, Any],
-            next_extra_specs: Dict[str, Any]
+            next_extra_specs: Dict[str, Any],
         ) -> Any:
             """Constructs a ParallelNStepTransitionAdder signature from specs.
 
@@ -225,7 +225,9 @@ class ParallelTransitionAdderSignature(AdderSignature):
                 ParallelNStepTransitionAdder signature.
             """
             return reverb_adders.ParallelNStepTransitionAdder.signature(
-                ma_environment_spec=ma_environment_spec, extras_specs=extras_specs ,next_extras_spec=next_extra_specs,
+                ma_environment_spec=ma_environment_spec,
+                extras_specs=extras_specs,
+                next_extras_spec=next_extra_specs,
             )
 
         builder.store.adder_signature_fn = adder_sig_fn
@@ -266,7 +268,7 @@ class ParallelSequenceAdder(Adder):
 
         adder = reverb_adders.ParallelSequenceAdder(
             priority_fns=builder.store.priority_fns,
-            client=builder.store.data_server_client, 
+            client=builder.store.data_server_client,
             net_ids_to_keys=builder.store.unique_net_keys,
             sequence_length=self.config.sequence_length,
             table_network_config=builder.store.table_network_config,

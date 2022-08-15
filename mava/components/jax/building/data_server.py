@@ -96,16 +96,18 @@ class DataServer(Component):
                 builder.store.extras_spec,
                 num_networks,
             )
-            
+
             next_extras_specs = convert_specs(
                 builder.store.agent_net_keys,
                 builder.store.extras_spec,
                 num_networks,
             )
 
-            #TODO: Add if statment for MADQN and PPO
-            table = self.table(table_key, env_specs, extras_specs, next_extras_specs,builder)
-            #table = self.table(table_key, env_specs, extras_specs,builder)
+            # TODO: Add if statment for MADQN and PPO
+            table = self.table(
+                table_key, env_specs, extras_specs, next_extras_specs, builder
+            )
+            # table = self.table(table_key, env_specs, extras_specs,builder)
             data_tables.append(table)
         return data_tables
 
@@ -196,18 +198,19 @@ class OffPolicyDataServer(DataServer):
                 "A remover component for the dataserver has not been given"
             )
 
-        
         table = reverb.Table(
             name=table_key,
             sampler=builder.store.sampler_fn(),
             remover=builder.store.remover_fn(),
             max_size=self.config.max_size,
             rate_limiter=builder.store.rate_limiter_fn(),
-            #signature=builder.store.adder_signature_fn(environment_specs, builder.store.sequence_length,extras_specs),
-            signature=builder.store.adder_signature_fn(environment_specs, extras_specs, next_extras_specs),
+            # signature=builder.store.adder_signature_fn(environment_specs, builder.store.sequence_length,extras_specs),
+            signature=builder.store.adder_signature_fn(
+                environment_specs, extras_specs, next_extras_specs
+            ),
             max_times_sampled=self.config.max_times_sampled,
         )
-        
+
         """
          table = reverb.Table(
             name=table_key,
@@ -220,7 +223,7 @@ class OffPolicyDataServer(DataServer):
             ),
         )
         """
-       
+
         return table
 
     @staticmethod

@@ -118,6 +118,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             utils.add_batch_dim(executor.store.observation.legal_actions),
         )
 
+
 class FeedforwardExecutorSelectActionValueBased(ExecutorSelectAction):
     """Feedforward executor that selects actions based on the q-values.
 
@@ -155,7 +156,7 @@ class FeedforwardExecutorSelectActionValueBased(ExecutorSelectAction):
             executor.store.agent_net_keys[agent]
         ]
 
-        #observation = executor.store.observation.observation.reshape((1, -1))
+        # observation = executor.store.observation.observation.reshape((1, -1))
         observation = utils.add_batch_dim(executor.store.observation.observation)
         rng_key, executor.store.key = jax.random.split(executor.store.key)
 
