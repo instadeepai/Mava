@@ -20,8 +20,7 @@ from typing import Callable, List, Optional, Type, Union
 import launchpad as lp
 
 from mava.callbacks import Callback
-from mava.components.jax import Component
-from mava.components.jax.training.trainer import BaseTrainerInit
+from mava.components.jax import Component, training
 from mava.core_jax import SystemBuilder
 from mava.systems.jax.launcher import Launcher, NodeType
 
@@ -148,4 +147,4 @@ class Distributor(Component):
         Returns:
             List of required component classes.
         """
-        return [BaseTrainerInit]
+        return [training.BaseTrainerInit]

@@ -23,8 +23,7 @@ import jax.numpy as jnp
 import rlax
 
 from mava.callbacks import Callback
-from mava.components.jax import Component
-from mava.components.jax.training.trainer import BaseTrainerInit
+from mava.components.jax import Component, training
 from mava.core_jax import SystemTrainer
 
 
@@ -52,7 +51,7 @@ class Loss(Component):
         Returns:
             List of required component classes.
         """
-        return [BaseTrainerInit]
+        return [training.BaseTrainerInit]
 
 
 @dataclass

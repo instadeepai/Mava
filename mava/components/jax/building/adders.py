@@ -21,9 +21,8 @@ from typing import Any, Callable, Dict, List, Optional, Type
 from mava import specs
 from mava.adders import reverb as reverb_adders
 from mava.callbacks import Callback
-from mava.components.jax import Component
+from mava.components.jax import Component, training
 from mava.components.jax.building.system_init import BaseSystemInit
-from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemBuilder
 
 
@@ -56,7 +55,7 @@ class Adder(Component):
         Returns:
             List of required component classes.
         """
-        return [BaseTrainerInit, BaseSystemInit]
+        return [training.BaseTrainerInit, BaseSystemInit]
 
 
 @dataclass
@@ -112,7 +111,7 @@ class AdderPriority(Component):
         Returns:
             List of required component classes.
         """
-        return [BaseTrainerInit]
+        return [training.BaseTrainerInit]
 
 
 @dataclass

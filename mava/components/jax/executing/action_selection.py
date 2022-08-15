@@ -23,10 +23,9 @@ import jax
 from acme.jax import utils
 
 from mava.callbacks import Callback
-from mava.components.jax import Component
+from mava.components.jax import Component, training
 from mava.components.jax.building.networks import Networks
 from mava.components.jax.building.system_init import BaseSystemInit
-from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemExecutor
 
 
@@ -76,7 +75,7 @@ class ExecutorSelectAction(Component):
         Returns:
             List of required component classes.
         """
-        return [BaseTrainerInit, BaseSystemInit, Networks]
+        return [training.BaseTrainerInit, BaseSystemInit, Networks]
 
 
 class FeedforwardExecutorSelectAction(ExecutorSelectAction):
