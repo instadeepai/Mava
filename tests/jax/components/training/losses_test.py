@@ -35,7 +35,7 @@ class MockPolicyNet:
     @staticmethod
     def apply(
         parameters: Dict[str, jnp.ndarray], observation: jnp.ndarray
-    ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+    ) -> jnp.ndarray:
         """Mock function to apply the network to training data"""
         return observation
 
@@ -46,7 +46,7 @@ class MockCriticNet:
     @staticmethod
     def apply(
         parameters: Dict[str, jnp.ndarray], observation: jnp.ndarray
-    ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+    ) -> jnp.ndarray:
         """Mock function to apply the network to training data"""
         return parameters["mlp/~/linear_0"]["w"]
 
