@@ -17,7 +17,7 @@
 # have been created.
 
 """Jax-based Mava system builder implementation."""
-
+from types import SimpleNamespace
 from typing import Any, List
 
 from mava.callbacks import BuilderHookMixin, Callback
@@ -31,15 +31,18 @@ class Builder(SystemBuilder, BuilderHookMixin):
     def __init__(
         self,
         components: List[Callback],
+        global_config: SimpleNamespace = SimpleNamespace(),
     ) -> None:
-        """System building init
+        """System building init.
 
         Args:
-            components: system callback component
+            components: system callback component.
+            global_config: config shared across components.
         """
         super().__init__()
 
         self.callbacks = components
+        self.store.global_config = global_config
 
         self.on_building_init_start()
 
@@ -51,7 +54,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
         """Data server to store and serve transition data from and to system.
 
         Returns:
-            System data server
+            System data server.
         """
 
         # start of make replay tables
@@ -74,10 +77,8 @@ class Builder(SystemBuilder, BuilderHookMixin):
     def parameter_server(self) -> Any:
         """Parameter server to store and serve system network parameters.
 
-        Args:
-            extra_nodes : additional nodes to add to a launchpad program build
         Returns:
-            System parameter server
+            System parameter server.
         """
 
         # start of make parameter server
@@ -90,7 +91,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
         self.on_building_parameter_server_end()
 
         return ParameterServer(
-            config=self.store,
+            store=self.store,
             components=self.callbacks,
         )
 
@@ -100,11 +101,12 @@ class Builder(SystemBuilder, BuilderHookMixin):
         """Executor, a collection of agents in an environment to gather experience.
 
         Args:
-            executor_id : id to identify the executor process for logging purposes
-            data_server_client : data server client for pushing transition data
-            parameter_server_client : parameter server client for pulling parameters
+            executor_id : id to identify the executor process for logging purposes.
+            data_server_client : data server client for pushing transition data.
+            parameter_server_client : parameter server client for pulling parameters.
+
         Returns:
-            System executor
+            System executor.
         """
 
         self.store.executor_id = executor_id
@@ -136,7 +138,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
 
         # create the executor
         self.store.executor = Executor(
-            config=self.store,
+            store=self.store,
             components=self.callbacks,
         )
 
@@ -158,16 +160,16 @@ class Builder(SystemBuilder, BuilderHookMixin):
         """Trainer, a system process for updating agent specific network parameters.
 
         Args:
-            trainer_id : id to identify the trainer process for logging purposes
-            data_server_client : data server client for pulling transition data
-            parameter_server_client : parameter server client for pushing parameters
+            trainer_id : id to identify the trainer process for logging purposes.
+            data_server_client : data server client for pulling transition data.
+            parameter_server_client : parameter server client for pushing parameters.
+
         Returns:
-            System trainer
+            System trainer.
         """
 
         self.store.trainer_id = trainer_id
         self.store.data_server_client = data_server_client
-        self.store.table_name = f"table_{trainer_id}"
         self.store.parameter_server_client = parameter_server_client
 
         # start of making the trainer
@@ -190,12 +192,16 @@ class Builder(SystemBuilder, BuilderHookMixin):
 
         # create and rreturn the trainer
         return Trainer(
-            config=self.store,
+            store=self.store,
             components=self.callbacks,
         )
 
     def build(self) -> None:
-        """Construct program nodes."""
+        """Construct program nodes.
+
+        Returns:
+            None.
+        """
 
         # start of system building
         self.on_building_start()
@@ -207,7 +213,11 @@ class Builder(SystemBuilder, BuilderHookMixin):
         self.on_building_end()
 
     def launch(self) -> None:
-        """Run the graph program."""
+        """Run the graph program.
+
+        Returns:
+            None.
+        """
 
         # start of system launch
         self.on_building_launch_start()

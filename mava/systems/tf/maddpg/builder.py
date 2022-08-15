@@ -56,6 +56,10 @@ class MADDPGConfig:
         table_network_config: Networks each table (trainer) expects.
         network_sampling_setup: List of networks that are randomly
                 sampled from by the executors at the start of an environment run.
+        fix_sampler: Optional list that can fix the executor sampler to sample
+                in a specific way.
+        net_spec_keys: Optional network to agent mapping used to get the environment
+                specs for each network.
         net_keys_to_ids: mapping from net_key to network id.
         unique_net_keys: list of unique net_keys.
         checkpoint_minute_interval: The number of minutes to wait between
@@ -105,6 +109,8 @@ class MADDPGConfig:
     trainer_networks: Dict[str, List]
     table_network_config: Dict[str, List]
     network_sampling_setup: List
+    fix_sampler: Optional[List]
+    net_spec_keys: Dict[str, str]
     net_keys_to_ids: Dict[str, int]
     unique_net_keys: List[str]
     checkpoint_minute_interval: int
@@ -178,7 +184,7 @@ class MADDPGBuilder:
         env_adder_spec: specs.MAEnvironmentSpec = copy.deepcopy(environment_spec)
         keys = env_adder_spec._keys
         for key in keys:
-            agent_spec = env_adder_spec._specs[key]
+            agent_spec = env_adder_spec.get_agent_environment_specs()[key]
             if type(agent_spec.actions) == DiscreteArray:
                 num_actions = agent_spec.actions.num_values
                 minimum = [float("-inf")] * num_actions
@@ -191,7 +197,7 @@ class MADDPGBuilder:
                     name="actions",
                 )
 
-                env_adder_spec._specs[key] = EnvironmentSpec(
+                env_adder_spec.get_agent_environment_specs()[key] = EnvironmentSpec(
                     observations=agent_spec.observations,
                     actions=new_act_spec,
                     rewards=agent_spec.rewards,
@@ -199,19 +205,28 @@ class MADDPGBuilder:
                 )
         return env_adder_spec
 
-    def covert_specs(self, spec: Dict[str, Any], num_networks: int) -> Dict[str, Any]:
+    def convert_specs(
+        self, spec: Dict[str, Any], trainer_network_names: List
+    ) -> Dict[str, Any]:
         if type(spec) is not dict:
             return spec
 
-        agents = sort_str_num(self._config.agent_net_keys.keys())[:num_networks]
+        agents = []
+        for network in trainer_network_names:
+            agents.append(self._config.net_spec_keys[network])
+
+        agents = sort_str_num(agents)
         converted_spec: Dict[str, Any] = {}
+
         if agents[0] in spec.keys():
-            for agent in agents:
-                converted_spec[agent] = spec[agent]
+            for i, agent in enumerate(agents):
+                converted_spec[self._agents[i]] = spec[agent]
         else:
             # For the extras
             for key in spec.keys():
-                converted_spec[key] = self.covert_specs(spec[key], num_networks)
+                converted_spec[key] = self.convert_specs(
+                    spec[key], trainer_network_names
+                )
         return converted_spec
 
     def make_replay_tables(
@@ -272,21 +287,32 @@ class MADDPGBuilder:
 
         # Create table per trainer
         replay_tables = []
-        for table_key in self._config.table_network_config.keys():
-            # TODO (dries): Clean the below coverter code up.
-            # Convert a Mava spec
-            num_networks = len(self._config.table_network_config[table_key])
-            env_spec = copy.deepcopy(env_adder_spec)
-            env_spec._specs = self.covert_specs(env_spec._specs, num_networks)
 
-            env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
-            if env_spec.extra_specs is not None:
-                env_spec.extra_specs = self.covert_specs(
-                    env_spec.extra_specs, num_networks
+        for table_key in self._config.table_network_config.keys():
+
+            # TODO (dries): Clean the below converter code up.
+            # Convert a Mava spec
+
+            trainer_network_names = self._config.table_network_config[table_key]
+            env_spec = copy.deepcopy(env_adder_spec)
+            env_spec.set_agent_environment_specs(
+                self.convert_specs(
+                    env_spec.get_agent_environment_specs(), trainer_network_names
                 )
-            extra_specs = self.covert_specs(
+            )
+
+            env_spec._keys = list(
+                sort_str_num(env_spec.get_agent_environment_specs().keys())
+            )
+            if env_spec.get_extras_specs() is not None:
+                env_spec.set_extras_specs(
+                    self.convert_specs(
+                        env_spec.get_extras_specs(), trainer_network_names
+                    )
+                )
+            extra_specs = self.convert_specs(
                 self._extra_specs,
-                num_networks,
+                trainer_network_names,
             )
 
             replay_tables.append(
@@ -299,6 +325,7 @@ class MADDPGBuilder:
                     signature=adder_sig_fn(env_spec, extra_specs),
                 )
             )
+
         return replay_tables
 
     def make_dataset_iterator(
@@ -494,9 +521,10 @@ class MADDPGBuilder:
             policy_networks=policy_networks,
             counts=counts,
             net_keys_to_ids=self._config.net_keys_to_ids,
-            agent_specs=self._config.environment_spec.get_agent_specs(),
+            agent_specs=self._config.environment_spec.get_agent_environment_specs(),
             agent_net_keys=self._config.agent_net_keys,
             network_sampling_setup=self._config.network_sampling_setup,
+            fix_sampler=self._config.fix_sampler,
             variable_client=variable_client,
             adder=adder,
             evaluator=evaluator,

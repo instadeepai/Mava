@@ -17,15 +17,15 @@
 import abc
 import copy
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 import reverb
-from reverb import reverb_types
 
 from mava import specs
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
-from mava.utils.builder_utils import covert_specs
+from mava.utils import enums
+from mava.utils.builder_utils import convert_specs
 from mava.utils.sort_utils import sort_str_num
 
 
@@ -34,49 +34,78 @@ class DataServer(Component):
         self,
         config: Any,
     ) -> None:
-        """_summary_
+        """Component sets up a reverb Table for each trainer.
 
         Args:
-            config : _description_.
+            config: Any.
         """
 
         self.config = config
 
     def _create_table_per_trainer(self, builder: SystemBuilder) -> List[reverb.Table]:
+        """Create a reverb table for each trainer.
+
+        Defines a default table network config for when one is not provided, but
+        which only works when using fixed agent networks.
+        Converts specs from the environment and uses them to create tables.
+
+        Args:
+            builder: SystemBuilder.
+
+        Returns:
+            List of reverb tables where each table corresponds to a trainer.
+        """
         data_tables = []
+        # Default table network config - often overwritten by TrainerInit.
+        if not hasattr(builder.store, "table_network_config"):
+            builder.store.table_network_config = {
+                "table_0": sort_str_num(builder.store.agent_net_keys.values())
+            }
+            assert (
+                builder.store.global_config.network_sampling_setup_type
+                == enums.NetworkSampler.fixed_agent_networks
+            ), f"We only have a default config for the fixed_agent_networks sampler setting, \
+            not the {builder.store.global_config.network_sampling_setup_type} setting."
+
         for table_key in builder.store.table_network_config.keys():
-            # TODO (dries): Clean the below coverter code up.
+            # TODO (dries): Clean the below converter code up.
             # Convert a Mava spec
             num_networks = len(builder.store.table_network_config[table_key])
-            env_spec = copy.deepcopy(builder.store.environment_spec)
-            env_spec._specs = covert_specs(
-                builder.store.agent_net_keys, env_spec._specs, num_networks
+            env_specs = copy.deepcopy(builder.store.ma_environment_spec)
+            env_specs.set_agent_environment_specs(
+                convert_specs(
+                    builder.store.agent_net_keys,
+                    env_specs.get_agent_environment_specs(),
+                    num_networks,
+                )
             )
 
-            env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
-            if env_spec.extra_specs is not None:
-                env_spec.extra_specs = covert_specs(
-                    builder.store.agent_net_keys, env_spec.extra_specs, num_networks
+            env_specs._keys = list(
+                sort_str_num(env_specs.get_agent_environment_specs().keys())
+            )
+            if env_specs.get_extras_specs() is not None:
+                env_specs.set_extras_specs(
+                    convert_specs(
+                        builder.store.agent_net_keys,
+                        env_specs.get_extras_specs(),
+                        num_networks,
+                    )
                 )
-            extras_spec = covert_specs(
+            extras_specs = convert_specs(
+                builder.store.agent_net_keys,
+                builder.store.extras_spec,
+                num_networks,
+            )
+            
+            next_extras_specs = convert_specs(
                 builder.store.agent_net_keys,
                 builder.store.extras_spec,
                 num_networks,
             )
 
-            next_extras_spec = covert_specs(
-                builder.store.agent_net_keys,
-                builder.store.next_extras_spec,
-                num_networks,
-            )
-
-            table = self.table(
-                table_key=table_key,
-                environment_spec=env_spec,
-                extras_spec=extras_spec,
-                next_extras_spec=next_extras_spec,
-                builder=builder,
-            )
+            #TODO: Add if statment for MADQN and PPO
+            table = self.table(table_key, env_specs, extras_specs, next_extras_specs,builder)
+            #table = self.table(table_key, env_specs, extras_specs,builder)
             data_tables.append(table)
         return data_tables
 
@@ -84,39 +113,53 @@ class DataServer(Component):
     def table(
         self,
         table_key: str,
-        environment_spec: specs.MAEnvironmentSpec,
-        extras_spec: Dict[str, Any],
-        next_extras_spec: Dict[str, Any],
+        environment_specs: specs.MAEnvironmentSpec,
+        extras_specs: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
-        """_summary_"""
+        """Abstract method defining signature for table creation.
+
+        Args:
+            table_key: Identifier for table.
+            environment_specs: Environment specs.
+            extras_specs: Other specs.
+            builder: SystemBuilder.
+
+        Returns:
+            A new reverb table.
+        """
 
     def on_building_data_server(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Create a table for each trainer and load into store.
+
+        Args:
+            builder: SystemBuilder
+
+        Returns:
+            None.
+        """
         builder.store.data_tables = self._create_table_per_trainer(builder)
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "data_server"
 
 
 @dataclass
 class OffPolicyDataServerConfig:
-    sampler: reverb_types.SelectorType = reverb.item_selectors.Uniform
-    remover: reverb_types.SelectorType = reverb.item_selectors.Fifo
-    max_size: int = 1_000_000
+    max_size: int = 100000
+    max_times_sampled: int = 0
 
 
 class OffPolicyDataServer(DataServer):
     def __init__(
-        self,
-        config: OffPolicyDataServerConfig = OffPolicyDataServerConfig(),
+        self, config: OffPolicyDataServerConfig = OffPolicyDataServerConfig()
     ) -> None:
-        """_summary_
+        """Component creates an off-policy data server.
 
         Args:
-            config : _description_.
+            config: OffPolicyDataServerConfig.
         """
 
         self.config = config
@@ -124,37 +167,69 @@ class OffPolicyDataServer(DataServer):
     def table(
         self,
         table_key: str,
-        environment_spec: specs.MAEnvironmentSpec,
-        extras_spec: Dict[str, Any],
-        next_extras_spec: Dict[str, Any],
+        environment_specs: specs.MAEnvironmentSpec,
+        extras_specs: Dict[str, Any],
+        next_extras_specs: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
-        """_summary_
+        """Create OffPolicyDataServer table.
+
+        Requires sampler and remover functions in the system to operate.
 
         Args:
-            table_key : _description_
-            environment_spec : _description_
-            extras_spec : _description_
-            next_extras_spec: _description_
-            builder : _description_
+            table_key: Identifier for table.
+            environment_specs: Environment specs.
+            extras_specs: Other specs.
+            builder: SystemBuilder.
+
         Returns:
-            _description_
+            A new reverb table.
         """
+
+        if not hasattr(builder.store, "sampler_fn"):
+            raise ValueError(
+                "A sampler component for the dataserver has not been given"
+            )
+
+        if not hasattr(builder.store, "remover_fn"):
+            raise ValueError(
+                "A remover component for the dataserver has not been given"
+            )
+
+        
         table = reverb.Table(
+            name=table_key,
+            sampler=builder.store.sampler_fn(),
+            remover=builder.store.remover_fn(),
+            max_size=self.config.max_size,
+            rate_limiter=builder.store.rate_limiter_fn(),
+            #signature=builder.store.adder_signature_fn(environment_specs, builder.store.sequence_length,extras_specs),
+            signature=builder.store.adder_signature_fn(environment_specs, extras_specs, next_extras_specs),
+            max_times_sampled=self.config.max_times_sampled,
+        )
+        
+        """
+         table = reverb.Table(
             name=table_key,
             sampler=self.config.sampler(),
             remover=self.config.remover(),
             max_size=self.config.max_size,
             rate_limiter=builder.store.rate_limiter_fn(),
             signature=builder.store.adder_signature_fn(
-                environment_spec, extras_spec, next_extras_spec
+                environment_specs, extras_specs, next_extras_specs
             ),
         )
+        """
+       
         return table
 
     @staticmethod
-    def config_class() -> Callable:
-        """Return the configuration class for this component."""
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return OffPolicyDataServerConfig
 
 
@@ -168,10 +243,10 @@ class OnPolicyDataServer(DataServer):
         self,
         config: OnPolicyDataServerConfig = OnPolicyDataServerConfig(),
     ) -> None:
-        """_summary_
+        """Component creates an on-policy data server.
 
         Args:
-            config : _description_.
+            config: OnPolicyDataServerConfig.
         """
 
         self.config = config
@@ -179,30 +254,43 @@ class OnPolicyDataServer(DataServer):
     def table(
         self,
         table_key: str,
-        environment_spec: specs.MAEnvironmentSpec,
-        extras_spec: Dict[str, Any],
+        environment_specs: specs.MAEnvironmentSpec,
+        extras_specs: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
-        """_summary_
+        """Create OnPolicyDataServer table.
+
+        Requires sampler and remover functions in the system to operate.
 
         Args:
-            table_key : _description_
-            environment_spec : _description_
-            extras_spec : _description_
-            builder : _description_
+            table_key: Identifier for table.
+            environment_specs: Environment specs.
+            extras_specs: Other specs.
+            builder: SystemBuilder.
+
         Returns:
-            _description_
+            A new reverb table.
         """
+        if builder.store.__dict__.get("sequence_length"):
+            signature = builder.store.adder_signature_fn(
+                environment_specs, builder.store.sequence_length, extras_specs
+            )
+        else:
+            signature = builder.store.adder_signature_fn(
+                environment_specs, extras_specs
+            )
         table = reverb.Table.queue(
             name=table_key,
             max_size=self.config.max_queue_size,
-            signature=builder.store.adder_signature_fn(
-                environment_spec, builder.store.sequence_length, extras_spec
-            ),
+            signature=signature,
         )
         return table
 
     @staticmethod
-    def config_class() -> Callable:
-        """Return the configuration class for this component."""
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return OnPolicyDataServerConfig

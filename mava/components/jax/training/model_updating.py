@@ -15,6 +15,7 @@
 
 """Trainer components for system updating."""
 
+import abc
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Tuple
 
@@ -29,6 +30,18 @@ from mava.components.jax.training import Batch, Utility
 from mava.core_jax import SystemTrainer
 
 
+class MinibatchUpdate(Utility):
+    @abc.abstractmethod
+    def __init__(self, config: Any) -> None:
+        """Abstract component defining a mini-batch update."""
+        self.config = config
+
+    @staticmethod
+    def name() -> str:
+        """Static method that returns component name."""
+        return "minibatch_update"
+
+
 @dataclass
 class MAPGMinibatchUpdateConfig:
     learning_rate: float = 1e-3
@@ -37,20 +50,30 @@ class MAPGMinibatchUpdateConfig:
     optimizer: Optional[optax_base.GradientTransformation] = (None,)
 
 
-class MAPGMinibatchUpdate(Utility):
+class MAPGMinibatchUpdate(MinibatchUpdate):
     def __init__(
         self,
         config: MAPGMinibatchUpdateConfig = MAPGMinibatchUpdateConfig(),
     ):
-        """_summary_
+        """Component defines a multi-agent policy gradient mini-batch update.
 
         Args:
-            config : _description_.
+            config: MAPGMinibatchUpdateConfig.
         """
         self.config = config
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """_summary_"""
+        """Create and store MAPG mini-batch update function.
+
+        Creates a default optimizer if none is provided in the config.
+        Creates an optimizer for each trainer.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
 
         if not self.config.optimizer:
             trainer.store.optimizer = optax.chain(
@@ -92,7 +115,6 @@ class MAPGMinibatchUpdate(Utility):
             )
 
             # Update the networks and optimizors.
-            metrics = {}
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
                 # Apply updates
@@ -109,46 +131,59 @@ class MAPGMinibatchUpdate(Utility):
                     gradients[agent_key]
                 )
                 agent_metrics[agent_key]["norm_updates"] = optax.global_norm(updates)
-                metrics[agent_key] = agent_metrics
-            return (params, opt_states), metrics
+            return (params, opt_states), agent_metrics
 
         trainer.store.minibatch_update_fn = model_update_minibatch
 
     @staticmethod
-    def name() -> str:
-        """_summary_
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
 
         Returns:
-            _description_
+            config class/dataclass for component.
         """
-        return "minibatch_update_fn"
+        return MAPGMinibatchUpdateConfig
+
+
+class EpochUpdate(Utility):
+    @abc.abstractmethod
+    def __init__(self, config: Any) -> None:
+        """Abstract component for performing model updates from an entire epoch."""
+        self.config = config
 
     @staticmethod
-    def config_class() -> Callable:
-        return MAPGMinibatchUpdateConfig
+    def name() -> str:
+        """Static method that returns component name."""
+        return "epoch_update"
 
 
 @dataclass
 class MAPGEpochUpdateConfig:
     num_epochs: int = 4
     num_minibatches: int = 1
-    batch_size: int = 256
 
 
-class MAPGEpochUpdate(Utility):
+class MAPGEpochUpdate(EpochUpdate):
     def __init__(
         self,
         config: MAPGEpochUpdateConfig = MAPGEpochUpdateConfig(),
     ):
-        """_summary_
+        """Component defines a multi-agent policy gradient epoch-level update.
 
         Args:
-            config : _description_.
+            config: MAPGEpochUpdateConfig.
         """
         self.config = config
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """_summary_"""
+        """Define and store the epoch update function.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
         trainer.store.num_epochs = self.config.num_epochs
         trainer.store.num_minibatches = self.config.num_minibatches
 
@@ -161,8 +196,21 @@ class MAPGEpochUpdate(Utility):
         ]:
             """Performs model updates based on one epoch of data."""
             key, params, opt_states, batch = carry
+
             new_key, subkey = jax.random.split(key)
-            permutation = jax.random.permutation(subkey, self.config.batch_size)
+
+            # TODO (dries): This assert is ugly. Is there a better way to do this check?
+            # Maybe using a tree map of some sort?
+            # shapes = jax.tree_map(
+            #         lambda x: x.shape[0]==trainer.store.full_batch_size, batch
+            #     )
+            # assert ...
+            assert (
+                list(batch.observations.values())[0].observation.shape[0]
+                == trainer.store.full_batch_size
+            )
+
+            permutation = jax.random.permutation(subkey, trainer.store.full_batch_size)
 
             shuffled_batch = jax.tree_map(
                 lambda x: jnp.take(x, permutation, axis=0), batch
@@ -186,14 +234,10 @@ class MAPGEpochUpdate(Utility):
         trainer.store.epoch_update_fn = model_update_epoch
 
     @staticmethod
-    def name() -> str:
-        """_summary_
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
 
         Returns:
-            _description_
+            config class/dataclass for component.
         """
-        return "epoch_update_fn"
-
-    @staticmethod
-    def config_class() -> Callable:
         return MAPGEpochUpdateConfig

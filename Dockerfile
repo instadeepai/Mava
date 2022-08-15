@@ -19,17 +19,17 @@ RUN pip install --upgrade pip setuptools wheel
 ARG folder=/home/app/mava
 ## working directory
 WORKDIR ${folder}
-## Copy code from current path.
+## Copy code from current path
 COPY . /home/app/mava
 # For box2d
 RUN apt-get install swig -y
-## Install core dependencies.
-RUN pip install -e .[reverb,launchpad]
+## Install core dependencies + reverb.
+RUN pip install -e .[reverb]
 ## Optional install for screen recording.
 ENV DISPLAY=:0
 RUN if [ "$record" = "true" ]; then \
     ./bash_scripts/install_record.sh; \
-fi
+    fi
 EXPOSE 6006
 ##########################################################
 
@@ -105,7 +105,7 @@ ENV XLA_PYTHON_CLIENT_PREALLOCATE=false
 ## Install core jax dependencies.
 # Install jax gpu
 RUN pip install -e .[jax]
-RUN pip install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_releases.html
+RUN pip install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ##########################################################
 
 ##########################################################

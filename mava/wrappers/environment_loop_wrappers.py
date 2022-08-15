@@ -114,9 +114,7 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
 
         # Record counts.
         if hasattr(self._executor, "_counts"):
-            loop_type = "executor"
-            if "_" not in self._loop_label:
-                loop_type = "evaluator"
+            loop_type = "evaluator" if "_" not in self._loop_label else "executor"
             if hasattr(self._executor, "_variable_client"):
                 self._executor._variable_client.add_async(
                     [f"{loop_type}_episodes", f"{loop_type}_steps"],
@@ -127,6 +125,12 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
                 self._executor._counts[f"{loop_type}_steps"] += episode_steps
 
             counts = self._executor._counts
+        elif hasattr(self._executor, "store"):
+            loop_type = "evaluator" if "_" not in self._loop_label else "executor"
+            self._executor.store.executor_parameter_client.add_async(
+                {f"{loop_type}_episodes": 1, f"{loop_type}_steps": episode_steps}
+            )
+            counts = self._executor.store.executor_counts
         else:
             counts = self._counter.increment(episodes=1, steps=episode_steps)
 
@@ -224,9 +228,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
 
         # Record counts.
         if hasattr(self._executor, "_counts"):
-            loop_type = "executor"
-            if "_" not in self._loop_label:
-                loop_type = "evaluator"
+            loop_type = "evaluator" if "_" not in self._loop_label else "executor"
             if hasattr(self._executor, "_variable_client"):
                 self._executor._variable_client.add_async(
                     [f"{loop_type}_episodes", f"{loop_type}_steps"],
@@ -237,6 +239,12 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
                 self._executor._counts[f"{loop_type}_steps"] += episode_steps
 
             counts = self._executor._counts
+        elif hasattr(self._executor, "store"):
+            loop_type = "evaluator" if "_" not in self._loop_label else "executor"
+            self._executor.store.executor_parameter_client.add_async(
+                {f"{loop_type}_episodes": 1, f"{loop_type}_steps": episode_steps}
+            )
+            counts = self._executor.store.executor_counts
         else:
             counts = self._counter.increment(episodes=1, steps=episode_steps)
         self._episode_length_stats.push(episode_steps)
@@ -353,8 +361,11 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
 
     def _append_frame(self) -> None:
         """Appends a frame to the sequence of frames."""
+        # TODO: THIS IS UGLY, we need to separate jax and tf functionality
         if hasattr(self._executor, "_counts"):
             counts = self._executor._counts
+        elif hasattr(self._executor, "store"):
+            counts = self._executor.store.executor_counts
         else:
             counts = self._counter.get_counts()
         counter = counts.get(self._counter_str)
@@ -370,6 +381,8 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
     def _write_frames(self) -> None:
         if hasattr(self._executor, "_counts"):
             counts = self._executor._counts
+        elif hasattr(self._executor, "store"):
+            counts = self._executor.store.executor_counts
         else:
             counts = self._counter.get_counts()
         counter = int(counts.get(self._counter_str))

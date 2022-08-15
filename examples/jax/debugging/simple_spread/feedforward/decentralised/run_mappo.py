@@ -67,8 +67,8 @@ def main(_: Any) -> None:
             **kwargs,
         )
 
-    # Checkpointer appends "Checkpoints" to checkpoint_dir
-    checkpoint_subpath = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+    # Used for checkpoints, tensorboard logging and env monitoring
+    experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
     log_every = 10
@@ -94,7 +94,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        checkpoint_subpath=checkpoint_subpath,
+        experiment_path=experiment_path,
         optimizer=optimizer,
         run_evaluator=False,
         sample_batch_size=5,

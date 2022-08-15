@@ -17,6 +17,7 @@
 from typing import Any, Tuple
 
 from mava.components.jax import building, executing, training, updating
+from mava.components.jax.building.guardrails import ComponentDependencyGuardrails
 from mava.specs import DesignSpec
 from mava.systems.jax import System
 from mava.systems.jax.mappo.components import ExtrasLogProbSpec
@@ -34,25 +35,32 @@ class MAPPOSystem(System):
         default_params = MAPPODefaultConfig()
 
         # Default system processes
+        # System initialization
+        system_init = DesignSpec(
+            environment_spec=building.EnvironmentSpec,
+            system_init=building.FixedNetworkSystemInit,
+        ).get()
+
         # Executor
         executor_process = DesignSpec(
             executor_init=executing.ExecutorInit,
             executor_observe=executing.FeedforwardExecutorObserve,
             executor_select_action=executing.FeedforwardExecutorSelectAction,
             executor_adder=building.ParallelSequenceAdder,
+            adder_priority=building.UniformAdderPriority,
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
             networks=building.DefaultNetworks,
         ).get()
 
         # Trainer
         trainer_process = DesignSpec(
-            trainer_init=training.TrainerInit,
+            trainer_init=training.SingleTrainerInit,
             gae_fn=training.GAE,
             loss=training.MAPGWithTrustRegionClippingLoss,
             epoch_update=training.MAPGEpochUpdate,
             minibatch_update=training.MAPGMinibatchUpdate,
             sgd_step=training.MAPGWithTrustRegionStep,
-            step=training.DefaultStep,
+            step=training.DefaultTrainerStep,
             trainer_dataset=building.TrajectoryDataset,
         ).get()
 
@@ -68,14 +76,17 @@ class MAPPOSystem(System):
             parameter_server=updating.DefaultParameterServer,
             executor_parameter_client=building.ExecutorParameterClient,
             trainer_parameter_client=building.TrainerParameterClient,
+            termination_condition=updating.CountConditionTerminator,
         ).get()
 
         system = DesignSpec(
+            **system_init,
             **data_server_process,
             **parameter_server_process,
             **executor_process,
             **trainer_process,
             distributor=building.Distributor,
             logger=building.Logger,
+            component_dependency_guardrails=ComponentDependencyGuardrails,
         )
         return system, default_params

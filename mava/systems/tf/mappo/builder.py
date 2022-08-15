@@ -169,13 +169,13 @@ class MAPPOBuilder:
         env_adder_spec: specs.MAEnvironmentSpec = copy.deepcopy(environment_spec)
         keys = env_adder_spec._keys
         for key in keys:
-            agent_spec = env_adder_spec._specs[key]
+            agent_spec = env_adder_spec.get_agent_environment_specs()[key]
             new_act_spec = {"actions": agent_spec.actions}
 
             # Make dummy logits
             new_act_spec["log_probs"] = tf.ones(shape=(), dtype=tf.float32)
 
-            env_adder_spec._specs[key] = EnvironmentSpec(
+            env_adder_spec.get_agent_environment_specs()[key] = EnvironmentSpec(
                 observations=agent_spec.observations,
                 actions=new_act_spec,
                 rewards=agent_spec.rewards,
@@ -184,12 +184,12 @@ class MAPPOBuilder:
         return env_adder_spec
 
     def get_nets_specific_specs(
-        self, spec: Dict[str, Any], network_names: List
+        self, spec: Dict[str, Any], trainer_network_names: List
     ) -> Dict[str, Any]:
         """Convert specs.
         Args:
             spec: agent specs
-            network_names: names of the networks in the desired reverb table
+            trainer_network_names: names of the networks in the desired reverb table
             (to get specs for)
         Returns:
             distilled version of agent specs containing only specs related to
@@ -199,7 +199,7 @@ class MAPPOBuilder:
             return spec
 
         agents = []
-        for network in network_names:
+        for network in trainer_network_names:
             agents.append(self._config.net_spec_keys[network])
 
         agents = sort_str_num(agents)
@@ -211,7 +211,7 @@ class MAPPOBuilder:
             # For the extras
             for key in spec.keys():
                 converted_spec[key] = self.get_nets_specific_specs(
-                    spec[key], network_names
+                    spec[key], trainer_network_names
                 )
         return converted_spec
 
@@ -236,26 +236,32 @@ class MAPPOBuilder:
         for table_key in self._config.table_network_config.keys():
             # TODO (dries): Clean the below converter code up.
             # Convert a Mava spec
-            tables_network_names = self._config.table_network_config[table_key]
+            trainer_network_names = self._config.table_network_config[table_key]
             env_spec = copy.deepcopy(adder_env_spec)
-            env_spec._specs = self.get_nets_specific_specs(
-                env_spec._specs, tables_network_names
+            env_spec.set_agent_environment_specs(
+                self.get_nets_specific_specs(
+                    env_spec.get_agent_environment_specs(), trainer_network_names
+                )
             )
 
-            env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
-            if env_spec.extra_specs is not None:
-                env_spec.extra_specs = self.get_nets_specific_specs(
-                    env_spec.extra_specs, tables_network_names
+            env_spec._keys = list(
+                sort_str_num(env_spec.get_agent_environment_specs().keys())
+            )
+            if env_spec.get_extras_specs() is not None:
+                env_spec.set_extras_specs(
+                    self.get_nets_specific_specs(
+                        env_spec.get_extras_specs(), trainer_network_names
+                    )
                 )
             extra_specs = self.get_nets_specific_specs(
                 self._extra_specs,
-                tables_network_names,
+                trainer_network_names,
             )
 
             signature = reverb_adders.ParallelSequenceAdder.signature(
-                env_spec,
+                ma_environment_spec=env_spec,
                 sequence_length=self._config.sequence_length,
-                extras_spec=extra_specs,
+                extras_specs=extra_specs,
             )
 
             replay_tables.append(
@@ -456,7 +462,7 @@ class MAPPOBuilder:
             policy_networks=policy_networks,
             counts=counts,
             net_keys_to_ids=self._config.net_keys_to_ids,
-            agent_specs=self._config.environment_spec.get_agent_specs(),
+            agent_specs=self._config.environment_spec.get_agent_environment_specs(),
             agent_net_keys=self._config.agent_net_keys,
             network_sampling_setup=self._config.network_sampling_setup,
             fix_sampler=self._config.fix_sampler,

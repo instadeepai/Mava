@@ -13,45 +13,111 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Parameter server component for Mava systems."""
+"""Parameter server Component for Mava systems."""
+import abc
 import time
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 import numpy as np
 from acme.jax import savers
 
-from mava.callbacks import Callback
+from mava.components.jax.component import Component
 from mava.core_jax import SystemParameterServer
 
 
 @dataclass
 class ParameterServerConfig:
     checkpoint: bool = True
-    checkpoint_subpath: str = "~/mava/"
+    experiment_path: str = "~/mava/"
     checkpoint_minute_interval: int = 5
     non_blocking_sleep_seconds: int = 10
 
 
-class DefaultParameterServer(Callback):
+class ParameterServer(Component):
+    @abc.abstractmethod
     def __init__(
         self,
         config: ParameterServerConfig = ParameterServerConfig(),
     ) -> None:
-        """Mock system component."""
+        """Component defining hooks to override when creating a parameter server."""
+        self.config = config
+
+    @abc.abstractmethod
+    def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
+        """Register parameters and network params to track. Create checkpointer."""
+        pass
+
+    # Get
+    @abc.abstractmethod
+    def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
+        """Fetch the parameters from the server specified in the store."""
+        pass
+
+    # Set
+    @abc.abstractmethod
+    def on_parameter_server_set_parameters(self, server: SystemParameterServer) -> None:
+        """Set the parameters in the server to the values specified in the store."""
+        pass
+
+    # Add
+    @abc.abstractmethod
+    def on_parameter_server_add_to_parameters(
+        self, server: SystemParameterServer
+    ) -> None:
+        """Increment the server parameters by the amount specified in the store."""
+        pass
+
+    # Save variables using checkpointer
+    @abc.abstractmethod
+    def on_parameter_server_run_loop(self, server: SystemParameterServer) -> None:
+        """Intermittently checkpoint the server parameters."""
+        pass
+
+    @staticmethod
+    def name() -> str:
+        """Static method that returns component name."""
+        return "parameter_server"
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for Component.
+
+        Returns:
+            config class/dataclass for Component.
+        """
+        return ParameterServerConfig
+
+
+class DefaultParameterServer(ParameterServer):
+    def __init__(
+        self,
+        config: ParameterServerConfig = ParameterServerConfig(),
+    ) -> None:
+        """Default Mava parameter server.
+
+        Registers count parameters and network params for tracking.
+        Creates the checkpointer.
+        Handles the getting, setting, and adding of parameters.
+        Handles periodic checkpointing of parameters.
+
+        Args:
+            config: ParameterServerConfig.
+        """
         self.config = config
 
     def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
-        """_summary_
+        """Register parameters and network params to track. Create checkpointer.
 
         Args:
-            server : _description_
-        """
+            server: SystemParameterServer.
 
-        server.store.non_blocking_sleep_seconds = self.config.non_blocking_sleep_seconds
+        Returns:
+            None.
+        """
         networks = server.store.network_factory()
 
-        # # Create parameters
+        # Create parameters
         server.store.parameters = {
             "trainer_steps": np.zeros(1, dtype=np.int32),
             "trainer_walltime": np.zeros(1, dtype=np.float32),
@@ -72,9 +138,6 @@ class DefaultParameterServer(Callback):
         # Create the checkpointer
         if self.config.checkpoint:
             server.store.last_checkpoint_time = 0
-            server.store.checkpoint_minute_interval = (
-                self.config.checkpoint_minute_interval
-            )
 
             # Only save variables that are not empty.
             save_variables = {}
@@ -84,13 +147,20 @@ class DefaultParameterServer(Callback):
                 if not (type(var) == tuple and len(var) == 0):
                     save_variables[key] = var
             server.store.system_checkpointer = savers.Checkpointer(
-                save_variables, self.config.checkpoint_subpath, time_delta_minutes=0
+                save_variables, self.config.experiment_path, time_delta_minutes=0
             )
 
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
-        """_summary_"""
-        names = server.store._param_names
+        """Fetch the parameters from the server specified in the store.
+
+        Args:
+            server: SystemParameterServer.
+
+        Returns:
+            None.
+        """
+        names: Union[str, Sequence[str]] = server.store._param_names
 
         if type(names) == str:
             get_params = server.store.parameters[names]  # type: ignore
@@ -102,13 +172,16 @@ class DefaultParameterServer(Callback):
 
     # Set
     def on_parameter_server_set_parameters(self, server: SystemParameterServer) -> None:
-        """_summary_"""
-        params = server.store._set_params
-        names = params.keys()
+        """Set the parameters in the server to the values specified in the store.
 
-        if type(names) == str:
-            params = {names: params}  # type: ignore
-            names = [names]  # type: ignore
+        Args:
+            server: SystemParameterServer.
+
+        Returns:
+            None.
+        """
+        params: Dict[str, Any] = server.store._set_params
+        names = params.keys()
 
         for var_key in names:
             assert var_key in server.store.parameters
@@ -124,13 +197,16 @@ class DefaultParameterServer(Callback):
     def on_parameter_server_add_to_parameters(
         self, server: SystemParameterServer
     ) -> None:
-        """_summary_"""
-        params = server.store._add_to_params
-        names = params.keys()
+        """Increment the server parameters by the amount specified in the store.
 
-        if type(names) == str:
-            params = {names: params}  # type: ignore
-            names = [names]  # type: ignore
+        Args:
+            server: SystemParameterServer.
+
+        Returns:
+            None.
+        """
+        params: Dict[str, Any] = server.store._add_to_params
+        names = params.keys()
 
         for var_key in names:
             assert var_key in server.store.parameters
@@ -138,27 +214,21 @@ class DefaultParameterServer(Callback):
 
     # Save variables using checkpointer
     def on_parameter_server_run_loop(self, server: SystemParameterServer) -> None:
-        """_summary_
+        """Intermittently checkpoint the server parameters.
 
         Args:
-            server : _description_
+            server: SystemParameterServer.
+
+        Returns:
+            None.
         """
         if (
-            server.store.system_checkpointer
+            self.config.checkpoint
             and server.store.last_checkpoint_time
-            + server.store.checkpoint_minute_interval * 60
+            + self.config.checkpoint_minute_interval * 60
             + 1
             < time.time()
         ):
             server.store.system_checkpointer.save()
             server.store.last_checkpoint_time = time.time()
             print("Updated variables checkpoint.")
-
-    @staticmethod
-    def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
-        return "parameter_server"
-
-    @staticmethod
-    def config_class() -> Callable:
-        return ParameterServerConfig

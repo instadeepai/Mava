@@ -14,8 +14,9 @@
 # limitations under the License.
 
 """Commonly used dataset components for system builders"""
+import abc
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import reverb
 from acme import datasets
@@ -26,58 +27,89 @@ from mava.core_jax import SystemBuilder
 Transform = Callable[[reverb.ReplaySample], reverb.ReplaySample]
 
 
+class TrainerDataset(Component):
+    @abc.abstractmethod
+    def __init__(
+        self,
+        config: Any,
+    ):
+        """Component creates an iterable dataset from existing reverb table.
+
+        Args:
+            config: Any.
+        """
+        self.config = config
+
+    @abc.abstractmethod
+    def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
+        """Abstract method defining hook to be overridden.
+
+        Args:
+            builder: SystemBuilder.
+
+        Returns:
+            None.
+        """
+        pass
+
+    @staticmethod
+    def name() -> str:
+        """Static method that returns component name."""
+        return "trainer_dataset"
+
+
 @dataclass
 class TransitionDatasetConfig:
     sample_batch_size: int = 256
-    prefetch_size: Optional[int] = 4
+    prefetch_size: Optional[int] = None
     num_parallel_calls: int = 12
     max_in_flight_samples_per_worker: Optional[int] = None
     postprocess: Optional[Transform] = None
+    # dataset_name: str = "transition_dataset"
 
 
-class TransitionDataset(Component):
+class TransitionDataset(TrainerDataset):
     def __init__(
         self,
         config: TransitionDatasetConfig = TransitionDatasetConfig(),
     ):
-        """_summary_
+        """Component creates a reverb transition dataset for the trainer.
 
         Args:
-            config : _description_.
+            config: TransitionDatasetConfig.
         """
         self.config = config
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Build a transition dataset and save it to the store.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
+        max_in_flight_samples_per_worker = self.config.max_in_flight_samples_per_worker
         dataset = datasets.make_reverb_dataset(
             table=builder.store.trainer_id,
             server_address=builder.store.data_server_client.server_address,
             batch_size=self.config.sample_batch_size,
             prefetch_size=self.config.prefetch_size,
             num_parallel_calls=self.config.num_parallel_calls,
-            max_in_flight_samples_per_worker=self.config.max_in_flight_samples_per_worker,
-            # This doesn't exist in our version of acme yet.
-            # postprocess=self.config.postprocess,
+            max_in_flight_samples_per_worker=max_in_flight_samples_per_worker,
+            postprocess=self.config.postprocess,
         )
 
-        builder.store.dataset_iterator = dataset.as_numpy_iterator()
+        builder.store.dataset_iterator = iter(dataset)
 
     @staticmethod
-    def config_class() -> Callable:
-        return TransitionDatasetConfig
-
-    @staticmethod
-    def name() -> str:
-        """_summary_
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
 
         Returns:
-            _description_
+            config class/dataclass for component.
         """
-        return "transition_dataset"
+        return TransitionDatasetConfig
 
 
 @dataclass
@@ -92,23 +124,28 @@ class TrajectoryDatasetConfig:
     # dataset_name: str = "trajectory_dataset"
 
 
-class TrajectoryDataset(Component):
+class TrajectoryDataset(TrainerDataset):
     def __init__(
         self,
         config: TrajectoryDatasetConfig = TrajectoryDatasetConfig(),
     ):
-        """_summary_
+        """Component creates a reverb trajectory dataset for the trainer.
 
         Args:
-            config : _description_.
+            config: TrajectoryDatasetConfig.
         """
         self.config = config
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Build a trajectory dataset and save it to the store.
+
+        Automatically adds a batch dimension to the dataset.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
         dataset = reverb.TrajectoryDataset.from_table_signature(
             server_address=builder.store.data_server_client.server_address,
@@ -123,18 +160,15 @@ class TrajectoryDataset(Component):
 
         # Add batch dimension.
         dataset = dataset.batch(self.config.sample_batch_size, drop_remainder=True)
+        builder.store.sample_batch_size = self.config.sample_batch_size
 
         builder.store.dataset_iterator = dataset.as_numpy_iterator()
 
     @staticmethod
-    def name() -> str:
-        """_summary_
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
 
         Returns:
-            _description_
+            config class/dataclass for component.
         """
-        return "trainer_dataset"
-
-    @staticmethod
-    def config_class() -> Callable:
         return TrajectoryDatasetConfig

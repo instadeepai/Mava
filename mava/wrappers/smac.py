@@ -203,7 +203,7 @@ class SMACWrapper(ParallelEnvWrapper):
 
         return olt_observations
 
-    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+    def extras_spec(self) -> Dict[str, specs.BoundedArray]:
         """Function returns extra spec (format) of the env.
 
         Returns:

@@ -15,7 +15,7 @@
 
 """Commonly used distributor components for system builders"""
 from dataclasses import dataclass
-from typing import Callable, List, Union
+from typing import Callable, List, Optional, Union
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
@@ -29,29 +29,37 @@ class DistributorConfig:
     nodes_on_gpu: Union[List[str], str] = "trainer"
     run_evaluator: bool = True
     distributor_name: str = "System"
+    terminal: str = "current_terminal"
 
 
 class Distributor(Component):
     def __init__(self, config: DistributorConfig = DistributorConfig()):
-        """_summary_
+        """Component builds launchpad program nodes and launches the program.
 
         Args:
-            config : _description_.
+            config: DistributorConfig.
         """
         if isinstance(config.nodes_on_gpu, str):
             config.nodes_on_gpu = [config.nodes_on_gpu]
         self.config = config
 
     def on_building_program_nodes(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Create nodes for the program and save the program in the store.
+
+        Create data server, parameter server, executor, trainer, and evaluator nodes.
+        Handles both single-process and multi-process.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
         builder.store.program = Launcher(
             multi_process=self.config.multi_process,
             nodes_on_gpu=self.config.nodes_on_gpu,
             name=self.config.distributor_name,
+            terminal=self.config.terminal,
         )
 
         # tables node
@@ -64,7 +72,7 @@ class Distributor(Component):
         # variable server node
         parameter_server = builder.store.program.add(
             builder.parameter_server,
-            node_type=NodeType.corrier,
+            node_type=NodeType.courier,
             name="parameter_server",
         )
 
@@ -73,7 +81,7 @@ class Distributor(Component):
             builder.store.program.add(
                 builder.executor,
                 [f"executor_{executor_id}", data_server, parameter_server],
-                node_type=NodeType.corrier,
+                node_type=NodeType.courier,
                 name="executor",
             )
 
@@ -82,7 +90,7 @@ class Distributor(Component):
             builder.store.program.add(
                 builder.executor,
                 ["evaluator", data_server, parameter_server],
-                node_type=NodeType.corrier,
+                node_type=NodeType.courier,
                 name="evaluator",
             )
 
@@ -91,7 +99,7 @@ class Distributor(Component):
             builder.store.program.add(
                 builder.trainer,
                 [trainer_id, data_server, parameter_server],
-                node_type=NodeType.corrier,
+                node_type=NodeType.courier,
                 name="trainer",
             )
 
@@ -99,18 +107,26 @@ class Distributor(Component):
             builder.store.system_build = builder.store.program.get_nodes()
 
     def on_building_launch(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """Start the launchpad program saved in the store.
 
         Args:
-            builder : _description_
+            builder: SystemBuilder.
+
+        Returns:
+            None.
         """
         builder.store.program.launch()
 
     @staticmethod
     def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
+        """Static method that returns component name."""
         return "distributor"
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return DistributorConfig

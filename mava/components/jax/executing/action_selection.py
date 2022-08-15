@@ -15,6 +15,7 @@
 
 """Execution components for system builders"""
 
+import abc
 from dataclasses import dataclass
 
 import jax
@@ -25,25 +26,63 @@ from mava.core_jax import SystemExecutor
 
 
 @dataclass
-class ExecutorSelectActionProcessConfig:
+class ExecutorSelectActionConfig:
     pass
 
 
-class FeedforwardExecutorSelectAction(Component):
+class ExecutorSelectAction(Component):
+    @abc.abstractmethod
     def __init__(
         self,
-        config: ExecutorSelectActionProcessConfig = ExecutorSelectActionProcessConfig(),
+        config: ExecutorSelectActionConfig = ExecutorSelectActionConfig(),
     ):
-        """_summary_
+        """Component defines hooks to override for executor action selection.
 
         Args:
-            config : _description_.
+            config: ExecutorSelectActionConfig.
+        """
+        self.config = config
+
+    # Select actions
+    @abc.abstractmethod
+    def on_execution_select_actions(self, executor: SystemExecutor) -> None:
+        """Hook to override for selecting actions for each agent."""
+        pass
+
+    # Select action
+    @abc.abstractmethod
+    def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
+        """Hook to override for selecting an action for a single agent."""
+        pass
+
+    @staticmethod
+    def name() -> str:
+        """Static method that returns component name."""
+        return "executor_select_action"
+
+
+class FeedforwardExecutorSelectAction(ExecutorSelectAction):
+    def __init__(
+        self,
+        config: ExecutorSelectActionConfig = ExecutorSelectActionConfig(),
+    ):
+        """Component defines hooks for the executor selecting actions.
+
+        Args:
+            config: ExecutorSelectActionConfig.
         """
         self.config = config
 
     # Select actions
     def on_execution_select_actions(self, executor: SystemExecutor) -> None:
-        """Select actions for all the agents."""
+        """Select actions for each agent and save info in store.
+
+        Args:
+            executor: SystemExecutor.
+
+        Returns:
+            None.
+        """
         executor.store.actions_info = {}
         executor.store.policies_info = {}
         for agent, observation in executor.store.observations.items():
@@ -53,30 +92,33 @@ class FeedforwardExecutorSelectAction(Component):
 
     # Select action
     def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
-        """Summary"""
+        """Select action for a single agent and save in store.
+
+        Args:
+            executor: SystemExecutor.
+
+        Returns:
+            None.
+        """
 
         agent = executor.store.agent
         network = executor.store.networks["networks"][
             executor.store.agent_net_keys[agent]
         ]
 
-        observation = executor.store.observation.observation.reshape((1, -1))
+        observation = utils.add_batch_dim(executor.store.observation.observation)
         rng_key, executor.store.key = jax.random.split(executor.store.key)
 
         # TODO (dries): We are currently using jit in the networks per agent.
         # We can also try jit over all the agents in a for loop. This would
         # allow the jit function to save us even more time.
         executor.store.action_info, executor.store.policy_info = network.get_action(
-            observation, rng_key
+            observation,
+            rng_key,
+            utils.add_batch_dim(executor.store.observation.legal_actions),
         )
 
-    @staticmethod
-    def name() -> str:
-        """_summary_"""
-        return "action_selector"
-
-
-class FeedforwardExecutorSelectActionValueBased(Component):
+class FeedforwardExecutorSelectActionValueBased(ExecutorSelectAction):
     """Feedforward executor that selects actions based on the q-values.
 
     TODO: this class has method on_execution_select_actions which identical to the same
@@ -85,7 +127,7 @@ class FeedforwardExecutorSelectActionValueBased(Component):
 
     def __init__(
         self,
-        config: ExecutorSelectActionProcessConfig = ExecutorSelectActionProcessConfig(),
+        config: ExecutorSelectActionConfig = ExecutorSelectActionConfig(),
     ) -> None:
         """_summary_
 
@@ -113,7 +155,8 @@ class FeedforwardExecutorSelectActionValueBased(Component):
             executor.store.agent_net_keys[agent]
         ]
 
-        observation = executor.store.observation.observation.reshape((1, -1))
+        #observation = executor.store.observation.observation.reshape((1, -1))
+        observation = utils.add_batch_dim(executor.store.observation.observation)
         rng_key, executor.store.key = jax.random.split(executor.store.key)
 
         # TODO (dries): We are currently using jit in the networks per agent.
@@ -128,7 +171,10 @@ class FeedforwardExecutorSelectActionValueBased(Component):
             mask=utils.add_batch_dim(executor.store.observation.legal_actions),
         )
 
-    @staticmethod
-    def name() -> str:
-        """Returns the name of the component."""
-        return "action_selector"
+        """
+         executor.store.action_info, executor.store.policy_info = network.get_action(
+            observation,
+            rng_key,
+            utils.add_batch_dim(executor.store.observation.legal_actions),
+        )
+        """

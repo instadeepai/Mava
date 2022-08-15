@@ -222,7 +222,7 @@ class MADQNEpochUpdate(Utility):
         Returns:
             _description_
         """
-        return "epoch_update_fn"
+        return "epoch_update"
 
     @staticmethod
     def config_class() -> Callable:

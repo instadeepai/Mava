@@ -34,11 +34,22 @@ class Logger(Component):
         self,
         config: LoggerConfig = LoggerConfig(),
     ):
-        """[summary]"""
+        """Component creates executor, trainer, and evaluator loggers.
+
+        Args:
+            config: LoggerConfig.
+        """
         self.config = config
 
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Create and store either the executor or evaluator logger.
+
+        Args:
+            builder: SystemBuilder.
+
+        Returns:
+            None.
+        """
         logger_config = self.config.logger_config if self.config.logger_config else {}
         name = "executor" if not builder.store.is_evaluator else "evaluator"
 
@@ -46,25 +57,37 @@ class Logger(Component):
             logger_config = self.config.logger_config[name]
 
         builder.store.executor_logger = self.config.logger_factory(  # type: ignore
-            f"executor_{builder.store.executor_id}", **logger_config
+            builder.store.executor_id, **logger_config
         )
 
     def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Create and store the trainer logger.
+
+        Args:
+            builder: SystemBuilder.
+
+        Returns:
+            None.
+        """
         logger_config = self.config.logger_config if self.config.logger_config else {}
         name = "trainer"
         if self.config.logger_config and name in self.config.logger_config:
             logger_config = self.config.logger_config[name]
 
         builder.store.trainer_logger = self.config.logger_factory(  # type: ignore
-            f"trainer_{builder.store.trainer_id}", **logger_config
+            builder.store.trainer_id, **logger_config
         )
 
     @staticmethod
     def name() -> str:
-        """_summary_"""
+        """Static method that returns component name."""
         return "logger"
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return LoggerConfig

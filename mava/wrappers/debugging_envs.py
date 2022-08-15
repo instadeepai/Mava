@@ -105,7 +105,7 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
             step_type=self._step_type,
         )
         if self.return_state_info:
-            return timestep, {"env_states": state}
+            return timestep, {"s_t": state}
         else:
             return timestep
 
@@ -170,7 +170,7 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
             )
         return observation_specs
 
-    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+    def extras_spec(self) -> Dict[str, specs.BoundedArray]:
         extras = {}
         if self.return_state_info:
             shape = self.environment._get_state().shape
@@ -182,7 +182,7 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
                 minimum=[float("-inf")] * shape[0],
                 maximum=[float("inf")] * shape[0],
             )
-            extras.update({"env_states": ex_spec})
+            extras.update({"s_t": ex_spec})
         return extras
 
 
@@ -214,7 +214,7 @@ class SwitchGameWrapper(PettingZooParallelEnvWrapper):
             step_type=self._step_type,
         )
 
-    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+    def extras_spec(self) -> Dict[str, specs.BoundedArray]:
         return {}
 
 
@@ -227,8 +227,8 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
         self._reset_next_step = False
         self.environment.action_spaces = {}
         self.environment.observation_spaces = {}
-        self.environment.extra_specs = {
-            "env_states": spaces.Discrete(3)
+        self.environment._extras_specs = {
+            "s_t": spaces.Discrete(3)
         }  # Global state 1, 2, or 3
 
         for agent_id in self.environment.agent_ids:
@@ -296,5 +296,5 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
             state_infos,
         )
 
-    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
-        return self.environment.extra_specs
+    def extras_spec(self) -> Dict[str, specs.BoundedArray]:
+        return self.environment._extras_specs

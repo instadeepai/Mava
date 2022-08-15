@@ -13,44 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Execution components for system builders"""
+"""Observation components for system builders"""
 
+import abc
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Dict, Optional, Callable
 
 from mava.components.jax import Component
 from mava.core_jax import SystemExecutor
 from mava.utils.extras.extras import UserDefinedExtrasFinder
 from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
-
-# @dataclass
-# class ExtrasConfig:
-#     extra_creator_s: ExtrasSyncWithStateCreator = ExtrasSyncWithStateCreator()
-#     extra_creator_a: ExtrasSyncWithActionCreator = ExtrasSyncWithActionCreator()
-#
-#
-# class Extras(Component):
-#     def __init__(self, config: ExtrasConfig = ExtrasConfig()):
-#         """Creating Extras from Store of the executor at its current state."""
-#         self.config = config
-#
-#     def on_execution_init(self, executor: SystemExecutor) -> None:
-#         executor.store.extras_sync_with_state = self.config.extra_creator_s
-#         executor.store.extras_sync_with_action = self.config.extra_creator_a
-#
-#     @staticmethod
-#     def name() -> str:
-#         """_summary_"""
-#         return "extras"
-#
-#     @staticmethod
-#     def config_class() -> Optional[Callable]:
-#         """
-#         Optional class which specifies the
-#         dataclass/config object for the component.
-#         """
-#         return ExtrasConfig
-#
 
 
 @dataclass
@@ -77,32 +49,66 @@ class ExtrasFinder(Component):
         """Returns class config."""
         return ExtrasFinderConfig
 
-
 @dataclass
 class ExecutorObserveConfig:
     pass
 
 
-class FeedforwardExecutorObserve(Component):
+class ExecutorObserve(Component):
+    @abc.abstractmethod
     def __init__(self, config: ExecutorObserveConfig = ExecutorObserveConfig()):
-        """_summary_
+        """Abstract component parses observations and updates executor variables.
 
         Args:
-            config : _description_.
+            config: ExecutorObserveConfig.
         """
         self.config = config
 
-    # Observe first
+    @abc.abstractmethod
     def on_execution_observe_first(self, executor: SystemExecutor) -> None:
-        """_summary_
+        """Handle first executor observation in episode."""
+        pass
+
+    @abc.abstractmethod
+    def on_execution_observe(self, executor: SystemExecutor) -> None:
+        """Handle observations in executor."""
+        pass
+
+    @abc.abstractmethod
+    def on_execution_update(self, executor: SystemExecutor) -> None:
+        """Update the executor variables."""
+        pass
+
+    @staticmethod
+    def name() -> str:
+        """Static method that returns component name."""
+        return "executor_observe"
+
+
+class FeedforwardExecutorObserve(ExecutorObserve):
+    def __init__(self, config: ExecutorObserveConfig = ExecutorObserveConfig()):
+        """Component handles observations for a feedforward executor.
 
         Args:
-            executor : _description_
+            config: ExecutorObserveConfig.
+        """
+        self.config = config
+
+    def on_execution_observe_first(self, executor: SystemExecutor) -> None:
+        """Handle first observation in episode and give to adder.
+
+        Also selects networks to be used for episode.
+
+        Args:
+            executor: SystemExecutor.
+
+        Returns:
+            None.
         """
         if not executor.store.adder:
             return
 
-        "Select new networks from the sampler at the start of each episode."
+        # Select new networks from the sampler at the start of each episode.
         agents = sort_str_num(list(executor.store.agent_net_keys.keys()))
         (
             executor.store.network_int_keys_extras,
@@ -112,92 +118,46 @@ class FeedforwardExecutorObserve(Component):
             executor.store.network_sampling_setup,
             executor.store.net_keys_to_ids,
         )
-
-        # At this point executor.store.extras should only have env_extras.
-        # In the following we get the user defined extras which are synced with state
-        # and update the executor.store.extra dictionary with them
-
-        # collecting user-defined extras
-        keys = list(executor.store.next_extras_spec.keys())
-        extras = executor.store.extras_finder(executor.store, keys)
-        executor.store.extras.update(extras)
-        # Now we add all the extras which are synced with the state (env_extras plus
-        # user defined ones).
+        executor.store.extras[
+            "network_int_keys"
+        ] = executor.store.network_int_keys_extras
+        #print(executor.store.extras)
+        #exit()
         executor.store.adder.add_first(executor.store.timestep, executor.store.extras)
 
-        # The following variable in executor.store keeps track of which elements of the
-        # "extra"
-        # are available before taking the decision of the current step. These are the
-        # information which are known right after taking the action of the previous
-        # step.
-        executor.store.keys_available_as_next_extra = list(extras.keys())
-
-    # Observe
     def on_execution_observe(self, executor: SystemExecutor) -> None:
-        """_summary_
+        """Handle observations and pass along to the adder.
 
         Args:
-            executor : _description_
+            executor: SystemExecutor.
+
+        Returns:
+            None.
         """
         if not executor.store.adder:
             return
 
-        # At this point the state is t+1, and next_extra has the env_extra at t+1.
-        # In the following, we get the user-defined extras which are synced with the
-        # state and update the executor.store.next_extra dictionary with them. By
-        # calling the adder, this information is going to (partially) appended to the
-        # reverb trajectory under:
-        # --> item "extra"
-        # --> at time step t+1; hence it is called next_extra.
-        # tmp = executor.store.extras_sync_with_state.create(executor.store)
-        keys = list(executor.store.next_extras_spec.keys())
-        extras = executor.store.extras_finder(executor.store, keys)
-        executor.store.next_extras.update(extras)
+        actions_info = executor.store.actions_info
+        policies_info = executor.store.policies_info
 
-        # We are not yet done with the timestep t, the associated actions and the extra
-        # information which is  synced with its action(i.e. the latest action) are
-        # still not stored. An example of extra information which is synced with the
-        # action is action-values or policy values. This information unlike the
-        # information created above will be appended to the reverb trajectory under
-        # timestep t (and not timestep t+1). That's why they are extras (and not next
-        # extras). A more expressive name would be extras_synced_with_actions,
-        # but we stick to extras.
-
-        actions_info = executor.store.actions_info  # includes taken actions
         adder_actions: Dict[str, Any] = {}
-
+        executor.store.next_extras["policy_info"] = {}
         for agent in actions_info.keys():
             adder_actions[agent] = {
                 "actions_info": actions_info[agent],
             }
+            executor.store.next_extras["policy_info"][agent] = policies_info[agent]
 
-        # the extra information which became in relation to the taken actions (
-        # actions of timestep t). As these are information which are related to the
-        # timestep t (and not timestep t+1), they belong to the extras.
-        # extras = executor.store.extras_sync_with_action.create(executor.store)
-        all_keys = list(executor.store.extras_spec.keys())
-        keys_to_be_removed = list(executor.store.next_extras_spec.keys())  # they are
-        # already there.
-        for key in keys_to_be_removed:
-            if key in all_keys:
-                all_keys.remove(key)
-        keys = all_keys
-        extras = executor.store.extras_finder(executor.store, keys)
-
+        executor.store.next_extras[
+            "network_int_keys"
+        ] = executor.store.network_int_keys_extras
         executor.store.adder.add(
             actions=adder_actions,
             next_timestep=executor.store.next_timestep,
             next_extras=executor.store.next_extras,
-            extras=extras,
         )
 
-    # Update the executor variables.
     def on_execution_update(self, executor: SystemExecutor) -> None:
-        """Update the policy variables."""
+        """Update the executor variables."""
         if executor.store.executor_parameter_client:
             executor.store.executor_parameter_client.get_async()
-
-    @staticmethod
-    def name() -> str:
-        """_summary_"""
-        return "executor_observe"

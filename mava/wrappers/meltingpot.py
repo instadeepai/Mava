@@ -308,7 +308,7 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
             for i in range(self._num_agents)
         }
 
-    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+    def extras_spec(self) -> Dict[str, specs.BoundedArray]:
         """Extra data spec.
         Returns:
             Dict[str, specs.BoundedArray]: spec for extra data.

@@ -16,8 +16,9 @@
 """Jax-based Mava system implementation."""
 import abc
 import copy
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Type
 
+from mava.components.jax import Component
 from mava.core_jax import BaseSystem
 from mava.specs import DesignSpec
 from mava.systems.jax import Builder, Config
@@ -28,7 +29,11 @@ class System(BaseSystem):
     """General Mava system class for Jax-based systems."""
 
     def __init__(self) -> None:
-        """System Initialisation"""
+        """System Initialisation.
+
+        Creates config from the build and checks that component keys
+        match their assigned names.
+        """
         self._design, self._default_params = self.design()
         self.config = Config()  # Mava config
         self.components: List = []
@@ -37,9 +42,24 @@ class System(BaseSystem):
         # make config from build
         self._make_config()
 
+        # Enforce that design keys match component names
+        for key, value in self._design.get().items():
+            #print(key)
+            #print(value)
+            if key != value.name():
+                #print(key)
+                raise Exception(
+                    f"Component '{key}' has mismatching name '{value.name()}'"
+                )
+
     def _make_config(self) -> None:
-        """Private method to construct system config upon initialisation."""
+        """Private method to construct system config upon initialisation.
+
+        Returns:
+            None.
+        """
         for component in self._design.get().values():
+            #print(component)
             config_class = component.config_class()
             if config_class:
                 input = {component.name(): config_class()}
@@ -50,15 +70,17 @@ class System(BaseSystem):
         """System design specifying the list of components to use.
 
         Returns:
-            system callback components
+            Tuple[system callback components, system config].
         """
 
     def update(self, component: Any) -> None:
         """Update a component that has already been added to the system.
 
         Args:
-            component : system callback component
-            name : component name
+            component: system callback component.
+
+        Returns:
+            None.
         """
         if self._built:
             raise Exception(
@@ -83,8 +105,10 @@ class System(BaseSystem):
         """Add a new component to the system.
 
         Args:
-            component : system callback component
-            name : component name
+            component: system callback component.
+
+        Returns:
+            None.
         """
         if self._built:
             raise Exception(
@@ -105,8 +129,16 @@ class System(BaseSystem):
                 self.config.add(**config_feed)
 
     def build(self, **kwargs: Any) -> None:
-        """Configure system hyperparameters."""
+        """Build the system with all components and hyperparameters.
 
+        Args:
+            **kwargs: dictionary {config name: value} to replace system config values.
+
+        Returns:
+            None.
+        """
+
+        #print(**kwargs)
         if self._built:
             raise Exception("System already built.")
 
@@ -126,16 +158,26 @@ class System(BaseSystem):
 
         # update default system component configs
         assert len(self.components) == 0
+        component: Type[Component]  # provide type
         for component in self._design.get().values():
-            self.components.append(component(system_config))
+            self.components.append(
+                component(config=self.config.get_local_config(component))
+            )
 
         # Build system
-        self._builder = Builder(components=self.components)
+        self._builder = Builder(components=self.components, global_config=system_config)
         self._builder.build()
         self._built = True
 
     def launch(self) -> None:
-        """Run the system."""
+        """Run the system by launching the builder.
+
+        Raises:
+            Exception: if system has not already been built.
+
+        Returns:
+            None.
+        """
         if not self._built:
             raise Exception(
                 "System not built. First call .build() before calling .launch()."

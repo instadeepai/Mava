@@ -44,7 +44,7 @@ class ExtrasActionInfo(Component):
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """[summary]"""
         # TODO: extras
-        agent_specs = builder.store.environment_spec.get_agent_specs()
+        agent_specs = builder.store.ma_environment_spec.get_agent_environment_specs()
         builder.store.extras_spec = {"policy_info": {}}
 
         for agent, spec in agent_specs.items():
@@ -55,7 +55,7 @@ class ExtrasActionInfo(Component):
 
         # Add the networks keys to extras.
         int_spec = specs.DiscreteArray(len(builder.store.unique_net_keys))
-        agents = builder.store.environment_spec.get_agent_ids()
+        agents = builder.store.ma_environment_spec.get_agent_ids()
         net_spec = {"network_keys": {agent: int_spec for agent in agents}}
         builder.store.extras_spec.update(net_spec)
         # adding network keys to next_extras
@@ -68,4 +68,4 @@ class ExtrasActionInfo(Component):
         Returns:
             _description_
         """
-        return "extras_info"
+        return "extras_spec"

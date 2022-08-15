@@ -163,4 +163,4 @@ class MADQNLoss(Loss):
     @staticmethod
     def name() -> str:
         """Returns name of the component."""
-        return "madqn_loss"
+        return "loss"

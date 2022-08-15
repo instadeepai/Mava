@@ -15,26 +15,29 @@
 
 """Trainer components for Mava systems."""
 from mava.components.jax.training.advantage_estimation import GAE
-from mava.components.jax.training.base import (
-    Batch,
-    BatchDQN,
-    Loss,
-    Step,
-    TrainingState,
-    Utility,
-)
+from mava.components.jax.training.base import Batch, Loss, Step, TrainingState, TrainingStateQ, Utility, BatchDQN
 from mava.components.jax.training.losses import MAPGWithTrustRegionClippingLoss
 from mava.components.jax.training.losses_dqn import MADQNLoss
 from mava.components.jax.training.model_updating import (
     MAPGEpochUpdate,
     MAPGMinibatchUpdate,
 )
+
+#FOR MADQN
 from mava.components.jax.training.model_updating_dqn import (
     MADQNEpochUpdate,
     MADQNMinibatchUpdate,
 )
-from mava.components.jax.training.step import DefaultStep, MAPGWithTrustRegionStep
 
 # included for MADQN
 from mava.components.jax.training.step_dqn import MADQNStep
-from mava.components.jax.training.trainer import TrainerInit
+
+from mava.components.jax.training.step import (
+    DefaultTrainerStep,
+    MAPGWithTrustRegionStep,
+)
+from mava.components.jax.training.trainer import (
+    CustomTrainerInit,
+    OneTrainerPerNetworkInit,
+    SingleTrainerInit,
+)

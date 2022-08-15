@@ -100,4 +100,4 @@ class SampleToInsertRateLimiter(RateLimiter):
     @staticmethod
     def name() -> str:
         """Returns the name of the component."""
-        return "sample_to_insert_rate_limiter"
+        return "data_server_rate_limiter"#"sample_to_insert_rate_limiter"

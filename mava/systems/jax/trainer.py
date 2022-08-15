@@ -28,16 +28,16 @@ class Trainer(SystemTrainer, TrainerHookMixin):
 
     def __init__(
         self,
-        config: SimpleNamespace,
+        store: SimpleNamespace,
         components: List[Callback] = [],
     ):
-        """_summary_
+        """Initialise the trainer.
 
         Args:
-            config : _description_
-            components : _description_.
+            store: builder store.
+            components: components in the system.
         """
-        self.store = config
+        self.store = store
         self.callbacks = components
 
         self.on_training_init_start()
@@ -61,7 +61,7 @@ class Trainer(SystemTrainer, TrainerHookMixin):
         self.on_training_step_end()
 
     def run(self) -> None:
-        """_summary_"""
+        """Step the trainer in an infinite loop."""
 
         # Run the trainer.
         while True:

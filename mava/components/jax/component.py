@@ -24,10 +24,10 @@ from mava.callbacks import Callback
 class Component(Callback):
     @abc.abstractmethod
     def __init__(self, config: Any) -> None:
-        """_summary_
+        """By default, just set the local config.
 
         Args:
-            config : _description_.
+            config: Config for component, will be empty if no config class.
         """
         self.config = config
 
@@ -35,11 +35,13 @@ class Component(Callback):
     @abc.abstractmethod
     def name() -> str:
         """Static method that returns component name."""
+        raise NotImplementedError("Name method not implemented for a component")
 
     @staticmethod
     def config_class() -> Optional[Callable]:
-        """
-        Optional class which specifies the
-        dataclass/config object for the component.
+        """Optional class which specifies the dataclass/config object for the component.
+
+        Returns:
+            config class/dataclass for component.
         """
         pass

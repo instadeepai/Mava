@@ -15,9 +15,11 @@
 
 """Trainer components for calculating losses."""
 
+import functools
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
+import chex
 import jax
 import jax.numpy as jnp
 import rlax
@@ -39,15 +41,22 @@ class MAPGWithTrustRegionClippingLoss(Loss):
         self,
         config: MAPGTrustRegionClippingLossConfig = MAPGTrustRegionClippingLossConfig(),
     ):
-        """_summary_
+        """Component defines a MAPGWithTrustRegionClipping loss function.
 
         Args:
-            config : _description_.
+            config: MAPGTrustRegionClippingLossConfig.
         """
         self.config = config
 
     def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
-        """_summary_"""
+        """Create and store MAPGWithTrustRegionClipping loss function.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
 
         def loss_grad_fn(
             params: Any,
@@ -58,7 +67,20 @@ class MAPGWithTrustRegionClippingLoss(Loss):
             advantages: Dict[str, jnp.ndarray],
             behavior_values: Dict[str, jnp.ndarray],
         ) -> Tuple[Dict[str, jnp.ndarray], Dict[str, Dict[str, jnp.ndarray]]]:
-            """Surrogate loss using clipped probability ratios."""
+            """Surrogate loss using clipped probability ratios.
+
+            Args:
+                params: network parameters.
+                observations: agent observations.
+                actions: actions the agents took.
+                behaviour_log_probs: log probablity of action taken.
+                target_values: values computed using target networks.
+                advantages: advantage estimation values per agent.
+                behavior_values: estimated value from the critic.
+
+            Returns:
+                Tuple[gradients, loss info]
+            """
 
             grads = {}
             loss_info = {}
@@ -77,6 +99,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                     advantages: jnp.ndarray,
                     behavior_values: jnp.ndarray,
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
+                    """Inner loss function: see outer function for parameters."""
                     distribution_params, values = network.network.apply(
                         params, observations
                     )
@@ -145,5 +168,13 @@ class MAPGWithTrustRegionClippingLoss(Loss):
         trainer.store.grad_fn = loss_grad_fn
 
     @staticmethod
-    def config_class() -> Callable:
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
         return MAPGTrustRegionClippingLossConfig
+
+
+

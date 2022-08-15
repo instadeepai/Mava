@@ -34,14 +34,21 @@ class MADQNSystem(System):
         # Set the default configs
         default_params = MADQNDefaultConfig()
 
+        system_init = DesignSpec(
+            environment_spec=building.EnvironmentSpec,
+            system_init=building.FixedNetworkSystemInit,
+        ).get()
+
         # Default system processes
         # Executor
         executor_process = DesignSpec(
             executor_init=executing.ExecutorInit,
             executor_target_network_init=ExecutorTargetNetInit,
-            executor_extra=executing.ExtrasFinder,
+            #extras_finder=executing.ExtrasFinder,
             executor_observe=executing.FeedforwardExecutorObserve,
             executor_select_action=executing.FeedforwardExecutorSelectActionValueBased,
+            #executor_adder=building.ParallelSequenceAdder,
+            #adder_priority=building.UniformAdderPriority,
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
             executor_scheduler=executing.EpsilonScheduler,
             networks=building.DefaultNetworks,
@@ -49,22 +56,25 @@ class MADQNSystem(System):
 
         # Trainer
         trainer_process = DesignSpec(
-            trainer_init=training.TrainerInit,
-            step=training.DefaultStep,
+            trainer_init=training.SingleTrainerInit,
+            step=training.DefaultTrainerStep,
             sgd_step=training.MADQNStep,
             loss=training.MADQNLoss,
             epoch_update=training.MADQNEpochUpdate,
+            #trainer_dataset=building.TrajectoryDataset,
             trainer_dataset=building.TransitionDataset,
         ).get()
 
         # Data Server
         data_server_process = DesignSpec(
-            executor_adder_priority=building.adders.UniformAdderPriority,
+            adder_priority=building.adders.UniformAdderPriority,
             data_server=building.OffPolicyDataServer,
             executor_adder=building.ParallelTransitionAdder,
             data_server_rate_limiter=building.SampleToInsertRateLimiter,
             data_server_adder_signature=building.ParallelTransitionAdderSignature,
             extras_spec=ExtrasActionInfo,
+            data_server_sampler = building.reverb_components.UniformSampler,
+            data_server_remover = building.reverb_components.FIFORemover
         ).get()
 
         # Parameter Server
@@ -75,6 +85,7 @@ class MADQNSystem(System):
         ).get()
 
         system = DesignSpec(
+            **system_init,
             **data_server_process,
             **parameter_server_process,
             **executor_process,

@@ -27,7 +27,7 @@ import tree
 from acme.jax import utils
 from jax import jit
 
-from mava.components.jax.training import Step, TrainingState
+from mava.components.jax.training import Step, TrainingStateQ
 from mava.components.jax.training.base import BatchDQN
 from mava.core_jax import SystemTrainer
 
@@ -56,8 +56,8 @@ class MADQNStep(Step):
         @jit
         @chex.assert_max_traces(n=1)
         def sgd_step(
-            states: TrainingState, sample: reverb.ReplaySample
-        ) -> Tuple[TrainingState, Dict[str, jnp.ndarray]]:
+            states: TrainingStateQ, sample: reverb.ReplaySample
+        ) -> Tuple[TrainingStateQ, Dict[str, jnp.ndarray]]:
             """Performs a minibatch SGD step, returning new state and metrics."""
             # Extract the data.
             data = sample.data
@@ -107,7 +107,7 @@ class MADQNStep(Step):
             )
 
             # Update the training states.
-            new_states = TrainingState(
+            new_states = TrainingStateQ(
                 params=new_params,
                 target_params=new_target_params,
                 opt_states=new_opt_states,
@@ -154,9 +154,12 @@ class MADQNStep(Step):
             }
             opt_states = trainer.store.opt_states
             random_key, _ = jax.random.split(trainer.store.key)
-            steps = trainer.store.training_steps
+            #executor.store.executor_counts['training_steps']#
+            #print(trainer.store)
+            #exit()
+            steps = trainer.store.trainer_counts['trainer_steps']#trainer.store.training_steps
 
-            states = TrainingState(
+            states = TrainingStateQ(
                 params=params,
                 target_params=target_params,
                 opt_states=opt_states,
@@ -218,7 +221,7 @@ class MADQNStep(Step):
         Returns:
             _description_
         """
-        return "madqn_step_fn"
+        return "sgd_step"
 
     @staticmethod
     def config_class() -> Callable:

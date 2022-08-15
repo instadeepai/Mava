@@ -125,7 +125,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
         delta_encoded: bool = False,
         priority_fns: Optional[PriorityFnMapping] = None,
         get_signature_timeout_ms: int = 300_000,
-        # use_next_extras: bool = True,
+        use_next_extras: bool = True,
     ):
         """Reverb Base Adder.
 
@@ -153,8 +153,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             priority_fns=priority_fns,
             get_signature_timeout_ms=get_signature_timeout_ms,
         )
-        self._keys_available_as_next_extra = None
-        # self._use_next_extras = use_next_extras
+        self._use_next_extras = use_next_extras
 
     def write_experience_to_tables(  # noqa
         self,
@@ -279,13 +278,6 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
                             new_trajectory.extras[key] = {}
 
                             if type(trajectory) == mava_types.Transition:
-                                new_trajectory.extras[key] = {}  # type: ignore
-
-                        # Initialise empty next-extras
-                        for key in trajectory.next_extras.keys():
-                            new_trajectory.next_extras[key] = {}
-
-                            if type(trajectory) == mava_types.Transition:
                                 new_trajectory.next_extras[key] = {}  # type: ignore
 
                         # Go through each of the agents in item_agents and add them
@@ -329,35 +321,32 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
                                     # and not per agent. Maybe fix this in the future.
                                     new_trajectory.extras[key] = trajectory.extras[key]
                                 if type(trajectory) == mava_types.Transition:
-                                    if key in trajectory.next_extras.keys():
-                                        ext = trajectory.next_extras[key]  # type:ignore
-                                        if (
-                                            type(ext) is dict  # type: ignore
-                                            and cur_agent in ext  # type: ignore
-                                        ):
-                                            new_trajectory.next_extras[key][
-                                                # type: ignore
-                                                want_agent
-                                            ] = trajectory.next_extras[  # type: ignore
-                                                key
-                                            ][  # type: ignore
-                                                cur_agent
-                                            ]  # type: ignore
-                                        else:
-                                            # TODO: (dries) Only actually need to
-                                            # do this once and not per agent. Maybe
-                                            # fix this in the future.
-                                            new_trajectory.next_extras[  # type: ignore
-                                                key
-                                            ] = trajectory.next_extras[  # type: ignore
-                                                key
-                                            ]  # type: ignore
+                                    ext = trajectory.next_extras[key]  # type: ignore
+                                    if (
+                                        type(ext) is dict  # type: ignore
+                                        and cur_agent in ext  # type: ignore
+                                    ):
+                                        new_trajectory.next_extras[key][  # type: ignore
+                                            want_agent
+                                        ] = trajectory.next_extras[  # type: ignore
+                                            key
+                                        ][  # type: ignore
+                                            cur_agent
+                                        ]  # type: ignore
+                                    else:
+                                        # TODO: (dries) Only actually need to
+                                        # do this once and not per agent. Maybe
+                                        # fix this in the future.
+                                        new_trajectory.next_extras[  # type: ignore
+                                            key
+                                        ] = trajectory.next_extras[  # type: ignore
+                                            key
+                                        ]  # type: ignore
 
                         # Write the new_trajectory to the table.
                         self._writer.create_item(
                             table=table, priority=priority, trajectory=new_trajectory
                         )
-                        self._writer.flush()
             if not created_item:
                 raise EOFError(
                     "This experience was not used by any trainer: ",
@@ -391,12 +380,8 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             start_of_episode=timestep.first(),
         )
 
-        add_dict["extras"] = extras
-        # At this stage, the keys residing in extras are the ones which are available
-        # before taking the next action, i.e. these are synced with state. These
-        # keys are going to be always available in next_extras.
-        self._keys_available_as_next_extra = list(extras.keys())
-
+        if self._use_next_extras:
+            add_dict["extras"] = extras
         self._writer.append(
             add_dict,
             partial_step=True,
@@ -409,7 +394,6 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, types.NestedArray] = {},
-        extras: Dict = {},
     ) -> None:
         """Record an action and the following timestep."""
         if not self._add_first_called:
@@ -421,9 +405,11 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             actions=actions,
             rewards=next_timestep.reward,
             discounts=next_timestep.discount,
-            extras=extras
             # Start of episode indicator was passed at the previous add call.
         )
+
+        if not self._use_next_extras:
+            current_step["extras"] = next_extras
 
         self._writer.append(current_step)
 
@@ -431,9 +417,10 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
         next_step = dict(
             observations=next_timestep.observation,
             start_of_episode=next_timestep.first(),
-            extras=next_extras,
         )
 
+        if self._use_next_extras:
+            next_step["extras"] = next_extras
         self._writer.append(
             next_step,
             partial_step=True,

@@ -26,20 +26,23 @@ from mava.core_jax import SystemExecutor
 
 
 class Executor(SystemExecutor, ExecutorHookMixin):
-    """A generic executor."""
+    """Core system executor."""
 
     def __init__(
         self,
-        config: SimpleNamespace,
+        store: SimpleNamespace,
         components: List[Callback] = [],
     ):
-        """_summary_
+        """Initialise the executor.
+
+        Call to the init hooks.
+        Save whether or not this is an evaluator.
 
         Args:
-            config : _description_.
-            components : _description_.
+            store : builder store.
+            components : list of system components.
         """
-        self.store = config
+        self.store = store
         self.callbacks = components
 
         self.on_execution_init_start()
@@ -55,11 +58,11 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         timestep: dm_env.TimeStep,
         extras: Dict[str, NestedArray] = {},
     ) -> None:
-        """Record observed timestep from the environment.
+        """Record observed timestep from environment first episode step.
 
         Args:
-            timestep : data emitted by an environment during interaction
-            extras : possible extra information to record during the transition
+            timestep : data emitted by an environment during interaction.
+            extras : possible extra information to record during the transition.
         """
         self.store.timestep = timestep
         self.store.extras = extras
@@ -76,12 +79,12 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, NestedArray] = {},
     ) -> None:
-        """_summary_
+        """Record observed timestep from the environment.
 
         Args:
-            actions : _description_
-            next_timestep : _description_
-            next_extras : _description_.
+            actions : actions taken by agents in previous step.
+            next_timestep : data emitted by an environment during interaction.
+            next_extras : possible extra information to record during the transition.
         """
         self.store.actions = actions
         self.store.next_timestep = next_timestep
@@ -102,11 +105,12 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         """Agent specific policy function.
 
         Args:
-            agent : agent id
-            observation : observation tensor received from the environment
-            state : recurrent state
+            agent : agent id.
+            observation : observation tensor received from the environment.
+            state : recurrent state.
+
         Returns:
-            agent action
+            Action and policy info for agent.
         """
         self.store.agent = agent
         self.store.observation = observation
@@ -133,9 +137,10 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         """Select the actions for all agents in the system.
 
         Args:
-            observations : agent observations from the environment
+            observations : agent observations from the environment.
+
         Returns:
-            actions for all agents in the system.
+            Action and policy info for all agents in the system.
         """
         self.store.observations = observations
 
@@ -151,7 +156,10 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         """Update executor parameters.
 
         Args:
-            wait : whether to stall the executor's request for new parameter
+            wait : whether to stall the executor's request for new parameter.
+
+        Returns:
+            None.
         """
         self.store._wait = wait
 
