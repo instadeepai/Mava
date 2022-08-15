@@ -252,6 +252,11 @@ def test_step(mock_trainer: MockTrainer) -> None:
 
     assert metrics["observations_std"] == 0.104980744
 
+    assert sorted(list(metrics["rewards_mean"].keys())) == [
+        "agent_0",
+        "agent_1",
+        "agent_2",
+    ]
     sorted_reward_mean = sorted(list(metrics["rewards_mean"].values()))
     assert round(float(sorted_reward_mean[0]), 3) == 0.000
     assert round(float(sorted_reward_mean[1]), 3) == 0.072
