@@ -15,12 +15,9 @@
 
 """Tests for launcher class for Jax-based Mava systems"""
 
-from typing import Any, Callable, List
-
 import launchpad as lp
 import pytest
-from reverb import Client, item_selectors, pybind, rate_limiters
-from reverb import server as reverb_server
+from reverb import Client, pybind
 
 from mava.systems.jax.launcher import Launcher, NodeType
 from tests.jax.components.building.distributor_test import MockBuilder
