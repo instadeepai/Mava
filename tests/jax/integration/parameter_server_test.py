@@ -36,7 +36,7 @@ def test_system() -> System:
     return mappo.MAPPOSystem()
 
 
-def test_parameter_server(test_system: System) -> None:
+def test_parameter_server_single_process(test_system: System) -> None:
     """Test if the paraameter server instantiates processes as expected."""
 
     # Environment.
@@ -189,6 +189,163 @@ def test_parameter_server(test_system: System) -> None:
     assert parameter_server.store.system_checkpointer._last_saved == 0
 
     # run step function
+    parameter_server.step()
+
+    assert parameter_server.store.last_checkpoint_time
+    assert parameter_server.store.last_checkpoint_time < time.time()
+    assert parameter_server.store.system_checkpointer._last_saved != 0
+    assert parameter_server.store.system_checkpointer._last_saved < time.time()
+
+
+def test_parameter_server_multi_process(test_system: System) -> None:
+    """Test if the paraameter server instantiates processes as expected."""
+    # Environment.
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name="simple_spread",
+        action_space="discrete",
+    )
+
+    # Networks.
+    def network_factory(*args: Any, **kwargs: Any) -> Any:
+        return mappo.make_default_networks(  # type: ignore
+            policy_layer_sizes=(32, 32),
+            critic_layer_sizes=(64, 64),
+            *args,
+            **kwargs,
+        )
+
+    # Checkpointer appends "Checkpoints" to checkpoint_dir.
+    base_dir = "~/mava"
+    mava_id = str(datetime.now())
+    checkpoint_subpath = f"{base_dir}/{mava_id}"
+
+    # Log every [log_every] seconds.
+    log_every = 10
+    logger_factory = functools.partial(
+        logger_utils.make_logger,
+        directory=base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=mava_id,
+        time_delta=log_every,
+    )
+
+    # Optimizer.
+    optimizer = optax.chain(
+        optax.clip_by_global_norm(40.0),
+        optax.adam(1e-4),
+    )
+
+    # Build the system
+    test_system.build(
+        environment_factory=environment_factory,
+        network_factory=network_factory,
+        logger_factory=logger_factory,
+        experiment_path=checkpoint_subpath,
+        optimizer=optimizer,
+        executor_parameter_update_period=1,
+        multi_process=True,
+        run_evaluator=True,
+        num_executors=1,
+        max_queue_size=500,
+        use_next_extras=False,
+        sample_batch_size=5,
+        checkpoint=True,
+        nodes_on_gpu=[],
+        lp_launch_type=lp.LaunchType.TEST_MULTI_THREADING,
+    )
+
+    (parameter_server_node,) = test_system._builder.store.program._program._groups[
+        "parameter_server"
+    ]
+    parameter_server_node.disable_run()
+
+    test_system.launch()
+    parameter_server = parameter_server_node._construct_instance()
+
+    # System parameter server
+    assert type(parameter_server.store.system_checkpointer) == savers.Checkpointer
+
+    for network in parameter_server.store.parameters["networks-network_agent"].values():
+        assert list(network.keys()) == ["w", "b"]
+        assert jnp.size(network["w"]) != 0
+        assert jnp.size(network["b"]) != 0
+
+    param_without_net = parameter_server.store.parameters.copy()
+    del param_without_net["networks-network_agent"]
+    assert param_without_net == {
+        "trainer_steps": jnp.zeros(1, dtype=jnp.int32),
+        "trainer_walltime": jnp.zeros(1, dtype=jnp.float32),
+        "evaluator_steps": jnp.zeros(1, dtype=jnp.int32),
+        "evaluator_episodes": jnp.zeros(1, dtype=jnp.int32),
+        "executor_episodes": jnp.zeros(1, dtype=jnp.int32),
+        "executor_steps": jnp.zeros(1, dtype=jnp.int32),
+    }
+
+    ############################get_parameters test#####################################
+
+    parameter_server.get_parameters("trainer_steps")
+    assert parameter_server.store.get_parameters == jnp.zeros(1, dtype=jnp.int32)
+
+    parameter_server.get_parameters("networks-network_agent")
+    assert (
+        parameter_server.store.get_parameters
+        == parameter_server.store.parameters["networks-network_agent"]
+    )
+
+    # get multiple params
+    parameter_server.get_parameters(["executor_episodes", "executor_steps"])
+    assert parameter_server.store.get_parameters == {
+        "executor_episodes": jnp.zeros(1, dtype=jnp.int32),
+        "executor_steps": jnp.zeros(1, dtype=jnp.int32),
+    }
+
+    ############################set_parameters test#####################################
+    params = {
+        "trainer_steps": jnp.zeros(2, dtype=jnp.int32),
+        "trainer_walltime": jnp.zeros(2, dtype=jnp.float32),
+        "evaluator_steps": jnp.zeros(2, dtype=jnp.int32),
+        "evaluator_episodes": jnp.zeros(2, dtype=jnp.int32),
+        "executor_episodes": jnp.zeros(2, dtype=jnp.int32),
+        "executor_steps": jnp.zeros(2, dtype=jnp.int32),
+    }
+
+    parameter_server.set_parameters(params)
+    list_param = [
+        "trainer_steps",
+        "trainer_walltime",
+        "evaluator_steps",
+        "evaluator_episodes",
+        "executor_episodes",
+        "executor_steps",
+    ]
+    for param in list_param:
+        assert jnp.array_equal(
+            parameter_server.store.parameters[param], jnp.array([0, 0])
+        )
+
+    # set non existing param
+    param1: Dict[str, str] = {"wrong_param": "test"}
+    with pytest.raises(AssertionError):
+        assert parameter_server.set_parameters(param1)
+
+    ############################add_to_parameters_test#####################################
+    param2: Dict[str, Any] = {
+        "trainer_steps": jnp.array([1, 3]),
+    }
+    parameter_server.add_to_parameters(param2)
+
+    assert jnp.array_equal(
+        parameter_server.store.parameters["trainer_steps"], jnp.array([1, 3])
+    )  # [0,0]+[1,3]
+
+    ###################################step_test##########################################
+    # before running step
+    assert not parameter_server.store.last_checkpoint_time
+    assert parameter_server.store.system_checkpointer._last_saved == 0
+    # run step function
+    parameter_server.store.global_config.non_blocking_sleep_seconds = 0
     parameter_server.step()
 
     assert parameter_server.store.last_checkpoint_time
