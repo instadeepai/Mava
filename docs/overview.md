@@ -2,11 +2,11 @@
 
 > 🚧 **Note:** This only applies to the callback redesign of Mava.
 
-Going from papers to to code is one of the main challenges faced by reinformcement learning researchers. Mava aims to remove this constraint and to be the to go-to framework for fast iteration and experimentation. Mava also handles distributed computation by leveraging [Launchpad](https://github.com/deepmind/launchpad).
+Going from research papers to code and being able to quickly test experimental hypotheses are some of the main challenges faced by reinforcement learning researchers. Mava aims to remove this constraint and to be the to go-to framework for fast iteration and experimentation. Mava effectively utilizes computational resources by leveraging [Launchpad](https://github.com/deepmind/launchpad) for distributed computation.
 
 ### Design Paradigm
 
-Mava makes use of the a callback-based approach to enable modularity and flexibility in system designs. This enables the development of new system with minimal code reuse and overhead leading to fast experimentation and results. The system's architecture is based on components (Hooks) that are overritten in callbacks, and these callbacks are passed as arguments to the system classes, allowing you to configure your system differently dependent on the algorithm's properties. More information on callbacks may be found [here](https://google.com). 
+Mava makes use of the a callback-based approach to enable modularity and flexibility in system designs. This enables the development of new system with minimal code reuse and overhead leading to fast experimentation and results. The system's architecture is based on components (Hooks) that are overritten in callbacks, and these callbacks are passed as arguments to the system classes, allowing you to configure your system differently dependent on the algorithm's properties. More information on callbacks may be found [here](https://google.com).
 
 ### Deep learning framework
 
