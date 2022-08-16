@@ -51,7 +51,9 @@ class Loss(Component):
         Returns:
             List of required component classes.
         """
-        return [training.BaseTrainerInit]
+        return [
+            training.BaseTrainerInit
+        ]  # import from training to avoid partial dependency
 
 
 @dataclass
