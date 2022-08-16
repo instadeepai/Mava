@@ -41,9 +41,9 @@ nav:
   - Home: index.md
   - Getting started:
     - General: overview.md
-    - Creating a system: create_system.md
     - The store: store.md
     - The config: config.md
+    - Creating a system: create_system.md
     - Creating a new component: create_component.md
   - Systems:
     - General: systems/general.md
