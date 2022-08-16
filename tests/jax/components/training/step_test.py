@@ -491,9 +491,9 @@ def test_step_separate_networks(mock_trainer_separate_networks: Trainer) -> None
     metrics = mock_trainer.store.step_fn(dummy_sample)
 
     # Check that metrics were correctly computed
-    assert list(metrics.keys()) == [
-        "norm_policy_params",
+    assert sorted(list(metrics.keys())) == [
         "norm_critic_params",
+        "norm_policy_params",
         "observations_mean",
         "observations_std",
         "rewards_mean",
