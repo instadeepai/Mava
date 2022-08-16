@@ -32,6 +32,7 @@ class ParameterServerConfig:
     experiment_path: str = "~/mava/"
     checkpoint_minute_interval: int = 5
     non_blocking_sleep_seconds: int = 10
+    load_pretrained: bool = False
 
 
 class ParameterServer(Component):
@@ -125,6 +126,8 @@ class DefaultParameterServer(ParameterServer):
             "evaluator_episodes": np.zeros(1, dtype=np.int32),
             "executor_episodes": np.zeros(1, dtype=np.int32),
             "executor_steps": np.zeros(1, dtype=np.int32),
+            "seed": np.zeros(1, dtype=np.int32),
+            "optax_state": np.zeros(1, dtype=np.int32),
         }
 
         # Network parameters
@@ -147,7 +150,10 @@ class DefaultParameterServer(ParameterServer):
                 if not (type(var) == tuple and len(var) == 0):
                     save_variables[key] = var
             server.store.system_checkpointer = savers.Checkpointer(
-                save_variables, self.config.experiment_path, time_delta_minutes=0
+                object_to_save=save_variables,
+                directory=self.config.experiment_path,
+                add_uid=not self.config.load_pretrained,
+                time_delta_minutes=0,
             )
 
     # Get
@@ -229,6 +235,7 @@ class DefaultParameterServer(ParameterServer):
             + 1
             < time.time()
         ):
+            # TODO best checkpoint
             server.store.system_checkpointer.save()
             server.store.last_checkpoint_time = time.time()
             print("Updated variables checkpoint.")
