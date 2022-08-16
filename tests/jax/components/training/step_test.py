@@ -42,7 +42,7 @@ def step_fn(sample: int) -> Dict[str, int]:
 
 
 def apply(params: Any, observations: Any) -> Tuple:
-    """apply function used to test step_fn"""
+    """Apply function used to test step_fn"""
     return params, jnp.array([[0.1, 0.5], [0.1, 0.5], [0.1, 0.5]])
 
 
@@ -252,15 +252,25 @@ def test_step(mock_trainer: MockTrainer) -> None:
 
     assert metrics["observations_std"] == 0.104980744
 
-    assert list(metrics["rewards_mean"].keys()) == ["agent_0", "agent_1", "agent_2"]
-    assert float(list(metrics["rewards_mean"].values())[0]) == 0.0
-    assert float(list(metrics["rewards_mean"].values())[1]) == 0.08261971175670624
-    assert float(list(metrics["rewards_mean"].values())[2]) == 0.07156813144683838
+    assert sorted(list(metrics["rewards_mean"].keys())) == [
+        "agent_0",
+        "agent_1",
+        "agent_2",
+    ]
+    sorted_reward_mean = sorted(list(metrics["rewards_mean"].values()))
+    assert round(float(sorted_reward_mean[0]), 3) == 0.000
+    assert round(float(sorted_reward_mean[1]), 3) == 0.072
+    assert round(float(sorted_reward_mean[2]), 3) == 0.083
 
-    assert list(metrics["rewards_std"].keys()) == ["agent_0", "agent_1", "agent_2"]
-    assert float(list(metrics["rewards_std"].values())[0]) == 0.0
-    assert float(list(metrics["rewards_std"].values())[1]) == 0.07048596441745758
-    assert float(list(metrics["rewards_std"].values())[2]) == 0.07740379124879837
+    assert sorted(list(metrics["rewards_std"].keys())) == [
+        "agent_0",
+        "agent_1",
+        "agent_2",
+    ]
+    sorted_reward_std = sorted(list(metrics["rewards_std"].values()))
+    assert round(float(sorted_reward_std[0]), 3) == 0.000
+    assert round(float(sorted_reward_std[1]), 3) == 0.070
+    assert round(float(sorted_reward_std[2]), 3) == 0.077
 
     # check that trainer random key has been updated
     assert list(mock_trainer.store.key) != list(old_key)
