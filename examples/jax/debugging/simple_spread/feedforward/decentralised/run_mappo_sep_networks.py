@@ -15,7 +15,6 @@
 
 """Example running MAPPO on debug MPE environments."""
 import functools
-import os
 from datetime import datetime
 from typing import Any
 
@@ -26,8 +25,6 @@ from mava.systems.jax import mappo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
-# Without this flag, JAX uses the whole GPU from the beginning and our trainer crashes.
-os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "env_name",
@@ -66,12 +63,13 @@ def main(_: Any) -> None:
         return mappo.make_default_networks(  # type: ignore
             policy_layer_sizes=(254, 254, 254),
             critic_layer_sizes=(512, 512, 256),
+            single_network=False,
             *args,
             **kwargs,
         )
 
-    # Used for checkpoints, tensorboard logging and env monitoring
-    experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+    # Checkpointer appends "Checkpoints" to checkpoint_dir
+    checkpoint_subpath = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
     log_every = 10
@@ -85,26 +83,30 @@ def main(_: Any) -> None:
     )
 
     # Optimizer.
-    optimizer = optax.chain(
+    policy_optimizer = optax.chain(
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+    )
+
+    critic_optimizer = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
     # Create the system.
-    system = mappo.MAPPOSystem()
+    system = mappo.MAPPOSystemSeparateNetworks()
 
     # Build the system.
     system.build(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        experiment_path=experiment_path,
-        optimizer=optimizer,
+        experiment_path=checkpoint_subpath,
+        policy_optimizer=policy_optimizer,
+        critic_optimizer=critic_optimizer,
         run_evaluator=True,
         sample_batch_size=5,
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        clip_value=False,
     )
 
     # Launch the system.

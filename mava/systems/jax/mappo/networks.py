@@ -15,7 +15,7 @@
 
 """Jax MAPPO system networks."""
 import dataclasses
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import chex
 import haiku as hk  # type: ignore
@@ -133,10 +133,124 @@ class PPONetworks:
         return value
 
 
+# This class is made to replicate the behaviour of the categorical value head
+# which squeezes the value inside the __call__ method before returning it.
+# please see
+# https://github.com/deepmind/acme/blob/70e1e6b694d79d94f1bed13d55cda5c1837a10f3/acme/jax/networks/distributional.py#L284 # noqa: E501
+class ValueHead(hk.Module):
+    """Network head that produces a value."""
+
+    def __init__(
+        self,
+        name: Optional[str] = None,
+    ):
+        """Initialize the class"""
+        super().__init__(name=name)
+        self._value_layer = hk.Linear(1)
+
+    def __call__(self, inputs: jnp.ndarray) -> Any:
+        """Return output given network inputs."""
+        value = jnp.squeeze(self._value_layer(inputs), axis=-1)
+        return value
+
+
+@dataclasses.dataclass
+class PPOSeparateNetworks:
+    """Separate policy and critic networks for IPPO."""
+
+    def __init__(
+        self,
+        policy_network: networks_lib.FeedForwardNetwork,
+        policy_params: networks_lib.Params,
+        critic_network: networks_lib.FeedForwardNetwork,
+        critic_params: networks_lib.Params,
+        log_prob: Optional[networks_lib.LogProbFn] = None,
+        entropy: Optional[EntropyFn] = None,
+        sample: Optional[networks_lib.SampleFn] = None,
+    ) -> None:
+        """Initiliaze networks class
+
+        Args:
+            policy_network: network to be used by the policy
+            policy_params: parameters for the policy network
+            critic_network: network to be used by the critic
+            critic_params: parameters for the critic network
+            log_prob: lambda function for getting the log probability of
+                a particular action from a distribution.
+                Defaults to None.
+            entropy: lambda function for getting the entropy of
+                a particular distribution.
+                Defaults to None.
+            sample: lambda function for sampling an action
+                from a distribution.
+                Defaults to None.
+        """
+        self.policy_network = policy_network
+        self.policy_params = policy_params
+        self.critic_network = critic_network
+        self.critic_params = critic_params
+        self.log_prob = log_prob
+        self.entropy = entropy
+        self.sample = sample
+
+        @jit
+        def forward_fn(
+            policy_params: Dict[str, jnp.ndarray],
+            observations: networks_lib.Observation,
+            key: networks_lib.PRNGKey,
+            mask: chex.Array = None,
+        ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+            """Get actions and relevant log probabilities from the \
+                policy network given some observations.
+
+            Args:
+                policy_params: parameters of the policy network
+                observations: agent observations
+                key: jax random key for sampling from the policy
+                    distribution
+                mask: optional mask for selecting only legal actions
+                    Defaults to None.
+
+            Returns:
+                Tuple (actions, log_prob): sampled actions and relevant
+                    log probabilities of sampled actions
+            """
+            # The parameters of the network might change. So it has to
+            # be fed into the jitted function.
+            distribution = self.policy_network.apply(policy_params, observations)
+            if mask is not None:
+                distribution = action_mask_categorical_policies(distribution, mask)
+
+            actions = jax.numpy.squeeze(distribution.sample(seed=key))
+            log_prob = distribution.log_prob(actions)
+
+            return actions, log_prob
+
+        self.forward_fn = forward_fn
+
+    def get_action(
+        self,
+        observations: networks_lib.Observation,
+        key: networks_lib.PRNGKey,
+        mask: chex.Array = None,
+    ) -> Tuple[np.ndarray, Dict]:
+        """Get actions from policy network given observations."""
+        actions, log_prob = self.forward_fn(self.policy_params, observations, key, mask)
+        actions = np.array(actions, dtype=np.int64)
+        log_prob = np.squeeze(np.array(log_prob, dtype=np.float32))
+        return actions, {"log_prob": log_prob}
+
+    def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
+        """Get state value from critic network given observations."""
+        value = self.critic_network.apply(self.critic_params, observations)
+        return value
+
+
 def make_ppo_network(
     network: networks_lib.FeedForwardNetwork, params: Dict[str, jnp.ndarray]
 ) -> PPONetworks:
-    """Makes generic PPO network
+    """Instantiate PPO network class which has shared hidden layers with unique\
+        policy and value heads.
 
     Args:
         network: feedforward network representing the agent policy function
@@ -154,6 +268,25 @@ def make_ppo_network(
     )
 
 
+def make_ppo_networks(
+    policy_network: networks_lib.FeedForwardNetwork,
+    policy_params: Dict[str, jnp.ndarray],
+    critic_network: networks_lib.FeedForwardNetwork,
+    critic_params: Dict[str, jnp.ndarray],
+) -> PPOSeparateNetworks:
+    """Instantiate PPO networks class which has separate policy and \
+        critic networks."""
+    return PPOSeparateNetworks(
+        policy_network=policy_network,
+        policy_params=policy_params,
+        critic_network=critic_network,
+        critic_params=critic_params,
+        log_prob=lambda distribution, action: distribution.log_prob(action),
+        entropy=lambda distribution: distribution.entropy(),
+        sample=lambda distribution, key: distribution.sample(seed=key),
+    )
+
+
 def make_networks(
     spec: specs.EnvironmentSpec,
     key: networks_lib.PRNGKey,
@@ -164,8 +297,12 @@ def make_networks(
     ),
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
     observation_network: Callable = utils.batch_concat,
-) -> PPONetworks:
-    """Calls functions to make discrete or continuous network
+    single_network: bool = True,
+) -> Union[PPONetworks, PPOSeparateNetworks]:
+    """Function for creating PPO networks to be used.
+
+    These networks will be different depending on whether the
+    environment has a discrete or continuous action space.
 
     Args:
         spec: specifications of training environment
@@ -173,6 +310,7 @@ def make_networks(
         policy_layer_sizes: size of each layer of the policy network
         critic_layer_sizes: size of each layer of the critic network
         observation_network: Network used for feature extraction layers
+        single_network: If a shared represnetation netowrk should be used.
 
     Returns:
         make_discrete_networks: function to create a discrete network
@@ -189,6 +327,7 @@ def make_networks(
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
             observation_network=observation_network,
+            single_network=single_network,
         )
 
     else:
@@ -205,19 +344,25 @@ def make_discrete_networks(
     policy_layer_sizes: Sequence[int],
     critic_layer_sizes: Sequence[int],
     observation_network: Callable = utils.batch_concat,
+    single_network: bool = True,
     # default behaviour is to flatten observations
-) -> PPONetworks:
-    """Make discrete PPO network
+) -> Union[PPONetworks, PPOSeparateNetworks]:
+    """Create PPO network for environments with discrete action spaces.
 
     Args:
-        environment_spec: specifications of training environment
-        key: pseudo-random value used to initialise distributions
-        policy_layer_sizes: size of each layer of the policy network
-        critic_layer_sizes: size of each layer of the critic network
-        observation_network: Network used for feature extraction layers
+        environment_spec: environment spec
+        key: jax random key for initializing network parameters
+        policy_layer_sizes: sizes of hidden layers for the policy network
+        critic_layer_sizes: sizes of hidden layers for the critic network
+        observation_network: optional network for processing observations.
+            Defaults to utils.batch_concat.
+        single_network: True if shared layer network with separate heads should be used
+            for policy and critic and False if separate policy and critic networks
+            should be used.
+            Defaults to True.
 
     Returns:
-        make_ppo_network: function to create a ppo network
+        PPONetworks class
     """
 
     num_actions = environment_spec.actions.num_values
@@ -226,27 +371,73 @@ def make_discrete_networks(
     # than having a policy_fn and critic_fn. Maybe jit solves
     # this issue. Having one function makes obs network calculations
     # easier.
-    def forward_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
-        policy_value_network = hk.Sequential(
-            [
-                observation_network,
-                hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
-                networks_lib.CategoricalValueHead(num_values=num_actions),
-            ]
+
+    if single_network:
+
+        def forward_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+            policy_value_network = hk.Sequential(
+                [
+                    observation_network,
+                    hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
+                    networks_lib.CategoricalValueHead(num_values=num_actions),
+                ]
+            )
+            return policy_value_network(inputs)
+
+        # Transform into pure functions.
+        forward_fn = hk.without_apply_rng(hk.transform(forward_fn))
+
+        dummy_obs = utils.zeros_like(environment_spec.observations.observation)
+        dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
+
+        network_key, key = jax.random.split(key)
+        params = forward_fn.init(network_key, dummy_obs)  # type: ignore
+
+        # Create PPONetworks to add functionality required by the agent.
+        return make_ppo_network(network=forward_fn, params=params)
+
+    else:
+
+        def policy_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+            policy_network = hk.Sequential(
+                [
+                    observation_network,
+                    hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
+                    networks_lib.CategoricalHead(num_values=num_actions),
+                ]
+            )
+            return policy_network(inputs)
+
+        def critic_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+            critic_network = hk.Sequential(
+                [
+                    observation_network,
+                    hk.nets.MLP(critic_layer_sizes, activation=jax.nn.relu),
+                    ValueHead(),
+                ]
+            )
+            return critic_network(inputs)
+
+        # Transform into pure functions.
+        policy_fn = hk.without_apply_rng(hk.transform(policy_fn))
+        critic_fn = hk.without_apply_rng(hk.transform(critic_fn))
+
+        dummy_obs = utils.zeros_like(environment_spec.observations.observation)
+        dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
+
+        network_key, key = jax.random.split(key)
+        policy_params = policy_fn.init(network_key, dummy_obs)  # type: ignore
+
+        network_key, key = jax.random.split(key)
+        critic_params = critic_fn.init(network_key, dummy_obs)  # type: ignore
+
+        # Create PPONetworks to add functionality required by the agent.
+        return make_ppo_networks(
+            policy_network=policy_fn,
+            policy_params=policy_params,
+            critic_network=critic_fn,
+            critic_params=critic_params,
         )
-        return policy_value_network(inputs)
-
-    # Transform into pure functions.
-    forward_fn = hk.without_apply_rng(hk.transform(forward_fn))
-
-    dummy_obs = utils.zeros_like(environment_spec.observations.observation)
-    dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
-
-    network_key, key = jax.random.split(key)
-    params = forward_fn.init(network_key, dummy_obs)  # type: ignore
-
-    # Create PPONetworks to add functionality required by the agent.
-    return make_ppo_network(network=forward_fn, params=params)
 
 
 def make_default_networks(
@@ -261,17 +452,24 @@ def make_default_networks(
     ),
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
     observation_network: Callable = utils.batch_concat,
+    single_network: bool = True,
 ) -> Dict[str, Any]:
-    """Call to create one of default Mava network types
+    """Create default PPO networks
 
     Args:
-        environment_spec: specifications of training environment
-        agent_net_keys: keys for each agent network
-        rng_key: pseudo-random value used to initialise distributions
+        environment_spec: mava multi-agent environment spec
+        agent_net_keys: dictionary specifiying which networks are
+                        used by which agent
+        rng_key: jax random key to be used for network initialization
         net_spec_keys: keys for each agent network
-        policy_layer_sizes: size of each layer of the policy network
-        critic_layer_sizes: size of each layer of the critic network
-        observation_network: Network used for feature extraction layers
+        policy_layer_sizes: policy network layers
+        critic_layer_sizes: critic network layers
+        observation_network: network for processing environment observations
+                             defaults to flattening observations but could be
+                             a CNN or similar observation processing network
+        single_network: details whether a single network with a policy and value
+                        head should be used if true or whether separate policy
+                        and critic networks should be used if false.
 
     Returns:
         networks: networks created to given spec
@@ -292,6 +490,7 @@ def make_default_networks(
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
             observation_network=observation_network,
+            single_network=single_network,
         )
 
     return {
