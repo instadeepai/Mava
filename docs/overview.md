@@ -2,7 +2,7 @@
 
 > 🚧 **Note:** This only applies to the callback redesign of Mava.
 
-Going from research papers to code and being able to quickly test experimental hypotheses are some of the main challenges faced by reinforcement learning researchers. Mava aims to remove this constraint and to be the to go-to framework for fast iteration and experimentation. Mava effectively utilizes computational resources by leveraging [Launchpad](https://github.com/deepmind/launchpad) for distributed computation.
+Going from research papers to code and being able to quickly test experimental hypotheses are some of the main challenges faced by reinforcement learning researchers. Mava aims to remove this constraint and to be the go-to framework for fast iteration and experimentation. Mava effectively utilizes computational resources by leveraging [Launchpad](https://github.com/deepmind/launchpad) for distributed computation.
 
 ### Design Paradigm
 

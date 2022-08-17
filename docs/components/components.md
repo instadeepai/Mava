@@ -5,7 +5,7 @@
 ## Callbacks
 A callback function is one that is passed as an input to another function, and its execution is postponed until the function to which it is passed is run.
 
-In the MAVA system, callbacks are invoked via core components (such as `on_execution_init`) or store variables (such as `trainer.store.step_fn`).
+In the MAVA system, callbacks are invoked via methods belong to the core components (such as `on_execution_init`) or store variables (such as `trainer.store.step_fn`).
 
 ## Hooks mixin
 Mixin class used to call system component hooks. In addition to the system abstract components, the core components inherit from the mixin classes too, as the mixin classes supply the call for component hooks.
