@@ -6,7 +6,7 @@ In MARL, it is usual to have several algorithms go by slightly different names a
 
 ## IPPO vs. MAPPO
 
-The two main learning schemes in MARL are **The independent learning** (independent policy) and **The centralized training decentralized execution** (centralized-critic or some mixing network). According to previous research, the PPO algorithm in the case of multi-agent can be implemented for both case scenarios.
+The two main learning schemes in MARL are **The independent learning** (decentralized critic) and **The centralized training decentralized execution** (centralized-critic or some mixing network). According to previous research, the PPO algorithm in the case of multi-agent can be implemented for both case scenarios.
 
 As a regime, we used **IPPO** for the independent learning implementation of PPO and **MAPPO** for the centralized training.
 
