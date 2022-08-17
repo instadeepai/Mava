@@ -263,7 +263,7 @@ def test_parameter_server_single_process_without_adder(test_system: System) -> N
     assert not hasattr(executor._executor.store.adder, "add")
 
 
-def test_parameter_server_multi_process_without_adder(test_system: System) -> None:
+def test_parameter_server_multi_process_with_adder(test_system: System) -> None:
     """Test if the executor instantiates processes as expected."""
     # Environment.
     environment_factory = functools.partial(
