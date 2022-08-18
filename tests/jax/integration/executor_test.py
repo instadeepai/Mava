@@ -95,7 +95,6 @@ def test_executor_single_process_with_adder(test_system: System) -> None:
         max_in_flight_samples_per_worker=4,
         num_workers_per_iterator=-1,
         rate_limiter_timeout_ms=-1,
-        checkpoint=True,
         nodes_on_gpu=[],
         lp_launch_type=lp.LaunchType.TEST_MULTI_THREADING,
         sequence_length=4,
@@ -215,7 +214,6 @@ def test_executor_single_process_without_adder(test_system: System) -> None:
         max_in_flight_samples_per_worker=4,
         num_workers_per_iterator=-1,
         rate_limiter_timeout_ms=-1,
-        checkpoint=True,
         nodes_on_gpu=[],
         lp_launch_type=lp.LaunchType.TEST_MULTI_THREADING,
         sequence_length=4,
@@ -317,16 +315,13 @@ def test_executor_multi_process_with_adder(test_system: System) -> None:
         max_queue_size=500,
         use_next_extras=False,
         sample_batch_size=5,
-        checkpoint=False,
         nodes_on_gpu=[],
         lp_launch_type=lp.LaunchType.TEST_MULTI_THREADING,
     )
     (executor_node,) = test_system._builder.store.program._program._groups["executor"]
     test_address_builder.bind_addresses([executor_node])
-
     test_system.launch()
-
-    time.sleep(30)
+    time.sleep(10)
     executor = executor_node._construct_instance()
 
     # Observe first and observe
@@ -350,6 +345,11 @@ def test_executor_multi_process_with_adder(test_system: System) -> None:
     assert len(executor._executor.store.adder._writer._column_history) != 0
 
     # Select actions and select action
+    i = 0
+    while list(executor._executor.store.actions_info.keys()) == None and i < 100:
+        time.sleep(2)
+        i += 1
+
     assert list(executor._executor.store.actions_info.keys()) == [
         "agent_0",
         "agent_1",
