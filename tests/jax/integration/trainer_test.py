@@ -24,9 +24,6 @@ import jax.numpy as jnp
 import launchpad as lp
 import optax
 import pytest
-from launchpad.launch.test_multi_threading import (
-    address_builder as test_address_builder,
-)
 
 from mava.systems.jax import System, mappo
 from mava.utils.environments import debugging_utils
@@ -109,7 +106,7 @@ def test_trainer_single_process(test_system: System) -> None:
         trainer,
     ) = test_system._builder.store.system_build
 
-    for i in range(0, 4):
+    for _ in range(5):
         executor.run_episode()
 
     # Before run step method
@@ -190,11 +187,10 @@ def test_trainer_multi_process(test_system: System) -> None:
     # Disable the run of the trainer node
     (trainer_node,) = test_system._builder.store.program._program._groups["trainer"]
     trainer_node.disable_run()
-    test_address_builder.bind_addresses([trainer_node])
 
     # launch the system
     test_system.launch()
-    time.sleep(10)  # wait the executor to run at least one time
+    time.sleep(10)  # wait till the executor has run
 
     trainer = trainer_node._construct_instance()
 
