@@ -96,7 +96,6 @@ def test_mappo(
         max_queue_size=500,
         use_next_extras=False,
         sample_batch_size=5,
-        checkpoint=True,
         nodes_on_gpu=[],
         lp_launch_type=lp.LaunchType.TEST_MULTI_THREADING,
     )
