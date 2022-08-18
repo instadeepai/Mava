@@ -97,7 +97,7 @@ def test_executor_single_process_with_adder(test_system: System) -> None:
         rate_limiter_timeout_ms=-1,
         checkpoint=True,
         nodes_on_gpu=[],
-        lp_launch_type=lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        lp_launch_type=lp.LaunchType.TEST_MULTI_THREADING,
         sequence_length=4,
         period=4,
     )
@@ -217,7 +217,7 @@ def test_executor_single_process_without_adder(test_system: System) -> None:
         rate_limiter_timeout_ms=-1,
         checkpoint=True,
         nodes_on_gpu=[],
-        lp_launch_type=lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        lp_launch_type=lp.LaunchType.TEST_MULTI_THREADING,
         sequence_length=4,
         period=4,
     )
@@ -317,7 +317,7 @@ def test_executor_multi_process_with_adder(test_system: System) -> None:
         max_queue_size=500,
         use_next_extras=False,
         sample_batch_size=5,
-        checkpoint=True,
+        checkpoint=False,
         nodes_on_gpu=[],
         lp_launch_type=lp.LaunchType.TEST_MULTI_THREADING,
     )
@@ -325,7 +325,8 @@ def test_executor_multi_process_with_adder(test_system: System) -> None:
     test_address_builder.bind_addresses([executor_node])
 
     test_system.launch()
-    time.sleep(20)
+
+    time.sleep(30)
     executor = executor_node._construct_instance()
 
     # Observe first and observe
