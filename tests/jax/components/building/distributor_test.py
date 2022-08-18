@@ -47,7 +47,7 @@ class MockBuilder(Builder):
         self.program_launched = False
 
     def data_server(self) -> List[Any]:
-        """Data server to test no multi_process in on_building_program_nodes method
+        """Data server to test on_building_program_nodes method
 
         Returns:
             tables: fake table composed of reverb_server tables
@@ -63,13 +63,13 @@ class MockBuilder(Builder):
         ]
 
     def parameter_server(self) -> str:
-        """parameter_server to test no multi_process in on_building_program_nodes"""
+        """parameter_server to test on_building_program_nodes"""
         return "Parameter Server Test"
 
     def executor(
         self, executor_id: str, data_server_client: Any, parameter_server_client: Any
     ) -> str:
-        """Executor to test no multi_process in on_building_program_nodes method"""
+        """Executor to test on_building_program_nodes method"""
         if executor_id == "evaluator":
             return "Evaluator Test"
 
@@ -79,7 +79,7 @@ class MockBuilder(Builder):
     def trainer(
         self, trainer_id: str, data_server_client: Any, parameter_server_client: Any
     ) -> str:
-        """Trainer to test no multi_process in on_building_program_nodes method"""
+        """Trainer to test on_building_program_nodes method"""
         return "Trainer Test"
 
     def launch(self) -> None:
