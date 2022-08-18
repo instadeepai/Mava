@@ -119,34 +119,27 @@ def test_on_building_program_nodes_multi_process(
         "evaluator",
         "trainer",
     ]
-
-    data_server_fn = mock_builder.store.program._program._groups["data_server"][
-        -1
-    ]._priority_tables_fn
-    assert str(repr(data_server_fn).split(" ")[2].split(".")[-1]) == "data_server"
     assert (
-        mock_builder.store.program._program._groups["parameter_server"][
+        mock_builder.store.program._program._groups["data_server"][
             -1
-        ]._constructor()
-        == "Parameter Server Test"
+        ]._priority_tables_fn
+        == mock_builder.data_server
     )
     assert (
-        mock_builder.store.program._program._groups["executor"][-1]._constructor(
-            "executor", "fake_data_server", "fake_parameter_server"
-        )
-        == "Executor Test"
+        mock_builder.store.program._program._groups["parameter_server"][-1]._constructor
+        == mock_builder.parameter_server
     )
     assert (
-        mock_builder.store.program._program._groups["evaluator"][-1]._constructor(
-            "evaluator", "fake_data_server", "fake_parameter_server"
-        )
-        == "Evaluator Test"
+        mock_builder.store.program._program._groups["executor"][-1]._constructor
+        == mock_builder.executor
     )
     assert (
-        mock_builder.store.program._program._groups["trainer"][-1]._constructor(
-            "trainer", "fake_data_server", "fake_parameter_server"
-        )
-        == "Trainer Test"
+        mock_builder.store.program._program._groups["evaluator"][-1]._constructor
+        == mock_builder.executor
+    )
+    assert (
+        mock_builder.store.program._program._groups["trainer"][-1]._constructor
+        == mock_builder.trainer
     )
 
     with pytest.raises(Exception):
@@ -169,28 +162,23 @@ def test_on_building_program_nodes_multi_process_no_evaluator(
         "executor",
         "trainer",
     ]
-    data_server_fn = mock_builder.store.program._program._groups["data_server"][
-        -1
-    ]._priority_tables_fn
-    assert str(repr(data_server_fn).split(" ")[2].split(".")[-1]) == "data_server"
-
     assert (
-        mock_builder.store.program._program._groups["parameter_server"][
+        mock_builder.store.program._program._groups["data_server"][
             -1
-        ]._constructor()
-        == "Parameter Server Test"
+        ]._priority_tables_fn
+        == mock_builder.data_server
     )
     assert (
-        mock_builder.store.program._program._groups["executor"][-1]._constructor(
-            "executor", "fake_data_server", "fake_parameter_server"
-        )
-        == "Executor Test"
+        mock_builder.store.program._program._groups["parameter_server"][-1]._constructor
+        == mock_builder.parameter_server
     )
     assert (
-        mock_builder.store.program._program._groups["trainer"][-1]._constructor(
-            "trainer", "fake_data_server", "fake_parameter_server"
-        )
-        == "Trainer Test"
+        mock_builder.store.program._program._groups["executor"][-1]._constructor
+        == mock_builder.executor
+    )
+    assert (
+        mock_builder.store.program._program._groups["trainer"][-1]._constructor
+        == mock_builder.trainer
     )
 
     with pytest.raises(Exception):
