@@ -126,7 +126,7 @@ def test_trainer_single_process(test_system: System) -> None:
             assert not jnp.all(categorical_value_head["w"] == 0)
 
 
-def test_trainer_multi_process(test_system: System) -> None:
+def test_trainer_multi_thread(test_system: System) -> None:
     """Test if the trainer instantiates processes as expected."""
     # Environment.
     environment_factory = functools.partial(
