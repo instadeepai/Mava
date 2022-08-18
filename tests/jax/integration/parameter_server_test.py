@@ -92,9 +92,8 @@ def test_parameter_server_single_process(test_system: System) -> None:
         max_in_flight_samples_per_worker=4,
         num_workers_per_iterator=-1,
         rate_limiter_timeout_ms=-1,
-        checkpoint=True,
         nodes_on_gpu=[],
-        lp_launch_type=lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        lp_launch_type=lp.LaunchType.TEST_MULTI_THREADING,
         sequence_length=4,
         period=4,
     )
@@ -197,7 +196,7 @@ def test_parameter_server_single_process(test_system: System) -> None:
     assert parameter_server.store.system_checkpointer._last_saved < time.time()
 
 
-def test_parameter_server_multi_process(test_system: System) -> None:
+def test_parameter_server_multi_thread(test_system: System) -> None:
     """Test if the paraameter server instantiates processes as expected."""
     # Environment.
     environment_factory = functools.partial(
@@ -251,7 +250,6 @@ def test_parameter_server_multi_process(test_system: System) -> None:
         max_queue_size=500,
         use_next_extras=False,
         sample_batch_size=5,
-        checkpoint=True,
         nodes_on_gpu=[],
         lp_launch_type=lp.LaunchType.TEST_MULTI_THREADING,
     )
