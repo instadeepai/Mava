@@ -1,3 +1,20 @@
+# python3
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Tests for data server for Jax-based Mava systems"""
+
 import functools
 from datetime import datetime
 from typing import Any
@@ -87,9 +104,8 @@ def test_data_server(test_system: System) -> None:
         max_in_flight_samples_per_worker=4,
         num_workers_per_iterator=-1,
         rate_limiter_timeout_ms=-1,
-        checkpoint=True,
         nodes_on_gpu=[],
-        lp_launch_type=lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        lp_launch_type=lp.LaunchType.TEST_MULTI_THREADING,
         sequence_length=4,
         period=4,
     )
