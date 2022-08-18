@@ -346,7 +346,11 @@ def test_executor_multi_process_with_adder(test_system: System) -> None:
 
     # Select actions and select action
     i = 0
-    while list(executor._executor.store.actions_info.keys()) == None and i < 100:
+    while (
+        sorted(list(executor._executor.store.actions_info.keys()))
+        != ["agent_0", "agent_1", "agent_2"]
+        and i < 1000
+    ):
         time.sleep(2)
         i += 1
 
