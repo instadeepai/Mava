@@ -47,7 +47,7 @@ class MockBuilder(Builder):
         self.program_launched = False
 
     def data_server(self) -> List[Any]:
-        """Data server to test no multi_process in on_building_program_nodes method
+        """Data server to test on_building_program_nodes method
 
         Returns:
             tables: fake table composed of reverb_server tables
@@ -63,13 +63,13 @@ class MockBuilder(Builder):
         ]
 
     def parameter_server(self) -> str:
-        """parameter_server to test no multi_process in on_building_program_nodes"""
+        """parameter_server to test on_building_program_nodes"""
         return "Parameter Server Test"
 
     def executor(
         self, executor_id: str, data_server_client: Any, parameter_server_client: Any
     ) -> str:
-        """Executor to test no multi_process in on_building_program_nodes method"""
+        """Executor to test on_building_program_nodes method"""
         if executor_id == "evaluator":
             return "Evaluator Test"
 
@@ -79,7 +79,7 @@ class MockBuilder(Builder):
     def trainer(
         self, trainer_id: str, data_server_client: Any, parameter_server_client: Any
     ) -> str:
-        """Trainer to test no multi_process in on_building_program_nodes method"""
+        """Trainer to test on_building_program_nodes method"""
         return "Trainer Test"
 
     def launch(self) -> None:
@@ -119,27 +119,34 @@ def test_on_building_program_nodes_multi_process(
         "evaluator",
         "trainer",
     ]
+
+    data_server_fn = mock_builder.store.program._program._groups["data_server"][
+        -1
+    ]._priority_tables_fn
+    assert str(repr(data_server_fn).split(" ")[2].split(".")[-1]) == "data_server"
     assert (
-        mock_builder.store.program._program._groups["data_server"][
+        mock_builder.store.program._program._groups["parameter_server"][
             -1
-        ]._priority_tables_fn
-        == mock_builder.data_server
+        ]._constructor()
+        == "Parameter Server Test"
     )
     assert (
-        mock_builder.store.program._program._groups["parameter_server"][-1]._constructor
-        == mock_builder.parameter_server
+        mock_builder.store.program._program._groups["executor"][-1]._constructor(
+            "executor", "fake_data_server", "fake_parameter_server"
+        )
+        == "Executor Test"
     )
     assert (
-        mock_builder.store.program._program._groups["executor"][-1]._constructor
-        == mock_builder.executor
+        mock_builder.store.program._program._groups["evaluator"][-1]._constructor(
+            "evaluator", "fake_data_server", "fake_parameter_server"
+        )
+        == "Evaluator Test"
     )
     assert (
-        mock_builder.store.program._program._groups["evaluator"][-1]._constructor
-        == mock_builder.executor
-    )
-    assert (
-        mock_builder.store.program._program._groups["trainer"][-1]._constructor
-        == mock_builder.trainer
+        mock_builder.store.program._program._groups["trainer"][-1]._constructor(
+            "trainer", "fake_data_server", "fake_parameter_server"
+        )
+        == "Trainer Test"
     )
 
     with pytest.raises(Exception):
@@ -162,23 +169,28 @@ def test_on_building_program_nodes_multi_process_no_evaluator(
         "executor",
         "trainer",
     ]
+    data_server_fn = mock_builder.store.program._program._groups["data_server"][
+        -1
+    ]._priority_tables_fn
+    assert str(repr(data_server_fn).split(" ")[2].split(".")[-1]) == "data_server"
+
     assert (
-        mock_builder.store.program._program._groups["data_server"][
+        mock_builder.store.program._program._groups["parameter_server"][
             -1
-        ]._priority_tables_fn
-        == mock_builder.data_server
+        ]._constructor()
+        == "Parameter Server Test"
     )
     assert (
-        mock_builder.store.program._program._groups["parameter_server"][-1]._constructor
-        == mock_builder.parameter_server
+        mock_builder.store.program._program._groups["executor"][-1]._constructor(
+            "executor", "fake_data_server", "fake_parameter_server"
+        )
+        == "Executor Test"
     )
     assert (
-        mock_builder.store.program._program._groups["executor"][-1]._constructor
-        == mock_builder.executor
-    )
-    assert (
-        mock_builder.store.program._program._groups["trainer"][-1]._constructor
-        == mock_builder.trainer
+        mock_builder.store.program._program._groups["trainer"][-1]._constructor(
+            "trainer", "fake_data_server", "fake_parameter_server"
+        )
+        == "Trainer Test"
     )
 
     with pytest.raises(Exception):
