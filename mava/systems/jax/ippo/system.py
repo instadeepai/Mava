@@ -13,18 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Jax MAPPO system."""
+"""Jax IPPO system."""
 from typing import Any, Tuple
 
 from mava.components.jax import building, executing, training, updating
 from mava.components.jax.building.guardrails import ComponentDependencyGuardrails
 from mava.specs import DesignSpec
 from mava.systems.jax import System
-from mava.systems.jax.mappo.components import ExtrasLogProbSpec
-from mava.systems.jax.mappo.config import MAPPODefaultConfig
+from mava.systems.jax.ippo.components import ExtrasLogProbSpec
+from mava.systems.jax.ippo.config import IPPODefaultConfig
 
 
-class MAPPOSystemSeparateNetworks(System):
+class IPPOSystemSeparateNetworks(System):
     def design(self) -> Tuple[DesignSpec, Any]:
         """System design for PPO with separate policy and critic networks.
 
@@ -32,7 +32,7 @@ class MAPPOSystemSeparateNetworks(System):
             system callback components, default system parameters
         """
         # Set the default configs
-        default_params = MAPPODefaultConfig()
+        default_params = IPPODefaultConfig()
 
         # Default system processes
         # System initialization
@@ -91,7 +91,7 @@ class MAPPOSystemSeparateNetworks(System):
         return system, default_params
 
 
-class MAPPOSystem(System):
+class IPPOSystem(System):
     def design(self) -> Tuple[DesignSpec, Any]:
         """System design for IPPO with single optimiser.
 
@@ -103,7 +103,7 @@ class MAPPOSystem(System):
             default_params: default IPPO configuration
         """
         # Set the default configs
-        default_params = MAPPODefaultConfig()
+        default_params = IPPODefaultConfig()
 
         # Default system processes
         # System initialization
