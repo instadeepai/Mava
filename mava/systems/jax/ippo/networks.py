@@ -244,6 +244,9 @@ def make_networks(
         )
 
 
+# TODO: The only change here isfor setting the dummy_obs
+# for the critic. We create a joint observation using the
+# agent ids to initiaise the critic network
 def make_discrete_networks(
     agent_keys: List[str],
     environment_spec: specs.EnvironmentSpec,

@@ -362,6 +362,10 @@ class MAPPOLossNetworksConfig:
     use_adaptive_entropy: bool = False
 
 
+# TODO:Policy gradient function is the same as standard IPPO,
+# We could probably just make MAPPOLoss inherit from
+# the MAPGWithTrustRegionClippingLossSeparateNetworks
+# and override the critic loss with the MAPPO one.
 class MAPPOLossSeparateNetworks(Loss):
     def __init__(
         self,

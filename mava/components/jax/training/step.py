@@ -648,6 +648,9 @@ class MAPPOStepSeparateNetworks(Step):
             behavior_value = get_behavior_values(
                 agent_nets[index], rewards[index], joint_obs
             )
+
+            # TODO:
+            # Create duplicate values to generate multiple GAE
             for key in agent_nets.keys():
                 behavior_values[key] = behavior_value
 
