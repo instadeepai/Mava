@@ -24,7 +24,7 @@ from launchpad.launch.test_multi_threading import (
     address_builder as test_address_builder,
 )
 
-from mava.systems.jax import mappo
+from mava.systems.jax import ippo
 from mava.systems.jax.system import System
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -36,13 +36,13 @@ from mava.utils.loggers import logger_utils
 @pytest.fixture
 def test_full_system() -> System:
     """Full mava system fixture for testing"""
-    return mappo.MAPPOSystem()
+    return ippo.IPPOSystem()
 
 
-def test_mappo(
+def test_ippo(
     test_full_system: System,
 ) -> None:
-    """Full integration test of mappo system."""
+    """Full integration test of ippo system."""
 
     # Environment.
     environment_factory = functools.partial(
@@ -53,7 +53,7 @@ def test_mappo(
 
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
-        return mappo.make_default_networks(  # type: ignore
+        return ippo.make_default_networks(  # type: ignore
             policy_layer_sizes=(32, 32),
             critic_layer_sizes=(64, 64),
             *args,
