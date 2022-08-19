@@ -15,7 +15,10 @@
 
 """Updating components for Mava systems."""
 
-from mava.components.jax.updating.parameter_server import DefaultParameterServer
+from mava.components.jax.updating.parameter_server import (
+    DefaultParameterServer,
+    ParameterServerSeparateNetworks,
+)
 from mava.components.jax.updating.terminators import (
     CountConditionTerminator,
     TimeTerminator,

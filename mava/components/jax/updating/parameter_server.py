@@ -17,11 +17,13 @@
 import abc
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Type, Union
 
 import numpy as np
 from acme.jax import savers
 
+from mava.callbacks import Callback
+from mava.components.jax.building.networks import Networks
 from mava.components.jax.component import Component
 from mava.core_jax import SystemParameterServer
 
@@ -87,6 +89,17 @@ class ParameterServer(Component):
             config class/dataclass for Component.
         """
         return ParameterServerConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        Networks required to set up server.store.network_factory.
+
+        Returns:
+            List of required component classes.
+        """
+        return [Networks]
 
 
 class DefaultParameterServer(ParameterServer):
@@ -160,6 +173,7 @@ class DefaultParameterServer(ParameterServer):
         Returns:
             None.
         """
+        # server.store._param_names set by Parameter Server
         names: Union[str, Sequence[str]] = server.store._param_names
 
         if type(names) == str:
@@ -180,6 +194,7 @@ class DefaultParameterServer(ParameterServer):
         Returns:
             None.
         """
+        # server.store._set_params set by Parameter Server
         params: Dict[str, Any] = server.store._set_params
         names = params.keys()
 
@@ -205,6 +220,7 @@ class DefaultParameterServer(ParameterServer):
         Returns:
             None.
         """
+        # server.store._add_to_params set by Parameter Server
         params: Dict[str, Any] = server.store._add_to_params
         names = params.keys()
 
@@ -232,3 +248,70 @@ class DefaultParameterServer(ParameterServer):
             server.store.system_checkpointer.save()
             server.store.last_checkpoint_time = time.time()
             print("Updated variables checkpoint.")
+
+
+class ParameterServerSeparateNetworks(DefaultParameterServer):
+    def __init__(
+        self,
+        config: ParameterServerConfig = ParameterServerConfig(),
+    ) -> None:
+        """Mava parameter server.
+
+        For a system with separate networks for the policy
+        and critic.
+
+        Registers count parameters and network params for tracking.
+        Creates the checkpointer.
+        Handles the getting, setting, and adding of parameters.
+        Handles periodic checkpointing of parameters.
+
+        Args:
+            config: ParameterServerConfig.
+        """
+        self.config = config
+
+    def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
+        """Register parameters and network params to track. Create checkpointer.
+
+        Args:
+            server: SystemParameterServer.
+        """
+        networks = server.store.network_factory()
+
+        # Create parameters
+        server.store.parameters = {
+            "trainer_steps": np.zeros(1, dtype=np.int32),
+            "trainer_walltime": np.zeros(1, dtype=np.float32),
+            "evaluator_steps": np.zeros(1, dtype=np.int32),
+            "evaluator_episodes": np.zeros(1, dtype=np.int32),
+            "executor_episodes": np.zeros(1, dtype=np.int32),
+            "executor_steps": np.zeros(1, dtype=np.int32),
+        }
+
+        # Network parameters
+        for net_type_key in networks.keys():
+            for agent_net_key in networks[net_type_key].keys():
+                # Ensure obs and target networks are sonnet modules
+                server.store.parameters[
+                    f"policy_{net_type_key}-{agent_net_key}"
+                ] = networks[net_type_key][agent_net_key].policy_params
+
+                # Ensure obs and target networks are sonnet modules
+                server.store.parameters[
+                    f"critic_{net_type_key}-{agent_net_key}"
+                ] = networks[net_type_key][agent_net_key].critic_params
+
+        # Create the checkpointer
+        if self.config.checkpoint:
+            server.store.last_checkpoint_time = 0
+
+            # Only save variables that are not empty.
+            save_variables = {}
+            for key in server.store.parameters.keys():
+                var = server.store.parameters[key]
+                # Don't store empty tuple (e.g. empty observation_network) variables
+                if not (type(var) == tuple and len(var) == 0):
+                    save_variables[key] = var
+            server.store.system_checkpointer = savers.Checkpointer(
+                save_variables, self.config.experiment_path, time_delta_minutes=0
+            )
