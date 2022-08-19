@@ -4,31 +4,6 @@
 
 In order to create a new system in Mava, a system class must be defined that inherits from the base [`System`](https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/systems/jax/system.py#L28) class. The `design` method must then be overwritten return a [`DesignSpec`](https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/specs.py#L161) object containing all the components to be used by a particular system. A default system config may also be created as a `dataclass` which contains the default system hyperparameters to be used.
 
-These are the defined arguments for `system.build()`, but we emphasize that the build is adaptable enough to add or remove some of them:
-
-- `environment_factory` - used to construct the environment.
-
-- `network_factory` - used to construct the agent networks.
-
-- `logger_factory` - used to construct the loggers.
-
-- `experiment_path` - the destination to save the experiment results.
-
-- `optimizer` - the optimiser used by the trainer to updated the agent weights.
-
-- `run_evaulator` - a flag indicating weather a seperate environment process should be run that tracks the system's performance using Tensorboard and possibly gameplay recordings.
-
-- `sample_batch_size` - the batch size to use in the trainer when updating the agent networks.
-
-- `num_epochs` - the number of epochs to train on sampled data before discarding it.
-
-- `num_executors` - the number of experience generators (workers) to run in parallel.
-
-- `multi_process` - determines wheather the code is run using multiple processes or using a single process. We are using the multiple processor setup for faster training.
-
-- `record_every` - determines how often the evaluator should record a gameplay video.
-
-
 Please consider the following example where a IPPO system is created:
 
 ```python
@@ -101,3 +76,27 @@ class IPPOSystem(System):
 ```
 
 In the above example certain processes are grouped together, which has been done for readability but it is not strictly required. For an example of how a full system may be launched on a particular environment and with logging included, please see [here](https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo.py).
+
+When building the system, `system.build` can contain arguments that will overwrite the default config values from any existing component in the system. Commonly overwritten build arguments are:
+
+- `environment_factory` - used to construct the environment (defined in EnvironmentSpec Component [here](https://github.com/instadeepai/Mava/blob/develop/mava/components/jax/building/environments.py#L39).
+
+- `network_factory` - used to construct the agent networks.(defined in EnvironmentSpec Component [here](https://github.com/instadeepai/Mava/blob/develop/mava/components/jax/building/networks.py#L34).
+
+- `logger_factory` - used to construct the loggers.
+
+- `experiment_path` - the destination to save the experiment results.
+
+- `optimizer` - the optimiser used by the trainer to updated the agent weights.
+
+- `run_evaulator` - a flag indicating weather a seperate environment process should be run that tracks the system's performance using Tensorboard and possibly gameplay recordings.
+
+- `sample_batch_size` - the batch size to use in the trainer when updating the agent networks.
+
+- `num_epochs` - the number of epochs to train on sampled data before discarding it.
+
+- `num_executors` - the number of experience generators (workers) to run in parallel.
+
+- `multi_process` - determines wheather the code is run using multiple processes or using a single process. We are using the multiple processor setup for faster training.
+
+- `record_every` - determines how often the evaluator should record a gameplay video.

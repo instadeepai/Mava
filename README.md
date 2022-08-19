@@ -83,7 +83,7 @@ As we develop Mava further, we aim to have all systems well tested on a wide var
 
 ## Usage
 
-To get a sense of how Mava systems are used we provide the following simplified example of launching a Tensorflow based distributed MADQN system.
+To get a sense of how Mava systems are used we provide the following simplified example of launching a Tensorflow-based distributed MADQN system.
 
 ```python
 # Mava imports
@@ -138,6 +138,8 @@ system.build(
 # Launch the system
 system.launch()
 ```
+
+The arguments we provide to our `system.build` overwrite the default config values from the existing components in the system
 
 For a deeper dive, take a look at the detailed working code
 examples found in our [examples] subdirectory which show how to instantiate a few MARL systems and environments.
