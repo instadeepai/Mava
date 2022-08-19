@@ -96,7 +96,7 @@ def test_data_server(test_system: System) -> None:
     assert table_trainer.num_episodes == 5  # 5 episodes
     assert table_trainer.num_unique_samples != 0
 
-    # dataset added by the exevutor via the adders
+    # dataset added by the executor via the adders
     dataset = get_dataset(data_server)
     for sample in dataset.take(1):
         assert sorted(list(sample.data.observations.keys())) == [
