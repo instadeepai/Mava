@@ -13,6 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Jax MAPPO system."""
-from mava.systems.jax.mappo.networks import make_default_networks
-from mava.systems.jax.mappo.system import MAPPOSystem
+"""Default hyperparameters for IPPO system."""
+from dataclasses import dataclass
+
+
+@dataclass
+class IPPODefaultConfig:
+    sample_batch_size: int = 512
+    sequence_length: int = 20
+    period: int = 10
+    use_next_extras: bool = False
