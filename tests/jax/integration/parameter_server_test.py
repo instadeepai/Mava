@@ -25,93 +25,40 @@ import optax
 import pytest
 from acme.jax import savers
 
+from mava.systems.jax import System
+from tests.jax.integration.mock_systems import (
+    mock_system_multi_process,
+    mock_system_multi_thread,
+    mock_system_single_process,
+)
 
-
-from mava.components.jax import building
-from mava.components.jax.building.adders import ParallelTransitionAdderSignature
-from mava.components.jax.updating.parameter_server import DefaultParameterServer
-from mava.specs import DesignSpec
-from mava.systems.jax import ParameterServer, ippo
-from mava.systems.jax.system import System
-from mava.utils.environments import debugging_utils
-from mava.utils.loggers import logger_utils
+@pytest.fixture
+def test_system_sp() -> System:
+    """A single process built system"""
+    return mock_system_single_process()
 
 
 @pytest.fixture
-def test_system() -> System:
-    """Mappo system"""
-    return mappo.MAPPOSystem()
+def test_system_mp() -> System:
+    """A multi process built system"""
+    return mock_system_multi_process()
 
 
-def test_parameter_server_single_process(test_system: System) -> None:
+@pytest.fixture
+def test_system_mt() -> System:
+    """A multi thread built system"""
+    return mock_system_multi_thread()
+
+
+def test_parameter_server_single_process(test_system_sp: System) -> None:
     """Test if the paraameter server instantiates processes as expected."""
-
-    # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name="simple_spread",
-        action_space="discrete",
-    )
-
-    # Networks.
-    def network_factory(*args: Any, **kwargs: Any) -> Any:
-        return mappo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(32, 32),
-            critic_layer_sizes=(64, 64),
-            *args,
-            **kwargs,
-        )
-
-    # Checkpointer appends "Checkpoints" to checkpoint_dir.
-    base_dir = "~/mava"
-    mava_id = str(datetime.now())
-    checkpoint_subpath = f"{base_dir}/{mava_id}"
-    # Log every [log_every] seconds.
-    log_every = 1
-    logger_factory = functools.partial(
-        logger_utils.make_logger,
-        directory=base_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=mava_id,
-        time_delta=log_every,
-    )
-    # Optimizer.
-    optimizer = optax.chain(
-        optax.clip_by_global_norm(40.0),
-        optax.adam(1e-4),
-    )
-
-    # Build the test_system
-    test_system.build(
-        environment_factory=environment_factory,
-        network_factory=network_factory,
-        logger_factory=logger_factory,
-        experiment_path=checkpoint_subpath,
-        optimizer=optimizer,
-        executor_parameter_update_period=10,
-        multi_process=False,
-        run_evaluator=True,
-        num_executors=1,
-        use_next_extras=False,
-        max_queue_size=5000,
-        sample_batch_size=2,
-        max_in_flight_samples_per_worker=4,
-        num_workers_per_iterator=-1,
-        rate_limiter_timeout_ms=-1,
-        nodes_on_gpu=[],
-        lp_launch_type=lp.LaunchType.TEST_MULTI_THREADING,
-        sequence_length=4,
-        period=4,
-    )
-
     (
         data_server,
         parameter_server,
         executor,
         evaluator,
         trainer,
-    ) = test_system._builder.store.system_build
+    ) = test_system_sp._builder.store.system_build
 
     # System parameter server
     assert type(parameter_server.store.system_checkpointer) == savers.Checkpointer
@@ -203,70 +150,14 @@ def test_parameter_server_single_process(test_system: System) -> None:
     assert parameter_server.store.system_checkpointer._last_saved < time.time()
 
 
-def test_parameter_server_multi_thread(test_system: System) -> None:
+def test_parameter_server_multi_thread(test_system_mt: System) -> None:
     """Test if the paraameter server instantiates processes as expected."""
-    # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name="simple_spread",
-        action_space="discrete",
-    )
-
-    # Networks.
-    def network_factory(*args: Any, **kwargs: Any) -> Any:
-        return mappo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(32, 32),
-            critic_layer_sizes=(64, 64),
-            *args,
-            **kwargs,
-        )
-
-    # Checkpointer appends "Checkpoints" to checkpoint_dir.
-    base_dir = "~/mava"
-    mava_id = str(datetime.now())
-    checkpoint_subpath = f"{base_dir}/{mava_id}"
-
-    # Log every [log_every] seconds.
-    log_every = 10
-    logger_factory = functools.partial(
-        logger_utils.make_logger,
-        directory=base_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=mava_id,
-        time_delta=log_every,
-    )
-
-    # Optimizer.
-    optimizer = optax.chain(
-        optax.clip_by_global_norm(40.0),
-        optax.adam(1e-4),
-    )
-
-    # Build the system
-    test_system.build(
-        environment_factory=environment_factory,
-        network_factory=network_factory,
-        logger_factory=logger_factory,
-        experiment_path=checkpoint_subpath,
-        optimizer=optimizer,
-        executor_parameter_update_period=1,
-        multi_process=True,
-        run_evaluator=True,
-        num_executors=1,
-        max_queue_size=500,
-        use_next_extras=False,
-        sample_batch_size=5,
-        nodes_on_gpu=[],
-        lp_launch_type=lp.LaunchType.TEST_MULTI_THREADING,
-    )
-
-    (parameter_server_node,) = test_system._builder.store.program._program._groups[
+    (parameter_server_node,) = test_system_mt._builder.store.program._program._groups[
         "parameter_server"
     ]
     parameter_server_node.disable_run()
 
-    test_system.launch()
+    test_system_mt.launch()
     parameter_server = parameter_server_node._construct_instance()
 
     # System parameter server
@@ -359,69 +250,16 @@ def test_parameter_server_multi_thread(test_system: System) -> None:
     assert parameter_server.store.system_checkpointer._last_saved < time.time()
 
 
-def test_parameter_server_multi_process(test_system: System) -> None:
+def test_parameter_server_multi_process(test_system_mp: System) -> None:
     """Test if the paraameter server instantiates processes as expected."""
-    # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name="simple_spread",
-        action_space="discrete",
-    )
 
-    # Networks.
-    def network_factory(*args: Any, **kwargs: Any) -> Any:
-        return mappo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(254, 254, 254),
-            critic_layer_sizes=(512, 512, 256),
-            *args,
-            **kwargs,
-        )
-
-    # Checkpointer appends "Checkpoints" to checkpoint_dir.
-    base_dir = "~/mava"
-    mava_id = str(datetime.now())
-    checkpoint_subpath = f"{base_dir}/{mava_id}"
-
-    # Log every [log_every] seconds.
-    log_every = 10
-    logger_factory = functools.partial(
-        logger_utils.make_logger,
-        directory=base_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=mava_id,
-        time_delta=log_every,
-    )
-
-    # Optimizer.
-    optimizer = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
-    )
-
-    # Create the system.
-    test_system = mappo.MAPPOSystem()
-
-    # Build the system.
-    test_system.build(
-        environment_factory=environment_factory,
-        network_factory=network_factory,
-        logger_factory=logger_factory,
-        experiment_path=checkpoint_subpath,
-        optimizer=optimizer,
-        run_evaluator=True,
-        sample_batch_size=5,
-        num_epochs=15,
-        num_executors=1,
-        multi_process=True,
-    )
-
-    (parameter_server_node,) = test_system._builder.store.program._program._groups[
+    (parameter_server_node,) = test_system_mp._builder.store.program._program._groups[
         "parameter_server"
     ]
-
     parameter_server_node.disable_run()
 
-    test_system.launch()
+    test_system_mp.launch()
+
     parameter_server = parameter_server_node._construct_instance()
 
     # System parameter server
