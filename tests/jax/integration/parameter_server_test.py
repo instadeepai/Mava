@@ -8,7 +8,7 @@ from mava.components.jax import building
 from mava.components.jax.building.adders import ParallelTransitionAdderSignature
 from mava.components.jax.updating.parameter_server import DefaultParameterServer
 from mava.specs import DesignSpec
-from mava.systems.jax import ParameterServer, mappo
+from mava.systems.jax import ParameterServer, ippo
 from mava.systems.jax.system import System
 from mava.utils.environments import debugging_utils
 from tests.jax import mocks
@@ -59,7 +59,7 @@ def test_parameter_server_process_instantiate(
     )
 
     # Networks.
-    network_factory = mappo.make_default_networks
+    network_factory = ippo.make_default_networks
 
     test_system.build(
         environment_factory=environment_factory,

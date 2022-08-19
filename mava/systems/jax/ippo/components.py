@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Custom components for MAPPO system."""
+"""Custom components for IPPO system."""
 import abc
 from dataclasses import dataclass
 from typing import Any
