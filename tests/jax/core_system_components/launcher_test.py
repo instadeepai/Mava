@@ -15,60 +15,12 @@
 
 """Tests for launcher class for Jax-based Mava systems"""
 
-from typing import Any, Callable, List
-
 import launchpad as lp
 import pytest
-from reverb import Client, item_selectors, pybind, rate_limiters
-from reverb import server as reverb_server
+from reverb import Client, pybind
 
 from mava.systems.jax.launcher import Launcher, NodeType
 from tests.jax.components.building.distributor_test import MockBuilder
-
-
-@pytest.fixture
-def mock_data_server_fn() -> Callable:
-    """call data_server function"""
-
-    def data_server() -> List[Any]:
-        """data_server
-
-        Returns:
-                tables: fake table composed of reverb_server tables
-        """
-        return [
-            reverb_server.Table(
-                name="table_0",
-                sampler=item_selectors.Prioritized(priority_exponent=1),
-                remover=item_selectors.Fifo(),
-                max_size=1000,
-                rate_limiter=rate_limiters.MinSize(1),
-            )
-        ]
-
-    return data_server
-
-
-@pytest.fixture
-def mock_parameter_server_fn() -> Callable:
-    """call parameter_server function"""
-
-    def parameter_server() -> str:
-        """Fake parameter server function"""
-        return "test_parameter_server"
-
-    return parameter_server
-
-
-@pytest.fixture
-def mock_parameter_server_second_fn() -> Callable:
-    """call the second parameter_server function"""
-
-    def parameter_server_second() -> str:
-        """Another fake parameter server function"""
-        return "test_parameter_server_second_mock"
-
-    return parameter_server_second
 
 
 @pytest.fixture
@@ -120,7 +72,7 @@ def test_initiator_non_multi_process() -> None:
     assert not hasattr(launcher, "_program")
 
 
-def test_add_multi_process(mock_data_server_fn: Callable) -> None:
+def test_add_multi_process(mock_builder: MockBuilder) -> None:
     """Test add method in the Launcher for the case of multi process
 
     Args:
@@ -128,16 +80,19 @@ def test_add_multi_process(mock_data_server_fn: Callable) -> None:
     """
     launcher = Launcher(multi_process=True)
     data_server = launcher.add(
-        mock_data_server_fn,
+        mock_builder.data_server,
         node_type=NodeType.reverb,
         name="data_server_test",
     )
 
     assert list(launcher._program._groups.keys()) == ["data_server_test"]
-    assert (
-        launcher._program._groups["data_server_test"][-1]._priority_tables_fn
-        == mock_data_server_fn
-    )
+
+    # Make sure the node have data_server method
+    data_server_fn = launcher._program._groups["data_server_test"][
+        -1
+    ]._priority_tables_fn
+    assert str(repr(data_server_fn).split(" ")[2].split(".")[-1]) == "data_server"
+
     assert [data_server] == launcher._program._groups["data_server_test"][
         -1
     ]._created_handles
@@ -146,9 +101,7 @@ def test_add_multi_process(mock_data_server_fn: Callable) -> None:
     assert not hasattr(launcher, "_node_dict")
 
 
-def test_add_multi_process_two_add_calls(
-    mock_data_server_fn: Callable, mock_parameter_server_fn: Callable
-) -> None:
+def test_add_multi_process_two_add_calls(mock_builder: MockBuilder) -> None:
     """Test calling add more than one time method in the Launcher for the case of multi process
 
     Args:
@@ -157,12 +110,12 @@ def test_add_multi_process_two_add_calls(
     """
     launcher = Launcher(multi_process=True)
     data_server = launcher.add(
-        mock_data_server_fn,
+        mock_builder.data_server,
         node_type=NodeType.reverb,
         name="data_server_test",
     )
     parameter_server = launcher.add(
-        mock_parameter_server_fn,
+        mock_builder.parameter_server,
         node_type=NodeType.courier,
         name="parameter_server_test",
     )
@@ -172,17 +125,19 @@ def test_add_multi_process_two_add_calls(
         "parameter_server_test",
     ]
 
-    assert (
-        launcher._program._groups["data_server_test"][-1]._priority_tables_fn
-        == mock_data_server_fn
-    )
+    # Make sure the node have data_server method
+    data_server_fn = launcher._program._groups["data_server_test"][
+        -1
+    ]._priority_tables_fn
+    assert str(repr(data_server_fn).split(" ")[2].split(".")[-1]) == "data_server"
+
     assert [data_server] == launcher._program._groups["data_server_test"][
         -1
     ]._created_handles
 
     assert (
-        launcher._program._groups["parameter_server_test"][-1]._constructor
-        == mock_parameter_server_fn
+        launcher._program._groups["parameter_server_test"][-1]._constructor()
+        == "Parameter Server Test"
     )
     assert [parameter_server] == launcher._program._groups["parameter_server_test"][
         -1
@@ -192,9 +147,7 @@ def test_add_multi_process_two_add_calls(
     assert not hasattr(launcher, "_node_dict")
 
 
-def test_add_multi_process_two_add_same_name(
-    mock_parameter_server_fn: Callable, mock_parameter_server_second_fn: Callable
-) -> None:
+def test_add_multi_process_two_add_same_name(mock_builder: MockBuilder) -> None:
     """Test calling twice add for two nodes with same name for the case of multi process
 
     Args:
@@ -204,24 +157,24 @@ def test_add_multi_process_two_add_same_name(
     launcher = Launcher(multi_process=True)
 
     parameter_server_1 = launcher.add(
-        mock_parameter_server_fn,
+        mock_builder.parameter_server,
         node_type=NodeType.courier,
         name="parameter_server_test",
     )
     parameter_server_2 = launcher.add(
-        mock_parameter_server_second_fn,
+        mock_builder.parameter_server,
         node_type=NodeType.courier,
         name="parameter_server_test",
     )
 
     assert list(launcher._program._groups.keys()) == ["parameter_server_test"]
     assert (
-        launcher._program._groups["parameter_server_test"][0]._constructor
-        == mock_parameter_server_fn
+        launcher._program._groups["parameter_server_test"][0]._constructor()
+        == "Parameter Server Test"
     )
     assert (
-        launcher._program._groups["parameter_server_test"][1]._constructor
-        == mock_parameter_server_second_fn
+        launcher._program._groups["parameter_server_test"][1]._constructor()
+        == "Parameter Server Test"
     )
     assert [parameter_server_1] == launcher._program._groups["parameter_server_test"][
         0
