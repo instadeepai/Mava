@@ -15,96 +15,45 @@
 
 """Integration test of the Trainer for Jax-based Mava"""
 
-import functools
 import time
-from datetime import datetime
-from typing import Any
-
 import jax.numpy as jnp
-import launchpad as lp
-import optax
 import pytest
 
-from mava.systems.jax import System, mappo
-from mava.utils.environments import debugging_utils
-from mava.utils.loggers import logger_utils
+from mava.systems.jax import System
+from tests.jax.integration.mock_systems import (
+    mock_system_multi_process,
+    mock_system_multi_thread,
+    mock_system_single_process,
+)
 
 
 @pytest.fixture
-def test_system() -> System:
-    """Mappo system"""
-    return mappo.MAPPOSystem()
+def test_system_sp() -> System:
+    """A single process built system"""
+    return mock_system_single_process()
 
 
-def test_trainer_single_process(test_system: System) -> None:
+@pytest.fixture
+def test_system_mp() -> System:
+    """A multi process built system"""
+    return mock_system_multi_process()
+
+
+@pytest.fixture
+def test_system_mt() -> System:
+    """A multi thread built system"""
+    return mock_system_multi_thread()
+
+
+def test_trainer_single_process(test_system_sp: System) -> None:
     """Test if the trainer instantiates processes as expected."""
-
-    # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name="simple_spread",
-        action_space="discrete",
-    )
-
-    # Networks.
-    def network_factory(*args: Any, **kwargs: Any) -> Any:
-        return mappo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(32, 32),
-            critic_layer_sizes=(64, 64),
-            *args,
-            **kwargs,
-        )
-
-    # Checkpointer appends "Checkpoints" to checkpoint_dir.
-    base_dir = "~/mava"
-    mava_id = str(datetime.now())
-    checkpoint_subpath = f"{base_dir}/{mava_id}"
-    # Log every [log_every] seconds.
-    log_every = 1
-    logger_factory = functools.partial(
-        logger_utils.make_logger,
-        directory=base_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=mava_id,
-        time_delta=log_every,
-    )
-    # Optimizer.
-    optimizer = optax.chain(
-        optax.clip_by_global_norm(40.0),
-        optax.adam(1e-4),
-    )
-
-    # Build the test_system
-    test_system.build(
-        environment_factory=environment_factory,
-        network_factory=network_factory,
-        logger_factory=logger_factory,
-        experiment_path=checkpoint_subpath,
-        optimizer=optimizer,
-        executor_parameter_update_period=10,
-        multi_process=False,
-        run_evaluator=True,
-        num_executors=1,
-        use_next_extras=False,
-        max_queue_size=5000,
-        sample_batch_size=2,
-        max_in_flight_samples_per_worker=4,
-        num_workers_per_iterator=-1,
-        rate_limiter_timeout_ms=-1,
-        nodes_on_gpu=[],
-        lp_launch_type=lp.LaunchType.TEST_MULTI_THREADING,
-        sequence_length=4,
-        period=4,
-    )
-
     (
         data_server,
         parameter_server,
         executor,
         evaluator,
         trainer,
-    ) = test_system._builder.store.system_build
+    ) = test_system_sp._builder.store.system_build
 
     for _ in range(5):
         executor.run_episode()
@@ -126,70 +75,14 @@ def test_trainer_single_process(test_system: System) -> None:
             assert not jnp.all(categorical_value_head["w"] == 0)
 
 
-def test_trainer_multi_thread(test_system: System) -> None:
+def test_trainer_multi_thread(test_system_mt: System) -> None:
     """Test if the trainer instantiates processes as expected."""
-    # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name="simple_spread",
-        action_space="discrete",
-    )
-
-    # Networks.
-    def network_factory(*args: Any, **kwargs: Any) -> Any:
-        return mappo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(32, 32),
-            critic_layer_sizes=(64, 64),
-            *args,
-            **kwargs,
-        )
-
-    # Checkpointer appends "Checkpoints" to checkpoint_dir.
-    base_dir = "~/mava"
-    mava_id = str(datetime.now())
-    checkpoint_subpath = f"{base_dir}/{mava_id}"
-
-    # Log every [log_every] seconds.
-    log_every = 10
-    logger_factory = functools.partial(
-        logger_utils.make_logger,
-        directory=base_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=mava_id,
-        time_delta=log_every,
-    )
-
-    # Optimizer.
-    optimizer = optax.chain(
-        optax.clip_by_global_norm(40.0),
-        optax.adam(1e-4),
-    )
-
-    # Build the system
-    test_system.build(
-        environment_factory=environment_factory,
-        network_factory=network_factory,
-        logger_factory=logger_factory,
-        experiment_path=checkpoint_subpath,
-        optimizer=optimizer,
-        executor_parameter_update_period=1,
-        multi_process=True,
-        run_evaluator=True,
-        num_executors=1,
-        max_queue_size=500,
-        use_next_extras=False,
-        sample_batch_size=5,
-        nodes_on_gpu=[],
-        lp_launch_type=lp.LaunchType.TEST_MULTI_THREADING,
-    )
-
     # Disable the run of the trainer node
-    (trainer_node,) = test_system._builder.store.program._program._groups["trainer"]
+    (trainer_node,) = test_system_mt._builder.store.program._program._groups["trainer"]
     trainer_node.disable_run()
 
     # launch the system
-    test_system.launch()
+    test_system_mt.launch()
     time.sleep(10)  # wait till the executor has run
 
     trainer = trainer_node._construct_instance()
@@ -212,81 +105,21 @@ def test_trainer_multi_thread(test_system: System) -> None:
             assert not jnp.all(categorical_value_head["w"] == 0)
 
 
-def test_trainer_multi_process(test_system: System) -> None:
+def test_trainer_multi_process(test_system_mp: System) -> None:
     """Test if the trainer instantiates processes as expected."""
-    # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name="simple_spread",
-        action_space="discrete",
-    )
-
-    # Networks.
-    def network_factory(*args: Any, **kwargs: Any) -> Any:
-        return mappo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(254, 254, 254),
-            critic_layer_sizes=(512, 512, 256),
-            *args,
-            **kwargs,
-        )
-
-    # Checkpointer appends "Checkpoints" to checkpoint_dir.
-    base_dir = "~/mava"
-    mava_id = str(datetime.now())
-    checkpoint_subpath = f"{base_dir}/{mava_id}"
-
-    # Log every [log_every] seconds.
-    log_every = 10
-    logger_factory = functools.partial(
-        logger_utils.make_logger,
-        directory=base_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=mava_id,
-        time_delta=log_every,
-    )
-
-    # Optimizer.
-    optimizer = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
-    )
-
-    # Create the system.
-    test_system = mappo.MAPPOSystem()
-
-    # Build the system.
-    test_system.build(
-        environment_factory=environment_factory,
-        network_factory=network_factory,
-        logger_factory=logger_factory,
-        experiment_path=checkpoint_subpath,
-        optimizer=optimizer,
-        executor_parameter_update_period=1,
-        multi_process=True,
-        run_evaluator=True,
-        num_executors=1,
-        max_queue_size=500,
-        use_next_extras=False,
-        sample_batch_size=5,
-        nodes_on_gpu=[],
-        lp_launch_type=lp.LaunchType.LOCAL_MULTI_PROCESSING,
-    )
-
     # Disable the run of the trainer node
-    (trainer_node,) = test_system._builder.store.program._program._groups["trainer"]
+    (trainer_node,) = test_system_mp._builder.store.program._program._groups["trainer"]
     trainer_node.disable_run()
 
     # launch the system
-    test_system.launch()
+    test_system_mp.launch()
     time.sleep(10)  # wait till the executor has run
 
     trainer = trainer_node._construct_instance()
 
     # Before run step function
     for net_key in trainer.store.networks["networks"].keys():
-        print("nETWORK", trainer.store.opt_states[net_key][1][1])
         mu = trainer.store.opt_states[net_key][1][1]  # network
-
         for categorical_value_head in mu.values():
             assert jnp.all(categorical_value_head["b"] == 0)
             assert jnp.all(categorical_value_head["w"] == 0)
