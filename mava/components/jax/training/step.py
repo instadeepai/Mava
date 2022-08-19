@@ -81,8 +81,8 @@ class DefaultTrainerStep(TrainerStep):
         """Does a step of SGD and logs the results."""
 
         # Do a batch of SGD.
-        # print(trainer.store)
-        # exit()
+        #print(trainer.store)
+        #exit()
         sample = next(trainer.store.dataset_iterator)
         results = trainer.store.step_fn(sample)
 

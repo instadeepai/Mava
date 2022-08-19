@@ -38,7 +38,6 @@ class Batch(NamedTuple):
     behavior_values: Any
     behavior_log_probs: Any
 
-
 class BatchDQN(NamedTuple):
     """A batch of data; all shapes are expected to be [B, ...]."""
 

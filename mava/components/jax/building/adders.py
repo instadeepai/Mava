@@ -193,11 +193,14 @@ class ParallelTransitionAdderSignature(AdderSignature):
         """
 
         def adder_sig_fn(
-            ma_environment_spec: specs.MAEnvironmentSpec,
+            env_spec: specs.MAEnvironmentSpec,
             extras_specs: Dict[str, Any],
+            next_extras_specs: Dict[str, Any],
         ) -> Any:
             return reverb_adders.ParallelNStepTransitionAdder.signature(
-                ma_environment_spec=ma_environment_spec, extras_specs=extras_specs
+                ma_environment_spec=env_spec, 
+                extras_specs=extras_specs, 
+                next_extras_specs=next_extras_specs
             )
 
         builder.store.adder_signature_fn = adder_sig_fn

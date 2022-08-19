@@ -59,7 +59,6 @@ class ExecutorInit(Component):
         """
         return ExecutorInitConfig
 
-
 @dataclass
 class ExecutorTargetNetInitConfig:
     pass
@@ -90,3 +89,6 @@ class ExecutorTargetNetInit(Component):
     def config_class() -> Callable:
         """Returns the config class for this component."""
         return ExecutorTargetNetInitConfig
+
+
+    

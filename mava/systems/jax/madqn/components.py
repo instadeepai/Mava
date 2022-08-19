@@ -29,7 +29,6 @@ from mava.core_jax import SystemBuilder
 class ExtrasActionInfoConfig:
     pass
 
-
 class ExtrasSpec(Component):
     @abc.abstractmethod
     def __init__(self, config: Any) -> None:
@@ -66,18 +65,30 @@ class ExtrasActionInfo(ExtrasSpec):
         """[summary]"""
         # TODO: extras
         agent_specs = builder.store.ma_environment_spec.get_agent_environment_specs()
-        builder.store.extras_spec = {"policy_info": {}}
-
+        builder.store.extras_specs = {"policy_info": {}}
+        
         for agent, spec in agent_specs.items():
             # Make dummy log_probs
-            builder.store.extras_spec["policy_info"][agent] = np.ones(
+            builder.store.extras_specs["policy_info"][agent] = np.ones(
                 shape=spec.actions.num_values, dtype=np.float32
             )
-
+      
         # Add the networks keys to extras.
         int_spec = specs.DiscreteArray(len(builder.store.unique_net_keys))
         agents = builder.store.ma_environment_spec.get_agent_ids()
         net_spec = {"network_keys": {agent: int_spec for agent in agents}}
-        builder.store.extras_spec.update(net_spec)
+        builder.store.extras_specs.update(net_spec)
         # adding network keys to next_extras
-        # builder.store.next_extras_spec = net_spec  # this could be easily set to {}
+        builder.store.next_extras_specs = net_spec  # this could be easily set to {}
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "extras_spec"
+
+
+

@@ -125,7 +125,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
         delta_encoded: bool = False,
         priority_fns: Optional[PriorityFnMapping] = None,
         get_signature_timeout_ms: int = 300_000,
-        use_next_extras: bool = True,
+        use_next_extras: bool = False,
     ):
         """Reverb Base Adder.
 
@@ -383,8 +383,6 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
         if self._use_next_extras:
             add_dict["extras"] = extras
 
-        # print(add_dict["extras"])
-        # exit()
         self._writer.append(
             add_dict,
             partial_step=True,
@@ -397,6 +395,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, types.NestedArray] = {},
+        extras: Dict = {}
     ) -> None:
         """Record an action and the following timestep."""
         if not self._add_first_called:
@@ -410,12 +409,10 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             discounts=next_timestep.discount,
             # Start of episode indicator was passed at the previous add call.
         )
-
-        # print(next_extras)
+        
+        #print(next_extras)
         if not self._use_next_extras:
             current_step["extras"] = next_extras
-
-        print(next_extras)
 
         self._writer.append(current_step)
 

@@ -28,6 +28,9 @@ from mava.utils import enums
 from mava.utils.builder_utils import convert_specs
 from mava.utils.sort_utils import sort_str_num
 
+#Check network type
+from mava.systems.jax.madqn.DQNNetworks import DQNNetworks
+
 
 class DataServer(Component):
     def __init__(
@@ -84,7 +87,26 @@ class DataServer(Component):
                 builder.store.extras_spec,
                 num_networks,
             )
-            table = self.table(table_key, env_specs, extras_specs, builder)
+
+            #DQN requires next extras for transition adder and IPPO does not
+            if isinstance(builder.store.networks['networks']['network_agent'],DQNNetworks):
+
+                next_extras_specs = convert_specs(
+                builder.store.agent_net_keys,
+                builder.store.next_extras_specs,
+                num_networks,
+            )
+
+                table = self.table(
+                table_key=table_key,
+                environment_specs=env_specs,
+                extras_specs=extras_specs,
+                next_extras_specs=next_extras_specs,
+                builder=builder,
+            )
+            else:
+                table = self.table(table_key, env_specs, extras_specs, builder)
+            
             data_tables.append(table)
         return data_tables
 
@@ -94,6 +116,7 @@ class DataServer(Component):
         table_key: str,
         environment_specs: specs.MAEnvironmentSpec,
         extras_specs: Dict[str, Any],
+        next_extras_specs: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
         """_summary_"""
@@ -131,6 +154,7 @@ class OffPolicyDataServer(DataServer):
         table_key: str,
         environment_specs: specs.MAEnvironmentSpec,
         extras_specs: Dict[str, Any],
+        next_extras_specs: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
         """_summary_
@@ -139,6 +163,7 @@ class OffPolicyDataServer(DataServer):
             table_key : _description_
             environment_specs : _description_
             extras_specs : _description_
+            next_extras_specs: _description_
             builder : _description_
         Returns:
             _description_
@@ -159,7 +184,7 @@ class OffPolicyDataServer(DataServer):
             remover=builder.store.remover_fn(),
             max_size=self.config.max_size,
             rate_limiter=builder.store.rate_limiter_fn(),
-            signature=builder.store.adder_signature_fn(environment_specs, extras_specs),
+            signature=builder.store.adder_signature_fn(environment_specs, extras_specs, next_extras_specs),
             max_times_sampled=self.config.max_times_sampled,
         )
         return table

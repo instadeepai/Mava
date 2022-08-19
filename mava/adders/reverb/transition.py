@@ -146,18 +146,16 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         # transition that is about to be written.
         history = self._writer.history
 
-        # print(history.keys())
-        # exit()
         s, e, a = tree.map_structure(
             get_first, (history["observations"], history["extras"], history["actions"])
         )
 
-        # print(e)
-        # exit()
+        
         s_, e_ = tree.map_structure(
             get_last, (history["observations"], history["extras"])
         )
 
+        
         # # Maybe get extras to add to the transition later.
         # if 'extras' in history:
         #     extras = tree.map_structure(get_first, history['extras'])
@@ -216,6 +214,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         cls,
         ma_environment_spec: mava_specs.MAEnvironmentSpec,
         extras_specs: Dict[str, Any] = {},
+        next_extras_specs: tf.TypeSpec = {},
     ) -> tf.TypeSpec:
         """Signature for adder.
 
@@ -270,7 +269,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             rewards=reward_specs,
             discounts=step_discount_specs,
             extras=extras_specs,
-            next_extras=extras_specs,
+            next_extras=next_extras_specs,
         )
 
         return tree.map_structure_with_path(

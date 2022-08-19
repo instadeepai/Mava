@@ -108,7 +108,6 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             utils.add_batch_dim(executor.store.observation.legal_actions),
         )
 
-
 class FeedforwardExecutorSelectActionValueBased(ExecutorSelectAction):
     """Feedforward executor that selects actions based on the q-values.
 

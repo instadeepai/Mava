@@ -24,7 +24,8 @@ class UserDefinedExtrasFinder:
                 modified_key = "network_int_keys"
                 key_in_store = "network_int_keys_extras"
             if key == "policy_info":
-                key_in_store = "policies_info"
+                key_in_store = "policy_info"
             value = store.__getattribute__(key_in_store)
+            #value = store.extras_spec[key_in_store]
             user_defined_extras.update({modified_key: value})
         return user_defined_extras
