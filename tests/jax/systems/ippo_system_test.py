@@ -43,7 +43,6 @@ def test_ippo(
     test_full_system: System,
 ) -> None:
     """Full integration test of ippo system."""
- parameter server instantiates processes as expected."""
 
     # Environment.
     environment_factory = functools.partial(
@@ -64,7 +63,6 @@ def test_ippo(
     # Checkpointer appends "Checkpoints" to checkpoint_dir.
     base_dir = "~/mava"
     mava_id = str(datetime.now())
-
     checkpoint_subpath = f"{base_dir}/{mava_id}"
 
     # Log every [log_every] seconds.
@@ -82,7 +80,7 @@ def test_ippo(
     optimizer = optax.chain(
         optax.clip_by_global_norm(40.0),
         optax.adam(1e-4),
-
+    )
 
     # Build the system
     test_full_system.build(
@@ -113,4 +111,3 @@ def test_ippo(
 
     for _ in range(5):
         trainer_run.step()
-
