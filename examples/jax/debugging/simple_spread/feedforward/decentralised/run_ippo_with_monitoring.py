@@ -12,9 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run feedforward MADQN on SMAC."""
 
-
+"""Example running IPPO on debug MPE environments."""
 import functools
 from datetime import datetime
 from typing import Any
@@ -22,15 +21,21 @@ from typing import Any
 import optax
 from absl import app, flags
 
-from mava.systems.jax import mappo
-from mava.utils.environments.smac_utils import make_environment
+from mava.components.jax.building.environments import MonitorExecutorEnvironmentLoop
+from mava.systems.jax import ippo
+from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "map_name",
-    "3m",
-    "Starcraft 2 micromanagement map name (str).",
+    "env_name",
+    "simple_spread",
+    "Debugging environment name (str).",
+)
+flags.DEFINE_string(
+    "action_space",
+    "discrete",
+    "Environment action space type (str).",
 )
 
 flags.DEFINE_string(
@@ -42,17 +47,21 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Example running feedforward MADQN on SMAC environment."""
+    """Run main script
 
-    # WARNING (dries): This code has not been run yet. There might still
-    # be runtime errors in the code.
-
-    # Environment
-    environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
+    Args:
+        _ : _
+    """
+    # Environment.
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name=FLAGS.env_name,
+        action_space=FLAGS.action_space,
+    )
 
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
-        return mappo.make_default_networks(  # type: ignore
+        return ippo.make_default_networks(  # type: ignore
             policy_layer_sizes=(254, 254, 254),
             critic_layer_sizes=(512, 512, 256),
             *args,
@@ -79,8 +88,8 @@ def main(_: Any) -> None:
     )
 
     # Create the system.
-    system = mappo.MAPPOSystem()
-
+    system = ippo.IPPOSystem()
+    system.update(MonitorExecutorEnvironmentLoop)
     # Build the system.
     system.build(
         environment_factory=environment_factory,
@@ -93,6 +102,7 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
+        record_every=1,
     )
 
     # Launch the system.

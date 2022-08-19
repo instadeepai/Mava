@@ -27,14 +27,21 @@ from launchpad.launch.test_multi_threading import (
     address_builder as test_address_builder,
 )
 
-from mava.systems.jax import System, mappo
-from mava.types import OLT
+from mava.components.jax.building.data_server import OnPolicyDataServer
+from mava.components.jax.building.distributor import Distributor
+from mava.components.jax.building.parameter_client import ExecutorParameterClient
+from mava.components.jax.updating.parameter_server import DefaultParameterServer
+from mava.specs import DesignSpec
+from mava.systems.jax import ippo
+from mava.systems.jax.ippo.components import ExtrasLogProbSpec
+from mava.systems.jax.system import System
+
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
 
 @pytest.fixture
-def test_system() -> System:
+def test_system() -> System
     """Mappo system"""
     return mappo.MAPPOSystem()
 
@@ -57,6 +64,7 @@ def test_executor_single_process_with_adder(test_system: System) -> None:
             *args,
             **kwargs,
         )
+
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir.
     base_dir = "~/mava"
@@ -176,6 +184,7 @@ def test_executor_single_process_without_adder(test_system: System) -> None:
             *args,
             **kwargs,
         )
+
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir.
     base_dir = "~/mava"
@@ -300,6 +309,7 @@ def test_executor_multi_process_with_adder(test_system: System) -> None:
         optax.clip_by_global_norm(40.0),
         optax.adam(1e-4),
     )
+
 
     # Build the system
     test_system.build(
