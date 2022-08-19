@@ -17,7 +17,7 @@
 import abc
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 import jax
 import jax.numpy as jnp
@@ -27,6 +27,9 @@ import tree
 from acme.jax import utils
 from jax import jit
 
+import mava.components.jax.building.adders  # To avoid circular imports
+import mava.components.jax.training.model_updating  # To avoid circular imports
+from mava.callbacks import Callback
 from mava.components.jax import Component
 
 from mava.components.jax.building.datasets import TrainerDataset, TrajectoryDataset
@@ -36,6 +39,7 @@ from mava.components.jax.building.parameter_client import TrainerParameterClient
 from mava.components.jax.training.advantage_estimation import GAE
 from mava.components.jax.training.base import (
     Batch,
+    Step,
     TrainingState,
     TrainingStateSeparateNetworks,
 )

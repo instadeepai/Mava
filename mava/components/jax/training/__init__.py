@@ -17,7 +17,6 @@
 from mava.components.jax.training.advantage_estimation import GAE
 from mava.components.jax.training.base import (
     Batch,
-<<<<<<< HEAD
     BatchDQN,
     Loss,
     Step,
