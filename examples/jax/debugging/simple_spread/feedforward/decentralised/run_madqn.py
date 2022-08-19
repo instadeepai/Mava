@@ -98,12 +98,13 @@ def main(_: Any) -> None:
         optimizer=optimizer,
         executor_parameter_update_period=10,
         multi_process=True,
-        run_evaluator=True,
+        run_evaluator=False,
         num_executors=1,
-        sample_batch_size=1,
+        sample_batch_size=2,
         target_update_period=100,
         min_data_server_size=1_000,
         n_step=1,
+        # use_next_extras=False
     )
 
     # Launch the system.

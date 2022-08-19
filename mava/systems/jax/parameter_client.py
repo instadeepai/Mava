@@ -37,16 +37,7 @@ class ParameterClient:
         update_period: int = 1,
         devices: Dict[str, Optional[Union[str, jax.xla.Device]]] = {},
     ):
-        """Initialise the parameter client.
-
-        Args:
-            client: the system parameter server.
-            parameters: parameters that the client tracks.
-            get_keys: names of parameters to fetch from the server in requests.
-            set_keys: names of parameters to set in the server.
-            update_period: number of calls between syncs with the server.
-            devices: dictionary {parameter name: device} defining devices for params.
-        """
+        """Initialise the parameter server."""
         self._all_keys = sort_str_num(list(parameters.keys()))
         # TODO (dries): Is the below change correct?
         self._get_keys = get_keys if get_keys is not None else []
@@ -96,22 +87,13 @@ class ParameterClient:
         self._add_future: Optional[futures.Future] = None
 
     def _adjust_and_request(self) -> None:
-        """Set the parameters in the server, then update local params from the server.
-
-        Returns:
-            None.
-        """
         self._client.set_parameters(
             {key: self._parameters[key] for key in self._set_keys},
         )
         self._copy(self._client.get_parameters(self._get_keys))
 
     def get_async(self) -> None:
-        """Asynchronously updates the parameters with the latest copy from server.
-
-        Returns:
-            None.
-        """
+        """Asynchronously updates the parameters with the latest copy from server."""
 
         # Track the number of calls (we only update periodically).
         if self._get_call_counter < self._update_period:
@@ -130,11 +112,7 @@ class ParameterClient:
             self._get_future = None
 
     def set_async(self) -> None:
-        """Asynchronously updates server with the set parameters.
-
-        Returns:
-            None.
-        """
+        """Asynchronously updates server with the set parameters."""
         # Track the number of calls (we only update periodically).
         if self._set_call_counter < self._update_period:
             self._set_call_counter += 1
@@ -151,11 +129,7 @@ class ParameterClient:
             self._set_future = None
 
     def set_and_get_async(self) -> None:
-        """Asynchronously updates server and gets from server.
-
-        Returns:
-            None.
-        """
+        """Asynchronously updates server and gets from server."""
         # Track the number of calls (we only update periodically).
         if self._set_get_call_counter < self._update_period:
             self._set_get_call_counter += 1
@@ -171,11 +145,7 @@ class ParameterClient:
             self._set_get_future = None
 
     def add_async(self, params: Dict[str, Any]) -> None:
-        """Asynchronously adds to server parameters.
-
-        Returns:
-            None.
-        """
+        """Asynchronously adds to server parameters."""
         if self._add_future is not None and self._add_future.done():
             self._add_future = None
 
@@ -204,62 +174,28 @@ class ParameterClient:
                     self._async_add_buffer[name] = params[name]
 
     def add_and_wait(self, params: Dict[str, Any]) -> None:
-        """Add to the given parameters in the server. Wait for completion.
-
-        Adds the specified parameters to the corresponding parameters in server
-        and waits for the process to complete before continuing.
-
-        Args:
-            params: dictionary {param name: value to add to param}.
-
-        Returns:
-            None.
-        """
+        """Adds the specified parameters to the corresponding parameters in server \
+        and waits for the process to complete before continuing."""
         self._client.add_to_parameters(params)
 
     def get_and_wait(self) -> None:
-        """Update get parameters from server. Wait for completion.
-
-        Updates the get parameters with the latest copy from server
-        and waits for the process to complete before continuing.
-
-        Returns:
-            None.
-        """
+        """Updates the get parameters with the latest copy from server \
+        and waits for the process to complete before continuing."""
         self._copy(self._request())
 
     def get_all_and_wait(self) -> None:
-        """Update all parameters from server. Wait for completion.
-
-        Updates all the parameters with the latest copy from server
-        and waits for the process to complete before continuing.
-
-        Returns:
-            None.
-        """
+        """Updates all the parameters with the latest copy from server \
+        and waits for the process to complete before continuing."""
         self._copy(self._request_all())
 
     def set_and_wait(self) -> None:
-        """Update server with set parameters. Wait for completion.
-
-        Updates server with the set parameters
-        and waits for the process to complete before continuing.
-
-        Returns:
-            None.
-        """
+        """Updates server with the set parameters \
+        and waits for the process to complete before continuing."""
         self._adjust()
 
     # TODO(Dries/Arnu): this needs a bit of a cleanup
     def _copy(self, new_parameters: Dict[str, Any]) -> None:
-        """Copy the given new parameters to the existing ones.
-
-        Args:
-            new_parameters: dictionary {parameter name: new parameter value}.
-
-        Returns:
-            None.
-        """
+        """Copies the new parameters to the old ones."""
         for key in new_parameters.keys():
             if isinstance(new_parameters[key], dict):
                 for type1_key in new_parameters[key].keys():
@@ -308,6 +244,6 @@ class ParameterClient:
                     else:
                         self._parameters[key][i] = new_parameters[key][i]
             else:
-                raise NotImplementedError(
+                NotImplementedError(
                     f"Parameter type of {type(new_parameters[key])} not implemented."
                 )

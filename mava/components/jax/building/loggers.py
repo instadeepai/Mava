@@ -34,22 +34,11 @@ class Logger(Component):
         self,
         config: LoggerConfig = LoggerConfig(),
     ):
-        """Component creates executor, trainer, and evaluator loggers.
-
-        Args:
-            config: LoggerConfig.
-        """
+        """[summary]"""
         self.config = config
 
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
-        """Create and store either the executor or evaluator logger.
-
-        Args:
-            builder: SystemBuilder.
-
-        Returns:
-            None.
-        """
+        """[summary]"""
         logger_config = self.config.logger_config if self.config.logger_config else {}
         name = "executor" if not builder.store.is_evaluator else "evaluator"
 
@@ -61,14 +50,7 @@ class Logger(Component):
         )
 
     def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
-        """Create and store the trainer logger.
-
-        Args:
-            builder: SystemBuilder.
-
-        Returns:
-            None.
-        """
+        """[summary]"""
         logger_config = self.config.logger_config if self.config.logger_config else {}
         name = "trainer"
         if self.config.logger_config and name in self.config.logger_config:
@@ -80,7 +62,7 @@ class Logger(Component):
 
     @staticmethod
     def name() -> str:
-        """Static method that returns component name."""
+        """_summary_"""
         return "logger"
 
     @staticmethod

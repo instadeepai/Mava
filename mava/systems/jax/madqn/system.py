@@ -44,11 +44,9 @@ class MADQNSystem(System):
         executor_process = DesignSpec(
             executor_init=executing.ExecutorInit,
             executor_target_network_init=ExecutorTargetNetInit,
-            # extras_finder=executing.ExtrasFinder,
+            extras_finder=executing.ExtrasFinder,
             executor_observe=executing.FeedforwardExecutorObserve,
             executor_select_action=executing.FeedforwardExecutorSelectActionValueBased,
-            # executor_adder=building.ParallelSequenceAdder,
-            # adder_priority=building.UniformAdderPriority,
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
             executor_scheduler=executing.EpsilonScheduler,
             networks=building.DefaultNetworks,
@@ -61,7 +59,6 @@ class MADQNSystem(System):
             sgd_step=training.MADQNStep,
             loss=training.MADQNLoss,
             epoch_update=training.MADQNEpochUpdate,
-            # trainer_dataset=building.TrajectoryDataset,
             trainer_dataset=building.TransitionDataset,
         ).get()
 

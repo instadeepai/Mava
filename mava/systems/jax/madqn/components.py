@@ -14,8 +14,9 @@
 # limitations under the License.
 
 """Custom components for MADQN system."""
-
+import abc
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from dm_env import specs
@@ -29,7 +30,27 @@ class ExtrasActionInfoConfig:
     pass
 
 
-class ExtrasActionInfo(Component):
+class ExtrasSpec(Component):
+    @abc.abstractmethod
+    def __init__(self, config: Any) -> None:
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "extras_spec"
+
+
+class ExtrasActionInfo(ExtrasSpec):
     def __init__(
         self,
         config: ExtrasActionInfoConfig = ExtrasActionInfoConfig(),
@@ -59,13 +80,4 @@ class ExtrasActionInfo(Component):
         net_spec = {"network_keys": {agent: int_spec for agent in agents}}
         builder.store.extras_spec.update(net_spec)
         # adding network keys to next_extras
-        builder.store.next_extras_spec = net_spec  # this could be easily set to {}
-
-    @staticmethod
-    def name() -> str:
-        """_summary_
-
-        Returns:
-            _description_
-        """
-        return "extras_spec"
+        # builder.store.next_extras_spec = net_spec  # this could be easily set to {}

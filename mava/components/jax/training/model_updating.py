@@ -33,12 +33,20 @@ from mava.core_jax import SystemTrainer
 class MinibatchUpdate(Utility):
     @abc.abstractmethod
     def __init__(self, config: Any) -> None:
-        """Abstract component defining a mini-batch update."""
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
         self.config = config
 
     @staticmethod
     def name() -> str:
-        """Static method that returns component name."""
+        """_summary_
+
+        Returns:
+            _description_
+        """
         return "minibatch_update"
 
 
@@ -55,25 +63,15 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
         self,
         config: MAPGMinibatchUpdateConfig = MAPGMinibatchUpdateConfig(),
     ):
-        """Component defines a multi-agent policy gradient mini-batch update.
+        """_summary_
 
         Args:
-            config: MAPGMinibatchUpdateConfig.
+            config : _description_.
         """
         self.config = config
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """Create and store MAPG mini-batch update function.
-
-        Creates a default optimizer if none is provided in the config.
-        Creates an optimizer for each trainer.
-
-        Args:
-            trainer: SystemTrainer.
-
-        Returns:
-            None.
-        """
+        """_summary_"""
 
         if not self.config.optimizer:
             trainer.store.optimizer = optax.chain(
@@ -148,12 +146,20 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
 class EpochUpdate(Utility):
     @abc.abstractmethod
     def __init__(self, config: Any) -> None:
-        """Abstract component for performing model updates from an entire epoch."""
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
         self.config = config
 
     @staticmethod
     def name() -> str:
-        """Static method that returns component name."""
+        """_summary_
+
+        Returns:
+            _description_
+        """
         return "epoch_update"
 
 
@@ -168,22 +174,15 @@ class MAPGEpochUpdate(EpochUpdate):
         self,
         config: MAPGEpochUpdateConfig = MAPGEpochUpdateConfig(),
     ):
-        """Component defines a multi-agent policy gradient epoch-level update.
+        """_summary_
 
         Args:
-            config: MAPGEpochUpdateConfig.
+            config : _description_.
         """
         self.config = config
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """Define and store the epoch update function.
-
-        Args:
-            trainer: SystemTrainer.
-
-        Returns:
-            None.
-        """
+        """_summary_"""
         trainer.store.num_epochs = self.config.num_epochs
         trainer.store.num_minibatches = self.config.num_minibatches
 

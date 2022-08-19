@@ -39,53 +39,6 @@ class Batch(NamedTuple):
     behavior_log_probs: Any
 
 
-class TrainingState(NamedTuple):
-    """Training state consists of network parameters and optimiser state."""
-
-    params: Any
-    opt_states: Dict[str, optax.OptState]
-    random_key: Any
-
-
-class TrainingStateQ(NamedTuple):
-    """Training state consists of network parameters and optimiser state."""
-
-    params: Any
-    opt_states: Dict[str, optax.OptState]
-    random_key: Any
-    steps: int
-    # values needed for Q-learning family of methods.
-    target_params: Any = {}
-
-
-class Utility(Component):
-    @abc.abstractmethod
-    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """Hook to override to define training utility functions."""
-
-
-class Loss(Component):
-    @abc.abstractmethod
-    def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
-        """Hook to override to create loss function."""
-
-    @staticmethod
-    def name() -> str:
-        """Static method that returns component name."""
-        return "loss"
-
-
-class Step(Component):
-    @abc.abstractmethod
-    def on_training_step_fn(self, trainer: SystemTrainer) -> None:
-        """Hook to override to create SGD step function."""
-
-    @staticmethod
-    def name() -> str:
-        """Static method that returns component name."""
-        return "sgd_step"
-
-
 class BatchDQN(NamedTuple):
     """A batch of data; all shapes are expected to be [B, ...]."""
 
@@ -96,3 +49,47 @@ class BatchDQN(NamedTuple):
     next_observations: Any
     discounts: Any
     rewards: Any
+
+
+class TrainingState(NamedTuple):
+    """Training state consists of network parameters and optimiser state."""
+
+    params: Any
+    opt_states: Dict[str, optax.OptState]
+    random_key: Any
+
+
+class Utility(Component):
+    @abc.abstractmethod
+    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+
+
+class Loss(Component):
+    @abc.abstractmethod
+    def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "loss"
+
+
+class Step(Component):
+    @abc.abstractmethod
+    def on_training_step_fn(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "sgd_step"

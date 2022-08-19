@@ -17,11 +17,12 @@
 # https://github.com/deepmind/acme/blob/master/acme/adders/reverb/transition.py
 
 """Transition adders.
+
 This implements an N-step transition adder which collapses trajectory sequences
 into a single transition, simplifying to a simple transition adder when N=1.
 """
 import copy
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import reverb
@@ -40,6 +41,7 @@ from mava.adders.reverb.base import ReverbParallelAdder
 
 class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
     """An N-step transition adder.
+
     This will buffer a sequence of N timesteps in order to form a single N-step
     transition which is added to reverb for future retrieval.
     For N=1 the data added to replay will be a standard one-step transition which
@@ -68,6 +70,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         i.e. it is the episode termination signal.
       s_{t+n}: The "arrival" state, i.e. the state at time t+n.
       e_t [Optional]: A nested structure of any 'extras' the user wishes to add.
+
     Notes:
       - At the beginning and end of episodes, shorter transitions are added.
         That is, at the beginning of the episode, it will add:
@@ -88,9 +91,9 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         *,
         priority_fns: Optional[base.PriorityFnMapping] = None,
         max_in_flight_items: int = 5,
-        # use_next_extras: bool = True,
     ) -> None:
         """Creates an N-step transition adder.
+
         Args:
           client: A `reverb.Client` to send the data to replay through.
           n_step: The "N" in N-step transition. See the class docstring for the
@@ -104,6 +107,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
           table_network_config: A dictionary mapping table names to lists of
             network names.
           priority_fns: See docstring for BaseAdder.
+
         Raises:
           ValueError: If n_step is less than 1.
         """
@@ -122,14 +126,11 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             max_sequence_length=n_step + 1,
             priority_fns=priority_fns,
             max_in_flight_items=max_in_flight_items,
-            # use_next_extras=use_next_extras,
+            use_next_extras=True,
         )
 
     def _write(self) -> None:
         # Convenient getters for use in tree operations.
-        # print(self._first_idx)
-        # print(self._last_idx)
-        # exit()
         def get_first(x: np.ndarray) -> np.ndarray:
             return x[self._first_idx]
 
@@ -141,37 +142,21 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         def get_all_np(x: np.ndarray) -> np.ndarray:
             return x[self._first_idx : self._last_idx].numpy()
 
+        # Get the state, action, next_state, as well as possibly extras for the
+        # transition that is about to be written.
         history = self._writer.history
+
+        # print(history.keys())
+        # exit()
         s, e, a = tree.map_structure(
             get_first, (history["observations"], history["extras"], history["actions"])
         )
 
-        # Next observations.
-        s_ = tree.map_structure(get_last, history["observations"])
+        # print(e)
+        # exit()
         s_, e_ = tree.map_structure(
             get_last, (history["observations"], history["extras"])
         )
-
-        # Next extras.
-        # next extra refers to "extras" belonging to the next step. One should note
-        # that not all that extra information is yet available at this stage,
-        # because although the next state (and all the state-dependent extras) are
-        # known, the action dependent extras are not known as the action of the next
-        # state is not yet taken. So we should only ask for the ones which are available
-
-        """
-        e_ = {}
-        for available_key in self._keys_available_as_next_extra:
-            e_.update(
-                {
-                    available_key: tree.map_structure(
-                        get_last, history["extras"][available_key]
-                    )
-                }
-            )
-        """
-
-        # e_ = tree.map_structure(get_first, history["extras"])
 
         # # Maybe get extras to add to the transition later.
         # if 'extras' in history:
@@ -230,13 +215,14 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
     def signature(
         cls,
         ma_environment_spec: mava_specs.MAEnvironmentSpec,
-        extras_specs: tf.TypeSpec = {},
-        next_extras_spec: tf.TypeSpec = {},
+        extras_specs: Dict[str, Any] = {},
     ) -> tf.TypeSpec:
         """Signature for adder.
+
         Args:
-            environment_spec (mava_specs.EnvironmentSpec): MA environment spec.
-            extras_spec (tf.TypeSpec, optional): Spec for extras data. Defaults to {}.
+            ma_environment_spec (mava_specs.MAEnvironmentSpec): MA environment spec.
+            extras_specs (Dictionary, optional): Spec for extras data. Defaults to {}.
+
         Returns:
             tf.TypeSpec: Signature for transition adder.
         """
@@ -251,7 +237,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         # either the signature discount shape nor the signature reward shape, so we
         # can ignore it.
 
-        agent_specs = ma_environment_spec.get_agent_environment_specs()
+        agent_environment_specs = ma_environment_spec.get_agent_environment_specs()
         agents = ma_environment_spec.get_agent_ids()
         env_extras_specs = ma_environment_spec.get_extras_specs()
         extras_specs.update(env_extras_specs)
@@ -263,7 +249,8 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         for agent in agents:
 
             rewards_spec, step_discounts_spec = tree_utils.broadcast_structures(
-                agent_specs[agent].rewards, agent_specs[agent].discounts
+                agent_environment_specs[agent].rewards,
+                agent_environment_specs[agent].discounts,
             )
 
             rewards_spec = tree.map_structure(
@@ -271,8 +258,8 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             )
             step_discounts_spec = tree.map_structure(copy.deepcopy, step_discounts_spec)
 
-            obs_specs[agent] = agent_specs[agent].observations
-            act_specs[agent] = agent_specs[agent].actions
+            obs_specs[agent] = agent_environment_specs[agent].observations
+            act_specs[agent] = agent_environment_specs[agent].actions
             reward_specs[agent] = rewards_spec
             step_discount_specs[agent] = step_discounts_spec
 
@@ -283,7 +270,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             rewards=reward_specs,
             discounts=step_discount_specs,
             extras=extras_specs,
-            next_extras=next_extras_spec,
+            next_extras=extras_specs,
         )
 
         return tree.map_structure_with_path(

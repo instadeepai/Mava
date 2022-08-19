@@ -38,28 +38,17 @@ class Networks(Component):
         self,
         config: NetworksConfig = NetworksConfig(),
     ):
-        """Abstract component defines the skeleton for initialising networks.
-
-        Args:
-            config: NetworksConfig.
-        """
+        """[summary]"""
         self.config = config
 
     @abc.abstractmethod
     def on_building_init_start(self, builder: SystemBuilder) -> None:
-        """Create and store the network factory from the config.
-
-        Args:
-            builder: SystemBuilder.
-
-        Returns:
-            None.
-        """
+        """Summary"""
         pass
 
     @staticmethod
     def name() -> str:
-        """Static method that returns component name."""
+        """_summary_"""
         return "networks"
 
 
@@ -68,24 +57,11 @@ class DefaultNetworks(Networks):
         self,
         config: NetworksConfig = NetworksConfig(),
     ):
-        """Component defines the default way to initialise networks.
-
-        Args:
-            config: NetworksConfig.
-        """
+        """[summary]"""
         self.config = config
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
-        """Create and store the network factory from the config.
-
-        Also manages keys, creating and storing a key from the config seed.
-
-        Args:
-            builder: SystemBuilder.
-
-        Returns:
-            None.
-        """
+        """Summary"""
         # Setup the jax key for network initialisations
         builder.store.key = jax.random.PRNGKey(self.config.seed)
 

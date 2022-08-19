@@ -27,49 +27,47 @@ class TrainerHookMixin(ABC):
 
     callbacks: List
 
-    # INIT
     def on_training_init_start(self) -> None:
-        """Start of trainer initialisation."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_training_init_start(self)
 
-    def on_training_utility_fns(self) -> None:
-        """Create utility functions during trainer initialisation."""
-        for callback in self.callbacks:
-            callback.on_training_utility_fns(self)
-
-    def on_training_loss_fns(self) -> None:
-        """Create loss functions during trainer initialisation."""
-        for callback in self.callbacks:
-            callback.on_training_loss_fns(self)
-
-    def on_training_step_fn(self) -> None:
-        """Create step function during trainer initialisation."""
-        for callback in self.callbacks:
-            callback.on_training_step_fn(self)
-
     def on_training_init(self) -> None:
-        """Trainer initialisation."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_training_init(self)
 
     def on_training_init_end(self) -> None:
-        """End of trainer initialisation."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_training_init_end(self)
 
-    # STEP
+    def on_training_utility_fns(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_utility_fns(self)
+
+    def on_training_loss_fns(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_loss_fns(self)
+
+    def on_training_step_fn(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_step_fn(self)
+
     def on_training_step_start(self) -> None:
-        """Start of trainer step."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_training_step_start(self)
 
     def on_training_step(self) -> None:
-        """Trainer step."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_training_step(self)
 
     def on_training_step_end(self) -> None:
-        """End of trainer step."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_training_step_end(self)

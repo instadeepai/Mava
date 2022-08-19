@@ -382,6 +382,9 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
 
         if self._use_next_extras:
             add_dict["extras"] = extras
+
+        # print(add_dict["extras"])
+        # exit()
         self._writer.append(
             add_dict,
             partial_step=True,
@@ -408,8 +411,11 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             # Start of episode indicator was passed at the previous add call.
         )
 
+        # print(next_extras)
         if not self._use_next_extras:
             current_step["extras"] = next_extras
+
+        print(next_extras)
 
         self._writer.append(current_step)
 

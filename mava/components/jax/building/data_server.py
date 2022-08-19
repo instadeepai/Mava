@@ -34,27 +34,15 @@ class DataServer(Component):
         self,
         config: Any,
     ) -> None:
-        """Component sets up a reverb Table for each trainer.
+        """_summary_
 
         Args:
-            config: Any.
+            config : _description_.
         """
 
         self.config = config
 
     def _create_table_per_trainer(self, builder: SystemBuilder) -> List[reverb.Table]:
-        """Create a reverb table for each trainer.
-
-        Defines a default table network config for when one is not provided, but
-        which only works when using fixed agent networks.
-        Converts specs from the environment and uses them to create tables.
-
-        Args:
-            builder: SystemBuilder.
-
-        Returns:
-            List of reverb tables where each table corresponds to a trainer.
-        """
         data_tables = []
         # Default table network config - often overwritten by TrainerInit.
         if not hasattr(builder.store, "table_network_config"):
@@ -96,18 +84,7 @@ class DataServer(Component):
                 builder.store.extras_spec,
                 num_networks,
             )
-
-            next_extras_specs = convert_specs(
-                builder.store.agent_net_keys,
-                builder.store.extras_spec,
-                num_networks,
-            )
-
-            # TODO: Add if statment for MADQN and PPO
-            table = self.table(
-                table_key, env_specs, extras_specs, next_extras_specs, builder
-            )
-            # table = self.table(table_key, env_specs, extras_specs,builder)
+            table = self.table(table_key, env_specs, extras_specs, builder)
             data_tables.append(table)
         return data_tables
 
@@ -119,32 +96,15 @@ class DataServer(Component):
         extras_specs: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
-        """Abstract method defining signature for table creation.
-
-        Args:
-            table_key: Identifier for table.
-            environment_specs: Environment specs.
-            extras_specs: Other specs.
-            builder: SystemBuilder.
-
-        Returns:
-            A new reverb table.
-        """
+        """_summary_"""
 
     def on_building_data_server(self, builder: SystemBuilder) -> None:
-        """Create a table for each trainer and load into store.
-
-        Args:
-            builder: SystemBuilder
-
-        Returns:
-            None.
-        """
+        """[summary]"""
         builder.store.data_tables = self._create_table_per_trainer(builder)
 
     @staticmethod
     def name() -> str:
-        """Static method that returns component name."""
+        """Component type name, e.g. 'dataset' or 'executor'."""
         return "data_server"
 
 
@@ -158,10 +118,10 @@ class OffPolicyDataServer(DataServer):
     def __init__(
         self, config: OffPolicyDataServerConfig = OffPolicyDataServerConfig()
     ) -> None:
-        """Component creates an off-policy data server.
+        """_summary_
 
         Args:
-            config: OffPolicyDataServerConfig.
+            config : _description_.
         """
 
         self.config = config
@@ -171,23 +131,18 @@ class OffPolicyDataServer(DataServer):
         table_key: str,
         environment_specs: specs.MAEnvironmentSpec,
         extras_specs: Dict[str, Any],
-        next_extras_specs: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
-        """Create OffPolicyDataServer table.
-
-        Requires sampler and remover functions in the system to operate.
+        """_summary_
 
         Args:
-            table_key: Identifier for table.
-            environment_specs: Environment specs.
-            extras_specs: Other specs.
-            builder: SystemBuilder.
-
+            table_key : _description_
+            environment_specs : _description_
+            extras_specs : _description_
+            builder : _description_
         Returns:
-            A new reverb table.
+            _description_
         """
-
         if not hasattr(builder.store, "sampler_fn"):
             raise ValueError(
                 "A sampler component for the dataserver has not been given"
@@ -204,26 +159,9 @@ class OffPolicyDataServer(DataServer):
             remover=builder.store.remover_fn(),
             max_size=self.config.max_size,
             rate_limiter=builder.store.rate_limiter_fn(),
-            # signature=builder.store.adder_signature_fn(environment_specs, builder.store.sequence_length,extras_specs),
-            signature=builder.store.adder_signature_fn(
-                environment_specs, extras_specs, next_extras_specs
-            ),
+            signature=builder.store.adder_signature_fn(environment_specs, extras_specs),
             max_times_sampled=self.config.max_times_sampled,
         )
-
-        """
-         table = reverb.Table(
-            name=table_key,
-            sampler=self.config.sampler(),
-            remover=self.config.remover(),
-            max_size=self.config.max_size,
-            rate_limiter=builder.store.rate_limiter_fn(),
-            signature=builder.store.adder_signature_fn(
-                environment_specs, extras_specs, next_extras_specs
-            ),
-        )
-        """
-
         return table
 
     @staticmethod
@@ -246,10 +184,10 @@ class OnPolicyDataServer(DataServer):
         self,
         config: OnPolicyDataServerConfig = OnPolicyDataServerConfig(),
     ) -> None:
-        """Component creates an on-policy data server.
+        """_summary_
 
         Args:
-            config: OnPolicyDataServerConfig.
+            config : _description_.
         """
 
         self.config = config
@@ -261,18 +199,15 @@ class OnPolicyDataServer(DataServer):
         extras_specs: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
-        """Create OnPolicyDataServer table.
-
-        Requires sampler and remover functions in the system to operate.
+        """_summary_
 
         Args:
-            table_key: Identifier for table.
-            environment_specs: Environment specs.
-            extras_specs: Other specs.
-            builder: SystemBuilder.
-
+            table_key : _description_
+            environment_specs : _description_
+            extras_specs : _description_
+            builder : _description_
         Returns:
-            A new reverb table.
+            _description_
         """
         if builder.store.__dict__.get("sequence_length"):
             signature = builder.store.adder_signature_fn(

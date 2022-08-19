@@ -43,7 +43,11 @@ class TrainerStep(Component):
         self,
         config: TrainerStepConfig = TrainerStepConfig(),
     ):
-        """Defines the hooks to override to step the trainer."""
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
         self.config = config
 
     @abc.abstractmethod
@@ -53,7 +57,11 @@ class TrainerStep(Component):
 
     @staticmethod
     def name() -> str:
-        """Static method that returns component name."""
+        """_summary_
+
+        Returns:
+            _description_
+        """
         return "step"
 
 
@@ -62,27 +70,19 @@ class DefaultTrainerStep(TrainerStep):
         self,
         config: TrainerStepConfig = TrainerStepConfig(),
     ):
-        """Component defines the default trainer step.
-
-        Sample -> execute step function -> sync parameter client
-        -> update counts -> log.
+        """_summary_
 
         Args:
-            config: TrainerStepConfig.
+            config : _description_.
         """
         self.config = config
 
     def on_training_step(self, trainer: SystemTrainer) -> None:
-        """Does a step of SGD and logs the results.
-
-        Args:
-            trainer: SystemTrainer.
-
-        Returns:
-            None.
-        """
+        """Does a step of SGD and logs the results."""
 
         # Do a batch of SGD.
+        # print(trainer.store)
+        # exit()
         sample = next(trainer.store.dataset_iterator)
         results = trainer.store.step_fn(sample)
 
@@ -123,50 +123,27 @@ class MAPGWithTrustRegionStep(Step):
         self,
         config: MAPGWithTrustRegionStepConfig = MAPGWithTrustRegionStepConfig(),
     ):
-        """Component defines the MAPGWithTrustRegion SGD step.
+        """_summary_
 
         Args:
-            config: MAPGWithTrustRegionStepConfig.
+            config : _description_.
         """
         self.config = config
 
     def on_training_init_start(self, trainer: SystemTrainer) -> None:
-        """Compute and store full batch size.
-
-        Args:
-            trainer: SystemTrainer.
-
-        Returns:
-            None.
-        """
         # Note (dries): Assuming the batch and sequence dimensions are flattened.
         trainer.store.full_batch_size = trainer.store.sample_batch_size * (
             trainer.store.sequence_length - 1
         )
 
     def on_training_step_fn(self, trainer: SystemTrainer) -> None:
-        """Define and store the SGD step function for MAPGWithTrustRegion.
-
-        Args:
-            trainer: SystemTrainer.
-
-        Returns:
-            None.
-        """
+        """_summary_"""
 
         @jit
         def sgd_step(
             states: TrainingState, sample: reverb.ReplaySample
         ) -> Tuple[TrainingState, Dict[str, jnp.ndarray]]:
-            """Performs a minibatch SGD step.
-
-            Args:
-                states: Training states (network params and optimiser states).
-                sample: Reverb sample.
-
-            Returns:
-                Tuple[new state, metrics].
-            """
+            """Performs a minibatch SGD step, returning new state and metrics."""
 
             # Extract the data.
             data = sample.data
@@ -190,7 +167,6 @@ class MAPGWithTrustRegionStep(Step):
             def get_behavior_values(
                 net_key: Any, reward: Any, observation: Any
             ) -> jnp.ndarray:
-                """Gets behaviour values from the agent networks and observations."""
                 o = jax.tree_map(
                     lambda x: jnp.reshape(x, [-1] + list(x.shape[2:])), observation
                 )
@@ -286,14 +262,6 @@ class MAPGWithTrustRegionStep(Step):
             return new_states, metrics
 
         def step(sample: reverb.ReplaySample) -> Tuple[Dict[str, jnp.ndarray]]:
-            """Step over the reverb sample and update the parameters / optimiser states.
-
-            Args:
-                sample: Reverb sample.
-
-            Returns:
-                Metrics from SGD step.
-            """
 
             # Repeat training for the given number of epoch, taking a random
             # permutation for every epoch.

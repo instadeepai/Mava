@@ -94,7 +94,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        experiment_path=experiment_path,
+        # experiment_path=experiment_path,
         optimizer=optimizer,
         run_evaluator=False,
         sample_batch_size=5,

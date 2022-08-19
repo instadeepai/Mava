@@ -27,103 +27,97 @@ class ParameterServerHookMixin(ABC):
     # system parameter server hooks
     ###############################
 
-    # INIT
     def on_parameter_server_init_start(self) -> None:
-        """Start of parameter server initialisation."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_init_start(self)
 
     def on_parameter_server_init(self) -> None:
-        """Parameter server initialisation."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_init(self)
 
     def on_parameter_server_init_checkpointer(self) -> None:
-        """Create checkpointer during parameter server initialisation."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_init_checkpointer(self)
 
     def on_parameter_server_init_end(self) -> None:
-        """End of parameter server initialisation."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_init_end(self)
 
-    # GET PARAMETERS
     def on_parameter_server_get_parameters_start(self) -> None:
-        """Start of getting parameters from parameter server."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_get_parameters_start(self)
 
     def on_parameter_server_get_parameters(self) -> None:
-        """Get parameters from parameter server."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_get_parameters(self)
 
     def on_parameter_server_get_parameters_end(self) -> None:
-        """End of getting parameters from parameter server."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_get_parameters_end(self)
 
-    # SET PARAMETERS
     def on_parameter_server_set_parameters_start(self) -> None:
-        """Start of setting parameters in parameter server."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_set_parameters_start(self)
 
     def on_parameter_server_set_parameters(self) -> None:
-        """Set parameters in parameter server."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_set_parameters(self)
 
     def on_parameter_server_set_parameters_end(self) -> None:
-        """End of setting parameters in parameter server."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_set_parameters_end(self)
 
-    # ADD TO PARAMETERS
     def on_parameter_server_add_to_parameters_start(self) -> None:
-        """Start of adding to parameters in parameter server."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_add_to_parameters_start(self)
 
     def on_parameter_server_add_to_parameters(self) -> None:
-        """Add to parameters in parameter server."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_add_to_parameters(self)
 
     def on_parameter_server_add_to_parameters_end(self) -> None:
-        """End of adding to parameters in parameter server."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_add_to_parameters_end(self)
 
-    # RUN
     def on_parameter_server_run_start(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_run_start(self)
 
-    # STEP
     def on_parameter_server_run_loop_start(self) -> None:
-        """Start of parameter server run loop."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_run_loop_start(self)
 
     def on_parameter_server_run_loop_checkpoint(self) -> None:
-        """Checkpoint during parameter server run loop."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_run_loop_checkpoint(self)
 
     def on_parameter_server_run_loop(self) -> None:
-        """Parameter server run loop."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_run_loop(self)
 
     def on_parameter_server_run_loop_termination(self) -> None:
-        """Check for termination during parameter server run loop."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_run_loop_termination(self)
 
     def on_parameter_server_run_loop_end(self) -> None:
-        """End of parameter server run loop."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_parameter_server_run_loop_end(self)

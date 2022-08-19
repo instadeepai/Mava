@@ -34,26 +34,20 @@ class DistributorConfig:
 
 class Distributor(Component):
     def __init__(self, config: DistributorConfig = DistributorConfig()):
-        """Component builds launchpad program nodes and launches the program.
+        """_summary_
 
         Args:
-            config: DistributorConfig.
+            config : _description_.
         """
         if isinstance(config.nodes_on_gpu, str):
             config.nodes_on_gpu = [config.nodes_on_gpu]
         self.config = config
 
     def on_building_program_nodes(self, builder: SystemBuilder) -> None:
-        """Create nodes for the program and save the program in the store.
-
-        Create data server, parameter server, executor, trainer, and evaluator nodes.
-        Handles both single-process and multi-process.
+        """_summary_
 
         Args:
-            builder: SystemBuilder.
-
-        Returns:
-            None.
+            builder : _description_
         """
         builder.store.program = Launcher(
             multi_process=self.config.multi_process,
@@ -107,19 +101,16 @@ class Distributor(Component):
             builder.store.system_build = builder.store.program.get_nodes()
 
     def on_building_launch(self, builder: SystemBuilder) -> None:
-        """Start the launchpad program saved in the store.
+        """_summary_
 
         Args:
-            builder: SystemBuilder.
-
-        Returns:
-            None.
+            builder : _description_
         """
         builder.store.program.launch()
 
     @staticmethod
     def name() -> str:
-        """Static method that returns component name."""
+        """Component type name, e.g. 'dataset' or 'executor'."""
         return "distributor"
 
     @staticmethod

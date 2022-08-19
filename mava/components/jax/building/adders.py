@@ -25,22 +25,17 @@ from mava.core_jax import SystemBuilder
 
 
 class Adder(Component):
-    """Abstract Adder component defining which hooks should be used."""
-
     @abc.abstractmethod
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
-        """Create the executor adder.
-
-        Args:
-            builder: SystemBuilder.
-
-        Returns:
-            None.
-        """
+        """[summary]"""
 
     @staticmethod
     def name() -> str:
-        """Static method that returns component name."""
+        """_summary_
+
+        Returns:
+            _description_
+        """
         return "executor_adder"
 
 
@@ -50,33 +45,34 @@ class AdderPriorityConfig:
 
 
 class AdderPriority(Component):
-    """Abstract AdderPriority component defining which hooks should be used."""
-
     def __init__(
         self,
         config: AdderPriorityConfig = AdderPriorityConfig(),
     ):
-        """Component creates priority functions for reverb adders.
+        """_summary_
 
         Args:
-            config: AdderPriorityConfig.
+            config : _description_.
         """
         self.config = config
 
     @abc.abstractmethod
     def on_building_executor_adder_priority(self, builder: SystemBuilder) -> None:
-        """Create the priority functions.
+        """_summary_
 
         Args:
-            builder: SystemBuilder.
-
+            builder : _description_
         Returns:
-            None.
+            _description_
         """
 
     @staticmethod
     def name() -> str:
-        """Static method that returns component name."""
+        """_summary_
+
+        Returns:
+            _description_
+        """
         return "adder_priority"
 
     @staticmethod
@@ -95,33 +91,28 @@ class AdderSignatureConfig:
 
 
 class AdderSignature(Component):
-    """Abstract AdderSignature component defining which hooks should be used."""
-
     def __init__(
         self,
         config: AdderSignatureConfig = AdderSignatureConfig(),
     ):
-        """Component creates an adder signature for reverb adders.
+        """_summary_
 
         Args:
-            config: AdderSignatureConfig.
+            config : _description_.
         """
         self.config = config
 
     @abc.abstractmethod
     def on_building_data_server_adder_signature(self, builder: SystemBuilder) -> None:
-        """Create the adder signature function.
-
-        Args:
-            builder: SystemBuilder.
-
-        Returns:
-            None.
-        """
+        """[summary]"""
 
     @staticmethod
     def name() -> str:
-        """Static method that returns component name."""
+        """_summary_
+
+        Returns:
+            _description_
+        """
         return "data_server_adder_signature"
 
     @staticmethod
@@ -145,21 +136,18 @@ class ParallelTransitionAdder(Adder):
         self,
         config: ParallelTransitionAdderConfig = ParallelTransitionAdderConfig(),
     ):
-        """Creates a reverb ParallelNStepTransitionAdder.
+        """_summary_
 
         Args:
-            config: ParallelTransitionAdderConfig.
+            config : _description_.
         """
         self.config = config
 
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
-        """Create a ParallelNStepTransitionAdder.
+        """_summary_
 
         Args:
-            builder: SystemBuilder.
-
-        Returns:
-            None.
+            builder : _description_
         """
 
         adder = reverb_adders.ParallelNStepTransitionAdder(
@@ -185,13 +173,10 @@ class ParallelTransitionAdder(Adder):
 
 class UniformAdderPriority(AdderPriority):
     def on_building_executor_adder_priority(self, builder: SystemBuilder) -> None:
-        """Create and store the adder priority functions.
+        """_summary_
 
         Args:
-            builder: SystemBuilder.
-
-        Returns:
-            None.
+            builder : _description_
         """
         builder.store.priority_fns = {
             table_key: lambda x: 1.0
@@ -201,33 +186,18 @@ class UniformAdderPriority(AdderPriority):
 
 class ParallelTransitionAdderSignature(AdderSignature):
     def on_building_data_server_adder_signature(self, builder: SystemBuilder) -> None:
-        """Create a ParallelNStepTransitionAdder signature.
+        """_summary_
 
         Args:
-            builder: SystemBuilder.
-
-        Returns:
-            None.
+            builder : _description_
         """
 
         def adder_sig_fn(
             ma_environment_spec: specs.MAEnvironmentSpec,
             extras_specs: Dict[str, Any],
-            next_extra_specs: Dict[str, Any],
         ) -> Any:
-            """Constructs a ParallelNStepTransitionAdder signature from specs.
-
-            Args:
-                ma_environment_spec: Environment specs.
-                extras_specs: Other specs.
-
-            Returns:
-                ParallelNStepTransitionAdder signature.
-            """
             return reverb_adders.ParallelNStepTransitionAdder.signature(
-                ma_environment_spec=ma_environment_spec,
-                extras_specs=extras_specs,
-                next_extras_spec=next_extra_specs,
+                ma_environment_spec=ma_environment_spec, extras_specs=extras_specs
             )
 
         builder.store.adder_signature_fn = adder_sig_fn
@@ -238,32 +208,32 @@ class ParallelSequenceAdderConfig:
     sequence_length: int = 20
     period: int = 10
     use_next_extras: bool = False
-    n_step: int = 5
 
 
 class ParallelSequenceAdder(Adder):
     def __init__(
         self, config: ParallelSequenceAdderConfig = ParallelSequenceAdderConfig()
     ):
-        """Component creates a reverb ParallelSequenceAdder.
+        """_summary_
 
         Args:
-            config: ParallelSequenceAdderConfig.
+            config : _description_.
         """
         self.config = config
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
-        """TODO: method should be removed in another PR"""
+        """_summary_
+
+        Args:
+            builder : _description_
+        """
         builder.store.sequence_length = self.config.sequence_length
 
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
-        """Create a ParallelSequenceAdder.
+        """_summary_
 
         Args:
-            builder: SystemBuilder.
-
-        Returns:
-            None.
+            builder : _description_
         """
 
         adder = reverb_adders.ParallelSequenceAdder(
@@ -290,13 +260,10 @@ class ParallelSequenceAdder(Adder):
 
 class ParallelSequenceAdderSignature(AdderSignature):
     def on_building_data_server_adder_signature(self, builder: SystemBuilder) -> None:
-        """Create a ParallelSequenceAdder signature.
+        """_summary_
 
         Args:
-            builder: SystemBuilder.
-
-        Returns:
-            None.
+            builder : _description_
         """
 
         def adder_sig_fn(
@@ -304,16 +271,6 @@ class ParallelSequenceAdderSignature(AdderSignature):
             sequence_length: int,
             extras_specs: Dict[str, Any],
         ) -> Any:
-            """Creates a ParallelSequenceAdder signature.
-
-            Args:
-                ma_environment_spec: Environment specs.
-                sequence_length: Length of the adder sequences.
-                extras_specs: Other specs.
-
-            Returns:
-                ParallelSequenceAdder signature.
-            """
             return reverb_adders.ParallelSequenceAdder.signature(
                 ma_environment_spec=ma_environment_spec,
                 sequence_length=sequence_length,

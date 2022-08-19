@@ -38,36 +38,20 @@ class GAE(Utility):
         self,
         config: GAEConfig = GAEConfig(),
     ):
-        """Component defines advantage estimation function.
+        """_summary_
 
         Args:
-            config: GAEConfig.
+            config : _description_.
         """
         self.config = config
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """Create and store a GAE advantage function.
-
-        Args:
-            trainer: SystemTrainer.
-
-        Returns:
-            None.
-        """
+        """_summary_"""
 
         def gae_advantages(
             rewards: jnp.ndarray, discounts: jnp.ndarray, values: jnp.ndarray
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
-            """Use truncated GAE to compute advantages.
-
-            Args:
-                rewards: Agent rewards.
-                discounts: Agent discount factors.
-                values: Agent value estimations.
-
-            Returns:
-                Tuple of advantage values, target values.
-            """
+            """Uses truncated GAE to compute advantages."""
 
             # Apply reward clipping.
             max_abs_reward = self.config.max_abs_reward
@@ -88,7 +72,11 @@ class GAE(Utility):
 
     @staticmethod
     def name() -> str:
-        """Static method that returns component name."""
+        """_summary_
+
+        Returns:
+            _description_
+        """
         return "gae_fn"
 
     @staticmethod

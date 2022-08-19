@@ -27,108 +27,102 @@ class ExecutorHookMixin(ABC):
 
     callbacks: List
 
-    # INIT
     def on_execution_init_start(self) -> None:
-        """Start of executor initialisation."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_init_start(self)
 
     def on_execution_init(self) -> None:
-        """Executor initialisation."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_init(self)
 
     def on_execution_init_end(self) -> None:
-        """End of executor initialisation."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_init_end(self)
 
-    # SELECT ACTION
     def on_execution_select_action_start(self) -> None:
-        """Start of executor selecting an action for agent."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_select_action_start(self)
 
     def on_execution_select_action_preprocess(self) -> None:
-        """Preprocessing when executor selecting an action for agent."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_select_action_preprocess(self)
 
     def on_execution_select_action_compute(self) -> None:
-        """Call to agent networks when executor selecting an action for agent."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_select_action_compute(self)
 
     def on_execution_select_action_sample(self) -> None:
-        """Sample an action when executor selecting an action for agent."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_select_action_sample(self)
 
     def on_execution_select_action_end(self) -> None:
-        """End of executor selecting an action for agent."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_select_action_end(self)
 
-    # OBSERVE FIRST
     def on_execution_observe_first_start(self) -> None:
-        """Start of executor observing the first time in an episode."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_observe_first_start(self)
 
     def on_execution_observe_first(self) -> None:
-        """Executor observing the first time in an episode."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_observe_first(self)
 
     def on_execution_observe_first_end(self) -> None:
-        """End of executor observing the first time in an episode."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_observe_first_end(self)
 
-    # OBSERVE
     def on_execution_observe_start(self) -> None:
-        """Start of executor observing."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_observe_start(self)
 
     def on_execution_observe(self) -> None:
-        """Executor observing."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_observe(self)
 
     def on_execution_observe_end(self) -> None:
-        """End of executor observing."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_observe_end(self)
 
-    # SELECT ACTIONS
     def on_execution_select_actions_start(self) -> None:
-        """Start of executor selecting actions for all agents in the system."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_select_actions_start(self)
 
     def on_execution_select_actions(self) -> None:
-        """Executor selecting actions for all agents in the system."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_select_actions(self)
 
     def on_execution_select_actions_end(self) -> None:
-        """End of executor selecting actions for all agents in the system."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_select_actions_end(self)
 
-    # UPDATE
     def on_execution_update_start(self) -> None:
-        """Start of updating executor parameters."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_update_start(self)
 
     def on_execution_update(self) -> None:
-        """Update executor parameters."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_update(self)
 
     def on_execution_update_end(self) -> None:
-        """End of updating executor parameters."""
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_update_end(self)

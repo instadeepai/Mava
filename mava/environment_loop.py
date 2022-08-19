@@ -466,6 +466,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
             # Have the agent observe the timestep and let the actor update itself.
             # print(timestep)
+            # print(env_extras)
             self._executor.observe(
                 actions, next_timestep=timestep, next_extras=env_extras
             )
@@ -474,8 +475,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 self._executor.update()
 
             # Book-keeping.
-            episode_steps += 1
-
             if hasattr(self._executor, "after_action_selection"):
                 if hasattr(self._executor, "_counts"):
                     loop_type = "evaluator" if self._executor._evaluator else "executor"

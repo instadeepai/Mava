@@ -23,8 +23,6 @@ from mava.utils import lp_utils
 
 
 class NodeType:
-    """Specify launchpad node types that systems can use."""
-
     reverb = lp.ReverbNode
     courier = lp.CourierNode
 
@@ -42,18 +40,15 @@ class Launcher:
         name: str = "System",
         terminal: str = "current_terminal",
     ) -> None:
-        """Initialise the launcher.
-
-        If multi-process, set up the launchpad program.
-        Otherwise, create a dictionary for the nodes in the system.
+        """_summary_
 
         Args:
-            multi_process : whether to use launchpad to run nodes on separate processes.
-            nodes_on_gpu : which nodes should be run on the GPU.
-            sp_trainer_period : number of episodes between single process trainer steps.
-            sp_evaluator_period : num episodes between single process evaluator steps.
-            name : launchpad program name.
-            terminal : terminal for launchpad processes to be shown on.
+            multi_process : _description_.
+            nodes_on_gpu : _description_.
+            sp_trainer_period : _description_.
+            sp_evaluator_period : _description_.
+            name : _description_.
+            terminal : terminal for launchpad processes to be shown on
         """
         self._multi_process = multi_process
         self._name = name
@@ -80,26 +75,18 @@ class Launcher:
         node_type: Union[lp.ReverbNode, lp.CourierNode] = NodeType.courier,
         name: str = "Node",
     ) -> Any:
-        """Add a node to the system.
-
-        If multi-processing, add a node to the existing launchpad program,
-        grouped under the given name.
-        This means that when multi-processing,
-        you can have multiple nodes of the same name (e.g. executor).
-        If system is single-process, only one node per name is allowed in the system.
+        """_summary_
 
         Args:
-            node_fn : Function returning the system process that will run on the node.
-            arguments : Arguments used when initialising the system process.
-            node_type : Type of launchpad node to use.
-            name : Node name (e.g. executor).
+            node_fn : _description_
+            arguments : _description_.
+            node_type : _description_.
+            name : _description_.
 
         Raises:
-            ValueError: if single-process and node name is not supported.
-            ValueError: if single-process and trying to init a node more than once.
-
+            NotImplementedError: _description_
         Returns:
-            The system process or launchpad node.
+            _description_
         """
         # Create a list of arguments
         if type(arguments) is not list:
@@ -118,7 +105,7 @@ class Launcher:
                 )
             elif self._node_dict[name] is not None:
                 raise ValueError(
-                    f"Node named {name} initialised more than once."
+                    f"Node named {name} initialised more than onces."
                     + "Single process currently only supports one node per type."
                 )
 
@@ -132,24 +119,17 @@ class Launcher:
             return process
 
     def get_nodes(self) -> List[Any]:
-        """Get the nodes of a single-process system.
-
-        Raises:
-            ValueError: if system is multi-process.
-
-        Returns:
-            System nodes.
-        """
+        """TODO: Add description here."""
         if self._multi_process:
             raise ValueError("Get nodes only implemented for single process setups.")
 
         return self._nodes
 
     def launch(self) -> None:
-        """Launch the launchpad program or start the single-process system loop.
+        """_summary_
 
-        Returns:
-            None.
+        Raises:
+            NotImplementedError: _description_
         """
         if self._multi_process:
             local_resources = lp_utils.to_device(

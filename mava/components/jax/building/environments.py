@@ -39,22 +39,11 @@ class EnvironmentSpecConfig:
 
 class EnvironmentSpec(Component):
     def __init__(self, config: EnvironmentSpecConfig = EnvironmentSpecConfig()):
-        """Component creates a multi-agent environment spec.
-
-        Args:
-            config: EnvironmentSpecConfig.
-        """
+        """[summary]"""
         self.config = config
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
-        """Using the env factory in config, create and store the env spec and agents.
-
-        Args:
-            builder: SystemBuilder.
-
-        Returns:
-            None.
-        """
+        """[summary]"""
 
         builder.store.ma_environment_spec = specs.MAEnvironmentSpec(
             self.config.environment_factory()
@@ -67,7 +56,7 @@ class EnvironmentSpec(Component):
 
     @staticmethod
     def name() -> str:
-        """Static method that returns component name."""
+        """_summary_"""
         return "environment_spec"
 
     @staticmethod
@@ -92,21 +81,18 @@ class ExecutorEnvironmentLoop(Component):
     def __init__(
         self, config: ExecutorEnvironmentLoopConfig = ExecutorEnvironmentLoopConfig()
     ):
-        """Component creates an executor environment loop.
-
-        Args:
-            config: ExecutorEnvironmentLoopConfig.
-        """
+        """[summary]"""
         self.config = config
 
+    def on_building_init_start(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+        pass
+
     def on_building_executor_environment(self, builder: SystemBuilder) -> None:
-        """Create and store the executor environment from the factory in config.
+        """_summary_
 
         Args:
-            builder: SystemBuilder.
-
-        Returns:
-            None.
+            builder : _description_
         """
         # Global config set by EnvironmentSpec component
         builder.store.executor_environment = (
@@ -115,18 +101,11 @@ class ExecutorEnvironmentLoop(Component):
 
     @abc.abstractmethod
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
-        """Abstract method for overriding: should create executor environment loop.
-
-        Args:
-            builder: SystemBuilder.
-
-        Returns:
-            None.
-        """
+        """[summary]"""
 
     @staticmethod
     def name() -> str:
-        """Static method that returns component name."""
+        """_summary_"""
         return "executor_environment_loop"
 
     @staticmethod
@@ -141,13 +120,10 @@ class ExecutorEnvironmentLoop(Component):
 
 class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
-        """Create and store a parallel environment loop.
+        """_summary_
 
         Args:
-            builder: SystemBuilder.
-
-        Returns:
-            None.
+            builder : _description_
         """
         executor_environment_loop = ParallelEnvironmentLoop(
             environment=builder.store.executor_environment,
@@ -180,19 +156,19 @@ class MonitorExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
         self,
         config: MonitorExecutorEnvironmentLoopConfig = MonitorExecutorEnvironmentLoopConfig(),  # noqa
     ):
-        """Component for visualising environment progress."""
+        """Component for visualising environment progress"""
         super().__init__(config=config)
         self.config = config
 
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
-        """Monitors environments and produces videos of episodes.
+        """Monitors environments and produces videos of episodes
 
         Builds a `ParallelEnvironmentLoop` on the evaluator and a
         `MonitorParallelEnvironmentLoop` on all executors and stores it
-        in the `builder.store.system_executor`.
+        in the `builder.store.system_executor`
 
         Args:
-            builder: SystemBuilder
+            builder : the system builder
         """
         if builder.store.is_evaluator:
             executor_environment_loop = MonitorParallelEnvironmentLoop(

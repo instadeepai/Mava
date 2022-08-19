@@ -31,7 +31,7 @@ class BaseTrainerInit(Component):
         self,
         config: Any,
     ):
-        """Component sets up trainer networks.
+        """Initialise system init components.
 
         Args:
             config : a dataclass specifying the component parameters.
@@ -40,12 +40,12 @@ class BaseTrainerInit(Component):
 
     @abc.abstractmethod
     def on_building_init_end(self, builder: SystemBuilder) -> None:
-        """Set up the networks during the build."""
+        """Summary."""
         pass
 
     @abc.abstractmethod
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """Set up trainer agents."""
+        """Summary."""
         pass
 
     @staticmethod
@@ -113,14 +113,7 @@ class SingleTrainerInit(BaseTrainerInit):
         builder.store.networks = builder.store.network_factory()
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """Set up trainer agents.
-
-        Args:
-            trainer: SystemTrainer.
-
-        Returns:
-            None.
-        """
+        """_summary_"""
         # Convert network keys for the trainer.
         trainer.store.trainer_table_entry = trainer.store.table_network_config[
             trainer.store.trainer_id
@@ -146,7 +139,7 @@ class OneTrainerPerNetworkInit(BaseTrainerInit):
         self.config = config
 
     def on_building_init_end(self, builder: SystemBuilder) -> None:
-        """Set up trainer networks.
+        """.
 
         Args:
             builder : the system builder
@@ -193,14 +186,7 @@ class OneTrainerPerNetworkInit(BaseTrainerInit):
         builder.store.networks = builder.store.network_factory()
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """Set up trainer agents.
-
-        Args:
-            trainer: SystemTrainer.
-
-        Returns:
-            None.
-        """
+        """_summary_"""
         # Convert network keys for the trainer.
         trainer.store.trainer_table_entry = trainer.store.table_network_config[
             trainer.store.trainer_id
@@ -283,14 +269,7 @@ class CustomTrainerInit(BaseTrainerInit):
         builder.store.networks = builder.store.network_factory()
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """Set up and store trainer agents.
-
-        Args:
-            trainer: SystemTrainer.
-
-        Returns:
-            None.
-        """
+        """_summary_"""
         # Convert network keys for the trainer.
         trainer.store.trainer_table_entry = trainer.store.table_network_config[
             trainer.store.trainer_id

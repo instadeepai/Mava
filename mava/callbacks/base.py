@@ -173,236 +173,222 @@ class Callback(ABC):
     # system executor hooks
     #######################
 
-    # INIT
     def on_execution_init_start(self, executor: SystemExecutor) -> None:
-        """Start of executor initialisation."""
+        """[summary]"""
         pass
 
     def on_execution_init(self, executor: SystemExecutor) -> None:
-        """Executor initialisation."""
+        """[summary]"""
         pass
 
     def on_execution_init_end(self, executor: SystemExecutor) -> None:
-        """End of executor initialisation."""
+        """[summary]"""
         pass
 
-    # SELECT ACTION
     def on_execution_select_action_start(self, executor: SystemExecutor) -> None:
-        """Start of executor selecting an action for agent."""
+        """[summary]"""
         pass
 
     def on_execution_select_action_preprocess(self, executor: SystemExecutor) -> None:
-        """Preprocessing when executor selecting an action for agent."""
+        """[summary]"""
         pass
 
     def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
-        """Call to agent networks when executor selecting an action for agent."""
+        """[summary]"""
         pass
 
     def on_execution_select_action_sample(self, executor: SystemExecutor) -> None:
-        """Sample an action when executor selecting an action for agent."""
+        """[summary]"""
         pass
 
     def on_execution_select_action_end(self, executor: SystemExecutor) -> None:
-        """End of executor selecting an action for agent."""
+        """[summary]"""
         pass
 
-    # OBSERVE FIRST
     def on_execution_observe_first_start(self, executor: SystemExecutor) -> None:
-        """Start of executor observing the first time in an episode."""
+        """[summary]"""
         pass
 
     def on_execution_observe_first(self, executor: SystemExecutor) -> None:
-        """Executor observing the first time in an episode."""
+        """[summary]"""
         pass
 
     def on_execution_observe_first_end(self, executor: SystemExecutor) -> None:
-        """End of executor observing the first time in an episode."""
+        """[summary]"""
         pass
 
-    # OBSERVE
     def on_execution_observe_start(self, executor: SystemExecutor) -> None:
-        """Start of executor observing."""
+        """[summary]"""
         pass
 
     def on_execution_observe(self, executor: SystemExecutor) -> None:
-        """Executor observing."""
+        """[summary]"""
         pass
 
     def on_execution_observe_end(self, executor: SystemExecutor) -> None:
-        """End of executor observing."""
+        """[summary]"""
         pass
 
-    # SELECT ACTIONS
     def on_execution_select_actions_start(self, executor: SystemExecutor) -> None:
-        """Start of executor selecting actions for all agents in the system."""
+        """[summary]"""
         pass
 
     def on_execution_select_actions(self, executor: SystemExecutor) -> None:
-        """Executor selecting actions for all agents in the system."""
+        """[summary]"""
         pass
 
     def on_execution_select_actions_end(self, executor: SystemExecutor) -> None:
-        """End of executor selecting actions for all agents in the system."""
+        """[summary]"""
         pass
 
-    # UPDATE
     def on_execution_update_start(self, executor: SystemExecutor) -> None:
-        """Start of updating executor parameters."""
+        """[summary]"""
         pass
 
     def on_execution_update(self, executor: SystemExecutor) -> None:
-        """Update executor parameters."""
+        """[summary]"""
         pass
 
     def on_execution_update_end(self, executor: SystemExecutor) -> None:
-        """End of updating executor parameters."""
+        """[summary]"""
         pass
 
     ######################
     # system trainer hooks
     ######################
 
-    # INIT
     def on_training_init_start(self, trainer: SystemTrainer) -> None:
-        """Start of trainer initialisation."""
-        pass
-
-    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """Create utility functions during trainer initialisation."""
-        pass
-
-    def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
-        """Create loss functions during trainer initialisation."""
-        pass
-
-    def on_training_step_fn(self, trainer: SystemTrainer) -> None:
-        """Create step function during trainer initialisation."""
+        """[summary]"""
         pass
 
     def on_training_init(self, trainer: SystemTrainer) -> None:
-        """Trainer initialisation."""
+        """[summary]"""
         pass
 
     def on_training_init_end(self, trainer: SystemTrainer) -> None:
-        """End of trainer initialisation."""
+        """[summary]"""
         pass
 
-    # STEP
+    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_step_fn(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
     def on_training_step_start(self, trainer: SystemTrainer) -> None:
-        """Start of trainer step."""
+        """[summary]"""
         pass
 
     def on_training_step(self, trainer: SystemTrainer) -> None:
-        """Trainer step."""
+        """[summary]"""
         pass
 
     def on_training_step_end(self, trainer: SystemTrainer) -> None:
-        """End of trainer step."""
+        """[summary]"""
         pass
 
     ###############################
     # system parameter server hooks
     ###############################
 
-    # INIT
     def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
-        """Start of parameter server initialisation."""
+        """[summary]"""
         pass
 
     def on_parameter_server_init(self, server: SystemParameterServer) -> None:
-        """Parameter server initialisation."""
+        """[summary]"""
         pass
 
     def on_parameter_server_init_checkpointer(
         self, server: SystemParameterServer
     ) -> None:
-        """Create checkpointer during parameter server initialisation."""
+        """[summary]"""
         pass
 
     def on_parameter_server_init_end(self, server: SystemParameterServer) -> None:
-        """End of parameter server initialisation."""
+        """[summary]"""
         pass
 
-    # GET PARAMETERS
     def on_parameter_server_get_parameters_start(
         self, server: SystemParameterServer
     ) -> None:
-        """Start of getting parameters from parameter server."""
+        """[summary]"""
         pass
 
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
-        """Get parameters from parameter server."""
+        """[summary]"""
         pass
 
     def on_parameter_server_get_parameters_end(
         self, server: SystemParameterServer
     ) -> None:
-        """End of getting parameters from parameter server."""
+        """[summary]"""
         pass
 
-    # SET PARAMETERS
     def on_parameter_server_set_parameters_start(
         self, server: SystemParameterServer
     ) -> None:
-        """Start of setting parameters in parameter server."""
+        """[summary]"""
         pass
 
     def on_parameter_server_set_parameters(self, server: SystemParameterServer) -> None:
-        """Set parameters in parameter server."""
+        """[summary]"""
         pass
 
     def on_parameter_server_set_parameters_end(
         self, server: SystemParameterServer
     ) -> None:
-        """End of setting parameters in parameter server."""
+        """[summary]"""
         pass
 
-    # ADD TO PARAMETERS
     def on_parameter_server_add_to_parameters_start(
         self, server: SystemParameterServer
     ) -> None:
-        """Start of adding to parameters in parameter server."""
+        """[summary]"""
         pass
 
     def on_parameter_server_add_to_parameters(
         self, server: SystemParameterServer
     ) -> None:
-        """Add to parameters in parameter server."""
+        """[summary]"""
         pass
 
     def on_parameter_server_add_to_parameters_end(
         self, server: SystemParameterServer
     ) -> None:
-        """End of adding to parameters in parameter server."""
+        """[summary]"""
         pass
 
-    # RUN
     def on_parameter_server_run_start(self, server: SystemParameterServer) -> None:
-        """Called when the parameter server starts running."""
+        """[summary]"""
         pass
 
-    # STEP
     def on_parameter_server_run_loop_start(self, server: SystemParameterServer) -> None:
-        """Start of parameter server run loop."""
+        """[summary]"""
         pass
 
     def on_parameter_server_run_loop_checkpoint(
         self, server: SystemParameterServer
     ) -> None:
-        """Checkpoint during parameter server run loop."""
+        """[summary]"""
         pass
 
     def on_parameter_server_run_loop(self, server: SystemParameterServer) -> None:
-        """Parameter server run loop."""
+        """[summary]"""
         pass
 
     def on_parameter_server_run_loop_termination(
         self, server: SystemParameterServer
     ) -> None:
-        """Check for termination during parameter server run loop."""
+        """[summary]"""
         pass
 
     def on_parameter_server_run_loop_end(self, server: SystemParameterServer) -> None:
-        """End of parameter server run loop."""
+        """[summary]"""
         pass

@@ -30,12 +30,7 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
         store: SimpleNamespace,
         components: List[Callback],
     ) -> None:
-        """Initialise the parameter server.
-
-        Args:
-            store: builder store.
-            components: components in the system.
-        """
+        """Initialise the parameter server."""
         super().__init__()
 
         self.store = store
@@ -53,10 +48,9 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
         """Get parameters from the parameter server.
 
         Args:
-            names: names of the parameters to get.
-
+            names : Names of the parameters to get
         Returns:
-            The parameters that were requested.
+            The parameters that were requested
         """
         self.store._param_names = names
 
@@ -72,10 +66,7 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
         """Set parameters in the parameter server.
 
         Args:
-            set_params: dictionary {parameter name: new value}.
-
-        Returns:
-            None.
+            set_params : The values to set the parameters to
         """
         self.store._set_params = set_params
 
@@ -89,10 +80,7 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
         """Add to the parameters in the parameter server.
 
         Args:
-            add_to_params: dictionary {parameter name: value to add}.
-
-        Returns:
-            None.
+            add_to_params : The values to add to the parameters to
         """
         self.store._add_to_params = add_to_params
 
@@ -103,14 +91,7 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
         self.on_parameter_server_add_to_parameters_end()
 
     def step(self) -> None:
-        """Single step of the parameter server.
-
-        Calls to hooks which define the main operations of the parameter server.
-        Also calls to termination condition and checkpointing hooks.
-
-        Returns:
-            None.
-        """
+        """_summary_"""
         # Wait {non_blocking_sleep_seconds} seconds before checking again
         non_blocking_sleep(self.store.global_config.non_blocking_sleep_seconds)
 
@@ -125,14 +106,8 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
         self.on_parameter_server_run_loop_end()
 
     def run(self) -> None:
-        """Run the parameter server, stepping in an infinite loop.
-
-        This function allows for checkpointing and other
-        centralised computations to be performed by the parameter server.
-
-        Returns:
-            None.
-        """
+        """Run the parameter server. This function allows for checkpointing and other \
+            centralised computations to be performed by the parameter server."""
 
         self.on_parameter_server_run_start()
 

@@ -43,7 +43,7 @@ class BaseSystemInit(Component):
 
     @staticmethod
     def name() -> str:
-        """Static method that returns component name."""
+        """_summary_"""
         return "system_init"
 
 

@@ -33,11 +33,11 @@ class Builder(SystemBuilder, BuilderHookMixin):
         components: List[Callback],
         global_config: SimpleNamespace = SimpleNamespace(),
     ) -> None:
-        """System building init.
+        """System building init
 
         Args:
-            components: system callback component.
-            global_config: config shared across components.
+            components: system callback component
+            global_config: config shared across components
         """
         super().__init__()
 
@@ -54,7 +54,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
         """Data server to store and serve transition data from and to system.
 
         Returns:
-            System data server.
+            System data server
         """
 
         # start of make replay tables
@@ -77,8 +77,10 @@ class Builder(SystemBuilder, BuilderHookMixin):
     def parameter_server(self) -> Any:
         """Parameter server to store and serve system network parameters.
 
+        Args:
+            extra_nodes : additional nodes to add to a launchpad program build
         Returns:
-            System parameter server.
+            System parameter server
         """
 
         # start of make parameter server
@@ -101,12 +103,11 @@ class Builder(SystemBuilder, BuilderHookMixin):
         """Executor, a collection of agents in an environment to gather experience.
 
         Args:
-            executor_id : id to identify the executor process for logging purposes.
-            data_server_client : data server client for pushing transition data.
-            parameter_server_client : parameter server client for pulling parameters.
-
+            executor_id : id to identify the executor process for logging purposes
+            data_server_client : data server client for pushing transition data
+            parameter_server_client : parameter server client for pulling parameters
         Returns:
-            System executor.
+            System executor
         """
 
         self.store.executor_id = executor_id
@@ -160,12 +161,11 @@ class Builder(SystemBuilder, BuilderHookMixin):
         """Trainer, a system process for updating agent specific network parameters.
 
         Args:
-            trainer_id : id to identify the trainer process for logging purposes.
-            data_server_client : data server client for pulling transition data.
-            parameter_server_client : parameter server client for pushing parameters.
-
+            trainer_id : id to identify the trainer process for logging purposes
+            data_server_client : data server client for pulling transition data
+            parameter_server_client : parameter server client for pushing parameters
         Returns:
-            System trainer.
+            System trainer
         """
 
         self.store.trainer_id = trainer_id
@@ -197,11 +197,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
         )
 
     def build(self) -> None:
-        """Construct program nodes.
-
-        Returns:
-            None.
-        """
+        """Construct program nodes."""
 
         # start of system building
         self.on_building_start()
@@ -213,11 +209,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
         self.on_building_end()
 
     def launch(self) -> None:
-        """Run the graph program.
-
-        Returns:
-            None.
-        """
+        """Run the graph program."""
 
         # start of system launch
         self.on_building_launch_start()
