@@ -1,7 +1,9 @@
 # Examples
 
-We include a non-exhaustive number of examples, showing common use-cases for Mava. We also have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-Agent System.
+We include a non-exhaustive number of examples for both Jax-based systems and Tensorflow-based systems, showing common use-cases for Mava. We also have a [Tensorflow Quickstart notebook][tf_quickstart] and [Jax Quickstart notebook][tf_quickstart] that can be used to quickly create and train your first Multi-Agent System.
 
+# Tensorflow examples
+We have various examples using the Tensorflow-based implementation of Mava.
 ## Continuous control
 
 We include a number of systems running on continuous control tasks.
@@ -13,12 +15,12 @@ We include a number of systems running on continuous control tasks.
   - *Feedforward*:
     - Decentralised
       - [decentralised][debug_maddpg_ff_dec]
-      - [decentralised record agents][debug_maddpg_ff_dec_record]  (***recording agents acting in the environment***)
+      - [decentralised record agents][debug_maddpg_ff_dec_record] (***recording agents acting in the environment***)
       - [decentralised executor scaling][debug_maddpg_ff_dec_scaling_executors] (***scaling to 4 executors***)
-      - [decentralised multiple trainers][debug_maddpg_ff_dec_scaling_trainers](***using multiple trainers***)
+      - [decentralised multiple trainers][debug_maddpg_ff_dec_scaling_trainers] (***using multiple trainers***)
       - [decentralised custom loggers][debug_maddpg_ff_dec_custom_logging] (***using custom logging***)
-      - [decentralised lr scheduling][debug_maddpg_ff_dec_lr_scheduling](***using lr schedule***)
-      - [decentralised evaluator intervals][debug_maddpg_ff_dec_eval_intervals](***running the evaluation loop at intervals***)
+      - [decentralised lr scheduling][debug_maddpg_ff_dec_lr_scheduling] (***using lr schedule***)
+      - [decentralised evaluator intervals][debug_maddpg_ff_dec_eval_intervals] (***running the evaluation loop at intervals***)
 
     - [centralised][debug_maddpg_cen] , [networked][debug_maddpg_networked] (***using a fully-connected, networked architecture***), [networked with custom architecture][debug_maddpg_networked_custom] (***using a custom, sparse, networked architecture***) and [state_based][debug_maddpg_state_based].
 
@@ -136,8 +138,43 @@ We also include a number of systems running on discrete action space environment
   - *Feedforward*
     - [decentralised][openspiel_madqn_ff_dec].
 
+# Jax examples
+We also have various Jax-based exmaples which make use of the callback design paradigm. Our pre-implemented Jax-based systems are continually expanding so please check back often to see new implemented systems.
+
+## Discrete control
+
+### Debugging Environment - Simple Spread
+
+- **IPPO**:
+    an IPPO system running on the discrete action space simple_spread MPE environment.
+  - *Feedforward*
+    - [decentralised][debug_ippo_ff_dec_jax]
+
+### Flatland
+
+- **IPPO**:
+    an IPPO system running on the discrete action space simple_spread MPE environment.
+  - *Feedforward*
+    - [decentralised][flatland_ippo_ff_dec_jax]
+
+### Pettingzoo - Cooperative pong
+
+- **IPPO**:
+    an IPPO system running on the discrete action space simple_spread MPE environment.
+  - *Feedforward*
+    - [decentralised][pz_coop_pong_ippo_ff_dec_jax]
+
+### SMAC - StarCraft Multi-Agent Challenge
+
+- **IPPO**:
+    an IPPO system running on the discrete action space simple_spread MPE environment.
+  - *Feedforward*
+    - [decentralised][smac_ippo_ff_dec_jax]
+
+
+
 <!-- Examples -->
-[quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/quickstart.ipynb
+[tf_quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/quickstart.ipynb
 <!-- Continous -->
 [debug_maddpg_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/debugging/simple_spread/feedforward/decentralised/run_maddpg.py
 [debug_maddpg_ff_dec_record]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/debugging/simple_spread/feedforward/decentralised/run_maddpg_record.py
@@ -165,9 +202,9 @@ We also include a number of systems running on discrete action space environment
 [pz_mad4pg_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg.py
 [pz_mad4pg_ff_dec_record]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg_record.py
 
-[pz_mad4pg_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg.py
-[pz_mad4pg_ff_dec_record]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg_record.py
-[pz_mappo_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mappo.py
+[pz_mad4pg_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg.py
+[pz_mad4pg_ff_dec_record]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg_record.py
+[pz_mappo_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mappo.py
 
 [robocup_mad4pg_ff_state_based]:https://github.com/instadeepai/Mava/blob/develop/examples/tf/robocup/recurrent/state_based/run_mad4pg.py
 <!-- Discrete -->
@@ -198,3 +235,8 @@ We also include a number of systems running on discrete action space environment
 [smac_vdn_rec_cen]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/smac/recurrent/centralised/run_vdn.py
 
 [openspiel_madqn_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/openspiel/tic_tac_toe/feedforward/decentralised/run_madqn.py
+
+[debug_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo.py
+[flatland_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/flatland/feedforward/decentralised/run_ippo.py
+[pz_coop_pong_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/petting_zoo/butterfly/cooperative_pong/feedforward/decentralised/run_ippo.py
+[smac_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/smac/feedforward/decentralised/run_ippo.py
