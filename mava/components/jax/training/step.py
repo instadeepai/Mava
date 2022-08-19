@@ -253,7 +253,7 @@ class MAPGWithTrustRegionStep(Step):
                 net_key: Any, reward: Any, observation: Any
             ) -> jnp.ndarray:
                 """Gets behaviour values from the agent networks and observations."""
-                o = jax.tree_map(
+                o = jax.tree_util.tree_map(
                     lambda x: jnp.reshape(x, [-1] + list(x.shape[2:])), observation
                 )
                 _, behavior_values = networks[net_key].network.apply(
@@ -282,7 +282,12 @@ class MAPGWithTrustRegionStep(Step):
 
             # Exclude the last step - it was only used for bootstrapping.
             # The shape is [num_sequences, num_steps, ..]
-            observations, actions, behavior_log_probs, behavior_values = jax.tree_map(
+            (
+                observations,
+                actions,
+                behavior_log_probs,
+                behavior_values,
+            ) = jax.tree_util.tree_map(
                 lambda x: x[:, :-1],
                 (observations, actions, behavior_log_probs, behavior_values),
             )
@@ -307,7 +312,7 @@ class MAPGWithTrustRegionStep(Step):
                 "Num minibatches must divide batch size. Got batch_size={}"
                 " num_minibatches={}."
             ).format(batch_size, trainer.store.global_config.num_minibatches)
-            batch = jax.tree_map(
+            batch = jax.tree_util.tree_map(
                 lambda x: x.reshape((batch_size,) + x.shape[2:]), trajectories
             )
 
@@ -319,11 +324,11 @@ class MAPGWithTrustRegionStep(Step):
             )
 
             # Set the metrics
-            metrics = jax.tree_map(jnp.mean, metrics)
+            metrics = jax.tree_util.tree_map(jnp.mean, metrics)
             metrics["norm_params"] = optax.global_norm(states.params)
             metrics["observations_mean"] = jnp.mean(
                 utils.batch_concat(
-                    jax.tree_map(
+                    jax.tree_util.tree_map(
                         lambda x: jnp.abs(jnp.mean(x, axis=(0, 1))), observations
                     ),
                     num_batch_dims=0,
@@ -331,14 +336,16 @@ class MAPGWithTrustRegionStep(Step):
             )
             metrics["observations_std"] = jnp.mean(
                 utils.batch_concat(
-                    jax.tree_map(lambda x: jnp.std(x, axis=(0, 1)), observations),
+                    jax.tree_util.tree_map(
+                        lambda x: jnp.std(x, axis=(0, 1)), observations
+                    ),
                     num_batch_dims=0,
                 )
             )
-            metrics["rewards_mean"] = jax.tree_map(
+            metrics["rewards_mean"] = jax.tree_util.tree_map(
                 lambda x: jnp.mean(jnp.abs(jnp.mean(x, axis=(0, 1)))), rewards
             )
-            metrics["rewards_std"] = jax.tree_map(
+            metrics["rewards_std"] = jax.tree_util.tree_map(
                 lambda x: jnp.std(x, axis=(0, 1)), rewards
             )
 
