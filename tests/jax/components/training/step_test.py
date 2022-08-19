@@ -76,7 +76,7 @@ def gae_advantages(
 
 def epoch_update(carry: Tuple, unused_t: Tuple[()]) -> Tuple:
     """Performs model updates based on one epoch of data."""
-    results = jax.tree_map(lambda x: x + 1, carry)
+    results = jax.tree_util.tree_map(lambda x: x + 1, carry)
     return results, {}
 
 
