@@ -21,7 +21,7 @@ from mava.components.jax.building.adders import (
     UniformAdderPriority,
 )
 from mava.components.jax.building.data_server import OnPolicyDataServer
-from mava.components.jax.building.datasets import TrajectoryDataset
+from mava.components.jax.building.datasets import TrajectoryDataset, TransitionDataset
 from mava.components.jax.building.distributor import Distributor
 from mava.components.jax.building.environments import (
     EnvironmentSpec,
@@ -31,7 +31,9 @@ from mava.components.jax.building.loggers import Logger
 from mava.components.jax.building.networks import DefaultNetworks
 from mava.components.jax.building.parameter_client import (
     ExecutorParameterClient,
+    ExecutorParameterClientSeparateNetworks,
     TrainerParameterClient,
+    TrainerParameterClientSeparateNetworks,
 )
 from mava.components.jax.building.system_init import (
     CustomSamplingSystemInit,
