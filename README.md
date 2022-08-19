@@ -77,7 +77,7 @@ For details on how to add your own environment, see [here](https://github.com/in
 
 | **Name**         | **Recurrent**      | **Continuous** | **Discrete**  | **Centralised training**  | **Multi Processing**   |
 | ------------------- | ------------------ | ------------------ | ------------------ | ------------------- | ------------------- |
-| MAPPO   | :x: | :x: | :heavy_check_mark: | :x: | :heavy_check_mark: |
+| IPPO   | :x: | :x: | :heavy_check_mark: | :x: | :heavy_check_mark: |
 
 As we develop Mava further, we aim to have all systems well tested on a wide variety of environments. The team is also hard at work at expanding the systems that are implemented in Jax using the callback design approach.
 
@@ -109,34 +109,35 @@ launchpad.launch(
 )
 ```
 
-We also illustrate how a Jax based MAPPO system may be implemented.
+The first two arguments of the program are environment and network factory functions.
+These helper functions are responsible for creating the networks for the system, initialising their parameters on the different compute nodes and providing a copy of the environment for each executor. The next argument `num_executors` sets the number of executor processes to be run.
+
+After building the program we feed it to Launchpad's `launch` function and specify the launch type to perform local multi-processing, i.e. running the distributed program on a single machine. Scaling up or down is simply a matter of adjusting the number of executor processes.
+
+We also illustrate how a Jax based IPPO system may be implemented.
 
 ```python
 # Mava imports
-from mava.systems.jax import mappo
+from mava.systems.jax import ippo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
 # Create the system.
-system = mappo.MAPPOSystem()
+system = ippo.IPPOSystem()
 
 # Build the distributed system.
 system.build(
     environment_factory=environment_factory,
     network_factory=network_factory,
+    num_executors=1,
     sample_batch_size=5,
     num_epochs=15,
-    num_executors=1,
     multi_process=True,
 )
 
 # Launch the system
 system.launch()
 ```
-
-The first two arguments to the program are environment and network factory functions.
-These helper functions are responsible for creating the networks for the system, initialising their parameters on the different compute nodes and providing a copy of the environment for each executor. The next argument `num_executors` sets the number of executor processes to be run.
-After building the program we feed it to Launchpad's `launch` function and specify the launch type to perform local multi-processing, i.e. running the distributed program on a single machine. Scaling up or down is simply a matter of adjusting the number of executor processes.
 
 For a deeper dive, take a look at the detailed working code
 examples found in our [examples] subdirectory which show how to instantiate a few MARL systems and environments.

@@ -145,31 +145,31 @@ We also have various Jax-based exmaples which make use of the callback design pa
 
 ### Debugging Environment - Simple Spread
 
-- **MAPPO**:
-    a MAPPO system running on the discrete action space simple_spread MPE environment.
+- **IPPO**:
+    an IPPO system running on the discrete action space simple_spread MPE environment.
   - *Feedforward*
-    - [decentralised][debug_mappo_ff_dec_jax]
+    - [decentralised][debug_ippo_ff_dec_jax]
 
 ### Flatland
 
-- **MAPPO**:
-    a MAPPO system running on the discrete action space simple_spread MPE environment.
+- **IPPO**:
+    an IPPO system running on the discrete action space simple_spread MPE environment.
   - *Feedforward*
-    - [decentralised][flatland_mappo_ff_dec_jax]
+    - [decentralised][flatland_ippo_ff_dec_jax]
 
 ### Pettingzoo - Cooperative pong
 
-- **MAPPO**:
-    a MAPPO system running on the discrete action space simple_spread MPE environment.
+- **IPPO**:
+    an IPPO system running on the discrete action space simple_spread MPE environment.
   - *Feedforward*
-    - [decentralised][pz_coop_pong_mappo_ff_dec_jax]
+    - [decentralised][pz_coop_pong_ippo_ff_dec_jax]
 
 ### SMAC - StarCraft Multi-Agent Challenge
 
-- **MAPPO**:
-    a MAPPO system running on the discrete action space simple_spread MPE environment.
+- **IPPO**:
+    an IPPO system running on the discrete action space simple_spread MPE environment.
   - *Feedforward*
-    - [decentralised][smac_mappo_ff_dec_jax]
+    - [decentralised][smac_ippo_ff_dec_jax]
 
 
 
@@ -202,9 +202,9 @@ We also have various Jax-based exmaples which make use of the callback design pa
 [pz_mad4pg_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg.py
 [pz_mad4pg_ff_dec_record]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg_record.py
 
-[pz_mad4pg_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg.py
-[pz_mad4pg_ff_dec_record]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg_record.py
-[pz_mappo_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mappo.py
+[pz_mad4pg_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg.py
+[pz_mad4pg_ff_dec_record]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg_record.py
+[pz_mappo_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mappo.py
 
 [robocup_mad4pg_ff_state_based]:https://github.com/instadeepai/Mava/blob/develop/examples/tf/robocup/recurrent/state_based/run_mad4pg.py
 <!-- Discrete -->
@@ -236,7 +236,7 @@ We also have various Jax-based exmaples which make use of the callback design pa
 
 [openspiel_madqn_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/openspiel/tic_tac_toe/feedforward/decentralised/run_madqn.py
 
-[debug_mappo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_mappo.py
-[flatland_mappo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/flatland/feedforward/decentralised/run_mappo.py
-[pz_coop_pong_mappo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/petting_zoo/butterfly/cooperative_pong/feedforward/decentralised/run_mappo.py
-[smac_mappo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/smac/feedforward/decentralised/run_mappo.py
+[debug_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo.py
+[flatland_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/flatland/feedforward/decentralised/run_ippo.py
+[pz_coop_pong_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/petting_zoo/butterfly/cooperative_pong/feedforward/decentralised/run_ippo.py
+[smac_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/smac/feedforward/decentralised/run_ippo.py

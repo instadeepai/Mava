@@ -4,18 +4,18 @@
 
 In order to create a new system in Mava, a system class must be defined that inherits from the base [`System`](https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/systems/jax/system.py#L28) class. The `design` method must then be overwritten return a [`DesignSpec`](https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/specs.py#L161) object containing all the components to be used by a particular system. A default system config may also be created as a `dataclass` which contains the default system hyperparameters to be used.
 
-Please consider the following example where a MAPPO system is created:
+Please consider the following example where a IPPO system is created:
 
 ```python
-class MAPPOSystem(System):
+class IPPOSystem(System):
     def design(self) -> Tuple[DesignSpec, Any]:
-        """Design for MAPPO system.
+        """Design for IPPO system.
         Returns:
             system: system callback components
             default_params: system default parameters
         """
         # Set the default configs
-        default_params = MAPPODefaultConfig()
+        default_params = IPPODefaultConfig()
 
         # Default system processes
         # System initialization
@@ -75,4 +75,4 @@ class MAPPOSystem(System):
         return system, default_params
 ```
 
-In the above example certain processes are grouped together, which has been done for readability but it is not strictly required. For an example of how a full system may be launched on a particular environment and with logging included, please see [here](https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_mappo.py).
+In the above example certain processes are grouped together, which has been done for readability but it is not strictly required. For an example of how a full system may be launched on a particular environment and with logging included, please see [here](https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo.py).

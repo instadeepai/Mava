@@ -77,7 +77,7 @@ For details on how to add your own environment, see [here](https://github.com/in
 
 | **Name**         | **Recurrent**      | **Continuous** | **Discrete**  | **Centralised training**  | **Multi Processing**   |
 | ------------------- | ------------------ | ------------------ | ------------------ | ------------------- | ------------------- |
-| MAPPO   | ❌ | ❌ | ✔️ | ❌ | ✔️ |
+| IPPO   | ❌ | ❌ | ✔️ | ❌ | ✔️ |
 
 As we develop Mava further, we aim to have all systems well tested on a wide variety of environments. The team is also hard at work at expanding the systems that are implemented in Jax using the callback design approach.
 
@@ -109,16 +109,16 @@ launchpad.launch(
 )
 ```
 
-We also illustrate how a Jax based MAPPO system may be implemented.
+We also illustrate how a Jax based IPPO system may be implemented.
 
 ```python
 # Mava imports
-from mava.systems.jax import mappo
+from mava.systems.jax import ippo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
 # Create the system.
-system = mappo.MAPPOSystem()
+system = ippo.IPPOSystem()
 
 # Build the distributed system.
 system.build(
