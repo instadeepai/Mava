@@ -32,6 +32,7 @@ from tests.jax.integration.mock_systems import (
     mock_system_single_process,
 )
 
+
 @pytest.fixture
 def test_system_sp() -> System:
     """A single process built system"""
