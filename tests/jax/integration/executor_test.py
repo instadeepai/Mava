@@ -32,8 +32,8 @@ from mava.components.jax.building.distributor import Distributor
 from mava.components.jax.building.parameter_client import ExecutorParameterClient
 from mava.components.jax.updating.parameter_server import DefaultParameterServer
 from mava.specs import DesignSpec
-from mava.systems.jax import mappo
-from mava.systems.jax.mappo.components import ExtrasLogProbSpec
+from mava.systems.jax import ippo
+from mava.systems.jax.ippo.components import ExtrasLogProbSpec
 from mava.systems.jax.system import System
 from mava.utils.environments import debugging_utils
 from tests.jax import mocks
@@ -99,7 +99,7 @@ def test_executor(
     )
 
     # Networks.
-    network_factory = mappo.make_default_networks
+    network_factory = ippo.make_default_networks
 
     # Build the system
     test_exector_system.build(
@@ -166,7 +166,7 @@ def test_executor_parameter_server(
     )
 
     # Networks.
-    network_factory = mappo.make_default_networks
+    network_factory = ippo.make_default_networks
 
     # Build the system
     test_executor_parameter_server_system.build(
@@ -250,7 +250,7 @@ def test_except_trainer(
     )
 
     # Networks.
-    network_factory = mappo.make_default_networks
+    network_factory = ippo.make_default_networks
 
     # Build the system
     test_system_except_trainer.build(

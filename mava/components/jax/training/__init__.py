@@ -17,18 +17,26 @@
 from mava.components.jax.training.advantage_estimation import GAE
 from mava.components.jax.training.base import (
     Batch,
+<<<<<<< HEAD
     BatchDQN,
     Loss,
     Step,
     TrainingState,
+    TrainingStateSeparateNetworks,
     #TrainingStateQ,
     Utility,
 )
-from mava.components.jax.training.losses import MAPGWithTrustRegionClippingLoss
+from mava.components.jax.training.losses import (
+    MAPGWithTrustRegionClippingLoss,
+    MAPGWithTrustRegionClippingLossSeparateNetworks,
+)
 from mava.components.jax.training.losses_dqn import MADQNLoss
+
 from mava.components.jax.training.model_updating import (
     MAPGEpochUpdate,
+    MAPGEpochUpdateSeparateNetworks,
     MAPGMinibatchUpdate,
+    MAPGMinibatchUpdateSeparateNetworks,
 )
 
 # FOR MADQN
@@ -40,11 +48,13 @@ from mava.components.jax.training.model_updating_dqn import (
 from mava.components.jax.training.step import (
     DefaultTrainerStep,
     MAPGWithTrustRegionStep,
+    MAPGWithTrustRegionStepSeparateNetworks,
 )
 
 # included for MADQN
 from mava.components.jax.training.step_dqn import MADQNStep
 from mava.components.jax.training.trainer import (
+    BaseTrainerInit,
     CustomTrainerInit,
     OneTrainerPerNetworkInit,
     SingleTrainerInit,
