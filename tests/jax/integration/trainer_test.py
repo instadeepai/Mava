@@ -20,7 +20,6 @@ import signal
 import time
 
 import jax.numpy as jnp
-import launchpad as lp
 import pytest
 
 from mava.systems.jax import System
