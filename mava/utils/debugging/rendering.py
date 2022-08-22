@@ -430,7 +430,7 @@ class Viewer(object):
         )
         self.window.flip()
         arr = np.fromstring(image_data.data, dtype=np.uint8, sep="")  # type:ignore
-        arr = arr.reshape((self.height, self.width, 4))
+        arr = arr.reshape((self.height, self.width, 4))  # type:ignore
         return arr[::-1, :, 0:3]
 
 
