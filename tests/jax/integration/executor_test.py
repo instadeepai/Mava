@@ -17,6 +17,8 @@
 
 import functools
 import time
+import os
+import signal
 
 import pytest
 from launchpad.launch.test_multi_threading import (
@@ -117,7 +119,6 @@ def test_executor_single_process_with_adder(test_system_sp: System) -> None:
         for key in executor._executor.store.policies_info.values()
     )
 
-
 def test_executor_single_process_without_adder(test_system_sp: System) -> None:
     """Test if the executor instantiates processes as expected."""
     (
@@ -160,7 +161,6 @@ def test_executor_single_process_without_adder(test_system_sp: System) -> None:
 
     # Observe (without adder)
     assert not hasattr(executor._executor.store.adder, "add")
-
 
 def test_executor_multi_thread_with_adder(test_system_mt: System) -> None:
     """Test if the executor instantiates processes as expected."""
@@ -223,7 +223,6 @@ def test_executor_multi_thread_with_adder(test_system_mt: System) -> None:
         for key in executor._executor.store.policies_info.values()
     )
 
-
 def test_executor_mulit_process_with_adder(test_system_mp: System) -> None:
     """Test if the executor instantiates processes as expected."""
     (executor_node,) = test_system_mp._builder.store.program._program._groups[
@@ -231,11 +230,16 @@ def test_executor_mulit_process_with_adder(test_system_mp: System) -> None:
     ]
     test_address_builder.bind_addresses([executor_node])
 
+    # pid is necessary to stop the launcher once the test ends
+    pid = os.getpid()
+
     test_system_mp.launch()
     time.sleep(10)
 
     executor = executor_node._construct_instance()
-    executor.run_episode()
+
+    for _ in range(5):
+        executor.run_episode()
 
     # Observe first and observe
     assert executor._executor.store.adder._writer.history
@@ -257,16 +261,6 @@ def test_executor_mulit_process_with_adder(test_system_mp: System) -> None:
 
     assert len(executor._executor.store.adder._writer._column_history) != 0
 
-    # Select actions and select action
-    i = 0
-    while (
-        sorted(list(executor._executor.store.actions_info.keys()))
-        != ["agent_0", "agent_1", "agent_2"]
-        and i < 100
-    ):
-        time.sleep(2)
-        i += 1
-
     assert list(executor._executor.store.actions_info.keys()) == [
         "agent_0",
         "agent_1",
@@ -286,3 +280,6 @@ def test_executor_mulit_process_with_adder(test_system_mp: System) -> None:
         lambda: key == "log_prob"
         for key in executor._executor.store.policies_info.values()
     )
+
+    # stop the launcher
+    os.kill(pid, signal.SIGTERM)
