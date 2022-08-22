@@ -59,4 +59,4 @@ Multi-Agent Proximal Policy Optimization (MAPPO)        | [Yu et al., 2021], [Sc
 
 [TF Logo]: https://raw.githubusercontent.com/instadeepai/Mava/main/docs/images/tf-small.png
 
-[Jax Logo]: https://raw.githubusercontent.com/instadeepai/Mava/feature/expand-docs-for-redesign/docs/images/jax_logo_small.png
+[Jax Logo]: https://raw.githubusercontent.com/instadeepai/Mava/develop/docs/images/jax_logo_small.png
