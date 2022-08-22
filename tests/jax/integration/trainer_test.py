@@ -18,6 +18,8 @@
 import time
 import jax.numpy as jnp
 import pytest
+import os
+import signal
 
 from mava.systems.jax import System
 from tests.jax.integration.mock_systems import (
@@ -26,7 +28,7 @@ from tests.jax.integration.mock_systems import (
     mock_system_single_process,
 )
 
-
+import launchpad as lp
 @pytest.fixture
 def test_system_sp() -> System:
     """A single process built system"""
@@ -74,7 +76,6 @@ def test_trainer_single_process(test_system_sp: System) -> None:
             assert not jnp.all(categorical_value_head["b"] == 0)
             assert not jnp.all(categorical_value_head["w"] == 0)
 
-
 def test_trainer_multi_thread(test_system_mt: System) -> None:
     """Test if the trainer instantiates processes as expected."""
     # Disable the run of the trainer node
@@ -111,8 +112,11 @@ def test_trainer_multi_process(test_system_mp: System) -> None:
     (trainer_node,) = test_system_mp._builder.store.program._program._groups["trainer"]
     trainer_node.disable_run()
 
+    #pid to help stop the launcher once the test ends
+    pid = os.getpid()
     # launch the system
     test_system_mp.launch()
+
     time.sleep(10)  # wait till the executor has run
 
     trainer = trainer_node._construct_instance()
@@ -133,3 +137,6 @@ def test_trainer_multi_process(test_system_mp: System) -> None:
         for categorical_value_head in mu.values():
             assert not jnp.all(categorical_value_head["b"] == 0)
             assert not jnp.all(categorical_value_head["w"] == 0)
+
+    #stop the launcher
+    os.kill(pid, signal.SIGTERM)
