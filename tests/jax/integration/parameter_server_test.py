@@ -14,14 +14,12 @@
 # limitations under the License.
 
 """Tests for parameter server for Jax-based Mava systems"""
-import functools
+import os
+import signal
 import time
-from datetime import datetime
 from typing import Any, Dict
 
 import jax.numpy as jnp
-import launchpad as lp
-import optax
 import pytest
 from acme.jax import savers
 
@@ -259,6 +257,9 @@ def test_parameter_server_multi_process(test_system_mp: System) -> None:
     ]
     parameter_server_node.disable_run()
 
+    # pid is necessary to stop the launcher once the test is done
+    pid = os.getpid()
+
     test_system_mp.launch()
 
     parameter_server = parameter_server_node._construct_instance()
@@ -351,3 +352,6 @@ def test_parameter_server_multi_process(test_system_mp: System) -> None:
     assert parameter_server.store.last_checkpoint_time < time.time()
     assert parameter_server.store.system_checkpointer._last_saved != 0
     assert parameter_server.store.system_checkpointer._last_saved < time.time()
+
+    # stop the launchpad
+    os.kill(pid, signal.SIGTERM)
