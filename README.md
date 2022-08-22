@@ -62,7 +62,7 @@ For details on how to add your own environment, see [here](https://github.com/in
 |:---:|:---:|
 |MAD4PG on the 2D RoboCup environment using 6 executors.| MADQN on a melting pot clean up scenario |
 
-## System Implementations
+## Tensorflow System Implementations
 
 | **Name**         | **Recurrent**      | **Continuous** | **Discrete**  | **Centralised training**  | **Multi Processing**   |
 | ------------------- | ------------------ | ------------------ | ------------------ | ------------------- | ------------------- |
@@ -73,11 +73,17 @@ For details on how to add your own environment, see [here](https://github.com/in
 | VDN   | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | QMIX   | :heavy_check_mark: | :x: | :heavy_check_mark:                | :heavy_check_mark: | :heavy_check_mark: |
 
-As we develop Mava further, we aim to have all systems well tested on a wide variety of environments.
+## Jax System Implementations
+
+| **Name**         | **Recurrent**      | **Continuous** | **Discrete**  | **Centralised training**  | **Multi Processing**   |
+| ------------------- | ------------------ | ------------------ | ------------------ | ------------------- | ------------------- |
+| IPPO   | :x: | :x: | :heavy_check_mark: | :x: | :heavy_check_mark: |
+
+As we develop Mava further, we aim to have all systems well tested on a wide variety of environments. The team is also hard at work at expanding the systems that are implemented in Jax using the callback design approach.
 
 ## Usage
 
-To get a sense of how Mava systems are used we provide the following simplified example of launching a distributed MADQN system.
+To get a sense of how Mava systems are used we provide the following simplified example of launching a Tensorflow-based distributed MADQN system.
 
 ```python
 # Mava imports
@@ -103,9 +109,37 @@ launchpad.launch(
 )
 ```
 
-The first two arguments to the program are environment and network factory functions.
+The first two arguments of the program are environment and network factory functions.
 These helper functions are responsible for creating the networks for the system, initialising their parameters on the different compute nodes and providing a copy of the environment for each executor. The next argument `num_executors` sets the number of executor processes to be run.
+
 After building the program we feed it to Launchpad's `launch` function and specify the launch type to perform local multi-processing, i.e. running the distributed program on a single machine. Scaling up or down is simply a matter of adjusting the number of executor processes.
+
+We also illustrate how a Jax based IPPO system may be implemented.
+
+```python
+# Mava imports
+from mava.systems.jax import ippo
+from mava.utils.environments import debugging_utils
+from mava.utils.loggers import logger_utils
+
+# Create the system.
+system = ippo.IPPOSystem()
+
+# Build the distributed system.
+system.build(
+    environment_factory=environment_factory,
+    network_factory=network_factory,
+    num_executors=1,
+    sample_batch_size=5,
+    num_epochs=15,
+    multi_process=True,
+)
+
+# Launch the system
+system.launch()
+```
+
+The arguments we provide to our `system.build` overwrite the default config values from the existing components in the system
 
 For a deeper dive, take a look at the detailed working code
 examples found in our [examples] subdirectory which show how to instantiate a few MARL systems and environments.
@@ -441,7 +475,7 @@ If you use Mava in your work, please cite the accompanying
 [roadmap]: https://github.com/instadeepai/Mava/issues/246
 [wishlist]: https://github.com/instadeepai/Mava/issues/247
 [bsuite]: https://github.com/deepmind/bsuite
-[quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/quickstart.ipynb
+[quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/quickstart.ipynb
 [blog]: https://medium.com/instadeep/mava-a-new-framework-for-multi-agent-reinforcement-learning-5dcc158e104e
 [release]: https://www.instadeep.com/2021/07/mava-a-new-framework-for-distributed-multi-agent-reinforcement-learning/
 [documentation]: https://id-mava.readthedocs.io/

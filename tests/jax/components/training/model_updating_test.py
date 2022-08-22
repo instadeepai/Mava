@@ -479,13 +479,13 @@ def test_on_training_utility_fns_empty_config_optimizer(
         )
         assert mock_trainer.store.opt_states[net_key][1][0] == jnp.array([0])
         assert list(mock_trainer.store.opt_states[net_key][1][1]) == list(
-            jax.tree_map(
+            jax.tree_util.tree_map(
                 lambda t: jnp.zeros_like(t, dtype=float),
                 mock_trainer.store.networks["networks"][net_key].params,
             )
         )
         assert list(mock_trainer.store.opt_states[net_key][1][2]) == list(
-            jax.tree_map(
+            jax.tree_util.tree_map(
                 jnp.zeros_like, mock_trainer.store.networks["networks"][net_key].params
             )
         )

@@ -1,8 +1,29 @@
-import functools
+# python3
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-import acme
+import functools
+import os
+import signal
+from datetime import datetime
+from typing import Any
+
 import optax
 import pytest
+from launchpad.launch.test_multi_threading import (
+    address_builder as test_address_builder,
+)
 
 from mava.systems.jax import ippo
 from mava.systems.jax.system import System
@@ -15,16 +36,14 @@ from mava.utils.loggers import logger_utils
 
 @pytest.fixture
 def test_full_system() -> System:
-    """Add description here."""
+    """Full mava system fixture for testing"""
     return ippo.IPPOSystem()
 
 
-# TODO: fix test
-@pytest.mark.skip(reason="test is currently breaking ci pipeline")
-def test_except_trainer(
+def test_ippo(
     test_full_system: System,
 ) -> None:
-    """Test if the parameter server instantiates processes as expected."""
+    """Full integration test of ippo system."""
 
     # Environment.
     environment_factory = functools.partial(
@@ -34,11 +53,17 @@ def test_except_trainer(
     )
 
     # Networks.
-    network_factory = ippo.make_default_networks
+    def network_factory(*args: Any, **kwargs: Any) -> Any:
+        return ippo.make_default_networks(  # type: ignore
+            policy_layer_sizes=(32, 32),
+            critic_layer_sizes=(64, 64),
+            *args,
+            **kwargs,
+        )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir.
     base_dir = "~/mava"
-    mava_id = "12345"
+    mava_id = str(datetime.now())
     checkpoint_subpath = f"{base_dir}/{mava_id}"
 
     # Log every [log_every] seconds.
@@ -54,7 +79,8 @@ def test_except_trainer(
 
     # Optimizer.
     optimizer = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+        optax.clip_by_global_norm(40.0),
+        optax.adam(1e-4),
     )
 
     # Build the system
@@ -62,28 +88,32 @@ def test_except_trainer(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        checkpoint_subpath=checkpoint_subpath,
+        experiment_path=checkpoint_subpath,
         optimizer=optimizer,
-        executor_parameter_update_period=20,
-        multi_process=False,
+        executor_parameter_update_period=1,
+        multi_process=True,  # multi process case
         run_evaluator=True,
         num_executors=1,
+        max_queue_size=500,
         use_next_extras=False,
-        sample_batch_size=2,
+        sample_batch_size=5,
+        nodes_on_gpu=[],
     )
 
-    (
-        data_server,
-        parameter_server,
-        executor,
-        evaluator,
-        trainer,
-    ) = test_full_system._builder.store.system_build
+    (trainer_node,) = test_full_system._builder.store.program._program._groups[
+        "trainer"
+    ]
+    trainer_node.disable_run()
+    test_address_builder.bind_addresses([trainer_node])
 
-    assert isinstance(executor, acme.core.Worker)
+    # pid is necessary to stop the launcher once the test ends
+    pid = os.getpid()
 
-    # Step the executor
-    executor.run_episode()
+    test_full_system.launch()
+    trainer_run = trainer_node.create_handle().dereference()
 
-    # Step the trainer
-    trainer.step()
+    for _ in range(5):
+        trainer_run.step()
+
+    # stop the launcher
+    os.kill(pid, signal.SIGTERM)
