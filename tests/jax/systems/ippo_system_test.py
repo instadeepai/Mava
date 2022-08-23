@@ -14,8 +14,6 @@
 # limitations under the License.
 
 import functools
-import os
-import signal
 from datetime import datetime
 from typing import Any
 
@@ -82,7 +80,7 @@ def test_ippo(
         optax.clip_by_global_norm(40.0),
         optax.adam(1e-4),
     )
-
+    num_train_step = 5
     # Build the system
     test_full_system.build(
         environment_factory=environment_factory,
@@ -98,6 +96,7 @@ def test_ippo(
         use_next_extras=False,
         sample_batch_size=5,
         nodes_on_gpu=[],
+        termination_condition={"trainer_steps": num_train_step - 1},
     )
 
     (trainer_node,) = test_full_system._builder.store.program._program._groups[
@@ -106,14 +105,8 @@ def test_ippo(
     trainer_node.disable_run()
     test_address_builder.bind_addresses([trainer_node])
 
-    # pid is necessary to stop the launcher once the test ends
-    pid = os.getpid()
-
     test_full_system.launch()
     trainer_run = trainer_node.create_handle().dereference()
 
-    for _ in range(5):
+    for _ in range(num_train_step):
         trainer_run.step()
-
-    # stop the launcher
-    os.kill(pid, signal.SIGTERM)
