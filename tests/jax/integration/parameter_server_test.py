@@ -14,10 +14,7 @@
 # limitations under the License.
 
 """Tests for parameter server for Jax-based Mava systems"""
-import os
-import signal
 import time
-from typing import Any, Dict
 
 import jax.numpy as jnp
 import pytest
@@ -59,11 +56,11 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
         trainer,
     ) = test_system_sp._builder.store.system_build
 
-    # System parameter server
+    # Initial state of the parameter_server
     assert type(parameter_server.store.system_checkpointer) == savers.Checkpointer
 
     for network in parameter_server.store.parameters["networks-network_agent"].values():
-        assert list(network.keys()) == ["w", "b"]
+        assert sorted(list(network.keys())) == ["b", "w"]
         assert jnp.size(network["w"]) != 0
         assert jnp.size(network["b"]) != 0
 
@@ -78,67 +75,24 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
         "executor_steps": jnp.zeros(1, dtype=jnp.int32),
     }
 
-    ############################get_parameters test#####################################
-
-    parameter_server.get_parameters("trainer_steps")
-    assert parameter_server.store.get_parameters == jnp.zeros(1, dtype=jnp.int32)
-
-    parameter_server.get_parameters("networks-network_agent")
-    assert (
-        parameter_server.store.get_parameters
-        == parameter_server.store.parameters["networks-network_agent"]
-    )
-
-    # get multiple params
-    parameter_server.get_parameters(["executor_episodes", "executor_steps"])
-    assert parameter_server.store.get_parameters == {
-        "executor_episodes": jnp.zeros(1, dtype=jnp.int32),
-        "executor_steps": jnp.zeros(1, dtype=jnp.int32),
-    }
-
-    ############################set_parameters test#####################################
-    params = {
-        "trainer_steps": jnp.zeros(2, dtype=jnp.int32),
-        "trainer_walltime": jnp.zeros(2, dtype=jnp.float32),
-        "evaluator_steps": jnp.zeros(2, dtype=jnp.int32),
-        "evaluator_episodes": jnp.zeros(2, dtype=jnp.int32),
-        "executor_episodes": jnp.zeros(2, dtype=jnp.int32),
-        "executor_steps": jnp.zeros(2, dtype=jnp.int32),
-    }
-
-    parameter_server.set_parameters(params)
-    list_param = [
-        "trainer_steps",
-        "trainer_walltime",
-        "evaluator_steps",
-        "evaluator_episodes",
-        "executor_episodes",
-        "executor_steps",
-    ]
-    for param in list_param:
-        assert jnp.array_equal(
-            parameter_server.store.parameters[param], jnp.array([0, 0])
-        )
-
-    # set non existing param
-    param1: Dict[str, str] = {"wrong_param": "test"}
-    with pytest.raises(AssertionError):
-        assert parameter_server.set_parameters(param1)
-
-    ############################add_to_parameters_test#####################################
-    param2: Dict[str, Any] = {
-        "trainer_steps": jnp.array([1, 3]),
-    }
-    parameter_server.add_to_parameters(param2)
-
-    assert jnp.array_equal(
-        parameter_server.store.parameters["trainer_steps"], jnp.array([1, 3])
-    )  # [0,0]+[1,3]
-
-    ###################################step_test##########################################
-    # before running step
     assert not parameter_server.store.last_checkpoint_time
     assert parameter_server.store.system_checkpointer._last_saved == 0
+
+    # test get and set parameters
+    for _ in range(3):
+        executor.run_episode()
+    trainer.step()
+
+    trainer_steps = parameter_server.get_parameters("trainer_steps")
+    executor_episodes = parameter_server.get_parameters("executor_episodes")
+    assert list(trainer_steps) == [1]  # trainer.step one time
+    assert list(executor_episodes) == [3]  # run episodes three times
+
+    network = parameter_server.get_parameters("networks-network_agent")
+    for network in network.values():
+        assert sorted(list(network.keys())) == ["b", "w"]
+        assert jnp.size(network["w"]) != 0  # network is updated
+        assert jnp.size(network["b"]) != 0
 
     # run step function
     parameter_server.step()
@@ -151,19 +105,34 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
 
 def test_parameter_server_multi_thread(test_system_mt: System) -> None:
     """Test if the paraameter server instantiates processes as expected."""
+    (trainer_node,) = test_system_mt._builder.store.program._program._groups["trainer"]
+    (executor_node,) = test_system_mt._builder.store.program._program._groups[
+        "executor"
+    ]
+    (evaluator_node,) = test_system_mt._builder.store.program._program._groups[
+        "evaluator"
+    ]
     (parameter_server_node,) = test_system_mt._builder.store.program._program._groups[
         "parameter_server"
     ]
+
+    trainer_node.disable_run()
+    executor_node.disable_run()
+    evaluator_node.disable_run()
     parameter_server_node.disable_run()
 
     test_system_mt.launch()
-    parameter_server = parameter_server_node._construct_instance()
+    time.sleep(10)
 
-    # System parameter server
+    parameter_server = parameter_server_node._construct_instance()
+    executor = executor_node._construct_instance()
+    trainer = trainer_node._construct_instance()
+
+    # Initial state of the parameter_server
     assert type(parameter_server.store.system_checkpointer) == savers.Checkpointer
 
     for network in parameter_server.store.parameters["networks-network_agent"].values():
-        assert list(network.keys()) == ["w", "b"]
+        assert sorted(list(network.keys())) == ["b", "w"]
         assert jnp.size(network["w"]) != 0
         assert jnp.size(network["b"]) != 0
 
@@ -178,69 +147,26 @@ def test_parameter_server_multi_thread(test_system_mt: System) -> None:
         "executor_steps": jnp.zeros(1, dtype=jnp.int32),
     }
 
-    ############################get_parameters test#####################################
-
-    parameter_server.get_parameters("trainer_steps")
-    assert parameter_server.store.get_parameters == jnp.zeros(1, dtype=jnp.int32)
-
-    parameter_server.get_parameters("networks-network_agent")
-    assert (
-        parameter_server.store.get_parameters
-        == parameter_server.store.parameters["networks-network_agent"]
-    )
-
-    # get multiple params
-    parameter_server.get_parameters(["executor_episodes", "executor_steps"])
-    assert parameter_server.store.get_parameters == {
-        "executor_episodes": jnp.zeros(1, dtype=jnp.int32),
-        "executor_steps": jnp.zeros(1, dtype=jnp.int32),
-    }
-
-    ############################set_parameters test#####################################
-    params = {
-        "trainer_steps": jnp.zeros(2, dtype=jnp.int32),
-        "trainer_walltime": jnp.zeros(2, dtype=jnp.float32),
-        "evaluator_steps": jnp.zeros(2, dtype=jnp.int32),
-        "evaluator_episodes": jnp.zeros(2, dtype=jnp.int32),
-        "executor_episodes": jnp.zeros(2, dtype=jnp.int32),
-        "executor_steps": jnp.zeros(2, dtype=jnp.int32),
-    }
-
-    parameter_server.set_parameters(params)
-    list_param = [
-        "trainer_steps",
-        "trainer_walltime",
-        "evaluator_steps",
-        "evaluator_episodes",
-        "executor_episodes",
-        "executor_steps",
-    ]
-    for param in list_param:
-        assert jnp.array_equal(
-            parameter_server.store.parameters[param], jnp.array([0, 0])
-        )
-
-    # set non existing param
-    param1: Dict[str, str] = {"wrong_param": "test"}
-    with pytest.raises(AssertionError):
-        assert parameter_server.set_parameters(param1)
-
-    ############################add_to_parameters_test#####################################
-    param2: Dict[str, Any] = {
-        "trainer_steps": jnp.array([1, 3]),
-    }
-    parameter_server.add_to_parameters(param2)
-
-    assert jnp.array_equal(
-        parameter_server.store.parameters["trainer_steps"], jnp.array([1, 3])
-    )  # [0,0]+[1,3]
-
-    ###################################step_test##########################################
-    # before running step
     assert not parameter_server.store.last_checkpoint_time
     assert parameter_server.store.system_checkpointer._last_saved == 0
+
+    # test get and set parameters
+    for _ in range(3):
+        executor.run_episode()
+    trainer.step()
+
+    trainer_steps = parameter_server.get_parameters("trainer_steps")
+    executor_episodes = parameter_server.get_parameters("executor_episodes")
+    assert list(trainer_steps) == [1]  # trainer.step one time
+    assert list(executor_episodes) == [3]  # run episodes three times
+
+    network = parameter_server.get_parameters("networks-network_agent")
+    for network in network.values():
+        assert sorted(list(network.keys())) == ["b", "w"]
+        assert jnp.size(network["w"]) != 0  # network is updated
+        assert jnp.size(network["b"]) != 0
+
     # run step function
-    parameter_server.store.global_config.non_blocking_sleep_seconds = 0
     parameter_server.step()
 
     assert parameter_server.store.last_checkpoint_time
@@ -252,23 +178,33 @@ def test_parameter_server_multi_thread(test_system_mt: System) -> None:
 def test_parameter_server_multi_process(test_system_mp: System) -> None:
     """Test if the paraameter server instantiates processes as expected."""
 
+    (trainer_node,) = test_system_mp._builder.store.program._program._groups["trainer"]
+    (executor_node,) = test_system_mp._builder.store.program._program._groups[
+        "executor"
+    ]
+    (evaluator_node,) = test_system_mp._builder.store.program._program._groups[
+        "evaluator"
+    ]
     (parameter_server_node,) = test_system_mp._builder.store.program._program._groups[
         "parameter_server"
     ]
-    parameter_server_node.disable_run()
 
-    # pid is necessary to stop the launcher once the test is done
-    pid = os.getpid()
+    trainer_node.disable_run()
+    executor_node.disable_run()
+    evaluator_node.disable_run()
+    # parameter_server_node.disable_run()
 
     test_system_mp.launch()
 
     parameter_server = parameter_server_node._construct_instance()
+    executor = executor_node._construct_instance()
+    trainer = trainer_node._construct_instance()
 
-    # System parameter server
+    # Initial state of the parameter_server
     assert type(parameter_server.store.system_checkpointer) == savers.Checkpointer
 
     for network in parameter_server.store.parameters["networks-network_agent"].values():
-        assert list(network.keys()) == ["w", "b"]
+        assert sorted(list(network.keys())) == ["b", "w"]
         assert jnp.size(network["w"]) != 0
         assert jnp.size(network["b"]) != 0
 
@@ -283,75 +219,25 @@ def test_parameter_server_multi_process(test_system_mp: System) -> None:
         "executor_steps": jnp.zeros(1, dtype=jnp.int32),
     }
 
-    ############################get_parameters test#####################################
-
-    parameter_server.get_parameters("trainer_steps")
-    assert parameter_server.store.get_parameters == jnp.zeros(1, dtype=jnp.int32)
-
-    parameter_server.get_parameters("networks-network_agent")
-    assert (
-        parameter_server.store.get_parameters
-        == parameter_server.store.parameters["networks-network_agent"]
-    )
-
-    # get multiple params
-    parameter_server.get_parameters(["executor_episodes", "executor_steps"])
-    assert parameter_server.store.get_parameters == {
-        "executor_episodes": jnp.zeros(1, dtype=jnp.int32),
-        "executor_steps": jnp.zeros(1, dtype=jnp.int32),
-    }
-
-    ############################set_parameters test#####################################
-    params = {
-        "trainer_steps": jnp.zeros(2, dtype=jnp.int32),
-        "trainer_walltime": jnp.zeros(2, dtype=jnp.float32),
-        "evaluator_steps": jnp.zeros(2, dtype=jnp.int32),
-        "evaluator_episodes": jnp.zeros(2, dtype=jnp.int32),
-        "executor_episodes": jnp.zeros(2, dtype=jnp.int32),
-        "executor_steps": jnp.zeros(2, dtype=jnp.int32),
-    }
-
-    parameter_server.set_parameters(params)
-    list_param = [
-        "trainer_steps",
-        "trainer_walltime",
-        "evaluator_steps",
-        "evaluator_episodes",
-        "executor_episodes",
-        "executor_steps",
-    ]
-    for param in list_param:
-        assert jnp.array_equal(
-            parameter_server.store.parameters[param], jnp.array([0, 0])
-        )
-
-    # set non existing param
-    param1: Dict[str, str] = {"wrong_param": "test"}
-    with pytest.raises(AssertionError):
-        assert parameter_server.set_parameters(param1)
-
-    ############################add_to_parameters_test#####################################
-    param2: Dict[str, Any] = {
-        "trainer_steps": jnp.array([1, 3]),
-    }
-    parameter_server.add_to_parameters(param2)
-
-    assert jnp.array_equal(
-        parameter_server.store.parameters["trainer_steps"], jnp.array([1, 3])
-    )  # [0,0]+[1,3]
-
-    ###################################step_test##########################################
-    # before running step
     assert not parameter_server.store.last_checkpoint_time
     assert parameter_server.store.system_checkpointer._last_saved == 0
+
+    # test get and set parameters
+    for _ in range(3):
+        executor.run_episode()
+
+    trainer.step()
+
+    network = parameter_server.get_parameters("networks-network_agent")
+    for network in network.values():
+        assert sorted(list(network.keys())) == ["b", "w"]
+        assert jnp.size(network["w"]) != 0  # network is updated
+        assert jnp.size(network["b"]) != 0
+
     # run step function
-    parameter_server.store.global_config.non_blocking_sleep_seconds = 0
     parameter_server.step()
 
     assert parameter_server.store.last_checkpoint_time
     assert parameter_server.store.last_checkpoint_time < time.time()
     assert parameter_server.store.system_checkpointer._last_saved != 0
     assert parameter_server.store.system_checkpointer._last_saved < time.time()
-
-    # stop the launchpad
-    os.kill(pid, signal.SIGTERM)

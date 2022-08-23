@@ -214,6 +214,5 @@ def mock_system_multi_process() -> System:
         sample_batch_size=5,
         nodes_on_gpu=[],
         lp_launch_type=lp.LaunchType.LOCAL_MULTI_PROCESSING,
-        termination_condition={"trainer_steps": 1},
     )
     return test_system
