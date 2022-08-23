@@ -16,6 +16,7 @@
 import functools
 from datetime import datetime
 from typing import Any
+
 import optax
 import pytest
 
@@ -94,8 +95,10 @@ def test_ippo(
         nodes_on_gpu=[],
     )
 
-   # Disable the nodes
-    (trainer_node,) = test_full_system._builder.store.program._program._groups["trainer"]
+    # Disable the nodes
+    (trainer_node,) = test_full_system._builder.store.program._program._groups[
+        "trainer"
+    ]
     (executor_node,) = test_full_system._builder.store.program._program._groups[
         "executor"
     ]
