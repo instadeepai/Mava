@@ -271,8 +271,8 @@ class RunningStatistics:
             self._mean = x
             self._var = 0
         else:
-            self._mean = np.mean(self.queue)
-            self._var = np.var(self.queue)
+            self._mean = np.mean(np.array(self.queue))
+            self._var = np.var(np.array(self.queue))
 
     def max(self) -> float:
         return self._max

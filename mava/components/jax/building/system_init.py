@@ -15,9 +15,11 @@
 
 import abc
 from dataclasses import dataclass, field
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable, List, Optional, Type, Union
 
+from mava.callbacks import Callback
 from mava.components.jax import Component
+from mava.components.jax.building.environments import EnvironmentSpec
 from mava.core_jax import SystemBuilder
 from mava.utils import enums
 from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
@@ -45,6 +47,18 @@ class BaseSystemInit(Component):
     def name() -> str:
         """Static method that returns component name."""
         return "system_init"
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        EnvironmentSpec required to set up builder.store.agents
+        and builder.store.environment_spec.
+
+        Returns:
+            List of required component classes.
+        """
+        return [EnvironmentSpec]
 
 
 @dataclass

@@ -34,12 +34,6 @@ def dummy_config() -> ExecutorInitConfig:
     return ExecutorInitConfig(interval={"test": 1})
 
 
-def network_factory() -> str:
-    """Function used in builder.store.networ_factory"""
-
-    return "after_network_factory"
-
-
 @pytest.fixture
 def mock_builder() -> Builder:
     """Mock builder component.
@@ -49,7 +43,7 @@ def mock_builder() -> Builder:
     """
     builder = Builder(components=[])
     # store
-    store = SimpleNamespace(network_factory=network_factory, networks=None)
+    store = SimpleNamespace(networks=None)
     builder.store = store
     return builder
 
@@ -65,18 +59,6 @@ def mock_executor() -> Executor:
     executor = Executor(store=store)
     executor._interval = None  # type: ignore
     return executor
-
-
-def test_on_building_init(mock_builder: Builder) -> None:
-    """Test on_building_init method from ExecutorInit
-
-    Args:
-        mock_builder:Builder
-    """
-    executor_init = ExecutorInit()
-    executor_init.on_building_init(builder=mock_builder)
-
-    assert mock_builder.store.networks == "after_network_factory"
 
 
 def test_on_execution_init_start(

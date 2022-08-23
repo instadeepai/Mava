@@ -38,12 +38,15 @@ tf_requirements = [
 
 jax_requirements = [
     "chex",
-    "jax",
+    # TODO Unpin JAX, once new rlax and acme version is released.
+    # To fix cannot import name 'tree_multimap' from 'jax.tree_util'.
+    "jax<=0.3.15",
     "jaxlib",
     "dm-haiku",
     "flax",
     "optax",
     "rlax",
+    "networkx",
 ] + tf_requirements
 
 pettingzoo_requirements = [
@@ -105,7 +108,7 @@ setup(
         "absl-py",
         "dm_env",
         "dm-tree",
-        "numpy~=1.21.4",
+        "numpy",
         "pillow",
         "matplotlib",
         "dataclasses",

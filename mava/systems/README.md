@@ -30,7 +30,7 @@ We also have a system that works with either discrete or continuous action-space
 
 System                                                    | Paper                    | Code
 -------------------------------------------------------- | :----------------------: | :--:
-Multi-Agent Proximal Policy Optimization (MAPPO)        | [Yu et al., 2021], [Schroeder et al., 2020]      | [![TF][TF Logo]][MAPPO_TF2]
+Multi-Agent Proximal Policy Optimization (MAPPO)        | [Yu et al., 2021], [Schroeder et al., 2020]      | [![TF][TF Logo]][MAPPO_TF2] [![Jax][Jax Logo]][IPPO_Jax]
 
 <!-- TF agents -->
 
@@ -42,6 +42,9 @@ Multi-Agent Proximal Policy Optimization (MAPPO)        | [Yu et al., 2021], [Sc
 [QMIX_TF2]: https://github.com/instadeepai/Mava/tree/main/mava/systems/tf/qmix/
 
 [MAPPO_TF2]: https://github.com/instadeepai/Mava/tree/main/mava/systems/tf/mappo/
+
+<!-- Jax agents -->
+[IPPO_Jax]: https://github.com/instadeepai/Mava/tree/develop/mava/systems/jax/ippo
 
 <!-- Papers -->
 [Lowe et al., 2017]: https://arxiv.org/abs/1706.02275
@@ -55,3 +58,5 @@ Multi-Agent Proximal Policy Optimization (MAPPO)        | [Yu et al., 2021], [Sc
 [Schroeder et al., 2020]: https://arxiv.org/abs/2011.09533
 
 [TF Logo]: https://raw.githubusercontent.com/instadeepai/Mava/main/docs/images/tf-small.png
+
+[Jax Logo]: https://raw.githubusercontent.com/instadeepai/Mava/develop/docs/images/jax_logo_small.png

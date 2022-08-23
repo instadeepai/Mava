@@ -16,13 +16,14 @@
 """Trainer components for advantage calculations."""
 
 from dataclasses import dataclass
-from typing import Callable, Optional, Tuple
+from typing import Callable, List, Optional, Tuple, Type
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import rlax
 
+from mava.callbacks import Callback
 from mava.components.jax.training.base import Utility
 from mava.core_jax import SystemTrainer
 
@@ -99,3 +100,14 @@ class GAE(Utility):
             config class/dataclass for component.
         """
         return GAEConfig
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        None required.
+
+        Returns:
+            List of required component classes.
+        """
+        return []

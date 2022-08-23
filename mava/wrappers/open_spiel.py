@@ -106,7 +106,7 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
             "action_mask": action_mask,
         }
 
-        return observation
+        return observation  # type: ignore
 
     def step(self, action_list: Tuple[np.ndarray]) -> dm_env.TimeStep:
         """Steps the environment."""
