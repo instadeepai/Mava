@@ -16,8 +16,6 @@
 """Integration test of The Executor for Jax-based Mava systems"""
 
 import functools
-import os
-import signal
 import time
 
 import pytest
@@ -166,15 +164,27 @@ def test_executor_single_process_without_adder(test_system_sp: System) -> None:
 
 def test_executor_multi_thread_with_adder(test_system_mt: System) -> None:
     """Test if the executor instantiates processes as expected."""
+
+    (trainer_node,) = test_system_mt._builder.store.program._program._groups["trainer"]
     (executor_node,) = test_system_mt._builder.store.program._program._groups[
         "executor"
     ]
-    test_address_builder.bind_addresses([executor_node])
+    (evaluator_node,) = test_system_mt._builder.store.program._program._groups[
+        "evaluator"
+    ]
+    (parameter_server_node,) = test_system_mt._builder.store.program._program._groups[
+        "parameter_server"
+    ]
+    trainer_node.disable_run()
+    executor_node.disable_run()
+    evaluator_node.disable_run()
+    parameter_server_node.disable_run()
 
     test_system_mt.launch()
     time.sleep(10)
     executor = executor_node._construct_instance()
 
+    executor.run_episode()
     # Observe first and observe
     assert executor._executor.store.adder._writer.history
     assert list(executor._executor.store.adder._writer.history.keys()) == [
@@ -228,21 +238,32 @@ def test_executor_multi_thread_with_adder(test_system_mt: System) -> None:
 
 def test_executor_mulit_process_with_adder(test_system_mp: System) -> None:
     """Test if the executor instantiates processes as expected."""
+
+    (trainer_node,) = test_system_mp._builder.store.program._program._groups["trainer"]
+    (executor_node,) = test_system_mp._builder.store.program._program._groups[
+        "executor"
+    ]
+    (evaluator_node,) = test_system_mp._builder.store.program._program._groups[
+        "evaluator"
+    ]
+    (parameter_server_node,) = test_system_mp._builder.store.program._program._groups[
+        "parameter_server"
+    ]
+    trainer_node.disable_run()
+    executor_node.disable_run()
+    evaluator_node.disable_run()
+    parameter_server_node.disable_run()
+
     (executor_node,) = test_system_mp._builder.store.program._program._groups[
         "executor"
     ]
     test_address_builder.bind_addresses([executor_node])
 
-    # pid is necessary to stop the launcher once the test ends
-    pid = os.getpid()
-
     test_system_mp.launch()
-    time.sleep(10)
 
     executor = executor_node._construct_instance()
 
-    for _ in range(5):
-        executor.run_episode()
+    executor.run_episode()
 
     # Observe first and observe
     assert executor._executor.store.adder._writer.history
@@ -283,6 +304,3 @@ def test_executor_mulit_process_with_adder(test_system_mp: System) -> None:
         lambda: key == "log_prob"
         for key in executor._executor.store.policies_info.values()
     )
-
-    # stop the launcher
-    os.kill(pid, signal.SIGTERM)
