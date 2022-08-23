@@ -14,16 +14,10 @@
 # limitations under the License.
 
 import functools
-import os
-import signal
 from datetime import datetime
 from typing import Any
-
 import optax
 import pytest
-from launchpad.launch.test_multi_threading import (
-    address_builder as test_address_builder,
-)
 
 from mava.systems.jax import ippo
 from mava.systems.jax.system import System
@@ -100,20 +94,22 @@ def test_ippo(
         nodes_on_gpu=[],
     )
 
-    (trainer_node,) = test_full_system._builder.store.program._program._groups[
-        "trainer"
+   # Disable the nodes
+    (trainer_node,) = test_full_system._builder.store.program._program._groups["trainer"]
+    (executor_node,) = test_full_system._builder.store.program._program._groups[
+        "executor"
     ]
     trainer_node.disable_run()
-    test_address_builder.bind_addresses([trainer_node])
+    executor_node.disable_run()
 
-    # pid is necessary to stop the launcher once the test ends
-    pid = os.getpid()
-
+    # launch the system
     test_full_system.launch()
-    trainer_run = trainer_node.create_handle().dereference()
 
-    for _ in range(5):
-        trainer_run.step()
+    # Extract the executor and trainer instance
+    executor = executor_node._construct_instance()
+    trainer = trainer_node._construct_instance()
 
-    # stop the launcher
-    os.kill(pid, signal.SIGTERM)
+    for _ in range(3):
+        executor.run_episode()
+
+    trainer.step()
