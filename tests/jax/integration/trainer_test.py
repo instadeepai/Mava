@@ -15,6 +15,8 @@
 
 """Integration test of the Trainer for Jax-based Mava"""
 
+import os
+import signal
 import time
 
 import jax.numpy as jnp
@@ -112,6 +114,8 @@ def test_trainer_multi_process(test_system_mp: System) -> None:
     (trainer_node,) = test_system_mp._builder.store.program._program._groups["trainer"]
     trainer_node.disable_run()
 
+    # pid to help stop the launcher once the test ends
+    pid = os.getpid()
     # launch the system
     test_system_mp.launch()
 
@@ -119,7 +123,7 @@ def test_trainer_multi_process(test_system_mp: System) -> None:
 
     trainer = trainer_node._construct_instance()
 
-    # Before runnning the step function
+    # Before run step function
     for net_key in trainer.store.networks["networks"].keys():
         mu = trainer.store.opt_states[net_key][1][1]  # network
         for categorical_value_head in mu.values():
@@ -128,12 +132,13 @@ def test_trainer_multi_process(test_system_mp: System) -> None:
 
     # Step function
     trainer.step()
-    # Check that the trainer updates the network
+
+    # Check that the trainer update the network
     for net_key in trainer.store.networks["networks"].keys():
         mu = trainer.store.opt_states[net_key][1][1]
         for categorical_value_head in mu.values():
             assert not jnp.all(categorical_value_head["b"] == 0)
             assert not jnp.all(categorical_value_head["w"] == 0)
 
-    # step trainer again to trigger termination
-    trainer.step()
+    # stop the launcher
+    os.kill(pid, signal.SIGTERM)
