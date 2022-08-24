@@ -21,7 +21,6 @@ import pytest
 from mava.systems.jax import System
 from tests.jax.integration.mock_systems import (
     mock_system_multi_process,
-    mock_system_multi_thread,
     mock_system_single_process,
 )
 
@@ -36,12 +35,6 @@ def test_system_sp() -> System:
 def test_system_mp() -> System:
     """A multi process built system"""
     return mock_system_multi_process()
-
-
-@pytest.fixture
-def test_system_mt() -> System:
-    """A multi thread built system"""
-    return mock_system_multi_thread()
 
 
 def test_trainer_single_process(test_system_sp: System) -> None:
@@ -67,34 +60,6 @@ def test_trainer_single_process(test_system_sp: System) -> None:
     trainer.step()
 
     # After run step method
-    for net_key in trainer.store.networks["networks"].keys():
-        mu = trainer.store.opt_states[net_key][1][0][-1]
-        for categorical_value_head in mu.values():
-            assert not jnp.all(categorical_value_head["b"] == 0)
-            assert not jnp.all(categorical_value_head["w"] == 0)
-
-
-def test_trainer_multi_thread(test_system_mt: System) -> None:
-    """Test if the trainer instantiates processes as expected."""
-    # Disable the run of the trainer node
-    (trainer_node,) = test_system_mt._builder.store.program._program._groups["trainer"]
-    trainer_node.disable_run()
-
-    # launch the system and extract the trainer instance
-    test_system_mt.launch()
-    trainer = trainer_node._construct_instance()
-
-    # Before run step function
-    for net_key in trainer.store.networks["networks"].keys():
-        mu = trainer.store.opt_states[net_key][1][0][-1]  # network
-        for categorical_value_head in mu.values():
-            assert jnp.all(categorical_value_head["b"] == 0)
-            assert jnp.all(categorical_value_head["w"] == 0)
-
-    # Step function
-    trainer.step()
-
-    # Check that the trainer update the network
     for net_key in trainer.store.networks["networks"].keys():
         mu = trainer.store.opt_states[net_key][1][0][-1]
         for categorical_value_head in mu.values():

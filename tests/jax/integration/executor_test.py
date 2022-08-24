@@ -28,7 +28,6 @@ from mava.types import OLT
 from mava.utils.environments import debugging_utils
 from tests.jax.integration.mock_systems import (
     mock_system_multi_process,
-    mock_system_multi_thread,
     mock_system_single_process,
 )
 
@@ -44,12 +43,6 @@ environment_factory = functools.partial(
 def test_system_sp() -> System:
     """A single process built system"""
     return mock_system_single_process()
-
-
-@pytest.fixture
-def test_system_mt() -> System:
-    """A multi thread built system"""
-    return mock_system_multi_thread()
 
 
 @pytest.fixture
@@ -160,81 +153,6 @@ def test_executor_single_process_without_adder(test_system_sp: System) -> None:
 
     # Observe (without adder)
     assert not hasattr(executor._executor.store.adder, "add")
-
-
-def test_executor_multi_thread_with_adder(test_system_mt: System) -> None:
-    """Test if the executor instantiates processes as expected."""
-
-    (trainer_node,) = test_system_mt._builder.store.program._program._groups["trainer"]
-    (executor_node,) = test_system_mt._builder.store.program._program._groups[
-        "executor"
-    ]
-    (evaluator_node,) = test_system_mt._builder.store.program._program._groups[
-        "evaluator"
-    ]
-    (parameter_server_node,) = test_system_mt._builder.store.program._program._groups[
-        "parameter_server"
-    ]
-    trainer_node.disable_run()
-    executor_node.disable_run()
-    evaluator_node.disable_run()
-    parameter_server_node.disable_run()
-
-    test_system_mt.launch()
-    time.sleep(10)
-    executor = executor_node._construct_instance()
-
-    executor.run_episode()
-    # Observe first and observe
-    assert executor._executor.store.adder._writer.history
-    assert list(executor._executor.store.adder._writer.history.keys()) == [
-        "observations",
-        "start_of_episode",
-        "actions",
-        "rewards",
-        "discounts",
-        "extras",
-    ]
-    assert list(
-        executor._executor.store.adder._writer.history["observations"].keys()
-    ) == ["agent_0", "agent_1", "agent_2"]
-    assert (
-        type(executor._executor.store.adder._writer.history["observations"]["agent_0"])
-        == OLT
-    )
-
-    assert len(executor._executor.store.adder._writer._column_history) != 0
-
-    # Select actions and select action
-    i = 0
-    while (
-        sorted(list(executor._executor.store.actions_info.keys()))
-        != ["agent_0", "agent_1", "agent_2"]
-        and i < 100
-    ):
-        time.sleep(2)
-        i += 1
-
-    assert list(executor._executor.store.actions_info.keys()) == [
-        "agent_0",
-        "agent_1",
-        "agent_2",
-    ]
-    assert list(executor._executor.store.policies_info.keys()) == [
-        "agent_0",
-        "agent_1",
-        "agent_2",
-    ]
-    num_possible_actions = environment_factory().action_spec()["agent_0"].num_values
-    assert (
-        lambda: x in range(0, num_possible_actions)
-        for x in list(executor._executor.store.actions_info.values())
-    )
-    assert (
-        lambda: key == "log_prob"
-        for key in executor._executor.store.policies_info.values()
-    )
-
 
 def test_executor_mulit_process_with_adder(test_system_mp: System) -> None:
     """Test if the executor instantiates processes as expected."""
