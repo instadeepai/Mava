@@ -154,6 +154,7 @@ def test_executor_single_process_without_adder(test_system_sp: System) -> None:
     # Observe (without adder)
     assert not hasattr(executor._executor.store.adder, "add")
 
+
 def test_executor_mulit_process_with_adder(test_system_mp: System) -> None:
     """Test if the executor instantiates processes as expected."""
 
