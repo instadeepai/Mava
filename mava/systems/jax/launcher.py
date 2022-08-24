@@ -43,9 +43,6 @@ class Launcher:
         single_process_max_episodes: Optional[int] = None,
         name: str = "System",
         terminal: str = "current_terminal",
-        lp_launch_type: Union[
-            str, lp.LaunchType
-        ] = lp.LaunchType.LOCAL_MULTI_PROCESSING,
     ) -> None:
         """Initialise the launcher.
 
@@ -63,7 +60,6 @@ class Launcher:
                 before termination.
             name : launchpad program name.
             terminal : terminal for launchpad processes to be shown on.
-            lp_launch_type: launchpad launch type.
         """
         self._multi_process = multi_process
         self._name = name
@@ -71,7 +67,6 @@ class Launcher:
         self._single_process_evaluator_period = single_process_evaluator_period
         self._single_process_max_episodes = single_process_max_episodes
         self._terminal = terminal
-        self._lp_launch_type = lp_launch_type
         if multi_process:
             self._program = lp.Program(name=name)
             self._nodes_on_gpu = nodes_on_gpu
@@ -173,7 +168,7 @@ class Launcher:
 
             lp.launch(
                 self._program,
-                launch_type=self._lp_launch_type,
+                launch_type=lp.LaunchType.LOCAL_MULTI_PROCESSING,
                 terminal=self._terminal,
                 local_resources=local_resources,
             )
