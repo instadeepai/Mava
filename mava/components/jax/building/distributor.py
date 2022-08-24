@@ -34,7 +34,6 @@ class DistributorConfig:
     run_evaluator: bool = True
     distributor_name: str = "System"
     terminal: str = "current_terminal"
-    lp_launch_type: Union[str, lp.LaunchType] = lp.LaunchType.LOCAL_MULTI_PROCESSING
     single_process_max_episodes: Optional[int] = None
 
 
@@ -66,7 +65,6 @@ class Distributor(Component):
             nodes_on_gpu=self.config.nodes_on_gpu,
             name=self.config.distributor_name,
             terminal=self.config.terminal,
-            lp_launch_type=self.config.lp_launch_type,
             single_process_max_episodes=self.config.single_process_max_episodes,
         )
 
