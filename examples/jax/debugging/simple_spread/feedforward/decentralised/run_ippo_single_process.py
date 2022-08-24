@@ -100,7 +100,6 @@ def main(_: Any) -> None:
         num_executors=1,
         max_queue_size=500,
         sample_batch_size=5,
-        lp_launch_type=lp.LaunchType.LOCAL_MULTI_PROCESSING,
     )
     system.launch()
 
