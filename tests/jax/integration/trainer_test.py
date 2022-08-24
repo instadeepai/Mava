@@ -15,17 +15,12 @@
 
 """Integration test of the Trainer for Jax-based Mava"""
 
-import os
-import signal
-import time
-
 import jax.numpy as jnp
 import pytest
 
 from mava.systems.jax import System
 from tests.jax.integration.mock_systems import (
     mock_system_multi_process,
-    mock_system_multi_thread,
     mock_system_single_process,
 )
 
@@ -42,14 +37,9 @@ def test_system_mp() -> System:
     return mock_system_multi_process()
 
 
-@pytest.fixture
-def test_system_mt() -> System:
-    """A multi thread built system"""
-    return mock_system_multi_thread()
-
-
 def test_trainer_single_process(test_system_sp: System) -> None:
     """Test if the trainer instantiates processes as expected."""
+    # extract the nodes
     (
         data_server,
         parameter_server,
@@ -58,8 +48,7 @@ def test_trainer_single_process(test_system_sp: System) -> None:
         trainer,
     ) = test_system_sp._builder.store.system_build
 
-    for _ in range(5):
-        executor.run_episode()
+    executor.run_episode()
 
     # Before run step method
     for net_key in trainer.store.networks["networks"].keys():
@@ -78,49 +67,29 @@ def test_trainer_single_process(test_system_sp: System) -> None:
             assert not jnp.all(categorical_value_head["w"] == 0)
 
 
-def test_trainer_multi_thread(test_system_mt: System) -> None:
-    """Test if the trainer instantiates processes as expected."""
-    # Disable the run of the trainer node
-    (trainer_node,) = test_system_mt._builder.store.program._program._groups["trainer"]
-    trainer_node.disable_run()
-
-    # launch the system
-    test_system_mt.launch()
-    time.sleep(10)  # wait till the executor has run
-
-    trainer = trainer_node._construct_instance()
-
-    # Before run step function
-    for net_key in trainer.store.networks["networks"].keys():
-        mu = trainer.store.opt_states[net_key][1][0][-1]  # network
-        for categorical_value_head in mu.values():
-            assert jnp.all(categorical_value_head["b"] == 0)
-            assert jnp.all(categorical_value_head["w"] == 0)
-
-    # Step function
-    trainer.step()
-
-    # Check that the trainer update the network
-    for net_key in trainer.store.networks["networks"].keys():
-        mu = trainer.store.opt_states[net_key][1][0][-1]
-        for categorical_value_head in mu.values():
-            assert not jnp.all(categorical_value_head["b"] == 0)
-            assert not jnp.all(categorical_value_head["w"] == 0)
-
-
 def test_trainer_multi_process(test_system_mp: System) -> None:
     """Test if the trainer instantiates processes as expected."""
-    # Disable the run of the trainer node
+    # Disable the nodes
     (trainer_node,) = test_system_mp._builder.store.program._program._groups["trainer"]
+    (executor_node,) = test_system_mp._builder.store.program._program._groups[
+        "executor"
+    ]
+    (evaluator_node,) = test_system_mp._builder.store.program._program._groups[
+        "evaluator"
+    ]
+    (parameter_server_node,) = test_system_mp._builder.store.program._program._groups[
+        "parameter_server"
+    ]
     trainer_node.disable_run()
+    executor_node.disable_run()
+    evaluator_node.disable_run()
+    parameter_server_node.disable_run()
 
-    # pid to help stop the launcher once the test ends
-    pid = os.getpid()
     # launch the system
     test_system_mp.launch()
 
-    time.sleep(10)  # wait till the executor has run
-
+    # Extract the executor and trainer instance
+    executor = executor_node._construct_instance()
     trainer = trainer_node._construct_instance()
 
     # Before run step function
@@ -130,7 +99,9 @@ def test_trainer_multi_process(test_system_mp: System) -> None:
             assert jnp.all(categorical_value_head["b"] == 0)
             assert jnp.all(categorical_value_head["w"] == 0)
 
-    # Step function
+    # Run the executor and the trainer
+    for _ in range(3):
+        executor.run_episode()
     trainer.step()
 
     # Check that the trainer update the network
@@ -139,6 +110,3 @@ def test_trainer_multi_process(test_system_mp: System) -> None:
         for categorical_value_head in mu.values():
             assert not jnp.all(categorical_value_head["b"] == 0)
             assert not jnp.all(categorical_value_head["w"] == 0)
-
-    # stop the launcher
-    os.kill(pid, signal.SIGTERM)
