@@ -151,7 +151,6 @@ def mock_system_multi_thread() -> System:
         use_next_extras=False,
         sample_batch_size=5,
         nodes_on_gpu=[],
-        lp_launch_type=lp.LaunchType.TEST_MULTI_THREADING,
     )
     return test_system
 
@@ -213,6 +212,5 @@ def mock_system_multi_process() -> System:
         use_next_extras=False,
         sample_batch_size=5,
         nodes_on_gpu=[],
-        lp_launch_type=lp.LaunchType.LOCAL_MULTI_PROCESSING,
     )
     return test_system
