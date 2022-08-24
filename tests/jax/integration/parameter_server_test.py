@@ -192,7 +192,7 @@ def test_parameter_server_multi_process(test_system_mp: System) -> None:
     trainer_node.disable_run()
     executor_node.disable_run()
     evaluator_node.disable_run()
-    # parameter_server_node.disable_run()
+    parameter_server_node.disable_run()
 
     test_system_mp.launch()
 
