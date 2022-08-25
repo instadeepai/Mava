@@ -43,10 +43,11 @@ class Launcher:
         single_process_max_episodes: Optional[int] = None,
         name: str = "System",
         terminal: str = "current_terminal",
+        is_test: Optional[bool] = False,
     ) -> None:
         """Initialise the launcher.
 
-        If multi-process, set up the launchpad program.
+        If multi-process, ss_test: Optional[bool] = False,et up the launchpad program.
         Otherwise, create a dictionary for the nodes in the system.
 
         Args:
@@ -61,6 +62,7 @@ class Launcher:
             name : launchpad program name.
             terminal : terminal for launchpad processes to be shown on.
         """
+        self._is_test = is_test
         self._multi_process = multi_process
         self._name = name
         self._single_process_trainer_period = single_process_trainer_period
@@ -166,12 +168,21 @@ class Launcher:
                 nodes_on_gpu=self._nodes_on_gpu,
             )
 
-            lp.launch(
-                self._program,
-                launch_type=lp.LaunchType.LOCAL_MULTI_PROCESSING,
-                terminal=self._terminal,
-                local_resources=local_resources,
-            )
+            if self._is_test:
+                lp.launch(
+                    self._program,
+                    launch_type=lp.LaunchType.TEST_MULTI_THREADING,
+                    terminal=self._terminal,
+                    local_resources=local_resources,
+                )
+            else:
+                lp.launch(
+                    self._program,
+                    launch_type=lp.LaunchType.LOCAL_MULTI_PROCESSING,
+                    terminal=self._terminal,
+                    local_resources=local_resources,
+                )
+
         else:
             episode = 1
             step = 1
