@@ -54,6 +54,7 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
         "executor_steps": jnp.zeros(1, dtype=jnp.int32),
     }
 
+    # check that checkpoint not yet saved
     assert not parameter_server.store.last_checkpoint_time
     assert parameter_server.store.system_checkpointer._last_saved == 0
 
@@ -69,13 +70,15 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     assert list(executor_episodes) == [3]  # run episodes three times
 
     # check that the network is updated (at least one of the values updated)
-    updated_network = parameter_server.get_parameters("networks-network_agent")
+    updated_networks_param = parameter_server.get_parameters("networks-network_agent")
     at_least_one_changed = False
-    for key in updated_network.keys():
-        assert sorted(list(updated_network[key].keys())) == ["b", "w"]
+    for key in updated_networks_param.keys():
+        assert sorted(list(updated_networks_param[key].keys())) == ["b", "w"]
         if not jnp.array_equal(
-            updated_network[key]["w"], first_network[key]["w"]
-        ) or not jnp.array_equal(updated_network[key]["b"], first_network[key]["w"]):
+            updated_networks_param[key]["w"], first_network[key]["w"]
+        ) or not jnp.array_equal(
+            updated_networks_param[key]["b"], first_network[key]["w"]
+        ):
             at_least_one_changed = True
             break
     assert at_least_one_changed
@@ -83,6 +86,7 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     # run step function
     parameter_server.step()
 
+    # Check that the checkpoint is saved thanks to the step function
     assert parameter_server.store.last_checkpoint_time
     assert parameter_server.store.last_checkpoint_time < time.time()
     assert parameter_server.store.system_checkpointer._last_saved != 0
