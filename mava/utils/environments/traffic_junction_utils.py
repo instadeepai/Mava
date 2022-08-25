@@ -6,12 +6,14 @@ from mava.wrappers.traffic_junction import TrafficJunctionWrapper
 
 def make_environment(
     difficulty: str = "easy",
+    test_for_comms: bool = True,
     evaluation: bool = False,
 ) -> dm_env.Environment:
     """Create a wrapped Traffic Junction environment.
 
     Args:
         difficulty: 'easy', 'medium', or 'hard'.
+        test_for_comms: Whether to set vision to 0 to test if comms are working.
         evaluation: Whether environment is used by the evaluator.
 
     Returns:
@@ -37,10 +39,12 @@ def make_environment(
         add_rate = 0.05
         max_steps = 80
 
+    vision = 0 if test_for_comms else 1  # Set vision to 0 to test comms, 1 is standard
+
     env_module = TrafficJunctionEnv(
         num_agents=num_agents,
         dim=dim,
-        vision=1,
+        vision=vision,
         add_rate_min=add_rate,
         curr_start=0,
         curr_end=0,
