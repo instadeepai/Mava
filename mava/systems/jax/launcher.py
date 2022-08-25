@@ -164,25 +164,23 @@ class Launcher:
             None.
         """
         if self._multi_process:
+
+            if self._is_test:
+                launch_type = lp.LaunchType.TEST_MULTI_THREADING
+            else:
+                launch_type = lp.LaunchType.LOCAL_MULTI_PROCESSING
+
             local_resources = lp_utils.to_device(
                 program_nodes=self._program.groups.keys(),
                 nodes_on_gpu=self._nodes_on_gpu,
             )
 
-            if self._is_test:
-                lp.launch(
-                    self._program,
-                    launch_type=lp.LaunchType.TEST_MULTI_THREADING,
-                    terminal=self._terminal,
-                    local_resources=local_resources,
-                )
-            else:
-                lp.launch(
-                    self._program,
-                    launch_type=lp.LaunchType.LOCAL_MULTI_PROCESSING,
-                    terminal=self._terminal,
-                    local_resources=local_resources,
-                )
+            lp.launch(
+                self._program,
+                launch_type=launch_type,
+                terminal=self._terminal,
+                local_resources=local_resources,
+            )
 
         else:
             episode = 1
