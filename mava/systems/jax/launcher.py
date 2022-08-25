@@ -116,7 +116,8 @@ class Launcher:
 
         if self._multi_process:
             with self._program.group(name):
-                node_fn = copy_node_fn(node_fn)
+                if self._is_test:
+                    node_fn = copy_node_fn(node_fn)
                 node = self._program.add_node(node_type(node_fn, *arguments))
             return node
         else:
