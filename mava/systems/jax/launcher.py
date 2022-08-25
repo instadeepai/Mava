@@ -47,7 +47,7 @@ class Launcher:
     ) -> None:
         """Initialise the launcher.
 
-        If multi-process,et up the launchpad program.
+        If multi-process, set up the launchpad program.
         Otherwise, create a dictionary for the nodes in the system.
 
         Args:
