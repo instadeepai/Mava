@@ -87,11 +87,17 @@ def test_executor_single_process_with_adder(test_system_sp: System) -> None:
         "agent_1",
         "agent_2",
     ]
-    num_possible_actions = environment_factory().action_spec()["agent_0"].num_values
-    assert (
-        lambda: x in range(0, num_possible_actions)
-        for x in list(executor._executor.store.actions_info.values())
-    )
+
+    # check that the selected action is within the possible ones
+    num_possible_actions = [
+        environment_factory().action_spec()[agent].num_values
+        for agent in environment_factory().possible_agents
+    ]
+    for i in range(len(num_possible_actions)):
+        assert list(executor._executor.store.actions_info.values())[i] in range(
+            0, num_possible_actions[i]
+        )
+
     assert (
         lambda: key == "log_prob"
         for key in executor._executor.store.policies_info.values()
@@ -127,11 +133,16 @@ def test_executor_single_process_without_adder(test_system_sp: System) -> None:
         "agent_1",
         "agent_2",
     ]
-    num_possible_actions = environment_factory().action_spec()["agent_0"].num_values
-    assert (
-        lambda: x in range(0, num_possible_actions)
-        for x in list(executor._executor.store.actions_info.values())
-    )
+
+    # check that the selected action is within the possible ones
+    num_possible_actions = [
+        environment_factory().action_spec()[agent].num_values
+        for agent in environment_factory().possible_agents
+    ]
+    for i in range(len(num_possible_actions)):
+        assert list(executor._executor.store.actions_info.values())[i] in range(
+            0, num_possible_actions[i]
+        )
 
     assert (
         lambda: key == "log_prob"
