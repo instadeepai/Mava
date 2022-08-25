@@ -43,6 +43,7 @@ class Launcher:
         single_process_max_episodes: Optional[int] = None,
         name: str = "System",
         terminal: str = "current_terminal",
+        is_test: Optional[bool] = False,
     ) -> None:
         """Initialise the launcher.
 
@@ -61,6 +62,7 @@ class Launcher:
             name : launchpad program name.
             terminal : terminal for launchpad processes to be shown on.
         """
+        self._is_test = is_test
         self._multi_process = multi_process
         self._name = name
         self._single_process_trainer_period = single_process_trainer_period
@@ -114,7 +116,8 @@ class Launcher:
 
         if self._multi_process:
             with self._program.group(name):
-                node_fn = copy_node_fn(node_fn)
+                if self._is_test:
+                    node_fn = copy_node_fn(node_fn)
                 node = self._program.add_node(node_type(node_fn, *arguments))
             return node
         else:
@@ -161,6 +164,12 @@ class Launcher:
             None.
         """
         if self._multi_process:
+
+            if self._is_test:
+                launch_type = lp.LaunchType.TEST_MULTI_THREADING
+            else:
+                launch_type = lp.LaunchType.LOCAL_MULTI_PROCESSING
+
             local_resources = lp_utils.to_device(
                 program_nodes=self._program.groups.keys(),
                 nodes_on_gpu=self._nodes_on_gpu,
@@ -168,10 +177,11 @@ class Launcher:
 
             lp.launch(
                 self._program,
-                launch_type=lp.LaunchType.LOCAL_MULTI_PROCESSING,
+                launch_type=launch_type,
                 terminal=self._terminal,
                 local_resources=local_resources,
             )
+
         else:
             episode = 1
             step = 1
