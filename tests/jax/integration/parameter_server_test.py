@@ -58,7 +58,7 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     assert not parameter_server.store.last_checkpoint_time
     assert parameter_server.store.system_checkpointer._last_saved == 0
 
-    first_network = parameter_server.store.parameters["networks-network_agent"]
+    first_network_param = parameter_server.store.parameters["networks-network_agent"]
     # test get and set parameters
     for _ in range(3):
         executor.run_episode()
@@ -75,9 +75,9 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     for key in updated_networks_param.keys():
         assert sorted(list(updated_networks_param[key].keys())) == ["b", "w"]
         if not jnp.array_equal(
-            updated_networks_param[key]["w"], first_network[key]["w"]
+            updated_networks_param[key]["w"], first_network_param[key]["w"]
         ) or not jnp.array_equal(
-            updated_networks_param[key]["b"], first_network[key]["w"]
+            updated_networks_param[key]["b"], first_network_param[key]["w"]
         ):
             at_least_one_changed = True
             break
