@@ -77,7 +77,7 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
         if not jnp.array_equal(
             updated_networks_param[key]["w"], first_network_param[key]["w"]
         ) or not jnp.array_equal(
-            updated_networks_param[key]["b"], first_network_param[key]["w"]
+            updated_networks_param[key]["b"], first_network_param[key]["b"]
         ):
             at_least_one_changed = True
             break
