@@ -47,7 +47,7 @@ class Launcher:
     ) -> None:
         """Initialise the launcher.
 
-        If multi-process, ss_test: Optional[bool] = False,et up the launchpad program.
+        If multi-process,et up the launchpad program.
         Otherwise, create a dictionary for the nodes in the system.
 
         Args:
