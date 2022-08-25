@@ -43,11 +43,6 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     # Initial state of the parameter_server
     assert type(parameter_server.store.system_checkpointer) == savers.Checkpointer
 
-    for network in parameter_server.store.parameters["networks-network_agent"].values():
-        assert sorted(list(network.keys())) == ["b", "w"]
-        assert jnp.size(network["w"]) != 0
-        assert jnp.size(network["b"]) != 0
-
     param_without_net = parameter_server.store.parameters.copy()
     del param_without_net["networks-network_agent"]
     assert param_without_net == {
@@ -62,6 +57,7 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     assert not parameter_server.store.last_checkpoint_time
     assert parameter_server.store.system_checkpointer._last_saved == 0
 
+    first_network = parameter_server.store.parameters["networks-network_agent"]
     # test get and set parameters
     for _ in range(3):
         executor.run_episode()
@@ -72,11 +68,17 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     assert list(trainer_steps) == [1]  # trainer.step one time
     assert list(executor_episodes) == [3]  # run episodes three times
 
-    network = parameter_server.get_parameters("networks-network_agent")
-    for network in network.values():
-        assert sorted(list(network.keys())) == ["b", "w"]
-        assert jnp.size(network["w"]) != 0  # network is updated
-        assert jnp.size(network["b"]) != 0
+    # check that the network is updated (at least one of the values updated)
+    updated_network = parameter_server.get_parameters("networks-network_agent")
+    at_least_one_changed = False
+    for key in updated_network.keys():
+        assert sorted(list(updated_network[key].keys())) == ["b", "w"]
+        if not jnp.array_equal(
+            updated_network[key]["w"], first_network[key]["w"]
+        ) or not jnp.array_equal(updated_network[key]["b"], first_network[key]["w"]):
+            at_least_one_changed = True
+            break
+    assert at_least_one_changed
 
     # run step function
     parameter_server.step()
