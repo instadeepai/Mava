@@ -18,7 +18,6 @@ import functools
 import os
 from datetime import datetime
 from typing import Any
-
 import optax
 from absl import app, flags
 
