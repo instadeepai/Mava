@@ -23,7 +23,7 @@ import pytest
 from mava.systems.jax import System
 from mava.types import OLT
 from mava.utils.environments import debugging_utils
-from tests.jax.systems.test_systems import test_ippo_system_single_process
+from tests.jax.systems.systems import test_ippo_system_single_process
 
 # Environment.
 environment_factory = functools.partial(

@@ -17,7 +17,7 @@
 import pytest
 
 from mava.systems.jax.system import System
-from tests.jax.systems.test_systems import test_ippo_system_multi_thread
+from tests.jax.systems.systems import test_ippo_system_multi_thread
 
 #########################################################################
 # Full system integration test.

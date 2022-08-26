@@ -21,7 +21,7 @@ import pytest
 from acme.jax import savers
 
 from mava.systems.jax import System
-from tests.jax.systems.test_systems import test_ippo_system_single_process
+from tests.jax.systems.systems import test_ippo_system_single_process
 
 
 @pytest.fixture
