@@ -21,13 +21,13 @@ import pytest
 from acme.jax import savers
 
 from mava.systems.jax import System
-from tests.jax.integration.mock_systems import mock_system_single_process
+from tests.jax.systems.test_systems import test_ippo_system_single_process
 
 
 @pytest.fixture
 def test_system_sp() -> System:
     """A single process built system"""
-    return mock_system_single_process()
+    return test_ippo_system_single_process()
 
 
 def test_parameter_server_single_process(test_system_sp: System) -> None:
