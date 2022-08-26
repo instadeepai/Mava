@@ -51,7 +51,7 @@ def test_evaluator_single_process(test_system_sp: System) -> None:
     evaluator.run_episode()
 
     # Observe first (without adder)
-    evaluator._executor.store.adder is None
+    assert evaluator._executor.store.adder is None
 
     # Select actions and select action
     assert list(evaluator._executor.store.actions_info.keys()) == [
