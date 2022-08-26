@@ -20,7 +20,6 @@ import functools
 import pytest
 
 from mava.systems.jax import System
-from mava.types import OLT
 from mava.utils.environments import debugging_utils
 from tests.jax.integration.mock_systems import mock_system_single_process
 
@@ -38,8 +37,8 @@ def test_system_sp() -> System:
     return mock_system_single_process()
 
 
-def test_executor_single_process(test_system_sp: System) -> None:
-    """Test if the executor instantiates processes as expected."""
+def test_evaluator_single_process(test_system_sp: System) -> None:
+    """Test if the evaluator instantiates processes as expected."""
     (
         data_server,
         parameter_server,
@@ -48,41 +47,19 @@ def test_executor_single_process(test_system_sp: System) -> None:
         trainer,
     ) = test_system_sp._builder.store.system_build
 
-    # _writer.append needs to be called once to get _writer.history
-    # _writer.append called in observe_first and observe
-    with pytest.raises(RuntimeError):
-        assert executor._executor.store.adder._writer.history
-
     # Run an episode
-    executor.run_episode()
+    evaluator.run_episode()
 
-    # Observe first and observe
-    assert executor._executor.store.adder._writer.history
-    assert list(executor._executor.store.adder._writer.history.keys()) == [
-        "observations",
-        "start_of_episode",
-        "actions",
-        "rewards",
-        "discounts",
-        "extras",
-    ]
-    assert list(
-        executor._executor.store.adder._writer.history["observations"].keys()
-    ) == ["agent_0", "agent_1", "agent_2"]
-    assert (
-        type(executor._executor.store.adder._writer.history["observations"]["agent_0"])
-        == OLT
-    )
-
-    assert len(executor._executor.store.adder._writer._column_history) != 0
+    # Observe first (without adder)
+    evaluator._executor.store.adder is None
 
     # Select actions and select action
-    assert list(executor._executor.store.actions_info.keys()) == [
+    assert list(evaluator._executor.store.actions_info.keys()) == [
         "agent_0",
         "agent_1",
         "agent_2",
     ]
-    assert list(executor._executor.store.policies_info.keys()) == [
+    assert list(evaluator._executor.store.policies_info.keys()) == [
         "agent_0",
         "agent_1",
         "agent_2",
@@ -94,11 +71,14 @@ def test_executor_single_process(test_system_sp: System) -> None:
         for agent in environment_factory().possible_agents
     ]
     for i in range(len(num_possible_actions)):
-        assert list(executor._executor.store.actions_info.values())[i] in range(
+        assert list(evaluator._executor.store.actions_info.values())[i] in range(
             0, num_possible_actions[i]
         )
 
     assert (
         lambda: key == "log_prob"
-        for key in executor._executor.store.policies_info.values()
+        for key in evaluator._executor.store.policies_info.values()
     )
+
+    # Observe (without adder)
+    assert not hasattr(evaluator._executor.store.adder, "add")
