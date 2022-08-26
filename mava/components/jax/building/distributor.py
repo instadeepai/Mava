@@ -17,8 +17,6 @@
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Type, Union
 
-import launchpad as lp
-
 from mava.callbacks import Callback
 from mava.components.jax import Component
 from mava.components.jax.training.trainer import BaseTrainerInit
