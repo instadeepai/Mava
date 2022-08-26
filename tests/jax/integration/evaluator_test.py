@@ -22,7 +22,7 @@ import pytest
 
 from mava.systems.jax import System
 from mava.utils.environments import debugging_utils
-from tests.jax.systems.systems import test_ippo_system_single_process
+from tests.jax.systems.systems_test_data import ippo_system_single_process
 
 # Environment.
 environment_factory = functools.partial(
@@ -35,7 +35,7 @@ environment_factory = functools.partial(
 @pytest.fixture
 def test_system_sp() -> System:
     """A single process built system"""
-    return test_ippo_system_single_process()
+    return ippo_system_single_process()
 
 
 def test_evaluator_single_process(test_system_sp: System) -> None:

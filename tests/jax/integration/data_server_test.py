@@ -20,13 +20,13 @@ import reverb
 from tensorflow.python.data.ops import dataset_ops
 
 from mava.systems.jax import System
-from tests.jax.systems.systems import test_ippo_system_single_process
+from tests.jax.systems.systems_test_data import ippo_system_single_process
 
 
 @pytest.fixture
 def test_system_sp() -> System:
     """A built IPPO system"""
-    return test_ippo_system_single_process()
+    return ippo_system_single_process()
 
 
 def get_dataset(data_server: reverb.client.Client) -> dataset_ops.DatasetV1Adapter:

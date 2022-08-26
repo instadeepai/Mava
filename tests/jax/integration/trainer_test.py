@@ -19,13 +19,13 @@ import jax.numpy as jnp
 import pytest
 
 from mava.systems.jax import System
-from tests.jax.systems.systems import test_ippo_system_single_process
+from tests.jax.systems.systems_test_data import ippo_system_single_process
 
 
 @pytest.fixture
 def test_system_sp() -> System:
     """A single process built system"""
-    return test_ippo_system_single_process()
+    return ippo_system_single_process()
 
 
 def test_trainer_single_process(test_system_sp: System) -> None:

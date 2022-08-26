@@ -18,13 +18,13 @@
 import pytest
 
 from mava.systems.jax import System
-from tests.jax.systems.systems import test_ippo_system_multi_thread
+from tests.jax.systems.systems_test_data import ippo_system_multi_thread
 
 
 @pytest.fixture
 def test_system_mt() -> System:
     """A multi threaded built system that uses Launchpad"""
-    return test_ippo_system_multi_thread()
+    return ippo_system_multi_thread()
 
 
 def test_system_multi_thread(test_system_mt: System) -> None:

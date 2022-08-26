@@ -26,7 +26,7 @@ from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
 
-def test_ippo_system_single_process() -> System:
+def ippo_system_single_process() -> System:
     """Single process IPPO test system"""
     # Environment.
     environment_factory = functools.partial(
@@ -92,7 +92,7 @@ def test_ippo_system_single_process() -> System:
     return test_system
 
 
-def test_ippo_system_multi_thread() -> System:
+def ippo_system_multi_thread() -> System:
     """Multi thread IPPO test system using Launchpad"""
     # Environment.
     environment_factory = functools.partial(
