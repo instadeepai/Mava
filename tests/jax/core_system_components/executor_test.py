@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for the executor class for Jax-based Mava systems."""
+"""Tests for executor class for Jax-based Mava systems."""
 from types import SimpleNamespace
 from typing import Dict, List
 
