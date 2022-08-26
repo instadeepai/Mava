@@ -24,7 +24,7 @@ from tests.jax.systems.test_systems import test_ippo_system_single_process
 
 
 @pytest.fixture
-def test_system() -> System:
+def test_system_sp() -> System:
     """A built IPPO system"""
     return test_ippo_system_single_process()
 
@@ -40,7 +40,7 @@ def get_dataset(data_server: reverb.client.Client) -> dataset_ops.DatasetV1Adapt
     return dataset
 
 
-def test_data_server(test_system: System) -> None:
+def test_data_server_single_process(test_system_sp: System) -> None:
     """Test if the data server instantiates processes as expected."""
     (
         data_server,
@@ -48,7 +48,7 @@ def test_data_server(test_system: System) -> None:
         executor,
         evaluator,
         trainer,
-    ) = test_system._builder.store.system_build
+    ) = test_system_sp._builder.store.system_build
 
     table_trainer = data_server.server_info()["trainer"]
     assert table_trainer.name == "trainer"

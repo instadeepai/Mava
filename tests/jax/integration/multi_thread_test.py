@@ -18,29 +18,29 @@
 import pytest
 
 from mava.systems.jax import System
-from tests.jax.systems.test_systems import test_ippo_system_multi_process
+from tests.jax.systems.test_systems import test_ippo_system_multi_thread
 
 
 @pytest.fixture
-def test_system_mp() -> System:
-    """A multi process built system"""
-    return test_ippo_system_multi_process()
+def test_system_mt() -> System:
+    """A multi threaded built system that uses Launchpad"""
+    return test_ippo_system_multi_thread()
 
 
-def test_system_multi_process(test_system_mp: System) -> None:
+def test_system_multi_thread(test_system_mt: System) -> None:
     """Test if the trainer instantiates processes as expected."""
     # Disable the nodes
-    (trainer_node,) = test_system_mp._builder.store.program._program._groups["trainer"]
-    (executor_node,) = test_system_mp._builder.store.program._program._groups[
+    (trainer_node,) = test_system_mt._builder.store.program._program._groups["trainer"]
+    (executor_node,) = test_system_mt._builder.store.program._program._groups[
         "executor"
     ]
-    (evaluator_node,) = test_system_mp._builder.store.program._program._groups[
+    (evaluator_node,) = test_system_mt._builder.store.program._program._groups[
         "evaluator"
     ]
-    (parameter_server_node,) = test_system_mp._builder.store.program._program._groups[
+    (parameter_server_node,) = test_system_mt._builder.store.program._program._groups[
         "parameter_server"
     ]
-    (data_server_node,) = test_system_mp._builder.store.program._program._groups[
+    (data_server_node,) = test_system_mt._builder.store.program._program._groups[
         "data_server"
     ]
 
@@ -51,7 +51,7 @@ def test_system_multi_process(test_system_mp: System) -> None:
     # Data server runs in background
 
     # launch the system
-    test_system_mp.launch()
+    test_system_mt.launch()
 
     # Extract the instances of each node
     trainer_run = trainer_node.create_handle().dereference()

@@ -17,29 +17,29 @@
 import pytest
 
 from mava.systems.jax.system import System
-from tests.jax.systems.test_systems import test_ippo_system_multi_process
+from tests.jax.systems.test_systems import test_ippo_system_multi_thread
 
 #########################################################################
 # Full system integration test.
 
 
 @pytest.fixture
-def test_ippo_system_mp() -> System:
-    """A multi process built system"""
-    return test_ippo_system_multi_process()
+def test_ippo_system_mt() -> System:
+    """A multi threaded built system that uses Launchpad"""
+    return test_ippo_system_multi_thread()
 
 
 def test_ippo(
-    test_ippo_system_mp: System,
+    test_ippo_system_mt: System,
 ) -> None:
     """Full integration test of ippo system."""
-    (trainer_node,) = test_ippo_system_mp._builder.store.program._program._groups[
+    (trainer_node,) = test_ippo_system_mt._builder.store.program._program._groups[
         "trainer"
     ]
 
     trainer_node.disable_run()
 
-    test_ippo_system_mp.launch()
+    test_ippo_system_mt.launch()
     trainer_run = trainer_node.create_handle().dereference()
 
     for _ in range(5):
