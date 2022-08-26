@@ -14,11 +14,10 @@
 # limitations under the License.
 
 import functools
-import os
-import signal
 from datetime import datetime
 from typing import Any
 
+import launchpad as lp
 import optax
 import pytest
 from launchpad.launch.test_multi_threading import (
@@ -91,13 +90,14 @@ def test_ippo(
         experiment_path=checkpoint_subpath,
         optimizer=optimizer,
         executor_parameter_update_period=1,
-        multi_process=True,  # multi process case
+        multi_process=True,
         run_evaluator=True,
         num_executors=1,
         max_queue_size=500,
         use_next_extras=False,
         sample_batch_size=5,
         nodes_on_gpu=[],
+        is_test=True,
     )
 
     (trainer_node,) = test_full_system._builder.store.program._program._groups[
@@ -106,14 +106,8 @@ def test_ippo(
     trainer_node.disable_run()
     test_address_builder.bind_addresses([trainer_node])
 
-    # pid is necessary to stop the launcher once the test ends
-    pid = os.getpid()
-
     test_full_system.launch()
     trainer_run = trainer_node.create_handle().dereference()
 
     for _ in range(5):
         trainer_run.step()
-
-    # stop the launcher
-    os.kill(pid, signal.SIGTERM)
