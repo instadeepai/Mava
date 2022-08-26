@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-"""Integration test of The Evaluatorfor Jax-based Mava systems"""
+"""Integration test of The Evaluator for Jax-based Mava systems"""
 
 import functools
 
