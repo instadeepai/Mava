@@ -61,6 +61,7 @@ class Launcher:
                 before termination.
             name : launchpad program name.
             terminal : terminal for launchpad processes to be shown on.
+            is_test : whether to set testing launchpad launch_type.
         """
         self._is_test = is_test
         self._multi_process = multi_process
@@ -164,7 +165,6 @@ class Launcher:
             None.
         """
         if self._multi_process:
-
             if self._is_test:
                 launch_type = lp.LaunchType.TEST_MULTI_THREADING
             else:
