@@ -154,7 +154,7 @@ class ExecutorParameterClient(BaseParameterClient):
 
 @dataclass
 class TrainerParameterClientConfig:
-    trainer_parameter_update_period: int = 10
+    trainer_parameter_update_period: int = 5
 
 
 class TrainerParameterClient(BaseParameterClient):

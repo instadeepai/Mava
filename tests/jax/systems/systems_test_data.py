@@ -87,6 +87,7 @@ def ippo_system_single_process() -> System:
         nodes_on_gpu=[],
         sequence_length=4,
         period=4,
+        trainer_parameter_update_period=1,
     )
 
     return test_system
@@ -150,5 +151,6 @@ def ippo_system_multi_thread() -> System:
         sample_batch_size=5,
         nodes_on_gpu=[],
         is_test=True,
+        trainer_parameter_update_period=1,
     )
     return test_system

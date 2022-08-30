@@ -558,6 +558,7 @@ class MockTrainerParameterClientConfig:
 
     trainer_parameter_client_param_0: int = 1
     trainer_parameter_client_param_1: str = "param"
+    trainer_parameter_update_period: int = 1
 
 
 class MockTrainerParameterClient(Component):
