@@ -75,7 +75,7 @@ def mock_system_single_process() -> System:
         logger_factory=logger_factory,
         experiment_path=checkpoint_subpath,
         optimizer=optimizer,
-        executor_parameter_update_period=10,
+        executor_parameter_update_period=1,
         multi_process=False,  # Single process case
         run_evaluator=True,
         num_executors=1,

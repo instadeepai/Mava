@@ -172,7 +172,7 @@ def test_executor_parameter_server(
     test_executor_parameter_server_system.build(
         environment_factory=environment_factory,
         network_factory=network_factory,
-        executor_parameter_update_period=20,
+        executor_parameter_update_period=1,
     )
 
     (
@@ -256,7 +256,7 @@ def test_except_trainer(
     test_system_except_trainer.build(
         environment_factory=environment_factory,
         network_factory=network_factory,
-        executor_parameter_update_period=20,
+        executor_parameter_update_period=1,
         multi_process=False,
         run_evaluator=True,
         num_executors=1,

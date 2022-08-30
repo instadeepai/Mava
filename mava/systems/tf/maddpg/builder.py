@@ -120,7 +120,7 @@ class MADDPGConfig:
     target_averaging: bool = False
     target_update_period: int = 100
     target_update_rate: Optional[float] = None
-    executor_variable_update_period: int = 1000
+    executor_variable_update_period: int = 200
     min_replay_size: int = 1000
     max_replay_size: int = 1000000
     samples_per_insert: Optional[float] = 32.0
