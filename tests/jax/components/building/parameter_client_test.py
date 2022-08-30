@@ -240,7 +240,7 @@ def test_executor_parameter_client_no_evaluator_with_parameter_client(
     mock_builder = mock_builder_with_parameter_client
     mock_builder.store.is_evaluator = False
     exec_param_client = ExecutorParameterClient(
-        config=ExecutorParameterClientConfig(executor_parameter_update_period=100)
+        config=ExecutorParameterClientConfig(executor_parameter_update_period=00)
     )
     exec_param_client.on_building_executor_parameter_client(builder=mock_builder)
 
