@@ -267,7 +267,7 @@ def test_executor_parameter_client_no_evaluator_with_parameter_client(
     assert mock_builder.store.executor_parameter_client._get_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_get_call_counter == 0
-    assert mock_builder.store.executor_parameter_client._update_period == 100
+    assert mock_builder.store.executor_parameter_client._update_period == 1
     assert isinstance(
         mock_builder.store.executor_parameter_client._client, ParameterServer
     )
@@ -287,7 +287,7 @@ def test_executor_parameter_client_evaluator_with_parameter_client(
     mock_builder = mock_builder_with_parameter_client
     mock_builder.store.is_evaluator = True
     exec_param_client = ExecutorParameterClient(
-        config=ExecutorParameterClientConfig(executor_parameter_update_period=100)
+        config=ExecutorParameterClientConfig(executor_parameter_update_period=200)
     )
     exec_param_client.on_building_executor_parameter_client(builder=mock_builder)
 
@@ -316,7 +316,7 @@ def test_executor_parameter_client_evaluator_with_parameter_client(
     assert mock_builder.store.executor_parameter_client._get_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_get_call_counter == 0
-    assert mock_builder.store.executor_parameter_client._update_period == 100
+    assert mock_builder.store.executor_parameter_client._update_period == 200
     assert isinstance(
         mock_builder.store.executor_parameter_client._client, ParameterServer
     )
@@ -417,7 +417,7 @@ def test_executor_parameter_client_no_evaluator_with_parameter_client_separate_n
     mock_builder = mock_builder_with_parameter_client_separate_networks
     mock_builder.store.is_evaluator = False
     exec_param_client = ExecutorParameterClientSeparateNetworks(
-        config=ExecutorParameterClientConfig(executor_parameter_update_period=100)
+        config=ExecutorParameterClientConfig(executor_parameter_update_period=200)
     )
     exec_param_client.on_building_executor_parameter_client(builder=mock_builder)
 
@@ -445,7 +445,7 @@ def test_executor_parameter_client_no_evaluator_with_parameter_client_separate_n
     assert mock_builder.store.executor_parameter_client._get_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_get_call_counter == 0
-    assert mock_builder.store.executor_parameter_client._update_period == 100
+    assert mock_builder.store.executor_parameter_client._update_period == 200
     assert isinstance(
         mock_builder.store.executor_parameter_client._client, ParameterServer
     )
@@ -465,7 +465,7 @@ def test_executor_parameter_client_evaluator_with_parameter_client_separate_netw
     mock_builder = mock_builder_with_parameter_client_separate_networks
     mock_builder.store.is_evaluator = True
     exec_param_client = ExecutorParameterClientSeparateNetworks(
-        config=ExecutorParameterClientConfig(executor_parameter_update_period=100)
+        config=ExecutorParameterClientConfig(executor_parameter_update_period=200)
     )
     exec_param_client.on_building_executor_parameter_client(builder=mock_builder)
 
@@ -495,7 +495,7 @@ def test_executor_parameter_client_evaluator_with_parameter_client_separate_netw
     assert mock_builder.store.executor_parameter_client._get_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_get_call_counter == 0
-    assert mock_builder.store.executor_parameter_client._update_period == 100
+    assert mock_builder.store.executor_parameter_client._update_period == 200
     assert isinstance(
         mock_builder.store.executor_parameter_client._client, ParameterServer
     )
