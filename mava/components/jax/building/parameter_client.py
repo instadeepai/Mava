@@ -156,6 +156,7 @@ class ExecutorParameterClient(BaseParameterClient):
 class TrainerParameterClientConfig:
     trainer_parameter_update_period: int = 10
 
+
 class TrainerParameterClient(BaseParameterClient):
     def __init__(
         self,
@@ -231,7 +232,7 @@ class TrainerParameterClient(BaseParameterClient):
     def name() -> str:
         """Static method that returns component name."""
         return "trainer_parameter_client"
-    
+
     @staticmethod
     def config_class() -> Optional[Callable]:
         """Config class used for component.
@@ -419,7 +420,7 @@ class TrainerParameterClientSeparateNetworks(BaseParameterClient):
     def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "trainer_parameter_client"
-    
+
     @staticmethod
     def config_class() -> Optional[Callable]:
         """Config class used for component.
