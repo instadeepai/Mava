@@ -377,7 +377,7 @@ def test_trainer_parameter_client(
     assert mock_builder.store.trainer_parameter_client._get_call_counter == 0
     assert mock_builder.store.trainer_parameter_client._set_call_counter == 0
     assert mock_builder.store.trainer_parameter_client._set_get_call_counter == 0
-    assert mock_builder.store.trainer_parameter_client._update_period == 1
+    assert mock_builder.store.trainer_parameter_client._update_period == 5
     assert isinstance(
         mock_builder.store.trainer_parameter_client._client, ParameterServer
     )
