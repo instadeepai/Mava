@@ -533,7 +533,7 @@ class MAPPOBuilder:
             variables=variables,
             get_keys=get_keys,
             set_keys=set_keys,
-            update_period=1,
+            update_period=10,
         )
 
         # Get all the initial variables

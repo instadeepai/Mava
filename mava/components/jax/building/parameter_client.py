@@ -154,8 +154,7 @@ class ExecutorParameterClient(BaseParameterClient):
 
 @dataclass
 class TrainerParameterClientConfig:
-    pass
-
+    trainer_parameter_update_period: int = 10
 
 class TrainerParameterClient(BaseParameterClient):
     def __init__(
@@ -220,6 +219,7 @@ class TrainerParameterClient(BaseParameterClient):
                 parameters=params,
                 get_keys=get_keys,
                 set_keys=set_keys,
+                update_period=self.config.trainer_parameter_update_period,
             )
 
             # Get all the initial parameters
@@ -398,6 +398,7 @@ class TrainerParameterClientSeparateNetworks(BaseParameterClient):
                 parameters=params,
                 get_keys=get_keys,
                 set_keys=set_keys,
+                update_period=self.config.trainer_parameter_update_period,
             )
 
             # Get all the initial parameters
