@@ -231,6 +231,15 @@ class TrainerParameterClient(BaseParameterClient):
     def name() -> str:
         """Static method that returns component name."""
         return "trainer_parameter_client"
+    
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return TrainerParameterClientConfig
 
 
 ####################
@@ -410,3 +419,12 @@ class TrainerParameterClientSeparateNetworks(BaseParameterClient):
     def name() -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "trainer_parameter_client"
+    
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return TrainerParameterClientConfig
