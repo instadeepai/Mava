@@ -137,33 +137,3 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             rng_key,
             utils.add_batch_dim(executor.store.observation.legal_actions),
         )
-
-
-@dataclass
-class FeedForwardGdnCommunicationConfig:
-    pass
-
-
-class FeedForwardGdnCommunication(Component):
-    def __init__(
-        self,
-        config: FeedForwardGdnCommunicationConfig = FeedForwardGdnCommunicationConfig(),
-    ):
-        """Component builds a GDN communication graph from the environment."""
-        self.config = config
-
-    @staticmethod
-    def name() -> str:
-        """Static method that returns component name."""
-        return "feed_forward_gdn_communication"
-
-    @staticmethod
-    def required_components() -> List[Type[Callback]]:
-        """List of other Components required in the system for this Component to function.
-
-        None required.
-
-        Returns:
-            List of required component classes.
-        """
-        return []
