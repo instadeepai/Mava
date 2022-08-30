@@ -1,4 +1,5 @@
 from typing import Any, Tuple
+
 import jax.numpy as jnp
 import reverb
 from jax.tree_util import register_pytree_node_class

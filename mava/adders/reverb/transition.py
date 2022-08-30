@@ -140,7 +140,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         # Note: this getter is meant to be used on a TrajectoryWriter.history to
         # obtain its numpy values.
         def get_all_np(x: np.ndarray) -> np.ndarray:
-            return x[self._first_idx : self._last_idx].numpy()
+            return x[self._first_idx : self._last_idx].numpy()  # type: ignore
 
         # Get the state, action, next_state, as well as possibly extras for the
         # transition that is about to be written.

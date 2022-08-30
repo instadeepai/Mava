@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import copy
 from typing import Any, Callable, Dict, Optional, Union
 
 from mava.components.tf.modules.exploration.exploration_scheduling import (
@@ -20,6 +21,21 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
     ConstantScheduler,
 )
 from mava.utils.sort_utils import sort_str_num
+
+
+def copy_node_fn(fn: Callable) -> Callable:
+    """Creates a copy of a node function.
+
+    Args:
+        fn : node function.
+
+    Returns:
+        copied node function.
+    """
+    memo = {}
+    memo[id(fn.__self__.store.program)] = fn.__self__.store.program  # type: ignore
+    copied_fn = copy.deepcopy(fn, memo=memo)
+    return copied_fn
 
 
 def convert_specs(

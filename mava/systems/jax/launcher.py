@@ -14,12 +14,13 @@
 # limitations under the License.
 
 """General launcher for systems"""
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import launchpad as lp
 import reverb
 
 from mava.utils import lp_utils
+from mava.utils.builder_utils import copy_node_fn
 
 
 class NodeType:
@@ -37,10 +38,12 @@ class Launcher:
         self,
         multi_process: bool,
         nodes_on_gpu: List = [],
-        sp_trainer_period: int = 10,
-        sp_evaluator_period: int = 10,
+        single_process_trainer_period: int = 1,
+        single_process_evaluator_period: int = 10,
+        single_process_max_episodes: Optional[int] = None,
         name: str = "System",
         terminal: str = "current_terminal",
+        is_test: Optional[bool] = False,
     ) -> None:
         """Initialise the launcher.
 
@@ -50,15 +53,22 @@ class Launcher:
         Args:
             multi_process : whether to use launchpad to run nodes on separate processes.
             nodes_on_gpu : which nodes should be run on the GPU.
-            sp_trainer_period : number of episodes between single process trainer steps.
-            sp_evaluator_period : num episodes between single process evaluator steps.
+            single_process_trainer_period : number of episodes between single process
+                trainer steps.
+            single_process_evaluator_period : num episodes between single process
+                evaluator steps.
+            single_process_max_episodes: maximum number of episodes to run
+                before termination.
             name : launchpad program name.
             terminal : terminal for launchpad processes to be shown on.
+            is_test : whether to set testing launchpad launch_type.
         """
+        self._is_test = is_test
         self._multi_process = multi_process
         self._name = name
-        self._sp_trainer_period = sp_trainer_period
-        self._sp_evaluator_period = sp_evaluator_period
+        self._single_process_trainer_period = single_process_trainer_period
+        self._single_process_evaluator_period = single_process_evaluator_period
+        self._single_process_max_episodes = single_process_max_episodes
         self._terminal = terminal
         if multi_process:
             self._program = lp.Program(name=name)
@@ -107,6 +117,8 @@ class Launcher:
 
         if self._multi_process:
             with self._program.group(name):
+                if self._is_test:
+                    node_fn = copy_node_fn(node_fn)
                 node = self._program.add_node(node_type(node_fn, *arguments))
             return node
         else:
@@ -122,6 +134,7 @@ class Launcher:
                     + "Single process currently only supports one node per type."
                 )
 
+            node_fn = copy_node_fn(node_fn)
             process = node_fn(*arguments)
             if node_type == lp.ReverbNode:
                 # Assigning server to self to keep it alive.
@@ -152,6 +165,11 @@ class Launcher:
             None.
         """
         if self._multi_process:
+            if self._is_test:
+                launch_type = lp.LaunchType.TEST_MULTI_THREADING
+            else:
+                launch_type = lp.LaunchType.LOCAL_MULTI_PROCESSING
+
             local_resources = lp_utils.to_device(
                 program_nodes=self._program.groups.keys(),
                 nodes_on_gpu=self._nodes_on_gpu,
@@ -159,30 +177,51 @@ class Launcher:
 
             lp.launch(
                 self._program,
-                lp.LaunchType.LOCAL_MULTI_PROCESSING,
+                launch_type=launch_type,
                 terminal=self._terminal,
                 local_resources=local_resources,
             )
+
         else:
             episode = 1
+            step = 1
             executor_steps = 0
 
-            _ = self._node_dict["data_server"]
+            data_server = self._node_dict["data_server"]
             _ = self._node_dict["parameter_server"]
             executor = self._node_dict["executor"]
             evaluator = self._node_dict["evaluator"]
             trainer = self._node_dict["trainer"]
 
-            while True:
-                executor_stats = executor.run_episode_and_log()
+            # getting the maximum queue size
+            queue_threshold = data_server.server_info()["trainer"].max_size
 
-                if episode % self._sp_trainer_period == 0:
+            while (
+                self._single_process_max_episodes is None
+                or episode <= self._single_process_max_episodes
+            ):
+                # if the queue is too full we skip the executor to ensure that the
+                # executor won't hang when trying to push experience
+                if data_server.server_info()["trainer"].current_size < int(
+                    queue_threshold * 0.75
+                ):
+                    executor_stats = executor.run_episode_and_log()
+                    executor_steps += executor_stats["episode_length"]
+
+                    print(f"Episode {episode} completed.")
+                    episode += 1
+
+                # if the queue has less than sample_batch_size samples in it we skip
+                # the trainer to ensure that the trainer won't hang
+                if (
+                    data_server.server_info()["trainer"].current_size
+                    >= trainer.store.global_config.sample_batch_size
+                    and step % self._single_process_trainer_period == 0
+                ):
                     _ = trainer.step()  # logging done in trainer
                     print("Performed trainer step.")
-                if episode % self._sp_evaluator_period == 0:
+                if step % self._single_process_evaluator_period == 0:
                     _ = evaluator.run_episode_and_log()
                     print("Performed evaluator run.")
 
-                print(f"Episode {episode} completed.")
-                episode += 1
-                executor_steps += executor_stats["episode_length"]
+                step += 1

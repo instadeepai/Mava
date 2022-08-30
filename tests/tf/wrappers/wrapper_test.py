@@ -301,11 +301,11 @@ class TestEnvWrapper:
 
                 for agent in wrapped_env.agents:
                     np.testing.assert_array_equal(
-                        test_agents_observations[agent].get("observation"),
+                        test_agents_observations[agent].get("observation"),  # type: ignore # noqa: E501
                         dm_env_timestep[agent].observation,
                     )
                     np.testing.assert_array_equal(
-                        test_agents_observations[agent].get("action_mask"),
+                        test_agents_observations[agent].get("action_mask"),  # type: ignore # noqa: E501
                         dm_env_timestep[agent].legal_actions,
                     )
                     assert (
@@ -320,12 +320,12 @@ class TestEnvWrapper:
                     )
 
                     np.testing.assert_array_equal(
-                        test_agents_observations[agent].get("observation"),
+                        test_agents_observations[agent].get("observation"),  # type: ignore # noqa: E501
                         dm_env_timestep.observation,
                     )
 
                     np.testing.assert_array_equal(
-                        test_agents_observations[agent].get("action_mask"),
+                        test_agents_observations[agent].get("action_mask"),  # type: ignore # noqa: E501
                         dm_env_timestep.legal_actions,
                     )
                     assert (

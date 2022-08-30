@@ -32,6 +32,8 @@ class DistributorConfig:
     run_evaluator: bool = True
     distributor_name: str = "System"
     terminal: str = "current_terminal"
+    single_process_max_episodes: Optional[int] = None
+    is_test: Optional[bool] = False
 
 
 class Distributor(Component):
@@ -62,6 +64,8 @@ class Distributor(Component):
             nodes_on_gpu=self.config.nodes_on_gpu,
             name=self.config.distributor_name,
             terminal=self.config.terminal,
+            single_process_max_episodes=self.config.single_process_max_episodes,
+            is_test=self.config.is_test,
         )
 
         # tables node

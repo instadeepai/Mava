@@ -15,10 +15,12 @@
 
 """Tests for Distributor class for Jax-based Mava systems"""
 
+from multiprocessing.connection import Client
 from types import SimpleNamespace
 from typing import Any, List
 
 import pytest
+from reverb import client as reverb_client
 from reverb import item_selectors, rate_limiters
 from reverb import server as reverb_server
 
@@ -42,23 +44,14 @@ class MockBuilder(Builder):
         program = SimpleNamespace(launch=self.launch)
         store = SimpleNamespace(trainer_networks=trainer_networks, program=program)
         self.store = store
-        self.node_built = {
-            "data_server": False,
-            "parameter_server": False,
-            "executor": False,
-            "evaluator": False,
-            "trainer": False,
-        }
-        self.built_node_values = {}  # type: ignore
         self.program_launched = False
 
     def data_server(self) -> List[Any]:
-        """Data server to test no multi_process in on_building_program_nodes method
+        """Data server to test on_building_program_nodes method
 
         Returns:
             tables: fake table composed of reverb_server tables
         """
-        self.node_built["data_server"] = True
         return [
             reverb_server.Table(
                 name="table_0",
@@ -70,28 +63,24 @@ class MockBuilder(Builder):
         ]
 
     def parameter_server(self) -> str:
-        """parameter_server to test no multi_process in on_building_program_nodes"""
-        self.node_built["parameter_server"] = True
+        """parameter_server to test on_building_program_nodes"""
         return "Parameter Server Test"
 
     def executor(
         self, executor_id: str, data_server_client: Any, parameter_server_client: Any
-    ) -> None:
-        """Executor to test no multi_process in on_building_program_nodes method"""
+    ) -> str:
+        """Executor to test on_building_program_nodes method"""
         if executor_id == "evaluator":
-            self.node_built["evaluator"] = True
+            return "Evaluator Test"
+
         else:
-            self.node_built["executor"] = True
-        self.built_node_values["data_server_client"] = data_server_client
-        self.built_node_values["parameter_server_client"] = parameter_server_client
+            return "Executor Test"
 
     def trainer(
         self, trainer_id: str, data_server_client: Any, parameter_server_client: Any
-    ) -> None:
-        """Trainer to test no multi_process in on_building_program_nodes method"""
-        self.node_built["trainer"] = True
-        self.built_node_values["data_server_client"] = data_server_client
-        self.built_node_values["parameter_server_client"] = parameter_server_client
+    ) -> str:
+        """Trainer to test on_building_program_nodes method"""
+        return "Trainer Test"
 
     def launch(self) -> None:
         """Launch to test on_building_launch method"""
@@ -130,27 +119,34 @@ def test_on_building_program_nodes_multi_process(
         "evaluator",
         "trainer",
     ]
+
+    data_server_fn = mock_builder.store.program._program._groups["data_server"][
+        -1
+    ]._priority_tables_fn
+    assert str(repr(data_server_fn).split(" ")[2].split(".")[-1]) == "data_server"
     assert (
-        mock_builder.store.program._program._groups["data_server"][
+        mock_builder.store.program._program._groups["parameter_server"][
             -1
-        ]._priority_tables_fn
-        == mock_builder.data_server
+        ]._constructor()
+        == "Parameter Server Test"
     )
     assert (
-        mock_builder.store.program._program._groups["parameter_server"][-1]._constructor
-        == mock_builder.parameter_server
+        mock_builder.store.program._program._groups["executor"][-1]._constructor(
+            "executor", "fake_data_server", "fake_parameter_server"
+        )
+        == "Executor Test"
     )
     assert (
-        mock_builder.store.program._program._groups["executor"][-1]._constructor
-        == mock_builder.executor
+        mock_builder.store.program._program._groups["evaluator"][-1]._constructor(
+            "evaluator", "fake_data_server", "fake_parameter_server"
+        )
+        == "Evaluator Test"
     )
     assert (
-        mock_builder.store.program._program._groups["evaluator"][-1]._constructor
-        == mock_builder.executor
-    )
-    assert (
-        mock_builder.store.program._program._groups["trainer"][-1]._constructor
-        == mock_builder.trainer
+        mock_builder.store.program._program._groups["trainer"][-1]._constructor(
+            "trainer", "fake_data_server", "fake_parameter_server"
+        )
+        == "Trainer Test"
     )
 
     with pytest.raises(Exception):
@@ -173,23 +169,28 @@ def test_on_building_program_nodes_multi_process_no_evaluator(
         "executor",
         "trainer",
     ]
+    data_server_fn = mock_builder.store.program._program._groups["data_server"][
+        -1
+    ]._priority_tables_fn
+    assert str(repr(data_server_fn).split(" ")[2].split(".")[-1]) == "data_server"
+
     assert (
-        mock_builder.store.program._program._groups["data_server"][
+        mock_builder.store.program._program._groups["parameter_server"][
             -1
-        ]._priority_tables_fn
-        == mock_builder.data_server
+        ]._constructor()
+        == "Parameter Server Test"
     )
     assert (
-        mock_builder.store.program._program._groups["parameter_server"][-1]._constructor
-        == mock_builder.parameter_server
+        mock_builder.store.program._program._groups["executor"][-1]._constructor(
+            "executor", "fake_data_server", "fake_parameter_server"
+        )
+        == "Executor Test"
     )
     assert (
-        mock_builder.store.program._program._groups["executor"][-1]._constructor
-        == mock_builder.executor
-    )
-    assert (
-        mock_builder.store.program._program._groups["trainer"][-1]._constructor
-        == mock_builder.trainer
+        mock_builder.store.program._program._groups["trainer"][-1]._constructor(
+            "trainer", "fake_data_server", "fake_parameter_server"
+        )
+        == "Trainer Test"
     )
 
     with pytest.raises(Exception):
@@ -204,20 +205,26 @@ def test_on_building_program_nodes(
     distributor.config.run_evaluator = True
     distributor.on_building_program_nodes(builder=mock_builder)
 
-    assert isinstance(mock_builder.store.program, Launcher)
-
-    for value in mock_builder.node_built.values():
-        assert value
-    assert (
-        mock_builder.built_node_values["data_server_client"]
-        == mock_builder.store.program._node_dict["data_server"]
-    )
-    assert (
-        mock_builder.built_node_values["parameter_server_client"]
-        == "Parameter Server Test"
-    )
-
     assert mock_builder.store.system_build == mock_builder.store.program._nodes
+
+    assert isinstance(mock_builder.store.program, Launcher)
+    (
+        data_server,
+        parameter_server,
+        executor,
+        evaluator,
+        trainer,
+    ) = mock_builder.store.system_build
+
+    assert isinstance(data_server, reverb_client.Client)
+
+    assert parameter_server == "Parameter Server Test"
+
+    assert executor == "Executor Test"
+
+    assert evaluator == "Evaluator Test"
+
+    assert trainer == "Trainer Test"
 
 
 def test_on_building_program_nodes_no_evaluator(
@@ -228,23 +235,23 @@ def test_on_building_program_nodes_no_evaluator(
     distributor.config.run_evaluator = False
     distributor.on_building_program_nodes(builder=mock_builder)
 
-    assert isinstance(mock_builder.store.program, Launcher)
-
-    for key, value in mock_builder.node_built.items():
-        if key == "evaluator":
-            assert not value
-        else:
-            assert value
-    assert (
-        mock_builder.built_node_values["data_server_client"]
-        == mock_builder.store.program._node_dict["data_server"]
-    )
-    assert (
-        mock_builder.built_node_values["parameter_server_client"]
-        == "Parameter Server Test"
-    )
-
     assert mock_builder.store.system_build == mock_builder.store.program._nodes
+
+    assert isinstance(mock_builder.store.program, Launcher)
+    (
+        data_server,
+        parameter_server,
+        executor,
+        trainer,
+    ) = mock_builder.store.system_build
+
+    assert isinstance(data_server, reverb_client.Client)
+
+    assert parameter_server == "Parameter Server Test"
+
+    assert executor == "Executor Test"
+
+    assert trainer == "Trainer Test"
 
 
 def test_on_building_launch(

@@ -2,7 +2,7 @@
 
 For each new page in the docs, you will need to add `.md` file to the `docs` folder and then add a route to this page in `mkdocs.yml` (under `nav`).
 
-To build this locally, you will need to download the docs requirements, `pip install -r docs/requirements.txt`.
+To build this locally, you will need to download the docs requirements by running `pip install -r docs/requirements.txt` followed by `mkdocs serve`.
 
 ### Adding a page:
 #### 1.  Auto generated from docstrings.
