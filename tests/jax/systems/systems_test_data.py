@@ -13,13 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Mock of built systems to be used in the integration tests"""
+"""Built systems to be used in the integration tests"""
 
 import functools
 from datetime import datetime
 from typing import Any
 
-import launchpad as lp
 import optax
 
 from mava.systems.jax import System, ippo
@@ -27,8 +26,8 @@ from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
 
-def mock_system_single_process() -> System:
-    """Mock of ippo system in the single process case"""
+def ippo_system_single_process() -> System:
+    """Single process IPPO test system"""
     # Environment.
     environment_factory = functools.partial(
         debugging_utils.make_environment,
@@ -93,8 +92,8 @@ def mock_system_single_process() -> System:
     return test_system
 
 
-def mock_system_multi_process() -> System:
-    """Mock of ippo system in the multi process case"""
+def ippo_system_multi_thread() -> System:
+    """Multi thread IPPO test system using Launchpad"""
     # Environment.
     environment_factory = functools.partial(
         debugging_utils.make_environment,
@@ -150,5 +149,6 @@ def mock_system_multi_process() -> System:
         use_next_extras=False,
         sample_batch_size=5,
         nodes_on_gpu=[],
+        is_test=True,
     )
     return test_system

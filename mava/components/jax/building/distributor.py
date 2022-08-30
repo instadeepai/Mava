@@ -17,8 +17,6 @@
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Type, Union
 
-import launchpad as lp
-
 from mava.callbacks import Callback
 from mava.components.jax import Component
 from mava.components.jax.training.trainer import BaseTrainerInit
@@ -35,6 +33,7 @@ class DistributorConfig:
     distributor_name: str = "System"
     terminal: str = "current_terminal"
     single_process_max_episodes: Optional[int] = None
+    is_test: Optional[bool] = False
 
 
 class Distributor(Component):
@@ -66,6 +65,7 @@ class Distributor(Component):
             name=self.config.distributor_name,
             terminal=self.config.terminal,
             single_process_max_episodes=self.config.single_process_max_episodes,
+            is_test=self.config.is_test,
         )
 
         # tables node

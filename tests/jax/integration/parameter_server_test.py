@@ -1,89 +1,93 @@
-import functools
-from typing import Dict, Tuple
+# python3
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-import numpy as np
+"""Tests for parameter server for Jax-based Mava systems"""
+import time
+
+import jax.numpy as jnp
 import pytest
+from acme.jax import savers
 
-from mava.components.jax import building
-from mava.components.jax.building.adders import ParallelTransitionAdderSignature
-from mava.components.jax.updating.parameter_server import DefaultParameterServer
-from mava.specs import DesignSpec
-from mava.systems.jax import ParameterServer, ippo
-from mava.systems.jax.system import System
-from mava.utils.environments import debugging_utils
-from tests.jax import mocks
-
-
-class TestSystem(System):
-    def design(self) -> Tuple[DesignSpec, Dict]:
-        """Mock system design with zero components.
-
-        Returns:
-            system callback components
-        """
-        components = DesignSpec(
-            environment_spec=building.EnvironmentSpec,
-            system_init=building.FixedNetworkSystemInit,
-            data_server=mocks.MockOnPolicyDataServer,
-            data_server_adder_signature=ParallelTransitionAdderSignature,
-            parameter_server=DefaultParameterServer,
-            executor_parameter_client=mocks.MockExecutorParameterClient,
-            trainer_parameter_client=mocks.MockTrainerParameterClient,
-            logger=mocks.MockLogger,
-            executor=mocks.MockExecutor,
-            executor_adder=mocks.MockAdder,
-            executor_environment_loop=mocks.MockExecutorEnvironmentLoop,
-            networks=mocks.MockNetworks,
-            trainer=mocks.MockTrainer,
-            trainer_dataset=mocks.MockTrainerDataset,
-            distributor=mocks.MockDistributor,
-        )
-        return components, {}
+from mava.systems.jax import System
+from tests.jax.systems.systems_test_data import ippo_system_single_process
 
 
 @pytest.fixture
-def test_system() -> System:
-    """Dummy system with zero components."""
-    return TestSystem()
+def test_system_sp() -> System:
+    """A single process built system"""
+    return ippo_system_single_process()
 
 
-def test_parameter_server_process_instantiate(
-    test_system: System,
-) -> None:
-    """Test if the parameter server instantiates processes as expected."""
-    # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name="simple_spread",
-        action_space="discrete",
-    )
-
-    # Networks.
-    network_factory = ippo.make_default_networks
-
-    test_system.build(
-        environment_factory=environment_factory,
-        network_factory=network_factory,
-        non_blocking_sleep_seconds=0,
-    )
+def test_parameter_server_single_process(test_system_sp: System) -> None:
+    """Test if the paraameter server instantiates processes as expected."""
     (
         data_server,
         parameter_server,
         executor,
         evaluator,
         trainer,
-    ) = test_system._builder.store.system_build
-    assert type(parameter_server) == ParameterServer
+    ) = test_system_sp._builder.store.system_build
 
-    step_var = parameter_server.get_parameters("trainer_steps")
-    assert type(step_var) == np.ndarray
-    assert step_var[0] == 0
+    # Initial state of the parameter_server
+    assert type(parameter_server.store.system_checkpointer) == savers.Checkpointer
 
-    parameter_server.set_parameters({"trainer_steps": np.ones(1, dtype=np.int32)})
-    assert parameter_server.get_parameters("trainer_steps")[0] == 1
+    param_without_net = parameter_server.store.parameters.copy()
+    del param_without_net["networks-network_agent"]
+    assert param_without_net == {
+        "trainer_steps": jnp.zeros(1, dtype=jnp.int32),
+        "trainer_walltime": jnp.zeros(1, dtype=jnp.float32),
+        "evaluator_steps": jnp.zeros(1, dtype=jnp.int32),
+        "evaluator_episodes": jnp.zeros(1, dtype=jnp.int32),
+        "executor_episodes": jnp.zeros(1, dtype=jnp.int32),
+        "executor_steps": jnp.zeros(1, dtype=jnp.int32),
+    }
 
-    parameter_server.add_to_parameters({"trainer_steps": np.ones(1, dtype=np.int32)})
-    assert parameter_server.get_parameters("trainer_steps")[0] == 2
+    # check that checkpoint not yet saved
+    assert not parameter_server.store.last_checkpoint_time
+    assert parameter_server.store.system_checkpointer._last_saved == 0
 
-    # Step the parameter sever
+    first_network_param = parameter_server.store.parameters["networks-network_agent"]
+    # test get and set parameters
+    for _ in range(3):
+        executor.run_episode()
+    trainer.step()
+
+    trainer_steps = parameter_server.get_parameters("trainer_steps")
+    executor_episodes = parameter_server.get_parameters("executor_episodes")
+    assert list(trainer_steps) == [1]  # trainer.step one time
+    assert list(executor_episodes) == [3]  # run episodes three times
+
+    # check that the network is updated (at least one of the values updated)
+    updated_networks_param = parameter_server.get_parameters("networks-network_agent")
+    at_least_one_changed = False
+    for key in updated_networks_param.keys():
+        assert sorted(list(updated_networks_param[key].keys())) == ["b", "w"]
+        if not jnp.array_equal(
+            updated_networks_param[key]["w"], first_network_param[key]["w"]
+        ) or not jnp.array_equal(
+            updated_networks_param[key]["b"], first_network_param[key]["b"]
+        ):
+            at_least_one_changed = True
+            break
+    assert at_least_one_changed
+
+    # run step function
     parameter_server.step()
+
+    # Check that the checkpoint is saved thanks to the step function
+    assert parameter_server.store.last_checkpoint_time
+    assert parameter_server.store.last_checkpoint_time < time.time()
+    assert parameter_server.store.system_checkpointer._last_saved != 0
+    assert parameter_server.store.system_checkpointer._last_saved < time.time()
