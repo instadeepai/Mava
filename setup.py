@@ -47,6 +47,7 @@ jax_requirements = [
     "optax",
     "rlax",
     "networkx",
+    "jraph",
 ] + tf_requirements
 
 pettingzoo_requirements = [

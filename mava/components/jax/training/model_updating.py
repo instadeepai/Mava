@@ -385,6 +385,27 @@ class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
                 advantages,
             )
 
+            # TODO (Matthew): perhaps the following to get GDN loss?
+            # Here we have policy_gradients,
+            # which is the gradient of the policy loss w.r.t its
+            # params (W_1), the modified obs (M), the actions (A),
+            # action probs (B), and advantages (R).
+            # I.e. we have:
+            # dL / (dW_1 dM dA dB dR).
+            #
+            # If we compute the gradient of the GNN, then we have:
+            # dM / (dO, dW_2)
+            # where dW_2 is the GNN parameters,
+            # since the GNN computes modifies obs M from raw obs O.
+            #
+            # Then, we can compute a policy gradient using the raw obs,
+            # instead of the modified ones:
+            # dL / (dW_1 dO dA dB dR dW_2)
+            # = (dL / (dW_1 dM dA dB dR)) * (dM / (dO, dW_2)).
+            #
+            # dL / (dW_1 dM dA dB dR) can still be used to compute the policy loss.
+            # dL / (dW_1 dO dA dB dR dW_2) must be used to compute the GNN loss.
+
             # Calculate the gradients and agent metrics.
             critic_gradients, critic_agent_metrics = trainer.store.critic_grad_fn(
                 critic_params,
