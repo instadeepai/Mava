@@ -145,9 +145,12 @@ class FeedforwardExecutorObserve(ExecutorObserve):
             return
 
         if 1==1:
-
+            #print("OBSERVE")
+            # collecting user-defined extras
             keys = list(executor.store.next_extras_specs.keys())
             extras = executor.store.extras_finder(executor.store, keys)
+            #print(extras)
+            #exit()
             executor.store.next_extras.update(extras)
             
             actions_info = executor.store.actions_info  # includes taken actions
@@ -180,11 +183,13 @@ class FeedforwardExecutorObserve(ExecutorObserve):
             #print(extras)
             #print(executor.store.extras)
             #exit()
+            #print(executor.store.next_extras)
+            #exit()
             executor.store.adder.add(
                 actions=adder_actions,
                 next_timestep=executor.store.next_timestep,
                 next_extras=executor.store.next_extras,
-                extras=extras,
+                #extras=extras,
             )
         else:
             

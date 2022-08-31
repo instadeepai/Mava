@@ -36,7 +36,7 @@ from mava.core_jax import SystemTrainer
 @dataclass
 class MADQNStepConfig:
     target_update_period: int = 10
-    # discount: float = 0.99 this is defined somewhere else, I guess in transition.
+    discounts: float = 0.99 #this is defined somewhere else, I guess in transition.
 
 
 class MADQNStep(Step):
@@ -73,7 +73,7 @@ class MADQNStep(Step):
             )
 
             discounts = tree.map_structure(
-                lambda x: x * self.config.discount,
+                lambda x: x * self.config.discounts,
                 discounts
                 # lambda x: x * 0.99, discounts  # TODO: this is a hack, fix it
             )

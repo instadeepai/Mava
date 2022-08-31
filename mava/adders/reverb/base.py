@@ -125,7 +125,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
         delta_encoded: bool = False,
         priority_fns: Optional[PriorityFnMapping] = None,
         get_signature_timeout_ms: int = 300_000,
-        use_next_extras: bool = False,
+        use_next_extras: bool = True,
     ):
         """Reverb Base Adder.
 
@@ -153,6 +153,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             priority_fns=priority_fns,
             get_signature_timeout_ms=get_signature_timeout_ms,
         )
+        self._keys_available_as_next_extra = None
         self._use_next_extras = use_next_extras
 
     def write_experience_to_tables(  # noqa
@@ -279,6 +280,13 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
 
                             if type(trajectory) == mava_types.Transition:
                                 new_trajectory.next_extras[key] = {}  # type: ignore
+                        
+                        # Initialise empty next-extras
+                        for key in trajectory.next_extras.keys():
+                            new_trajectory.next_extras[key] = {}
+
+                            if type(trajectory) == mava_types.Transition:
+                                new_trajectory.next_extras[key] = {}  # type: ignore
 
                         # Go through each of the agents in item_agents and add them
                         # to the new trajectory in the correct spot based on their
@@ -320,6 +328,9 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
                                     # TODO: (dries) Only actually need to do this once
                                     # and not per agent. Maybe fix this in the future.
                                     new_trajectory.extras[key] = trajectory.extras[key]
+
+                                #TODO(SIDDARTH): FIGURE OUT WHY THIS BREAKS THE TABLES
+                                """
                                 if type(trajectory) == mava_types.Transition:
                                     ext = trajectory.next_extras[key]  # type: ignore
                                     if (
@@ -342,6 +353,8 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
                                         ] = trajectory.next_extras[  # type: ignore
                                             key
                                         ]  # type: ignore
+                                """
+                                
 
                         # Write the new_trajectory to the table.
                         self._writer.create_item(
@@ -382,7 +395,9 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
 
         if self._use_next_extras:
             add_dict["extras"] = extras
-
+	
+        self._keys_available_as_next_extra = list(extras.keys())
+	
         self._writer.append(
             add_dict,
             partial_step=True,

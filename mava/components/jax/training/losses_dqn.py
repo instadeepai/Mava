@@ -35,6 +35,7 @@ class MADQNLossConfig:
     # entropy_cost: float = 0.01
     # value_cost: float = 0.5
     max_abs_reward: float = 1.0
+    gamma: float = 0.99
 
 
 class MADQNLoss(Loss):
@@ -116,7 +117,7 @@ class MADQNLoss(Loss):
                         jnp.finfo(q_t_selector.dtype).min,
                     )
 
-                    d_t = (discount * self.config.discount).astype(jnp.float32)
+                    d_t = (discount * self.config.gamma).astype(jnp.float32)
                     # Cast and clip rewards.
                     r_t = jnp.clip(
                         rewards,

@@ -115,6 +115,7 @@ class MADQNEpochUpdateConfig:
     batch_size: int = 128
     learning_rate: float = 1e-3
     adam_epsilon: float = 1e-5
+    target_update_period = 10
     max_gradient_norm: float = jnp.inf
     optimizer: Optional[optax_base.GradientTransformation] = (None,)
 
