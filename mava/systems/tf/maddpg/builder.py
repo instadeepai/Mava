@@ -596,7 +596,7 @@ class MADDPGBuilder:
             variables=variables,
             get_keys=get_keys,
             set_keys=set_keys,
-            update_period=10,
+            update_period=5,
         )
 
         # Get all the initial variables
