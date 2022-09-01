@@ -38,7 +38,7 @@ Mava allows a high level of composability for novel research (i.e. building new 
 
 ## Getting Started
 
-We have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-Agent System. For more information on how to use Mava, please view our [usage section](#usage). Finally, for more on Mava's implementation details, please visit our [documentation].
+We have both a [TF2 quickstart notebook][tf_quickstart] and a [Jax quickstart notebook][jax_quickstart] that can be used to quickly create and train your first multi-agent system. For more information on how to use Mava, please view our [usage section](#usage). Finally, for more on Mava's implementation details, please visit our [documentation].
 
 ## Supported Environments
 
@@ -139,7 +139,7 @@ system.build(
 system.launch()
 ```
 
-The arguments we provide to our `system.build` overwrite the default config values from the existing components in the system
+The arguments we provide to `system.build` overwrite the default config values from the existing components in the system.
 
 For a deeper dive, take a look at the detailed working code
 examples found in our [examples] subdirectory which show how to instantiate a few MARL systems and environments.
@@ -475,7 +475,8 @@ If you use Mava in your work, please cite the accompanying
 [roadmap]: https://github.com/instadeepai/Mava/issues/246
 [wishlist]: https://github.com/instadeepai/Mava/issues/247
 [bsuite]: https://github.com/deepmind/bsuite
-[quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/quickstart.ipynb
+[tf_quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/quickstart.ipynb
+[jax_quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/quickstart.ipynb
 [blog]: https://medium.com/instadeep/mava-a-new-framework-for-multi-agent-reinforcement-learning-5dcc158e104e
 [release]: https://www.instadeep.com/2021/07/mava-a-new-framework-for-distributed-multi-agent-reinforcement-learning/
 [documentation]: https://id-mava.readthedocs.io/

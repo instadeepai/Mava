@@ -37,11 +37,11 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting started:
-      - General: overview.md
-      - The store: store.md
-      - The config: config.md
-      - Creating a system: create_system.md
-      - Creating a new component: create_component.md
+      - General: getting_started/overview.md
+      - The store: getting_started/store.md
+      - The config: getting_started/config.md
+      - Creating a system: getting_started/create_system.md
+      - Creating a new component: getting_started/create_component.md
   - Systems:
       - General: systems/general.md
       - Tensorflow:
