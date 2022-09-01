@@ -53,7 +53,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
         self._evaluator = self.store.is_evaluator
         if self._evaluator:
-            self._interval = self.store.global_config.interval
+            self._evaluation_interval = self.store.global_config.evaluation_interval
 
     def observe_first(
         self,

@@ -31,7 +31,7 @@ def dummy_config() -> ExecutorInitConfig:
     Returns:
         ExecutorInitConfig
     """
-    return ExecutorInitConfig(interval={"test": 1})
+    return ExecutorInitConfig(evaluation_interval={"test": 1})
 
 
 @pytest.fixture
@@ -57,7 +57,7 @@ def mock_executor() -> Executor:
     """
     store = SimpleNamespace(is_evaluator=None)
     executor = Executor(store=store)
-    executor._interval = None  # type: ignore
+    executor._evaluation_interval = None  # type: ignore
     return executor
 
 
@@ -73,7 +73,7 @@ def test_on_execution_init_start(
     executor_init = ExecutorInit(config=dummy_config)
     executor_init.on_execution_init_start(executor=mock_executor)
 
-    assert mock_executor._interval == dummy_config.interval  # type: ignore
+    assert mock_executor._evaluation_interval == dummy_config.evaluation_interval  # type: ignore # noqa: E501
 
 
 def test_name() -> None:

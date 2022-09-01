@@ -145,7 +145,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
         # We remove the interval argument from the executor but keep it in the
         # evaluator.
         if not self.store.is_evaluator:
-            del self.store.executor.store.global_config.interval
+            del self.store.executor.store.global_config.evaluation_interval
 
         # make copy of environment
         self.on_building_executor_environment()
