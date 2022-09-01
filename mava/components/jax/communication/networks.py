@@ -7,7 +7,9 @@ import haiku as hk
 import jax
 import jax.numpy as jnp
 import jraph
+from acme.jax import networks as networks_lib
 from acme.jax import utils
+from jax import jit
 from jraph import GraphConvolution, GraphsTuple
 
 from mava import specs as mava_specs
@@ -58,7 +60,7 @@ def make_default_gcn(
         return graph
 
     # Transform into pure function
-    net_fn = hk.without_apply_rng(hk.transform(net_fn))
+    net = hk.without_apply_rng(hk.transform(net_fn))
 
     # Init the network with dummy obs, dummy_graph, and a key
     dummy_obs = utils.zeros_like(agent_spec.observations.observation)
@@ -73,10 +75,51 @@ def make_default_gcn(
         globals=None,
     )
     network_key, rng_key = jax.random.split(rng_key)
-    params = net_fn.init(network_key, dummy_graph)
-    print(params)  # TODO: save params to class with forward_fn
+    params = net.init(network_key, dummy_graph)
+    gdn_network = GdnNetwork(network=net, params=params)
 
-    return {"gdn_network": net_fn}
+    return {"gdn_network": gdn_network}
+
+
+@dataclass
+class GdnNetwork:
+    def __init__(
+        self,
+        network: networks_lib.FeedForwardNetwork,
+        params: networks_lib.Params,
+    ):
+        """Wrapper class for communication GNN.
+
+        Args:
+            network: GNN network.
+            params: Network params.
+        """
+        self.network = network
+        self.params = params
+
+        @jit
+        def forward_fn(
+            params: Dict[str, jnp.ndarray],
+            graph: GraphsTuple,
+        ) -> List[networks_lib.Observation]:
+            output_graph = self.network.apply(params, graph)
+            return output_graph.nodes
+
+        self.forward_fn = forward_fn
+
+    def get_modified_obs(
+        self,
+        graph: GraphsTuple,
+    ) -> List[networks_lib.Observation]:
+        """Get the output of the GNN on the GDN graph.
+
+        Args:
+            graph: GDN graph of obs and communication structure.
+
+        Returns:
+            List of observations.
+        """
+        return self.forward_fn(self.params, graph)
 
 
 @dataclass
