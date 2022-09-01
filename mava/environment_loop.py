@@ -20,6 +20,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import acme
 import dm_env
+import jax
 import numpy as np
 from acme.utils import counting, loggers
 
@@ -590,15 +591,33 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         if environment_loop_schedule:
             eval_condition = check_count_condition(self._executor._evaluation_interval)
 
+        evaluation_duration = self._executor.store.global_config.evaluation_duration
+
         while not should_terminate(episode_count, step_count):
             if (not environment_loop_schedule) or (should_run_loop(eval_condition)):
 
-                result = self.run_episode()
-                episode_count += 1
-                step_count += result["episode_length"]
+                if self._executor._evaluator:
+                    # Get first result dictionary
+                    results = self.run_episode()
+                    episode_count += 1
+                    step_count += results["episode_length"]
+                    for _ in range(evaluation_duration - 1):
+                        # Add consecutive evaluation run data
+                        result = self.run_episode()
+                        episode_count += 1
+                        step_count += result["episode_length"]
+                        results = jax.tree_map(lambda x, y: x + y, results, result)
+
+                    # compute the mean over all evaluation runs
+                    results = jax.tree_map(lambda x: x / evaluation_duration, results)
+                    self._logger.write(results)
+
+                else:
+                    result = self.run_episode()
+                    episode_count += 1
+                    step_count += result["episode_length"]
                 # Log the given results.
                 self._logger.write(result)
-                # run_first_eval_loop = False
             else:
                 # Note: We assume that the evaluator will be running less
                 # than once per second.

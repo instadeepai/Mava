@@ -26,6 +26,7 @@ from mava.core_jax import SystemExecutor
 @dataclass
 class ExecutorInitConfig:
     evaluation_interval: Optional[dict] = None
+    evaluation_duration: Optional[int] = None
 
 
 class ExecutorInit(Component):
@@ -46,7 +47,9 @@ class ExecutorInit(Component):
         Returns:
             None.
         """
+        # TODO (Ruan): Double check that this is necessary
         executor._evaluation_interval = self.config.evaluation_interval  # type: ignore
+        executor._evaluation_duration = self.config.evaluation_duration  # type: ignore
 
     @staticmethod
     def name() -> str:

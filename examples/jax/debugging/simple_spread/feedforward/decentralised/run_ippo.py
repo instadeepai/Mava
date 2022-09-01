@@ -107,7 +107,8 @@ def main(_: Any) -> None:
         clip_value=False,
         # TODO (Ruan): Remove before full PR
         termination_condition={"executor_steps": 300000},
-        evaluation_interval={"executor_steps": 2000},
+        evaluation_interval={"executor_steps": 10000},
+        evaluation_duration=32,
     )
 
     # Launch the system.

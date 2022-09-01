@@ -93,6 +93,9 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
+        # TODO (Ruan): Remove before full PR
+        termination_condition={"executor_steps": 300000},
+        evaluation_interval={"executor_steps": 10000},
     )
 
     # Launch the system.
