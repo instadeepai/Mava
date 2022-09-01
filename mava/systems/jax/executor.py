@@ -52,6 +52,8 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         self.on_execution_init_end()
 
         self._evaluator = self.store.is_evaluator
+        if self._evaluator:
+            self._interval = self.store.global_config.interval
 
     def observe_first(
         self,

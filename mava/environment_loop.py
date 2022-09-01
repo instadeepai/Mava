@@ -561,9 +561,10 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             """
             should_run_loop = False
             eval_interval_key, eval_interval_count = eval_condition
-            counts = self.get_counts()
+            counts = self._executor.store.executor_counts
+
             if counts:
-                count = counts.get(eval_interval_key)
+                count = counts[eval_interval_key]
                 # We run eval loops around every eval_interval_count (not exactly every
                 # eval_interval_count due to latency in getting updated counts).
                 should_run_loop = (
@@ -575,24 +576,29 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         "Running eval loop at executor step: "
                         + f"{self._last_evaluator_run_t}"
                     )
+
             return should_run_loop
 
         episode_count, step_count = 0, 0
 
         # Currently, we only use intervals for eval loops.
-        environment_loop_schedule = (
-            self._executor._evaluator and self._executor._interval
+        # Boolean for when evaluation loop should be run
+        environment_loop_schedule = self._executor._evaluator and (
+            self._executor._interval is not None
         )
+
         if environment_loop_schedule:
             eval_condition = check_count_condition(self._executor._interval)
 
         while not should_terminate(episode_count, step_count):
-            if (not environment_loop_schedule) or should_run_loop(eval_condition):
+            if (not environment_loop_schedule) or (should_run_loop(eval_condition)):
+
                 result = self.run_episode()
                 episode_count += 1
                 step_count += result["episode_length"]
                 # Log the given results.
                 self._logger.write(result)
+                # run_first_eval_loop = False
             else:
                 # Note: We assume that the evaluator will be running less
                 # than once per second.

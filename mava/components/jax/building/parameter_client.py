@@ -120,6 +120,13 @@ class ExecutorParameterClient(BaseParameterClient):
         else:
             set_keys = [x for x in set_keys if x.startswith("executor")]
 
+        # Set this so the evaluator is able to update continually
+        # with the latest parameters
+        if builder.store.is_evaluator is True:
+            update_period = 1
+        else:
+            update_period = self.config.executor_parameter_update_period
+
         parameter_client = None
         if builder.store.parameter_server_client:  # Created by builder
             # Create parameter client
@@ -128,7 +135,7 @@ class ExecutorParameterClient(BaseParameterClient):
                 parameters=params,
                 get_keys=get_keys,
                 set_keys=set_keys,
-                update_period=self.config.executor_parameter_update_period,
+                update_period=update_period,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by

@@ -105,6 +105,8 @@ def main(_: Any) -> None:
         num_executors=1,
         multi_process=True,
         clip_value=False,
+        termination_condition={"executor_steps": 300000},
+        interval={"executor_steps": 20000},
     )
 
     # Launch the system.
