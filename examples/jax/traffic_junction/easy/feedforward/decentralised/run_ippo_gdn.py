@@ -24,12 +24,12 @@ from typing import Any
 import optax
 from absl import app, flags
 
-from mava.components.jax.communication.action_selection import FeedforwardExecutorGdn
-from mava.components.jax.communication.networks import (
+from mava.components.jax.communication.forward_pass import FeedforwardExecutorGdn
+from mava.components.jax.communication.gdn_networks import (
     DefaultGdnNetworks,
     make_default_gcn,
 )
-from mava.components.jax.communication.observing import GdnGraphFromEnvironment
+from mava.components.jax.communication.graph_construction import GdnGraphFromEnvironment
 from mava.systems.jax import ippo
 from mava.utils.environments import traffic_junction_utils
 from mava.utils.loggers import logger_utils

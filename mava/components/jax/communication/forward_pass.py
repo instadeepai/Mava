@@ -20,7 +20,7 @@ from typing import List, Type
 
 from mava.callbacks import Callback
 from mava.components.jax import Component
-from mava.components.jax.communication.observing import (
+from mava.components.jax.communication.graph_construction import (
     GdnGraphConstructor,
     TempGraphsTuple,
 )
