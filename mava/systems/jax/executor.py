@@ -23,6 +23,32 @@ from acme.types import NestedArray
 
 from mava.callbacks import Callback, ExecutorHookMixin
 from mava.core_jax import SystemExecutor
+from acme.jax import utils
+import jax
+
+
+def select_action(observation, network, key):
+    observation = utils.add_batch_dim(observation)
+    new_key, sub_key = jax.random.split(key)
+    action_info, policy_info = network.get_action(
+        observation,
+        sub_key,
+        utils.add_batch_dim(observation.legal_actions),
+    )
+
+    return action_info, policy_info, new_key
+
+
+@jax.jit
+def select_actions(observations, networks, agent_net_keys, key):
+    actions_info, policies_info = {}, {}
+    # TODO Look at tree mapping this forloop.
+    for agent, observation in observations.items():
+        network = networks["networks"][agent_net_keys[agent]]
+        actions_info[agent], policies_info[agent], key = select_action(
+            observation, network, key
+        )
+    return actions_info, policies_info, key
 
 
 class Executor(SystemExecutor, ExecutorHookMixin):
@@ -116,9 +142,9 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         self.store.observation = observation
         self.store.state = state
 
-        self.on_execution_select_action_start()
+        # self.on_execution_select_action_start()
 
-        self.on_execution_select_action_preprocess()
+        # self.on_execution_select_action_preprocess()
 
         self.on_execution_select_action_compute()
 
@@ -142,13 +168,21 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         Returns:
             Action and policy info for all agents in the system.
         """
-        self.store.observations = observations
+        # self.store.observations = observations
+        (
+            self.store.actions_info,
+            self.store.policies_info,
+            self.store.key,
+        ) = select_actions(
+            observations, self.store.networks, self.store.agent_net_keys, self.store.key
+        )
+        # select_actions_internal(observations)
 
-        self.on_execution_select_actions_start()
+        # self.on_execution_select_actions_start()
 
-        self.on_execution_select_actions()
+        # self.on_execution_select_actions()
 
-        self.on_execution_select_actions_end()
+        # self.on_execution_select_actions_end()
 
         return self.store.actions_info, self.store.policies_info
 
