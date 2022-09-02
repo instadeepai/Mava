@@ -15,6 +15,7 @@
 """Example running feedforward MADQN on Flatland."""
 
 import functools
+import os
 from datetime import datetime
 from typing import Any, Dict
 
@@ -25,6 +26,10 @@ from mava.systems.jax import ippo
 from mava.utils.environments.flatland_utils import make_environment
 from mava.utils.loggers import logger_utils
 
+# Without this flag, JAX uses the whole GPU from the beginning and our trainer crashes.
+os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+# Env uses int64 action space due to the use of spac.Discrete.
+os.environ["JAX_ENABLE_X64"] = "true"
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
