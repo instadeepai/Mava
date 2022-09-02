@@ -62,7 +62,7 @@ nav:
   - Environments:
       - General: environments/general.md
       - Supported Environments:
-          - Debugging Env: environments/debugging.md
+          - Debugging Environment: environments/debugging.md
           - PettingZoo: environments/pettingzoo.md
           - SMAC: environments/smac.md
           - Flatland: environments/flatland.md
