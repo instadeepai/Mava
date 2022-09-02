@@ -14,9 +14,10 @@
 # limitations under the License.
 import abc
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Type
+from typing import Dict, List, Type
 
 import jax.numpy as jnp
+import numpy as np
 from jraph import GraphsTuple
 
 from mava.callbacks import Callback
@@ -27,14 +28,14 @@ from mava.types import OLT
 """Components to construct GDN GraphsTuples."""
 
 
-def build_graphs_tuple_from_senders_receivers(
-    observations: Dict[str, OLT], communication_graph: Tuple[List, List]
+def build_graphs_tuple_from_adj_matrix(
+    observations: Dict[str, OLT], communication_graph: np.ndarray
 ) -> GraphsTuple:
     """Assemble a GraphsTuple from the observations and graph structure.
 
     Args:
         observations: Agent observations.
-        communication_graph: Communication graph senders / receivers.
+        communication_graph: Communication graph adjacency matrix.
 
     Returns:
         GraphsTuple of 'communication_graph' with node features 'observations'.
@@ -45,12 +46,14 @@ def build_graphs_tuple_from_senders_receivers(
         nodes[agent_num] = observations[agent].observation
     nodes = jnp.array(nodes)
 
-    senders, receivers = communication_graph
+    senders: List[int] = []
+    receivers: List[int] = []
+    # TODO(Matthew): compute senders / receivers from adj matrix
     graph = GraphsTuple(
         nodes=nodes,
         edges=None,
-        senders=jnp.array(senders),
-        receivers=jnp.array(receivers),
+        senders=jnp.array(senders, dtype=int),
+        receivers=jnp.array(receivers, dtype=int),
         globals=None,
         n_node=jnp.array([len(observations)], dtype=int),
         n_edge=jnp.array([len(senders)], dtype=int),
@@ -139,11 +142,9 @@ class GdnGraphFromEnvironment(GdnGraphConstructor):
         if "communication_graph" not in executor.store.extras:
             raise Exception("Environment does not return a communication graph.")
 
-        executor.store.communication_graphs_tuple = (
-            build_graphs_tuple_from_senders_receivers(
-                executor.store.timestep.observation,
-                executor.store.extras["communication_graph"],
-            )
+        executor.store.communication_graphs_tuple = build_graphs_tuple_from_adj_matrix(
+            executor.store.timestep.observation,
+            executor.store.extras["communication_graph"],
         )
 
     def on_execution_observe(self, executor: SystemExecutor) -> None:
@@ -158,9 +159,7 @@ class GdnGraphFromEnvironment(GdnGraphConstructor):
         if "communication_graph" not in executor.store.next_extras:
             raise Exception("Environment does not return a communication graph.")
 
-        executor.store.communication_graphs_tuple = (
-            build_graphs_tuple_from_senders_receivers(
-                executor.store.next_timestep.observation,
-                executor.store.next_extras["communication_graph"],
-            )
+        executor.store.communication_graphs_tuple = build_graphs_tuple_from_adj_matrix(
+            executor.store.next_timestep.observation,
+            executor.store.next_extras["communication_graph"],
         )
