@@ -28,8 +28,18 @@ from mava.core_jax import SystemParameterServer
 
 @dataclass
 class CheckpointerConfig:
-    checkpoint_minute_interval_comp: int = 5
+    checkpoint_minute_interval: float = 5 / 60
     experiment_path: str = "~/mava/"
+
+
+# TODO
+# DONE save only specific variables maybe not trainer steps)
+# check why reference to orig is being lost
+# checkpointer unit test
+# decide what to save
+# check saveable wrapper issues
+# add optax state and seed
+# best checkpoint
 
 
 class SaveableWrapper(core.Saveable):
@@ -82,7 +92,7 @@ class Checkpointer(Component):  # , core.Saveable):
         # self._state = server.store.parameters
         server.store.system_checkpointer = savers.Checkpointer(
             object_to_save=SaveableWrapper(
-                server.store.parameters
+                server.store.saveable_parameters
             ),  # must be saveable type
             directory=self.config.experiment_path,
             add_uid=False,
@@ -102,13 +112,11 @@ class Checkpointer(Component):  # , core.Saveable):
             None.
         """
         if (
-            server.store.last_checkpoint_time
-            + self.config.checkpoint_minute_interval_comp * 60
-            + 1
-            < time.time()
+            time.time() - server.store.last_checkpoint_time
+            > self.config.checkpoint_minute_interval * 60
         ):
             server.store.system_checkpointer._checkpoint.saveable._object_to_save = (
-                SaveableWrapper(server.store.parameters)
+                SaveableWrapper(server.store.saveable_parameters)
             )
             server.store.system_checkpointer.save()
             server.store.last_checkpoint_time = time.time()

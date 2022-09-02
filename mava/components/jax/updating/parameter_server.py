@@ -137,14 +137,13 @@ class DefaultParameterServer(ParameterServer):
                     net_type_key
                 ][agent_net_key].params
 
-            # Only save variables that are not empty.
-            # save_variables = {}
-            # for key in server.store.parameters.keys():
-            #     var = server.store.parameters[key]
-            #     # Don't store empty tuple (e.g. empty observation_network) variables
-            #     if not (type(var) == tuple and len(var) == 0):
-            #         save_variables[key] = var
-            # server.store.checkpoint_variables = save_variables
+        # Only save variables that are not empty.
+        server.store.saveable_parameters = {}
+        for key in server.store.parameters.keys():
+            var = server.store.parameters[key]
+            # Don't store empty tuple (e.g. empty observation_network) variables
+            if not (type(var) == tuple and len(var) == 0):
+                server.store.saveable_parameters[key] = var
 
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
@@ -260,3 +259,12 @@ class ParameterServerSeparateNetworks(DefaultParameterServer):
                 server.store.parameters[
                     f"critic_{net_type_key}-{agent_net_key}"
                 ] = networks[net_type_key][agent_net_key].critic_params
+
+        # Only save variables that are not empty.
+        server.store.saveable_parameters = {}
+        for key in server.store.parameters.keys():
+            var = server.store.parameters[key]
+            # print(key, "\n\n\n")
+            # Don't store empty tuple (e.g. empty observation_network) variables
+            if not (type(var) == tuple and len(var) == 0):
+                server.store.saveable_parameters[key] = var
