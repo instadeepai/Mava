@@ -23,6 +23,7 @@ from mava.systems.jax import System
 from mava.systems.jax.ippo.components import ExtrasLogProbSpec
 from mava.systems.jax.ippo.config import IPPODefaultConfig
 
+
 class IPPOSystem(System):
     def design(self) -> Tuple[DesignSpec, Any]:
         """System design for IPPO with single optimiser.
@@ -94,6 +95,7 @@ class IPPOSystem(System):
         )
         return system, default_params
 
+
 class IPPOSystemSeparateNetworks(System):
     def design(self) -> Tuple[DesignSpec, Any]:
         """System design for PPO with separate policy and critic networks.
@@ -111,14 +113,17 @@ class IPPOSystemSeparateNetworks(System):
         system.set("minibatch_update", training.MAPGMinibatchUpdateSeparateNetworks)
         system.set("sgd_step", training.MAPGWithTrustRegionStepSeparateNetworks)
         system.set("epoch_update", training.MAPGEpochUpdateSeparateNetworks)
-        
+
         # Update parameter server components with seperate networks
         # TODO (dries): See if we can somehow reuse the same parameter client and server components
         # as is used in the shared networks system. We can then remove the below components.
         system.set("parameter_server", updating.ParameterServerSeparateNetworks)
-        system.set("executor_parameter_client", building.ExecutorParameterClientSeparateNetworks)
-        system.set("trainer_parameter_client", building.TrainerParameterClientSeparateNetworks)
-
-        print("system")
+        system.set(
+            "executor_parameter_client",
+            building.ExecutorParameterClientSeparateNetworks,
+        )
+        system.set(
+            "trainer_parameter_client", building.TrainerParameterClientSeparateNetworks
+        )
 
         return system, default_params

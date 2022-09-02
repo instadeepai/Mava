@@ -19,6 +19,7 @@ from typing import Any, Dict, List
 import dm_env
 from acme.specs import EnvironmentSpec
 
+from mava.components.jax import Component
 from mava.utils.sort_utils import sort_str_num
 
 
@@ -170,8 +171,8 @@ class DesignSpec(SimpleNamespace):
             _description_
         """
         return self.__dict__
-    
-    def set(self, name, component) -> None:
+
+    def set(self, name: str, component: Any) -> None:
         """_summary_
 
         Returns:

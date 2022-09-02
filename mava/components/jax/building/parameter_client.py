@@ -238,7 +238,7 @@ class TrainerParameterClient(BaseParameterClient):
 ###################
 
 
-class ExecutorParameterClientSeparateNetworks(BaseParameterClient):
+class ExecutorParameterClientSeparateNetworks(ExecutorParameterClient):
     def __init__(
         self,
         config: ExecutorParameterClientConfig = ExecutorParameterClientConfig(),
@@ -327,7 +327,7 @@ class ExecutorParameterClientSeparateNetworks(BaseParameterClient):
         return ExecutorParameterClientConfig
 
 
-class TrainerParameterClientSeparateNetworks(BaseParameterClient):
+class TrainerParameterClientSeparateNetworks(TrainerParameterClient):
     def __init__(
         self,
         config: TrainerParameterClientConfig = TrainerParameterClientConfig(),
