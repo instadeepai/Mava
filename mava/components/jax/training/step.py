@@ -487,11 +487,11 @@ class MAPGWithTrustRegionStepSeparateNetworks(Step):
         @jit
         def sgd_step(
             states: TrainingStateSeparateNetworks,
-            gdn_state: Optional[TrainingStateGdn],
+            gdn_state: TrainingStateGdn,
             sample: reverb.ReplaySample,
         ) -> Tuple[
             TrainingStateSeparateNetworks,
-            Optional[TrainingStateGdn],
+            TrainingStateGdn,
             Dict[str, jnp.ndarray],
         ]:
             """Performs a minibatch SGD step.

@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Type
 
 import jax.numpy as jnp
+import jraph
 import numpy as np
 from jraph import GraphsTuple
 
@@ -48,8 +49,8 @@ def build_graphs_tuple_from_adj_matrix(
 
     senders: List[int] = []
     receivers: List[int] = []
-    for i in range(communication_graph.shape[1]):
-        for j in range(communication_graph.shape[2]):
+    for i in range(communication_graph.shape[0]):
+        for j in range(communication_graph.shape[1]):
             if communication_graph[i][j] == 1:
                 senders.append(i)
                 receivers.append(j)
@@ -65,6 +66,51 @@ def build_graphs_tuple_from_adj_matrix(
     )
 
     return graph
+
+
+def batch_build_graphs_tuple_from_adj_matrix(
+    observations: Dict[str, OLT], communication_graph: np.ndarray
+) -> GraphsTuple:
+    """Assemble a GraphsTuple from the observations and graph structure.
+
+    Observations is {agent_id: OLT}, where OLT.observation has shape [batch, obs].
+    communication_graph has shape [batch, num_agents, num_agents].
+
+    Args:
+        observations: Agent observations.
+        communication_graph: Communication graph adjacency matrix.
+
+    Returns:
+        GraphsTuple: batch of GDN graphs.
+    """
+    graph_list = []
+    for batch_num in range(communication_graph.shape[0]):
+        nodes = [jnp.zeros(0) for _ in range(len(observations))]
+        for agent in observations.keys():
+            agent_num = int(agent[6:])
+            nodes[agent_num] = observations[agent].observation[batch_num]
+        nodes = jnp.array(nodes)
+
+        senders: List[int] = []
+        receivers: List[int] = []
+        for i in range(communication_graph.shape[1]):
+            for j in range(communication_graph.shape[2]):
+                if communication_graph[batch_num][i][j] == 1:
+                    senders.append(i)
+                    receivers.append(j)
+
+        graph = GraphsTuple(
+            nodes=nodes,
+            edges=None,
+            senders=jnp.array(senders, dtype=int),
+            receivers=jnp.array(receivers, dtype=int),
+            globals=None,
+            n_node=jnp.array([len(observations)], dtype=int),
+            n_edge=jnp.array([len(senders)], dtype=int),
+        )
+        graph_list.append(graph)
+
+    return jraph.batch(graph_list)
 
 
 @dataclass
