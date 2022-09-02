@@ -50,7 +50,7 @@ def build_graphs_tuple_from_adj_matrix(
     receivers: List[int] = []
     for i in range(communication_graph.shape[1]):
         for j in range(communication_graph.shape[2]):
-            if communication_graph[0][i][j] == 1:
+            if communication_graph[i][j] == 1:
                 senders.append(i)
                 receivers.append(j)
 
