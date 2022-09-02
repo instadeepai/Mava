@@ -218,6 +218,7 @@ class MAPGWithTrustRegionStep(Step):
             None.
         """
 
+        # TODO(Matthew): add GDN states to the step args
         @jit
         def sgd_step(
             states: TrainingState, sample: reverb.ReplaySample
