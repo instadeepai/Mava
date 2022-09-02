@@ -153,6 +153,8 @@ def test_on_parameter_server_init_start(
         "evaluator_episodes",
         "executor_episodes",
         "executor_steps",
+        # "seed",
+        # "optimizer_state",
     }
     required_float_keys = {"trainer_walltime"}
     for required_int_key in required_int_keys:
@@ -173,6 +175,7 @@ def test_on_parameter_server_init_start(
         not (type(var) == tuple and len(var) == 0)
         for var in server.store.saveable_parameters.values()
     )
+    assert hasattr(server.store, "experiment_path")
 
 
 def test_on_parameter_server_get_parameters_single(
@@ -237,7 +240,7 @@ def test_on_parameter_server_add_to_parameters(
 ########################
 
 
-def test_on_parameter_server_init_start_parameter_creation_separate_networks(
+def test_on_parameter_server_init_start_separate_networks(
     test_default_parameter_server_separate_networks: ParameterServerSeparateNetworks,
     server_separate_networks: SystemParameterServer,
 ) -> None:
@@ -284,6 +287,7 @@ def test_on_parameter_server_init_start_parameter_creation_separate_networks(
         not (type(var) == tuple and len(var) == 0)
         for var in server.store.saveable_parameters.values()
     )
+    assert hasattr(server.store, "experiment_path")
 
 
 def test_on_parameter_server_get_parameters_single_separate_networks(

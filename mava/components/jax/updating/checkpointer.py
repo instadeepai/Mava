@@ -29,7 +29,6 @@ from mava.wrappers import SaveableWrapper
 @dataclass
 class CheckpointerConfig:
     checkpoint_minute_interval: float = 5 / 60
-    experiment_path: str = "~/mava/"
 
 
 # TODO
@@ -50,7 +49,6 @@ class Checkpointer(Component):
     ):
         """Component for checkpointing system variables."""
         self.config = config
-        # self._state = None
 
     def on_parameter_server_init(self, server: SystemParameterServer) -> None:
         """Create the system checkpointer.
@@ -61,12 +59,11 @@ class Checkpointer(Component):
         Returns:
             None.
         """
-        # self._state = server.store.parameters
         server.store.system_checkpointer = acme_savers.Checkpointer(
             object_to_save=SaveableWrapper(
                 server.store.saveable_parameters
             ),  # must be saveable type
-            directory=self.config.experiment_path,
+            directory=server.store.experiment_path,
             add_uid=False,
             time_delta_minutes=0,
         )

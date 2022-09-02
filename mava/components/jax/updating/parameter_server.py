@@ -29,6 +29,7 @@ from mava.core_jax import SystemParameterServer
 @dataclass
 class ParameterServerConfig:
     non_blocking_sleep_seconds: int = 10
+    experiment_path: str = "~/mava/"
 
 
 class ParameterServer(Component):
@@ -144,6 +145,7 @@ class DefaultParameterServer(ParameterServer):
             # Don't store empty tuple (e.g. empty observation_network) variables
             if not (type(var) == tuple and len(var) == 0):
                 server.store.saveable_parameters[key] = var
+        server.store.experiment_path = self.config.experiment_path
 
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:

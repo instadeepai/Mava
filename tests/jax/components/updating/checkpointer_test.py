@@ -29,6 +29,7 @@ from mava.core_jax import SystemParameterServer
 @dataclass
 class MockParameterStore:
     saveable_parameters: Optional[Dict[str, Any]] = None
+    experiment_path: Optional[str] = None
 
 
 @dataclass
@@ -45,7 +46,8 @@ def mock_parameter_server() -> MockParameterServer:
             saveable_parameters={
                 "trainer_steps": 50,
             },
-        )
+            experiment_path=tempfile.mkdtemp(),
+        ),
     )
 
     return mock_server
@@ -60,9 +62,7 @@ def checkpointer() -> Checkpointer:
     """
 
     checkpointer = Checkpointer(
-        config=CheckpointerConfig(  # type: ignore
-            checkpoint_minute_interval=1 / 60, fexperiment_path=tempfile.mkdtemp()
-        ),
+        config=CheckpointerConfig(checkpoint_minute_interval=1 / 60),  # type: ignore
     )
     return checkpointer
 
@@ -92,9 +92,7 @@ def test_save_restore(
     ]
     assert any(
         fname == "checkpoint"
-        for fname in os.listdir(
-            os.path.join(checkpointer.config.experiment_path, "checkpoints/default")
-        )
+        for fname in os.listdir(system_checkpointer._checkpoint_dir)
     )
 
     # Change the parameters and check that the checkpointer has the same value
@@ -132,7 +130,6 @@ def test_checkpointer(
     """
     # Check whether checkpointer parameters are set correctly
     assert checkpointer.config.checkpoint_minute_interval == 1 / 60
-    assert "/tmp" in checkpointer.config.experiment_path
 
     # Create checkpointer
     checkpointer.on_parameter_server_init(server=mock_parameter_server)
