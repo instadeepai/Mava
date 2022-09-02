@@ -276,7 +276,7 @@ class MAPGWithTrustRegionClippingLossSeparateNetworks(Loss):
                     advantages: jnp.ndarray,
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
                     """Inner policy loss function: see outer function for parameters."""
-                    # TODO: GNN application could go here?
+                    # TODO(Matthew): GNN application could go here?
                     distribution_params = network.policy_network.apply(
                         policy_params, observations
                     )

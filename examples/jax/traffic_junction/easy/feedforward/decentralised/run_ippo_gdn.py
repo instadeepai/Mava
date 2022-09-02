@@ -25,6 +25,10 @@ import optax
 from absl import app, flags
 
 from mava.components.jax.communication.action_selection import FeedforwardExecutorGdn
+from mava.components.jax.communication.networks import (
+    DefaultGdnNetworks,
+    make_default_gcn,
+)
 from mava.components.jax.communication.observing import GdnGraphFromEnvironment
 from mava.systems.jax import ippo
 from mava.utils.environments import traffic_junction_utils
@@ -67,6 +71,12 @@ def main(_: Any) -> None:
             **kwargs,
         )
 
+    # GDN network
+    def gdn_network_factory(*args: Any, **kwargs: Any) -> Any:
+        return make_default_gcn(  # type: ignore
+            update_node_layer_sizes=((128, 128), (128, 128)), *args, **kwargs
+        )
+
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_subpath = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
@@ -97,11 +107,13 @@ def main(_: Any) -> None:
     # TODO(Matthew): make a separate system for this later that builds on IPPO
     system.add(GdnGraphFromEnvironment)
     system.add(FeedforwardExecutorGdn)
+    system.add(DefaultGdnNetworks)
 
     # Build the system.
     system.build(
         environment_factory=environment_factory,
         network_factory=network_factory,
+        gdn_network_factory=gdn_network_factory,
         logger_factory=logger_factory,
         experiment_path=checkpoint_subpath,
         policy_optimizer=policy_optimizer,

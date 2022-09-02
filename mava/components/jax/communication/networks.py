@@ -32,7 +32,7 @@ def make_default_gcn(
     ] = environment_spec.get_agent_environment_specs()
 
     # Assumes all agents have same spec
-    # TODO: assert all have same spec (i.e. same obs size)
+    # TODO(Matthew): assert all have same spec (i.e. same obs size)
     agent_spec: acme.specs.EnvironmentSpec = list(specs.values())[0]
 
     # Define GNN function
@@ -52,7 +52,7 @@ def make_default_gcn(
 
         # One final layer to get the output size equal to
         # the policy input size (i.e. env obs size)
-        # TODO: rather init the policy on the output of the GNN
+        # TODO(Matthew): rather init the policy on the output of the GNN
         obs_size = agent_spec.observations.observation.shape[0]
         graph_decoder = jraph.GraphMapFeatures(embed_node_fn=hk.Linear(obs_size))
         graph = graph_decoder(graph)
@@ -68,10 +68,10 @@ def make_default_gcn(
     dummy_graph = jraph.GraphsTuple(
         nodes=jnp.array([dummy_obs for _ in range(num_agents)]),
         edges=None,
-        senders=jnp.array([]),
-        receivers=jnp.array([]),
-        n_node=jnp.array([num_agents]),
-        n_edge=jnp.array([]),
+        senders=jnp.array([], dtype=int),
+        receivers=jnp.array([], dtype=int),
+        n_node=jnp.array([num_agents], dtype=int),
+        n_edge=jnp.array([], dtype=int),
         globals=None,
     )
     network_key, rng_key = jax.random.split(rng_key)
@@ -124,7 +124,7 @@ class GdnNetwork:
 
 @dataclass
 class GdnNetworksConfig:
-    network_factory: Optional[Callable[[str], dm_env.Environment]] = None
+    gdn_network_factory: Optional[Callable[[str], dm_env.Environment]] = None
 
 
 class DefaultGdnNetworks(Component):
@@ -150,9 +150,8 @@ class DefaultGdnNetworks(Component):
         """
         # Build network function here
         network_key, builder.store.key = jax.random.split(builder.store.key)
-        builder.store.gdn_network_factory = lambda: self.config.network_factory(
+        builder.store.gdn_network_factory = lambda: self.config.gdn_network_factory(
             environment_spec=builder.store.ma_environment_spec,
-            agent_net_keys=builder.store.agent_net_keys,
             rng_key=network_key,
         )
 
@@ -165,6 +164,7 @@ class DefaultGdnNetworks(Component):
         Returns:
             None.
         """
+        # TODO(Matthew): register gdn networks in the parameter server
         builder.store.gdn_networks = builder.store.gdn_network_factory()
 
     @staticmethod
