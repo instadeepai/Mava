@@ -170,3 +170,11 @@ class DesignSpec(SimpleNamespace):
             _description_
         """
         return self.__dict__
+    
+    def set(self, name, component) -> None:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        self.__dict__[name] = component

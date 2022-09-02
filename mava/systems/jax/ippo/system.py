@@ -23,74 +23,6 @@ from mava.systems.jax import System
 from mava.systems.jax.ippo.components import ExtrasLogProbSpec
 from mava.systems.jax.ippo.config import IPPODefaultConfig
 
-
-class IPPOSystemSeparateNetworks(System):
-    def design(self) -> Tuple[DesignSpec, Any]:
-        """System design for PPO with separate policy and critic networks.
-
-        Returns:
-            system callback components, default system parameters
-        """
-        # Set the default configs
-        default_params = IPPODefaultConfig()
-
-        # Default system processes
-        # System initialization
-        system_init = DesignSpec(
-            environment_spec=building.EnvironmentSpec,
-            system_init=building.FixedNetworkSystemInit,
-        ).get()
-
-        # Executor
-        executor_process = DesignSpec(
-            executor_init=executing.ExecutorInit,
-            executor_observe=executing.FeedforwardExecutorObserve,
-            executor_select_action=executing.FeedforwardExecutorSelectAction,
-            executor_adder=building.ParallelSequenceAdder,
-            adder_priority=building.UniformAdderPriority,
-            executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
-            networks=building.DefaultNetworks,
-        ).get()
-
-        # Trainer
-        trainer_process = DesignSpec(
-            trainer_init=training.SingleTrainerInit,
-            gae_fn=training.GAE,
-            loss=training.MAPGWithTrustRegionClippingLossSeparateNetworks,
-            epoch_update=training.MAPGEpochUpdateSeparateNetworks,
-            minibatch_update=training.MAPGMinibatchUpdateSeparateNetworks,
-            sgd_step=training.MAPGWithTrustRegionStepSeparateNetworks,
-            step=training.DefaultTrainerStep,
-            trainer_dataset=building.TrajectoryDataset,
-        ).get()
-
-        # Data Server
-        data_server_process = DesignSpec(
-            data_server=building.OnPolicyDataServer,
-            data_server_adder_signature=building.ParallelSequenceAdderSignature,
-            extras_spec=ExtrasLogProbSpec,
-        ).get()
-
-        # Parameter Server
-        parameter_server_process = DesignSpec(
-            parameter_server=updating.ParameterServerSeparateNetworks,
-            executor_parameter_client=building.ExecutorParameterClientSeparateNetworks,
-            trainer_parameter_client=building.TrainerParameterClientSeparateNetworks,
-            termination_condition=updating.CountConditionTerminator,
-        ).get()
-
-        system = DesignSpec(
-            **system_init,
-            **data_server_process,
-            **parameter_server_process,
-            **executor_process,
-            **trainer_process,
-            distributor=building.Distributor,
-            logger=building.Logger,
-        )
-        return system, default_params
-
-
 class IPPOSystem(System):
     def design(self) -> Tuple[DesignSpec, Any]:
         """System design for IPPO with single optimiser.
@@ -160,4 +92,33 @@ class IPPOSystem(System):
             logger=building.Logger,
             component_dependency_guardrails=ComponentDependencyGuardrails,
         )
+        return system, default_params
+
+class IPPOSystemSeparateNetworks(System):
+    def design(self) -> Tuple[DesignSpec, Any]:
+        """System design for PPO with separate policy and critic networks.
+
+        Returns:
+            system callback components, default system parameters
+        """
+
+        # Get the generic IPPO system setup.
+        system, default_params = IPPOSystem().design()
+
+        # Update trainer components with seperate networks
+        # TODO (dries): Investigate whether the names (below) are necessary or if they can be removed.
+        system.set("loss", training.MAPGWithTrustRegionClippingLossSeparateNetworks)
+        system.set("minibatch_update", training.MAPGMinibatchUpdateSeparateNetworks)
+        system.set("sgd_step", training.MAPGWithTrustRegionStepSeparateNetworks)
+        system.set("epoch_update", training.MAPGEpochUpdateSeparateNetworks)
+        
+        # Update parameter server components with seperate networks
+        # TODO (dries): See if we can somehow reuse the same parameter client and server components
+        # as is used in the shared networks system. We can then remove the below components.
+        system.set("parameter_server", updating.ParameterServerSeparateNetworks)
+        system.set("executor_parameter_client", building.ExecutorParameterClientSeparateNetworks)
+        system.set("trainer_parameter_client", building.TrainerParameterClientSeparateNetworks)
+
+        print("system")
+
         return system, default_params
