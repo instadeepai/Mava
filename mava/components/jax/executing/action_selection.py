@@ -17,10 +17,12 @@
 
 import abc
 from dataclasses import dataclass
-from typing import List, Type
+from typing import Any, Dict, List, Tuple, Type
 
 import jax
+from acme.jax import networks as networks_lib
 from acme.jax import utils
+from acme.types import NestedArray
 
 from mava.callbacks import Callback
 from mava.components.jax import Component
@@ -79,6 +81,36 @@ class ExecutorSelectAction(Component):
         return [BaseTrainerInit, BaseSystemInit, Networks]
 
 
+def select_action(
+    observation: NestedArray,
+    current_params: NestedArray,
+    network: Any,
+    key: networks_lib.PRNGKey,
+) -> Tuple[NestedArray, NestedArray, networks_lib.PRNGKey]:
+    """Action selection across a single agent.
+
+    Args:
+        observation : obs for current agent.
+        current_params : params for current agent's network.
+        network : network object.
+        key : prng key.
+
+    Returns:
+        action info, policy info and new key.
+    """
+    observation_data = utils.add_batch_dim(observation.observation)
+    # We use the subkey immediately and keep the new key for future splits.
+    new_key, sub_key = jax.random.split(key)
+    action_info, policy_info = network.get_action(
+        observation_data,
+        current_params,
+        sub_key,
+        utils.add_batch_dim(observation.legal_actions),
+    )
+
+    return action_info, policy_info, new_key
+
+
 class FeedforwardExecutorSelectAction(ExecutorSelectAction):
     def __init__(
         self,
@@ -101,13 +133,19 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
         Returns:
             None.
         """
-        executor.store.actions_info = {}
-        executor.store.policies_info = {}
-        # executor.store.observations set by Executor
-        for agent, observation in executor.store.observations.items():
-            action_info, policy_info = executor.select_action(agent, observation)
-            executor.store.actions_info[agent] = action_info
-            executor.store.policies_info[agent] = policy_info
+        observations = executor.store.observations
+        # Dict with params per network
+        current_agent_params = {
+            network: executor.store.networks["networks"][network].params
+            for network in executor.store.agent_net_keys.values()
+        }
+        (
+            executor.store.actions_info,
+            executor.store.policies_info,
+            executor.store.key,
+        ) = executor.store.select_actions_fn(
+            observations, current_agent_params, executor.store.key
+        )
 
     # Select action
     def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
@@ -137,3 +175,33 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             rng_key,
             utils.add_batch_dim(executor.store.observation.legal_actions),
         )
+
+    def on_execution_init_end(self, executor: SystemExecutor) -> None:
+        """Create function that is used to select actions.
+
+        Args:
+            executor : SystemExecutor.
+
+        Returns:
+            None.
+        """
+        networks = executor.store.networks
+        agent_net_keys = executor.store.agent_net_keys
+
+        def select_actions(
+            observations: Dict[str, NestedArray],
+            current_params: Dict[str, NestedArray],
+            key: networks_lib.PRNGKey,
+        ) -> Tuple[
+            Dict[str, NestedArray], Dict[str, NestedArray], networks_lib.PRNGKey
+        ]:
+            actions_info, policies_info = {}, {}
+            # TODO Look at tree mapping this forloop.
+            for agent, observation in observations.items():
+                network = networks["networks"][agent_net_keys[agent]]
+                actions_info[agent], policies_info[agent], key = select_action(
+                    observation, current_params[agent_net_keys[agent]], network, key
+                )
+            return actions_info, policies_info, key
+
+        executor.store.select_actions_fn = jax.jit(select_actions)
