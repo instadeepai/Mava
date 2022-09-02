@@ -45,7 +45,7 @@ To join us in these efforts, please feel free to reach out, raise issues or read
 
 <hr>
 
-👋 **UPDATE - 02/09/2022**: As mentioned in our previous update, we are in the process of fully moving to JAX. In the next few weeks, we will release our first JAX system! Using a more modular and flexible build method, with many more develops to come soon. These will include more components and utilities, state-of-the-art system implementations, notebooks and tutorials as well as detailed benchmarking and performance guides. Please note that all TF2-based systems using the old build method will be deprecated in the near future. As part of this update, we have also restructured the readme and our documentation to reflect our move to JAX. 
+👋 **UPDATE - 02/09/2022**: As mentioned in our previous update, we are in the process of fully moving to JAX. In the next few weeks, we will release our first JAX system! Using a more modular and flexible build method, with many more develops to come soon. These will include more components and utilities, state-of-the-art system implementations, notebooks and tutorials as well as detailed benchmarking and performance guides. Please note that all TF2-based systems using the old build method will be deprecated in the near future. As part of this update, we have also restructured the readme and our documentation to reflect our move to JAX.
 
 <hr>
 
@@ -58,16 +58,19 @@ To join us in these efforts, please feel free to reach out, raise issues or read
 ## Installation 🎬
 
 You can install the latest release of Mava from PyPI:
+
 ```bash
 pip install id-mava[reverb,jax,envs]
 ```
+
 or you can install the latest development version directly from GitHub (recommended for latest JAX code):
+
 ```bash
 pip install "id-mava[reverb,jax,envs] @ git+https://github.com/instadeepai/mava.git"
 ```
 
 We have tested `mava` on Python 3.7, 3.8 and 3.9. Note that because the installation of JAX differs depending on your hardware accelerator,
-we advise users to explicitly install the correct JAX version (see the [official installation guide](https://github.com/google/jax#installation)). For more in-depth instalations guides including Docker builds and virtual environments, please see our [optional installs](OPTIONAL_INSTALL.md).
+we advise users to explicitly install the correct JAX version (see the [official installation guide](https://github.com/google/jax#installation)). For more in-depth instalations guides including Docker builds and virtual environments, please see our [detailed installation guide](OPTIONAL_INSTALL.md).
 
 ## Quickstart ⚡
 
