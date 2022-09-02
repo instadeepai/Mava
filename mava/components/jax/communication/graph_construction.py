@@ -48,7 +48,12 @@ def build_graphs_tuple_from_adj_matrix(
 
     senders: List[int] = []
     receivers: List[int] = []
-    # TODO(Matthew): compute senders / receivers from adj matrix
+    for i in range(communication_graph.shape[1]):
+        for j in range(communication_graph.shape[2]):
+            if communication_graph[0][i][j] == 1:
+                senders.append(i)
+                receivers.append(j)
+
     graph = GraphsTuple(
         nodes=nodes,
         edges=None,
