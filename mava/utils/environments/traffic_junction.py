@@ -917,7 +917,7 @@ class TrafficJunctionEnv(gym.Env):
             Adjacency matrix of graph.
         """
         adj = np.zeros(
-            (1, self.num_agents, self.num_agents)
+            (self.num_agents, self.num_agents)
         )  # 1 if agents can communicate
         for i in range(self.num_agents):
             if not self.alive_mask[i]:
@@ -931,8 +931,8 @@ class TrafficJunctionEnv(gym.Env):
                     car_loc1[1] - car_loc2[1]
                 ) ** 2
                 if squared_distance <= self.comm_range**2:
-                    adj[0][i][j] = 1
-                    adj[0][j][i] = 1
+                    adj[i][j] = 1
+                    adj[j][i] = 1
 
         return adj
 
