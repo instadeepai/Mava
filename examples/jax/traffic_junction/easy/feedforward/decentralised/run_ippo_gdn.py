@@ -25,8 +25,9 @@ import optax
 from absl import app, flags
 
 from mava.components.jax.communication.forward_pass import FeedforwardExecutorGdn
+from mava.components.jax.communication.gdn_model_updating import GdnTrainer
 from mava.components.jax.communication.gdn_networks import (
-    DefaultGdnNetworks,
+    DefaultGdnNetwork,
     make_default_gcn,
 )
 from mava.components.jax.communication.graph_construction import GdnGraphFromEnvironment
@@ -100,6 +101,10 @@ def main(_: Any) -> None:
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
+    gdn_optimizer = optax.chain(
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+    )
+
     # Create the system.
     system = ippo.IPPOSystemSeparateNetworks()
 
@@ -107,7 +112,8 @@ def main(_: Any) -> None:
     # TODO(Matthew): make a separate system for this later that builds on IPPO
     system.add(GdnGraphFromEnvironment)
     system.add(FeedforwardExecutorGdn)
-    system.add(DefaultGdnNetworks)
+    system.add(DefaultGdnNetwork)
+    system.add(GdnTrainer)
 
     # Build the system.
     system.build(
@@ -118,6 +124,7 @@ def main(_: Any) -> None:
         experiment_path=checkpoint_subpath,
         policy_optimizer=policy_optimizer,
         critic_optimizer=critic_optimizer,
+        gdn_optimizer=gdn_optimizer,
         run_evaluator=True,
         sample_batch_size=5,
         num_epochs=15,

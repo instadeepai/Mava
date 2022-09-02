@@ -478,12 +478,19 @@ class MAPGWithTrustRegionStepSeparateNetworks(Step):
 
         @jit
         def sgd_step(
-            states: TrainingStateSeparateNetworks, sample: reverb.ReplaySample
-        ) -> Tuple[TrainingStateSeparateNetworks, Dict[str, jnp.ndarray]]:
+            states: TrainingStateSeparateNetworks,
+            gdn_state: Optional[TrainingStateGdn],
+            sample: reverb.ReplaySample,
+        ) -> Tuple[
+            TrainingStateSeparateNetworks,
+            Optional[TrainingStateGdn],
+            Dict[str, jnp.ndarray],
+        ]:
             """Performs a minibatch SGD step.
 
             Args:
                 states: Training states (network params and optimiser states).
+                gdn_state: GDN training state (network params and opt state)
                 sample: Reverb sample.
 
             Returns:
@@ -500,6 +507,12 @@ class MAPGWithTrustRegionStepSeparateNetworks(Step):
                 data.discounts,
                 data.extras,
             )
+
+            # observations: Dict[str, OLT]
+            # OLT.observation: ShapedArray(float32[5,20,137])
+            # data.extras['communication_graph']: float32[5,20,1,5,5])
+            print("\n\n\nOBS\n", observations, "\n\n\n")
+            print("\n\n\nGRAPH\n", data.extras["communication_graph"], "\n\n\n")
 
             discounts = tree.map_structure(
                 lambda x: x * self.config.discount, termination
@@ -625,7 +638,9 @@ class MAPGWithTrustRegionStepSeparateNetworks(Step):
                 critic_opt_states=new_critic_opt_states,
                 random_key=new_key,
             )
-            return new_states, metrics
+            # TODO(Matthew): return actual new GDN state
+            new_gdn_state = gdn_state
+            return new_states, new_gdn_state, metrics
 
         def step(sample: reverb.ReplaySample) -> Tuple[Dict[str, jnp.ndarray]]:
             """Step over the reverb sample and update the parameters / optimiser states.
