@@ -26,7 +26,6 @@ from acme import specs
 from acme.jax import networks as networks_lib
 from acme.jax import utils
 from dm_env import specs as dm_specs
-from jax import jit
 
 from mava import specs as mava_specs
 from mava.utils.jax_training_utils import action_mask_categorical_policies
@@ -64,7 +63,6 @@ class PPONetworks:
         self.entropy = entropy
         self.sample = sample
 
-        @jit
         def forward_fn(
             params: Dict[str, jnp.ndarray],
             observations: networks_lib.Observation,
@@ -99,6 +97,7 @@ class PPONetworks:
     def get_action(
         self,
         observations: networks_lib.Observation,
+        params: Any,
         key: networks_lib.PRNGKey,
         mask: chex.Array = None,
     ) -> Tuple[np.ndarray, Dict]:
@@ -106,6 +105,7 @@ class PPONetworks:
 
         Args:
            observations: agent observations
+           params: current params of network.
            key: pseudo-random value used to initialise distributions
            mask: action mask which removes illegal actions
 
@@ -114,9 +114,10 @@ class PPONetworks:
             log_prob: log prob of the chosen action
 
         """
-        actions, log_prob = self.forward_fn(self.params, observations, key, mask)
-        actions = np.array(actions, dtype=np.int64)
-        log_prob = np.squeeze(np.array(log_prob, dtype=np.float32))
+        actions, log_prob = self.forward_fn(params, observations, key, mask)
+        # TODO Allow typed distributions - don't assume np.int64
+        actions = jnp.array(actions, dtype=np.int64)
+        log_prob = jnp.squeeze(jnp.array(log_prob, dtype=np.float32))
         return actions, {"log_prob": log_prob}
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
@@ -193,7 +194,6 @@ class PPOSeparateNetworks:
         self.entropy = entropy
         self.sample = sample
 
-        @jit
         def forward_fn(
             policy_params: Dict[str, jnp.ndarray],
             observations: networks_lib.Observation,
@@ -231,11 +231,12 @@ class PPOSeparateNetworks:
     def get_action(
         self,
         observations: networks_lib.Observation,
+        policy_params: Any,
         key: networks_lib.PRNGKey,
         mask: chex.Array = None,
     ) -> Tuple[np.ndarray, Dict]:
         """Get actions from policy network given observations."""
-        actions, log_prob = self.forward_fn(self.policy_params, observations, key, mask)
+        actions, log_prob = self.forward_fn(policy_params, observations, key, mask)
         actions = np.array(actions, dtype=np.int64)
         log_prob = np.squeeze(np.array(log_prob, dtype=np.float32))
         return actions, {"log_prob": log_prob}
