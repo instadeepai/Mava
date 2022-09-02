@@ -377,6 +377,7 @@ class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
                 advantages = minibatch.advantages
 
             # Calculate the gradients and agent metrics.
+            # TODO(Matthew): pass communication graph down
             policy_gradients, policy_agent_metrics = trainer.store.policy_grad_fn(
                 policy_params,
                 minibatch.observations,

@@ -21,6 +21,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optax
 import reverb
 import tree
@@ -293,6 +294,11 @@ class MAPGWithTrustRegionStep(Step):
                 (observations, actions, behavior_log_probs, behavior_values),
             )
 
+            # Make fake graph to add into the Batch
+            # TODO(Matthew): implement GDNs for seperate networks as well
+            shape = list(data.observations.values())[0].observation.shape
+            communication_graph = np.zeros(list(shape[:2]) + [1])
+
             trajectories = Batch(
                 observations=observations,
                 actions=actions,
@@ -300,6 +306,7 @@ class MAPGWithTrustRegionStep(Step):
                 behavior_log_probs=behavior_log_probs,
                 target_values=target_values,
                 behavior_values=behavior_values,
+                communication_graph=communication_graph,
             )
 
             # Concatenate all trajectories. Reshape from [num_sequences, num_steps,..]
@@ -508,11 +515,14 @@ class MAPGWithTrustRegionStepSeparateNetworks(Step):
                 data.extras,
             )
 
-            # observations: Dict[str, OLT]
-            # OLT.observation: ShapedArray(float32[5,20,137])
-            # data.extras['communication_graph']: float32[5,20,1,5,5])
-            print("\n\n\nOBS\n", observations, "\n\n\n")
-            print("\n\n\nGRAPH\n", data.extras["communication_graph"], "\n\n\n")
+            # Load communication graph
+            # [num_sequences, num_steps, num_agents, num_agents]
+            if hasattr(data.extras, "communication_graph"):
+                communication_graph = data.extras["communication_graph"]
+            else:
+                # Make fake graph to add into the Batch
+                shape = list(data.observations.values())[0].observation.shape
+                communication_graph = np.zeros(list(shape[:2]) + [1])
 
             discounts = tree.map_structure(
                 lambda x: x * self.config.discount, termination
@@ -556,9 +566,21 @@ class MAPGWithTrustRegionStepSeparateNetworks(Step):
 
             # Exclude the last step - it was only used for bootstrapping.
             # The shape is [num_sequences, num_steps, ..]
-            observations, actions, behavior_log_probs, behavior_values = jax.tree_map(
+            (
+                observations,
+                actions,
+                behavior_log_probs,
+                behavior_values,
+                communication_graph,
+            ) = jax.tree_map(
                 lambda x: x[:, :-1],
-                (observations, actions, behavior_log_probs, behavior_values),
+                (
+                    observations,
+                    actions,
+                    behavior_log_probs,
+                    behavior_values,
+                    communication_graph,
+                ),
             )
 
             trajectories = Batch(
@@ -568,6 +590,7 @@ class MAPGWithTrustRegionStepSeparateNetworks(Step):
                 behavior_log_probs=behavior_log_probs,
                 target_values=target_values,
                 behavior_values=behavior_values,
+                communication_graph=communication_graph,
             )
 
             # Concatenate all trajectories. Reshape from [num_sequences, num_steps,..]

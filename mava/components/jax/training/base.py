@@ -38,6 +38,9 @@ class Batch(NamedTuple):
     behavior_values: Any
     behavior_log_probs: Any
 
+    # Adjacency matrix of communication graph
+    communication_graph: Any
+
 
 class TrainingState(NamedTuple):
     """Training state consists of network parameters and optimiser state."""
