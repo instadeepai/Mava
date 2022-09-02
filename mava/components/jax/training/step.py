@@ -613,8 +613,10 @@ class MAPGWithTrustRegionStepSeparateNetworks(Step):
                 new_key,
                 new_policy_params,
                 new_critic_params,
+                new_gdn_params,
                 new_policy_opt_states,
                 new_critic_opt_states,
+                new_gdn_opt_state,
                 _,
             ), metrics = jax.lax.scan(
                 trainer.store.epoch_update_fn,
@@ -622,8 +624,10 @@ class MAPGWithTrustRegionStepSeparateNetworks(Step):
                     states.random_key,
                     states.policy_params,
                     states.critic_params,
+                    gdn_state.params,
                     states.policy_opt_states,
                     states.critic_opt_states,
+                    gdn_state.opt_state,
                     batch,
                 ),
                 (),
@@ -662,8 +666,10 @@ class MAPGWithTrustRegionStepSeparateNetworks(Step):
                 critic_opt_states=new_critic_opt_states,
                 random_key=new_key,
             )
-            # TODO(Matthew): return actual new GDN state
-            new_gdn_state = gdn_state
+            new_gdn_state = TrainingStateGdn(
+                params=new_gdn_params, opt_state=new_gdn_opt_state
+            )
+
             return new_states, new_gdn_state, metrics
 
         def step(sample: reverb.ReplaySample) -> Tuple[Dict[str, jnp.ndarray]]:

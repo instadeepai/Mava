@@ -360,12 +360,12 @@ class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
 
         def model_update_minibatch(
             carry: Tuple[
-                networks_lib.Params, networks_lib.Params, optax.OptState, optax.OptState
+                networks_lib.Params, networks_lib.Params, networks_lib.Params, optax.OptState, optax.OptState, optax.OptState
             ],
             minibatch: Batch,
-        ) -> Tuple[Tuple[Any, Any, optax.OptState, optax.OptState], Dict[str, Any]]:
+        ) -> Tuple[Tuple[Any, Any, Any, optax.OptState, optax.OptState, optax.OptState], Dict[str, Any]]:
             """Performs model update for a single minibatch."""
-            policy_params, critic_params, policy_opt_states, critic_opt_states = carry
+            policy_params, critic_params, gdn_params, policy_opt_states, critic_opt_states, gdn_opt_state = carry
 
             # Normalize advantages at the minibatch level before using them.
             if self.config.normalize_advantage:
@@ -376,8 +376,22 @@ class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
             else:
                 advantages = minibatch.advantages
 
+            # TODO(Matthew): construct GDN graph
+
+            # TODO(Matthew): move GDN training to IF statements
+            gdn_gradients, gdn_agent_metrics = trainer.store.gdn_grad_fn(
+                gdn_params,
+                policy_params,
+                gdn_graph,
+                minibatch.actions,
+                minibatch.behavior_log_probs,
+                advantages,
+            )
+
+            # Compute modified observations to use for policy and critic gradients
+            modified_observations =
+
             # Calculate the gradients and agent metrics.
-            # TODO(Matthew): pass communication graph down
             policy_gradients, policy_agent_metrics = trainer.store.policy_grad_fn(
                 policy_params,
                 minibatch.observations,
@@ -386,7 +400,7 @@ class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
                 advantages,
             )
 
-            # TODO (Matthew): perhaps the following to get GDN loss?
+            # TODO(Matthew): perhaps the following to get GDN loss? (probably not)
             # Here we have policy_gradients,
             # which is the gradient of the policy loss w.r.t its
             # params (W_1), the modified obs (M), the actions (A),
@@ -464,11 +478,15 @@ class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
                 # TODO (Ruan): double check that this was done correctly
                 metrics[agent_key].update(critic_agent_metrics[agent_key])
 
+                # TODO(Matthew): update gdn params and state
+
             return (
                 policy_params,
                 critic_params,
+                gdn_params,
                 policy_opt_states,
                 critic_opt_states,
+                gdn_opt_state,
             ), metrics
 
         trainer.store.minibatch_update_fn = model_update_minibatch
@@ -517,10 +535,10 @@ class MAPGEpochUpdateSeparateNetworks(EpochUpdate):
         trainer.store.num_minibatches = self.config.num_minibatches
 
         def model_update_epoch(
-            carry: Tuple[KeyArray, Any, Any, optax.OptState, optax.OptState, Batch],
+            carry: Tuple[KeyArray, Any, Any, Any, optax.OptState, optax.OptState, optax.OptState, Batch],
             unused_t: Tuple[()],
         ) -> Tuple[
-            Tuple[KeyArray, Any, Any, optax.OptState, optax.OptState, Batch],
+            Tuple[KeyArray, Any, Any, Any, optax.OptState, optax.OptState, optax.OptState, Batch],
             Dict[str, jnp.ndarray],
         ]:
             """Performs model updates based on one epoch of data."""
@@ -528,8 +546,10 @@ class MAPGEpochUpdateSeparateNetworks(EpochUpdate):
                 key,
                 policy_params,
                 critic_params,
+                gdn_params,
                 policy_opt_states,
                 critic_opt_states,
+                gdn_opt_state,
                 batch,
             ) = carry
 
@@ -561,11 +581,13 @@ class MAPGEpochUpdateSeparateNetworks(EpochUpdate):
             (
                 new_policy_params,
                 new_critic_params,
+                new_gdn_params,
                 new_policy_opt_states,
                 new_critic_opt_states,
+                new_gdn_opt_state,
             ), metrics = jax.lax.scan(
                 trainer.store.minibatch_update_fn,
-                (policy_params, critic_params, policy_opt_states, critic_opt_states),
+                (policy_params, critic_params, gdn_params, policy_opt_states, critic_opt_states, gdn_opt_state),
                 minibatches,
                 length=self.config.num_minibatches,
             )
@@ -574,8 +596,10 @@ class MAPGEpochUpdateSeparateNetworks(EpochUpdate):
                 new_key,
                 new_policy_params,
                 new_critic_params,
+                new_gdn_params,
                 new_policy_opt_states,
                 new_critic_opt_states,
+                new_gdn_opt_state,
                 batch,
             ), metrics
 
