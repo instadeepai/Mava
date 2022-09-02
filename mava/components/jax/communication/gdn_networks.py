@@ -65,7 +65,7 @@ def make_default_gcn(
     environment_spec: mava_specs.MAEnvironmentSpec,
     rng_key: List[int],
     update_node_layer_sizes: Sequence[Sequence[int]] = ((128, 128), (128, 128)),
-) -> Dict[str, GdnNetwork]:
+) -> GdnNetwork:
     """Create default GCN to use for communication."""
     # Create agent_type specs.
     specs: Dict[
@@ -119,7 +119,7 @@ def make_default_gcn(
     params = net.init(network_key, dummy_graph)
     gdn_network = GdnNetwork(network=net, params=params)
 
-    return {"gdn_network": gdn_network}
+    return gdn_network
 
 
 @dataclass
@@ -127,12 +127,12 @@ class GdnNetworksConfig:
     gdn_network_factory: Optional[Callable[[str], dm_env.Environment]] = None
 
 
-class DefaultGdnNetworks(Component):
+class DefaultGdnNetwork(Component):
     def __init__(
         self,
         config: GdnNetworksConfig = GdnNetworksConfig(),
     ):
-        """Component defines the default way to initialise Gdn networks.
+        """Component defines the default way to initialise a Gdn network.
 
         Args:
             config: GdnNetworksConfig.
@@ -156,7 +156,7 @@ class DefaultGdnNetworks(Component):
         )
 
     def on_building_init_end(self, builder: SystemBuilder) -> None:
-        """Create the GDN networks from the factory.
+        """Create the GDN network from the factory.
 
         Args:
             builder: SystemBuilder.
@@ -164,8 +164,8 @@ class DefaultGdnNetworks(Component):
         Returns:
             None.
         """
-        # TODO(Matthew): register gdn networks in the parameter server
-        builder.store.gdn_networks = builder.store.gdn_network_factory()
+        # TODO(Matthew): register gdn network in the parameter server
+        builder.store.gdn_network = builder.store.gdn_network_factory()
 
     @staticmethod
     def config_class() -> Optional[Callable]:
@@ -191,4 +191,4 @@ class DefaultGdnNetworks(Component):
     @staticmethod
     def name() -> str:
         """Static method that returns component name."""
-        return "gdn_networks"
+        return "gdn_network"

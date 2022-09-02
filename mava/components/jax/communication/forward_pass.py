@@ -84,7 +84,7 @@ class FeedforwardExecutorGdn(ExecutorGdn):
         Returns:
             None.
         """
-        gdn_network = executor.store.gdn_networks["gdn_network"]
+        gdn_network = executor.store.gdn_network
         new_agent_obs = gdn_network.get_modified_obs(
             executor.store.communication_graphs_tuple
         )

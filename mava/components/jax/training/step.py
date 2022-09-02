@@ -35,6 +35,7 @@ from mava.components.jax.building.datasets import TrainerDataset, TrajectoryData
 from mava.components.jax.building.loggers import Logger
 from mava.components.jax.building.networks import Networks
 from mava.components.jax.building.parameter_client import TrainerParameterClient
+from mava.components.jax.communication.gdn_model_updating import TrainingStateGdn
 from mava.components.jax.training.advantage_estimation import GAE
 from mava.components.jax.training.base import (
     Batch,
@@ -647,6 +648,17 @@ class MAPGWithTrustRegionStepSeparateNetworks(Step):
             }
             policy_opt_states = trainer.store.policy_opt_states
             critic_opt_states = trainer.store.critic_opt_states
+
+            # Possibly register GDN training state
+            if hasattr(trainer.store, "gdn_opt_state"):
+                gdn_opt_state = trainer.store.gdn_opt_state
+                gdn_params = trainer.store.gdn_network.params
+                gdn_training_state = TrainingStateGdn(
+                    opt_state=gdn_opt_state, params=gdn_params
+                )
+            else:
+                gdn_training_state = None
+
             random_key, _ = jax.random.split(trainer.store.key)
 
             states = TrainingStateSeparateNetworks(
@@ -657,7 +669,9 @@ class MAPGWithTrustRegionStepSeparateNetworks(Step):
                 random_key=random_key,
             )
 
-            new_states, metrics = sgd_step(states, sample)
+            new_states, new_gdn_state, metrics = sgd_step(
+                states=states, gdn_state=gdn_training_state, sample=sample
+            )
 
             # Set the new variables
             # TODO (dries): key is probably not being store correctly.
@@ -699,6 +713,14 @@ class MAPGWithTrustRegionStepSeparateNetworks(Step):
                 trainer.store.critic_opt_states[net_key] = new_states.critic_opt_states[
                     net_key
                 ]
+
+            # Possibly update GDN params and optimizer
+            if hasattr(trainer.store, "gdn_opt_state"):
+                net_params = trainer.store.gdn_network.params
+                for param_key in net_params.keys():
+                    net_params[param_key] = new_gdn_state.params[param_key]
+
+                trainer.store.gdn_opt_state = new_gdn_state.opt_state
 
             return metrics
 

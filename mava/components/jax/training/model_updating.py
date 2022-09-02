@@ -403,8 +403,8 @@ class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
             # dL / (dW_1 dO dA dB dR dW_2)
             # = (dL / (dW_1 dM dA dB dR)) * (dM / (dO, dW_2)).
             #
-            # dL / (dW_1 dM dA dB dR) can still be used to compute the policy loss.
-            # dL / (dW_1 dO dA dB dR dW_2) must be used to compute the GNN loss.
+            # dL / (dW_1 dM dA dB dR) can still be used to compute the policy gradient.
+            # dL / (dW_1 dO dA dB dR dW_2) must be used to compute the GNN gradient.
 
             # Calculate the gradients and agent metrics.
             critic_gradients, critic_agent_metrics = trainer.store.critic_grad_fn(
