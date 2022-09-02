@@ -19,7 +19,6 @@ from typing import Any, Dict, List
 import dm_env
 from acme.specs import EnvironmentSpec
 
-from mava.components.jax import Component
 from mava.utils.sort_utils import sort_str_num
 
 
