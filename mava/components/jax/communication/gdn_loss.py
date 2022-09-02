@@ -13,22 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
-from mava.components.jax.training.losses import Loss
+import jax
+import jax.numpy as jnp
+import jraph
+import rlax
+
+from mava.callbacks import Callback
+from mava.components.jax import Component
 from mava.core_jax import SystemTrainer
 
 
 @dataclass
 class MAPGWithTrustRegionClippingLossGdnPolicyConfig:
-    clipping_epsilon: float = 0.2
-    value_clip_parameter: float = 0.2
-    clip_value: bool = True
-    entropy_cost: float = 0.01
-    value_cost: float = 0.5
+    gdn_clipping_epsilon: float = 0.2
+    gdn_entropy_cost: float = 0.01
 
 
-class MAPGWithTrustRegionClippingLossGdnPolicy(Loss):
+class MAPGWithTrustRegionClippingLossGdnPolicy(Component):
     def __init__(
         self,
         config: MAPGWithTrustRegionClippingLossGdnPolicyConfig = MAPGWithTrustRegionClippingLossGdnPolicyConfig(),  # noqa: E501
@@ -55,24 +58,28 @@ class MAPGWithTrustRegionClippingLossGdnPolicy(Loss):
 
         # TODO(Matthew): implement this properly
         def gdn_loss_grad_fn(
+            gdn_params: Any,
             policy_params: Any,
-            observations: Any,
+            gdn_graph: jraph.GraphsTuple,
             actions: Dict[str, jnp.ndarray],
             behaviour_log_probs: Dict[str, jnp.ndarray],
             advantages: Dict[str, jnp.ndarray],
-        ) -> Tuple[Dict[str, jnp.ndarray], Dict[str, Dict[str, jnp.ndarray]]]:
+        ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray], Any]:
             """Surrogate loss using clipped probability ratios.
 
+            Computes gradient for the GDN using the policy loss.
+
             Args:
+                gdn_params: GDN network parameters.
                 policy_params: policy network parameters.
-                observations: agent observations.
+                gdn_graph: GDN graph with agent observations.
                 actions: actions the agents took.
                 behaviour_log_probs: Log probabilities of actions taken by
                     current policy in the environment.
                 advantages: advantage estimation values per agent.
 
             Returns:
-                Tuple[policy gradients, policy loss information]
+                Tuple[gdn gradients, gdn loss information, modified observations].
             """
 
             policy_grads = {}
@@ -100,7 +107,7 @@ class MAPGWithTrustRegionClippingLossGdnPolicy(Loss):
                     # Compute importance sampling weights:
                     # current policy / behavior policy.
                     rhos = jnp.exp(log_probs - behaviour_log_probs)
-                    clipping_epsilon = self.config.clipping_epsilon
+                    clipping_epsilon = self.config.gdn_clipping_epsilon
 
                     policy_loss = rlax.clipped_surrogate_pg_loss(
                         rhos, advantages, clipping_epsilon
@@ -110,7 +117,7 @@ class MAPGWithTrustRegionClippingLossGdnPolicy(Loss):
                     entropy_loss = -jnp.mean(entropy)
 
                     total_policy_loss = (
-                        policy_loss + entropy_loss * self.config.entropy_cost
+                        policy_loss + entropy_loss * self.config.gdn_entropy_cost
                     )
 
                     # TODO: (Ruan) Keeping the entropy penalty for now.
@@ -145,3 +152,19 @@ class MAPGWithTrustRegionClippingLossGdnPolicy(Loss):
             config class/dataclass for component.
         """
         return MAPGWithTrustRegionClippingLossGdnPolicyConfig
+
+    @staticmethod
+    def name() -> str:
+        """Static method that returns component name."""
+        return "gdn_loss"
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        TODO(Matthew): complete this.
+
+        Returns:
+            List of required component classes.
+        """
+        return []

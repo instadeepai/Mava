@@ -25,6 +25,9 @@ import optax
 from absl import app, flags
 
 from mava.components.jax.communication.forward_pass import FeedforwardExecutorGdn
+from mava.components.jax.communication.gdn_loss import (
+    MAPGWithTrustRegionClippingLossGdnPolicy,
+)
 from mava.components.jax.communication.gdn_model_updating import GdnTrainer
 from mava.components.jax.communication.gdn_networks import (
     DefaultGdnNetwork,
@@ -114,6 +117,7 @@ def main(_: Any) -> None:
     system.add(FeedforwardExecutorGdn)
     system.add(DefaultGdnNetwork)
     system.add(GdnTrainer)
+    system.add(MAPGWithTrustRegionClippingLossGdnPolicy)
 
     # Build the system.
     system.build(

@@ -404,7 +404,7 @@ class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
             # We use modified observations for policy and critic gradients.
             (
                 gdn_gradients,
-                gdn_agent_metrics,
+                gdn_metrics,
                 modified_observations,
             ) = trainer.store.gdn_grad_fn(
                 gdn_params,
