@@ -110,7 +110,6 @@ If you use Mava in your work, please cite the accompanying
 [meltingpot]: https://github.com/deepmind/meltingpot
 [flatland]: https://gitlab.aicrowd.com/flatland/flatland
 [robocup]: https://github.com/rcsoccersim
-[pymarl]: https://github.com/oxwhirl/pymarl
 [launchpad]: https://github.com/deepmind/launchpad
 [quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/quickstart.ipynb
 [documentation]: https://id-mava.readthedocs.io/

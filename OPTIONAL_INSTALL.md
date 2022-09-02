@@ -254,7 +254,7 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
 
 4. **Optional**: To log episodes in video/gif format, using the `Monitor` wrapper.
 
-- Install `xvfb` to run a headless/fake screen and `ffmpeg` to record video.
+* Install `xvfb` to run a headless/fake screen and `ffmpeg` to record video.
 
     ```
     sudo apt-get install -y xvfb ffmpeg
@@ -291,3 +291,5 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
   ```bash
   LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/ python examples/jax/smac/feedforward/decentralised/run_ippo.py
   ```
+
+[pymarl]: https://github.com/oxwhirl/pymarl
