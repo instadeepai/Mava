@@ -125,8 +125,8 @@ class DefaultParameterServer(ParameterServer):
             "evaluator_episodes": np.zeros(1, dtype=np.int32),
             "executor_episodes": np.zeros(1, dtype=np.int32),
             "executor_steps": np.zeros(1, dtype=np.int32),
-            "seed": server.store.key,
-            "optax_state": np.zeros(1, dtype=np.int32),
+            # "seed": np.zeros(1, dtype=np.int32),
+            # "optimizer_state": np.zeros(1, dtype=np.int32),
         }
 
         # Network parameters

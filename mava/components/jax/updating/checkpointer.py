@@ -14,14 +14,14 @@
 # limitations under the License.
 
 import time
-from typing import Any, Callable, Dict, Optional
+from typing import Callable, Optional
 
-from acme import core
-from acme.jax import savers
+from acme.jax import savers as acme_savers
 from chex import dataclass
 
 from mava.components.jax import Component
 from mava.core_jax import SystemParameterServer
+from mava.wrappers import SaveableWrapper
 
 """Checkpointer component for Mava systems."""
 
@@ -35,43 +35,15 @@ class CheckpointerConfig:
 # TODO
 # DONE save only specific variables maybe not trainer steps)
 # check why reference to orig is being lost
-# checkpointer unit test
+# DONE checkpointer unit test
 # decide what to save
-# check saveable wrapper issues
+# DONE check saveable wrapper issues
 # add optax state and seed
 # best checkpoint
+# DONE fix param server test
 
 
-class SaveableWrapper(core.Saveable):
-    def __init__(self, state: Dict[str, Any]):
-        """Initialise system state
-
-        Args:
-            state (_type_):  system state represented by a dictionary of saved variables
-        """
-        self.state = state
-
-    def save(self) -> Dict[str, Any]:
-        """Save system state
-
-        Returns:
-            system state.
-        """
-        # TODO fix type
-        return self.state
-
-    def restore(self, state: Dict[str, Any]) -> None:
-        """Restore system state
-
-        Args:
-            state (Any): system state represented by a dictionary of saved variables
-        Returns:
-            None.
-        """
-        self.state = state
-
-
-class Checkpointer(Component):  # , core.Saveable):
+class Checkpointer(Component):
     def __init__(
         self,
         config: CheckpointerConfig = CheckpointerConfig(),
@@ -90,7 +62,7 @@ class Checkpointer(Component):  # , core.Saveable):
             None.
         """
         # self._state = server.store.parameters
-        server.store.system_checkpointer = savers.Checkpointer(
+        server.store.system_checkpointer = acme_savers.Checkpointer(
             object_to_save=SaveableWrapper(
                 server.store.saveable_parameters
             ),  # must be saveable type
@@ -134,9 +106,3 @@ class Checkpointer(Component):  # , core.Saveable):
             config class/dataclass for component.
         """
         return CheckpointerConfig
-
-    # def save(self):
-    #     return self._state
-
-    # def restore(self, state):
-    #     self._state = state

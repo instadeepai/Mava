@@ -1,4 +1,3 @@
-import time
 from types import SimpleNamespace
 from typing import Any, Dict, Sequence, Union
 
@@ -135,7 +134,7 @@ def test_default_parameter_server_separate_networks() -> ParameterServerSeparate
 ######################
 
 
-def test_on_parameter_server_init_start_parameter_creation(
+def test_on_parameter_server_init_start(
     test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
 ) -> None:
     """Test that parameters are correctly assigned to the store"""
@@ -169,27 +168,11 @@ def test_on_parameter_server_init_start_parameter_creation(
     assert server.store.parameters["net_type_2-agent_net_1"] == "net_2_1_params"
     assert server.store.parameters["net_type_2-agent_net_2"] == "net_2_2_params"
 
-
-def test_on_parameter_server_init_start_no_checkpointer(
-    test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
-) -> None:
-    """Test init when no checkpointing specified"""
-    test_default_parameter_server.config.checkpoint = False
-    test_default_parameter_server.on_parameter_server_init_start(server)
-
-    assert not hasattr(server.store, "system_checkpointer")
-
-
-def test_on_parameter_server_init_start_create_checkpointer(
-    test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
-) -> None:
-    """Test init when checkpointer should be created"""
-    test_default_parameter_server.config.checkpoint = True
-    test_default_parameter_server.on_parameter_server_init_start(server)
-
-    assert server.store.last_checkpoint_time == 0
-    assert hasattr(server.store, "system_checkpointer")
-    # Test nothing more for now, since it's weird that a tf checkpointer is being used
+    assert hasattr(server.store, "saveable_parameters")
+    assert all(
+        not (type(var) == tuple and len(var) == 0)
+        for var in server.store.saveable_parameters.values()
+    )
 
 
 def test_on_parameter_server_get_parameters_single(
@@ -249,44 +232,6 @@ def test_on_parameter_server_add_to_parameters(
     assert server.store.parameters["param3"] == 6
 
 
-def test_on_parameter_server_run_loop(
-    test_default_parameter_server: DefaultParameterServer, server: SystemParameterServer
-) -> None:
-    """Test checkpointing in run loop"""
-    server.store.last_checkpoint_time = 0
-
-    # Do nothing if no checkpointer, even if checkpoint time has been reached
-    test_default_parameter_server.config.checkpoint = False
-    # Assert that the time to checkpoint has been reached
-    assert (
-        server.store.last_checkpoint_time
-        + test_default_parameter_server.config.checkpoint_minute_interval * 60
-        + 1
-        < time.time()
-    )
-    test_default_parameter_server.on_parameter_server_run_loop(server)
-    assert server.store.last_checkpoint_time == 0
-
-    class DummyCheckpointer:
-        def __init__(self) -> None:
-            self.called = False
-
-        def save(self) -> None:
-            self.called = True
-
-    server.store.system_checkpointer = DummyCheckpointer()
-    test_default_parameter_server.config.checkpoint = True
-
-    # Checkpoint if past time
-    test_default_parameter_server.on_parameter_server_run_loop(server)
-    assert server.store.system_checkpointer.called
-
-    # Wait for next checkpoint
-    server.store.system_checkpointer.called = False
-    test_default_parameter_server.on_parameter_server_run_loop(server)
-    assert not server.store.system_checkpointer.called
-
-
 ########################
 # SEPARATE NETWORK TESTS
 ########################
@@ -334,37 +279,11 @@ def test_on_parameter_server_init_start_parameter_creation_separate_networks(
     assert server.store.parameters["critic_net_type_2-agent_net_1"] == "net_2_1_params"
     assert server.store.parameters["critic_net_type_2-agent_net_2"] == "net_2_2_params"
 
-
-def test_on_parameter_server_init_start_no_checkpointer_separate_networks(
-    test_default_parameter_server_separate_networks: ParameterServerSeparateNetworks,
-    server_separate_networks: SystemParameterServer,
-) -> None:
-    """Test init when no checkpointing specified"""
-
-    test_default_parameter_server = test_default_parameter_server_separate_networks
-    server = server_separate_networks
-
-    test_default_parameter_server.config.checkpoint = False
-    test_default_parameter_server.on_parameter_server_init_start(server)
-
-    assert not hasattr(server.store, "system_checkpointer")
-
-
-def test_on_parameter_server_init_start_create_checkpointer_separate_networks(
-    test_default_parameter_server_separate_networks: ParameterServerSeparateNetworks,
-    server_separate_networks: SystemParameterServer,
-) -> None:
-    """Test init when checkpointer should be created"""
-
-    test_default_parameter_server = test_default_parameter_server_separate_networks
-    server = server_separate_networks
-
-    test_default_parameter_server.config.checkpoint = True
-    test_default_parameter_server.on_parameter_server_init_start(server)
-
-    assert server.store.last_checkpoint_time == 0
-    assert hasattr(server.store, "system_checkpointer")
-    # Test nothing more for now, since it's weird that a tf checkpointer is being used
+    assert hasattr(server.store, "saveable_parameters")
+    assert all(
+        not (type(var) == tuple and len(var) == 0)
+        for var in server.store.saveable_parameters.values()
+    )
 
 
 def test_on_parameter_server_get_parameters_single_separate_networks(
@@ -442,46 +361,3 @@ def test_on_parameter_server_add_to_parameters_separate_networks(
     assert server.store.parameters["param1"] == "param1_value_param1_add"
     assert server.store.parameters["param2"] == "param2_value"
     assert server.store.parameters["param3"] == 6
-
-
-def test_on_parameter_server_run_loop_separate_networks(
-    test_default_parameter_server_separate_networks: ParameterServerSeparateNetworks,
-    server_separate_networks: SystemParameterServer,
-) -> None:
-    """Test checkpointing in run loop"""
-
-    test_default_parameter_server = test_default_parameter_server_separate_networks
-    server = server_separate_networks
-
-    server.store.last_checkpoint_time = 0
-
-    # Do nothing if no checkpointer, even if checkpoint time has been reached
-    test_default_parameter_server.config.checkpoint = False
-    # Assert that the time to checkpoint has been reached
-    assert (
-        server.store.last_checkpoint_time
-        + test_default_parameter_server.config.checkpoint_minute_interval * 60
-        + 1
-        < time.time()
-    )
-    test_default_parameter_server.on_parameter_server_run_loop(server)
-    assert server.store.last_checkpoint_time == 0
-
-    class DummyCheckpointer:
-        def __init__(self) -> None:
-            self.called = False
-
-        def save(self) -> None:
-            self.called = True
-
-    server.store.system_checkpointer = DummyCheckpointer()
-    test_default_parameter_server.config.checkpoint = True
-
-    # Checkpoint if past time
-    test_default_parameter_server.on_parameter_server_run_loop(server)
-    assert server.store.system_checkpointer.called
-
-    # Wait for next checkpoint
-    server.store.system_checkpointer.called = False
-    test_default_parameter_server.on_parameter_server_run_loop(server)
-    assert not server.store.system_checkpointer.called

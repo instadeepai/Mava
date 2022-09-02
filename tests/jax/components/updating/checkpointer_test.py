@@ -61,7 +61,7 @@ def checkpointer() -> Checkpointer:
 
     checkpointer = Checkpointer(
         config=CheckpointerConfig(  # type: ignore
-            checkpoint_minute_interval=1 / 60, experiment_path=tempfile.mkdtemp()
+            checkpoint_minute_interval=1 / 60, fexperiment_path=tempfile.mkdtemp()
         ),
     )
     return checkpointer
@@ -90,14 +90,12 @@ def test_save_restore(
     saved_trainer_steps = mock_parameter_server.store.saveable_parameters[
         "trainer_steps"
     ]
-    created_checkpoint = False
-    for fname in os.listdir(
-        os.path.join(checkpointer.config.experiment_path, "checkpoints/default")
-    ):
-        if fname == "checkpoint":
-            created_checkpoint = True
-            break
-    assert created_checkpoint
+    assert any(
+        fname == "checkpoint"
+        for fname in os.listdir(
+            os.path.join(checkpointer.config.experiment_path, "checkpoints/default")
+        )
+    )
 
     # Change the parameters and check that the checkpointer has the same value
     mock_parameter_server.store.saveable_parameters["trainer_steps"] += 50
@@ -138,8 +136,8 @@ def test_checkpointer(
 
     # Create checkpointer
     checkpointer.on_parameter_server_init(server=mock_parameter_server)
-    assert mock_parameter_server.store.system_checkpointer
-    assert mock_parameter_server.store.last_checkpoint_time
+    assert hasattr(mock_parameter_server.store, "system_checkpointer")
+    assert hasattr(mock_parameter_server.store, "last_checkpoint_time")
     system_checkpointer = mock_parameter_server.store.system_checkpointer
 
     # Emulate parameters changing, as per system i.e. trainer_steps increase
