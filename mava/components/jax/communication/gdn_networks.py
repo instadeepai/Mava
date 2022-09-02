@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Sequence, Type
+from typing import Callable, Dict, List, Optional, Sequence, Type
 
 import acme
 import dm_env
@@ -20,11 +20,52 @@ from mava.components.jax.building.networks import Networks
 from mava.core_jax import SystemBuilder
 
 
+@dataclass
+class GdnNetwork:
+    def __init__(
+        self,
+        network: networks_lib.FeedForwardNetwork,
+        params: networks_lib.Params,
+    ):
+        """Wrapper class for communication GNN.
+
+        Args:
+            network: GNN network.
+            params: Network params.
+        """
+        self.network = network
+        self.params = params
+
+        @jit
+        def forward_fn(
+            params: Dict[str, jnp.ndarray],
+            graph: GraphsTuple,
+        ) -> List[networks_lib.Observation]:
+            output_graph = self.network.apply(params, graph)
+            return output_graph.nodes
+
+        self.forward_fn = forward_fn
+
+    def get_modified_obs(
+        self,
+        graph: GraphsTuple,
+    ) -> List[networks_lib.Observation]:
+        """Get the output of the GNN on the GDN graph.
+
+        Args:
+            graph: GDN graph of obs and communication structure.
+
+        Returns:
+            List of observations.
+        """
+        return self.forward_fn(self.params, graph)
+
+
 def make_default_gcn(
     environment_spec: mava_specs.MAEnvironmentSpec,
     rng_key: List[int],
     update_node_layer_sizes: Sequence[Sequence[int]] = ((128, 128), (128, 128)),
-) -> Dict[str, Any]:
+) -> Dict[str, GdnNetwork]:
     """Create default GCN to use for communication."""
     # Create agent_type specs.
     specs: Dict[
@@ -79,47 +120,6 @@ def make_default_gcn(
     gdn_network = GdnNetwork(network=net, params=params)
 
     return {"gdn_network": gdn_network}
-
-
-@dataclass
-class GdnNetwork:
-    def __init__(
-        self,
-        network: networks_lib.FeedForwardNetwork,
-        params: networks_lib.Params,
-    ):
-        """Wrapper class for communication GNN.
-
-        Args:
-            network: GNN network.
-            params: Network params.
-        """
-        self.network = network
-        self.params = params
-
-        @jit
-        def forward_fn(
-            params: Dict[str, jnp.ndarray],
-            graph: GraphsTuple,
-        ) -> List[networks_lib.Observation]:
-            output_graph = self.network.apply(params, graph)
-            return output_graph.nodes
-
-        self.forward_fn = forward_fn
-
-    def get_modified_obs(
-        self,
-        graph: GraphsTuple,
-    ) -> List[networks_lib.Observation]:
-        """Get the output of the GNN on the GDN graph.
-
-        Args:
-            graph: GDN graph of obs and communication structure.
-
-        Returns:
-            List of observations.
-        """
-        return self.forward_fn(self.params, graph)
 
 
 @dataclass

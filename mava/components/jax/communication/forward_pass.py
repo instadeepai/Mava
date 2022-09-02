@@ -20,10 +20,7 @@ from typing import List, Type
 
 from mava.callbacks import Callback
 from mava.components.jax import Component
-from mava.components.jax.communication.graph_construction import (
-    GdnGraphConstructor,
-    TempGraphsTuple,
-)
+from mava.components.jax.communication.graph_construction import GdnGraphConstructor
 from mava.core_jax import SystemExecutor
 from mava.types import OLT
 
@@ -87,13 +84,10 @@ class FeedforwardExecutorGdn(ExecutorGdn):
         Returns:
             None.
         """
-        # TODO(Matthew): replace with actual GNN
-        def gnn(input_graph: TempGraphsTuple) -> TempGraphsTuple:
-            input_graph.node_features += 1
-            return input_graph
-
-        output_graphs_tuple = gnn(executor.store.communication_graphs_tuple)
-        new_agent_obs = output_graphs_tuple.node_features
+        gdn_network = executor.store.gdn_networks["gdn_network"]
+        new_agent_obs = gdn_network.get_modified_obs(
+            executor.store.communication_graphs_tuple
+        )
 
         for agent in executor.store.observations.keys():
             agent_num = int(agent[6:])

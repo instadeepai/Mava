@@ -14,24 +14,49 @@
 # limitations under the License.
 import abc
 from dataclasses import dataclass
-from typing import Dict, List, Type
+from typing import Dict, List, Tuple, Type
 
-import numpy as np
+import jax.numpy as jnp
+from jraph import GraphsTuple
 
 from mava.callbacks import Callback
 from mava.components.jax import Component
 from mava.core_jax import SystemExecutor
 from mava.types import OLT
 
-"""Components to construct GraphsTuples from the environment observations."""
+"""Components to construct GDN GraphsTuples."""
 
 
-# TODO(Matthew): delete once using actual GraphsTuples
-class TempGraphsTuple:
-    def __init__(self) -> None:
-        """Create temp graph."""
-        self.node_features = np.zeros(1)
-        self.structure = np.zeros(1)
+def build_graphs_tuple_from_senders_receivers(
+    observations: Dict[str, OLT], communication_graph: Tuple[List, List]
+) -> GraphsTuple:
+    """Assemble a GraphsTuple from the observations and graph structure.
+
+    Args:
+        observations: Agent observations.
+        communication_graph: Communication graph senders / receivers.
+
+    Returns:
+        GraphsTuple of 'communication_graph' with node features 'observations'.
+    """
+    nodes = [jnp.zeros(0) for _ in range(len(observations))]
+    for agent in observations.keys():
+        agent_num = int(agent[6:])
+        nodes[agent_num] = observations[agent].observation
+    nodes = jnp.array(nodes)
+
+    senders, receivers = communication_graph
+    graph = GraphsTuple(
+        nodes=nodes,
+        edges=None,
+        senders=jnp.array(senders),
+        receivers=jnp.array(receivers),
+        globals=None,
+        n_node=jnp.array([len(observations)], dtype=int),
+        n_edge=jnp.array([len(senders)], dtype=int),
+    )
+
+    return graph
 
 
 @dataclass
@@ -114,9 +139,11 @@ class GdnGraphFromEnvironment(GdnGraphConstructor):
         if "communication_graph" not in executor.store.extras:
             raise Exception("Environment does not return a communication graph.")
 
-        executor.store.communication_graphs_tuple = self._build_graphs_tuple(
-            executor.store.timestep.observation,
-            executor.store.extras["communication_graph"],
+        executor.store.communication_graphs_tuple = (
+            build_graphs_tuple_from_senders_receivers(
+                executor.store.timestep.observation,
+                executor.store.extras["communication_graph"],
+            )
         )
 
     def on_execution_observe(self, executor: SystemExecutor) -> None:
@@ -131,30 +158,9 @@ class GdnGraphFromEnvironment(GdnGraphConstructor):
         if "communication_graph" not in executor.store.next_extras:
             raise Exception("Environment does not return a communication graph.")
 
-        executor.store.communication_graphs_tuple = self._build_graphs_tuple(
-            executor.store.next_timestep.observation,
-            executor.store.next_extras["communication_graph"],
+        executor.store.communication_graphs_tuple = (
+            build_graphs_tuple_from_senders_receivers(
+                executor.store.next_timestep.observation,
+                executor.store.next_extras["communication_graph"],
+            )
         )
-
-    # TODO(Matthew): switch the following to assemble a jraph GraphsTuple
-    @staticmethod
-    def _build_graphs_tuple(
-        observations: Dict[str, OLT], communication_graph: np.ndarray
-    ) -> TempGraphsTuple:
-        """Assemble a GraphsTuple from the observations and graph structure.
-
-        Args:
-            observations: Agent observations.
-            communication_graph: Comms graph structure from the environment.
-
-        Returns:
-            GraphsTuple of 'communication_graph' with node features 'observations'.
-        """
-        temp = TempGraphsTuple()
-        observation_list = [0] * len(observations)
-        for agent, observation in observations.items():
-            agent_num = int(agent[6:])
-            observation_list[agent_num] = observation.observation
-        temp.node_features = np.array(observation_list)
-        temp.structure = communication_graph
-        return temp
