@@ -28,6 +28,7 @@ from acme.jax import utils
 from dm_env import specs as dm_specs
 
 from mava import specs as mava_specs
+from mava.components.jax.networks import CategoricalValueHead
 from mava.utils.jax_training_utils import action_mask_categorical_policies
 
 Array = dm_specs.Array
@@ -88,8 +89,8 @@ class PPONetworks:
             if mask is not None:
                 distribution = action_mask_categorical_policies(distribution, mask)
 
-            actions = jax.numpy.squeeze(distribution.sample(seed=key))
-            log_prob = distribution.log_prob(actions)
+            actions = jnp.squeeze(distribution.sample(seed=key))
+            log_prob = jnp.squeeze(distribution.log_prob(actions))
 
             return actions, log_prob
 
@@ -116,9 +117,6 @@ class PPONetworks:
 
         """
         actions, log_prob = self.forward_fn(params, observations, key, mask)
-        # TODO Allow typed distributions - don't assume np.int64
-        actions = jnp.array(actions, dtype=np.int64)
-        log_prob = jnp.squeeze(jnp.array(log_prob, dtype=np.float32))
         return actions, {"log_prob": log_prob}
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
@@ -235,8 +233,8 @@ class PPOSeparateNetworks:
             if mask is not None:
                 distribution = action_mask_categorical_policies(distribution, mask)
 
-            actions = jax.numpy.squeeze(distribution.sample(seed=key))
-            log_prob = distribution.log_prob(actions)
+            actions = jnp.squeeze(distribution.sample(seed=key))
+            log_prob = jnp.squeeze(distribution.log_prob(actions))
 
             return actions, log_prob
 
@@ -253,9 +251,6 @@ class PPOSeparateNetworks:
         actions, log_prob = self.forward_fn(
             params["policy_network"], observations, key, mask
         )
-        # TODO Allow typed distributions - don't assume np.int64
-        actions = jnp.array(actions, dtype=np.int64)
-        log_prob = jnp.squeeze(jnp.array(log_prob, dtype=np.float32))
         return actions, {"log_prob": log_prob}
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
@@ -410,7 +405,9 @@ def make_discrete_networks(
                 [
                     observation_network,
                     hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
-                    networks_lib.CategoricalValueHead(num_values=num_actions),
+                    CategoricalValueHead(
+                        num_values=num_actions, dtype=environment_spec.actions.dtype
+                    ),
                 ]
             )
             return policy_value_network(inputs)

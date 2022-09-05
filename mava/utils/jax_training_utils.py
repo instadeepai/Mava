@@ -12,4 +12,4 @@ def action_mask_categorical_policies(
         distribution.logits,
         jnp.finfo(distribution.logits.dtype).min,
     )
-    return tfd.Categorical(logits=masked_logits)
+    return tfd.Categorical(logits=masked_logits, dtype=distribution.dtype)
