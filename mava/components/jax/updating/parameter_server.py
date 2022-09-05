@@ -126,8 +126,6 @@ class DefaultParameterServer(ParameterServer):
             "evaluator_episodes": np.zeros(1, dtype=np.int32),
             "executor_episodes": np.zeros(1, dtype=np.int32),
             "executor_steps": np.zeros(1, dtype=np.int32),
-            # "seed": np.zeros(1, dtype=np.int32),
-            # "optimizer_state": np.zeros(1, dtype=np.int32),
         }
 
         # Network parameters
@@ -266,7 +264,6 @@ class ParameterServerSeparateNetworks(DefaultParameterServer):
         server.store.saveable_parameters = {}
         for key in server.store.parameters.keys():
             var = server.store.parameters[key]
-            # print(key, "\n\n\n")
             # Don't store empty tuple (e.g. empty observation_network) variables
             if not (type(var) == tuple and len(var) == 0):
                 server.store.saveable_parameters[key] = var

@@ -31,17 +31,6 @@ class CheckpointerConfig:
     checkpoint_minute_interval: float = 5 / 60
 
 
-# TODO
-# DONE save only specific variables (maybe not trainer steps)
-# check why reference to orig is being lost
-# DONE checkpointer unit test
-# decide what to save
-# DONE check saveable wrapper issues
-# add optax state and seed
-# best checkpoint
-# DONE fix param server test
-
-
 class Checkpointer(Component):
     def __init__(
         self,
