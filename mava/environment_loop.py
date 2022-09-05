@@ -558,7 +558,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 eval_condition : tuple containing interval key and count.
 
             Returns:
-                a bool indicatings if eval should run.
+                a bool indicating if eval should run.
             """
             should_run_loop = False
             eval_interval_key, eval_interval_count = eval_condition
@@ -583,7 +583,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         episode_count, step_count = 0, 0
 
         # Currently, we only use intervals for eval loops.
-        # Boolean for when evaluation loop should be run
+        # Boolean for when evaluation loops should be run
         environment_loop_schedule = self._executor._evaluator and (
             self._executor._evaluation_interval is not None
         )
