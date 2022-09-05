@@ -211,9 +211,9 @@ def test_mapg_loss(
     low_agent_0_loss = low_loss_info["agent_0"]
     low_loss_policy = low_agent_0_loss["loss_policy"]
 
-    assert loss_entropy == -0.47500002
-    assert loss_value == 9
-    assert loss_total == (loss_entropy * 0.01 + loss_policy + loss_value * 0.5)
+    assert jnp.equal(loss_entropy, -0.47500002)
+    assert jnp.equal(loss_value, 9)
+    assert jnp.equal(loss_total, (loss_entropy * 0.01 + loss_policy + loss_value * 0.5))
 
     assert low_loss_policy < loss_policy
 

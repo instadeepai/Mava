@@ -116,7 +116,7 @@ class PPONetworks:
             log_prob: log prob of the chosen action
 
         """
-        actions, log_prob = self.forward_fn(params, observations, key, mask)
+        actions, log_prob = self.forward_fn(params["params"], observations, key, mask)
         return actions, {"log_prob": log_prob}
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:

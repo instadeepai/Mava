@@ -17,10 +17,11 @@
 
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Dict, Tuple
 
 import chex
 import jax
+import jax.numpy as jnp
 import pytest
 from acme.jax import networks as networks_lib
 from acme.jax import utils
@@ -61,7 +62,13 @@ def ff_executor_select_action() -> FeedforwardExecutorSelectAction:
 @pytest.fixture
 def mock_empty_executor() -> Executor:
     """Mock executore component with empty observations"""
-    store = SimpleNamespace(is_evaluator=None, observations={})
+    store = SimpleNamespace(
+        is_evaluator=None,
+        observations={},
+        agent_net_keys={},
+        select_actions_fn=select_actions,
+        key=42,
+    )
     return Executor(store=store)
 
 
@@ -80,8 +87,41 @@ def get_action(
     ), "policy_info_after_get_action_" + str(observation[0])
 
 
+def get_params() -> Dict[str, jnp.array]:
+    """Returns dummy params for test.
+
+    Returns:
+        dummy params
+    """
+    return {"params": jnp.zeros(10)}
+
+
+def select_actions(
+    observations: Dict[str, NestedArray],
+    current_params: Dict[str, NestedArray],
+    key: networks_lib.PRNGKey,
+) -> Tuple[Dict[str, NestedArray], Dict[str, NestedArray], networks_lib.PRNGKey]:
+    """Dummy select actions.
+
+    Args:
+        observations : dummy obs.
+        params : unused params.
+        key : dummy key.
+
+    Returns:
+        _description_
+    """
+    action_info = {}
+    policy_info = {}
+    for agent in observations.keys():
+        action_info[agent] = "action_info_" + str(agent)
+        policy_info[agent] = "policy_info_" + str(agent)
+    return action_info, policy_info, key
+
+
 class MockExecutor(Executor):
     def __init__(self) -> None:
+        """Init for mock executor."""
         observations = {
             "agent_0": [0.1, 0.5, 0.7],
             "agent_1": [0.8, 0.3, 0.7],
@@ -94,9 +134,15 @@ class MockExecutor(Executor):
         }
         networks = {
             "networks": {
-                agent_net_keys["agent_0"]: SimpleNamespace(get_action=get_action),
-                agent_net_keys["agent_1"]: SimpleNamespace(get_action=get_action),
-                agent_net_keys["agent_2"]: SimpleNamespace(get_action=get_action),
+                agent_net_keys["agent_0"]: SimpleNamespace(
+                    get_action=get_action, get_params=get_params
+                ),
+                agent_net_keys["agent_1"]: SimpleNamespace(
+                    get_action=get_action, get_params=get_params
+                ),
+                agent_net_keys["agent_2"]: SimpleNamespace(
+                    get_action=get_action, get_params=get_params
+                ),
             }
         }
         key = jax.random.PRNGKey(5)
@@ -113,15 +159,9 @@ class MockExecutor(Executor):
             key=key,
             action_info=action_info,
             policy_info=policy_info,
+            select_actions_fn=select_actions,
         )
         self.store = store
-
-    def select_action(
-        self, agent: str, observation: NestedArray, state: NestedArray = None
-    ) -> NestedArray:
-        action_info = "action_info_" + str(agent)
-        policy_info = "policy_info_" + str(agent)
-        return action_info, policy_info
 
     def set_agent(self, agent: str) -> None:
         """Update agent, observation
@@ -144,11 +184,12 @@ def mock_executor() -> Executor:
 
 # Test initiator
 def test_constructor(dummy_config: DummyExecutorSelectActionConfig) -> None:
-    """Test adding config as an attribute
+    """Test adding config as an attribute.
 
     Args:
-        dummy_config
+        dummy_config : dummy config for test.
     """
+
     ff_executor_select_action = FeedforwardExecutorSelectAction(config=dummy_config)  # type: ignore # noqa: E501
     assert ff_executor_select_action.config.parm_0 == dummy_config.parm_0
 

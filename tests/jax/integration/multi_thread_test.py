@@ -15,10 +15,15 @@
 
 """Integration test of the Trainer for Jax-based Mava"""
 
+import os
+
 import pytest
 
 from mava.systems.jax import System
 from tests.jax.systems.systems_test_data import ippo_system_multi_thread
+
+# Env uses int64 action space due to the use of spac.Discrete.
+os.environ["JAX_ENABLE_X64"] = "true"
 
 
 @pytest.fixture

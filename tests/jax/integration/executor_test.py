@@ -19,12 +19,15 @@
 import functools
 
 import pytest
+from jax.config import config as jax_config
 
 from mava.systems.jax import System
 from mava.types import OLT
 from mava.utils.environments import debugging_utils
 from tests.jax.systems.systems_test_data import ippo_system_single_process
 
+# Env uses int64 action space due to the use of spac.Discrete.
+jax_config.update("jax_enable_x64", True)
 # Environment.
 environment_factory = functools.partial(
     debugging_utils.make_environment,

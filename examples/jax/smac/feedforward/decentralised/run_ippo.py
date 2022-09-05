@@ -16,21 +16,20 @@
 
 
 import functools
-import os
 from datetime import datetime
 from typing import Any
 
 import optax
 from absl import app, flags
+from jax.config import config as jax_config
 
 from mava.systems.jax import ippo
 from mava.utils.environments.smac_utils import make_environment
 from mava.utils.loggers import logger_utils
 
 # Without this flag, JAX uses the whole GPU from the beginning and our trainer crashes.
-os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 # Env uses int64 action space due to the use of spac.Discrete.
-os.environ["JAX_ENABLE_X64"] = "true"
+jax_config.update("jax_enable_x64", True)
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "map_name",
