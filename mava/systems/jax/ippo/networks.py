@@ -36,6 +36,7 @@ DiscreteArray = dm_specs.DiscreteArray
 EntropyFn = Callable[[Any], jnp.ndarray]
 
 
+# TODO JAX Networks should be stateless.
 @dataclasses.dataclass
 class PPONetworks:
     """Class to implement the networks for the PPO algorithm"""
@@ -97,7 +98,7 @@ class PPONetworks:
     def get_action(
         self,
         observations: networks_lib.Observation,
-        params: Any,
+        params: jnp.ndarray,
         key: networks_lib.PRNGKey,
         mask: chex.Array = None,
     ) -> Tuple[np.ndarray, Dict]:
@@ -133,6 +134,18 @@ class PPONetworks:
         _, value = self.network.apply(self.params, observations)
         return value
 
+    def get_params(
+        self,
+    ) -> Dict[str, jnp.ndarray]:
+        """Return current params.
+
+        Returns:
+            params.
+        """
+        return {
+            "params": self.params,
+        }
+
 
 # This class is made to replicate the behaviour of the categorical value head
 # which squeezes the value inside the __call__ method before returning it.
@@ -155,6 +168,7 @@ class ValueHead(hk.Module):
         return value
 
 
+# TODO JAX Networks should be stateless.
 @dataclasses.dataclass
 class PPOSeparateNetworks:
     """Separate policy and critic networks for IPPO."""
@@ -231,20 +245,36 @@ class PPOSeparateNetworks:
     def get_action(
         self,
         observations: networks_lib.Observation,
-        policy_params: Any,
+        params: Any,
         key: networks_lib.PRNGKey,
         mask: chex.Array = None,
     ) -> Tuple[np.ndarray, Dict]:
         """Get actions from policy network given observations."""
-        actions, log_prob = self.forward_fn(policy_params, observations, key, mask)
-        actions = np.array(actions, dtype=np.int64)
-        log_prob = np.squeeze(np.array(log_prob, dtype=np.float32))
+        actions, log_prob = self.forward_fn(
+            params["policy_network"], observations, key, mask
+        )
+        # TODO Allow typed distributions - don't assume np.int64
+        actions = jnp.array(actions, dtype=np.int64)
+        log_prob = jnp.squeeze(jnp.array(log_prob, dtype=np.float32))
         return actions, {"log_prob": log_prob}
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
         """Get state value from critic network given observations."""
         value = self.critic_network.apply(self.critic_params, observations)
         return value
+
+    def get_params(
+        self,
+    ) -> Dict[str, jnp.ndarray]:
+        """Return current params.
+
+        Returns:
+            policy and critic params.
+        """
+        return {
+            "policy_network": self.policy_params,
+            "critic_network": self.critic_params,
+        }
 
 
 def make_ppo_network(

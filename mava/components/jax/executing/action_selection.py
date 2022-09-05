@@ -133,10 +133,10 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
         Returns:
             None.
         """
-        observations = executor.store.observations
+
         # Dict with params per network
         current_agent_params = {
-            network: executor.store.networks["networks"][network].params
+            network: executor.store.networks["networks"][network].get_params()
             for network in executor.store.agent_net_keys.values()
         }
         (
@@ -144,7 +144,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             executor.store.policies_info,
             executor.store.key,
         ) = executor.store.select_actions_fn(
-            observations, current_agent_params, executor.store.key
+            executor.store.observations, current_agent_params, executor.store.key
         )
 
     # Select action
