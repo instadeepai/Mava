@@ -17,13 +17,15 @@
 
 import abc
 from dataclasses import dataclass
-from typing import Any, Dict, Callable, Optional
+from typing import Any, Callable, Dict, Optional
+
 import jax.numpy as jnp
 
 from mava.components.jax import Component
 from mava.core_jax import SystemExecutor
 from mava.utils.extras.extras import UserDefinedExtrasFinder
 from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
+
 
 @dataclass
 class ExtrasFinderConfig:
@@ -86,6 +88,8 @@ class ExecutorObserve(Component):
         pass
 
     # Update the executor variables.networks']['network_agent
+
+
 class FeedforwardExecutorObserve(ExecutorObserve):
     def __init__(self, config: ExecutorObserveConfig = ExecutorObserveConfig()):
         """_summary_
@@ -105,7 +109,6 @@ class FeedforwardExecutorObserve(ExecutorObserve):
         if not executor.store.adder:
             return
 
-
         "Select new networks from the sampler at the start of each episode."
         agents = sort_str_num(list(executor.store.agent_net_keys.keys()))
         (
@@ -116,22 +119,22 @@ class FeedforwardExecutorObserve(ExecutorObserve):
             executor.store.network_sampling_setup,
             executor.store.net_keys_to_ids,
         )
-        #print(dir(executor.store))
-        #if dir(executor.store.extras_finder):
-        #TODO: ADD PROPER IF STATEMENT FOR TRANSITION AND TRAJECTORY ADDER USAGE
-        if 1==1:
+
+        if hasattr(executor.store, "extras_finder"):
             keys = list(executor.store.next_extras_specs.keys())
             extras = executor.store.extras_finder(executor.store, keys)
             executor.store.extras.update(extras)
 
-            executor.store.adder.add_first(executor.store.timestep, executor.store.extras)
-            
+            executor.store.adder.add_first(
+                executor.store.timestep, executor.store.extras
+            )
+
             executor.store.keys_available_as_next_extra = list(extras.keys())
-        
+
         else:
-           executor.store.adder.add_first(executor.store.timestep, executor.store.extras)
-       
-        
+            executor.store.adder.add_first(
+                executor.store.timestep, executor.store.extras
+            )
 
     # Observe
     def on_execution_observe(self, executor: SystemExecutor) -> None:
@@ -144,15 +147,13 @@ class FeedforwardExecutorObserve(ExecutorObserve):
         if not executor.store.adder:
             return
 
-        if 1==1:
-            #print("OBSERVE")
+        if hasattr(executor.store, "extras_finder"):
+
             # collecting user-defined extras
             keys = list(executor.store.next_extras_specs.keys())
             extras = executor.store.extras_finder(executor.store, keys)
-            #print(extras)
-            #exit()
             executor.store.next_extras.update(extras)
-            
+
             actions_info = executor.store.actions_info  # includes taken actions
             adder_actions: Dict[str, Any] = {}
 
@@ -166,7 +167,9 @@ class FeedforwardExecutorObserve(ExecutorObserve):
             # timestep t (and not timestep t+1), they belong to the extras.
             # extras = executor.store.extras_sync_with_action.create(executor.store)
             all_keys = list(executor.store.extras_specs.keys())
-            keys_to_be_removed = list(executor.store.next_extras_specs.keys())  # they are
+            keys_to_be_removed = list(
+                executor.store.next_extras_specs.keys()
+            )  # they are
             # already there.
             for key in keys_to_be_removed:
                 if key in all_keys:
@@ -174,31 +177,23 @@ class FeedforwardExecutorObserve(ExecutorObserve):
             keys = all_keys
             extras = executor.store.extras_finder(executor.store, keys)
 
-            policy_info = {'policy_info': 
-                    {'agent_0': {'action_values': jnp.array([0.,0.,0.,0.,0.])}
-                    ,'agent_1': {'action_values': jnp.array([0.,0.,0.,0.,0.])}
-                    ,'agent_2': {'action_values': jnp.array([0.,0.,0.,0.,0.])}}}
+            policy_info = {
+                "policy_info": {
+                    "agent_0": {"action_values": jnp.array([0.0, 0.0, 0.0, 0.0, 0.0])},
+                    "agent_1": {"action_values": jnp.array([0.0, 0.0, 0.0, 0.0, 0.0])},
+                    "agent_2": {"action_values": jnp.array([0.0, 0.0, 0.0, 0.0, 0.0])},
+                }
+            }
 
-
-            #print(extras)
-            #print(executor.store.extras)
-            #exit()
-            #print(executor.store.next_extras)
-            #exit()
             executor.store.adder.add(
                 actions=adder_actions,
                 next_timestep=executor.store.next_timestep,
                 next_extras=executor.store.next_extras,
-                #extras=extras,
             )
         else:
-            
-            #FOR MAPPO
+
             actions_info = executor.store.actions_info
             policies_info = executor.store.policies_info
-
-
-            #GET EXTRAS FOR DQN
 
             adder_actions: Dict[str, Any] = {}
             executor.store.next_extras["policy_info"] = {}
@@ -211,15 +206,10 @@ class FeedforwardExecutorObserve(ExecutorObserve):
             executor.store.next_extras[
                 "network_int_keys"
             ] = executor.store.network_int_keys_extras
-            
-            #print(executor.store.next_extras)
-            #exit()
+
             executor.store.adder.add(
                 adder_actions, executor.store.next_timestep, executor.store.next_extras
             )
-            
-            
-        
 
     # Update the executor variables.
     def on_execution_update(self, executor: SystemExecutor) -> None:

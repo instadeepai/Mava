@@ -31,18 +31,14 @@ import mava.components.jax.building.adders  # To avoid circular imports
 import mava.components.jax.training.model_updating  # To avoid circular imports
 from mava.callbacks import Callback
 from mava.components.jax import Component
-
 from mava.components.jax.building.datasets import TrainerDataset, TrajectoryDataset
 from mava.components.jax.building.loggers import Logger
 from mava.components.jax.building.networks import Networks
 from mava.components.jax.building.parameter_client import TrainerParameterClient
 from mava.components.jax.training.advantage_estimation import GAE
-from mava.components.jax.training.base import (
-    Batch,
-    Step,
-    TrainingState,
-    TrainingStateSeparateNetworks,
-)
+from mava.components.jax.training.base import Batch, Step
+from mava.components.jax.training.base import TrainingStatePPO as TrainingState
+from mava.components.jax.training.base import TrainingStateSeparateNetworks
 from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
 
@@ -96,8 +92,8 @@ class DefaultTrainerStep(TrainerStep):
         """Does a step of SGD and logs the results."""
 
         # Do a batch of SGD.
-        #print(trainer.store)
-        #exit()
+        # print(trainer.store)
+        # exit()
         sample = next(trainer.store.dataset_iterator)
         results = trainer.store.step_fn(sample)
 
@@ -185,7 +181,6 @@ class MAPGWithTrustRegionStep(Step):
 
                 """Gets behaviour values from the agent networks and observations."""
                 o = jax.tree_util.tree_map(
-
                     lambda x: jnp.reshape(x, [-1] + list(x.shape[2:])), observation
                 )
                 _, behavior_values = networks[net_key].network.apply(
@@ -243,10 +238,8 @@ class MAPGWithTrustRegionStep(Step):
             assert batch_size % trainer.store.num_minibatches == 0, (
                 "Num minibatches must divide batch size. Got batch_size={}"
                 " num_minibatches={}."
-
             ).format(batch_size, trainer.store.global_config.num_minibatches)
             batch = jax.tree_util.tree_map(
-
                 lambda x: x.reshape((batch_size,) + x.shape[2:]), trajectories
             )
 

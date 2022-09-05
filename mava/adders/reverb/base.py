@@ -280,13 +280,14 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
 
                             if type(trajectory) == mava_types.Transition:
                                 new_trajectory.next_extras[key] = {}  # type: ignore
-                        
-                        # Initialise empty next-extras
-                        for key in trajectory.next_extras.keys():
-                            new_trajectory.next_extras[key] = {}
 
-                            if type(trajectory) == mava_types.Transition:
-                                new_trajectory.next_extras[key] = {}  # type: ignore
+                        # Initialise empty next-extras
+                        if self._use_next_extras:
+                            for key in trajectory.next_extras.keys():
+                                new_trajectory.next_extras[key] = {}
+
+                                if type(trajectory) == mava_types.Transition:
+                                    new_trajectory.next_extras[key] = {}  # type: ignore
 
                         # Go through each of the agents in item_agents and add them
                         # to the new trajectory in the correct spot based on their
@@ -329,7 +330,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
                                     # and not per agent. Maybe fix this in the future.
                                     new_trajectory.extras[key] = trajectory.extras[key]
 
-                                #TODO(SIDDARTH): FIGURE OUT WHY THIS BREAKS THE TABLES
+                                # TODO: (Siddarth) Breaks tables for transition adder
                                 """
                                 if type(trajectory) == mava_types.Transition:
                                     ext = trajectory.next_extras[key]  # type: ignore
@@ -354,7 +355,6 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
                                             key
                                         ]  # type: ignore
                                 """
-                                
 
                         # Write the new_trajectory to the table.
                         self._writer.create_item(
@@ -395,9 +395,9 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
 
         if self._use_next_extras:
             add_dict["extras"] = extras
-	
+
         self._keys_available_as_next_extra = list(extras.keys())
-	
+
         self._writer.append(
             add_dict,
             partial_step=True,
@@ -410,7 +410,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, types.NestedArray] = {},
-        extras: Dict = {}
+        extras: Dict = {},
     ) -> None:
         """Record an action and the following timestep."""
         if not self._add_first_called:
@@ -424,8 +424,8 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             discounts=next_timestep.discount,
             # Start of episode indicator was passed at the previous add call.
         )
-        
-        #print(next_extras)
+
+        # print(next_extras)
         if not self._use_next_extras:
             current_step["extras"] = next_extras
 

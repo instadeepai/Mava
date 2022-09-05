@@ -200,9 +200,9 @@ class ParallelTransitionAdderSignature(AdderSignature):
             next_extras_specs: Dict[str, Any],
         ) -> Any:
             return reverb_adders.ParallelNStepTransitionAdder.signature(
-                environment_spec=env_spec, 
-                extras_spec=extras_specs, 
-                next_extras_spec=next_extras_specs
+                environment_spec=env_spec,
+                extras_spec=extras_specs,
+                next_extras_spec=next_extras_specs,
             )
 
         builder.store.adder_signature_fn = adder_sig_fn
@@ -212,7 +212,7 @@ class ParallelTransitionAdderSignature(AdderSignature):
 class ParallelSequenceAdderConfig:
     sequence_length: int = 20
     period: int = 10
-    #use_next_extras: bool = False
+    use_next_extras: bool = False
 
 
 class ParallelSequenceAdder(Adder):
