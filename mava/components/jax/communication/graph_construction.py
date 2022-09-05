@@ -28,6 +28,9 @@ from mava.types import OLT
 
 """Components to construct GDN GraphsTuples."""
 
+# TODO(Matthew): this needs to be made more efficient
+# Constantly switching between np arrays and dictionaries of agents is inefficient
+
 
 def build_graphs_tuple_from_adj_matrix(
     observations: Dict[str, OLT], communication_graph: np.ndarray

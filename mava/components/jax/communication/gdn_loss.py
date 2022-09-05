@@ -82,6 +82,9 @@ class MAPGWithTrustRegionClippingLossGdnPolicy(Component):
                 Tuple[gdn gradients, gdn loss information, modified observations].
             """
 
+            # TODO(Matthew): jax.grad should be called on function at this level
+            # I.e.: grad on all agents at once
+
             policy_grads = {}
             loss_info_policy = {}
             for agent_key in trainer.store.trainer_agents:
@@ -98,7 +101,6 @@ class MAPGWithTrustRegionClippingLossGdnPolicy(Component):
                     advantages: jnp.ndarray,
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
                     """Inner policy loss function: see outer function for parameters."""
-                    # TODO(Matthew): GNN application could go here?
                     distribution_params = network.policy_network.apply(
                         policy_params, observations
                     )
