@@ -31,15 +31,10 @@ import mava.components.jax.building.adders  # To avoid circular imports
 import mava.components.jax.training.model_updating  # To avoid circular imports
 from mava.callbacks import Callback
 from mava.components.jax import Component
-from mava.components.jax.building.datasets import TrainerDataset, TrajectoryDataset
-from mava.components.jax.building.loggers import Logger
-from mava.components.jax.building.networks import Networks
-from mava.components.jax.building.parameter_client import TrainerParameterClient
 from mava.components.jax.training.advantage_estimation import GAE
 from mava.components.jax.training.base import Batch, Step
 from mava.components.jax.training.base import TrainingStatePPO as TrainingState
 from mava.components.jax.training.base import TrainingStateSeparateNetworks
-from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
 
 

@@ -177,14 +177,6 @@ class FeedforwardExecutorObserve(ExecutorObserve):
             keys = all_keys
             extras = executor.store.extras_finder(executor.store, keys)
 
-            policy_info = {
-                "policy_info": {
-                    "agent_0": {"action_values": jnp.array([0.0, 0.0, 0.0, 0.0, 0.0])},
-                    "agent_1": {"action_values": jnp.array([0.0, 0.0, 0.0, 0.0, 0.0])},
-                    "agent_2": {"action_values": jnp.array([0.0, 0.0, 0.0, 0.0, 0.0])},
-                }
-            }
-
             executor.store.adder.add(
                 actions=adder_actions,
                 next_timestep=executor.store.next_timestep,
