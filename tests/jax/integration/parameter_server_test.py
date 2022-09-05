@@ -18,7 +18,7 @@ import time
 
 import jax.numpy as jnp
 import pytest
-from acme.jax import savers
+from acme.jax import savers as acme_savers
 
 from mava.systems.jax import System
 from tests.jax.systems.systems_test_data import ippo_system_single_process
@@ -31,7 +31,7 @@ def test_system_sp() -> System:
 
 
 def test_parameter_server_single_process(test_system_sp: System) -> None:
-    """Test if the paraameter server instantiates processes as expected."""
+    """Test if the parameter server instantiates processes as expected."""
     (
         data_server,
         parameter_server,
@@ -41,7 +41,7 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     ) = test_system_sp._builder.store.system_build
 
     # Initial state of the parameter_server
-    assert type(parameter_server.store.system_checkpointer) == savers.Checkpointer
+    assert type(parameter_server.store.system_checkpointer) == acme_savers.Checkpointer
 
     param_without_net = parameter_server.store.parameters.copy()
     del param_without_net["networks-network_agent"]
@@ -55,8 +55,8 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     }
 
     # check that checkpoint not yet saved
-    assert not parameter_server.store.last_checkpoint_time
     assert parameter_server.store.system_checkpointer._last_saved == 0
+    checkpoint_init_time = parameter_server.store.last_checkpoint_time
 
     first_network_param = parameter_server.store.parameters["networks-network_agent"]
     # test get and set parameters
@@ -87,7 +87,7 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     parameter_server.step()
 
     # Check that the checkpoint is saved thanks to the step function
-    assert parameter_server.store.last_checkpoint_time
+    assert parameter_server.store.last_checkpoint_time > checkpoint_init_time
     assert parameter_server.store.last_checkpoint_time < time.time()
     assert parameter_server.store.system_checkpointer._last_saved != 0
     assert parameter_server.store.system_checkpointer._last_saved < time.time()

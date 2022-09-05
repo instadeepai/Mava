@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 import pytest
+from acme.jax import savers as acme_savers
 
 from mava.components.jax.updating import Checkpointer
 from mava.components.jax.updating.checkpointer import CheckpointerConfig
@@ -136,12 +137,18 @@ def test_checkpointer(
     assert hasattr(mock_parameter_server.store, "system_checkpointer")
     assert hasattr(mock_parameter_server.store, "last_checkpoint_time")
     system_checkpointer = mock_parameter_server.store.system_checkpointer
+    assert type(system_checkpointer) == acme_savers.Checkpointer
+    assert checkpointer.name() == "checkpointer"
+
+    # check that checkpoint not yet saved
+    assert mock_parameter_server.store.system_checkpointer._last_saved == 0
+    checkpoint_init_time = mock_parameter_server.store.last_checkpoint_time
 
     # Emulate parameters changing, as per system i.e. trainer_steps increase
     mock_parameter_server.store.saveable_parameters = {"trainer_steps": 100}
 
     # Allow for checkpoint_minute_interval to elapse
-    time.sleep(checkpointer.config.checkpoint_minute_interval * 60 + 1)
+    time.sleep(checkpointer.config.checkpoint_minute_interval * 60 + 2)
     checkpointer.on_parameter_server_run_loop_checkpoint(server=mock_parameter_server)
 
     # Check whether the checkpointer has saved
@@ -151,5 +158,7 @@ def test_checkpointer(
             "trainer_steps"
         ]
     )
-
-    assert checkpointer.name() == "checkpointer"
+    assert mock_parameter_server.store.last_checkpoint_time > checkpoint_init_time
+    assert mock_parameter_server.store.last_checkpoint_time < time.time()
+    assert mock_parameter_server.store.system_checkpointer._last_saved != 0
+    assert mock_parameter_server.store.system_checkpointer._last_saved < time.time()

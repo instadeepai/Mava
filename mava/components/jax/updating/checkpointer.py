@@ -32,7 +32,7 @@ class CheckpointerConfig:
 
 
 # TODO
-# DONE save only specific variables maybe not trainer steps)
+# DONE save only specific variables (maybe not trainer steps)
 # check why reference to orig is being lost
 # DONE checkpointer unit test
 # decide what to save
@@ -82,7 +82,7 @@ class Checkpointer(Component):
         """
         if (
             time.time() - server.store.last_checkpoint_time
-            > self.config.checkpoint_minute_interval * 60
+            > self.config.checkpoint_minute_interval * 60 + 1
         ):
             server.store.system_checkpointer._checkpoint.saveable._object_to_save = (
                 SaveableWrapper(server.store.saveable_parameters)

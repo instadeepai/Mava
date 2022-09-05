@@ -270,3 +270,4 @@ class ParameterServerSeparateNetworks(DefaultParameterServer):
             # Don't store empty tuple (e.g. empty observation_network) variables
             if not (type(var) == tuple and len(var) == 0):
                 server.store.saveable_parameters[key] = var
+        server.store.experiment_path = self.config.experiment_path
