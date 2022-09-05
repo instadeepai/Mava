@@ -311,21 +311,7 @@ class ExecutorParameterClientSeparateNetworks(ExecutorParameterClient):
             parameter_client.get_and_wait()
 
         builder.store.executor_parameter_client = parameter_client
-
-    @staticmethod
-    def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
-        return "executor_parameter_client"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return ExecutorParameterClientConfig
-
+        
 
 class TrainerParameterClientSeparateNetworks(TrainerParameterClient):
     def __init__(
@@ -404,8 +390,3 @@ class TrainerParameterClientSeparateNetworks(TrainerParameterClient):
             parameter_client.get_all_and_wait()
 
         builder.store.trainer_parameter_client = parameter_client
-
-    @staticmethod
-    def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
-        return "trainer_parameter_client"
