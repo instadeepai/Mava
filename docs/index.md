@@ -38,7 +38,7 @@ Mava allows a high level of composability for novel research (i.e. building new 
 
 ## Getting Started
 
-We have a [Jax quickstart notebook][jax_quickstart] and [TF2 quickstart notebook][tf_quickstart] that can be used to quickly create and train your first Multi-Agent System. For more information on how to use Mava, please view our [usage section](#usage). Finally, for more on Mava's implementation details, please visit our [documentation].
+We have a [Jax quickstart notebook][jax_quickstart] and [TF2 quickstart notebook][tf_quickstart] that can be used to quickly create and train your first multi-agent system. For more information on how to use Mava, please view our [usage section](#usage). Finally, for more on Mava's implementation details, please visit our [documentation].
 
 ## Supported Environments
 

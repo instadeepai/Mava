@@ -17,7 +17,7 @@ The component can be added to the system:
 * Via system.add() if it is an entirely new component
 * Via system.update() if it overrides an existing component with the same name (see [here](https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo_with_monitoring.py#L92)).
 
-As an example, please consider the following component which creates a function for computing the generalized advantage estimate and adds that function to the trainer store so that it may be executed later. Notice that this component inherits from `Component` via the class called [`Utility`](https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/components/jax/training/base.py#L50).
+As an example, please consider the following component which creates a function for computing the generalised advantage estimate and adds that function to the trainer store so that it may be executed later. Notice that this component inherits from `Component` via the class called [`Utility`](https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/components/jax/training/base.py#L50).
 
 ```python
 @dataclass

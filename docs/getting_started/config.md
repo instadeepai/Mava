@@ -2,7 +2,7 @@
 
 > 🚧 **Note:** This only applies to the callback redesign of Mava.
 
-The `config` is an attribute that exists in various components and contains the parameter configuration to be used by components at their initialization. Consider, for example, a parameter like `learning_rate` for the `MAPGMinibatchUpdate` component. The parameters that are defined in a component config class can also be overwritten at build time by passing in updated values to the `.build` method of a given system.
+The `config` is an attribute that exists in various components and contains the parameter configuration to be used by components at their initialisation. Consider, for example, a parameter like `learning_rate` for the `MAPGMinibatchUpdate` component. The parameters that are defined in a component config class can also be overwritten at build time by passing in updated values to the `.build` method of a given system.
 ## Config restrictions
 If a user wants to make a new component that needs a config or wants to change an existing config class, the following constraints must be met:
 
