@@ -6,7 +6,7 @@ Going from research papers to code and being able to quickly test experimental h
 
 ### Design Paradigm
 
-Mava makes use of the a callback-based approach to enable modularity and flexibility in system designs. This enables the development of new system with minimal code reuse and overhead leading to fast experimentation and results. The system's architecture is based on components (Hooks) that are overwritten in callbacks, and these callbacks are passed as arguments to the system classes, allowing users to configure systems differently depending on an implemented algorithm's properties. More information on callbacks may be found [here](./components/components.md).
+Mava makes use of the a callback-based approach to enable modularity and flexibility in system designs. This enables the development of new systems with minimal code reuse and overhead leading to fast experimentation and results. The system's architecture is based on components that are overwritten in callbacks, and these callbacks are passed as arguments to the system classes, allowing users to configure systems differently depending on an implemented algorithm's properties. More information on callbacks may be found [here](./components/components.md).
 
 ### Deep learning framework
 

@@ -38,7 +38,7 @@ Mava allows a high level of composability for novel research (i.e. building new 
 
 ## Getting Started
 
-We have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-Agent System. For more information on how to use Mava, please view our [usage section](#usage). Finally, for more on Mava's implementation details, please visit our [documentation].
+We have a [Jax quickstart notebook][jax_quickstart] and [TF2 quickstart notebook][tf_quickstart] that can be used to quickly create and train your first Multi-Agent System. For more information on how to use Mava, please view our [usage section](#usage). Finally, for more on Mava's implementation details, please visit our [documentation].
 
 ## Supported Environments
 
@@ -469,7 +469,8 @@ If you use Mava in your work, please cite the accompanying
 [roadmap]: https://github.com/instadeepai/Mava/issues/246
 [wishlist]: https://github.com/instadeepai/Mava/issues/247
 [bsuite]: https://github.com/deepmind/bsuite
-[quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/quickstart.ipynb
+[tf_quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/quickstart.ipynb
+[jax_quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/quickstart.ipynb
 [blog]: https://medium.com/instadeep/mava-a-new-framework-for-multi-agent-reinforcement-learning-5dcc158e104e
 [release]: https://www.instadeep.com/2021/07/mava-a-new-framework-for-distributed-multi-agent-reinforcement-learning/
 [documentation]: https://id-mava.readthedocs.io/
