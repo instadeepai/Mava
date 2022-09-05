@@ -52,7 +52,9 @@ class ExecutorInit(Component):
             try:
                 assert not self.config.evaluation_interval is None
             except AssertionError:
-                print("Missing evaluation interval value: Evaluation duration was provided without a value for the evaluation interval.")
+                print(
+                    "Missing evaluation interval value: Evaluation duration was provided without a value for the evaluation interval."
+                )
         executor._evaluation_interval = self.config.evaluation_interval  # type: ignore
         executor._evaluation_duration = self.config.evaluation_duration  # type: ignore
 
