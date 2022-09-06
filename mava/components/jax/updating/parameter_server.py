@@ -136,13 +136,6 @@ class DefaultParameterServer(ParameterServer):
                     net_type_key
                 ][agent_net_key].params
 
-        # Only save variables that are not empty.
-        server.store.saveable_parameters = {}
-        for key in server.store.parameters.keys():
-            var = server.store.parameters[key]
-            # Don't store empty tuple (e.g. empty observation_network) variables
-            if not (type(var) == tuple and len(var) == 0):
-                server.store.saveable_parameters[key] = var
         server.store.experiment_path = self.config.experiment_path
 
     # Get
@@ -260,11 +253,4 @@ class ParameterServerSeparateNetworks(DefaultParameterServer):
                     f"critic_{net_type_key}-{agent_net_key}"
                 ] = networks[net_type_key][agent_net_key].critic_params
 
-        # Only save variables that are not empty.
-        server.store.saveable_parameters = {}
-        for key in server.store.parameters.keys():
-            var = server.store.parameters[key]
-            # Don't store empty tuple (e.g. empty observation_network) variables
-            if not (type(var) == tuple and len(var) == 0):
-                server.store.saveable_parameters[key] = var
         server.store.experiment_path = self.config.experiment_path

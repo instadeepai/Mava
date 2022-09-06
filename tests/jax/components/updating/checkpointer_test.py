@@ -29,7 +29,7 @@ from mava.core_jax import SystemParameterServer
 
 @dataclass
 class MockParameterStore:
-    saveable_parameters: Optional[Dict[str, Any]] = None
+    parameters: Optional[Dict[str, Any]] = None
     experiment_path: Optional[str] = None
 
 
@@ -44,7 +44,7 @@ def mock_parameter_server() -> MockParameterServer:
 
     mock_server = MockParameterServer(
         store=MockParameterStore(
-            saveable_parameters={
+            parameters={
                 "trainer_steps": 50,
             },
             experiment_path=tempfile.mkdtemp(),
@@ -88,27 +88,25 @@ def test_save_restore(
 
     # Save Initial parameters and check that the file has been saved to disk
     system_checkpointer.save()
-    saved_trainer_steps = mock_parameter_server.store.saveable_parameters[
-        "trainer_steps"
-    ]
+    saved_trainer_steps = mock_parameter_server.store.parameters["trainer_steps"]
     assert any(
         fname == "checkpoint"
         for fname in os.listdir(system_checkpointer._checkpoint_dir)
     )
 
     # Change the parameters and check that the checkpointer has the same value
-    mock_parameter_server.store.saveable_parameters["trainer_steps"] += 50
+    mock_parameter_server.store.parameters["trainer_steps"] += 50
 
     assert (
         system_checkpointer._checkpoint.saveable._object_to_save.state
-        == mock_parameter_server.store.saveable_parameters
+        == mock_parameter_server.store.parameters
     )
 
     # Restore the saved parameters and check that the checkpointer values are correct
     system_checkpointer.restore()
     assert (
         system_checkpointer._checkpoint.saveable._object_to_save.state
-        != mock_parameter_server.store.saveable_parameters
+        != mock_parameter_server.store.parameters
     )
     assert (
         system_checkpointer._checkpoint.saveable._object_to_save.state["trainer_steps"]
@@ -151,7 +149,7 @@ def test_checkpointer(
     checkpoint_init_time = mock_parameter_server.store.last_checkpoint_time
 
     # Emulate parameters changing e.g. trainer_steps increase
-    mock_parameter_server.store.saveable_parameters["trainer_steps"] += 100
+    mock_parameter_server.store.parameters["trainer_steps"] += 100
 
     # Sleep until checkpoint_minute_interval elapses
     time.sleep(checkpointer.config.checkpoint_minute_interval * 60 + 2)
@@ -159,7 +157,7 @@ def test_checkpointer(
 
     # Check whether the checkpointer has saved
     assert (
-        mock_parameter_server.store.saveable_parameters["trainer_steps"]
+        mock_parameter_server.store.parameters["trainer_steps"]
         == system_checkpointer._checkpoint.saveable._object_to_save.state[
             "trainer_steps"
         ]

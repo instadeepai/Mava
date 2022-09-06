@@ -48,7 +48,7 @@ class Checkpointer(Component):
         Returns:
             None.
         """
-        saveable_parameters = SaveableWrapper(server.store.saveable_parameters)
+        saveable_parameters = SaveableWrapper(server.store.parameters)
         server.store.system_checkpointer = acme_savers.Checkpointer(
             object_to_save=saveable_parameters,  # must be type saveable
             directory=server.store.experiment_path,
@@ -58,7 +58,6 @@ class Checkpointer(Component):
         # Assign the restored parameters to parameter server
         for key in saveable_parameters.state.keys():
             server.store.parameters[key] = saveable_parameters.state[key]
-            server.store.saveable_parameters[key] = saveable_parameters.state[key]
 
         server.store.last_checkpoint_time = time.time()
         server.store.checkpoint_minute_interval = self.config.checkpoint_minute_interval

@@ -173,11 +173,6 @@ def test_on_parameter_server_init_start(
     assert server.store.parameters["net_type_2-agent_net_1"] == "net_2_1_params"
     assert server.store.parameters["net_type_2-agent_net_2"] == "net_2_2_params"
 
-    assert hasattr(server.store, "saveable_parameters")
-    assert all(
-        not (type(var) == tuple and len(var) == 0)
-        for var in server.store.saveable_parameters.values()
-    )
     assert hasattr(server.store, "experiment_path")
 
 
@@ -290,11 +285,6 @@ def test_on_parameter_server_init_start_separate_networks(
     assert server.store.parameters["critic_net_type_2-agent_net_1"] == "net_2_1_params"
     assert server.store.parameters["critic_net_type_2-agent_net_2"] == "net_2_2_params"
 
-    assert hasattr(server.store, "saveable_parameters")
-    assert all(
-        not (type(var) == tuple and len(var) == 0)
-        for var in server.store.saveable_parameters.values()
-    )
     assert hasattr(server.store, "experiment_path")
 
 
