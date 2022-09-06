@@ -10,7 +10,7 @@ class SaveableWrapper(AcmeSaveable):
         """Initialise system state
 
         Args:
-            state (_type_):  system state represented by a dictionary of saved variables
+            state: a dictionary of variables to save
         """
         self.state = state
 
@@ -20,14 +20,13 @@ class SaveableWrapper(AcmeSaveable):
         Returns:
             system state.
         """
-        # TODO fix type
         return self.state
 
     def restore(self, state: Dict[str, Any]) -> None:
         """Restore system state
 
         Args:
-            state (Any): system state represented by a dictionary of saved variables
+            state: a dictionary of variables to save
         Returns:
             None.
         """

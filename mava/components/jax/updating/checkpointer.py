@@ -28,7 +28,7 @@ from mava.wrappers import SaveableWrapper
 
 @dataclass
 class CheckpointerConfig:
-    checkpoint_minute_interval: float = 5 / 60
+    checkpoint_minute_interval: float = 5
 
 
 class Checkpointer(Component):
