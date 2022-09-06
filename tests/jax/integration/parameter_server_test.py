@@ -54,12 +54,12 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
         "executor_steps": jnp.zeros(1, dtype=jnp.int32),
     }
 
-    # check that checkpoint not yet saved
+    # Check that checkpoint not yet saved
     assert parameter_server.store.system_checkpointer._last_saved == 0
     checkpoint_init_time = parameter_server.store.last_checkpoint_time
 
     first_network_param = parameter_server.store.parameters["networks-network_agent"]
-    # test get and set parameters
+    # Test get and set parameters
     for _ in range(3):
         executor.run_episode()
     trainer.step()
@@ -69,7 +69,7 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     assert list(trainer_steps) == [1]  # trainer.step one time
     assert list(executor_episodes) == [3]  # run episodes three times
 
-    # check that the network is updated (at least one of the values updated)
+    # Check that the network is updated (at least one of the values updated)
     updated_networks_param = parameter_server.get_parameters("networks-network_agent")
     at_least_one_changed = False
     for key in updated_networks_param.keys():
@@ -83,7 +83,10 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
             break
     assert at_least_one_changed
 
-    # run step function
+    #  Sleep until checkpoint_minute_interval elapses
+    time.sleep(parameter_server.store.checkpoint_minute_interval * 60 + 2)
+
+    # Run step function
     parameter_server.step()
 
     # Check that the checkpoint is saved thanks to the step function

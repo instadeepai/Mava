@@ -57,6 +57,7 @@ class Checkpointer(Component):
             time_delta_minutes=0,
         )
         server.store.last_checkpoint_time = time.time()
+        server.store.checkpoint_minute_interval = self.config.checkpoint_minute_interval
 
     def on_parameter_server_run_loop_checkpoint(
         self, server: SystemParameterServer
