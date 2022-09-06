@@ -155,6 +155,8 @@ def mock_builder_with_parameter_client() -> Builder:
         components=[],
     )
 
+    builder.store.parameter_server_client._update_period = 5
+
     return builder
 
 
@@ -201,6 +203,8 @@ def mock_builder_with_parameter_client_separate_networks() -> Builder:
         ),
         components=[],
     )
+
+    builder.store.parameter_server_client._update_period = 5
 
     return builder
 
