@@ -211,6 +211,10 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
                 f"{agent}_step_reward"
             )
 
+    def run_environment_episode(self) -> None:
+        # Expose run_episode() method from wrapped environment loop for tests
+        self.run_episode()
+
     def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
         for agent, reward in rewards.items():
             self._agents_stats[agent]["reward"].push(reward)
