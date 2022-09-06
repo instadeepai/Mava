@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Custom components for IPPO system."""
-# For precommit
+
 import abc
 from dataclasses import dataclass
 from typing import Any

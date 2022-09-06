@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Trainer components for calculating losses."""
-# For precommit
+
 import abc
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type

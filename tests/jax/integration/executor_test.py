@@ -15,7 +15,6 @@
 
 
 """Integration test of the executor for Jax-based Mava systems"""
-# For precommit
 import functools
 
 import pytest

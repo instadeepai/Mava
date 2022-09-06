@@ -2,13 +2,12 @@ import functools
 from typing import Tuple
 
 import acme
-import numpy as np
 import optax
 import pytest
 import reverb
-from tqdm import tqdm
+from tqdm import tqdm  # type: ignore
 
-from mava.systems.jax import Trainer, madqn
+from mava.systems.jax import madqn
 from mava.systems.jax.madqn import MADQNSystem
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -266,9 +265,7 @@ def test_data_server(test_full_system_not_evaluator: Tuple) -> None:
 
 
 def test_different_data_servers(test_full_system_trainer: Tuple) -> None:
-    """Testing whether the data-server of the store of the executor/trainer are same
-
-    as data-server."""
+    """Testing if the data-server of store and executor/trainer are same as ds"""
     data_server, _, executor, trainer = test_full_system_trainer
 
     assert data_server == executor._executor.store.data_server_client
@@ -351,11 +348,7 @@ def test_full_system_training() -> Tuple:
 
 
 def test_trainer_learning(test_full_system_training: Tuple) -> None:
-    """_summary_
-
-    Args:
-        test_full_system: _summary_
-    """
+    """_summary_"""
     from jax.config import config
 
     config.update("jax_disable_jit", True)

@@ -5,7 +5,6 @@ from typing import Any, Dict, List
 class UserDefinedExtrasFinder:
     """A class to find the values for the user-defined extras."""
 
-    # For precommit
     @staticmethod
     def find(store: Any, keys: List[str]) -> Dict:
         """Finds the information in the store.

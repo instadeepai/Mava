@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Execution components for system builders"""
-# For Precommit
+
 import copy
 from dataclasses import dataclass
 from typing import Callable, Optional

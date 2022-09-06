@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Execution components for system builders"""
-# For precommit
+
 import abc
 from dataclasses import dataclass
 
