@@ -597,7 +597,10 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         while not should_terminate(episode_count, step_count):
             if (not environment_loop_schedule) or (should_run_loop(eval_condition)):
 
-                if self._executor._evaluator:
+                if (
+                    self._executor._evaluator
+                    and self._executor.store._evaluation_interval is not None
+                ):
                     # Get first result dictionary
                     results = self.run_episode()
                     episode_count += 1
@@ -617,8 +620,8 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     result = self.run_episode()
                     episode_count += 1
                     step_count += result["episode_length"]
-                # Log the given results.
-                self._logger.write(result)
+                    # Log the given results.
+                    self._logger.write(result)
             else:
                 # Note: We assume that the evaluator will be running less
                 # than once per second.
