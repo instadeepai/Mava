@@ -430,7 +430,9 @@ def make_discrete_networks(
                 [
                     observation_network,
                     hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
-                    networks_lib.CategoricalHead(num_values=num_actions),
+                    networks_lib.CategoricalHead(
+                        num_values=num_actions, dtype=environment_spec.actions.dtype
+                    ),
                 ]
             )
             return policy_network(inputs)
