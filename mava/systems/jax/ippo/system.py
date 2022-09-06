@@ -113,7 +113,7 @@ class IPPOSystem(System):
 
         # Executor
         executor_process = DesignSpec(
-            executor_init=executing.ExecutorInit,
+            executor_init=executing.ExecutorInit,  # noqa: E501
             executor_observe=executing.FeedforwardExecutorObserve,  # noqa: E501
             executor_select_action=executing.FeedforwardExecutorSelectAction,  # noqa: E501
             executor_adder=building.ParallelSequenceAdder,

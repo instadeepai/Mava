@@ -7,9 +7,7 @@ import numpy as np
 from acme.jax import networks as networks_lib
 from jax import jit
 
-from mava.components.jax.executing.epsilon_greedy import (
-    EpsilonGreedyWithMask,
-)
+from mava.components.jax.executing.epsilon_greedy import EpsilonGreedyWithMask
 
 
 @dataclasses.dataclass
@@ -56,7 +54,7 @@ class DQNNetworks:
         observations: networks_lib.Observation,
         key: networks_lib.PRNGKey,
         epsilon: float,
-        mask: chex.Array = None,
+        mask: chex.Array,
     ) -> Tuple[np.ndarray, Dict]:
         """Taking actions using epsilon greedy approach.
 
@@ -71,7 +69,7 @@ class DQNNetworks:
         """
         action_values = self.forward_fn(self.params, observations)
         actions = EpsilonGreedyWithMask(
-            preferences=action_values, epsilon=epsilon, mask=mask
+            preferences=action_values, epsilon=epsilon, mask=mask  # type: ignore
         ).sample(seed=key)
         assert len(actions) == 1, "Only one action is allowed."
         actions = np.array(actions, dtype=np.int64)

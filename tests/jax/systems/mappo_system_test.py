@@ -4,7 +4,7 @@ import acme
 import optax
 import pytest
 
-from mava.systems.jax import mappo
+from mava.systems.jax import mappo  # type: ignore
 from mava.systems.jax.system import System
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -16,7 +16,7 @@ from mava.utils.loggers import logger_utils
 @pytest.fixture
 def test_full_system() -> System:
     """Add description here."""
-    return mappo.MAPPOSystem()
+    return mappo.MAPPOSystem()  # type: ignore
 
 
 # TODO: fix test
@@ -34,7 +34,7 @@ def test_except_trainer(
     )
 
     # Networks.
-    network_factory = mappo.make_default_networks
+    network_factory = mappo.make_default_networks  # type: ignore
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir.
     base_dir = "~/mava"

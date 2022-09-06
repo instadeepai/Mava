@@ -2,6 +2,8 @@
 # except masks invalid actions.
 """Epsilon-Greedy distributions with respect to a set of preferences."""
 
+from typing import Any
+
 import chex
 import jax.numpy as jnp
 from distrax._src.distributions import categorical, distribution
@@ -46,7 +48,7 @@ class EpsilonGreedyWithMask(categorical.Categorical):
         preferences: chex.Array,
         epsilon: float,
         mask: chex.Array,
-        dtype: jnp.dtype = int,
+        dtype: jnp.dtype = Any,
     ):
         """Initializes an EpsilonGreedy distribution.
 
