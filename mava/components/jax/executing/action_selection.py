@@ -147,7 +147,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             executor.store.observations, current_agent_params, executor.store.key
         )
 
-    # Select action
+    # NB: Not currently used.
     def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
         """Select action for a single agent and save in store.
 
@@ -195,8 +195,20 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
         ) -> Tuple[
             Dict[str, NestedArray], Dict[str, NestedArray], networks_lib.PRNGKey
         ]:
+            """Select actions across all agents - this is jitted below.
+
+            Args:
+                observations : all obs.
+                current_params : current params.
+                key : prng_key.
+
+            Returns:
+                action info, policy info and new prng key.
+            """
             actions_info, policies_info = {}, {}
             # TODO Look at tree mapping this forloop.
+            # Since this is jitted, compiling a forloop with lots of agents could take
+            # long, we should vectorize this.
             for agent, observation in observations.items():
                 network = networks["networks"][agent_net_keys[agent]]
                 actions_info[agent], policies_info[agent], key = select_action(
