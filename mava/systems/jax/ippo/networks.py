@@ -21,7 +21,6 @@ import chex
 import haiku as hk  # type: ignore
 import jax
 import jax.numpy as jnp
-import numpy as np
 from acme import specs
 from acme.jax import networks as networks_lib
 from acme.jax import utils
@@ -102,7 +101,7 @@ class PPONetworks:
         params: jnp.ndarray,
         key: networks_lib.PRNGKey,
         mask: chex.Array = None,
-    ) -> Tuple[np.ndarray, Dict]:
+    ) -> Tuple[jnp.ndarray, Dict]:
         """Gets an action from the network from given observation
 
         Args:
@@ -246,7 +245,7 @@ class PPOSeparateNetworks:
         params: Any,
         key: networks_lib.PRNGKey,
         mask: chex.Array = None,
-    ) -> Tuple[np.ndarray, Dict]:
+    ) -> Tuple[jnp.ndarray, Dict]:
         """Get actions from policy network given observations."""
         actions, log_prob = self.forward_fn(
             params["policy_network"], observations, key, mask

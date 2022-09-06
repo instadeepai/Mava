@@ -87,7 +87,7 @@ def get_action(
     ), "policy_info_after_get_action_" + str(observation[0])
 
 
-def get_params() -> Dict[str, jnp.array]:
+def get_params() -> Dict[str, jnp.ndarray]:
     """Returns dummy params for test.
 
     Returns:
