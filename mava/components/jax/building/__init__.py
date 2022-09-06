@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Builder components for Mava systems."""
-# for precommit
+
 from mava.components.jax.building.adders import (
     ParallelSequenceAdder,
     ParallelSequenceAdderSignature,
