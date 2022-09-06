@@ -311,7 +311,7 @@ class ExecutorParameterClientSeparateNetworks(ExecutorParameterClient):
             parameter_client.get_and_wait()
 
         builder.store.executor_parameter_client = parameter_client
-        
+
 
 class TrainerParameterClientSeparateNetworks(TrainerParameterClient):
     def __init__(
