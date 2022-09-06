@@ -67,7 +67,7 @@ class BaseParameterClient(Component):
 
 @dataclass
 class ExecutorParameterClientConfig:
-    executor_parameter_update_period: int = 1000
+    executor_parameter_update_period: int = 200
 
 
 class ExecutorParameterClient(BaseParameterClient):
@@ -154,7 +154,7 @@ class ExecutorParameterClient(BaseParameterClient):
 
 @dataclass
 class TrainerParameterClientConfig:
-    pass
+    trainer_parameter_update_period: int = 5
 
 
 class TrainerParameterClient(BaseParameterClient):
@@ -220,6 +220,7 @@ class TrainerParameterClient(BaseParameterClient):
                 parameters=params,
                 get_keys=get_keys,
                 set_keys=set_keys,
+                update_period=self.config.trainer_parameter_update_period,
             )
 
             # Get all the initial parameters
@@ -231,6 +232,15 @@ class TrainerParameterClient(BaseParameterClient):
     def name() -> str:
         """Static method that returns component name."""
         return "trainer_parameter_client"
+
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return TrainerParameterClientConfig
 
 
 ####################
@@ -384,6 +394,7 @@ class TrainerParameterClientSeparateNetworks(TrainerParameterClient):
                 parameters=params,
                 get_keys=get_keys,
                 set_keys=set_keys,
+                update_period=self.config.trainer_parameter_update_period,
             )
 
             # Get all the initial parameters

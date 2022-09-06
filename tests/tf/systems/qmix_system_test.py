@@ -63,7 +63,7 @@ class TestQMIX:
                 learning_rate=0.0005, epsilon=0.00001, decay=0.99
             ),
             batch_size=2,
-            executor_variable_update_period=200,
+            executor_variable_update_period=1,
             target_update_period=200,
             max_gradient_norm=20.0,
             min_replay_size=3,

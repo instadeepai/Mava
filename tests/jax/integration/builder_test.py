@@ -66,7 +66,10 @@ def test_builder(
     test_system: System,
 ) -> None:
     """Test if system builder instantiates processes as expected."""
-    test_system.build(environment_factory=mocks.make_fake_environment_factory())
+    test_system.build(
+        environment_factory=mocks.make_fake_environment_factory(),
+        trainer_parameter_update_period=1,
+    )
     (
         data_server,
         parameter_server,
