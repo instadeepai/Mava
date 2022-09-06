@@ -67,7 +67,7 @@ class MAPPO:
         net_spec_keys: Dict = {},
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
-        executor_variable_update_period: int = 100,
+        executor_variable_update_period: int = 200,
         policy_optimizer: Union[
             snt.Optimizer, Dict[str, snt.Optimizer]
         ] = snt.optimizers.Adam(learning_rate=5e-4),

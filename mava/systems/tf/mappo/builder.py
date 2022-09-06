@@ -110,7 +110,7 @@ class MAPPOConfig:
     discount: float = 0.99
     lambda_gae: float = 0.95
     max_queue_size: Optional[int] = 1000
-    executor_variable_update_period: int = 100
+    executor_variable_update_period: int = 200
     batch_size: int = 512
     minibatch_size: Optional[int] = None
     num_epochs: int = 10
@@ -533,7 +533,7 @@ class MAPPOBuilder:
             variables=variables,
             get_keys=get_keys,
             set_keys=set_keys,
-            update_period=1,
+            update_period=5,
         )
 
         # Get all the initial variables
