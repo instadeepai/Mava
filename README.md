@@ -5,7 +5,7 @@
 </p>
 
 <h2 align="center">
-    <p>A research framework for distributed multi-agent reinforcement learning in JAX</p>
+    <p>A framework for distributed multi-agent reinforcement learning in JAX</p>
 </h2>
 
 <div align="center">
