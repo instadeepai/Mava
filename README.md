@@ -35,8 +35,8 @@
 
 ## Welcome to Mava! 🦁
 
-[**Installation**](#Installation 🎬)
-| [**Quickstart**](#Quickstart ⚡)
+[**Installation**](#installation-🎬)
+| [**Quickstart**](#quickstart-⚡)
 | [**Documentation**](https://id-mava.readthedocs.io/)
 
 Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava provides useful components, abstractions, utilities and tools for MARL and allows for simple scaling for multi-process system training and execution while providing a high level of flexibility and composability. Originating in the Research Team at [InstaDeep](https://www.instadeep.com/), Mava is now developed jointly with the open-source community. “Mava” means experience, or wisdom, in Xhosa - one of South Africa’s eleven official languages.
@@ -57,13 +57,13 @@ To join us in these efforts, please feel free to reach out, raise issues or read
 
 ## Installation 🎬
 
-You can install the latest release of Mava from PyPI:
+You can install the latest release of Mava for **Tensorflow** from PyPI (to be deprecated soon):
 
 ```bash
-pip install id-mava[reverb,jax,envs]
+pip install id-mava[reverb,tf,envs]
 ```
 
-or you can install the latest development version directly from GitHub (recommended for latest JAX code):
+For **JAX**, please install the latest development version directly from GitHub (PyPI release coming soon!):
 
 ```bash
 pip install "id-mava[reverb,jax,envs] @ git+https://github.com/instadeepai/mava.git"
@@ -87,7 +87,7 @@ Please read our [troubleshooting and FAQs guide](./TROUBLESHOOTING.md).
 ## Citing Mava
 
 If you use Mava in your work, please cite the accompanying
-[technical report][Paper]:
+[technical report][Paper] (to be updated soon to reflect our transition to JAX):
 
 ```bibtex
 @article{pretorius2021mava,
