@@ -20,15 +20,12 @@ from typing import Any
 
 import optax
 from absl import app, flags
-from jax.config import config as jax_config
 
 from mava.components.jax.building.environments import MonitorExecutorEnvironmentLoop
 from mava.systems.jax import ippo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
-# Env uses int64 action space due to the use of spac.Discrete.
-jax_config.update("jax_enable_x64", True)
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "env_name",

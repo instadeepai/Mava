@@ -20,14 +20,11 @@ from typing import Any, Dict
 
 import optax
 from absl import app, flags
-from jax.config import config as jax_config
 
 from mava.systems.jax import ippo
 from mava.utils.environments.flatland_utils import make_environment
 from mava.utils.loggers import logger_utils
 
-# Env uses int64 action space due to the use of spac.Discrete.
-jax_config.update("jax_enable_x64", True)
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string(

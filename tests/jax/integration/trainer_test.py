@@ -17,13 +17,9 @@
 
 import jax.numpy as jnp
 import pytest
-from jax.config import config as jax_config
 
 from mava.systems.jax import System
 from tests.jax.systems.systems_test_data import ippo_system_single_process
-
-# Env uses int64 action space due to the use of spac.Discrete.
-jax_config.update("jax_enable_x64", True)
 
 
 @pytest.fixture

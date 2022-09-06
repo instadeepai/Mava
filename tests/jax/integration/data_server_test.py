@@ -17,14 +17,10 @@
 import jax.numpy as jnp
 import pytest
 import reverb
-from jax.config import config as jax_config
 from tensorflow.python.data.ops import dataset_ops
 
 from mava.systems.jax import System
 from tests.jax.systems.systems_test_data import ippo_system_single_process
-
-# Env uses int64 action space due to the use of spac.Discrete.
-jax_config.update("jax_enable_x64", True)
 
 
 @pytest.fixture
