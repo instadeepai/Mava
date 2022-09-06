@@ -248,7 +248,7 @@ class TrainerParameterClient(BaseParameterClient):
 ###################
 
 
-class ExecutorParameterClientSeparateNetworks(BaseParameterClient):
+class ExecutorParameterClientSeparateNetworks(ExecutorParameterClient):
     def __init__(
         self,
         config: ExecutorParameterClientConfig = ExecutorParameterClientConfig(),
@@ -322,22 +322,8 @@ class ExecutorParameterClientSeparateNetworks(BaseParameterClient):
 
         builder.store.executor_parameter_client = parameter_client
 
-    @staticmethod
-    def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
-        return "executor_parameter_client"
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return ExecutorParameterClientConfig
-
-
-class TrainerParameterClientSeparateNetworks(BaseParameterClient):
+class TrainerParameterClientSeparateNetworks(TrainerParameterClient):
     def __init__(
         self,
         config: TrainerParameterClientConfig = TrainerParameterClientConfig(),
@@ -415,17 +401,3 @@ class TrainerParameterClientSeparateNetworks(BaseParameterClient):
             parameter_client.get_all_and_wait()
 
         builder.store.trainer_parameter_client = parameter_client
-
-    @staticmethod
-    def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
-        return "trainer_parameter_client"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return TrainerParameterClientConfig
