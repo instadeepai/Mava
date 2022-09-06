@@ -33,10 +33,10 @@
   <img align="center" src="docs/images/animation_quick.gif" width="70%">
 </p>
 
-## Welcome to the Mava! 🦁
+## Welcome to Mava! 🦁
 
-[**Installation**](#installation-)
-| [**Quickstart**](#quickstart-)
+[**Installation**](#Installation 🎬)
+| [**Quickstart**](#Quickstart ⚡)
 | [**Documentation**](https://id-mava.readthedocs.io/)
 
 Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava provides useful components, abstractions, utilities and tools for MARL and allows for simple scaling for multi-process system training and execution while providing a high level of flexibility and composability. Originating in the Research Team at [InstaDeep](https://www.instadeep.com/), Mava is now developed jointly with the open-source community. “Mava” means experience, or wisdom, in Xhosa - one of South Africa’s eleven official languages.
@@ -70,11 +70,11 @@ pip install "id-mava[reverb,jax,envs] @ git+https://github.com/instadeepai/mava.
 ```
 
 We have tested `mava` on Python 3.7, 3.8 and 3.9. Note that because the installation of JAX differs depending on your hardware accelerator,
-we advise users to explicitly install the correct JAX version (see the [official installation guide](https://github.com/google/jax#installation)). For more in-depth instalations guides including Docker builds and virtual environments, please see our [detailed installation guide](OPTIONAL_INSTALL.md).
+we advise users to explicitly install the correct JAX version (see the [official installation guide](https://github.com/google/jax#installation)). For more in-depth instalations guides including Docker builds and virtual environments, please see our [detailed installation guide](DETAILED_INSTALL.md).
 
 ## Quickstart ⚡
 
-We have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-Agent System. For more information on how to use Mava, please view our [usage section](#usage). Finally, for more on Mava's implementation details, please visit our [documentation].
+We have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-Agent System. For more on Mava's implementation details, please visit our [documentation].
 
 ## Contributing 🤝
 
@@ -107,9 +107,7 @@ If you use Mava in your work, please cite the accompanying
 [pettingzoo]: https://github.com/PettingZoo-Team/PettingZoo
 [smac]: https://github.com/oxwhirl/smac
 [openspiel]: https://github.com/deepmind/open_spiel
-[meltingpot]: https://github.com/deepmind/meltingpot
 [flatland]: https://gitlab.aicrowd.com/flatland/flatland
 [robocup]: https://github.com/rcsoccersim
-[launchpad]: https://github.com/deepmind/launchpad
 [quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/quickstart.ipynb
 [documentation]: https://id-mava.readthedocs.io/
