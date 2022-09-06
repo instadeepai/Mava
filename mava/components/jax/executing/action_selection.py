@@ -81,36 +81,6 @@ class ExecutorSelectAction(Component):
         return [BaseTrainerInit, BaseSystemInit, Networks]
 
 
-def select_action(
-    observation: NestedArray,
-    current_params: NestedArray,
-    network: Any,
-    key: networks_lib.PRNGKey,
-) -> Tuple[NestedArray, NestedArray, networks_lib.PRNGKey]:
-    """Action selection across a single agent.
-
-    Args:
-        observation : obs for current agent.
-        current_params : params for current agent's network.
-        network : network object.
-        key : prng key.
-
-    Returns:
-        action info, policy info and new key.
-    """
-    observation_data = utils.add_batch_dim(observation.observation)
-    # We use the subkey immediately and keep the new key for future splits.
-    new_key, sub_key = jax.random.split(key)
-    action_info, policy_info = network.get_action(
-        observation_data,
-        current_params,
-        sub_key,
-        utils.add_batch_dim(observation.legal_actions),
-    )
-
-    return action_info, policy_info, new_key
-
-
 class FeedforwardExecutorSelectAction(ExecutorSelectAction):
     def __init__(
         self,
@@ -187,6 +157,35 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
         """
         networks = executor.store.networks
         agent_net_keys = executor.store.agent_net_keys
+
+        def select_action(
+            observation: NestedArray,
+            current_params: NestedArray,
+            network: Any,
+            key: networks_lib.PRNGKey,
+        ) -> Tuple[NestedArray, NestedArray, networks_lib.PRNGKey]:
+            """Action selection across a single agent.
+
+            Args:
+                observation : obs for current agent.
+                current_params : params for current agent's network.
+                network : network object.
+                key : prng key.
+
+            Returns:
+                action info, policy info and new key.
+            """
+            observation_data = utils.add_batch_dim(observation.observation)
+            # We use the subkey immediately and keep the new key for future splits.
+            new_key, sub_key = jax.random.split(key)
+            action_info, policy_info = network.get_action(
+                observation_data,
+                current_params,
+                sub_key,
+                utils.add_batch_dim(observation.legal_actions),
+            )
+
+            return action_info, policy_info, new_key
 
         def select_actions(
             observations: Dict[str, NestedArray],
