@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Custom components for IPPO system."""
+# For precommit
 import abc
 from dataclasses import dataclass
 from typing import Any
@@ -80,7 +81,7 @@ class ExtrasLogProbSpec(ExtrasSpec):
             builder.store.extras_spec["policy_info"][agent] = np.ones(
                 shape=(), dtype=np.float32
             )
-    
+
         # Add the networks keys to extras.
         int_spec = specs.DiscreteArray(len(builder.store.unique_net_keys))
         agents = builder.store.ma_environment_spec.get_agent_ids()

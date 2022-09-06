@@ -15,7 +15,7 @@
 
 
 """Integration test of the executor for Jax-based Mava systems"""
-
+# For precommit
 import functools
 
 import pytest
@@ -98,7 +98,6 @@ def test_executor_single_process(test_system_sp: System) -> None:
         assert list(executor._executor.store.actions_info.values())[i] in range(
             0, num_possible_actions[i]
         )
-
 
     assert (
         lambda: key == "log_prob"

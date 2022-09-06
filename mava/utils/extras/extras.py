@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 class UserDefinedExtrasFinder:
     """A class to find the values for the user-defined extras."""
 
+    # For precommit
     @staticmethod
     def find(store: Any, keys: List[str]) -> Dict:
         """Finds the information in the store.
@@ -26,6 +27,6 @@ class UserDefinedExtrasFinder:
             if key == "policy_info":
                 key_in_store = "policy_info"
             value = store.__getattribute__(key_in_store)
-            #value = store.extras_spec[key_in_store]
+            # value = store.extras_spec[key_in_store]
             user_defined_extras.update({modified_key: value})
         return user_defined_extras

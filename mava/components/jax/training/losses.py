@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Trainer components for calculating losses."""
+# For precommit
 import abc
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type
@@ -54,7 +55,6 @@ class Loss(Component):
         return [
             training.BaseTrainerInit
         ]  # import from training to avoid partial dependency
-
 
 
 @dataclass

@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Execution components for system builders"""
-
+# For Precommit
 import copy
 from dataclasses import dataclass
 from typing import Callable, Optional
@@ -59,6 +59,7 @@ class ExecutorInit(Component):
         """
         return ExecutorInitConfig
 
+
 @dataclass
 class ExecutorTargetNetInitConfig:
     pass
@@ -89,6 +90,3 @@ class ExecutorTargetNetInit(Component):
     def config_class() -> Callable:
         """Returns the config class for this component."""
         return ExecutorTargetNetInitConfig
-
-
-    

@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+# For precommit
 """Commonly used dataset components for system builders"""
 import abc
 from dataclasses import dataclass
@@ -98,7 +98,7 @@ class TransitionDataset(TrainerDataset):
             postprocess=self.config.postprocess,
         )
 
-        #builder.store.dataset = iter(dataset)
+        # builder.store.dataset = iter(dataset)
         builder.store.dataset_iterator = dataset.as_numpy_iterator()
 
     @staticmethod

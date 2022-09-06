@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Execution components for system builders"""
-
+# For precommit
 import abc
 from dataclasses import dataclass
 
@@ -107,6 +107,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             rng_key,
             utils.add_batch_dim(executor.store.observation.legal_actions),
         )
+
 
 class FeedforwardExecutorSelectActionValueBased(ExecutorSelectAction):
     """Feedforward executor that selects actions based on the q-values.
