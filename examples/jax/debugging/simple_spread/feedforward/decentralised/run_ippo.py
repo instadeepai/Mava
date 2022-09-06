@@ -15,7 +15,6 @@
 
 """Example running IPPO on debug MPE environments."""
 import functools
-import os
 from datetime import datetime
 from typing import Any
 
@@ -25,8 +24,6 @@ from absl import app, flags
 from mava.systems.jax import ippo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
-
-os.environ["JAX_ENABLE_X64"] = "true"
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
