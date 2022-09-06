@@ -316,7 +316,7 @@ def test_executor_parameter_client_evaluator_with_parameter_client(
     assert mock_builder.store.executor_parameter_client._get_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_get_call_counter == 0
-    assert mock_builder.store.executor_parameter_client._update_period == 100
+    assert mock_builder.store.executor_parameter_client._update_period == 1
     assert isinstance(
         mock_builder.store.executor_parameter_client._client, ParameterServer
     )

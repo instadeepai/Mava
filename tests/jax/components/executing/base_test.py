@@ -73,6 +73,22 @@ def test_on_execution_init_start(
     executor_init = ExecutorInit(config=dummy_config)
     executor_init.on_execution_init_start(executor=mock_executor)
 
+    assert mock_executor._evaluation_interval == None  # type: ignore # noqa: E501
+
+
+def test_on_execution_init_start_with_evaluator(
+    mock_executor: Executor, dummy_config: ExecutorInitConfig
+) -> None:
+    """Test on_execution_init_start method from ExecutorInit
+
+    Args:
+        mock_executor: Executor
+        dummy_config: ExecutorInitConfig
+    """
+    mock_executor._evaluator = True
+    executor_init = ExecutorInit(config=dummy_config)
+    executor_init.on_execution_init_start(executor=mock_executor)
+
     assert mock_executor._evaluation_interval == dummy_config.evaluation_interval  # type: ignore # noqa: E501
 
 
