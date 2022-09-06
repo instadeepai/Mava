@@ -158,8 +158,6 @@ def test_on_parameter_server_init_start(
         "evaluator_episodes",
         "executor_episodes",
         "executor_steps",
-        # "seed",
-        # "optimizer_state",
     }
     required_float_keys = {"trainer_walltime"}
     for required_int_key in required_int_keys:

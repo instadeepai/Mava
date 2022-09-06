@@ -150,8 +150,8 @@ def test_checkpointer(
     assert mock_parameter_server.store.system_checkpointer._last_saved == 0
     checkpoint_init_time = mock_parameter_server.store.last_checkpoint_time
 
-    # Emulate parameters changing, as per system i.e. trainer_steps increase
-    mock_parameter_server.store.saveable_parameters = {"trainer_steps": 100}
+    # Emulate parameters changing e.g. trainer_steps increase
+    mock_parameter_server.store.saveable_parameters["trainer_steps"] += 100
 
     # Sleep until checkpoint_minute_interval elapses
     time.sleep(checkpointer.config.checkpoint_minute_interval * 60 + 2)
