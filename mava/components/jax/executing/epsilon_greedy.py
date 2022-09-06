@@ -1,4 +1,3 @@
-# type: ignore
 # Similiar to https://github.com/deepmind/distrax/blob/master/distrax/_src/distributions/epsilon_greedy.py, # noqa: E501
 # except masks invalid actions.
 """Epsilon-Greedy distributions with respect to a set of preferences."""
@@ -59,6 +58,7 @@ class EpsilonGreedyWithMask(categorical.Categorical):
         """
         self._preferences = jnp.asarray(preferences)
         self._epsilon = epsilon
+        self.mask = mask
         greedy_probs = _argmax_with_random_tie_breaking(self._preferences, mask)
         probs = _mix_probs_with_uniform(greedy_probs, epsilon, mask)
         super().__init__(probs=probs, dtype=dtype)
@@ -79,5 +79,6 @@ class EpsilonGreedyWithMask(categorical.Categorical):
         return EpsilonGreedyWithMask(
             preferences=self.preferences[index],
             epsilon=self.epsilon,
+            mask=self.mask,
             dtype=self.dtype,
         )
