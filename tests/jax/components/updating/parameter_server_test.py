@@ -145,6 +145,11 @@ def test_on_parameter_server_init_start(
 
     # Parameters attribute in store
     assert hasattr(server.store, "parameters")
+    assert hasattr(server.store, "experiment_path")
+    assert (
+        server.store.experiment_path
+        == test_default_parameter_server.config.experiment_path
+    )
 
     # Parameter store training / executing info
     required_int_keys = {
@@ -255,6 +260,11 @@ def test_on_parameter_server_init_start_separate_networks(
 
     # Parameters attribute in store
     assert hasattr(server.store, "parameters")
+    assert hasattr(server.store, "experiment_path")
+    assert (
+        server.store.experiment_path
+        == test_default_parameter_server.config.experiment_path
+    )
 
     # Parameter store training / executing info
     required_int_keys = {

@@ -136,6 +136,12 @@ def test_checkpointer(
     checkpointer.on_parameter_server_init(server=mock_parameter_server)
     assert hasattr(mock_parameter_server.store, "system_checkpointer")
     assert hasattr(mock_parameter_server.store, "last_checkpoint_time")
+    assert hasattr(mock_parameter_server.store, "checkpoint_minute_interval")
+    assert (
+        mock_parameter_server.store.checkpoint_minute_interval
+        == checkpointer.config.checkpoint_minute_interval
+    )
+
     system_checkpointer = mock_parameter_server.store.system_checkpointer
     assert type(system_checkpointer) == acme_savers.Checkpointer
     assert checkpointer.name() == "checkpointer"
@@ -147,7 +153,7 @@ def test_checkpointer(
     # Emulate parameters changing, as per system i.e. trainer_steps increase
     mock_parameter_server.store.saveable_parameters = {"trainer_steps": 100}
 
-    # Allow for checkpoint_minute_interval to elapse
+    # Sleep until checkpoint_minute_interval elapses
     time.sleep(checkpointer.config.checkpoint_minute_interval * 60 + 2)
     checkpointer.on_parameter_server_run_loop_checkpoint(server=mock_parameter_server)
 
