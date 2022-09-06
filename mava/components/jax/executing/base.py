@@ -26,7 +26,7 @@ from mava.core_jax import SystemExecutor
 @dataclass
 class ExecutorInitConfig:
     evaluation_interval: Optional[dict] = None
-    evaluation_duration: Optional[int] = None
+    evaluation_duration: Optional[int] = 1
 
 
 class ExecutorInit(Component):
@@ -50,14 +50,15 @@ class ExecutorInit(Component):
         # TODO (Ruan): Double check that this is necessary
         if self.config.evaluation_duration:
             try:
-                assert not self.config.evaluation_interval is None
+                assert self.config.evaluation_interval is not None
             except AssertionError:
                 print(
-                    "Missing evaluation interval value: Evaluation duration was provided without a value for the evaluation interval."
+                    "Missing evaluation interval value: Evaluation duration \
+                        was provided without a value for the evaluation interval."
                 )
-        if executor._evaluator:
-            executor.store._evaluation_interval = self.config.evaluation_interval  # type: ignore
-            executor.store._evaluation_duration = self.config.evaluation_duration  # type: ignore
+        if executor.store.is_evaluator:
+            executor.store._evaluation_interval = self.config.evaluation_interval  # type: ignore # noqa: E501
+            executor.store._evaluation_duration = self.config.evaluation_duration  # type: ignore # noqa: E501
 
     @staticmethod
     def name() -> str:
