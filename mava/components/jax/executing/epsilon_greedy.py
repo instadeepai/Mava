@@ -9,7 +9,9 @@ from distrax._src.distributions import categorical, distribution
 Array = chex.Array
 
 
-def _argmax_with_random_tie_breaking(preferences: Array, mask: Array) -> Array:
+def _argmax_with_random_tie_breaking(
+    preferences: chex.Array, mask: chex.Array
+) -> chex.Array:
     """Compute probabilities greedily with respect to a set of preferences."""
     # Mask invalid prefs
     preferences = jnp.where(
@@ -21,7 +23,9 @@ def _argmax_with_random_tie_breaking(preferences: Array, mask: Array) -> Array:
     return optimal_actions / optimal_actions.sum(axis=-1, keepdims=True)
 
 
-def _mix_probs_with_uniform(probs: Array, epsilon: float, mask: Array) -> Array:
+def _mix_probs_with_uniform(
+    probs: chex.Array, epsilon: float, mask: chex.Array
+) -> chex.Array:
     """Mix an arbitrary categorical distribution with a uniform distribution."""
     num_actions = probs.shape[-1]
     uniform_probs = jnp.ones_like(probs) / num_actions
@@ -32,17 +36,24 @@ def _mix_probs_with_uniform(probs: Array, epsilon: float, mask: Array) -> Array:
 
 class EpsilonGreedyWithMask(categorical.Categorical):
     """A Categorical that is ε-greedy with respect to some preferences.
+
     Given a set of unnormalized preferences, the distribution is a mixture
     of the Greedy and Uniform distribution; with weight (1-ε) and ε, respectively.
     """
 
     def __init__(
-        self, preferences: Array, epsilon: float, mask: Array, dtype: jnp.dtype = int
+        self,
+        preferences: chex.Array,
+        epsilon: float,
+        mask: chex.Array,
+        dtype: jnp.dtype = int,
     ):
         """Initializes an EpsilonGreedy distribution.
+
         Args:
           preferences: Unnormalized preferences.
           epsilon: Mixing parameter ε.
+          mask: Action mask
           dtype: The type of event samples.
         """
         self._preferences = jnp.asarray(preferences)
@@ -57,13 +68,13 @@ class EpsilonGreedyWithMask(categorical.Categorical):
         return self._epsilon
 
     @property
-    def preferences(self) -> Array:
+    def preferences(self) -> chex.Array:
         """Unnormalized preferences."""
         return self._preferences
 
-    def __getitem__(self, index) -> "EpsilonGreedyWithMask":
+    def __getitem__(self, index) -> "EpsilonGreedyWithMask":  # type: ignore
         """See `Distribution.__getitem__`."""
         index = distribution.to_batch_shape_index(self.batch_shape, index)
         return EpsilonGreedyWithMask(
             preferences=self.preferences[index], epsilon=self.epsilon, dtype=self.dtype
-        )
+        )  # type: ignore

@@ -19,8 +19,6 @@ import abc
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional
 
-import jax.numpy as jnp
-
 from mava.components.jax import Component
 from mava.core_jax import SystemExecutor
 from mava.utils.extras.extras import UserDefinedExtrasFinder
@@ -138,14 +136,16 @@ class FeedforwardExecutorObserve(ExecutorObserve):
 
     # Observe
     def on_execution_observe(self, executor: SystemExecutor) -> None:
-        """_summary_print(key)
-                print(value)
+        """Observe data from actions performed in environment
 
         Args:
-            executor : _description_
+            executor : SystemExecutor
         """
         if not executor.store.adder:
             return
+
+        actions_info = executor.store.actions_info
+        adder_actions: Dict[str, Any] = {}
 
         if hasattr(executor.store, "extras_finder"):
 
@@ -154,8 +154,8 @@ class FeedforwardExecutorObserve(ExecutorObserve):
             extras = executor.store.extras_finder(executor.store, keys)
             executor.store.next_extras.update(extras)
 
-            actions_info = executor.store.actions_info  # includes taken actions
-            adder_actions: Dict[str, Any] = {}
+            # actions_info = executor.store.actions_info  # includes taken actions
+            # adder_actions: Dict[str, Any] = {}
 
             for agent in actions_info.keys():
                 adder_actions[agent] = {
@@ -184,10 +184,8 @@ class FeedforwardExecutorObserve(ExecutorObserve):
             )
         else:
 
-            actions_info = executor.store.actions_info
             policies_info = executor.store.policies_info
 
-            adder_actions: Dict[str, Any] = {}
             executor.store.next_extras["policy_info"] = {}
             for agent in actions_info.keys():
                 adder_actions[agent] = {

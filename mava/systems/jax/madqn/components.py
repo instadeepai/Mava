@@ -18,6 +18,7 @@ import abc
 from dataclasses import dataclass
 from typing import Any
 
+# Commmit
 import numpy as np
 from dm_env import specs
 
@@ -28,6 +29,7 @@ from mava.core_jax import SystemBuilder
 @dataclass
 class ExtrasActionInfoConfig:
     pass
+
 
 class ExtrasSpec(Component):
     @abc.abstractmethod
@@ -66,13 +68,13 @@ class ExtrasActionInfo(ExtrasSpec):
         # TODO: extras
         agent_specs = builder.store.ma_environment_spec.get_agent_environment_specs()
         builder.store.extras_specs = {"policy_info": {}}
-        
+
         for agent, spec in agent_specs.items():
             # Make dummy log_probs
             builder.store.extras_specs["policy_info"][agent] = np.ones(
                 shape=spec.actions.num_values, dtype=np.float32
             )
-      
+
         # Add the networks keys to extras.
         int_spec = specs.DiscreteArray(len(builder.store.unique_net_keys))
         agents = builder.store.ma_environment_spec.get_agent_ids()
@@ -89,6 +91,3 @@ class ExtrasActionInfo(ExtrasSpec):
             _description_
         """
         return "extras_spec"
-
-
-

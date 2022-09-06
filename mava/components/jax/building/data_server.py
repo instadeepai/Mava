@@ -24,12 +24,12 @@ import reverb
 from mava import specs
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
+
+# Check network type
+from mava.systems.jax.madqn.DQNNetworks import DQNNetworks
 from mava.utils import enums
 from mava.utils.builder_utils import convert_specs
 from mava.utils.sort_utils import sort_str_num
-
-#Check network type
-from mava.systems.jax.madqn.DQNNetworks import DQNNetworks
 
 
 class DataServer(Component):
@@ -88,25 +88,29 @@ class DataServer(Component):
                 num_networks,
             )
 
-            #DQN requires next extras for transition adder and IPPO does not
-            if isinstance(builder.store.networks['networks']['network_agent'],DQNNetworks):
+            # DQN requires next extras for transition adder and IPPO does not
+            if isinstance(
+                builder.store.networks["networks"]["network_agent"], DQNNetworks
+            ):
 
                 next_extras_specs = convert_specs(
-                builder.store.agent_net_keys,
-                builder.store.next_extras_specs,
-                num_networks,
-            )
+                    builder.store.agent_net_keys,
+                    builder.store.next_extras_specs,
+                    num_networks,
+                )
 
                 table = self.table(
-                table_key=table_key,
-                environment_specs=env_specs,
-                extras_specs=extras_specs,
-                next_extras_specs=next_extras_specs,
-                builder=builder,
-            )
+                    table_key=table_key,
+                    environment_specs=env_specs,
+                    extras_specs=extras_specs,
+                    next_extras_specs=next_extras_specs,
+                    builder=builder,
+                )
             else:
-                table = self.table(table_key, env_specs, extras_specs, builder)
-            
+                table = self.table(
+                    table_key, env_specs, extras_specs, builder  # type: ignore
+                )
+
             data_tables.append(table)
         return data_tables
 
@@ -184,7 +188,9 @@ class OffPolicyDataServer(DataServer):
             remover=builder.store.remover_fn(),
             max_size=self.config.max_size,
             rate_limiter=builder.store.rate_limiter_fn(),
-            signature=builder.store.adder_signature_fn(environment_specs, extras_specs, next_extras_specs),
+            signature=builder.store.adder_signature_fn(
+                environment_specs, extras_specs, next_extras_specs
+            ),
             max_times_sampled=self.config.max_times_sampled,
         )
         return table
@@ -217,7 +223,7 @@ class OnPolicyDataServer(DataServer):
 
         self.config = config
 
-    def table(
+    def table(  # type: ignore
         self,
         table_key: str,
         environment_specs: specs.MAEnvironmentSpec,

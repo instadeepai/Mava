@@ -160,8 +160,9 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         # known, the action dependent extras are not known as the action of the next
         # state is not yet taken. So we should only ask for the ones which are available
 
+        # TODO: (Siddarth) This looks odd, not sure is actually needed
         e_ = {}
-        for available_key in self._keys_available_as_next_extra:
+        for available_key in self._keys_available_as_next_extra:  # type: ignore
             e_.update(
                 {
                     available_key: tree.map_structure(

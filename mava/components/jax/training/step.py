@@ -137,6 +137,8 @@ class MAPGWithTrustRegionStep(Step):
         self.config = config
 
     def on_training_init_start(self, trainer: SystemTrainer) -> None:
+        """_summary_"""
+
         # Note (dries): Assuming the batch and sequence dimensions are flattened.
         trainer.store.full_batch_size = trainer.store.sample_batch_size * (
             trainer.store.sequence_length - 1
@@ -173,7 +175,6 @@ class MAPGWithTrustRegionStep(Step):
             def get_behavior_values(
                 net_key: Any, reward: Any, observation: Any
             ) -> jnp.ndarray:
-
                 """Gets behaviour values from the agent networks and observations."""
                 o = jax.tree_util.tree_map(
                     lambda x: jnp.reshape(x, [-1] + list(x.shape[2:])), observation
@@ -336,7 +337,7 @@ class MAPGWithTrustRegionStep(Step):
         Returns:
             List of required component classes.
         """
-        return Step.required_components() + [
+        return Step.required_components() + [  # type: ignore
             GAE,
             mava.components.jax.training.model_updating.MAPGEpochUpdate,
             mava.components.jax.training.model_updating.MinibatchUpdate,

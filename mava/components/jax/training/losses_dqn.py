@@ -131,7 +131,7 @@ class MADQNLoss(Loss):
                         q_tm1, actions, r_t, d_t, q_t_value, q_t_selector
                     )
                     loss = jnp.mean(rlax.l2_loss(td_error))
-                    loss_info = {}
+                    loss_info = {"loss_total": loss}
                     return loss, loss_info
 
                 (loss[agent_key], loss_info[agent_key]), grads[

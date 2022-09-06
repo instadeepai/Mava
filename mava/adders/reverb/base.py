@@ -283,8 +283,8 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
 
                         # Initialise empty next-extras
                         if self._use_next_extras:
-                            for key in trajectory.next_extras.keys():
-                                new_trajectory.next_extras[key] = {}
+                            for key in trajectory.next_extras.keys():  # type: ignore
+                                new_trajectory.next_extras[key] = {}  # type: ignore
 
                                 if type(trajectory) == mava_types.Transition:
                                     new_trajectory.next_extras[key] = {}  # type: ignore
@@ -396,7 +396,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
         if self._use_next_extras:
             add_dict["extras"] = extras
 
-        self._keys_available_as_next_extra = list(extras.keys())
+        self._keys_available_as_next_extra = list(extras.keys())  # type: ignore
 
         self._writer.append(
             add_dict,

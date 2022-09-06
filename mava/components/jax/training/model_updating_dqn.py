@@ -24,7 +24,7 @@ from acme.jax import networks as networks_lib
 from jax.random import KeyArray
 from optax._src import base as optax_base
 
-from mava.components.jax.training import Batch, Utility
+from mava.components.jax.training import BatchDQN, Utility
 from mava.core_jax import SystemTrainer
 
 
@@ -50,7 +50,7 @@ class MADQNMinibatchUpdate(Utility):
 
         def model_update_minibatch(
             carry: Tuple[networks_lib.Params, networks_lib.Params, optax.OptState],
-            minibatch: Batch,
+            minibatch: BatchDQN,
         ) -> Tuple[Tuple[Any, Any, optax.OptState], Dict[str, Any]]:
             """Performs model update for a single minibatch."""
             params, target_params, opt_states = carry
@@ -153,10 +153,10 @@ class MADQNEpochUpdate(Utility):
 
         @jax.jit
         def model_update_epoch(
-            carry: Tuple[KeyArray, Any, Any, optax.OptState, Batch],
+            carry: Tuple[KeyArray, Any, Any, Any, optax.OptState, BatchDQN],
             unused_t: Tuple[()],
         ) -> Tuple[
-            Tuple[KeyArray, Any, Any, optax.OptState, Batch],
+            Tuple[KeyArray, Any, Any, optax.OptState, BatchDQN],
             Dict[str, jnp.ndarray],
         ]:
             """Performs model updates based on one epoch of data."""
@@ -179,7 +179,7 @@ class MADQNEpochUpdate(Utility):
             new_target_params = {}
             new_opt_states = {}
 
-            steps += 1
+            steps += 1  # type: ignore
 
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]

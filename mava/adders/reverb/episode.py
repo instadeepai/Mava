@@ -54,22 +54,10 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
         Args:
           client: See docstring for BaseAdder.
           max_sequence_length: The maximum length of an episode.
-          period: The period with which we add sequences. If less than
-            sequence_length, overlapping sequences are added. If equal to
-            sequence_length, sequences are exactly non-overlapping.
-          delta_encoded: If `True` (False by default) enables delta encoding, see
-            `Client` for more information.
-          chunk_length: Number of timesteps grouped together before delta encoding
-            and compression. See `Client` for more information.
-          priority_fns: See docstring for BaseAdder.
-          pad_end_of_episode: If True (default) then upon end of episode the current
-            sequence will be padded (with observations, actions, etc... whose values
-            are 0) until its length is `sequence_length`. If False then the last
-            sequence in the episode may have length less than `sequence_length`.
-          break_end_of_episode: If 'False' (True by default) does not break
-            sequences on env reset. In this case 'pad_end_of_episode' is not used.
-          max_in_flight_items: The maximum number of items allowed to be "in flight"
-            at the same time. See `reverb.Writer.writer` for more info.
+          delta_encoded: __summary__
+          priority_fns: __summary__
+          max_in_flight_items: __summary__
+          padding_fn: __sumary__
         """
 
         ReverbParallelAdder.__init__(
@@ -87,7 +75,17 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
         action: types.NestedArray,
         next_timestep: dm_env.TimeStep,
         next_extras: types.NestedArray = (),
+        extras: Dict = {},
     ) -> None:
+        """__summary__
+
+        Args:
+            action: __summary__
+            next_timestep: __summary__
+            next_extras: __summary__
+            extras: __summary__
+        """
+
         if self._writer.episode_steps >= self._max_sequence_length - 1:
             raise ValueError(
                 "The number of observations within the same episode will exceed "
@@ -141,6 +139,15 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
         sequence_length: Optional[int] = None,
         extras_specs: Dict[str, Any] = {},
     ) -> tf.TypeSpec:
+        """__summary__
+
+        Args:
+            cls: __summary__
+            ma_environment_spec: __summary__
+            sequence_length: __summary__
+            extras_specs: __summary__
+        """
+
         return mava_utils.trajectory_signature(
             ma_environment_spec=ma_environment_spec,
             sequence_length=sequence_length,
