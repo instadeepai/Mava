@@ -334,11 +334,11 @@ def test_step(mock_trainer: MockTrainer) -> None:
         "rewards_std",
     ]
 
-    assert jnp.equal(metrics["norm_params"], 3.8729835)
+    assert jnp.isclose(metrics["norm_params"], 3.8729835)
 
-    assert jnp.equal(metrics["observations_mean"], 0.5667871)
+    assert jnp.isclose(metrics["observations_mean"], 0.5667871)
 
-    assert jnp.equal(metrics["observations_std"], 0.104980744)
+    assert jnp.isclose(metrics["observations_std"], 0.104980744)
 
     assert sorted(list(metrics["rewards_mean"].keys())) == [
         "agent_0",
@@ -499,11 +499,11 @@ def test_step_separate_networks(mock_trainer_separate_networks: Trainer) -> None
         "rewards_mean",
         "rewards_std",
     ]
-    assert jnp.equal(metrics["norm_policy_params"], 3.8729835)
-    assert jnp.equal(metrics["norm_critic_params"], 3.8729835)
+    assert jnp.isclose(metrics["norm_policy_params"], 3.8729835)
+    assert jnp.isclose(metrics["norm_critic_params"], 3.8729835)
 
-    assert jnp.equal(metrics["observations_mean"], 0.5667871)
-    assert jnp.equal(metrics["observations_std"], 0.104980744)
+    assert jnp.isclose(metrics["observations_mean"], 0.5667871)
+    assert jnp.isclose(metrics["observations_std"], 0.104980744)
 
     assert sorted(list(metrics["rewards_mean"].keys())) == [
         "agent_0",
