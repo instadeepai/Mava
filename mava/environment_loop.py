@@ -590,8 +590,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
         if environment_loop_schedule:
             eval_condition = check_count_condition(self._executor._evaluation_interval)
-
-        evaluation_duration = self._executor.store.global_config.evaluation_duration
+            evaluation_duration = self._executor._evaluation_duration
 
         while not should_terminate(episode_count, step_count):
             if (not environment_loop_schedule) or (should_run_loop(eval_condition)):

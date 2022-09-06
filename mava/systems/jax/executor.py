@@ -45,15 +45,13 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         self.store = store
         self.callbacks = components
 
+        self._evaluator = self.store.is_evaluator
+
         self.on_execution_init_start()
 
         self.on_execution_init()
 
         self.on_execution_init_end()
-
-        self._evaluator = self.store.is_evaluator
-        if self._evaluator:
-            self._evaluation_interval = self.store.global_config.evaluation_interval
 
     def observe_first(
         self,

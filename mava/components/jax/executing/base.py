@@ -55,8 +55,9 @@ class ExecutorInit(Component):
                 print(
                     "Missing evaluation interval value: Evaluation duration was provided without a value for the evaluation interval."
                 )
-        executor._evaluation_interval = self.config.evaluation_interval  # type: ignore
-        executor._evaluation_duration = self.config.evaluation_duration  # type: ignore
+        if executor._evaluator:
+            executor._evaluation_interval = self.config.evaluation_interval  # type: ignore
+            executor._evaluation_duration = self.config.evaluation_duration  # type: ignore
 
     @staticmethod
     def name() -> str:
