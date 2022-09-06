@@ -77,7 +77,7 @@ def ippo_system_single_process() -> System:
         logger_factory=logger_factory,
         experiment_path=checkpoint_subpath,
         optimizer=optimizer,
-        executor_parameter_update_period=10,
+        executor_parameter_update_period=1,
         multi_process=False,  # Single process case
         run_evaluator=True,
         num_executors=1,
@@ -90,7 +90,8 @@ def ippo_system_single_process() -> System:
         nodes_on_gpu=[],
         sequence_length=4,
         period=4,
-        checkpoint_minute_interval=1 / 60,
+        checkpoint_minute_interval=3 / 60,
+        trainer_parameter_update_period=1,
     )
 
     return test_system
@@ -108,7 +109,7 @@ def ippo_system_multi_thread() -> System:
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return ippo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(254, 254, 254),
+            policy_layer_sizes=(256, 256, 256),
             critic_layer_sizes=(512, 512, 256),
             *args,
             **kwargs,
@@ -155,6 +156,7 @@ def ippo_system_multi_thread() -> System:
         sample_batch_size=5,
         nodes_on_gpu=[],
         is_test=True,
-        checkpoint_minute_interval=1 / 60,
+        checkpoint_minute_interval=3 / 60,
+        trainer_parameter_update_period=1,
     )
     return test_system
