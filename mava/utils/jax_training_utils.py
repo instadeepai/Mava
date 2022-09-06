@@ -1,3 +1,5 @@
+import os
+
 import jax.numpy as jnp
 import tensorflow_probability.substrates.jax.distributions as tfd
 from chex import Array
@@ -13,3 +15,11 @@ def action_mask_categorical_policies(
         jnp.finfo(distribution.logits.dtype).min,
     )
     return tfd.Categorical(logits=masked_logits, dtype=distribution.dtype)
+
+
+def set_growing_gpu_memory() -> None:
+    """Solve gpu mem issues.
+
+    More on this - https://jax.readthedocs.io/en/latest/gpu_memory_allocation.html.
+    """
+    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
