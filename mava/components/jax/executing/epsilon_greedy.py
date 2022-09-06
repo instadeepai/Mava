@@ -1,8 +1,7 @@
+# type: ignore
 # Similiar to https://github.com/deepmind/distrax/blob/master/distrax/_src/distributions/epsilon_greedy.py, # noqa: E501
 # except masks invalid actions.
 """Epsilon-Greedy distributions with respect to a set of preferences."""
-
-from typing import Any
 
 import chex
 import jax.numpy as jnp
@@ -48,7 +47,7 @@ class EpsilonGreedyWithMask(categorical.Categorical):
         preferences: chex.Array,
         epsilon: float,
         mask: chex.Array,
-        dtype: jnp.dtype = Any,
+        dtype: jnp.dtype = int,  # type: ignore
     ):
         """Initializes an EpsilonGreedy distribution.
 
@@ -80,5 +79,5 @@ class EpsilonGreedyWithMask(categorical.Categorical):
         return EpsilonGreedyWithMask(
             preferences=self.preferences[index],
             epsilon=self.epsilon,
-            dtype=self.dtype,  # type: ignore
+            dtype=self.dtype,
         )
