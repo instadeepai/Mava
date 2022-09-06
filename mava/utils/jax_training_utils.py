@@ -33,7 +33,4 @@ def set_jax_double_precision() -> None:
 
     More on this - https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#double-64bit-precision. # noqa: E501
     """
-    # Works for single process.
     jax_config.update("jax_enable_x64", True)
-    # Works for multi-process.
-    os.environ["JAX_ENABLE_X64"] = "true"
