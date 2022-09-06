@@ -15,7 +15,7 @@
 
 """Builder components for Mava systems."""
 
-from mava.components.jax.building.adders import (
+from mava.components.jax.building.adders import (  # noqa: E402
     ParallelSequenceAdder,
     ParallelSequenceAdderSignature,
     ParallelTransitionAdder,

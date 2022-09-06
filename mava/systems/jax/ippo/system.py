@@ -106,7 +106,7 @@ class IPPOSystem(System):
 
         # Default system processes
         # System initialization
-        system_init = DesignSpec(
+        system_init = DesignSpec(  # noqa: E501
             environment_spec=building.EnvironmentSpec,
             system_init=building.FixedNetworkSystemInit,
         ).get()
@@ -114,8 +114,8 @@ class IPPOSystem(System):
         # Executor
         executor_process = DesignSpec(
             executor_init=executing.ExecutorInit,
-            executor_observe=executing.FeedforwardExecutorObserve,
-            executor_select_action=executing.FeedforwardExecutorSelectAction,
+            executor_observe=executing.FeedforwardExecutorObserve,  # noqa: E501
+            executor_select_action=executing.FeedforwardExecutorSelectAction,  # noqa: E501
             executor_adder=building.ParallelSequenceAdder,
             adder_priority=building.UniformAdderPriority,
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,

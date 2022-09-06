@@ -107,7 +107,7 @@ class DataServer(Component):
                     builder=builder,
                 )
             else:
-                table = self.table(
+                table = self.table(  # type: ignore
                     table_key, env_specs, extras_specs, builder  # type: ignore
                 )
 

@@ -76,5 +76,7 @@ class EpsilonGreedyWithMask(categorical.Categorical):
         """See `Distribution.__getitem__`."""
         index = distribution.to_batch_shape_index(self.batch_shape, index)
         return EpsilonGreedyWithMask(
-            preferences=self.preferences[index], epsilon=self.epsilon, dtype=self.dtype
-        )  # type: ignore
+            preferences=self.preferences[index],
+            epsilon=self.epsilon,
+            dtype=self.dtype,  # type: ignore
+        )
