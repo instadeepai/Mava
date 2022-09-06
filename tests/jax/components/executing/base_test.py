@@ -85,7 +85,7 @@ def test_on_execution_init_start_with_evaluator(
         mock_executor: Executor
         dummy_config: ExecutorInitConfig
     """
-    mock_executor._evaluator = True
+    mock_executor.store.is_evaluator = True
     executor_init = ExecutorInit(config=dummy_config)
     executor_init.on_execution_init_start(executor=mock_executor)
 
