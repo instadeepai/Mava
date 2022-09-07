@@ -203,6 +203,12 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
         export SC2PATH="/home/Documents/Code/Mava/3rdparty/StarCraftII"
         ```
 
+        Then install the environment wrapper
+
+        ```bash
+        pip install id-mava[sc2]
+        ```
+
     * MeltingPot:
 
         Install MeltingPot:
