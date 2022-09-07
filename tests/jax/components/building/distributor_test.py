@@ -24,6 +24,7 @@ from reverb import client as reverb_client
 from reverb import item_selectors, rate_limiters
 from reverb import server as reverb_server
 
+import jax
 from mava.components.jax.building.distributor import Distributor
 from mava.systems.jax.builder import Builder
 from mava.systems.jax.launcher import Launcher
@@ -35,14 +36,16 @@ class MockBuilder(Builder):
 
         Attributes:
             trainer_network
+            key: ring key
             program: used to test on_building_launch method
             test_launch: used to test on_building_launch method
             test: used to test on_building_program_nodes method
             test_values: used to test on_building_program_nodes method
         """
         trainer_networks = {"trainer": ["network_agent"]}
+        key = jax.random.PRNGKey(1234)
         program = SimpleNamespace(launch=self.launch)
-        store = SimpleNamespace(trainer_networks=trainer_networks, program=program)
+        store = SimpleNamespace(trainer_networks=trainer_networks, key=key, program=program)
         self.store = store
         self.program_launched = False
 
