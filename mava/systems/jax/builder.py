@@ -182,7 +182,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
         """
 
         # Set the ring key for the trainer.
-        if len(self.store.trainer_keys)>1:
+        if len(self.store.trainer_keys) > 1:
             self.store.key = self.store.trainer_keys[int(trainer_id.split("_")[-1])]
         else:
             self.store.key = self.store.trainer_keys[0]
