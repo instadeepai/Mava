@@ -57,6 +57,9 @@ class Builder(SystemBuilder, BuilderHookMixin):
             System data server.
         """
 
+        # Set the ring key for the data server.
+        self.store.key = self.store.data_key
+
         # start of make replay tables
         self.on_building_data_server_start()
 
@@ -80,6 +83,9 @@ class Builder(SystemBuilder, BuilderHookMixin):
         Returns:
             System parameter server.
         """
+
+        # Set the ring key for the parameter server.
+        self.store.key = self.store.param_key
 
         # start of make parameter server
         self.on_building_parameter_server_start()
@@ -113,6 +119,13 @@ class Builder(SystemBuilder, BuilderHookMixin):
         self.store.data_server_client = data_server_client
         self.store.parameter_server_client = parameter_server_client
         self.store.is_evaluator = self.store.executor_id == "evaluator"
+
+        if self.store.is_evaluator:
+            # Set the ring key for the evaluator.
+            self.store.key = self.store.eval_key
+        else:
+            # Set the ring key for the executor.
+            self.store.key = self.store.executor_keys[int(executor_id.split("_")[-1])]
 
         # start of making the executor
         self.on_building_executor_start()
@@ -167,6 +180,12 @@ class Builder(SystemBuilder, BuilderHookMixin):
         Returns:
             System trainer.
         """
+
+        # Set the ring key for the trainer.
+        if len(self.store.trainer_keys)>1:
+            self.store.key = self.store.trainer_keys[int(trainer_id.split("_")[-1])]
+        else:
+            self.store.key = self.store.trainer_keys[0]
 
         self.store.trainer_id = trainer_id
         self.store.data_server_client = data_server_client
