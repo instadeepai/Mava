@@ -30,4 +30,5 @@ class SaveableWrapper(AcmeSaveable):
         Returns:
             None.
         """
-        self.state = state
+        for key in state.keys():
+            self.state[key] = state[key]

@@ -55,9 +55,6 @@ class Checkpointer(Component):
             add_uid=False,
             time_delta_minutes=0,
         )
-        # Assign the restored parameters to parameter server
-        for key in saveable_parameters.state.keys():
-            server.store.parameters[key] = saveable_parameters.state[key]
 
         server.store.last_checkpoint_time = time.time()
         server.store.checkpoint_minute_interval = self.config.checkpoint_minute_interval
