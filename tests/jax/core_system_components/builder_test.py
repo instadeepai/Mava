@@ -23,6 +23,7 @@ from mava.components.jax.building import Logger
 from mava.systems.jax import Builder, Executor, ParameterServer, Trainer
 from tests.jax.hook_order_tracking import HookOrderTracking
 
+
 class TestBuilder(HookOrderTracking, Builder):
     __test__ = False
 

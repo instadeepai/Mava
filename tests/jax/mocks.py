@@ -821,7 +821,7 @@ class MockDistributor(Component):
         builder.store.param_key = [1234, 1234]
         builder.store.executor_keys = [[1234, 1234]]
         builder.store.trainer_keys = [[1234, 1234]]
-        
+
         data_server = builder.data_server()
 
         parameter_server = builder.parameter_server()
