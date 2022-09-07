@@ -23,7 +23,6 @@ from mava.components.jax.building import Logger
 from mava.systems.jax import Builder, Executor, ParameterServer, Trainer
 from tests.jax.hook_order_tracking import HookOrderTracking
 
-
 class TestBuilder(HookOrderTracking, Builder):
     __test__ = False
 
@@ -37,8 +36,14 @@ class TestBuilder(HookOrderTracking, Builder):
 
         super().__init__(components=components, global_config=global_config)
         self.store.data_tables = ["data_table_1", "data_table_2"]
-        self.store.system_executor = "system_executor"
+        self.store.system_executor = "executor"
         self.store.adder = "adder"
+
+        self.store.data_key = [1234, 1234]
+        self.store.eval_key = [1234, 1234]
+        self.store.param_key = [1234, 1234]
+        self.store.executor_keys = [[1234, 1234]]
+        self.store.trainer_keys = [[1234, 1234]]
 
 
 @pytest.fixture
@@ -80,7 +85,7 @@ def test_executor_store_when_is_evaluator(test_builder: TestBuilder) -> None:
             data_server_client=data_server_client,
             parameter_server_client=parameter_server_client,
         )
-        == "system_executor"
+        == "executor"
     )
 
     assert test_builder.store.executor_id == executor_id
@@ -95,7 +100,7 @@ def test_executor_store_when_is_evaluator(test_builder: TestBuilder) -> None:
 
 def test_executor_store_when_executor(test_builder: TestBuilder) -> None:
     """Test that store is handled correctly in executor() when it's an executor."""
-    executor_id = "executor"
+    executor_id = "executor_0"
     data_server_client = "data_server_client"
     parameter_server_client = "parameter_server_client"
     assert (
@@ -104,7 +109,7 @@ def test_executor_store_when_executor(test_builder: TestBuilder) -> None:
             data_server_client=data_server_client,
             parameter_server_client=parameter_server_client,
         )
-        == "system_executor"
+        == "executor"
     )
 
     assert test_builder.store.executor_id == executor_id
@@ -173,7 +178,7 @@ def test_executor_hook_order_when_executor(test_builder: TestBuilder) -> None:
     """Test if executor() hooks are called in the correct order when executor."""
     test_builder.reset_hook_list()
     test_builder.executor(
-        executor_id="executor", data_server_client="", parameter_server_client=""
+        executor_id="executor_0", data_server_client="", parameter_server_client=""
     )
     assert test_builder.hook_list == [
         "on_building_executor_start",

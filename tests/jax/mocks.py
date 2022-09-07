@@ -825,7 +825,7 @@ class MockDistributor(Component):
             parameter_server_client=parameter_server,
         )
         executor = builder.executor(
-            executor_id="executor",
+            executor_id="executor_0",
             data_server_client=data_server,
             parameter_server_client=parameter_server,
         )
