@@ -86,31 +86,39 @@ def test_save_restore(
 
     system_checkpointer = mock_parameter_server.store.system_checkpointer
 
-    # Save Initial parameters and check that the file has been saved to disk
-    system_checkpointer.save()
-    saved_trainer_steps = mock_parameter_server.store.parameters["trainer_steps"]
-    assert any(
-        fname == "checkpoint"
-        for fname in os.listdir(system_checkpointer._checkpoint_dir)
-    )
-
-    # Change the parameters and check that the checkpointer has the same value
+    # Emulate the parameters changing e.g. trainer_steps increase and then ensure that
+    # the saveable has updated
     mock_parameter_server.store.parameters["trainer_steps"] += 50
 
     assert (
         system_checkpointer._checkpoint.saveable._object_to_save.state
         == mock_parameter_server.store.parameters
     )
+    # Save modified parameters
+    time.sleep(checkpointer.config.checkpoint_minute_interval * 60 + 2)
+    checkpointer.on_parameter_server_run_loop_checkpoint(server=mock_parameter_server)
+    saved_trainer_steps = mock_parameter_server.store.parameters["trainer_steps"]
 
-    # Restore the saved parameters and check that the checkpointer values are correct
+    # Check whether the checkpointer has saved to disk
+    assert any(
+        fname == "checkpoint"
+        for fname in os.listdir(system_checkpointer._checkpoint_dir)
+    )
+
+    mock_parameter_server.store.parameters["trainer_steps"] += 50
+
+    assert (
+        mock_parameter_server.store.parameters["trainer_steps"] != saved_trainer_steps
+    )
+
+    # Restore the saved parameters
     system_checkpointer.restore()
     assert (
-        system_checkpointer._checkpoint.saveable._object_to_save.state
-        != mock_parameter_server.store.parameters
+        mock_parameter_server.store.parameters["trainer_steps"] == saved_trainer_steps
     )
     assert (
-        system_checkpointer._checkpoint.saveable._object_to_save.state["trainer_steps"]
-        == saved_trainer_steps
+        system_checkpointer._checkpoint.saveable._object_to_save.state
+        == mock_parameter_server.store.parameters
     )
 
 
@@ -144,24 +152,14 @@ def test_checkpointer(
     assert type(system_checkpointer) == acme_savers.Checkpointer
     assert checkpointer.name() == "checkpointer"
 
-    # check that checkpoint not yet saved
+    # check that checkpoint has not yet saved
     assert mock_parameter_server.store.system_checkpointer._last_saved == 0
     checkpoint_init_time = mock_parameter_server.store.last_checkpoint_time
-
-    # Emulate parameters changing e.g. trainer_steps increase
-    mock_parameter_server.store.parameters["trainer_steps"] += 100
 
     # Sleep until checkpoint_minute_interval elapses
     time.sleep(checkpointer.config.checkpoint_minute_interval * 60 + 2)
     checkpointer.on_parameter_server_run_loop_checkpoint(server=mock_parameter_server)
 
-    # Check whether the checkpointer has saved
-    assert (
-        mock_parameter_server.store.parameters["trainer_steps"]
-        == system_checkpointer._checkpoint.saveable._object_to_save.state[
-            "trainer_steps"
-        ]
-    )
     assert mock_parameter_server.store.last_checkpoint_time > checkpoint_init_time
     assert mock_parameter_server.store.last_checkpoint_time < time.time()
     assert mock_parameter_server.store.system_checkpointer._last_saved != 0
