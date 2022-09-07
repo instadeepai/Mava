@@ -37,7 +37,7 @@ class TestBuilder(HookOrderTracking, Builder):
 
         super().__init__(components=components, global_config=global_config)
         self.store.data_tables = ["data_table_1", "data_table_2"]
-        self.store.system_executor = "executor"
+        self.store.system_executor = "system_executor"
         self.store.adder = "adder"
 
         self.store.data_key = [1234, 1234]
@@ -86,7 +86,7 @@ def test_executor_store_when_is_evaluator(test_builder: TestBuilder) -> None:
             data_server_client=data_server_client,
             parameter_server_client=parameter_server_client,
         )
-        == "executor"
+        == "system_executor"
     )
 
     assert test_builder.store.executor_id == executor_id
@@ -110,7 +110,7 @@ def test_executor_store_when_executor(test_builder: TestBuilder) -> None:
             data_server_client=data_server_client,
             parameter_server_client=parameter_server_client,
         )
-        == "executor"
+        == "system_executor"
     )
 
     assert test_builder.store.executor_id == executor_id
