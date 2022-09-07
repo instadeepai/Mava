@@ -67,7 +67,7 @@ class BaseParameterClient(Component):
 
 @dataclass
 class ExecutorParameterClientConfig:
-    executor_parameter_update_period: int = 1000
+    executor_parameter_update_period: int = 200
 
 
 class ExecutorParameterClient(BaseParameterClient):
@@ -154,7 +154,7 @@ class ExecutorParameterClient(BaseParameterClient):
 
 @dataclass
 class TrainerParameterClientConfig:
-    pass
+    trainer_parameter_update_period: int = 5
 
 
 class TrainerParameterClient(BaseParameterClient):
@@ -220,6 +220,7 @@ class TrainerParameterClient(BaseParameterClient):
                 parameters=params,
                 get_keys=get_keys,
                 set_keys=set_keys,
+                update_period=self.config.trainer_parameter_update_period,
             )
 
             # Get all the initial parameters
@@ -232,13 +233,22 @@ class TrainerParameterClient(BaseParameterClient):
         """Static method that returns component name."""
         return "trainer_parameter_client"
 
+    @staticmethod
+    def config_class() -> Optional[Callable]:
+        """Config class used for component.
+
+        Returns:
+            config class/dataclass for component.
+        """
+        return TrainerParameterClientConfig
+
 
 ####################
 # SEPARATE NETWORKS
 ###################
 
 
-class ExecutorParameterClientSeparateNetworks(BaseParameterClient):
+class ExecutorParameterClientSeparateNetworks(ExecutorParameterClient):
     def __init__(
         self,
         config: ExecutorParameterClientConfig = ExecutorParameterClientConfig(),
@@ -312,22 +322,8 @@ class ExecutorParameterClientSeparateNetworks(BaseParameterClient):
 
         builder.store.executor_parameter_client = parameter_client
 
-    @staticmethod
-    def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
-        return "executor_parameter_client"
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return ExecutorParameterClientConfig
-
-
-class TrainerParameterClientSeparateNetworks(BaseParameterClient):
+class TrainerParameterClientSeparateNetworks(TrainerParameterClient):
     def __init__(
         self,
         config: TrainerParameterClientConfig = TrainerParameterClientConfig(),
@@ -398,14 +394,10 @@ class TrainerParameterClientSeparateNetworks(BaseParameterClient):
                 parameters=params,
                 get_keys=get_keys,
                 set_keys=set_keys,
+                update_period=self.config.trainer_parameter_update_period,
             )
 
             # Get all the initial parameters
             parameter_client.get_all_and_wait()
 
         builder.store.trainer_parameter_client = parameter_client
-
-    @staticmethod
-    def name() -> str:
-        """Component type name, e.g. 'dataset' or 'executor'."""
-        return "trainer_parameter_client"

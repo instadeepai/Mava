@@ -35,8 +35,8 @@
 
 ## Welcome to Mava! 🦁
 
-[**Installation**](#installation-🎬)
-| [**Quickstart**](#quickstart-⚡)
+[**Installation**](#installation-)
+| [**Quickstart**](#quickstart-)
 | [**Documentation**](https://id-mava.readthedocs.io/)
 
 Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava provides useful components, abstractions, utilities and tools for MARL and allows for simple scaling for multi-process system training and execution while providing a high level of flexibility and composability. Originating in the Research Team at [InstaDeep](https://www.instadeep.com/), Mava is now developed jointly with the open-source community. “Mava” means experience, or wisdom, in Xhosa - one of South Africa’s eleven official languages.
