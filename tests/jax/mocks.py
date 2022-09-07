@@ -816,7 +816,14 @@ class MockDistributor(Component):
 
     def on_building_program_nodes(self, builder: SystemBuilder) -> None:
         """_summary_"""
+        builder.store.data_key = [1234, 1234]
+        builder.store.eval_key = [1234, 1234]
+        builder.store.param_key = [1234, 1234]
+        builder.store.executor_keys = [[1234, 1234]]
+        builder.store.trainer_keys = [[1234, 1234]]
+        
         data_server = builder.data_server()
+
         parameter_server = builder.parameter_server()
 
         trainer = builder.trainer(
