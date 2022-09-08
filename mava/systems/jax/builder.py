@@ -125,7 +125,9 @@ class Builder(SystemBuilder, BuilderHookMixin):
             self.store.base_key = self.store.eval_key
         else:
             # Set the rng key for the executor.
-            self.store.base_key = self.store.executor_keys[int(executor_id.split("_")[-1])]
+            self.store.base_key = self.store.executor_keys[
+                int(executor_id.split("_")[-1])
+            ]
 
         # start of making the executor
         self.on_building_executor_start()
@@ -183,7 +185,9 @@ class Builder(SystemBuilder, BuilderHookMixin):
 
         # Set the rng key for the trainer.
         if len(self.store.trainer_keys) > 1:
-            self.store.base_key = self.store.trainer_keys[int(trainer_id.split("_")[-1])]
+            self.store.base_key = self.store.trainer_keys[
+                int(trainer_id.split("_")[-1])
+            ]
         else:
             self.store.base_key = self.store.trainer_keys[0]
 
