@@ -36,7 +36,7 @@ class MockBuilder(Builder):
 
         Attributes:
             trainer_network
-            key: ring key
+            key: rng key
             program: used to test on_building_launch method
             test_launch: used to test on_building_launch method
             test: used to test on_building_program_nodes method
