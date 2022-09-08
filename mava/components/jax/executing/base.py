@@ -46,7 +46,8 @@ class ExecutorInit(Component):
         Returns:
             None.
         """
-        executor._interval = self.config.interval  # type: ignore
+        executor.store.policy_states = {}
+        executor.store._interval = self.config.interval  # type: ignore
 
     @staticmethod
     def name() -> str:

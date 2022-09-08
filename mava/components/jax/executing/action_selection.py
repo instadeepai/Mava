@@ -216,12 +216,20 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             network: executor.store.networks["networks"][network].get_params()
             for network in executor.store.agent_net_keys.values()
         }
+
+        # Initialise the 
+        if not executor.store.policy_states:
+            for agent in self.store.agent_net_keys.keys():
+                network = self.store.agent_net_keys(agent)
+                executor.store.policy_states[agent] = executor.store.networks["networks"][network].get_init_state()
+
         (
             executor.store.actions_info,
             executor.store.policies_info,
+            executor.store.policy_states,
             executor.store.key,
         ) = executor.store.select_actions_fn(
-            executor.store.observations, current_agent_params, executor.store.key
+            executor.store.observations, current_agent_params, executor.store.policy_states, executor.store.key
         )
 
     def on_execution_init_end(self, executor: SystemExecutor) -> None:
@@ -239,6 +247,7 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
         def select_action(
             observation: NestedArray,
             current_params: NestedArray,
+            policy_state: NestedArray,
             network: Any,
             key: networks_lib.PRNGKey,
         ) -> Tuple[NestedArray, NestedArray, networks_lib.PRNGKey]:
@@ -247,6 +256,7 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             Args:
                 observation : obs for current agent.
                 current_params : params for current agent's network.
+                policy_state: State of the recurrent units
                 network : network object.
                 key : prng key.
 
@@ -256,18 +266,20 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             observation_data = utils.add_batch_dim(observation.observation)
             # We use the subkey immediately and keep the new key for future splits.
             new_key, sub_key = jax.random.split(key)
-            action_info, policy_info = network.get_action(
+            action_info, policy_info, policy_state = network.get_action(
                 observation_data,
                 current_params,
+                policy_state,
                 sub_key,
                 utils.add_batch_dim(observation.legal_actions),
             )
 
-            return action_info, policy_info, new_key
+            return action_info, policy_info, policy_state, new_key
 
         def select_actions(
             observations: Dict[str, NestedArray],
             current_params: Dict[str, NestedArray],
+            policy_states: Dict[str, NestedArray],
             key: networks_lib.PRNGKey,
         ) -> Tuple[
             Dict[str, NestedArray], Dict[str, NestedArray], networks_lib.PRNGKey
@@ -282,15 +294,15 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             Returns:
                 action info, policy info and new prng key.
             """
-            actions_info, policies_info = {}, {}
+            actions_info, policies_info, new_policy_states = {}, {}, {}
             # TODO Look at tree mapping this forloop.
             # Since this is jitted, compiling a forloop with lots of agents could take
             # long, we should vectorize this.
             for agent, observation in observations.items():
                 network = networks["networks"][agent_net_keys[agent]]
-                actions_info[agent], policies_info[agent], key = select_action(
-                    observation, current_params[agent_net_keys[agent]], network, key
+                actions_info[agent], policies_info[agent], new_policy_states[agent], key = select_action(
+                    observation, current_params[agent_net_keys[agent]], policy_states[agent], network, key
                 )
-            return actions_info, policies_info, key
+            return actions_info, policies_info, policy_states, key
 
         executor.store.select_actions_fn = jax.jit(select_actions)

@@ -18,4 +18,4 @@ from mava.components.jax.executing.action_selection import (
     FeedforwardExecutorSelectAction, RecurrentExecutorSelectAction
 )
 from mava.components.jax.executing.base import ExecutorInit
-from mava.components.jax.executing.observing import FeedforwardExecutorObserve
+from mava.components.jax.executing.observing import FeedforwardExecutorObserve, RecurrentExecutorObserve

@@ -40,7 +40,6 @@ EntropyFn = Callable[[Any], jnp.ndarray]
 @dataclasses.dataclass
 class PPONetworks:
     """Class to implement the networks for the PPO algorithm"""
-
     def __init__(
         self,
         network: networks_lib.FeedForwardNetwork,

@@ -160,3 +160,84 @@ class FeedforwardExecutorObserve(ExecutorObserve):
         """Update the executor variables."""
         if executor.store.executor_parameter_client:
             executor.store.executor_parameter_client.get_async()
+
+
+
+class RecurrentExecutorObserve(FeedforwardExecutorObserve):
+    def __init__(self, config: ExecutorObserveConfig = ExecutorObserveConfig()):
+        """Component handles observations for a feedforward executor.
+
+        Args:
+            config: ExecutorObserveConfig.
+        """
+        self.config = config
+
+    def on_execution_observe_first(self, executor: SystemExecutor) -> None:
+        """Handle first observation in episode and give to adder.
+
+        Also selects networks to be used for episode.
+
+        Args:
+            executor: SystemExecutor.
+
+        Returns:
+            None.
+        """
+        if not executor.store.adder:
+            return
+
+        # Select new networks from the sampler at the start of each episode.
+        agents = sort_str_num(list(executor.store.agent_net_keys.keys()))
+        (
+            executor.store.network_int_keys_extras,
+            executor.store.agent_net_keys,
+        ) = sample_new_agent_keys(
+            agents,
+            executor.store.network_sampling_setup,
+            executor.store.net_keys_to_ids,
+        )
+        # executor.store.extras set by Executor
+        executor.store.extras[
+            "network_int_keys"
+        ] = executor.store.network_int_keys_extras
+
+        # executor.store.timestep set by Executor
+        executor.store.adder.add_first(executor.store.timestep, executor.store.extras)
+
+    def on_execution_observe(self, executor: SystemExecutor) -> None:
+        """Handle observations and pass along to the adder.
+
+        Args:
+            executor: SystemExecutor.
+
+        Returns:
+            None.
+        """
+        if not executor.store.adder:
+            return
+
+        actions_info = executor.store.actions_info
+        policies_info = executor.store.policies_info
+
+        adder_actions: Dict[str, Any] = {}
+        # executor.store.next_extras set by Executor
+        executor.store.next_extras["policy_info"] = {}
+        for agent in actions_info.keys():
+            adder_actions[agent] = {
+                "actions_info": actions_info[agent],
+            }
+            executor.store.next_extras["policy_info"][agent] = policies_info[agent]
+
+        executor.store.next_extras[
+            "network_int_keys"
+        ] = executor.store.network_int_keys_extras
+
+        # executor.store.next_timestep set by Executor
+        executor.store.adder.add(
+            adder_actions, executor.store.next_timestep, executor.store.next_extras
+        )
+
+    def on_execution_update(self, executor: SystemExecutor) -> None:
+        """Update the executor variables."""
+        if executor.store.executor_parameter_client:
+            executor.store.executor_parameter_client.get_async()
