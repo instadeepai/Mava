@@ -322,7 +322,7 @@ def test_step(mock_trainer: MockTrainer) -> None:
     mapg_with_trust_region_step = MAPGWithTrustRegionStep()
     del mock_trainer.store.step_fn
     mapg_with_trust_region_step.on_training_step_fn(trainer=mock_trainer)
-    old_key = mock_trainer.store.key
+    old_key = mock_trainer.store.base_key
     metrics = mock_trainer.store.step_fn(dummy_sample)
 
     # Check that metrics were correctly computed
@@ -361,7 +361,7 @@ def test_step(mock_trainer: MockTrainer) -> None:
     assert round(float(sorted_reward_std[2]), 3) == 0.077
 
     # check that trainer random key has been updated
-    assert list(mock_trainer.store.key) != list(old_key)
+    assert list(mock_trainer.store.base_key) != list(old_key)
     num_expected_update_steps = (
         mock_trainer.store.global_config.num_epochs
         * mock_trainer.store.global_config.num_minibatches
@@ -487,7 +487,7 @@ def test_step_separate_networks(mock_trainer_separate_networks: Trainer) -> None
     del mock_trainer.store.step_fn
 
     mapg_with_trust_region_step.on_training_step_fn(trainer=mock_trainer)
-    old_key = mock_trainer.store.key
+    old_key = mock_trainer.store.base_key
     metrics = mock_trainer.store.step_fn(dummy_sample)
 
     # Check that metrics were correctly computed
@@ -526,7 +526,7 @@ def test_step_separate_networks(mock_trainer_separate_networks: Trainer) -> None
     assert round(float(sorted_reward_std[2]), 3) == 0.077
 
     # check that trainer random key has been updated
-    assert list(mock_trainer.store.key) != list(old_key)
+    assert list(mock_trainer.store.base_key) != list(old_key)
     num_expected_update_steps = (
         mock_trainer.store.global_config.num_epochs
         * mock_trainer.store.global_config.num_minibatches

@@ -692,10 +692,10 @@ class MockNetworks(Component):
         """Summary"""
 
         # Setup the jax key for network initialisations
-        builder.store.key = jax.random.PRNGKey(self.config.seed)
+        builder.store.base_key = jax.random.PRNGKey(self.config.seed)
 
         # Build network function here
-        network_key, builder.store.key = jax.random.split(builder.store.key)
+        network_key, builder.store.base_key = jax.random.split(builder.store.base_key)
         builder.store.network_factory = (
             lambda: self.config.network_factory(  # type: ignore
                 environment_spec=builder.store.ma_environment_spec,
