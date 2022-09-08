@@ -57,13 +57,13 @@ To join us in these efforts, please feel free to reach out, raise issues or read
 
 ## Installation 🎬
 
-You can install the latest release of Mava for **Tensorflow** from PyPI (to be deprecated soon):
+You can install the latest release of Mava for **Tensorflow** from PyPI (to be deprecated soon). Note that you will still be able to use TF2 systems by pinning to an older version of Mava.
 
 ```bash
 pip install id-mava[reverb,tf,envs]
 ```
 
-For **JAX**, please install the latest development version directly from GitHub (PyPI release coming soon!):
+For **JAX**, please install the latest development version directly from GitHub (PyPI release coming soon!).
 
 ```bash
 pip install "id-mava[reverb,jax,envs] @ git+https://github.com/instadeepai/mava.git"
