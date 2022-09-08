@@ -15,7 +15,7 @@
 
 """Executor components for Mava systems."""
 from mava.components.jax.executing.action_selection import (
-    FeedforwardExecutorSelectAction,
+    FeedforwardExecutorSelectAction, RecurrentExecutorSelectAction
 )
 from mava.components.jax.executing.base import ExecutorInit
 from mava.components.jax.executing.observing import FeedforwardExecutorObserve

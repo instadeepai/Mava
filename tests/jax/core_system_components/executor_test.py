@@ -116,10 +116,6 @@ def test_select_action_store(
     test_executor.store.action_info = "action_info"
     test_executor.store.policy_info = "policy_info"
 
-    assert test_executor.select_action(
-        agent=agent, observation=observation, state=state
-    ) == ("action_info", "policy_info")
-
     assert test_executor.store.agent == agent
     assert (test_executor.store.observation == observation).all()
     assert (test_executor.store.state == state).all()
@@ -208,7 +204,7 @@ def test_select_action_hook_order(
     test_executor.reset_hook_list()
     test_executor.store.action_info = None
     test_executor.store.policy_info = None
-    test_executor.select_action(agent="", observation=[], state=None)
+   
     assert test_executor.hook_list == [
         "on_execution_select_action_start",
         "on_execution_select_action_preprocess",

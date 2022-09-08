@@ -45,13 +45,7 @@ class Executor(acme.Actor):
       # Update the actor policy/parameters.
       system.update()
     """
-
-    @abc.abstractmethod
-    def select_action(
-        self, agent: str, observation: types.NestedArray
-    ) -> types.NestedArray:
-        """Samples from the policy and returns an action."""
-
+    
     @abc.abstractmethod
     def select_actions(
         self, observations: Dict[str, types.NestedArray]

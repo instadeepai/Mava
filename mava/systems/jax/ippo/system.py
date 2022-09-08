@@ -127,3 +127,19 @@ class IPPOSystemSeparateNetworks(System):
         )
 
         return system, default_params
+
+class IPPOSystemRecurrentActor(System):
+    def design(self) -> Tuple[DesignSpec, Any]:
+        """System design for PPO with separate policy and critic networks.
+
+        Returns:
+            system callback components, default system parameters
+        """
+
+        # Get the IPPOSystemSeparateNetworks system setup.
+        system, default_params = IPPOSystemSeparateNetworks().design()
+
+        # Update trainer components with seperate networks
+        system.set("executor_select_action", executing.RecurrentExecutorSelectAction)
+      
+        return system, default_params

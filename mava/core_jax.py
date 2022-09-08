@@ -151,12 +151,6 @@ class SystemExecutor(abc.ABC):
         self._extras: Dict[str, Any]
 
     @abc.abstractmethod
-    def select_action(
-        self, agent: str, observation: Any
-    ) -> Union[Any, Tuple[Any, Any]]:
-        """Select an action for a single agent in the system."""
-
-    @abc.abstractmethod
     def select_actions(
         self, observations: Dict[str, Any]
     ) -> Union[Dict[str, Any], Tuple[Dict[str, Any], Dict[str, Any]]]:
