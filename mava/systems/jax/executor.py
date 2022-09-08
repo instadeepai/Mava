@@ -96,7 +96,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
         self.on_execution_observe_end()
 
-    # NB: Not currently used.
+    # NB: Not currently used. TODO Deprecate in future.
     def select_action(
         self,
         agent: str,

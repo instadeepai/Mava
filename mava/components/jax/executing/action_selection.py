@@ -117,7 +117,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             executor.store.observations, current_agent_params, executor.store.key
         )
 
-    # NB: Not currently used.
+    # NB: Not currently used. TODO Deprecate in future.
     def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
         """Select action for a single agent and save in store.
 
