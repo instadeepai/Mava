@@ -72,7 +72,7 @@ def mock_builder() -> Builder:
     environment_spec.on_building_init_start(builder)
 
     builder.store.table_network_config = {
-        "trainer": ["network_agent", "network_agent", "network_agent"]
+        "trainer_0": ["network_agent", "network_agent", "network_agent"]
     }
     builder.store.agent_net_keys = {
         "agent_0": "network_agent",
