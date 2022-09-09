@@ -126,7 +126,7 @@ def test_off_policy_data_server(
 
     table = mock_builder.store.data_tables[0]
 
-    assert table.info.name == "trainer"
+    assert table.info.name == "trainer_0"
     assert table.info.rate_limiter_info.min_size_to_sample == 1000
     assert table.info.sampler_options.HasField(sampler_field)
     assert table.info.remover_options.HasField(remover_field)
@@ -152,7 +152,7 @@ def test_on_policy_data_server_no_sequence_length(
     table = mock_builder.store.data_tables[0]
 
     assert table.info.max_size == 1000
-    assert table.info.name == "trainer"
+    assert table.info.name == "trainer_0"
     assert type(table.info.signature).__name__ == "Transition"
 
 
@@ -174,5 +174,5 @@ def test_on_policy_data_server_with_sequence_length(
     table = mock_builder.store.data_tables[0]
 
     assert table.info.max_size == 1000
-    assert table.info.name == "trainer"
+    assert table.info.name == "trainer_0"
     assert type(table.info.signature).__name__ == "Step"
