@@ -124,9 +124,9 @@ def test_on_building_program_nodes_multi_process(
 
     assert len(set(start_keys)) == len(start_keys)
     assert len(set(end_keys)) == len(end_keys)
-        
     assert not hasattr(mock_builder.store, "base_key")
 
+    # Other checks
     assert isinstance(mock_builder.store.program, Launcher)
 
     assert list(mock_builder.store.program._program._groups.keys()) == [
