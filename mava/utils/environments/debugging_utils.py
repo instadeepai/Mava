@@ -19,6 +19,7 @@ import dm_env
 
 from mava.utils.debugging.environments import TwoStepEnv, switch_game
 from mava.utils.debugging.make_env import make_debugging_env
+from mava.utils.jax_training_utils import set_jax_double_precision
 from mava.wrappers.debugging_envs import (
     DebuggingEnvWrapper,
     SwitchGameWrapper,
@@ -38,6 +39,10 @@ def make_environment(
 ) -> dm_env.Environment:
 
     assert action_space == "continuous" or action_space == "discrete"
+
+    if action_space == "discrete":
+        # Env uses int64 action space due to the use of spac.Discrete.
+        set_jax_double_precision()
 
     del evaluation
 

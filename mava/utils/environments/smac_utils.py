@@ -16,6 +16,8 @@
 """Utils for SMAC environment."""
 from typing import Any, Optional
 
+from mava.utils.jax_training_utils import set_jax_double_precision
+
 try:
     from smac.env import StarCraft2Env
 
@@ -38,6 +40,9 @@ if _found_smac:
         evaluation: bool = False,
         random_seed: Optional[int] = None,
     ) -> Any:
+
+        # Env uses int64 action space due to the use of spac.Discrete.
+        set_jax_double_precision()
         env = StarCraft2Env(map_name=map_name, seed=random_seed)
 
         env = SMACWrapper(env)
