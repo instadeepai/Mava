@@ -116,9 +116,15 @@ def test_on_building_program_nodes_multi_process(
     distributor.on_building_program_nodes(builder=mock_builder)
 
     # Check that all the keys have different init values
-    keys = [mock_builder.store.data_key, mock_builder.store.param_key, mock_builder.store.eval_key] + \
-    list(mock_builder.store.executor_keys) + \
-    list(mock_builder.store.trainer_keys)
+    keys = (
+        [
+            mock_builder.store.data_key,
+            mock_builder.store.param_key,
+            mock_builder.store.eval_key,
+        ]
+        + list(mock_builder.store.executor_keys)
+        + list(mock_builder.store.trainer_keys)
+    )
     start_keys = [float(key[0]) for key in keys]
     end_keys = [float(key[1]) for key in keys]
 
