@@ -184,12 +184,9 @@ class Builder(SystemBuilder, BuilderHookMixin):
         """
 
         # Set the rng key for the trainer.
-        if len(self.store.trainer_keys) > 1:
-            self.store.base_key = self.store.trainer_keys[
-                int(trainer_id.split("_")[-1])
-            ]
-        else:
-            self.store.base_key = self.store.trainer_keys[0]
+        self.store.base_key = self.store.trainer_keys[
+            int(trainer_id.split("_")[-1])
+        ]
 
         self.store.trainer_id = trainer_id
         self.store.data_server_client = data_server_client

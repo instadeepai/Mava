@@ -279,7 +279,7 @@ def test_single_trainer_shared_weights_fixed_sampling(
     assert builder.store.table_network_config == {
         "trainer": ["network_agent", "network_agent", "network_agent"]
     }
-    assert builder.store.trainer_networks == {"trainer": ["network_agent"]}
+    assert builder.store.trainer_networks == {"trainer_0": ["network_agent"]}
     assert builder.store.networks == "network_initialized"
 
 

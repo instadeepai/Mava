@@ -778,7 +778,7 @@ class MockTrainer(Component):
         builder.store.table_network_config = {
             "trainer": ["network_agent", "network_agent", "network_agent"]
         }
-        builder.store.trainer_networks = {"trainer": ["network_agent"]}
+        builder.store.trainer_networks = {"trainer_0": ["network_agent"]}
 
     def on_building_trainer(self, builder: SystemBuilder) -> None:
         """_summary_"""
