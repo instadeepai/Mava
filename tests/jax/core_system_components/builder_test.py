@@ -40,6 +40,12 @@ class TestBuilder(HookOrderTracking, Builder):
         self.store.system_executor = "system_executor"
         self.store.adder = "adder"
 
+        self.store.data_key = [1234, 1234]
+        self.store.eval_key = [1234, 1234]
+        self.store.param_key = [1234, 1234]
+        self.store.executor_keys = [[1234, 1234]]
+        self.store.trainer_keys = [[1234, 1234]]
+
 
 @pytest.fixture
 def test_builder() -> Builder:
@@ -95,7 +101,7 @@ def test_executor_store_when_is_evaluator(test_builder: TestBuilder) -> None:
 
 def test_executor_store_when_executor(test_builder: TestBuilder) -> None:
     """Test that store is handled correctly in executor() when it's an executor."""
-    executor_id = "executor"
+    executor_id = "executor_0"
     data_server_client = "data_server_client"
     parameter_server_client = "parameter_server_client"
     assert (
@@ -119,7 +125,7 @@ def test_executor_store_when_executor(test_builder: TestBuilder) -> None:
 
 def test_trainer_store(test_builder: TestBuilder) -> None:
     """Test that store is handled correctly in trainer()."""
-    trainer_id = "trainer"
+    trainer_id = "trainer_0"
     data_server_client = "data_server_client"
     parameter_server_client = "parameter_server_client"
 
@@ -173,7 +179,7 @@ def test_executor_hook_order_when_executor(test_builder: TestBuilder) -> None:
     """Test if executor() hooks are called in the correct order when executor."""
     test_builder.reset_hook_list()
     test_builder.executor(
-        executor_id="executor", data_server_client="", parameter_server_client=""
+        executor_id="executor_0", data_server_client="", parameter_server_client=""
     )
     assert test_builder.hook_list == [
         "on_building_executor_start",
@@ -209,7 +215,7 @@ def test_trainer_hook_order(test_builder: TestBuilder) -> None:
     """Test if trainer() hooks are called in the correct order."""
     test_builder.reset_hook_list()
     test_builder.trainer(
-        trainer_id="trainer", data_server_client="", parameter_server_client=""
+        trainer_id="trainer_0", data_server_client="", parameter_server_client=""
     )
     assert test_builder.hook_list == [
         "on_building_trainer_start",

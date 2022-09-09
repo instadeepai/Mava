@@ -97,7 +97,7 @@ class SingleTrainerInit(BaseTrainerInit):
 
         # Setup trainer_networks
 
-        builder.store.trainer_networks = {"trainer": unique_net_keys}
+        builder.store.trainer_networks = {"trainer_0": unique_net_keys}
 
         # Get all the unique trainer network keys
         all_trainer_net_keys = []

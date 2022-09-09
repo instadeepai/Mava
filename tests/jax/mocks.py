@@ -692,10 +692,10 @@ class MockNetworks(Component):
         """Summary"""
 
         # Setup the jax key for network initialisations
-        builder.store.key = jax.random.PRNGKey(self.config.seed)
+        builder.store.base_key = jax.random.PRNGKey(self.config.seed)
 
         # Build network function here
-        network_key, builder.store.key = jax.random.split(builder.store.key)
+        network_key, builder.store.base_key = jax.random.split(builder.store.base_key)
         builder.store.network_factory = (
             lambda: self.config.network_factory(  # type: ignore
                 environment_spec=builder.store.ma_environment_spec,
@@ -776,9 +776,9 @@ class MockTrainer(Component):
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """TODO: Add description here."""
         builder.store.table_network_config = {
-            "trainer": ["network_agent", "network_agent", "network_agent"]
+            "trainer_0": ["network_agent", "network_agent", "network_agent"]
         }
-        builder.store.trainer_networks = {"trainer": ["network_agent"]}
+        builder.store.trainer_networks = {"trainer_0": ["network_agent"]}
 
     def on_building_trainer(self, builder: SystemBuilder) -> None:
         """_summary_"""
@@ -816,16 +816,23 @@ class MockDistributor(Component):
 
     def on_building_program_nodes(self, builder: SystemBuilder) -> None:
         """_summary_"""
+        builder.store.data_key = [1234, 1234]
+        builder.store.eval_key = [1234, 1234]
+        builder.store.param_key = [1234, 1234]
+        builder.store.executor_keys = [[1234, 1234]]
+        builder.store.trainer_keys = [[1234, 1234]]
+
         data_server = builder.data_server()
+
         parameter_server = builder.parameter_server()
 
         trainer = builder.trainer(
-            trainer_id="trainer",
+            trainer_id="trainer_0",
             data_server_client=data_server,
             parameter_server_client=parameter_server,
         )
         executor = builder.executor(
-            executor_id="executor",
+            executor_id="executor_0",
             data_server_client=data_server,
             parameter_server_client=parameter_server,
         )
