@@ -16,11 +16,12 @@
 """A simple multi-agent-system-environment training loop."""
 
 import time
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 import acme
 import dm_env
 import jax
+import jax.numpy as jnp
 import numpy as np
 from acme.utils import counting, loggers
 
@@ -378,9 +379,11 @@ class ParallelEnvironmentLoop(acme.core.Worker):
     ) -> None:
         pass
 
-    def get_counts(self) -> counting.Counter:
+    def get_counts(self) -> Union[counting.Counter, Dict[str, jnp.ndarray]]:
         """Get latest counts"""
-        if hasattr(self._executor, "_counts"):
+        if hasattr(self._executor, "store"):
+            counts = self._executor.store.executor_counts
+        elif hasattr(self._executor, "_counts"):
             counts = self._executor._counts
         else:
             counts = self._counter.get_counts()
@@ -551,7 +554,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 num_steps is not None and step_count >= num_steps
             )
 
-        def should_run_loop(eval_condtion: Tuple) -> bool:
+        def should_run_loop(eval_condition: Tuple) -> bool:
             """Check if the eval loop should run in current step.
 
             Args:
@@ -562,12 +565,12 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             """
             should_run_loop = False
             eval_interval_key, eval_interval_count = eval_condition
-            counts = self._executor.store.executor_counts
+            counts = self.get_counts()
 
             if counts:
                 count = counts[eval_interval_key]
-                # We run eval loops around every eval_interval_count (not exactly every
-                # eval_interval_count due to latency in getting updated counts).
+                # We run eval loops around every eval_interval_count (not exactly
+                # every eval_interval_count due to latency in getting updated counts).
                 should_run_loop = (
                     (count - self._last_evaluator_run_t) / eval_interval_count
                 ) >= 1.0
@@ -582,8 +585,8 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
         episode_count, step_count = 0, 0
 
-        # Currently, we only use intervals for eval loops.
-        # Boolean for when evaluation loops should be run
+        # TODO (Ruan): Checking whether we are using Jax or TF here
+        # this should be removed once we deprecate TF.
         if hasattr(self._executor, "store"):
             environment_loop_schedule = self._executor._evaluator and (
                 self._executor.store._evaluation_interval is not None
@@ -603,6 +606,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
         while not should_terminate(episode_count, step_count):
             if (not environment_loop_schedule) or (should_run_loop(eval_condition)):
+                # TODO (Ruan): Remove store check once TF is deprecated.
                 if environment_loop_schedule and hasattr(self._executor, "store"):
                     # Get first result dictionary
                     results = self.run_episode()
