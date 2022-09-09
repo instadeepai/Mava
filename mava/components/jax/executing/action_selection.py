@@ -217,12 +217,6 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             for network in executor.store.agent_net_keys.values()
         }
 
-        # Initialise the 
-        if not executor.store.policy_states:
-            for agent in self.store.agent_net_keys.keys():
-                network = self.store.agent_net_keys(agent)
-                executor.store.policy_states[agent] = executor.store.networks["networks"][network].get_init_state()
-
         (
             executor.store.actions_info,
             executor.store.policies_info,
@@ -303,6 +297,6 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
                 actions_info[agent], policies_info[agent], new_policy_states[agent], key = select_action(
                     observation, current_params[agent_net_keys[agent]], policy_states[agent], network, key
                 )
-            return actions_info, policies_info, policy_states, key
+            return actions_info, policies_info, new_policy_states, key
 
         executor.store.select_actions_fn = jax.jit(select_actions)
