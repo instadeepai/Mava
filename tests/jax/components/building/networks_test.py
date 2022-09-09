@@ -105,9 +105,9 @@ def test_key_in_store(
     Returns:
         None.
     """
-    assert not hasattr(test_builder.store, "key")
+    assert not hasattr(test_builder.store, "base_key")
     test_default_networks.on_building_init_start(test_builder)
-    assert hasattr(test_builder.store, "key")
+    assert hasattr(test_builder.store, "base_key")
     assert isinstance(
         test_builder.store.base_key, jax.random.PRNGKeyArray
     ) or isinstance(test_builder.store.base_key, jax.numpy.DeviceArray)
