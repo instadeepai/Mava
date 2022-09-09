@@ -112,9 +112,9 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
         (
             executor.store.actions_info,
             executor.store.policies_info,
-            executor.store.key,
+            executor.store.base_key,
         ) = executor.store.select_actions_fn(
-            executor.store.observations, current_agent_params, executor.store.key
+            executor.store.observations, current_agent_params, executor.store.base_key
         )
 
     # NB: Not currently used. TODO Deprecate in future.
