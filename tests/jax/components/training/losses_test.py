@@ -87,7 +87,7 @@ def mock_trainer() -> Trainer:
         }
     }
 
-    key = jax.random.PRNGKey(5)
+    base_key = jax.random.PRNGKey(5)
     action_info = "action_info_test"
     policy_info = "policy_info_test"
 
@@ -112,7 +112,7 @@ def mock_trainer() -> Trainer:
             "agent_1": "network_agent",
             "agent_2": "network_agent",
         },
-        key=key,
+        base_key=base_key,
         action_info=action_info,
         policy_info=policy_info,
     )
@@ -251,7 +251,7 @@ def mock_separate_networks_trainer() -> Trainer:
         }
     }
 
-    key = jax.random.PRNGKey(5)
+    base_key = jax.random.PRNGKey(5)
     action_info = "action_info_test"
     policy_info = "policy_info_test"
 
@@ -276,7 +276,7 @@ def mock_separate_networks_trainer() -> Trainer:
             "agent_1": "network_agent",
             "agent_2": "network_agent",
         },
-        key=key,
+        base_key=base_key,
         action_info=action_info,
         policy_info=policy_info,
     )

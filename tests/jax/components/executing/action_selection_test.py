@@ -99,7 +99,7 @@ class MockExecutor(Executor):
                 agent_net_keys["agent_2"]: SimpleNamespace(get_action=get_action),
             }
         }
-        key = jax.random.PRNGKey(5)
+        base_key = jax.random.PRNGKey(5)
         action_info = "action_info_test"
         policy_info = "policy_info_test"
 
@@ -110,7 +110,7 @@ class MockExecutor(Executor):
             agent="agent_0",
             networks=networks,
             agent_net_keys=agent_net_keys,
-            key=key,
+            base_key=base_key,
             action_info=action_info,
             policy_info=policy_info,
         )
