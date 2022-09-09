@@ -19,6 +19,7 @@ from multiprocessing.connection import Client
 from types import SimpleNamespace
 from typing import Any, List
 
+import jax
 import pytest
 from reverb import client as reverb_client
 from reverb import item_selectors, rate_limiters
@@ -35,14 +36,18 @@ class MockBuilder(Builder):
 
         Attributes:
             trainer_network
+            key: rng key
             program: used to test on_building_launch method
             test_launch: used to test on_building_launch method
             test: used to test on_building_program_nodes method
             test_values: used to test on_building_program_nodes method
         """
         trainer_networks = {"trainer": ["network_agent"]}
+        base_key = jax.random.PRNGKey(1234)
         program = SimpleNamespace(launch=self.launch)
-        store = SimpleNamespace(trainer_networks=trainer_networks, program=program)
+        store = SimpleNamespace(
+            trainer_networks=trainer_networks, base_key=base_key, program=program
+        )
         self.store = store
         self.program_launched = False
 
@@ -110,6 +115,24 @@ def test_on_building_program_nodes_multi_process(
     """Test on_building_program_nodes for multi_process distributor"""
     distributor.on_building_program_nodes(builder=mock_builder)
 
+    # Check that all the keys have different init values
+    keys = (
+        [
+            mock_builder.store.data_key,
+            mock_builder.store.param_key,
+            mock_builder.store.eval_key,
+        ]
+        + list(mock_builder.store.executor_keys)
+        + list(mock_builder.store.trainer_keys)
+    )
+    start_keys = [float(key[0]) for key in keys]
+    end_keys = [float(key[1]) for key in keys]
+
+    assert len(set(start_keys)) == len(start_keys)
+    assert len(set(end_keys)) == len(end_keys)
+    assert not hasattr(mock_builder.store, "base_key")
+
+    # Other checks
     assert isinstance(mock_builder.store.program, Launcher)
 
     assert list(mock_builder.store.program._program._groups.keys()) == [
