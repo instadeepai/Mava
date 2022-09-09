@@ -776,7 +776,7 @@ class MockTrainer(Component):
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """TODO: Add description here."""
         builder.store.table_network_config = {
-            "trainer": ["network_agent", "network_agent", "network_agent"]
+            "trainer_0": ["network_agent", "network_agent", "network_agent"]
         }
         builder.store.trainer_networks = {"trainer_0": ["network_agent"]}
 
@@ -827,7 +827,7 @@ class MockDistributor(Component):
         parameter_server = builder.parameter_server()
 
         trainer = builder.trainer(
-            trainer_id="trainer",
+            trainer_id="trainer_0",
             data_server_client=data_server,
             parameter_server_client=parameter_server,
         )

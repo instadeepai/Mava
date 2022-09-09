@@ -125,7 +125,7 @@ def test_executor_store_when_executor(test_builder: TestBuilder) -> None:
 
 def test_trainer_store(test_builder: TestBuilder) -> None:
     """Test that store is handled correctly in trainer()."""
-    trainer_id = "trainer"
+    trainer_id = "trainer_0"
     data_server_client = "data_server_client"
     parameter_server_client = "parameter_server_client"
 

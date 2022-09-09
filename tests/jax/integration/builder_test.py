@@ -103,7 +103,7 @@ def test_builder(
     # assert eval_exec_param == exec_param
 
     assert isinstance(trainer, Trainer)
-    # assert train_id == "trainer"
+    # assert train_id == "trainer_0"
     # assert train_logger == 1
     # assert train_dataset == 5
     # assert train_param_client == (2, "param")
