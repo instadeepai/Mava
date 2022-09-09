@@ -494,7 +494,9 @@ def test_custom_trainer_init_shared_weights_fixed_sampling(
     """
 
     trainer_init = CustomTrainerInit(
-        config=CustomTrainerInitConfig(trainer_networks={"trainer_0": ["network_agent"]})
+        config=CustomTrainerInitConfig(
+            trainer_networks={"trainer_0": ["network_agent"]}
+        )
     )
 
     builder = mock_builder_shared_weights_fixed_sampling
