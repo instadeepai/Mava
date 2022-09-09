@@ -96,6 +96,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
         self.on_execution_observe_end()
 
+    # NB: Not currently used. TODO Deprecate in future.
     def select_action(
         self,
         agent: str,
@@ -142,6 +143,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         Returns:
             Action and policy info for all agents in the system.
         """
+
         self.store.observations = observations
 
         self.on_execution_select_actions_start()

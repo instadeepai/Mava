@@ -16,6 +16,7 @@
 """Utils for making Flatland environment."""
 from typing import Optional
 
+from mava.utils.jax_training_utils import set_jax_double_precision
 from mava.wrappers.env_preprocess_wrappers import (
     ConcatAgentIdToObservation,
     ConcatPrevActionToObservation,
@@ -139,6 +140,9 @@ if _found_flatland:
         """Loads a flatand environment and wraps it using the flatland wrapper"""
 
         del evaluation  # since it has same behaviour for both train and eval
+
+        # Env uses int64 action space due to the use of spac.Discrete.
+        set_jax_double_precision()
 
         env = _create_rail_env_with_tree_obs(
             n_agents=n_agents,
