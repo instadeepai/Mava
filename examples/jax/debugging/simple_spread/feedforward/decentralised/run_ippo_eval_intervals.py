@@ -105,6 +105,8 @@ def main(_: Any) -> None:
         num_executors=1,
         multi_process=True,
         clip_value=False,
+        evaluation_interval={"executor_steps": 2000},
+        evaluation_duration=32,
     )
 
     # Launch the system.

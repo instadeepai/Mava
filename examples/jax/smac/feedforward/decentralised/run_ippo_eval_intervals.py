@@ -12,10 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Run feedforward MADQN on SMAC."""
 
-"""Example running IPPO on debug MPE environments."""
+
 import functools
-import os
 from datetime import datetime
 from typing import Any
 
@@ -23,21 +23,14 @@ import optax
 from absl import app, flags
 
 from mava.systems.jax import ippo
-from mava.utils.environments import debugging_utils
+from mava.utils.environments.smac_utils import make_environment
 from mava.utils.loggers import logger_utils
 
-# Without this flag, JAX uses the whole GPU from the beginning and our trainer crashes.
-os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
-)
-flags.DEFINE_string(
-    "action_space",
-    "discrete",
-    "Environment action space type (str).",
+    "map_name",
+    "3m",
+    "Starcraft 2 micromanagement map name (str).",
 )
 
 flags.DEFINE_string(
@@ -49,17 +42,13 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Run main script
+    """Example running feedforward MADQN on SMAC environment."""
 
-    Args:
-        _ : _
-    """
-    # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
-    )
+    # WARNING (dries): This code has not been run yet. There might still
+    # be runtime errors in the code.
+
+    # Environment
+    environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
 
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
@@ -104,7 +93,8 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        clip_value=False,
+        evaluation_interval={"executor_steps": 10000},
+        evaluation_duration=32,
     )
 
     # Launch the system.
