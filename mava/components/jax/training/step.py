@@ -260,6 +260,7 @@ class MAPGWithTrustRegionStep(Step):
                     states.params[net_key], o
                 )
                 behavior_values = jnp.reshape(behavior_values, reward.shape[0:2])
+                behavior_values = jax.lax.stop_gradient(behavior_values)
                 return behavior_values
 
             agent_nets = trainer.store.trainer_agent_net_keys
