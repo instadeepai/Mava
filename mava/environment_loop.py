@@ -525,7 +525,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         self._logger.write(results)
         return results
 
-    def run(
+    def run(  # noqa: C901
         self, num_episodes: Optional[int] = None, num_steps: Optional[int] = None
     ) -> None:
         """Perform the run loop.
@@ -608,6 +608,10 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             if (not environment_loop_schedule) or (should_run_loop(eval_condition)):
                 # TODO (Ruan): Remove store check once TF is deprecated.
                 if environment_loop_schedule and hasattr(self._executor, "store"):
+                    # Get old battles won for true SMAC winrate
+                    if hasattr(self._environment, "battles_won"):
+                        old_battles_won = self._environment.battles_won
+
                     # Get first result dictionary
                     results = self.run_episode()
                     episode_count += 1
@@ -621,6 +625,15 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
                     # compute the mean over all evaluation runs
                     results = jax.tree_map(lambda x: x / evaluation_duration, results)
+
+                    # Compute true win rate for SMAC
+                    if hasattr(self._environment, "battles_won"):
+                        win_rate = (
+                            self._environment.battles_won - old_battles_won
+                        ) / evaluation_duration
+
+                        results["win_rate"] = win_rate
+
                     self._logger.write(results)
 
                 else:
