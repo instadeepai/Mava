@@ -84,8 +84,8 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # Optimizer.
-    optimizer = optax.chain(
+    # Optimiser.
+    optimiser = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
@@ -98,7 +98,7 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         experiment_path=experiment_path,
-        optimizer=optimizer,
+        optimiser=optimiser,
         run_evaluator=True,
         sample_batch_size=5,
         num_epochs=15,

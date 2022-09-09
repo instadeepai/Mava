@@ -82,8 +82,8 @@ def main(_: Any) -> None:
         time_stamp=FLAGS.mava_id,
         time_delta=log_every,
     )
-    # Optimizer.
-    optimizer = optax.chain(
+    # Optimiser.
+    optimiser = optax.chain(
         optax.clip_by_global_norm(40.0),
         optax.adam(1e-4),
     )
@@ -93,7 +93,7 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         experiment_path=experiment_path,
-        optimizer=optimizer,
+        optimiser=optimiser,
         multi_process=False,
         run_evaluator=True,
         num_executors=1,
