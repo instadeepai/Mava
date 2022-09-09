@@ -215,7 +215,7 @@ def test_trainer_hook_order(test_builder: TestBuilder) -> None:
     """Test if trainer() hooks are called in the correct order."""
     test_builder.reset_hook_list()
     test_builder.trainer(
-        trainer_id="trainer", data_server_client="", parameter_server_client=""
+        trainer_id="trainer_0", data_server_client="", parameter_server_client=""
     )
     assert test_builder.hook_list == [
         "on_building_trainer_start",
