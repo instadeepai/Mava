@@ -154,7 +154,7 @@ class MockTrainer(Trainer):
             networks=networks,
             gae_fn=gae_advantages,
             opt_states=opt_states,
-            key=jax.random.PRNGKey(5),
+            base_key=jax.random.PRNGKey(5),
             epoch_update_fn=epoch_update,
             global_config=SimpleNamespace(
                 num_minibatches=1, num_epochs=2, sample_batch_size=2, sequence_length=3
@@ -212,7 +212,7 @@ class MockTrainerSeparateNetworks(Trainer):
             gae_fn=gae_advantages,
             policy_opt_states=copy.copy(opt_states),
             critic_opt_states=copy.copy(opt_states),
-            key=jax.random.PRNGKey(5),
+            base_key=jax.random.PRNGKey(5),
             epoch_update_fn=epoch_update,
             global_config=SimpleNamespace(
                 num_minibatches=1, num_epochs=2, sample_batch_size=2, sequence_length=3
