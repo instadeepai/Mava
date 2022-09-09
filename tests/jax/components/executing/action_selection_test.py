@@ -67,7 +67,7 @@ def mock_empty_executor() -> Executor:
         observations={},
         agent_net_keys={},
         select_actions_fn=select_actions,
-        key=42,
+        base_key=42,
     )
     return Executor(store=store)
 
