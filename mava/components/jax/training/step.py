@@ -162,7 +162,7 @@ class Step(Component):
         TrainerDataset required for config sample_batch_size.
         BaseTrainerInit required to set up trainer.store.networks
         and trainer.store.trainer_agent_net_keys.
-        Networks required to set up trainer.store.key.
+        Networks required to set up trainer.store.base_key.
 
         Returns:
             List of required component classes.
@@ -369,7 +369,7 @@ class MAPGWithTrustRegionStep(Step):
             networks = trainer.store.networks["networks"]
             params = {net_key: networks[net_key].params for net_key in networks.keys()}
             opt_states = trainer.store.opt_states
-            random_key, _ = jax.random.split(trainer.store.key)
+            random_key, _ = jax.random.split(trainer.store.base_key)
 
             states = TrainingState(
                 params=params, opt_states=opt_states, random_key=random_key
@@ -382,7 +382,7 @@ class MAPGWithTrustRegionStep(Step):
             # The variable client might lose reference to it when checkpointing.
             # We also need to add the optimizer and random_key to the variable
             # server.
-            trainer.store.key = new_states.random_key
+            trainer.store.base_key = new_states.random_key
 
             networks = trainer.store.networks["networks"]
             params = {net_key: networks[net_key].params for net_key in networks.keys()}
@@ -654,7 +654,7 @@ class MAPGWithTrustRegionStepSeparateNetworks(Step):
             }
             policy_opt_states = trainer.store.policy_opt_states
             critic_opt_states = trainer.store.critic_opt_states
-            random_key, _ = jax.random.split(trainer.store.key)
+            random_key, _ = jax.random.split(trainer.store.base_key)
 
             states = TrainingStateSeparateNetworks(
                 policy_params=policy_params,
@@ -671,7 +671,7 @@ class MAPGWithTrustRegionStepSeparateNetworks(Step):
             # The variable client might lose reference to it when checkpointing.
             # We also need to add the optimizer and random_key to the variable
             # server.
-            trainer.store.key = new_states.random_key
+            trainer.store.base_key = new_states.random_key
 
             # These updates must remain separate for loops since the policy and critic
             # networks could have different layers.

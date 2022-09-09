@@ -17,6 +17,8 @@
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Type, Union
 
+import jax
+
 from mava.callbacks import Callback
 from mava.components.jax import Component
 from mava.components.jax.training.trainer import BaseTrainerInit
@@ -67,6 +69,27 @@ class Distributor(Component):
             single_process_max_episodes=self.config.single_process_max_episodes,
             is_test=self.config.is_test,
         )
+
+        # Generate keys for the data_server, parameter_server and evaluator.
+        (
+            base_key,
+            builder.store.data_key,
+            builder.store.param_key,
+            builder.store.eval_key,
+        ) = jax.random.split(builder.store.base_key, 4)
+
+        # Generate keys for the executors
+        keys = jax.random.split(base_key, 1 + self.config.num_executors)
+        base_key = keys[0]
+        builder.store.executor_keys = keys[1:]
+
+        # Generate keys for the trainers
+        builder.store.trainer_keys = jax.random.split(
+            base_key, len(builder.store.trainer_networks.keys())
+        )
+
+        # Delete the builder key as it should not be used directly.
+        del builder.store.base_key
 
         # tables node
         data_server = builder.store.program.add(
