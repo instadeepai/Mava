@@ -584,23 +584,26 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
         # Currently, we only use intervals for eval loops.
         # Boolean for when evaluation loops should be run
-        environment_loop_schedule = self._executor._evaluator and (
-            self._executor.store._evaluation_interval is not None
-        )
-
-        if environment_loop_schedule:
-            eval_condition = check_count_condition(
-                self._executor.store._evaluation_interval
+        if hasattr(self._executor, "store"):
+            environment_loop_schedule = self._executor._evaluator and (
+                self._executor.store._evaluation_interval is not None
             )
-            evaluation_duration = self._executor.store._evaluation_duration
+
+            if environment_loop_schedule:
+                eval_condition = check_count_condition(
+                    self._executor.store._evaluation_interval
+                )
+                evaluation_duration = self._executor.store._evaluation_duration
+        else:
+            environment_loop_schedule = (
+                self._executor._evaluator and self._executor._interval
+            )
+            if environment_loop_schedule:
+                eval_condition = check_count_condition(self._executor._interval)
 
         while not should_terminate(episode_count, step_count):
             if (not environment_loop_schedule) or (should_run_loop(eval_condition)):
-
-                if (
-                    self._executor._evaluator
-                    and self._executor.store._evaluation_interval is not None
-                ):
+                if environment_loop_schedule and hasattr(self._executor, "store"):
                     # Get first result dictionary
                     results = self.run_episode()
                     episode_count += 1
