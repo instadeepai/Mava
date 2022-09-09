@@ -33,7 +33,7 @@ def get_dataset(data_server: reverb.client.Client) -> dataset_ops.DatasetV1Adapt
     """Batches 2 sequences to get samples"""
     dataset = reverb.TrajectoryDataset.from_table_signature(
         server_address=data_server._server_address,
-        table="trainer",
+        table="trainer_0",
         max_in_flight_samples_per_worker=10,
     )
     dataset = dataset.batch(2)
@@ -50,8 +50,8 @@ def test_data_server_single_process(test_system_sp: System) -> None:
         trainer,
     ) = test_system_sp._builder.store.system_build
 
-    table_trainer = data_server.server_info()["trainer"]
-    assert table_trainer.name == "trainer"
+    table_trainer = data_server.server_info()["trainer_0"]
+    assert table_trainer.name == "trainer_0"
     assert table_trainer.max_size == 5000  # max_queue_size
     assert table_trainer.max_times_sampled == 1
 
@@ -92,7 +92,7 @@ def test_data_server_single_process(test_system_sp: System) -> None:
     for _ in range(0, 5):
         executor.run_episode()
 
-    table_trainer = data_server.server_info()["trainer"]
+    table_trainer = data_server.server_info()["trainer_0"]
     assert table_trainer.num_episodes == 5  # 5 episodes
     assert table_trainer.num_unique_samples != 0
 
