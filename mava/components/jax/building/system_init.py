@@ -196,7 +196,7 @@ class RandomSamplingSystemInit(BaseSystemInit):
         builder.store.net_keys_to_ids = {
             net_key: i for i, net_key in enumerate(builder.store.unique_net_keys)
         }
-        
+
 
 @dataclass
 class CustomSamplingSystemInitConfig(BaseSystemInitConfig):
@@ -252,12 +252,3 @@ class CustomSamplingSystemInit(BaseSystemInit):
         builder.store.net_keys_to_ids = {
             net_key: i for i, net_key in enumerate(builder.store.unique_net_keys)
         }
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return CustomSamplingSystemInitConfig
