@@ -85,12 +85,6 @@ class DummyComponent(Component):
 
         return "dummy_component_name"
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Returns component config class"""
-
-        return ComponentConfig_1
-
 
 @pytest.fixture
 def dummy_component_config_0() -> ComponentConfig_0:

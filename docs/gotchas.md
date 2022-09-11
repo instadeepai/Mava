@@ -20,3 +20,23 @@ In order to have access to the underlying jax.numpy arrays that are in these var
 with jax.disable_jit():
     pdb.set_trace()
 ```
+
+## Components
+When creating components, it is important to include variable types for both the config class and component init function. This is necessary because Mava uses it to determine which config variables are available in the system. In the example below, we provide the types for the config variables and also the config class variable inside the `Distributor` component. For the config class variable we use the `DistributorConfig` as the type, which points the system to the config class that is used.
+
+```python
+@dataclass
+class DistributorConfig:
+    num_executors: int = 1
+    multi_process: bool = True
+    nodes_on_gpu: Union[List[str], str] = "trainer"
+    run_evaluator: bool = True
+    distributor_name: str = "System"
+    terminal: str = "current_terminal"
+    single_process_max_episodes: Optional[int] = None
+    is_test: Optional[bool] = False
+
+
+class Distributor(Component):
+    def __init__(self, config: DistributorConfig = DistributorConfig()):
+```

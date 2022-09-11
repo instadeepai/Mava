@@ -161,16 +161,6 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
 
         trainer.store.minibatch_update_fn = model_update_minibatch
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MAPGMinibatchUpdateConfig
-
-
 class EpochUpdate(Utility):
     @abc.abstractmethod
     def __init__(self, config: Any) -> None:
@@ -268,15 +258,6 @@ class MAPGEpochUpdate(EpochUpdate):
             return (new_key, new_params, new_opt_states, batch), metrics
 
         trainer.store.epoch_update_fn = model_update_epoch
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MAPGEpochUpdateConfig
 
 
 #######################
@@ -451,15 +432,6 @@ class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
 
         trainer.store.minibatch_update_fn = model_update_minibatch
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MAPGMinibatchUpdateSeparateNetworksConfig
-
 
 @dataclass
 class MAPGEpochUpdateSeparateNetworksConfig:
@@ -558,12 +530,3 @@ class MAPGEpochUpdateSeparateNetworks(EpochUpdate):
             ), metrics
 
         trainer.store.epoch_update_fn = model_update_epoch
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MAPGEpochUpdateSeparateNetworksConfig

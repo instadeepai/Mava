@@ -195,16 +195,6 @@ class MAPGWithTrustRegionClippingLoss(Loss):
         # Save the gradient funciton.
         trainer.store.grad_fn = loss_grad_fn
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MAPGTrustRegionClippingLossConfig
-
-
 @dataclass
 class MAPGTrustRegionClippingLossSeparateNetworksConfig:
     clipping_epsilon: float = 0.2
@@ -397,12 +387,3 @@ class MAPGWithTrustRegionClippingLossSeparateNetworks(Loss):
         # Save the gradient funcitons.
         trainer.store.policy_grad_fn = policy_loss_grad_fn
         trainer.store.critic_grad_fn = critic_loss_grad_fn
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MAPGTrustRegionClippingLossSeparateNetworksConfig

@@ -321,12 +321,3 @@ class CustomTrainerInit(BaseTrainerInit):
             agent: trainer.store.trainer_table_entry[a_i]
             for a_i, agent in enumerate(trainer.store.trainer_agents)
         }
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return CustomTrainerInitConfig
