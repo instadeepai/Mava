@@ -246,8 +246,8 @@ def mock_state_and_trainer_separate_networks(
         mock_trainer: mock_trainer_separate_networks
     """
     mini_batch_update = MAPGMinibatchUpdate()
-    mini_batch_update.config.policy_optimizer = copy.copy(mock_optimizer)
-    mini_batch_update.config.critic_optimizer = copy.copy(mock_optimizer)
+    mini_batch_update.config.policy_optimiser = copy.copy(mock_optimizer)
+    mini_batch_update.config.critic_optimiser = copy.copy(mock_optimizer)
     mini_batch_update.on_training_utility_fns(trainer=mock_trainer_separate_networks)
 
     random_key = jax.random.PRNGKey(5)
@@ -347,18 +347,18 @@ def test_on_training_utility_fns_empty_config_optimizer_sep_netwoks(
         mock_trainer_separate_networks: Trainer
     """
     mini_batch_update = MAPGMinibatchUpdate()
-    mini_batch_update.config.policy_optimizer = None
-    mini_batch_update.config.critic_optimizer = None
+    mini_batch_update.config.policy_optimiser = None
+    mini_batch_update.config.critic_optimiser = None
     mini_batch_update.on_training_utility_fns(trainer=mock_trainer_separate_networks)
 
-    assert mock_trainer_separate_networks.store.policy_optimizer is not None
+    assert mock_trainer_separate_networks.store.policy_optimiser is not None
     assert isinstance(
-        mock_trainer_separate_networks.store.policy_optimizer,
+        mock_trainer_separate_networks.store.policy_optimiser,
         optax.GradientTransformation,
     )
-    assert mock_trainer_separate_networks.store.critic_optimizer is not None
+    assert mock_trainer_separate_networks.store.critic_optimiser is not None
     assert isinstance(
-        mock_trainer_separate_networks.store.critic_optimizer,
+        mock_trainer_separate_networks.store.critic_optimiser,
         optax.GradientTransformation,
     )
 
@@ -464,12 +464,12 @@ def test_on_training_utility_fns_separate_networks(
         mock_optimizer: Optimizer
     """
     mini_batch_update = MAPGMinibatchUpdate()
-    mini_batch_update.config.policy_optimizer = copy.copy(mock_optimizer)
-    mini_batch_update.config.critic_optimizer = copy.copy(mock_optimizer)
+    mini_batch_update.config.policy_optimiser = copy.copy(mock_optimizer)
+    mini_batch_update.config.critic_optimiser = copy.copy(mock_optimizer)
     mini_batch_update.on_training_utility_fns(trainer=mock_trainer_separate_networks)
 
-    assert mock_trainer_separate_networks.store.policy_optimizer.initialized == "Done"
-    assert mock_trainer_separate_networks.store.critic_optimizer.initialized == "Done"
+    assert mock_trainer_separate_networks.store.policy_optimiser.initialized == "Done"
+    assert mock_trainer_separate_networks.store.critic_optimiser.initialized == "Done"
 
     for net_key in mock_trainer_separate_networks.store.networks["networks"].keys():
         assert mock_trainer_separate_networks.store.policy_opt_states[net_key] == list(

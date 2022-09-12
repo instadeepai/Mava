@@ -17,6 +17,49 @@ from mava.systems.jax.trainer import Trainer
 # SEPARATE NETWORKS TEST
 ########################
 
+class MockNet:
+    """Creates a mock network for loss function"""
+
+    @staticmethod
+    def apply(
+        parameters: Dict[str, jnp.ndarray], observation: jnp.ndarray
+    ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+        """Mock function to apply the network to training data"""
+        return observation, parameters["mlp/~/linear_0"]["w"]
+
+
+class MockPolicyNet:
+    """Creates a mock policy network for loss function"""
+
+    @staticmethod
+    def apply(
+        parameters: Dict[str, jnp.ndarray], observation: jnp.ndarray
+    ) -> jnp.ndarray:
+        """Mock function to apply the network to training data"""
+        return observation
+
+
+class MockCriticNet:
+    """Creates a mock critic network for loss function"""
+
+    @staticmethod
+    def apply(
+        parameters: Dict[str, jnp.ndarray], observation: jnp.ndarray
+    ) -> jnp.ndarray:
+        """Mock function to apply the network to training data"""
+        return parameters["mlp/~/linear_0"]["w"]
+
+
+def log_prob(distribution_params: jnp.ndarray, actions: jnp.ndarray) -> jnp.ndarray:
+    """Mock function to return fixed log probs"""
+    return distribution_params + actions
+
+
+def entropy(distribution_params: jnp.ndarray) -> jnp.ndarray:
+    """Mock function to return fixed entropy"""
+
+    return distribution_params
+
 
 @pytest.fixture
 def mock_separate_networks_trainer() -> Trainer:

@@ -79,18 +79,24 @@ def main(_: Any) -> None:
         time_stamp=FLAGS.mava_id,
         time_delta=log_every,
     )
-    # Optimizer.
-    optimizer = optax.chain(
-        optax.clip_by_global_norm(40.0),
-        optax.adam(1e-4),
+    
+    # Optimisers.
+    policy_optimiser = optax.chain(
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
+
+    critic_optimiser = optax.chain(
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+    )
+
     # Build the system
     system.build(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
         experiment_path=experiment_path,
-        optimizer=optimizer,
+        policy_optimiser=policy_optimiser,
+        critic_optimiser=critic_optimiser,
         multi_process=False,
         run_evaluator=True,
         num_executors=1,

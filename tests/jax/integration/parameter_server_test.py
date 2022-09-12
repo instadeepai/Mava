@@ -44,7 +44,8 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     assert type(parameter_server.store.system_checkpointer) == savers.Checkpointer
 
     param_without_net = parameter_server.store.parameters.copy()
-    del param_without_net["networks-network_agent"]
+    del param_without_net["policy_networks-network_agent"]
+    del param_without_net["critic_networks-network_agent"]
     assert param_without_net == {
         "trainer_steps": jnp.zeros(1, dtype=jnp.int32),
         "trainer_walltime": jnp.zeros(1, dtype=jnp.float32),
@@ -58,7 +59,7 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     assert not parameter_server.store.last_checkpoint_time
     assert parameter_server.store.system_checkpointer._last_saved == 0
 
-    first_network_param = parameter_server.store.parameters["networks-network_agent"]
+    first_network_param = parameter_server.store.parameters["policy_networks-network_agent"]
     # test get and set parameters
     for _ in range(3):
         executor.run_episode()
@@ -70,7 +71,7 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     assert list(executor_episodes) == [3]  # run episodes three times
 
     # check that the network is updated (at least one of the values updated)
-    updated_networks_param = parameter_server.get_parameters("networks-network_agent")
+    updated_networks_param = parameter_server.get_parameters("policy_networks-network_agent")
     at_least_one_changed = False
     for key in updated_networks_param.keys():
         assert sorted(list(updated_networks_param[key].keys())) == ["b", "w"]

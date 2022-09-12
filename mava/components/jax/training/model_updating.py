@@ -65,8 +65,8 @@ class MAPGMinibatchUpdateConfig:
     critic_learning_rate: float = 1e-3
     adam_epsilon: float = 1e-5
     max_gradient_norm: float = 0.5
-    policy_optimizer: Optional[optax_base.GradientTransformation] = (None,)
-    critic_optimizer: Optional[optax_base.GradientTransformation] = (None,)
+    policy_optimiser: Optional[optax_base.GradientTransformation] = (None,)
+    critic_optimiser: Optional[optax_base.GradientTransformation] = (None,)
     normalize_advantage: bool = True
 
 
@@ -95,30 +95,30 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
             None.
         """
 
-        if not self.config.policy_optimizer:
-            trainer.store.policy_optimizer = optax.chain(
+        if not self.config.policy_optimiser:
+            trainer.store.policy_optimiser = optax.chain(
                 optax.clip_by_global_norm(self.config.max_gradient_norm),
                 optax.scale_by_adam(eps=self.config.adam_epsilon),
                 optax.scale(-self.config.policy_learning_rate),
             )
         else:
-            trainer.store.policy_optimizer = self.config.policy_optimizer
+            trainer.store.policy_optimiser = self.config.policy_optimiser
 
-        if not self.config.critic_optimizer:
-            trainer.store.critic_optimizer = optax.chain(
+        if not self.config.critic_optimiser:
+            trainer.store.critic_optimiser = optax.chain(
                 optax.clip_by_global_norm(self.config.max_gradient_norm),
                 optax.scale_by_adam(eps=self.config.adam_epsilon),
                 optax.scale(-self.config.policy_learning_rate),
             )
         else:
-            trainer.store.critic_optimizer = self.config.critic_optimizer
+            trainer.store.critic_optimiser = self.config.critic_optimiser
 
         # Initialize optimizers.
         trainer.store.policy_opt_states = {}
         for net_key in trainer.store.networks["networks"].keys():
             trainer.store.policy_opt_states[
                 net_key
-            ] = trainer.store.policy_optimizer.init(
+            ] = trainer.store.policy_optimiser.init(
                 trainer.store.networks["networks"][net_key].policy_params
             )  # pytype: disable=attribute-error
 
@@ -126,7 +126,7 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
         for net_key in trainer.store.networks["networks"].keys():
             trainer.store.critic_opt_states[
                 net_key
-            ] = trainer.store.critic_optimizer.init(
+            ] = trainer.store.critic_optimiser.init(
                 trainer.store.networks["networks"][net_key].critic_params
             )  # pytype: disable=attribute-error
 
@@ -175,7 +175,7 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
                 (
                     policy_updates,
                     policy_opt_states[agent_net_key],
-                ) = trainer.store.policy_optimizer.update(
+                ) = trainer.store.policy_optimiser.update(
                     policy_gradients[agent_key], policy_opt_states[agent_net_key]
                 )
                 policy_params[agent_net_key] = optax.apply_updates(
@@ -198,7 +198,7 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
                 (
                     critic_updates,
                     critic_opt_states[agent_net_key],
-                ) = trainer.store.critic_optimizer.update(
+                ) = trainer.store.critic_optimiser.update(
                     critic_gradients[agent_key], critic_opt_states[agent_net_key]
                 )
                 critic_params[agent_net_key] = optax.apply_updates(
