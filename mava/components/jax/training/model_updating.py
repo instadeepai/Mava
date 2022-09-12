@@ -161,6 +161,7 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
 
         trainer.store.minibatch_update_fn = model_update_minibatch
 
+
 class EpochUpdate(Utility):
     @abc.abstractmethod
     def __init__(self, config: Any) -> None:

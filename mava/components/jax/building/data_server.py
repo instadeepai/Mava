@@ -216,7 +216,6 @@ class OffPolicyDataServer(DataServer):
         )
         return table
 
-
     @staticmethod
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.

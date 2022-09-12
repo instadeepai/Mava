@@ -551,6 +551,7 @@ class MockTrainerParameterClient(Component):
         """Static method that returns component name."""
         return "trainer_parameter_client"
 
+
 @dataclass
 class MockExecutorDefaultConfig:
     """Mock executor config"""
@@ -624,6 +625,7 @@ class MockExecutorEnvironmentLoop(Component):
     def name() -> str:
         """Static method that returns component name."""
         return "executor_environment_loop"
+
 
 @dataclass
 class MockNetworksConfig:

@@ -195,6 +195,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
         # Save the gradient funciton.
         trainer.store.grad_fn = loss_grad_fn
 
+
 @dataclass
 class MAPGTrustRegionClippingLossSeparateNetworksConfig:
     clipping_epsilon: float = 0.2

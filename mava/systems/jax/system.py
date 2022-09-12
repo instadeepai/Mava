@@ -59,7 +59,7 @@ class System(BaseSystem):
         """
         for component in self._design.get().values():
             config_class = component.__init__.__annotations__["config"]
-            
+
             if config_class is not SimpleNamespace:
                 input = {component.name(): config_class()}
                 self.config.add(**input)

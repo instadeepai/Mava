@@ -142,7 +142,6 @@ class AdderSignature(Component):
         return "data_server_adder_signature"
 
 
-
 @dataclass
 class ParallelTransitionAdderConfig:
     n_step: int = 5
