@@ -48,13 +48,14 @@ class ExecutorInit(Component):
             None.
         """
 
-        if self.config.evaluation_duration and (
+        if self.config.evaluation_duration != 1 and (
             self.config.evaluation_interval is None
         ):
             raise ValueError(
                 "Missing evaluation interval value: Evaluation duration"
                 + " value was provided without a value for the evaluation interval."
             )
+
         if executor.store.is_evaluator:
             executor.store._evaluation_interval = self.config.evaluation_interval  # type: ignore # noqa: E501
             executor.store._evaluation_duration = self.config.evaluation_duration  # type: ignore # noqa: E501
