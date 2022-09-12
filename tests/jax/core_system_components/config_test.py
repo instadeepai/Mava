@@ -52,7 +52,7 @@ class SameParameterNameConfig:
 class DummyComponentNoConfigClass(Component):
     def __init__(
         self,
-        config: Any,
+        config: SimpleNamespace,
     ):
         """Initialize component
 
