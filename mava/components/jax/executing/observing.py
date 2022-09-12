@@ -208,6 +208,10 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
             "network_int_keys"
         ] = executor.store.network_int_keys_extras
 
+        executor.store.extras[
+            "policy_states"
+        ] = executor.store.policy_states
+
         # executor.store.timestep set by Executor
         executor.store.adder.add_first(executor.store.timestep, executor.store.extras)
 
@@ -239,12 +243,11 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
             "network_int_keys"
         ] = executor.store.network_int_keys_extras
 
-        # executor.store.next_timestep set by Executor
+        # executor.store.extras set by Executor
+        executor.store.extras[
+            "policy_states"
+        ] = executor.store.policy_states
+
         executor.store.adder.add(
             adder_actions, executor.store.next_timestep, executor.store.next_extras
         )
-
-    def on_execution_update(self, executor: SystemExecutor) -> None:
-        """Update the executor variables."""
-        if executor.store.executor_parameter_client:
-            executor.store.executor_parameter_client.get_async()

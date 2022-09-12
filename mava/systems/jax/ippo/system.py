@@ -25,7 +25,8 @@ from mava.systems.jax.ippo.config import IPPODefaultConfig
 
 
 class IPPOSystem(System):
-    def design(self) -> Tuple[DesignSpec, Any]:
+    @staticmethod
+    def design() -> Tuple[DesignSpec, Any]:
         """System design for IPPO with single optimiser.
 
         Args:
@@ -97,7 +98,8 @@ class IPPOSystem(System):
 
 
 class IPPOSystemSeparateNetworks(System):
-    def design(self) -> Tuple[DesignSpec, Any]:
+    @staticmethod
+    def design() -> Tuple[DesignSpec, Any]:
         """System design for PPO with separate policy and critic networks.
 
         Returns:
@@ -105,7 +107,7 @@ class IPPOSystemSeparateNetworks(System):
         """
 
         # Get the generic IPPO system setup.
-        system, default_params = IPPOSystem().design()
+        system, default_params = IPPOSystem.design()
 
         # Update trainer components with seperate networks
         # TODO (dries): Investigate whether the names (below) are necessary or if they can be removed.
@@ -128,7 +130,7 @@ class IPPOSystemSeparateNetworks(System):
 
         return system, default_params
 
-class IPPOSystemRecurrentActor(System):
+class IPPOSystemRecurrentPolicy(System):
     def design(self) -> Tuple[DesignSpec, Any]:
         """System design for PPO with a recurrent policy.
 
@@ -137,10 +139,10 @@ class IPPOSystemRecurrentActor(System):
         """
 
         # Get the IPPOSystemSeparateNetworks system setup.
-        system, default_params = IPPOSystemSeparateNetworks().design()
+        system, default_params = IPPOSystemSeparateNetworks.design()
 
         # Update trainer components with seperate networks
         system.set("executor_select_action", executing.RecurrentExecutorSelectAction)
         system.set("executor_observe", executing.RecurrentExecutorObserve)
-      
+
         return system, default_params

@@ -93,7 +93,7 @@ def main(_: Any) -> None:
     )
 
     # Create the recurrent actor IPPO system.
-    system = ippo.IPPOSystemRecurrentActor()
+    system = ippo.IPPOSystemRecurrentPolicy()
 
     # Build the system.
     system.build(
