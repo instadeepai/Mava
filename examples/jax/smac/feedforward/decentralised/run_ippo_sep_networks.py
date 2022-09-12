@@ -83,7 +83,7 @@ def main(_: Any) -> None:
     )
 
     # Create the system.
-    system = ippo.IPPOSystemSeparateNetworks()
+    system = ippo.IPPOSystem()
 
     # Build the system.
     system.build(

@@ -31,9 +31,7 @@ from mava.components.jax.building.loggers import Logger
 from mava.components.jax.building.networks import DefaultNetworks
 from mava.components.jax.building.parameter_client import (
     ExecutorParameterClient,
-    ExecutorParameterClientSeparateNetworks,
     TrainerParameterClient,
-    TrainerParameterClientSeparateNetworks,
 )
 from mava.components.jax.building.system_init import (
     CustomSamplingSystemInit,

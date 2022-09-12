@@ -59,17 +59,14 @@ class MinibatchUpdate(Utility):
         return [BaseTrainerInit, Loss]
 
 
-#######################
-# SINGLE SHARED NETWORK
-#######################
-
-
 @dataclass
 class MAPGMinibatchUpdateConfig:
-    learning_rate: float = 1e-3
+    policy_learning_rate: float = 1e-3
+    critic_learning_rate: float = 1e-3
     adam_epsilon: float = 1e-5
     max_gradient_norm: float = 0.5
-    optimizer: Optional[optax_base.GradientTransformation] = (None,)
+    policy_optimizer: Optional[optax_base.GradientTransformation] = (None,)
+    critic_optimizer: Optional[optax_base.GradientTransformation] = (None,)
     normalize_advantage: bool = True
 
 
@@ -82,231 +79,6 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
 
         Args:
             config: MAPGMinibatchUpdateConfig.
-        """
-        self.config = config
-
-    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """Create and store MAPG mini-batch update function.
-
-        Creates a default optimizer if none is provided in the config.
-        Creates an optimizer for each trainer.
-
-        Args:
-            trainer: SystemTrainer.
-
-        Returns:
-            None.
-        """
-
-        if not self.config.optimizer:
-            trainer.store.optimizer = optax.chain(
-                optax.clip_by_global_norm(self.config.max_gradient_norm),
-                optax.scale_by_adam(eps=self.config.adam_epsilon),
-                optax.scale(-self.config.learning_rate),
-            )
-        else:
-            trainer.store.optimizer = self.config.optimizer
-
-        # Initialize optimizers.
-        trainer.store.opt_states = {}
-        for net_key in trainer.store.networks["networks"].keys():
-            trainer.store.opt_states[net_key] = trainer.store.optimizer.init(
-                trainer.store.networks["networks"][net_key].params
-            )  # pytype: disable=attribute-error
-
-        def model_update_minibatch(
-            carry: Tuple[networks_lib.Params, optax.OptState], minibatch: Batch
-        ) -> Tuple[Tuple[Any, optax.OptState], Dict[str, Any]]:
-            """Performs model update for a single minibatch."""
-            params, opt_states = carry
-
-            # Normalize advantages at the minibatch level before using them.
-            if self.config.normalize_advantage:
-                advantages = jax.tree_util.tree_map(
-                    lambda x: (x - jnp.mean(x, axis=0)) / (jnp.std(x, axis=0) + 1e-8),
-                    minibatch.advantages,
-                )
-            else:
-                advantages = minibatch.advantages
-
-            # Calculate the gradients and agent metrics.
-            gradients, agent_metrics = trainer.store.grad_fn(
-                params,
-                minibatch.observations,
-                minibatch.actions,
-                minibatch.behavior_log_probs,
-                minibatch.target_values,
-                advantages,
-                minibatch.behavior_values,
-            )
-
-            # Update the networks and optimizors.
-            for agent_key in trainer.store.trainer_agents:
-                agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
-                # Apply updates
-                # TODO (dries): Use one optimizer per network type here and not
-                # just one.
-                updates, opt_states[agent_net_key] = trainer.store.optimizer.update(
-                    gradients[agent_key], opt_states[agent_net_key]
-                )
-                params[agent_net_key] = optax.apply_updates(
-                    params[agent_net_key], updates
-                )
-
-                agent_metrics[agent_key]["norm_grad"] = optax.global_norm(
-                    gradients[agent_key]
-                )
-                agent_metrics[agent_key]["norm_updates"] = optax.global_norm(updates)
-            return (params, opt_states), agent_metrics
-
-        trainer.store.minibatch_update_fn = model_update_minibatch
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MAPGMinibatchUpdateConfig
-
-
-class EpochUpdate(Utility):
-    @abc.abstractmethod
-    def __init__(self, config: Any) -> None:
-        """Abstract component for performing model updates from an entire epoch."""
-        self.config = config
-
-    @staticmethod
-    def name() -> str:
-        """Static method that returns component name."""
-        return "epoch_update"
-
-    @staticmethod
-    def required_components() -> List[Type[Callback]]:
-        """List of other Components required in the system for this Component to function.
-
-        Step required to set up trainer.store.full_batch_size.
-        MinibatchUpdate required to set up trainer.store.minibatch_update_fn.
-
-        Returns:
-            List of required component classes.
-        """
-        return [Step, MinibatchUpdate]
-
-
-@dataclass
-class MAPGEpochUpdateConfig:
-    num_epochs: int = 4
-    num_minibatches: int = 1
-
-
-class MAPGEpochUpdate(EpochUpdate):
-    def __init__(
-        self,
-        config: MAPGEpochUpdateConfig = MAPGEpochUpdateConfig(),
-    ):
-        """Component defines a multi-agent policy gradient epoch-level update.
-
-        Args:
-            config: MAPGEpochUpdateConfig.
-        """
-        self.config = config
-
-    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """Define and store the epoch update function.
-
-        Args:
-            trainer: SystemTrainer.
-
-        Returns:
-            None.
-        """
-
-        def model_update_epoch(
-            carry: Tuple[KeyArray, Any, optax.OptState, Batch],
-            unused_t: Tuple[()],
-        ) -> Tuple[
-            Tuple[KeyArray, Any, optax.OptState, Batch],
-            Dict[str, jnp.ndarray],
-        ]:
-            """Performs model updates based on one epoch of data."""
-            key, params, opt_states, batch = carry
-
-            new_key, subkey = jax.random.split(key)
-
-            # TODO (dries): This assert is ugly. Is there a better way to do this check?
-            # Maybe using a tree map of some sort?
-            # shapes = jax.tree_util.tree_map(
-            #         lambda x: x.shape[0]==trainer.store.full_batch_size, batch
-            #     )
-            # assert ...
-            assert (
-                list(batch.observations.values())[0].observation.shape[0]
-                == trainer.store.full_batch_size
-            )
-
-            permutation = jax.random.permutation(subkey, trainer.store.full_batch_size)
-
-            shuffled_batch = jax.tree_util.tree_map(
-                lambda x: jnp.take(x, permutation, axis=0), batch
-            )
-            minibatches = jax.tree_util.tree_map(
-                lambda x: jnp.reshape(
-                    x, [self.config.num_minibatches, -1] + list(x.shape[1:])
-                ),
-                shuffled_batch,
-            )
-
-            (new_params, new_opt_states), metrics = jax.lax.scan(
-                trainer.store.minibatch_update_fn,
-                (params, opt_states),
-                minibatches,
-                length=self.config.num_minibatches,
-            )
-
-            return (new_key, new_params, new_opt_states, batch), metrics
-
-        trainer.store.epoch_update_fn = model_update_epoch
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MAPGEpochUpdateConfig
-
-
-#######################
-# SEPARATE NETWORKS
-#######################
-
-
-@dataclass
-class MAPGMinibatchUpdateSeparateNetworksConfig:
-    policy_learning_rate: float = 1e-3
-    critic_learning_rate: float = 1e-3
-    adam_epsilon: float = 1e-5
-    max_gradient_norm: float = 0.5
-    policy_optimizer: Optional[optax_base.GradientTransformation] = (None,)
-    critic_optimizer: Optional[optax_base.GradientTransformation] = (None,)
-    normalize_advantage: bool = True
-
-
-class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
-    def __init__(
-        self,
-        config: MAPGMinibatchUpdateSeparateNetworksConfig = MAPGMinibatchUpdateSeparateNetworksConfig(),  # noqa: E501
-    ):
-        """Component defines a multi-agent policy gradient mini-batch update.
-
-        Particularly for a PPO system with separate networks for the
-        policy and critic.
-
-        Args:
-            config : MAPGMinibatchUpdateSeparateNetworksConfig
         """
         self.config = config
 
@@ -451,6 +223,7 @@ class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
 
         trainer.store.minibatch_update_fn = model_update_minibatch
 
+
     @staticmethod
     def config_class() -> Optional[Callable]:
         """Config class used for component.
@@ -458,27 +231,48 @@ class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
         Returns:
             config class/dataclass for component.
         """
-        return MAPGMinibatchUpdateSeparateNetworksConfig
+        return MAPGMinibatchUpdateConfig
+
+
+class EpochUpdate(Utility):
+    @abc.abstractmethod
+    def __init__(self, config: Any) -> None:
+        """Abstract component for performing model updates from an entire epoch."""
+        self.config = config
+
+    @staticmethod
+    def name() -> str:
+        """Static method that returns component name."""
+        return "epoch_update"
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        Step required to set up trainer.store.full_batch_size.
+        MinibatchUpdate required to set up trainer.store.minibatch_update_fn.
+
+        Returns:
+            List of required component classes.
+        """
+        return [Step, MinibatchUpdate]
 
 
 @dataclass
-class MAPGEpochUpdateSeparateNetworksConfig:
+class MAPGEpochUpdateConfig:
     num_epochs: int = 4
     num_minibatches: int = 1
 
 
-class MAPGEpochUpdateSeparateNetworks(EpochUpdate):
+class MAPGEpochUpdate(EpochUpdate):
     def __init__(
         self,
-        config: MAPGEpochUpdateSeparateNetworksConfig = MAPGEpochUpdateSeparateNetworksConfig(),  # noqa: E501
+        config: MAPGEpochUpdateConfig = MAPGEpochUpdateConfig(),
     ):
         """Component defines a multi-agent policy gradient epoch-level update.
 
-        Particularly for a PPO system with separate networks
-        for the policy and critic.
-
         Args:
-            config: MAPGEpochUpdateSeparateNetworksConfig
+            config: MAPGEpochUpdateConfig.
         """
         self.config = config
 
@@ -566,4 +360,5 @@ class MAPGEpochUpdateSeparateNetworks(EpochUpdate):
         Returns:
             config class/dataclass for component.
         """
-        return MAPGEpochUpdateSeparateNetworksConfig
+        return MAPGEpochUpdateConfig
+

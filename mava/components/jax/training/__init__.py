@@ -18,23 +18,18 @@ from mava.components.jax.training.advantage_estimation import GAE
 from mava.components.jax.training.base import (
     Batch,
     TrainingState,
-    TrainingStateSeparateNetworks,
     Utility,
 )
 from mava.components.jax.training.losses import (
     MAPGWithTrustRegionClippingLoss,
-    MAPGWithTrustRegionClippingLossSeparateNetworks,
 )
 from mava.components.jax.training.model_updating import (
     MAPGEpochUpdate,
-    MAPGEpochUpdateSeparateNetworks,
     MAPGMinibatchUpdate,
-    MAPGMinibatchUpdateSeparateNetworks,
 )
 from mava.components.jax.training.step import (
     DefaultTrainerStep,
     MAPGWithTrustRegionStep,
-    MAPGWithTrustRegionStepSeparateNetworks,
 )
 from mava.components.jax.training.trainer import (
     BaseTrainerInit,
