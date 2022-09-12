@@ -44,9 +44,6 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 def main(_: Any) -> None:
     """Example running feedforward MADQN on SMAC environment."""
 
-    # WARNING (dries): This code has not been run yet. There might still
-    # be runtime errors in the code.
-
     # Environment
     environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
 
