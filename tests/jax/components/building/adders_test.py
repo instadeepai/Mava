@@ -310,6 +310,6 @@ def test_uniform_priority(
     assert mock_builder.store.priority_fns
     assert uniform_priority.name() == "adder_priority"
     assert issubclass(
-        uniform_priority.config_class(), AdderPriorityConfig  # type: ignore
+        uniform_priority.__init__.__annotations__["config"], AdderPriorityConfig  # type: ignore
     )
     assert all(mock_builder.store.priority_fns) == 1

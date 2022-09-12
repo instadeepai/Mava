@@ -312,15 +312,6 @@ class MockDataServer(Component):
         """Static method that returns component name."""
         return "data_server"
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MockDataServerConfig
-
 
 class MockOnPolicyDataServer(MockDataServer):
     def __init__(
@@ -382,15 +373,6 @@ class MockOnPolicyDataServer(MockDataServer):
             signature=signature,
         )
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return OnPolicyDataServerConfig
-
 
 class MockOffPolicyDataServer(MockDataServer):
     def __init__(
@@ -449,15 +431,6 @@ class MockOffPolicyDataServer(MockDataServer):
             rate_limiter=builder.store.rate_limiter_fn(),
             signature=builder.store.adder_signature_fn(environment_spec, extras_spec),
         )
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return OffPolicyDataServerConfig
 
 
 @dataclass
@@ -578,15 +551,6 @@ class MockTrainerParameterClient(Component):
         """Static method that returns component name."""
         return "trainer_parameter_client"
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MockTrainerParameterClientConfig
-
 
 @dataclass
 class MockExecutorDefaultConfig:
@@ -662,15 +626,6 @@ class MockExecutorEnvironmentLoop(Component):
         """Static method that returns component name."""
         return "executor_environment_loop"
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MockExecutorEnvironmentLoopConfig
-
 
 @dataclass
 class MockNetworksConfig:
@@ -692,10 +647,10 @@ class MockNetworks(Component):
         """Summary"""
 
         # Setup the jax key for network initialisations
-        builder.store.key = jax.random.PRNGKey(self.config.seed)
+        builder.store.base_key = jax.random.PRNGKey(self.config.seed)
 
         # Build network function here
-        network_key, builder.store.key = jax.random.split(builder.store.key)
+        network_key, builder.store.base_key = jax.random.split(builder.store.base_key)
         builder.store.network_factory = (
             lambda: self.config.network_factory(  # type: ignore
                 environment_spec=builder.store.ma_environment_spec,
@@ -708,15 +663,6 @@ class MockNetworks(Component):
     def name() -> str:
         """_summary_"""
         return "networks"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MockNetworksConfig
 
 
 @dataclass
@@ -747,15 +693,6 @@ class MockTrainerDataset(Component):
         """Static method that returns component name."""
         return "trainer_dataset"
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MockTrainerDatasetConfig
-
 
 @dataclass
 class MockTrainerConfig:
@@ -776,9 +713,9 @@ class MockTrainer(Component):
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """TODO: Add description here."""
         builder.store.table_network_config = {
-            "trainer": ["network_agent", "network_agent", "network_agent"]
+            "trainer_0": ["network_agent", "network_agent", "network_agent"]
         }
-        builder.store.trainer_networks = {"trainer": ["network_agent"]}
+        builder.store.trainer_networks = {"trainer_0": ["network_agent"]}
 
     def on_building_trainer(self, builder: SystemBuilder) -> None:
         """_summary_"""
@@ -827,7 +764,7 @@ class MockDistributor(Component):
         parameter_server = builder.parameter_server()
 
         trainer = builder.trainer(
-            trainer_id="trainer",
+            trainer_id="trainer_0",
             data_server_client=data_server,
             parameter_server_client=parameter_server,
         )

@@ -49,15 +49,6 @@ class ComponentDependencyGuardrails(Component):
         return "component_dependency_guardrails"
 
     @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Optional class which specifies the dataclass/config object for the component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return ComponentDependencyGuardrailsConfig
-
-    @staticmethod
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
@@ -255,15 +246,6 @@ class ComponentDependencyDebugger(Component):
     def name() -> str:
         """Static method that returns component name."""
         return "component_dependency_debugger"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Optional class which specifies the dataclass/config object for the component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return ComponentDependencyDebuggerConfig
 
     @staticmethod
     def required_components() -> List[Type[Callback]]:

@@ -95,15 +95,6 @@ class AdderPriority(Component):
         return "adder_priority"
 
     @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return AdderPriorityConfig
-
-    @staticmethod
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
@@ -150,15 +141,6 @@ class AdderSignature(Component):
         """Static method that returns component name."""
         return "data_server_adder_signature"
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return AdderSignatureConfig
-
 
 @dataclass
 class ParallelTransitionAdderConfig:
@@ -198,15 +180,6 @@ class ParallelTransitionAdder(Adder):
         )
 
         builder.store.adder = adder
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return ParallelTransitionAdderConfig
 
 
 class UniformAdderPriority(AdderPriority):
@@ -295,15 +268,6 @@ class ParallelSequenceAdder(Adder):
         )
 
         builder.store.adder = adder
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return ParallelSequenceAdderConfig
 
 
 class ParallelSequenceAdderSignature(AdderSignature):

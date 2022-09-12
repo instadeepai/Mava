@@ -73,15 +73,6 @@ class ComponentZero(MainComponent):
         """
         builder.store.int_plus_str = self.config.param_0 + int(self.config.param_1)
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return ComponentZeroDefaultConfig
-
 
 @dataclass
 class ComponentOneDefaultConfig:
@@ -107,15 +98,6 @@ class ComponentOne(SubComponent):
             float plus boolean cast as float
         """
         builder.store.float_plus_bool = self.config.param_2 + float(self.config.param_3)
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return ComponentOneDefaultConfig
 
 
 @dataclass
@@ -144,15 +126,6 @@ class ComponentTwo(MainComponent):
         builder.store.str_plus_bool = int(self.config.param_4) + int(
             self.config.param_5
         )
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return ComponentTwoDefaultConfig
 
 
 @dataclass
@@ -187,15 +160,6 @@ class MockDistributorComponent(Component):
             Component type name
         """
         return "distributor"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return DistributorDefaultConfig
 
 
 class TestSystemWithZeroComponents(System):

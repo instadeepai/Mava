@@ -47,15 +47,6 @@ class RateLimiter(Component):
         return "rate_limiter"
 
     @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return RateLimiterConfig
-
-    @staticmethod
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
@@ -170,15 +161,6 @@ class Sampler(Component):
         return "data_server_sampler"
 
     @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return SamplerConfig
-
-    @staticmethod
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
@@ -234,15 +216,6 @@ class PrioritySampler(Sampler):
 
         builder.store.sampler_fn = sampler_fn
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return PrioritySamplerConfig
-
 
 @dataclass
 class RemoverConfig:
@@ -282,15 +255,6 @@ class Remover(Component):
         """Static method that returns component name."""
 
         return "data_server_remover"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return RemoverConfig
 
     @staticmethod
     def required_components() -> List[Type[Callback]]:

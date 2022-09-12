@@ -73,7 +73,7 @@ class ExecutorSelectAction(Component):
 
         BaseTrainerInit required to set up executor.store.networks.
         BaseSystemInit required to set up executor.store.agent_net_keys.
-        Networks required to set up executor.store.key.
+        Networks required to set up executor.store.base_key.
 
         Returns:
             List of required component classes.
@@ -112,9 +112,9 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
         (
             executor.store.actions_info,
             executor.store.policies_info,
-            executor.store.key,
+            executor.store.base_key,
         ) = executor.store.select_actions_fn(
-            executor.store.observations, current_agent_params, executor.store.key
+            executor.store.observations, current_agent_params, executor.store.base_key
         )
 
     def on_execution_init_end(self, executor: SystemExecutor) -> None:

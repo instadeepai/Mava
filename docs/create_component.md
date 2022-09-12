@@ -84,13 +84,4 @@ class GAE(Utility):
     def name() -> str:
         """Static method that returns component name."""
         return "gae_fn"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return GAEConfig
 ```
