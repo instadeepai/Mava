@@ -47,15 +47,14 @@ class ExecutorInit(Component):
         Returns:
             None.
         """
-        # TODO (Ruan): Double check that this is necessary
-        if self.config.evaluation_duration:
-            try:
-                assert self.config.evaluation_interval is not None
-            except AssertionError:
-                print(
-                    "Missing evaluation interval value: Evaluation duration \
-                        was provided without a value for the evaluation interval."
-                )
+
+        if self.config.evaluation_duration and (
+            self.config.evaluation_interval is None
+        ):
+            raise ValueError(
+                "Missing evaluation interval value: Evaluation duration"
+                + " value was provided without a value for the evaluation interval."
+            )
         if executor.store.is_evaluator:
             executor.store._evaluation_interval = self.config.evaluation_interval  # type: ignore # noqa: E501
             executor.store._evaluation_duration = self.config.evaluation_duration  # type: ignore # noqa: E501
