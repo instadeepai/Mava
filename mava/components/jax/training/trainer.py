@@ -18,7 +18,7 @@
 import abc
 from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import Any, Callable, Dict, List, Optional, Type
+from typing import Any, Dict, List, Type
 
 from mava.callbacks import Callback
 from mava.components.jax import Component
@@ -71,7 +71,6 @@ class BaseTrainerInit(Component):
             List of required component classes.
         """
         return [BaseSystemInit, EnvironmentSpec, Networks]
-
 
 class SingleTrainerInit(BaseTrainerInit):
     def __init__(self, config: SimpleNamespace = SimpleNamespace()):

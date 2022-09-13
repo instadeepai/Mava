@@ -19,6 +19,7 @@ import abc
 import copy
 import functools
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import dm_env
@@ -260,13 +261,8 @@ def mock_queue(
     return reverb.Table.queue(name=name, max_size=max_queue_size, signature=signature)
 
 
-@dataclass
-class MockDataServerConfig:
-    pass
-
-
 class MockDataServer(Component):
-    def __init__(self, config: MockDataServerConfig = MockDataServerConfig()) -> None:
+    def __init__(self, config: SimpleNamespace = SimpleNamespace()) -> None:
         """_summary_
 
         Args:

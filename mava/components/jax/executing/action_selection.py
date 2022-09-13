@@ -16,7 +16,7 @@
 """Execution components for system builders"""
 
 import abc
-from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any, Dict, List, Tuple, Type
 
 import jax
@@ -32,16 +32,11 @@ from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemExecutor
 
 
-@dataclass
-class ExecutorSelectActionConfig:
-    pass
-
-
 class ExecutorSelectAction(Component):
     @abc.abstractmethod
     def __init__(
         self,
-        config: ExecutorSelectActionConfig = ExecutorSelectActionConfig(),
+        config: SimpleNamespace = SimpleNamespace(),
     ):
         """Component defines hooks to override for executor action selection.
 
