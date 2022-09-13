@@ -87,7 +87,7 @@ def mock_trainer() -> Trainer:
         }
     }
 
-    key = jax.random.PRNGKey(5)
+    base_key = jax.random.PRNGKey(5)
     action_info = "action_info_test"
     policy_info = "policy_info_test"
 
@@ -112,7 +112,7 @@ def mock_trainer() -> Trainer:
             "agent_1": "network_agent",
             "agent_2": "network_agent",
         },
-        key=key,
+        base_key=base_key,
         action_info=action_info,
         policy_info=policy_info,
     )
@@ -211,9 +211,9 @@ def test_mapg_loss(
     low_agent_0_loss = low_loss_info["agent_0"]
     low_loss_policy = low_agent_0_loss["loss_policy"]
 
-    assert loss_entropy == -0.47500002
-    assert loss_value == 9
-    assert loss_total == (loss_entropy * 0.01 + loss_policy + loss_value * 0.5)
+    assert jnp.isclose(loss_entropy, -0.47500002)
+    assert jnp.equal(loss_value, 9)
+    assert jnp.equal(loss_total, (loss_entropy * 0.01 + loss_policy + loss_value * 0.5))
 
     assert low_loss_policy < loss_policy
 
@@ -251,7 +251,7 @@ def mock_separate_networks_trainer() -> Trainer:
         }
     }
 
-    key = jax.random.PRNGKey(5)
+    base_key = jax.random.PRNGKey(5)
     action_info = "action_info_test"
     policy_info = "policy_info_test"
 
@@ -276,7 +276,7 @@ def mock_separate_networks_trainer() -> Trainer:
             "agent_1": "network_agent",
             "agent_2": "network_agent",
         },
-        key=key,
+        base_key=base_key,
         action_info=action_info,
         policy_info=policy_info,
     )
@@ -403,7 +403,7 @@ def test_mapg_loss_separate_networks(
     low_agent_0_critic_loss = low_critic_loss_info["agent_0"]
     low_loss_critic = low_agent_0_critic_loss["loss_critic"]
 
-    assert loss_entropy == -0.47500002
+    assert jnp.isclose(loss_entropy, -0.47500002)
     assert loss_critic == 4.5
     assert loss_policy_total == (loss_entropy * 0.01 + loss_policy)
 

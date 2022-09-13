@@ -21,14 +21,13 @@ import chex
 import haiku as hk  # type: ignore
 import jax
 import jax.numpy as jnp
-import numpy as np
 from acme import specs
 from acme.jax import networks as networks_lib
 from acme.jax import utils
 from dm_env import specs as dm_specs
-from jax import jit
 
 from mava import specs as mava_specs
+from mava.components.jax.networks import CategoricalValueHead
 from mava.utils.jax_training_utils import action_mask_categorical_policies
 
 Array = dm_specs.Array
@@ -37,6 +36,7 @@ DiscreteArray = dm_specs.DiscreteArray
 EntropyFn = Callable[[Any], jnp.ndarray]
 
 
+# TODO JAX Networks should be stateless.
 @dataclasses.dataclass
 class PPONetworks:
     """Class to implement the networks for the PPO algorithm"""
@@ -64,7 +64,6 @@ class PPONetworks:
         self.entropy = entropy
         self.sample = sample
 
-        @jit
         def forward_fn(
             params: Dict[str, jnp.ndarray],
             observations: networks_lib.Observation,
@@ -89,8 +88,8 @@ class PPONetworks:
             if mask is not None:
                 distribution = action_mask_categorical_policies(distribution, mask)
 
-            actions = jax.numpy.squeeze(distribution.sample(seed=key))
-            log_prob = distribution.log_prob(actions)
+            actions = jnp.squeeze(distribution.sample(seed=key))
+            log_prob = jnp.squeeze(distribution.log_prob(actions))
 
             return actions, log_prob
 
@@ -99,13 +98,15 @@ class PPONetworks:
     def get_action(
         self,
         observations: networks_lib.Observation,
+        params: jnp.ndarray,
         key: networks_lib.PRNGKey,
         mask: chex.Array = None,
-    ) -> Tuple[np.ndarray, Dict]:
+    ) -> Tuple[jnp.ndarray, Dict]:
         """Gets an action from the network from given observation
 
         Args:
            observations: agent observations
+           params: current params of network.
            key: pseudo-random value used to initialise distributions
            mask: action mask which removes illegal actions
 
@@ -114,9 +115,7 @@ class PPONetworks:
             log_prob: log prob of the chosen action
 
         """
-        actions, log_prob = self.forward_fn(self.params, observations, key, mask)
-        actions = np.array(actions, dtype=np.int64)
-        log_prob = np.squeeze(np.array(log_prob, dtype=np.float32))
+        actions, log_prob = self.forward_fn(params["params"], observations, key, mask)
         return actions, {"log_prob": log_prob}
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
@@ -131,6 +130,18 @@ class PPONetworks:
         """
         _, value = self.network.apply(self.params, observations)
         return value
+
+    def get_params(
+        self,
+    ) -> Dict[str, jnp.ndarray]:
+        """Return current params.
+
+        Returns:
+            params.
+        """
+        return {
+            "params": self.params,
+        }
 
 
 # This class is made to replicate the behaviour of the categorical value head
@@ -154,6 +165,7 @@ class ValueHead(hk.Module):
         return value
 
 
+# TODO JAX Networks should be stateless.
 @dataclasses.dataclass
 class PPOSeparateNetworks:
     """Separate policy and critic networks for IPPO."""
@@ -193,7 +205,6 @@ class PPOSeparateNetworks:
         self.entropy = entropy
         self.sample = sample
 
-        @jit
         def forward_fn(
             policy_params: Dict[str, jnp.ndarray],
             observations: networks_lib.Observation,
@@ -221,8 +232,8 @@ class PPOSeparateNetworks:
             if mask is not None:
                 distribution = action_mask_categorical_policies(distribution, mask)
 
-            actions = jax.numpy.squeeze(distribution.sample(seed=key))
-            log_prob = distribution.log_prob(actions)
+            actions = jnp.squeeze(distribution.sample(seed=key))
+            log_prob = jnp.squeeze(distribution.log_prob(actions))
 
             return actions, log_prob
 
@@ -231,19 +242,33 @@ class PPOSeparateNetworks:
     def get_action(
         self,
         observations: networks_lib.Observation,
+        params: Any,
         key: networks_lib.PRNGKey,
         mask: chex.Array = None,
-    ) -> Tuple[np.ndarray, Dict]:
+    ) -> Tuple[jnp.ndarray, Dict]:
         """Get actions from policy network given observations."""
-        actions, log_prob = self.forward_fn(self.policy_params, observations, key, mask)
-        actions = np.array(actions, dtype=np.int64)
-        log_prob = np.squeeze(np.array(log_prob, dtype=np.float32))
+        actions, log_prob = self.forward_fn(
+            params["policy_network"], observations, key, mask
+        )
         return actions, {"log_prob": log_prob}
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
         """Get state value from critic network given observations."""
         value = self.critic_network.apply(self.critic_params, observations)
         return value
+
+    def get_params(
+        self,
+    ) -> Dict[str, jnp.ndarray]:
+        """Return current params.
+
+        Returns:
+            policy and critic params.
+        """
+        return {
+            "policy_network": self.policy_params,
+            "critic_network": self.critic_params,
+        }
 
 
 def make_ppo_network(
@@ -379,7 +404,9 @@ def make_discrete_networks(
                 [
                     observation_network,
                     hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
-                    networks_lib.CategoricalValueHead(num_values=num_actions),
+                    CategoricalValueHead(
+                        num_values=num_actions, dtype=environment_spec.actions.dtype
+                    ),
                 ]
             )
             return policy_value_network(inputs)
@@ -403,7 +430,9 @@ def make_discrete_networks(
                 [
                     observation_network,
                     hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
-                    networks_lib.CategoricalHead(num_values=num_actions),
+                    networks_lib.CategoricalHead(
+                        num_values=num_actions, dtype=environment_spec.actions.dtype
+                    ),
                 ]
             )
             return policy_network(inputs)

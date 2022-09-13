@@ -90,10 +90,10 @@ class DefaultNetworks(Networks):
             None.
         """
         # Setup the jax key for network initialisations
-        builder.store.key = jax.random.PRNGKey(self.config.seed)
+        builder.store.base_key = jax.random.PRNGKey(self.config.seed)
 
         # Build network function here
-        network_key, builder.store.key = jax.random.split(builder.store.key)
+        network_key, builder.store.base_key = jax.random.split(builder.store.base_key)
         builder.store.network_factory = lambda: self.config.network_factory(
             environment_spec=builder.store.ma_environment_spec,
             agent_net_keys=builder.store.agent_net_keys,
