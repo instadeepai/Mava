@@ -146,6 +146,7 @@ class ExecutorParameterClient(BaseParameterClient):
         """Static method that returns component name."""
         return "executor_parameter_client"
 
+
 @dataclass
 class TrainerParameterClientConfig:
     trainer_parameter_update_period: int = 5
