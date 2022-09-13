@@ -43,9 +43,6 @@ def test_trainer_single_process(test_system_sp: System) -> None:
 
     # Before run step method
     for net_key in trainer.store.networks["networks"].keys():
-        # print("net_key: ", net_key)
-        # print("shape 0: ", len(trainer.store.policy_opt_states[net_key][1]))
-        # print("shape 1: ", len(trainer.store.policy_opt_states[net_key][1][0]))
         mu = trainer.store.policy_opt_states[net_key][1].mu  # network
         for categorical_value_head in mu.values():
             assert jnp.all(categorical_value_head["b"] == 0)
