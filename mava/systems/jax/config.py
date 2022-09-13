@@ -223,15 +223,16 @@ class Config:
                 "before calling .get_local_config()."
             )
 
+        config_class = component.__init__.__annotations__["config"]
+
+        # Return if there is no config class for the component
+        if config_class is SimpleNamespace: 
+            return config_class
+    
+        # Set local config to global config for names which appear in the config class
         global_config = self._built_config
         local_config: Dict[str, Any] = {}
 
-        config_class = component.__init__.__annotations__["config"]
-
-        if config_class is SimpleNamespace:  # no config class for component
-            return SimpleNamespace()
-
-        # Set local config to global config for names which appear in the config class
         for field in fields(config_class):
             local_config[field.name] = global_config[field.name]
 
