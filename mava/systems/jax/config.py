@@ -184,8 +184,10 @@ class Config:
                     f"""
                     The given parameter ({name}) is not part of the current system.
                     This should have been added first via a component .add() during
-                    system building or ensure you have defined func `config_class`
-                    for your components with config. Current parameters:
+                    system building. Ensure that you have defined the correct config
+                    class as a type for the component's config init variable. Also
+                    ensure that all the component's config variables have types.
+                    Current parameters:
                     {list(self._built_config.keys())}.
                     """
                 )
