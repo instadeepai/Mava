@@ -73,15 +73,6 @@ class EnvironmentSpec(Component):
         return "environment_spec"
 
     @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return EnvironmentSpecConfig
-
-    @staticmethod
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
@@ -141,15 +132,6 @@ class ExecutorEnvironmentLoop(Component):
     def name() -> str:
         """Static method that returns component name."""
         return "executor_environment_loop"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return ExecutorEnvironmentLoopConfig
 
     @staticmethod
     def required_components() -> List[Type[Callback]]:
@@ -250,12 +232,3 @@ class MonitorExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
             )
 
         builder.store.system_executor = executor_environment_loop
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            MonitorExecutorEnvironmentLoopConfig.
-        """
-        return MonitorExecutorEnvironmentLoopConfig

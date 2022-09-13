@@ -16,7 +16,7 @@
 """Parameter server Component for Mava systems."""
 import abc
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Sequence, Type, Union
+from typing import Any, Dict, List, Sequence, Type, Union
 
 import numpy as np
 
@@ -70,15 +70,6 @@ class ParameterServer(Component):
     def name() -> str:
         """Static method that returns component name."""
         return "parameter_server"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for Component.
-
-        Returns:
-            config class/dataclass for Component.
-        """
-        return ParameterServerConfig
 
     @staticmethod
     def required_components() -> List[Type[Callback]]:

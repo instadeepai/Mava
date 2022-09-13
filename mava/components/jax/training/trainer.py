@@ -18,7 +18,7 @@
 import abc
 from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import Any, Callable, Dict, List, Optional, Type
+from typing import Any, Dict, List, Type
 
 from mava.callbacks import Callback
 from mava.components.jax import Component
@@ -321,12 +321,3 @@ class CustomTrainerInit(BaseTrainerInit):
             agent: trainer.store.trainer_table_entry[a_i]
             for a_i, agent in enumerate(trainer.store.trainer_agents)
         }
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return CustomTrainerInitConfig
