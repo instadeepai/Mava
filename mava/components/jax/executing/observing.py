@@ -78,11 +78,11 @@ class ExecutorObserve(Component):
 
 
 class FeedforwardExecutorObserve(ExecutorObserve):
-    def __init__(self, config: ExecutorObserveConfig = ExecutorObserveConfig()):
+    def __init__(self, config: SimpleNamespace = SimpleNamespace()):
         """Component handles observations for a feedforward executor.
 
         Args:
-            config: ExecutorObserveConfig.
+            config: SimpleNamespace.
         """
         self.config = config
 
