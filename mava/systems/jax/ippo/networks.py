@@ -27,7 +27,6 @@ from acme.jax import utils
 from dm_env import specs as dm_specs
 
 from mava import specs as mava_specs
-from mava.components.jax.networks import CategoricalValueHead
 from mava.utils.jax_training_utils import action_mask_categorical_policies
 
 Array = dm_specs.Array
@@ -142,49 +141,6 @@ class PPONetworks:
         }
 
 
-# This class is made to replicate the behaviour of the categorical value head
-# which squeezes the value inside the __call__ method before returning it.
-# please see
-# https://github.com/deepmind/acme/blob/70e1e6b694d79d94f1bed13d55cda5c1837a10f3/acme/jax/networks/distributional.py#L284 # noqa: E501
-class ValueHead(hk.Module):
-    """Network head that produces a value."""
-
-    def __init__(
-        self,
-        name: Optional[str] = None,
-    ):
-        """Initialize the class"""
-        super().__init__(name=name)
-        self._value_layer = hk.Linear(1)
-
-    def __call__(self, inputs: jnp.ndarray) -> Any:
-        """Return output given network inputs."""
-        value = jnp.squeeze(self._value_layer(inputs), axis=-1)
-        return value
-
-
-def make_ppo_network(
-    network: networks_lib.FeedForwardNetwork, params: Dict[str, jnp.ndarray]
-) -> PPONetworks:
-    """Instantiate PPO network class which has shared hidden layers with unique\
-        policy and value heads.
-
-    Args:
-        network: feedforward network representing the agent policy function
-        params: values parameterising the network.
-
-    Returns:
-        PPONetworks: PPO network class
-    """
-    return PPONetworks(
-        network=network,
-        params=params,
-        log_prob=lambda distribution, action: distribution.log_prob(action),
-        entropy=lambda distribution: distribution.entropy(),
-        sample=lambda distribution, key: distribution.sample(seed=key),
-    )
-
-
 def make_ppo_networks(
     policy_network: networks_lib.FeedForwardNetwork,
     policy_params: Dict[str, jnp.ndarray],
@@ -204,53 +160,25 @@ def make_ppo_networks(
     )
 
 
-def make_networks(
-    spec: specs.EnvironmentSpec,
-    key: networks_lib.PRNGKey,
-    policy_layer_sizes: Sequence[int] = (
-        256,
-        256,
-        256,
-    ),
-    critic_layer_sizes: Sequence[int] = (512, 512, 256),
-    observation_network: Callable = utils.batch_concat,
-) -> PPONetworks:
-    """Function for creating PPO networks to be used.
+# This class is made to replicate the behaviour of the categorical value head
+# which squeezes the value inside the __call__ method before returning it.
+# please see
+# https://github.com/deepmind/acme/blob/70e1e6b694d79d94f1bed13d55cda5c1837a10f3/acme/jax/networks/distributional.py#L284 # noqa: E501
+class ValueHead(hk.Module):
+    """Network head that produces a value."""
 
-    These networks will be different depending on whether the
-    environment has a discrete or continuous action space.
+    def __init__(
+        self,
+        name: Optional[str] = None,
+    ):
+        """Initialize the class"""
+        super().__init__(name=name)
+        self._value_layer = hk.Linear(1)
 
-    Args:
-        spec: specifications of training environment
-        key: pseudo-random value used to initialise distributions
-        policy_layer_sizes: size of each layer of the policy network
-        critic_layer_sizes: size of each layer of the critic network
-        observation_network: Network used for feature extraction layers
-        single_network: If a shared represnetation netowrk should be used.
-
-    Returns:
-        make_discrete_networks: function to create a discrete network
-        make_continuous_networks: function to create a continuous network
-
-    Raises:
-        NotImplementedError: Raises an error if continous network is not
-                        available
-    """
-    if isinstance(spec.actions, specs.DiscreteArray):
-        return make_discrete_networks(
-            environment_spec=spec,
-            key=key,
-            policy_layer_sizes=policy_layer_sizes,
-            critic_layer_sizes=critic_layer_sizes,
-            observation_network=observation_network,
-        )
-
-    else:
-        raise NotImplementedError(
-            "Continuous networks not implemented yet."
-            + "See: https://github.com/deepmind/acme/blob/"
-            + "master/acme/agents/jax/ppo/networks.py"
-        )
+    def __call__(self, inputs: jnp.ndarray) -> Any:
+        """Return output given network inputs."""
+        value = jnp.squeeze(self._value_layer(inputs), axis=-1)
+        return value
 
 
 def make_discrete_networks(
@@ -328,6 +256,55 @@ def make_discrete_networks(
         critic_network=critic_fn,
         critic_params=critic_params,
     )
+
+
+def make_networks(
+    spec: specs.EnvironmentSpec,
+    key: networks_lib.PRNGKey,
+    policy_layer_sizes: Sequence[int] = (
+        256,
+        256,
+        256,
+    ),
+    critic_layer_sizes: Sequence[int] = (512, 512, 256),
+    observation_network: Callable = utils.batch_concat,
+) -> PPONetworks:
+    """Function for creating PPO networks to be used.
+
+    These networks will be different depending on whether the
+    environment has a discrete or continuous action space.
+
+    Args:
+        spec: specifications of training environment
+        key: pseudo-random value used to initialise distributions
+        policy_layer_sizes: size of each layer of the policy network
+        critic_layer_sizes: size of each layer of the critic network
+        observation_network: Network used for feature extraction layers
+        single_network: If a shared represnetation netowrk should be used.
+
+    Returns:
+        make_discrete_networks: function to create a discrete network
+        make_continuous_networks: function to create a continuous network
+
+    Raises:
+        NotImplementedError: Raises an error if continous network is not
+                        available
+    """
+    if isinstance(spec.actions, specs.DiscreteArray):
+        return make_discrete_networks(
+            environment_spec=spec,
+            key=key,
+            policy_layer_sizes=policy_layer_sizes,
+            critic_layer_sizes=critic_layer_sizes,
+            observation_network=observation_network,
+        )
+
+    else:
+        raise NotImplementedError(
+            "Continuous networks not implemented yet."
+            + "See: https://github.com/deepmind/acme/blob/"
+            + "master/acme/agents/jax/ppo/networks.py"
+        )
 
 
 def make_default_networks(
