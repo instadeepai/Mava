@@ -15,7 +15,7 @@ To read more about the motivation behind Mava, please see our [blog post][blog],
 
 <hr>
 
-👋 **UPDATE**: The team has been hard at work over the past few months to improve Mava's systems performance, stability and robustness. These efforts include extensively benchmarking system implementations, fixing bugs and profiling performance and speed. The culmination of this work will be reflected in our next stable release. However, during this period, we have learned a lot about what works and what doesn't. In particular, our current base system design allows for a decent amount of flexibility but quickly becomes difficult to maintain with growing signatures and system constructors as additional modules get added. Our class designs are also overly reliant on wrappers and inheritance which do not scale as well as we would like with increases in system complexity. Furthermore, our original motivation for choosing Tensorflow 2 (TF2) as our deep learning backend was to align with Acme's large repository of RL abstractions and tools for TF2. These were very useful for initially building our systems. But since then, we have found TF2 less performant and flexible than we desire given alternative frameworks. Acme has also affirmed their support of Jax underlying much of the DeepMind RL ecosystem. Therefore, in the coming months, following our stable release, **we plan to rollout a more modular and flexible build system specifically for Jax-based systems.** Please note that all TF2-based systems using the old build system will be maintained during the rollout. However, once a stable Jax release has been made with the new build system, Mava will only support a single DL backend, namely Jax, and we will begin to deprecate all TF2 systems and building support. That said, we will make sure to communicate clearly and often during the migration from TF2 to Jax.
+👋 **UPDATE - 02/09/2022**: As mentioned in our previous update, we are in the process of fully moving to JAX. In the next few weeks, we will release our first JAX system! Using a more modular and flexible build method, with many more develops to come soon. These will include more components and utilities, state-of-the-art system implementations, notebooks and tutorials as well as detailed benchmarking and performance guides. Please note that all TF2-based systems using the old build method will be deprecated in the near future. As part of this update, we have also restructured the readme and our documentation to reflect our move to JAX.
 
 <hr>
 
@@ -38,7 +38,7 @@ Mava allows a high level of composability for novel research (i.e. building new 
 
 ## Getting Started
 
-We have a [Jax quickstart notebook][jax_quickstart] and [TF2 quickstart notebook][tf_quickstart] that can be used to quickly create and train your first multi-agent system. For more information on how to use Mava, please view our [usage section](#usage). Finally, for more on Mava's implementation details, please visit our [documentation].
+We have a [Jax quickstart notebook][jax_quickstart] and [TF2 quickstart notebook][tf_quickstart] that can be used to quickly create and train your first multi-agent system. As mentioned above, please do note that TF2 will be deprecated soon. For more information on how to use Mava, please view our [usage section](#usage). Finally, for more on Mava's implementation details, please visit our [documentation].
 
 ## Supported Environments
 
