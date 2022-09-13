@@ -128,6 +128,13 @@ class DefaultParameterServer(ParameterServer):
                 server.store.parameters[
                     f"critic_{net_type_key}-{agent_net_key}"
                 ] = networks[net_type_key][agent_net_key].critic_params
+                if net_type_key == "networks":
+                    server.store.parameters[
+                        f"policy_opt_state-{agent_net_key}"
+                    ] = server.store.policy_opt_states[agent_net_key]
+                    server.store.parameters[
+                        f"critic_opt_state-{agent_net_key}"
+                    ] = server.store.critic_opt_states[agent_net_key]
 
         server.store.experiment_path = self.config.experiment_path
 

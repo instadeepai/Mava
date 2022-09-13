@@ -263,24 +263,30 @@ class ParameterClient:
         for key in new_parameters.keys():
             if isinstance(new_parameters[key], dict):
                 for type1_key in new_parameters[key].keys():
-                    for type2_key in self._parameters[key][type1_key].keys():
-                        if self._devices:
-                            # Move variables to a proper device.
-                            # self._parameters[key][type1_key][
-                            #     type2_key
-                            # ] = jax.device_put(  # type: ignore
-                            #     new_parameters[key][type1_key],
-                            #     self._devices[key][type1_key],
-                            # )
-                            raise NotImplementedError(
-                                "Support for devices"
-                                + "have not been implemented"
-                                + "yet in the parameter client."
-                            )
-                        else:
-                            self._parameters[key][type1_key][
-                                type2_key
-                            ] = new_parameters[key][type1_key][type2_key]
+                    # Check if nested dictionary
+                    if isinstance(new_parameters[key][type1_key], dict):
+                        for type2_key in self._parameters[key][type1_key].keys():
+                            if self._devices:
+                                # Move variables to a proper device.
+                                # self._parameters[key][type1_key][
+                                #     type2_key
+                                # ] = jax.device_put(  # type: ignore
+                                #     new_parameters[key][type1_key],
+                                #     self._devices[key][type1_key],
+                                # )
+                                raise NotImplementedError(
+                                    "Support for devices"
+                                    + "have not been implemented"
+                                    + "yet in the parameter client."
+                                )
+                            else:
+                                self._parameters[key][type1_key][
+                                    type2_key
+                                ] = new_parameters[key][type1_key][type2_key]
+                    else:
+                        self._parameters[key][type1_key] = new_parameters[key][
+                            type1_key
+                        ]
             elif isinstance(new_parameters[key], np.ndarray):
                 if self._devices:
                     self._parameters[key] = jax.device_put(
@@ -297,7 +303,6 @@ class ParameterClient:
                         self._parameters[key] += new_parameters[key][0]
                     else:
                         self._parameters[key] += new_parameters[key]
-
             elif isinstance(new_parameters[key], tuple):
                 for i in range(len(self._parameters[key])):
                     if self._devices:

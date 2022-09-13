@@ -17,7 +17,7 @@
 import abc
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Tuple, Type
 
 import jax
 import jax.numpy as jnp
@@ -391,6 +391,7 @@ class MAPGWithTrustRegionStep(Step):
             }
             policy_opt_states = trainer.store.policy_opt_states
             critic_opt_states = trainer.store.critic_opt_states
+
             random_key, _ = jax.random.split(trainer.store.base_key)
 
             states = TrainingState(
@@ -406,7 +407,7 @@ class MAPGWithTrustRegionStep(Step):
             # Set the new variables
             # TODO (dries): key is probably not being store correctly.
             # The variable client might lose reference to it when checkpointing.
-            # We also need to add the optimizer and random_key to the variable
+            # We also need to add the optimiser and random_key to the variable
             # server.
             trainer.store.base_key = new_states.random_key
 
@@ -418,31 +419,33 @@ class MAPGWithTrustRegionStep(Step):
                 net_key: networks[net_key].policy_params for net_key in networks.keys()
             }
             for net_key in policy_params.keys():
-                # This below forloop is needed to not lose the param reference.
+                # The for loop below is needed to not lose the param reference.
                 net_params = trainer.store.networks["networks"][net_key].policy_params
                 for param_key in net_params.keys():
                     net_params[param_key] = new_states.policy_params[net_key][param_key]
 
-                # Update the policy optimizer
-                # This needs to be in the loop to not lose the reference.
-                trainer.store.policy_opt_states[net_key] = new_states.policy_opt_states[
-                    net_key
-                ]
+                # Update the policy optimiser
+                # The opt_states need to be wrapped in a dict so as not to lose
+                # the reference.
 
+                trainer.store.policy_opt_states[net_key][
+                    "opt_state"
+                ] = new_states.policy_opt_states[net_key]["opt_state"]
             critic_params = {
                 net_key: networks[net_key].critic_params for net_key in networks.keys()
             }
             for net_key in critic_params.keys():
-                # This below forloop is needed to not lose the param reference.
+                # The for loop below is needed to not lose the param reference.
                 net_params = trainer.store.networks["networks"][net_key].critic_params
                 for param_key in net_params.keys():
                     net_params[param_key] = new_states.critic_params[net_key][param_key]
 
-                # Update the policy optimizer
-                # This needs to be in the loop to not lose the reference.
-                trainer.store.critic_opt_states[net_key] = new_states.critic_opt_states[
-                    net_key
-                ]
+                # Update the critic optimiser
+                # The opt_states need to be wrapped in a dict so as not to lose
+                # the reference.
+                trainer.store.critic_opt_states[net_key][
+                    "opt_state"
+                ] = new_states.critic_opt_states[net_key]["opt_state"]
 
             return metrics
 

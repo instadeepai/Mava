@@ -54,6 +54,7 @@ class IPPOSystem(System):
             adder_priority=building.UniformAdderPriority,
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
             networks=building.DefaultNetworks,
+            optimisers=building.DefaultOptimisers,
         ).get()
 
         # Trainer

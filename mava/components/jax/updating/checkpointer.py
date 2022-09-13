@@ -14,12 +14,14 @@
 # limitations under the License.
 
 import time
-from typing import Callable, Optional
+from typing import List, Type
 
 from acme.jax import savers as acme_savers
 from chex import dataclass
 
+from mava.callbacks import Callback
 from mava.components.jax import Component
+from mava.components.jax.updating.parameter_server import ParameterServer
 from mava.core_jax import SystemParameterServer
 from mava.wrappers import SaveableWrapper
 
@@ -55,7 +57,6 @@ class Checkpointer(Component):
             add_uid=False,
             time_delta_minutes=0,
         )
-
         server.store.last_checkpoint_time = time.time()
         server.store.checkpoint_minute_interval = self.config.checkpoint_minute_interval
 
@@ -83,10 +84,13 @@ class Checkpointer(Component):
         return "checkpointer"
 
     @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        ParameterServer required to set up server.store.parameters
+        and server.store.experiment_path.
 
         Returns:
-            config class/dataclass for component.
+            List of required component classes.
         """
-        return CheckpointerConfig
+        return [ParameterServer]

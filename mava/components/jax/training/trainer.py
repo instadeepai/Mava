@@ -24,6 +24,7 @@ from mava.callbacks import Callback
 from mava.components.jax import Component
 from mava.components.jax.building.environments import EnvironmentSpec
 from mava.components.jax.building.networks import Networks
+from mava.components.jax.building.optimisers import Optimisers
 from mava.components.jax.building.system_init import BaseSystemInit
 from mava.core_jax import SystemBuilder, SystemTrainer
 from mava.utils.sort_utils import sort_str_num
@@ -66,11 +67,13 @@ class BaseTrainerInit(Component):
         and builder.store.network_sampling_setup.
         EnvironmentSpec required to set up builder.store.agents.
         Networks required to set up builder.store.network_factory.
+        Optmisers required to set up builder.store.policy_optimiser
+        and builder.store.critic_optimiser.
 
         Returns:
             List of required component classes.
         """
-        return [BaseSystemInit, EnvironmentSpec, Networks]
+        return [BaseSystemInit, EnvironmentSpec, Networks, Optimisers]
 
 
 class SingleTrainerInit(BaseTrainerInit):
@@ -130,6 +133,23 @@ class SingleTrainerInit(BaseTrainerInit):
 
         # TODO (Matthew): networks need to be created on the nodes instead?
         builder.store.networks = builder.store.network_factory()
+
+        # Wrap opt_states in a mutable type (dict) since optax return an immutable tuple
+        builder.store.policy_opt_states = {}
+        for net_key in builder.store.networks["networks"].keys():
+            builder.store.policy_opt_states[net_key] = {
+                "opt_state": builder.store.policy_optimiser.init(
+                    builder.store.networks["networks"][net_key].policy_params
+                )
+            }  # pytype: disable=attribute-error
+
+        builder.store.critic_opt_states = {}
+        for net_key in builder.store.networks["networks"].keys():
+            builder.store.critic_opt_states[net_key] = {
+                "opt_state": builder.store.critic_optimiser.init(
+                    builder.store.networks["networks"][net_key].critic_params
+                )
+            }  # pytype: disable=attribute-error
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """Set up trainer agents.
@@ -210,6 +230,23 @@ class OneTrainerPerNetworkInit(BaseTrainerInit):
                     builder.store.table_network_config[trainer_key] = sample
 
         builder.store.networks = builder.store.network_factory()
+
+        # TODO Check!!!!
+        builder.store.policy_opt_states = {}
+        for net_key in builder.store.networks["networks"].keys():
+            builder.store.policy_opt_states[net_key] = {
+                "opt_state": builder.store.policy_optimiser.init(
+                    builder.store.networks["networks"][net_key].policy_params
+                )
+            }  # pytype: disable=attribute-error
+
+        builder.store.critic_opt_states = {}
+        for net_key in builder.store.networks["networks"].keys():
+            builder.store.critic_opt_states[net_key] = {
+                "opt_state": builder.store.critic_optimiser.init(
+                    builder.store.networks["networks"][net_key].critic_params
+                )
+            }  # pytype: disable=attribute-error
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """Set up trainer agents.
@@ -300,6 +337,22 @@ class CustomTrainerInit(BaseTrainerInit):
                     builder.store.table_network_config[trainer_key] = sample
 
         builder.store.networks = builder.store.network_factory()
+
+        builder.store.policy_opt_states = {}
+        for net_key in builder.store.networks["networks"].keys():
+            builder.store.policy_opt_states[net_key] = {
+                "opt_state": builder.store.policy_optimiser.init(
+                    builder.store.networks["networks"][net_key].policy_params
+                )
+            }  # pytype: disable=attribute-error
+
+        builder.store.critic_opt_states = {}
+        for net_key in builder.store.networks["networks"].keys():
+            builder.store.critic_opt_states[net_key] = {
+                "opt_state": builder.store.critic_optimiser.init(
+                    builder.store.networks["networks"][net_key].critic_params
+                )
+            }  # pytype: disable=attribute-error
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """Set up and store trainer agents.
