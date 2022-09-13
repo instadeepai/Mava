@@ -16,7 +16,6 @@
 """Config class for Mava systems"""
 
 from dataclasses import fields, is_dataclass
-from distutils.command.config import config
 from types import SimpleNamespace
 from typing import Any, Dict, List, Type
 
@@ -226,9 +225,9 @@ class Config:
         config_class = component.__init__.__annotations__["config"]
 
         # Return if there is no config class for the component
-        if config_class is SimpleNamespace: 
+        if config_class is SimpleNamespace:
             return config_class
-    
+
         # Set local config to global config for names which appear in the config class
         global_config = self._built_config
         local_config: Dict[str, Any] = {}
