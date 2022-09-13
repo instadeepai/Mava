@@ -43,7 +43,10 @@ def test_trainer_single_process(test_system_sp: System) -> None:
 
     # Before run step method
     for net_key in trainer.store.networks["networks"].keys():
-        mu = trainer.store.policy_opt_states[net_key][0][-1]  # network
+        # print("net_key: ", net_key)
+        # print("shape 0: ", len(trainer.store.policy_opt_states[net_key][1]))
+        # print("shape 1: ", len(trainer.store.policy_opt_states[net_key][1][0]))
+        mu = trainer.store.policy_opt_states[net_key][1].mu  # network
         for categorical_value_head in mu.values():
             assert jnp.all(categorical_value_head["b"] == 0)
             assert jnp.all(categorical_value_head["w"] == 0)
@@ -52,7 +55,7 @@ def test_trainer_single_process(test_system_sp: System) -> None:
 
     # After run step method
     for net_key in trainer.store.networks["networks"].keys():
-        mu = trainer.store.policy_opt_states[net_key][0][-1]
+        mu = trainer.store.policy_opt_states[net_key][1].mu
         for categorical_value_head in mu.values():
             assert not jnp.all(categorical_value_head["b"] == 0)
             assert not jnp.all(categorical_value_head["w"] == 0)
