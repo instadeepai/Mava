@@ -29,6 +29,7 @@ from mava.components.jax.building.environments import (
 )
 from mava.components.jax.building.loggers import Logger
 from mava.components.jax.building.networks import DefaultNetworks
+from mava.components.jax.building.optimisers import DefaultOptimisers
 from mava.components.jax.building.parameter_client import (
     ExecutorParameterClient,
     TrainerParameterClient,
