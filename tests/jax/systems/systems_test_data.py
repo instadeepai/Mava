@@ -50,6 +50,7 @@ def ippo_system_single_process() -> System:
     base_dir = tempfile.mkdtemp()
     mava_id = str(datetime.now())
     checkpoint_subpath = f"{base_dir}/{mava_id}"
+
     # Log every [log_every] seconds.
     log_every = 1
     logger_factory = functools.partial(
@@ -60,10 +61,14 @@ def ippo_system_single_process() -> System:
         time_stamp=mava_id,
         time_delta=log_every,
     )
-    # Optimizer.
-    optimizer = optax.chain(
-        optax.clip_by_global_norm(40.0),
-        optax.adam(1e-4),
+
+    # Optimisers.
+    policy_optimiser = optax.chain(
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+    )
+
+    critic_optimiser = optax.chain(
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
     # Create ippo system
@@ -76,7 +81,8 @@ def ippo_system_single_process() -> System:
         network_factory=network_factory,
         logger_factory=logger_factory,
         experiment_path=checkpoint_subpath,
-        optimizer=optimizer,
+        policy_optimiser=policy_optimiser,
+        critic_optimiser=critic_optimiser,
         executor_parameter_update_period=1,
         multi_process=False,  # Single process case
         run_evaluator=True,
@@ -131,8 +137,12 @@ def ippo_system_multi_thread() -> System:
         time_delta=log_every,
     )
 
-    # Optimizer.
-    optimizer = optax.chain(
+    # Optimisers.
+    policy_optimiser = optax.chain(
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+    )
+
+    critic_optimiser = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
@@ -146,7 +156,8 @@ def ippo_system_multi_thread() -> System:
         network_factory=network_factory,
         logger_factory=logger_factory,
         experiment_path=checkpoint_subpath,
-        optimizer=optimizer,
+        policy_optimiser=policy_optimiser,
+        critic_optimiser=critic_optimiser,
         executor_parameter_update_period=1,
         multi_process=True,
         run_evaluator=True,

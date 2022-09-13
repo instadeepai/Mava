@@ -42,14 +42,6 @@ class Batch(NamedTuple):
 class TrainingState(NamedTuple):
     """Training state consists of network parameters and optimiser state."""
 
-    params: Any
-    opt_states: Dict[str, optax.OptState]
-    random_key: Any
-
-
-class TrainingStateSeparateNetworks(NamedTuple):
-    """Training state consists of network parameters and optimiser state."""
-
     policy_params: Any
     critic_params: Any
     policy_opt_states: Dict[str, optax.OptState]
