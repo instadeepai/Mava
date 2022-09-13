@@ -16,7 +16,8 @@
 """Commonly used rate limiter, sampler and remover components for system builders"""
 import abc
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Type
+from types import SimpleNamespace
+from typing import List, Optional, Type
 
 import reverb
 
@@ -45,15 +46,6 @@ class RateLimiter(Component):
     def name() -> str:
         """Static method that returns component name."""
         return "rate_limiter"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return RateLimiterConfig
 
     @staticmethod
     def required_components() -> List[Type[Callback]]:
@@ -139,15 +131,10 @@ class SampleToInsertRateLimiter(RateLimiter):
         builder.store.rate_limiter_fn = rate_limiter_fn
 
 
-@dataclass
-class SamplerConfig:
-    pass
-
-
 class Sampler(Component):
     def __init__(
         self,
-        config: SamplerConfig = SamplerConfig(),
+        config: SimpleNamespace = SimpleNamespace(),
     ):
         """Creates reverb selector functions for sampling data.
 
@@ -168,15 +155,6 @@ class Sampler(Component):
         """Static method that returns component name."""
 
         return "data_server_sampler"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return SamplerConfig
 
     @staticmethod
     def required_components() -> List[Type[Callback]]:
@@ -234,25 +212,11 @@ class PrioritySampler(Sampler):
 
         builder.store.sampler_fn = sampler_fn
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return PrioritySamplerConfig
-
-
-@dataclass
-class RemoverConfig:
-    pass
-
 
 class Remover(Component):
     def __init__(
         self,
-        config: RemoverConfig = RemoverConfig(),
+        config: SimpleNamespace = SimpleNamespace(),
     ):
         """Creates reverb selector functions for removing data.
 
@@ -282,15 +246,6 @@ class Remover(Component):
         """Static method that returns component name."""
 
         return "data_server_remover"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return RemoverConfig
 
     @staticmethod
     def required_components() -> List[Type[Callback]]:

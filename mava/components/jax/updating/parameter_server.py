@@ -82,15 +82,6 @@ class ParameterServer(Component):
         return "parameter_server"
 
     @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for Component.
-
-        Returns:
-            config class/dataclass for Component.
-        """
-        return ParameterServerConfig
-
-    @staticmethod
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 

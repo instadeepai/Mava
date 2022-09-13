@@ -449,15 +449,6 @@ class MAPGWithTrustRegionStep(Step):
         trainer.store.step_fn = step
 
     @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MAPGWithTrustRegionStepConfig
-
-    @staticmethod
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
