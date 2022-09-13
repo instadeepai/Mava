@@ -132,15 +132,6 @@ class FixedNetworkSystemInit(BaseSystemInit):
             net_key: i for i, net_key in enumerate(builder.store.unique_net_keys)
         }
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return FixedNetworkSystemInitConfig
-
 
 @dataclass
 class RandomSamplingSystemInitConfig:
@@ -206,15 +197,6 @@ class RandomSamplingSystemInit(BaseSystemInit):
             net_key: i for i, net_key in enumerate(builder.store.unique_net_keys)
         }
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return RandomSamplingSystemInitConfig
-
 
 @dataclass
 class CustomSamplingSystemInitConfig(BaseSystemInitConfig):
@@ -270,12 +252,3 @@ class CustomSamplingSystemInit(BaseSystemInit):
         builder.store.net_keys_to_ids = {
             net_key: i for i, net_key in enumerate(builder.store.unique_net_keys)
         }
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return CustomSamplingSystemInitConfig

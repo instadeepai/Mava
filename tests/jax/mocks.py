@@ -19,6 +19,7 @@ import abc
 import copy
 import functools
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import dm_env
@@ -260,13 +261,8 @@ def mock_queue(
     return reverb.Table.queue(name=name, max_size=max_queue_size, signature=signature)
 
 
-@dataclass
-class MockDataServerConfig:
-    pass
-
-
 class MockDataServer(Component):
-    def __init__(self, config: MockDataServerConfig = MockDataServerConfig()) -> None:
+    def __init__(self, config: SimpleNamespace = SimpleNamespace()) -> None:
         """_summary_
 
         Args:
@@ -311,15 +307,6 @@ class MockDataServer(Component):
     def name() -> str:
         """Static method that returns component name."""
         return "data_server"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MockDataServerConfig
 
 
 class MockOnPolicyDataServer(MockDataServer):
@@ -382,15 +369,6 @@ class MockOnPolicyDataServer(MockDataServer):
             signature=signature,
         )
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return OnPolicyDataServerConfig
-
 
 class MockOffPolicyDataServer(MockDataServer):
     def __init__(
@@ -449,15 +427,6 @@ class MockOffPolicyDataServer(MockDataServer):
             rate_limiter=builder.store.rate_limiter_fn(),
             signature=builder.store.adder_signature_fn(environment_spec, extras_spec),
         )
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return OffPolicyDataServerConfig
 
 
 @dataclass
@@ -578,15 +547,6 @@ class MockTrainerParameterClient(Component):
         """Static method that returns component name."""
         return "trainer_parameter_client"
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MockTrainerParameterClientConfig
-
 
 @dataclass
 class MockExecutorDefaultConfig:
@@ -662,15 +622,6 @@ class MockExecutorEnvironmentLoop(Component):
         """Static method that returns component name."""
         return "executor_environment_loop"
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MockExecutorEnvironmentLoopConfig
-
 
 @dataclass
 class MockNetworksConfig:
@@ -709,15 +660,6 @@ class MockNetworks(Component):
         """_summary_"""
         return "networks"
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MockNetworksConfig
-
 
 @dataclass
 class MockTrainerDatasetConfig:
@@ -746,15 +688,6 @@ class MockTrainerDataset(Component):
     def name() -> str:
         """Static method that returns component name."""
         return "trainer_dataset"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MockTrainerDatasetConfig
 
 
 @dataclass

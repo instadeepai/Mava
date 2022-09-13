@@ -6,9 +6,8 @@ If a desired functionality does not exist in Mava, a system can easily be extend
 
 Each component requires:
 
-* An associated `dataclass` which defines a component specific config with hyperparameters to be used by it. Parameters from this component config `dataclass` can also be overwritten at a system level.
-* A `name` static method which defines the component name. This name gets used to verify that two components with the same desired functionality are not present in a system simultaneously.
-* A `config_class` static method which returns the component config `dataclass`.
+* An associated `dataclass` which defines a component specific config with parameters to be used by it. Parameters from this component config `dataclass` can also be overwritten at a system level.
+* A `name` static method which defines the component name. This name gets used to verify that two components with the same functionaltiy are not simultaneously present in the system.
 * Defining any relevant hooks to be overwritten by that component where each overwritten hook takes the process associated with a particular component as its input.
 
 The component can be added to the system:
@@ -83,15 +82,6 @@ class GAE(Utility):
     def name() -> str:
         """Static method that returns component name."""
         return "gae_fn"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return GAEConfig
 ```
 
 [component]: https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/components/jax/component.py#L24

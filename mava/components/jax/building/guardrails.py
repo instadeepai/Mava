@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Type
+from types import SimpleNamespace
+from typing import List, Type
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -9,15 +10,10 @@ from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 
 
-@dataclass
-class ComponentDependencyGuardrailsConfig:
-    pass
-
-
 class ComponentDependencyGuardrails(Component):
     def __init__(
         self,
-        config: ComponentDependencyGuardrailsConfig,
+        config: SimpleNamespace = SimpleNamespace(),
     ):
         """Save the config"""
         self.config = config
@@ -47,15 +43,6 @@ class ComponentDependencyGuardrails(Component):
     def name() -> str:
         """Static method that returns component name."""
         return "component_dependency_guardrails"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Optional class which specifies the dataclass/config object for the component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return ComponentDependencyGuardrailsConfig
 
     @staticmethod
     def required_components() -> List[Type[Callback]]:
@@ -255,15 +242,6 @@ class ComponentDependencyDebugger(Component):
     def name() -> str:
         """Static method that returns component name."""
         return "component_dependency_debugger"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Optional class which specifies the dataclass/config object for the component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return ComponentDependencyDebuggerConfig
 
     @staticmethod
     def required_components() -> List[Type[Callback]]:
