@@ -72,7 +72,6 @@ class MAPGMinibatchUpdateConfig:
     optimizer: Optional[optax_base.GradientTransformation] = (None,)
     normalize_advantage: bool = True
 
-
 class MAPGMinibatchUpdate(MinibatchUpdate):
     def __init__(
         self,
@@ -113,6 +112,11 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
             trainer.store.opt_states[net_key] = trainer.store.optimizer.init(
                 trainer.store.networks["networks"][net_key].params
             )  # pytype: disable=attribute-error
+        
+        # Initialise running stats here
+        trainer.store.stats = {}
+        for net_key in trainer.store.trainer_agent_net_keys.keys():
+            trainer.store.stats[net_key] = jnp.array([0, 0, 1e-4])
 
         def model_update_minibatch(
             carry: Tuple[networks_lib.Params, optax.OptState], minibatch: Batch
@@ -357,6 +361,11 @@ class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
             ] = trainer.store.critic_optimizer.init(
                 trainer.store.networks["networks"][net_key].critic_params
             )  # pytype: disable=attribute-error
+        
+        # Initialise running stats here
+        trainer.store.stats = {}
+        for net_key in trainer.store.trainer_agent_net_keys.keys():
+            trainer.store.stats[net_key] = jnp.array([0, 0, 1e-4])
 
         def model_update_minibatch(
             carry: Tuple[

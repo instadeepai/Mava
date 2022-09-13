@@ -46,6 +46,13 @@ class TrainingState(NamedTuple):
     opt_states: Dict[str, optax.OptState]
     random_key: Any
 
+class TrainingStateStats(NamedTuple):
+    """Extends the training state with a new field for the running statisitics (mean, var, count)"""
+
+    params: Any
+    opt_states: Dict[str, optax.OptState]
+    random_key: Any
+    stats: Any
 
 class TrainingStateSeparateNetworks(NamedTuple):
     """Training state consists of network parameters and optimiser state."""
@@ -56,6 +63,15 @@ class TrainingStateSeparateNetworks(NamedTuple):
     critic_opt_states: Dict[str, optax.OptState]
     random_key: Any
 
+class TrainingStateStatsSeparateNetworks(NamedTuple):
+    """Extends the training state for separate networks with a new field for the running statistics (mean, var, count)"""
+
+    policy_params: Any
+    critic_params: Any
+    policy_opt_states: Dict[str, optax.OptState]
+    critic_opt_states: Dict[str, optax.OptState]
+    random_key: Any
+    stats: Any
 
 class Utility(Component):
     @abc.abstractmethod
