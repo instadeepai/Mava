@@ -44,9 +44,7 @@ def mock_parameter_server() -> MockParameterServer:
 
     mock_server = MockParameterServer(
         store=MockParameterStore(
-            parameters={
-                "trainer_steps": 50,
-            },
+            parameters={"trainer_steps": 50},
             experiment_path=tempfile.mkdtemp(),
         ),
     )

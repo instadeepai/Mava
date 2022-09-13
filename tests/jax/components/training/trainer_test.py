@@ -16,6 +16,9 @@
 from types import SimpleNamespace
 from typing import List
 
+import jax
+import jax.numpy as jnp
+import optax
 import pytest
 
 from mava.callbacks.base import Callback
@@ -64,7 +67,29 @@ class MockBuilder(Builder):
         """
         super().__init__(components, global_config)
         self.store.agents = ["agent_0", "agent_1", "agent_2"]
-        self.store.network_factory = lambda: "network_initialized"
+        self.store.network_factory = lambda: {  # network factory to network
+            "networks": {
+                "network_agent_0": SimpleNamespace(
+                    policy_params={"weights": 0, "biases": 0},
+                    critic_params={"weights": 0, "biases": 0},
+                ),
+                "network_agent_1": SimpleNamespace(
+                    policy_params={"weights": 1, "biases": 1},
+                    critic_params={"weights": 1, "biases": 1},
+                ),
+                "network_agent_2": SimpleNamespace(
+                    policy_params={"weights": 2, "biases": 2},
+                    critic_params={"weights": 2, "biases": 2},
+                ),
+            }
+        }
+
+        self.store.policy_optimiser = optax.chain(
+            optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+        )
+        self.store.critic_optimiser = optax.chain(
+            optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+        )
 
 
 @pytest.fixture
@@ -259,6 +284,96 @@ def mock_one_trainer_per_network_random_sampling() -> Trainer:
 # TESTS
 ############################
 
+
+def check_opt_states(mock_builder: Builder) -> None:
+    """Checks optimiser states are as expected
+
+    Args:
+        mock_builder : Fixture SystemBuilder
+    """
+    assert list(mock_builder.store.policy_opt_states.keys()) == [
+        "network_agent_0",
+        "network_agent_1",
+        "network_agent_2",
+    ]
+    assert list(mock_builder.store.critic_opt_states.keys()) == [
+        "network_agent_0",
+        "network_agent_1",
+        "network_agent_2",
+    ]
+
+    for net_key in mock_builder.store.networks["networks"].keys():
+        # print("CHECK: ", mock_builder.store.policy_opt_states[net_key])
+        # exit()
+        assert (
+            mock_builder.store.policy_opt_states[net_key]["opt_state"][0]
+            == optax.EmptyState()
+        )
+        assert (
+            mock_builder.store.critic_opt_states[net_key]["opt_state"][0]
+            == optax.EmptyState()
+        )
+
+        assert isinstance(
+            mock_builder.store.policy_opt_states[net_key]["opt_state"][1],
+            optax.ScaleByAdamState,
+        )
+        assert isinstance(
+            mock_builder.store.critic_opt_states[net_key]["opt_state"][1],
+            optax.ScaleByAdamState,
+        )
+
+        assert mock_builder.store.policy_opt_states[net_key]["opt_state"][1][
+            0
+        ] == jnp.array([0])
+        assert mock_builder.store.critic_opt_states[net_key]["opt_state"][1][
+            0
+        ] == jnp.array([0])
+
+        assert list(
+            mock_builder.store.policy_opt_states[net_key]["opt_state"][1][1]
+        ) == list(
+            jax.tree_util.tree_map(
+                lambda t: jnp.zeros_like(t, dtype=float),
+                mock_builder.store.networks["networks"][net_key].policy_params,
+            )
+        )
+        assert list(
+            mock_builder.store.critic_opt_states[net_key]["opt_state"][1][1]
+        ) == list(
+            jax.tree_util.tree_map(
+                lambda t: jnp.zeros_like(t, dtype=float),
+                mock_builder.store.networks["networks"][net_key].critic_params,
+            )
+        )
+
+        assert list(
+            mock_builder.store.policy_opt_states[net_key]["opt_state"][1][2]
+        ) == list(
+            jax.tree_util.tree_map(
+                jnp.zeros_like,
+                mock_builder.store.networks["networks"][net_key].policy_params,
+            )
+        )
+        assert list(
+            mock_builder.store.critic_opt_states[net_key]["opt_state"][1][2]
+        ) == list(
+            jax.tree_util.tree_map(
+                jnp.zeros_like,
+                mock_builder.store.networks["networks"][net_key].critic_params,
+            )
+        )
+
+        assert (
+            mock_builder.store.policy_opt_states[net_key]["opt_state"][2]
+            == optax.EmptyState()
+        )
+        assert (
+            mock_builder.store.critic_opt_states[net_key]["opt_state"][2]
+            == optax.EmptyState()
+        )
+
+
 # ON_BUILDING_INIT_END TESTS
 
 
@@ -280,7 +395,9 @@ def test_single_trainer_shared_weights_fixed_sampling(
         "trainer_0": ["network_agent", "network_agent", "network_agent"]
     }
     assert builder.store.trainer_networks == {"trainer_0": ["network_agent"]}
-    assert builder.store.networks == "network_initialized"
+    assert builder.store.networks == builder.store.network_factory()
+
+    check_opt_states(builder)
 
 
 def test_single_trainer_no_shared_weights_fixed_sampling(
@@ -307,7 +424,9 @@ def test_single_trainer_no_shared_weights_fixed_sampling(
     assert builder.store.trainer_networks == {
         "trainer_0": ["network_agent_0", "network_agent_1", "network_agent_2"]
     }
-    assert builder.store.networks == "network_initialized"
+    assert builder.store.networks == builder.store.network_factory()
+
+    check_opt_states(builder)
 
 
 def test_single_trainer_no_shared_weights_random_sampling(
@@ -332,7 +451,9 @@ def test_single_trainer_no_shared_weights_random_sampling(
     assert builder.store.trainer_networks == {
         "trainer_0": ["network_0", "network_1", "network_2"]
     }
-    assert builder.store.networks == "network_initialized"
+    assert builder.store.networks == builder.store.network_factory()
+
+    check_opt_states(builder)
 
 
 def test_one_trainer_per_network_shared_weights_fixed_sampling(
@@ -353,69 +474,9 @@ def test_one_trainer_per_network_shared_weights_fixed_sampling(
         "trainer_0": ["network_agent", "network_agent", "network_agent"]
     }
     assert builder.store.trainer_networks == {"trainer_0": ["network_agent"]}
-    assert builder.store.networks == "network_initialized"
+    assert builder.store.networks == builder.store.network_factory()
 
-
-def test_one_trainer_per_network_no_shared_weights_fixed_sampling(
-    mock_builder_no_shared_weights_fixed_sampling: Builder,
-    one_trainer_per_network_init: OneTrainerPerNetworkInit,
-) -> None:
-    """Tests on_building_init_end hook.
-
-    One trainer per network, no shared network weights and
-    fixed agent network sampling.
-    """
-
-    builder = mock_builder_no_shared_weights_fixed_sampling
-    one_trainer_per_network_init.on_building_init_end(builder)
-
-    assert builder.store.net_spec_keys == {
-        "network_agent_0": "agent_0",
-        "network_agent_1": "agent_1",
-        "network_agent_2": "agent_2",
-    }
-    assert builder.store.table_network_config == {
-        "trainer_0": ["network_agent_0", "network_agent_1", "network_agent_2"],
-        "trainer_1": ["network_agent_0", "network_agent_1", "network_agent_2"],
-        "trainer_2": ["network_agent_0", "network_agent_1", "network_agent_2"],
-    }
-    assert builder.store.trainer_networks == {
-        "trainer_0": ["network_agent_0"],
-        "trainer_1": ["network_agent_1"],
-        "trainer_2": ["network_agent_2"],
-    }
-    assert builder.store.networks == "network_initialized"
-
-
-def test_one_trainer_per_network_random_sampling(
-    mock_builder_no_shared_weights_random_sampling: Builder,
-    one_trainer_per_network_init: OneTrainerPerNetworkInit,
-) -> None:
-    """Tests on_building_init_end hook.
-
-    One trainer per network, no shared network weights and
-    random agent network sampling.
-    """
-
-    builder = mock_builder_no_shared_weights_random_sampling
-    one_trainer_per_network_init.on_building_init_end(builder)
-
-    assert builder.store.net_spec_keys == {
-        "network_0": "agent_0",
-        "network_1": "agent_1",
-        "network_2": "agent_2",
-    }
-    assert builder.store.table_network_config == {
-        "trainer_0": ["network_0"],
-        "trainer_1": ["network_1"],
-        "trainer_2": ["network_2"],
-    }
-    assert builder.store.trainer_networks == {
-        "trainer_0": ["network_0"],
-        "trainer_1": ["network_1"],
-        "trainer_2": ["network_2"],
-    }
-    assert builder.store.networks == "network_initialized"
+    check_opt_states(builder)
 
 
 def test_custom_trainer_on_building_init_value_error(
@@ -480,7 +541,9 @@ def test_custom_trainer_init_no_shared_weights_random_sampling(
         "trainer_2": ["network_2"],
     }
 
-    assert builder.store.networks == "network_initialized"
+    assert builder.store.networks == builder.store.network_factory()
+
+    check_opt_states(builder)
 
 
 def test_custom_trainer_init_shared_weights_fixed_sampling(
@@ -507,7 +570,9 @@ def test_custom_trainer_init_shared_weights_fixed_sampling(
     assert builder.store.table_network_config == {
         "trainer_0": ["network_agent", "network_agent", "network_agent"]
     }
-    assert builder.store.networks == "network_initialized"
+    assert builder.store.networks == builder.store.network_factory()
+
+    check_opt_states(builder)
 
 
 #################################

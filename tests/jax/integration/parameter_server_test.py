@@ -43,10 +43,12 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     # Initial state of the parameter_server
     assert type(parameter_server.store.system_checkpointer) == acme_savers.Checkpointer
 
-    param_without_net = parameter_server.store.parameters.copy()
-    del param_without_net["policy_networks-network_agent"]
-    del param_without_net["critic_networks-network_agent"]
-    assert param_without_net == {
+    param_without_net_and_opt = parameter_server.store.parameters.copy()
+    del param_without_net_and_opt["policy_networks-network_agent"]
+    del param_without_net_and_opt["critic_networks-network_agent"]
+    del param_without_net_and_opt["policy_opt_state-network_agent"]
+    del param_without_net_and_opt["critic_opt_state-network_agent"]
+    assert param_without_net_and_opt == {
         "trainer_steps": jnp.zeros(1, dtype=jnp.int32),
         "trainer_walltime": jnp.zeros(1, dtype=jnp.float32),
         "evaluator_steps": jnp.zeros(1, dtype=jnp.int32),
