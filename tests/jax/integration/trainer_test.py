@@ -64,7 +64,7 @@ def test_trainer_single_process(test_system_sp: System) -> None:
         for categorical_value_head in mu.values():
             assert not jnp.all(categorical_value_head["b"] == 0)
             assert not jnp.all(categorical_value_head["w"] == 0)
-        
+
         # Critic
         mu = trainer.store.critic_opt_states[net_key][1].mu  # network
         for categorical_value_head in mu.values():
