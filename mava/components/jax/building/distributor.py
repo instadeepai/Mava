@@ -15,7 +15,7 @@
 
 """Commonly used distributor components for system builders"""
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Type, Union
+from typing import List, Optional, Type, Union
 
 import jax
 
