@@ -41,7 +41,7 @@ class ExecutorSelectAction(Component):
         """Component defines hooks to override for executor action selection.
 
         Args:
-            config: ExecutorSelectActionConfig.
+            config: SimpleNamespace.
         """
         self.config = config
 
@@ -79,12 +79,12 @@ class ExecutorSelectAction(Component):
 class FeedforwardExecutorSelectAction(ExecutorSelectAction):
     def __init__(
         self,
-        config: ExecutorSelectActionConfig = ExecutorSelectActionConfig(),
+        config: SimpleNamespace = SimpleNamespace(),
     ):
         """Component defines hooks for the executor selecting actions.
 
         Args:
-            config: ExecutorSelectActionConfig.
+            config: SimpleNamespace.
         """
         self.config = config
 
