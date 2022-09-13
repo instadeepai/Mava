@@ -378,7 +378,7 @@ class MAPGMinibatchUpdateSeparateNetworks(MinibatchUpdate):
 
             # Normalize advantages at the minibatch level before using them.
             if self.config.normalize_advantage:
-                advantages = jax.tree_map(
+                advantages = jax.tree_util.tree_map(
                     lambda x: (x - jnp.mean(x, axis=0)) / (jnp.std(x, axis=0) + 1e-8),
                     minibatch.advantages,
                 )
@@ -524,7 +524,7 @@ class MAPGEpochUpdateSeparateNetworks(EpochUpdate):
 
             # TODO (dries): This assert is ugly. Is there a better way to do this check?
             # Maybe using a tree map of some sort?
-            # shapes = jax.tree_map(
+            # shapes = jax.tree_util.tree_map(
             #         lambda x: x.shape[0]==trainer.store.full_batch_size, batch
             #     )
             # assert ...
@@ -535,10 +535,10 @@ class MAPGEpochUpdateSeparateNetworks(EpochUpdate):
 
             permutation = jax.random.permutation(subkey, trainer.store.full_batch_size)
 
-            shuffled_batch = jax.tree_map(
+            shuffled_batch = jax.tree_util.tree_map(
                 lambda x: jnp.take(x, permutation, axis=0), batch
             )
-            minibatches = jax.tree_map(
+            minibatches = jax.tree_util.tree_map(
                 lambda x: jnp.reshape(
                     x, [self.config.num_minibatches, -1] + list(x.shape[1:])
                 ),
