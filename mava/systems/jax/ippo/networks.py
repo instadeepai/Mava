@@ -163,8 +163,6 @@ class ValueHead(hk.Module):
         return value
 
 
-
-
 def make_ppo_network(
     network: networks_lib.FeedForwardNetwork, params: Dict[str, jnp.ndarray]
 ) -> PPONetworks:

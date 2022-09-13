@@ -59,7 +59,9 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     assert not parameter_server.store.last_checkpoint_time
     assert parameter_server.store.system_checkpointer._last_saved == 0
 
-    first_network_param = parameter_server.store.parameters["policy_networks-network_agent"]
+    first_network_param = parameter_server.store.parameters[
+        "policy_networks-network_agent"
+    ]
     # test get and set parameters
     for _ in range(3):
         executor.run_episode()
@@ -71,7 +73,9 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     assert list(executor_episodes) == [3]  # run episodes three times
 
     # check that the network is updated (at least one of the values updated)
-    updated_networks_param = parameter_server.get_parameters("policy_networks-network_agent")
+    updated_networks_param = parameter_server.get_parameters(
+        "policy_networks-network_agent"
+    )
     at_least_one_changed = False
     for key in updated_networks_param.keys():
         assert sorted(list(updated_networks_param[key].keys())) == ["b", "w"]

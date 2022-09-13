@@ -36,10 +36,7 @@ from mava.components.jax.building.loggers import Logger
 from mava.components.jax.building.networks import Networks
 from mava.components.jax.building.parameter_client import TrainerParameterClient
 from mava.components.jax.training.advantage_estimation import GAE
-from mava.components.jax.training.base import (
-    Batch,
-    TrainingState,
-)
+from mava.components.jax.training.base import Batch, TrainingState
 from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
 
@@ -479,6 +476,3 @@ class MAPGWithTrustRegionStep(Step):
             mava.components.jax.training.model_updating.MinibatchUpdate,
             mava.components.jax.building.adders.ParallelSequenceAdder,
         ]
-
-
-    

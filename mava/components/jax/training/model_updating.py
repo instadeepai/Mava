@@ -223,7 +223,6 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
 
         trainer.store.minibatch_update_fn = model_update_minibatch
 
-
     @staticmethod
     def config_class() -> Optional[Callable]:
         """Config class used for component.
@@ -361,4 +360,3 @@ class MAPGEpochUpdate(EpochUpdate):
             config class/dataclass for component.
         """
         return MAPGEpochUpdateConfig
-

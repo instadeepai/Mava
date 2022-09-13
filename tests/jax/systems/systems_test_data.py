@@ -48,7 +48,7 @@ def ippo_system_single_process() -> System:
     base_dir = "~/mava"
     mava_id = str(datetime.now())
     checkpoint_subpath = f"{base_dir}/{mava_id}"
-    
+
     # Log every [log_every] seconds.
     log_every = 1
     logger_factory = functools.partial(
@@ -59,8 +59,8 @@ def ippo_system_single_process() -> System:
         time_stamp=mava_id,
         time_delta=log_every,
     )
-    
-            # Optimisers.
+
+    # Optimisers.
     policy_optimiser = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
@@ -133,7 +133,7 @@ def ippo_system_multi_thread() -> System:
         time_delta=log_every,
     )
 
-        # Optimisers.
+    # Optimisers.
     policy_optimiser = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )

@@ -228,6 +228,7 @@ def fake_batch() -> Batch:
     )
     return batch
 
+
 @pytest.fixture
 def mock_state_and_trainer_separate_networks(
     mock_trainer_separate_networks: MockTrainer,
@@ -487,9 +488,7 @@ def test_on_training_utility_fns_separate_networks(
 
 
 def test_minibatch_update_fn_separate_networks(
-    mock_state_and_trainer_separate_networks: Tuple[
-        Dict[str, Any], MockTrainer
-    ]
+    mock_state_and_trainer_separate_networks: Tuple[Dict[str, Any], MockTrainer]
 ) -> None:
     """Test on_minibatch_update_fn
 
@@ -574,9 +573,7 @@ def test_on_training_utility_fns_epoch_separate_networks(
 
 
 def test_epoch_update_fn_separate_networks(
-    mock_state_and_trainer_separate_networks: Tuple[
-        Dict[str, Any], MockTrainer
-    ],
+    mock_state_and_trainer_separate_networks: Tuple[Dict[str, Any], MockTrainer],
     mock_minibatch_update_fn_separate_networks: Callable,
 ) -> None:
     """Test epoch_update_fn function for separate networks case

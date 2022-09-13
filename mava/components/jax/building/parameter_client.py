@@ -67,7 +67,8 @@ class BaseParameterClient(Component):
 
 @dataclass
 class ExecutorParameterClientConfig:
-    executor_parameter_update_period: int = 200    
+    executor_parameter_update_period: int = 200
+
 
 class ExecutorParameterClient(BaseParameterClient):
     def __init__(

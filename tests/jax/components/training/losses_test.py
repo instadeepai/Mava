@@ -7,8 +7,6 @@ import pytest
 
 from mava.components.jax.training.losses import (
     MAPGTrustRegionClippingLossConfig,
-    MAPGTrustRegionClippingLossConfig,
-    MAPGWithTrustRegionClippingLoss,
     MAPGWithTrustRegionClippingLoss,
 )
 from mava.systems.jax.trainer import Trainer
@@ -16,6 +14,7 @@ from mava.systems.jax.trainer import Trainer
 ########################
 # SEPARATE NETWORKS TEST
 ########################
+
 
 class MockNet:
     """Creates a mock network for loss function"""
@@ -129,9 +128,7 @@ def mapg_trust_region_clipping_loss_separate_networks() -> MAPGWithTrustRegionCl
     """Creates an MAPG loss fixture with trust region and clipping"""
 
     test_mapg = MAPGWithTrustRegionClippingLoss(
-        config=MAPGTrustRegionClippingLossConfig(
-            value_cost=0.5, entropy_cost=0.01
-        )
+        config=MAPGTrustRegionClippingLossConfig(value_cost=0.5, entropy_cost=0.01)
     )
 
     return test_mapg
