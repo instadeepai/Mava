@@ -226,7 +226,7 @@ class Config:
 
         # Return if there is no config class for the component
         if config_class is SimpleNamespace:
-            return config_class
+            return SimpleNamespace()
 
         # Set local config to global config for names which appear in the config class
         global_config = self._built_config
