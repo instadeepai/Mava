@@ -108,7 +108,7 @@ class IPPOSystemRecurrentPolicy(System):
         system, default_params = IPPOSystem.design()
 
         # Update trainer components with seperate networks
-        system.set("executor_select_action", executing.RecurrentExecutorSelectAction)
-        system.set("executor_observe", executing.RecurrentExecutorObserve)
+        system.set({"executor_select_action": executing.RecurrentExecutorSelectAction,
+                    "executor_observe": executing.RecurrentExecutorObserve})
 
         return system, default_params

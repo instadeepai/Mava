@@ -84,11 +84,11 @@ def main(_: Any) -> None:
     )
 
     # Optimizer.
-    policy_optimizer = optax.chain(
+    policy_optimiser = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
-    critic_optimizer = optax.chain(
+    critic_optimiser = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
@@ -101,8 +101,8 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         experiment_path=checkpoint_subpath,
-        policy_optimizer=policy_optimizer,
-        critic_optimizer=critic_optimizer,
+        policy_optimiser=policy_optimiser,
+        critic_optimiser=critic_optimiser,
         run_evaluator=True,
         sample_batch_size=5,
         num_epochs=15,
