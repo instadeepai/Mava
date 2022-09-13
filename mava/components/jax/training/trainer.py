@@ -72,6 +72,7 @@ class BaseTrainerInit(Component):
         """
         return [BaseSystemInit, EnvironmentSpec, Networks]
 
+
 class SingleTrainerInit(BaseTrainerInit):
     def __init__(self, config: SimpleNamespace = SimpleNamespace()):
         """Initialises a single trainer.
