@@ -87,7 +87,9 @@ When building the system, `system.build` can contain arguments that will overwri
 
 - `experiment_path` - the destination to save the experiment results.
 
-- `optimizer` - the optimiser used by the trainer to updated the agent weights.
+- `policy_optimiser` - the optimiser used by the trainer to updated the policy weights.
+
+- `critic_optimiser` - the optimiser used by the trainer to updated the critic weights.
 
 - `run_evaulator` - a flag indicating weather a seperate environment process should be run that tracks the system's performance using Tensorboard and possibly gameplay recordings.
 
