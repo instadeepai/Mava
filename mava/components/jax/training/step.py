@@ -428,8 +428,6 @@ class MAPGWithTrustRegionStep(Step):
                 # The opt_states need to be wrapped in a dict so as not to lose
                 # the reference.
 
-                print("SANITY: ", trainer.store.opt_state_key)
-                exit()
                 trainer.store.policy_opt_states[net_key][
                     trainer.store.opt_state_key
                 ] = new_states.policy_opt_states[net_key][trainer.store.opt_state_key]

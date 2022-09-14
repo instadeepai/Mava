@@ -144,10 +144,11 @@ class MockTrainer(Trainer):
             }
         }
 
+        opt_state_key = "optax_state"
         opt_states = {
-            "network_agent_0": {"opt_state": 0},
-            "network_agent_1": {"opt_state": 1},
-            "network_agent_2": {"opt_state": 2},
+            "network_agent_0": {opt_state_key: 0},
+            "network_agent_1": {opt_state_key: 1},
+            "network_agent_2": {opt_state_key: 2},
         }
         store = SimpleNamespace(
             dataset_iterator=iter([1, 2, 3]),
@@ -161,6 +162,7 @@ class MockTrainer(Trainer):
             gae_fn=gae_advantages,
             policy_opt_states=copy.copy(opt_states),
             critic_opt_states=copy.copy(opt_states),
+            opt_state_key=opt_state_key,
             base_key=jax.random.PRNGKey(5),
             epoch_update_fn=epoch_update,
             global_config=SimpleNamespace(
@@ -346,13 +348,25 @@ def test_step(mock_trainer: Trainer) -> None:
         )
 
     assert mock_trainer.store.policy_opt_states == {
-        "network_agent_0": {"opt_state": 0 + num_expected_update_steps},
-        "network_agent_1": {"opt_state": 1 + num_expected_update_steps},
-        "network_agent_2": {"opt_state": 2 + num_expected_update_steps},
+        "network_agent_0": {
+            mock_trainer.store.opt_state_key: 0 + num_expected_update_steps
+        },
+        "network_agent_1": {
+            mock_trainer.store.opt_state_key: 1 + num_expected_update_steps
+        },
+        "network_agent_2": {
+            mock_trainer.store.opt_state_key: 2 + num_expected_update_steps
+        },
     }
 
     assert mock_trainer.store.critic_opt_states == {
-        "network_agent_0": {"opt_state": 0 + num_expected_update_steps},
-        "network_agent_1": {"opt_state": 1 + num_expected_update_steps},
-        "network_agent_2": {"opt_state": 2 + num_expected_update_steps},
+        "network_agent_0": {
+            mock_trainer.store.opt_state_key: 0 + num_expected_update_steps
+        },
+        "network_agent_1": {
+            mock_trainer.store.opt_state_key: 1 + num_expected_update_steps
+        },
+        "network_agent_2": {
+            mock_trainer.store.opt_state_key: 2 + num_expected_update_steps
+        },
     }
