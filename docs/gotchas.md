@@ -22,7 +22,7 @@ with jax.disable_jit():
 ```
 
 ## Components
-When creating components, it is important to include variable types for both the config class and component init function. This is necessary because Mava uses it to determine which config variables are available in the system. In the example below, we provide the types for the config variables and also the config class variable inside the `Distributor` component. For the config class variable we use the `DistributorConfig` as the type, which points the system to the config class that is used.
+When creating components, it is important to include variable types for both the config class and component class `__init__` method. This is necessary because Mava uses it to determine which config variables are available in the system. In the example below, we provide the types for the config variables and also the config class variable inside the `Distributor` component. For the config class variable we use the `DistributorConfig` as the type, which points the system to the config class that is used.
 
 ```python
 @dataclass

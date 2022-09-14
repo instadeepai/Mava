@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Type
+from types import SimpleNamespace
+from typing import List, Type
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -9,15 +10,10 @@ from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 
 
-@dataclass
-class ComponentDependencyGuardrailsConfig:
-    pass
-
-
 class ComponentDependencyGuardrails(Component):
     def __init__(
         self,
-        config: ComponentDependencyGuardrailsConfig,
+        config: SimpleNamespace = SimpleNamespace(),
     ):
         """Save the config"""
         self.config = config

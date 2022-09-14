@@ -21,7 +21,6 @@ from mava import types
 from mava.adders import reverb as reverb_adders
 from mava.adders.reverb import base as reverb_base
 from mava.components.jax.building.adders import (
-    AdderPriorityConfig,
     ParallelSequenceAdder,
     ParallelSequenceAdderConfig,
     ParallelSequenceAdderSignature,
@@ -310,6 +309,6 @@ def test_uniform_priority(
     assert mock_builder.store.priority_fns
     assert uniform_priority.name() == "adder_priority"
     assert issubclass(
-        uniform_priority.__init__.__annotations__["config"], AdderPriorityConfig  # type: ignore
+        uniform_priority.__init__.__annotations__["config"], SimpleNamespace  # type: ignore
     )
     assert all(mock_builder.store.priority_fns) == 1

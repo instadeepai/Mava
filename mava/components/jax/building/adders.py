@@ -16,7 +16,8 @@
 """Commonly used adder components for system builders"""
 import abc
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Type
+from types import SimpleNamespace
+from typing import Any, Dict, List, Type
 
 from mava import specs
 from mava.adders import reverb as reverb_adders
@@ -59,22 +60,17 @@ class Adder(Component):
         return [BaseTrainerInit, BaseSystemInit]
 
 
-@dataclass
-class AdderPriorityConfig:
-    pass
-
-
 class AdderPriority(Component):
     """Abstract AdderPriority component defining which hooks should be used."""
 
     def __init__(
         self,
-        config: AdderPriorityConfig = AdderPriorityConfig(),
+        config: SimpleNamespace = SimpleNamespace(),
     ):
         """Component creates priority functions for reverb adders.
 
         Args:
-            config: AdderPriorityConfig.
+            config: SimpleNamespace.
         """
         self.config = config
 
@@ -106,22 +102,17 @@ class AdderPriority(Component):
         return [BaseTrainerInit]
 
 
-@dataclass
-class AdderSignatureConfig:
-    pass
-
-
 class AdderSignature(Component):
     """Abstract AdderSignature component defining which hooks should be used."""
 
     def __init__(
         self,
-        config: AdderSignatureConfig = AdderSignatureConfig(),
+        config: SimpleNamespace = SimpleNamespace(),
     ):
         """Component creates an adder signature for reverb adders.
 
         Args:
-            config: AdderSignatureConfig.
+            config: SimpleNamespace.
         """
         self.config = config
 
