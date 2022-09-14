@@ -146,9 +146,9 @@ class MockTrainer(Trainer):
         }
 
         opt_states = {
-            "network_agent_0": {constants.opt_state_dict_key: 0},
-            "network_agent_1": {constants.opt_state_dict_key: 1},
-            "network_agent_2": {constants.opt_state_dict_key: 2},
+            "network_agent_0": {constants.OPT_STATE_DICT_KEY: 0},
+            "network_agent_1": {constants.OPT_STATE_DICT_KEY: 1},
+            "network_agent_2": {constants.OPT_STATE_DICT_KEY: 2},
         }
         store = SimpleNamespace(
             dataset_iterator=iter([1, 2, 3]),
@@ -348,24 +348,24 @@ def test_step(mock_trainer: Trainer) -> None:
 
     assert mock_trainer.store.policy_opt_states == {
         "network_agent_0": {
-            constants.opt_state_dict_key: 0 + num_expected_update_steps
+            constants.OPT_STATE_DICT_KEY: 0 + num_expected_update_steps
         },
         "network_agent_1": {
-            constants.opt_state_dict_key: 1 + num_expected_update_steps
+            constants.OPT_STATE_DICT_KEY: 1 + num_expected_update_steps
         },
         "network_agent_2": {
-            constants.opt_state_dict_key: 2 + num_expected_update_steps
+            constants.OPT_STATE_DICT_KEY: 2 + num_expected_update_steps
         },
     }
 
     assert mock_trainer.store.critic_opt_states == {
         "network_agent_0": {
-            constants.opt_state_dict_key: 0 + num_expected_update_steps
+            constants.OPT_STATE_DICT_KEY: 0 + num_expected_update_steps
         },
         "network_agent_1": {
-            constants.opt_state_dict_key: 1 + num_expected_update_steps
+            constants.OPT_STATE_DICT_KEY: 1 + num_expected_update_steps
         },
         "network_agent_2": {
-            constants.opt_state_dict_key: 2 + num_expected_update_steps
+            constants.OPT_STATE_DICT_KEY: 2 + num_expected_update_steps
         },
     }

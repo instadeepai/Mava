@@ -85,7 +85,7 @@ class BaseTrainerInit(Component):
 
         for net_key in builder.store.networks["networks"].keys():
             builder.store.policy_opt_states[net_key] = {
-                constants.opt_state_dict_key: builder.store.policy_optimiser.init(
+                constants.OPT_STATE_DICT_KEY: builder.store.policy_optimiser.init(
                     builder.store.networks["networks"][net_key].policy_params
                 )
             }  # pytype: disable=attribute-error
@@ -93,7 +93,7 @@ class BaseTrainerInit(Component):
         builder.store.critic_opt_states = {}
         for net_key in builder.store.networks["networks"].keys():
             builder.store.critic_opt_states[net_key] = {
-                constants.opt_state_dict_key: builder.store.critic_optimiser.init(
+                constants.OPT_STATE_DICT_KEY: builder.store.critic_optimiser.init(
                     builder.store.networks["networks"][net_key].critic_params
                 )
             }  # pytype: disable=attribute-error

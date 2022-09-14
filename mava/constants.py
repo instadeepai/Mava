@@ -1,3 +1,3 @@
 from typing import Final
 
-opt_state_dict_key: Final[str] = "opt_state"
+OPT_STATE_DICT_KEY: Final[str] = "opt_state"

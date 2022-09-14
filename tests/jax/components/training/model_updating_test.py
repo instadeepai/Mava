@@ -180,7 +180,7 @@ class MockTrainer(Trainer):
         policy_opt_states = {}
         for net_key in networks["networks"].keys():
             policy_opt_states[net_key] = {
-                constants.opt_state_dict_key: policy_optimiser.init(
+                constants.OPT_STATE_DICT_KEY: policy_optimiser.init(
                     networks["networks"][net_key].policy_params
                 )
             }  # pytype: disable=attribute-error
@@ -188,7 +188,7 @@ class MockTrainer(Trainer):
         critic_opt_states = {}
         for net_key in networks["networks"].keys():
             critic_opt_states[net_key] = {
-                constants.opt_state_dict_key: critic_optimiser.init(
+                constants.OPT_STATE_DICT_KEY: critic_optimiser.init(
                     networks["networks"][net_key].critic_params
                 )
             }  # pytype: disable=attribute-error

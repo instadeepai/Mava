@@ -137,10 +137,10 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
                 # just one.
                 (
                     policy_updates,
-                    policy_opt_states[agent_net_key][constants.opt_state_dict_key],
+                    policy_opt_states[agent_net_key][constants.OPT_STATE_DICT_KEY],
                 ) = trainer.store.policy_optimiser.update(
                     policy_gradients[agent_key],
-                    policy_opt_states[agent_net_key][constants.opt_state_dict_key],
+                    policy_opt_states[agent_net_key][constants.OPT_STATE_DICT_KEY],
                 )
                 policy_params[agent_net_key] = optax.apply_updates(
                     policy_params[agent_net_key], policy_updates
@@ -152,7 +152,6 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
                 policy_agent_metrics[agent_key][
                     "norm_policy_updates"
                 ] = optax.global_norm(policy_updates)
-                # TODO (Ruan): Double check that this is done correctly
                 metrics[agent_key] = policy_agent_metrics[agent_key]
 
                 # Update the critic networks and optimisers.
@@ -161,10 +160,10 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
                 # just one.
                 (
                     critic_updates,
-                    critic_opt_states[agent_net_key][constants.opt_state_dict_key],
+                    critic_opt_states[agent_net_key][constants.OPT_STATE_DICT_KEY],
                 ) = trainer.store.critic_optimiser.update(
                     critic_gradients[agent_key],
-                    critic_opt_states[agent_net_key][constants.opt_state_dict_key],
+                    critic_opt_states[agent_net_key][constants.OPT_STATE_DICT_KEY],
                 )
                 critic_params[agent_net_key] = optax.apply_updates(
                     critic_params[agent_net_key], critic_updates

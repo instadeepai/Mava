@@ -430,8 +430,8 @@ class MAPGWithTrustRegionStep(Step):
                 # the reference.
 
                 trainer.store.policy_opt_states[net_key][
-                    constants.opt_state_dict_key
-                ] = new_states.policy_opt_states[net_key][constants.opt_state_dict_key]
+                    constants.OPT_STATE_DICT_KEY
+                ] = new_states.policy_opt_states[net_key][constants.OPT_STATE_DICT_KEY]
             critic_params = {
                 net_key: networks[net_key].critic_params for net_key in networks.keys()
             }
@@ -445,8 +445,8 @@ class MAPGWithTrustRegionStep(Step):
                 # The opt_states need to be wrapped in a dict so as not to lose
                 # the reference.
                 trainer.store.critic_opt_states[net_key][
-                    constants.opt_state_dict_key
-                ] = new_states.critic_opt_states[net_key][constants.opt_state_dict_key]
+                    constants.OPT_STATE_DICT_KEY
+                ] = new_states.critic_opt_states[net_key][constants.OPT_STATE_DICT_KEY]
 
             return metrics
 

@@ -305,40 +305,40 @@ def check_opt_states(mock_builder: Builder) -> None:
 
     for net_key in mock_builder.store.networks["networks"].keys():
         assert (
-            mock_builder.store.policy_opt_states[net_key][constants.opt_state_dict_key][
+            mock_builder.store.policy_opt_states[net_key][constants.OPT_STATE_DICT_KEY][
                 0
             ]
             == optax.EmptyState()
         )
         assert (
-            mock_builder.store.critic_opt_states[net_key][constants.opt_state_dict_key][
+            mock_builder.store.critic_opt_states[net_key][constants.OPT_STATE_DICT_KEY][
                 0
             ]
             == optax.EmptyState()
         )
 
         assert isinstance(
-            mock_builder.store.policy_opt_states[net_key][constants.opt_state_dict_key][
+            mock_builder.store.policy_opt_states[net_key][constants.OPT_STATE_DICT_KEY][
                 1
             ],
             optax.ScaleByAdamState,
         )
         assert isinstance(
-            mock_builder.store.critic_opt_states[net_key][constants.opt_state_dict_key][
+            mock_builder.store.critic_opt_states[net_key][constants.OPT_STATE_DICT_KEY][
                 1
             ],
             optax.ScaleByAdamState,
         )
 
         assert mock_builder.store.policy_opt_states[net_key][
-            constants.opt_state_dict_key
+            constants.OPT_STATE_DICT_KEY
         ][1][0] == jnp.array([0])
         assert mock_builder.store.critic_opt_states[net_key][
-            constants.opt_state_dict_key
+            constants.OPT_STATE_DICT_KEY
         ][1][0] == jnp.array([0])
 
         assert list(
-            mock_builder.store.policy_opt_states[net_key][constants.opt_state_dict_key][
+            mock_builder.store.policy_opt_states[net_key][constants.OPT_STATE_DICT_KEY][
                 1
             ][1]
         ) == list(
@@ -348,7 +348,7 @@ def check_opt_states(mock_builder: Builder) -> None:
             )
         )
         assert list(
-            mock_builder.store.critic_opt_states[net_key][constants.opt_state_dict_key][
+            mock_builder.store.critic_opt_states[net_key][constants.OPT_STATE_DICT_KEY][
                 1
             ][1]
         ) == list(
@@ -359,7 +359,7 @@ def check_opt_states(mock_builder: Builder) -> None:
         )
 
         assert list(
-            mock_builder.store.policy_opt_states[net_key][constants.opt_state_dict_key][
+            mock_builder.store.policy_opt_states[net_key][constants.OPT_STATE_DICT_KEY][
                 1
             ][2]
         ) == list(
@@ -369,7 +369,7 @@ def check_opt_states(mock_builder: Builder) -> None:
             )
         )
         assert list(
-            mock_builder.store.critic_opt_states[net_key][constants.opt_state_dict_key][
+            mock_builder.store.critic_opt_states[net_key][constants.OPT_STATE_DICT_KEY][
                 1
             ][2]
         ) == list(
@@ -380,13 +380,13 @@ def check_opt_states(mock_builder: Builder) -> None:
         )
 
         assert (
-            mock_builder.store.policy_opt_states[net_key][constants.opt_state_dict_key][
+            mock_builder.store.policy_opt_states[net_key][constants.OPT_STATE_DICT_KEY][
                 2
             ]
             == optax.EmptyState()
         )
         assert (
-            mock_builder.store.critic_opt_states[net_key][constants.opt_state_dict_key][
+            mock_builder.store.critic_opt_states[net_key][constants.OPT_STATE_DICT_KEY][
                 2
             ]
             == optax.EmptyState()

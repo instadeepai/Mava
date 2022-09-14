@@ -89,12 +89,12 @@ initial_parameters_trainer = {
     "critic_networks-network_agent_0": {"weights": 0, "biases": 0},
     "critic_networks-network_agent_1": {"weights": 1, "biases": 1},
     "critic_networks-network_agent_2": {"weights": 2, "biases": 2},
-    "policy_opt_state-network_agent_0": {constants.opt_state_dict_key: EmptyState()},
-    "policy_opt_state-network_agent_1": {constants.opt_state_dict_key: EmptyState()},
-    "policy_opt_state-network_agent_2": {constants.opt_state_dict_key: EmptyState()},
-    "critic_opt_state-network_agent_0": {constants.opt_state_dict_key: EmptyState()},
-    "critic_opt_state-network_agent_1": {constants.opt_state_dict_key: EmptyState()},
-    "critic_opt_state-network_agent_2": {constants.opt_state_dict_key: EmptyState()},
+    "policy_opt_state-network_agent_0": {constants.OPT_STATE_DICT_KEY: EmptyState()},
+    "policy_opt_state-network_agent_1": {constants.OPT_STATE_DICT_KEY: EmptyState()},
+    "policy_opt_state-network_agent_2": {constants.OPT_STATE_DICT_KEY: EmptyState()},
+    "critic_opt_state-network_agent_0": {constants.OPT_STATE_DICT_KEY: EmptyState()},
+    "critic_opt_state-network_agent_1": {constants.OPT_STATE_DICT_KEY: EmptyState()},
+    "critic_opt_state-network_agent_2": {constants.OPT_STATE_DICT_KEY: EmptyState()},
     "trainer_steps": np.array(0, dtype=np.int32),
     "trainer_walltime": np.array(0.0, dtype=np.float32),
     "evaluator_steps": np.array(0, dtype=np.int32),
@@ -144,12 +144,12 @@ def mock_builder_with_parameter_client() -> Builder:
     builder.store.policy_opt_states = {}
     for net_key in builder.store.networks["networks"].keys():
         builder.store.policy_opt_states[net_key] = {
-            constants.opt_state_dict_key: EmptyState()
+            constants.OPT_STATE_DICT_KEY: EmptyState()
         }
     builder.store.critic_opt_states = {}
     for net_key in builder.store.networks["networks"].keys():
         builder.store.critic_opt_states[net_key] = {
-            constants.opt_state_dict_key: EmptyState()
+            constants.OPT_STATE_DICT_KEY: EmptyState()
         }
 
     builder.store.parameter_server_client = ParameterServer(
