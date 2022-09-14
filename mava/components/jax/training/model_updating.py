@@ -49,8 +49,8 @@ class MinibatchUpdate(Utility):
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
-        BaseTrainerInit required to set up trainer.store.trainer_agents and
-        trainer.store.trainer_agent_net_keys.
+        BaseTrainerInit required to set up trainer.store.trainer_agents,
+        trainer.store.trainer_agent_net_keys and trainer.store.opt_state_key
         Optmisers required to set up trainer.store.policy_optimiser and
         trainer.store.critic_optimiser.
         Loss required to set up trainer.store.policy_grad_fn
@@ -136,10 +136,10 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
                 # just one.
                 (
                     policy_updates,
-                    policy_opt_states[agent_net_key]["opt_state"],
+                    policy_opt_states[agent_net_key][trainer.store.opt_state_key],
                 ) = trainer.store.policy_optimiser.update(
                     policy_gradients[agent_key],
-                    policy_opt_states[agent_net_key]["opt_state"],
+                    policy_opt_states[agent_net_key][trainer.store.opt_state_key],
                 )
                 policy_params[agent_net_key] = optax.apply_updates(
                     policy_params[agent_net_key], policy_updates
@@ -160,10 +160,10 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
                 # just one.
                 (
                     critic_updates,
-                    critic_opt_states[agent_net_key]["opt_state"],
+                    critic_opt_states[agent_net_key][trainer.store.opt_state_key],
                 ) = trainer.store.critic_optimiser.update(
                     critic_gradients[agent_key],
-                    critic_opt_states[agent_net_key]["opt_state"],
+                    critic_opt_states[agent_net_key][trainer.store.opt_state_key],
                 )
                 critic_params[agent_net_key] = optax.apply_updates(
                     critic_params[agent_net_key], critic_updates

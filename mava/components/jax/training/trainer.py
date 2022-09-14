@@ -136,9 +136,10 @@ class SingleTrainerInit(BaseTrainerInit):
 
         # Wrap opt_states in a mutable type (dict) since optax return an immutable tuple
         builder.store.policy_opt_states = {}
+        builder.store.opt_state_key = "opt_state"
         for net_key in builder.store.networks["networks"].keys():
             builder.store.policy_opt_states[net_key] = {
-                "opt_state": builder.store.policy_optimiser.init(
+                builder.store.opt_state_key: builder.store.policy_optimiser.init(
                     builder.store.networks["networks"][net_key].policy_params
                 )
             }  # pytype: disable=attribute-error
@@ -146,7 +147,7 @@ class SingleTrainerInit(BaseTrainerInit):
         builder.store.critic_opt_states = {}
         for net_key in builder.store.networks["networks"].keys():
             builder.store.critic_opt_states[net_key] = {
-                "opt_state": builder.store.critic_optimiser.init(
+                builder.store.opt_state_key: builder.store.critic_optimiser.init(
                     builder.store.networks["networks"][net_key].critic_params
                 )
             }  # pytype: disable=attribute-error
@@ -231,11 +232,11 @@ class OneTrainerPerNetworkInit(BaseTrainerInit):
 
         builder.store.networks = builder.store.network_factory()
 
-        # TODO Check!!!!
         builder.store.policy_opt_states = {}
+        builder.store.opt_state_key = "opt_state"
         for net_key in builder.store.networks["networks"].keys():
             builder.store.policy_opt_states[net_key] = {
-                "opt_state": builder.store.policy_optimiser.init(
+                builder.store.opt_state_key: builder.store.policy_optimiser.init(
                     builder.store.networks["networks"][net_key].policy_params
                 )
             }  # pytype: disable=attribute-error
@@ -243,7 +244,7 @@ class OneTrainerPerNetworkInit(BaseTrainerInit):
         builder.store.critic_opt_states = {}
         for net_key in builder.store.networks["networks"].keys():
             builder.store.critic_opt_states[net_key] = {
-                "opt_state": builder.store.critic_optimiser.init(
+                builder.store.opt_state_key: builder.store.critic_optimiser.init(
                     builder.store.networks["networks"][net_key].critic_params
                 )
             }  # pytype: disable=attribute-error
@@ -339,9 +340,10 @@ class CustomTrainerInit(BaseTrainerInit):
         builder.store.networks = builder.store.network_factory()
 
         builder.store.policy_opt_states = {}
+        builder.store.opt_state_key = "opt_state"
         for net_key in builder.store.networks["networks"].keys():
             builder.store.policy_opt_states[net_key] = {
-                "opt_state": builder.store.policy_optimiser.init(
+                builder.store.opt_state_key: builder.store.policy_optimiser.init(
                     builder.store.networks["networks"][net_key].policy_params
                 )
             }  # pytype: disable=attribute-error
@@ -349,7 +351,7 @@ class CustomTrainerInit(BaseTrainerInit):
         builder.store.critic_opt_states = {}
         for net_key in builder.store.networks["networks"].keys():
             builder.store.critic_opt_states[net_key] = {
-                "opt_state": builder.store.critic_optimiser.init(
+                builder.store.opt_state_key: builder.store.critic_optimiser.init(
                     builder.store.networks["networks"][net_key].critic_params
                 )
             }  # pytype: disable=attribute-error

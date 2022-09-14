@@ -156,8 +156,8 @@ class Step(Component):
         """List of other Components required in the system for this Component to function.
 
         TrainerDataset required for config sample_batch_size.
-        BaseTrainerInit required to set up trainer.store.networks
-        and trainer.store.trainer_agent_net_keys.
+        BaseTrainerInit required to set up trainer.store.networks,
+        trainer.store.trainer_agent_net_keys and  trainer.store.opt_state_key
         Networks required to set up trainer.store.base_key.
 
         Returns:
@@ -428,9 +428,11 @@ class MAPGWithTrustRegionStep(Step):
                 # The opt_states need to be wrapped in a dict so as not to lose
                 # the reference.
 
+                print("SANITY: ", trainer.store.opt_state_key)
+                exit()
                 trainer.store.policy_opt_states[net_key][
-                    "opt_state"
-                ] = new_states.policy_opt_states[net_key]["opt_state"]
+                    trainer.store.opt_state_key
+                ] = new_states.policy_opt_states[net_key][trainer.store.opt_state_key]
             critic_params = {
                 net_key: networks[net_key].critic_params for net_key in networks.keys()
             }
@@ -444,8 +446,8 @@ class MAPGWithTrustRegionStep(Step):
                 # The opt_states need to be wrapped in a dict so as not to lose
                 # the reference.
                 trainer.store.critic_opt_states[net_key][
-                    "opt_state"
-                ] = new_states.critic_opt_states[net_key]["opt_state"]
+                    trainer.store.opt_state_key
+                ] = new_states.critic_opt_states[net_key][trainer.store.opt_state_key]
 
             return metrics
 
