@@ -50,6 +50,9 @@ class SMACWrapper(ParallelEnvWrapper):
         self._reset_next_step = True
         self._done = False
 
+        self._battles_won = 0
+        self._battles_game = 0
+
     def reset(self) -> dm_env.TimeStep:
         """Resets the env.
 
@@ -281,7 +284,24 @@ class SMACWrapper(ParallelEnvWrapper):
         Returns:
             extra stats to be logged.
         """
-        return self._environment.get_stats()
+        stats = self._environment.get_stats()
+        stats["cumulative_win"] = stats["win_rate"]
+        del stats["win_rate"]
+        return stats
+
+    def get_extra_stats(self) -> Optional[Dict]:
+        """Return extra stats to be logged.
+
+        Returns:
+           Win rate
+        """
+        extra_stats: Dict[str, Any] = {}
+        extra_stats["win_rate"] = (
+            self._environment.battles_won - self._battles_won
+        ) / (self._environment.battles_game - self._battles_game)
+        self._battles_won = self._environment.battles_won
+        self._battles_game = self._environment.battles_game
+        return extra_stats
 
     @property
     def agents(self) -> List:
