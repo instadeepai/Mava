@@ -16,7 +16,7 @@
 """Trainer components for calculating losses."""
 import abc
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Tuple, Type
 
 import jax
 import jax.numpy as jnp
@@ -63,6 +63,8 @@ class MAPGTrustRegionClippingLossConfig:
     clip_value: bool = True
     entropy_cost: float = 0.01
     value_cost: float = 0.5
+    use_huber = True
+    huber_delta = 1.0
 
 
 class MAPGWithTrustRegionClippingLoss(Loss):
@@ -205,7 +207,12 @@ class MAPGWithTrustRegionClippingLoss(Loss):
 
                     # Value function loss. Exclude the bootstrap value
                     unclipped_value_error = target_values - values
-                    unclipped_value_loss = unclipped_value_error**2
+                    if self.config.use_huber:
+                        unclipped_value_loss = rlax.huber_loss(
+                            unclipped_value_error, self.config.huber_delta
+                        )
+                    else:
+                        unclipped_value_loss = unclipped_value_error**2
 
                     value_clip_parameter = self.config.value_clip_parameter
                     if self.config.clip_value:
@@ -217,7 +224,12 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                             value_clip_parameter,
                         )
                         clipped_value_error = target_values - clipped_values
-                        clipped_value_loss = clipped_value_error**2
+                        if self.config.use_huber:
+                            clipped_value_loss = rlax.huber_loss(
+                                clipped_value_error, self.config.huber_delta
+                            )
+                        else:
+                            clipped_value_loss = clipped_value_error**2
                         value_loss = jnp.mean(
                             jnp.fmax(unclipped_value_loss, clipped_value_loss)
                         )
