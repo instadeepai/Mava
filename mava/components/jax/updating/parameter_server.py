@@ -17,7 +17,7 @@
 import abc
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Sequence, Type, Union
+from typing import Any, Dict, List, Sequence, Type, Union
 
 import numpy as np
 from acme.jax import savers
