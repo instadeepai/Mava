@@ -138,6 +138,13 @@ class DefaultParameterServer(ParameterServer):
 
         server.store.experiment_path = self.config.experiment_path
 
+        for key, value in server.store.parameters.items():
+            if type(value) not in (list, set, dict, np.array, np.ndarray):
+                raise Exception(
+                    f"""All parameters in the parameter server must be a mutable type
+                    but "{key}" has type {type(value)} which is immutable"""
+                )
+
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
         """Fetch the parameters from the server specified in the store.
