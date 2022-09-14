@@ -21,6 +21,7 @@ import jax.numpy as jnp
 import optax
 import pytest
 
+from mava import constants
 from mava.callbacks.base import Callback
 from mava.components.jax.training.trainer import (
     CustomTrainerInit,
@@ -303,34 +304,43 @@ def check_opt_states(mock_builder: Builder) -> None:
     ]
 
     for net_key in mock_builder.store.networks["networks"].keys():
-        opt_state_key = mock_builder.store.opt_state_key
         assert (
-            mock_builder.store.policy_opt_states[net_key][opt_state_key][0]
+            mock_builder.store.policy_opt_states[net_key][constants.opt_state_dict_key][
+                0
+            ]
             == optax.EmptyState()
         )
         assert (
-            mock_builder.store.critic_opt_states[net_key][opt_state_key][0]
+            mock_builder.store.critic_opt_states[net_key][constants.opt_state_dict_key][
+                0
+            ]
             == optax.EmptyState()
         )
 
         assert isinstance(
-            mock_builder.store.policy_opt_states[net_key][opt_state_key][1],
+            mock_builder.store.policy_opt_states[net_key][constants.opt_state_dict_key][
+                1
+            ],
             optax.ScaleByAdamState,
         )
         assert isinstance(
-            mock_builder.store.critic_opt_states[net_key][opt_state_key][1],
+            mock_builder.store.critic_opt_states[net_key][constants.opt_state_dict_key][
+                1
+            ],
             optax.ScaleByAdamState,
         )
 
-        assert mock_builder.store.policy_opt_states[net_key][opt_state_key][1][
-            0
-        ] == jnp.array([0])
-        assert mock_builder.store.critic_opt_states[net_key][opt_state_key][1][
-            0
-        ] == jnp.array([0])
+        assert mock_builder.store.policy_opt_states[net_key][
+            constants.opt_state_dict_key
+        ][1][0] == jnp.array([0])
+        assert mock_builder.store.critic_opt_states[net_key][
+            constants.opt_state_dict_key
+        ][1][0] == jnp.array([0])
 
         assert list(
-            mock_builder.store.policy_opt_states[net_key][opt_state_key][1][1]
+            mock_builder.store.policy_opt_states[net_key][constants.opt_state_dict_key][
+                1
+            ][1]
         ) == list(
             jax.tree_util.tree_map(
                 lambda t: jnp.zeros_like(t, dtype=float),
@@ -338,7 +348,9 @@ def check_opt_states(mock_builder: Builder) -> None:
             )
         )
         assert list(
-            mock_builder.store.critic_opt_states[net_key][opt_state_key][1][1]
+            mock_builder.store.critic_opt_states[net_key][constants.opt_state_dict_key][
+                1
+            ][1]
         ) == list(
             jax.tree_util.tree_map(
                 lambda t: jnp.zeros_like(t, dtype=float),
@@ -347,7 +359,9 @@ def check_opt_states(mock_builder: Builder) -> None:
         )
 
         assert list(
-            mock_builder.store.policy_opt_states[net_key][opt_state_key][1][2]
+            mock_builder.store.policy_opt_states[net_key][constants.opt_state_dict_key][
+                1
+            ][2]
         ) == list(
             jax.tree_util.tree_map(
                 jnp.zeros_like,
@@ -355,7 +369,9 @@ def check_opt_states(mock_builder: Builder) -> None:
             )
         )
         assert list(
-            mock_builder.store.critic_opt_states[net_key][opt_state_key][1][2]
+            mock_builder.store.critic_opt_states[net_key][constants.opt_state_dict_key][
+                1
+            ][2]
         ) == list(
             jax.tree_util.tree_map(
                 jnp.zeros_like,
@@ -364,11 +380,15 @@ def check_opt_states(mock_builder: Builder) -> None:
         )
 
         assert (
-            mock_builder.store.policy_opt_states[net_key][opt_state_key][2]
+            mock_builder.store.policy_opt_states[net_key][constants.opt_state_dict_key][
+                2
+            ]
             == optax.EmptyState()
         )
         assert (
-            mock_builder.store.critic_opt_states[net_key][opt_state_key][2]
+            mock_builder.store.critic_opt_states[net_key][constants.opt_state_dict_key][
+                2
+            ]
             == optax.EmptyState()
         )
 
@@ -388,8 +408,6 @@ def test_single_trainer_shared_weights_fixed_sampling(
 
     builder = mock_builder_shared_weights_fixed_sampling
     single_trainer_init.on_building_init_end(builder)
-
-    assert hasattr(builder.store, "opt_state_key")
 
     assert builder.store.net_spec_keys == {"network_agent": "agent_0"}
     assert builder.store.table_network_config == {
@@ -413,8 +431,6 @@ def test_single_trainer_no_shared_weights_fixed_sampling(
 
     builder = mock_builder_no_shared_weights_fixed_sampling
     single_trainer_init.on_building_init_end(builder)
-
-    assert hasattr(builder.store, "opt_state_key")
 
     assert builder.store.net_spec_keys == {
         "network_agent_0": "agent_0",
@@ -445,8 +461,6 @@ def test_single_trainer_no_shared_weights_random_sampling(
     builder = mock_builder_no_shared_weights_random_sampling
     single_trainer_init.on_building_init_end(builder)
 
-    assert hasattr(builder.store, "opt_state_key")
-
     assert builder.store.net_spec_keys == {
         "network_0": "agent_0",
         "network_1": "agent_1",
@@ -473,8 +487,6 @@ def test_one_trainer_per_network_shared_weights_fixed_sampling(
 
     builder = mock_builder_shared_weights_fixed_sampling
     one_trainer_per_network_init.on_building_init_end(builder)
-
-    assert hasattr(builder.store, "opt_state_key")
 
     assert builder.store.net_spec_keys == {"network_agent": "agent_0"}
     assert builder.store.table_network_config == {
@@ -536,8 +548,6 @@ def test_custom_trainer_init_no_shared_weights_random_sampling(
 
     trainer_init.on_building_init_end(builder)
 
-    assert hasattr(builder.store, "opt_state_key")
-
     assert builder.store.net_spec_keys == {
         "network_0": "agent_0",
         "network_1": "agent_1",
@@ -574,8 +584,6 @@ def test_custom_trainer_init_shared_weights_fixed_sampling(
     builder = mock_builder_shared_weights_fixed_sampling
 
     trainer_init.on_building_init_end(builder)
-
-    assert hasattr(builder.store, "opt_state_key")
 
     assert builder.store.net_spec_keys == {"network_agent": "agent_0"}
     assert builder.store.table_network_config == {

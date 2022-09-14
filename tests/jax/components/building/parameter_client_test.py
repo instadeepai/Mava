@@ -22,6 +22,7 @@ import numpy as np
 import pytest
 from optax import EmptyState
 
+from mava import constants
 from mava.components.jax.building.parameter_client import (
     BaseParameterClient,
     ExecutorParameterClient,
@@ -81,7 +82,6 @@ expected_network_keys = {
 
 expected_keys = expected_count_keys.union(expected_network_keys)
 
-opt_state_key = "opt_states"
 initial_parameters_trainer = {
     "policy_networks-network_agent_0": {"weights": 0, "biases": 0},
     "policy_networks-network_agent_1": {"weights": 1, "biases": 1},
@@ -89,12 +89,12 @@ initial_parameters_trainer = {
     "critic_networks-network_agent_0": {"weights": 0, "biases": 0},
     "critic_networks-network_agent_1": {"weights": 1, "biases": 1},
     "critic_networks-network_agent_2": {"weights": 2, "biases": 2},
-    "policy_opt_state-network_agent_0": {opt_state_key: EmptyState()},
-    "policy_opt_state-network_agent_1": {opt_state_key: EmptyState()},
-    "policy_opt_state-network_agent_2": {opt_state_key: EmptyState()},
-    "critic_opt_state-network_agent_0": {opt_state_key: EmptyState()},
-    "critic_opt_state-network_agent_1": {opt_state_key: EmptyState()},
-    "critic_opt_state-network_agent_2": {opt_state_key: EmptyState()},
+    "policy_opt_state-network_agent_0": {constants.opt_state_dict_key: EmptyState()},
+    "policy_opt_state-network_agent_1": {constants.opt_state_dict_key: EmptyState()},
+    "policy_opt_state-network_agent_2": {constants.opt_state_dict_key: EmptyState()},
+    "critic_opt_state-network_agent_0": {constants.opt_state_dict_key: EmptyState()},
+    "critic_opt_state-network_agent_1": {constants.opt_state_dict_key: EmptyState()},
+    "critic_opt_state-network_agent_2": {constants.opt_state_dict_key: EmptyState()},
     "trainer_steps": np.array(0, dtype=np.int32),
     "trainer_walltime": np.array(0.0, dtype=np.float32),
     "evaluator_steps": np.array(0, dtype=np.int32),
@@ -143,10 +143,14 @@ def mock_builder_with_parameter_client() -> Builder:
 
     builder.store.policy_opt_states = {}
     for net_key in builder.store.networks["networks"].keys():
-        builder.store.policy_opt_states[net_key] = {opt_state_key: EmptyState()}
+        builder.store.policy_opt_states[net_key] = {
+            constants.opt_state_dict_key: EmptyState()
+        }
     builder.store.critic_opt_states = {}
     for net_key in builder.store.networks["networks"].keys():
-        builder.store.critic_opt_states[net_key] = {opt_state_key: EmptyState()}
+        builder.store.critic_opt_states[net_key] = {
+            constants.opt_state_dict_key: EmptyState()
+        }
 
     builder.store.parameter_server_client = ParameterServer(
         store=SimpleNamespace(

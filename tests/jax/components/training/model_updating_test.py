@@ -23,6 +23,7 @@ import jax.numpy as jnp
 import optax
 import pytest
 
+from mava import constants
 from mava.components.jax.training import Batch
 from mava.components.jax.training.model_updating import (
     MAPGEpochUpdate,
@@ -176,11 +177,10 @@ class MockTrainer(Trainer):
         policy_optimiser = MockOptimiser()
         critic_optimiser = MockOptimiser()
 
-        opt_state_key = "optax_states"
         policy_opt_states = {}
         for net_key in networks["networks"].keys():
             policy_opt_states[net_key] = {
-                opt_state_key: policy_optimiser.init(
+                constants.opt_state_dict_key: policy_optimiser.init(
                     networks["networks"][net_key].policy_params
                 )
             }  # pytype: disable=attribute-error
@@ -188,7 +188,7 @@ class MockTrainer(Trainer):
         critic_opt_states = {}
         for net_key in networks["networks"].keys():
             critic_opt_states[net_key] = {
-                opt_state_key: critic_optimiser.init(
+                constants.opt_state_dict_key: critic_optimiser.init(
                     networks["networks"][net_key].critic_params
                 )
             }  # pytype: disable=attribute-error
@@ -204,7 +204,6 @@ class MockTrainer(Trainer):
             critic_optimiser=critic_optimiser,
             policy_opt_states=policy_opt_states,
             critic_opt_states=critic_opt_states,
-            opt_state_key=opt_state_key,
         )
 
 
