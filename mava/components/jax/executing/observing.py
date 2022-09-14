@@ -165,4 +165,5 @@ class FeedforwardExecutorObserve(ExecutorObserve):
         if executor.store.executor_parameter_client:
             if force_update:
                 executor.store.executor_parameter_client.force_get_async()
-            executor.store.executor_parameter_client.get_async()
+            else:
+                executor.store.executor_parameter_client.get_async()
