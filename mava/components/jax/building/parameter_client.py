@@ -117,7 +117,9 @@ class ExecutorParameterClient(BaseParameterClient):
         builder.store.executor_counts = {name: params[name] for name in count_names}
 
         # Executors should only be able to update relevant params.
-        if builder.store.is_evaluator is True:
+        executor_type = "evaluator" if builder.store.is_evaluator else "executor"
+        set_keys = [x for x in get_keys if x.startswith(executor_type)]
+        get_keys = [x for x in get_keys if not x.startswith(executor_type)]
             set_keys = [x for x in get_keys if x.startswith("evaluator")]
             get_keys = [x for x in get_keys if not x.startswith("evaluator")]
         else:
