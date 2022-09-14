@@ -16,19 +16,15 @@
 """Example running IPPO on debug MPE environments."""
 
 import functools
-import os
 from typing import Any
 
 import optax
 from absl import app, flags
 
-from mava.components.jax.updating.checkpointer import Checkpointer
 from mava.systems.jax import ippo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
-# Without this flag, JAX uses the whole GPU from the beginning and our trainer crashes.
-os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "env_name",
@@ -73,6 +69,7 @@ def main(_: Any) -> None:
         )
 
     # Used for checkpoints, tensorboard logging and env monitoring
+    # Experiment_path must point to an existing folder to restore the checkpoint
     experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
@@ -97,9 +94,6 @@ def main(_: Any) -> None:
 
     # Create the system.
     system = ippo.IPPOSystem()
-
-    # Add the checkpointer component to the IPPO system
-    system.add(Checkpointer)
 
     # Build the system.
     system.build(

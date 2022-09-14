@@ -82,6 +82,7 @@ class IPPOSystem(System):
             executor_parameter_client=building.ExecutorParameterClient,
             trainer_parameter_client=building.TrainerParameterClient,
             termination_condition=updating.CountConditionTerminator,
+            checkpointer=updating.Checkpointer,
         ).get()
 
         system = DesignSpec(
