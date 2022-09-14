@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any, Dict, List, Type
 
+from mava import constants
 from mava.callbacks import Callback
 from mava.components.jax import Component
 from mava.components.jax.building.environments import EnvironmentSpec
@@ -81,13 +82,10 @@ class BaseTrainerInit(Component):
 
         # Wrap opt_states in a mutable type (dict) since optax return an immutable tuple
         builder.store.policy_opt_states = {}
-        builder.store.opt_state_key = (
-            "opt_state"  # GLOBAL VARIABLE LOOK AT, store changes
-        )
 
         for net_key in builder.store.networks["networks"].keys():
             builder.store.policy_opt_states[net_key] = {
-                builder.store.opt_state_key: builder.store.policy_optimiser.init(
+                constants.opt_state_dict_key: builder.store.policy_optimiser.init(
                     builder.store.networks["networks"][net_key].policy_params
                 )
             }  # pytype: disable=attribute-error
@@ -95,7 +93,7 @@ class BaseTrainerInit(Component):
         builder.store.critic_opt_states = {}
         for net_key in builder.store.networks["networks"].keys():
             builder.store.critic_opt_states[net_key] = {
-                builder.store.opt_state_key: builder.store.critic_optimiser.init(
+                constants.opt_state_dict_key: builder.store.critic_optimiser.init(
                     builder.store.networks["networks"][net_key].critic_params
                 )
             }  # pytype: disable=attribute-error
@@ -164,7 +162,7 @@ class SingleTrainerInit(BaseTrainerInit):
         # Setup trainer_networks
         unique_net_keys = builder.store.unique_net_keys
         builder.store.trainer_networks = {"trainer_0": unique_net_keys}
-        super(SingleTrainerInit, self).on_building_init_end(builder)  # callbacks!!!
+        super(SingleTrainerInit, self).on_building_init_end(builder)
 
 
 class OneTrainerPerNetworkInit(BaseTrainerInit):
@@ -224,5 +222,7 @@ class CustomTrainerInit(BaseTrainerInit):
         """
         # Setup trainer_networks
         trainer_networks = self.config.trainer_networks
+        if not isinstance(trainer_networks, dict) or trainer_networks == {}:
+            raise ValueError("trainer_networks must be a non-empty dictionary.")
         builder.store.trainer_networks = trainer_networks
         super(CustomTrainerInit, self).on_building_init_end(builder)
