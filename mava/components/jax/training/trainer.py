@@ -43,15 +43,80 @@ class BaseTrainerInit(Component):
         """
         self.config = config
 
-    @abc.abstractmethod
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """Set up the networks during the build."""
-        pass
+        unique_net_keys = builder.store.unique_net_keys
 
-    @abc.abstractmethod
+        # Get all the unique trainer network keys
+        all_trainer_net_keys = []
+        for trainer_nets in builder.store.trainer_networks.values():
+            all_trainer_net_keys.extend(trainer_nets)
+        unique_trainer_net_keys = sort_str_num(list(set(all_trainer_net_keys)))
+
+        # Check that all agent_net_keys are in trainer_networks
+        assert unique_net_keys == unique_trainer_net_keys
+        # Setup specs for each network
+        builder.store.net_spec_keys = {}
+        for i in range(len(unique_net_keys)):
+            builder.store.net_spec_keys[unique_net_keys[i]] = builder.store.agents[
+                i % len(builder.store.agents)
+            ]
+
+        # Setup table_network_config
+        builder.store.table_network_config = {}
+        for trainer_key in builder.store.trainer_networks.keys():
+            most_matches = 0
+            trainer_nets = builder.store.trainer_networks[trainer_key]
+            for sample in builder.store.network_sampling_setup:
+                matches = 0
+                for entry in sample:
+                    if entry in trainer_nets:
+                        matches += 1
+                if most_matches < matches:
+                    matches = most_matches
+                    builder.store.table_network_config[trainer_key] = sample
+
+        # TODO (Matthew): networks need to be created on the nodes instead?
+        builder.store.networks = builder.store.network_factory()
+
+        # Wrap opt_states in a mutable type (dict) since optax return an immutable tuple
+        builder.store.policy_opt_states = {}
+        builder.store.opt_state_key = (
+            "opt_state"  # GLOBAL VARIABLE LOOK AT, store changes
+        )
+
+        for net_key in builder.store.networks["networks"].keys():
+            builder.store.policy_opt_states[net_key] = {
+                builder.store.opt_state_key: builder.store.policy_optimiser.init(
+                    builder.store.networks["networks"][net_key].policy_params
+                )
+            }  # pytype: disable=attribute-error
+
+        builder.store.critic_opt_states = {}
+        for net_key in builder.store.networks["networks"].keys():
+            builder.store.critic_opt_states[net_key] = {
+                builder.store.opt_state_key: builder.store.critic_optimiser.init(
+                    builder.store.networks["networks"][net_key].critic_params
+                )
+            }  # pytype: disable=attribute-error
+
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """Set up trainer agents."""
-        pass
+        """Set up and store trainer agents.
+
+        Args:
+            trainer: SystemTrainer.
+        """
+        # Convert network keys for the trainer.
+        trainer.store.trainer_table_entry = trainer.store.table_network_config[
+            trainer.store.trainer_id  # Set by the Builder
+        ]
+        trainer.store.trainer_agents = trainer.store.agents[
+            : len(trainer.store.trainer_table_entry)
+        ]
+        trainer.store.trainer_agent_net_keys = {
+            agent: trainer.store.trainer_table_entry[a_i]
+            for a_i, agent in enumerate(trainer.store.trainer_agents)
+        }
 
     @staticmethod
     def name() -> str:
@@ -96,82 +161,10 @@ class SingleTrainerInit(BaseTrainerInit):
             ValueError: Raises an error when trainer_networks is not
                         set to single_trainer.
         """
-        unique_net_keys = builder.store.unique_net_keys
-
         # Setup trainer_networks
-
+        unique_net_keys = builder.store.unique_net_keys
         builder.store.trainer_networks = {"trainer_0": unique_net_keys}
-
-        # Get all the unique trainer network keys
-        all_trainer_net_keys = []
-        for trainer_nets in builder.store.trainer_networks.values():
-            all_trainer_net_keys.extend(trainer_nets)
-        unique_trainer_net_keys = sort_str_num(list(set(all_trainer_net_keys)))
-
-        # Check that all agent_net_keys are in trainer_networks
-        assert unique_net_keys == unique_trainer_net_keys
-        # Setup specs for each network
-        builder.store.net_spec_keys = {}
-        for i in range(len(unique_net_keys)):
-            builder.store.net_spec_keys[unique_net_keys[i]] = builder.store.agents[
-                i % len(builder.store.agents)
-            ]
-
-        # Setup table_network_config
-        builder.store.table_network_config = {}
-        for trainer_key in builder.store.trainer_networks.keys():
-            most_matches = 0
-            trainer_nets = builder.store.trainer_networks[trainer_key]
-            for sample in builder.store.network_sampling_setup:
-                matches = 0
-                for entry in sample:
-                    if entry in trainer_nets:
-                        matches += 1
-                if most_matches < matches:
-                    matches = most_matches
-                    builder.store.table_network_config[trainer_key] = sample
-
-        # TODO (Matthew): networks need to be created on the nodes instead?
-        builder.store.networks = builder.store.network_factory()
-
-        # Wrap opt_states in a mutable type (dict) since optax return an immutable tuple
-        builder.store.policy_opt_states = {}
-        builder.store.opt_state_key = "opt_state"
-        for net_key in builder.store.networks["networks"].keys():
-            builder.store.policy_opt_states[net_key] = {
-                builder.store.opt_state_key: builder.store.policy_optimiser.init(
-                    builder.store.networks["networks"][net_key].policy_params
-                )
-            }  # pytype: disable=attribute-error
-
-        builder.store.critic_opt_states = {}
-        for net_key in builder.store.networks["networks"].keys():
-            builder.store.critic_opt_states[net_key] = {
-                builder.store.opt_state_key: builder.store.critic_optimiser.init(
-                    builder.store.networks["networks"][net_key].critic_params
-                )
-            }  # pytype: disable=attribute-error
-
-    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """Set up trainer agents.
-
-        Args:
-            trainer: SystemTrainer.
-
-        Returns:
-            None.
-        """
-        # Convert network keys for the trainer.
-        trainer.store.trainer_table_entry = trainer.store.table_network_config[
-            trainer.store.trainer_id  # Set by the Builder
-        ]
-        trainer.store.trainer_agents = trainer.store.agents[
-            : len(trainer.store.trainer_table_entry)
-        ]
-        trainer.store.trainer_agent_net_keys = {
-            agent: trainer.store.trainer_table_entry[a_i]
-            for a_i, agent in enumerate(trainer.store.trainer_agents)
-        }
+        super(SingleTrainerInit, self).on_building_init_end(builder)  # callbacks!!!
 
 
 class OneTrainerPerNetworkInit(BaseTrainerInit):
@@ -194,81 +187,12 @@ class OneTrainerPerNetworkInit(BaseTrainerInit):
             ValueError: Raises an error when trainer_networks is not
                         set to one_trainer_per_network.
         """
-        unique_net_keys = builder.store.unique_net_keys
-
         # Setup trainer_networks
+        unique_net_keys = builder.store.unique_net_keys
         builder.store.trainer_networks = {
             f"trainer_{i}": [unique_net_keys[i]] for i in range(len(unique_net_keys))
         }
-
-        # Get all the unique trainer network keys
-        all_trainer_net_keys = []
-        for trainer_nets in builder.store.trainer_networks.values():
-            all_trainer_net_keys.extend(trainer_nets)
-        unique_trainer_net_keys = sort_str_num(list(set(all_trainer_net_keys)))
-
-        # Check that all agent_net_keys are in trainer_networks
-        assert unique_net_keys == unique_trainer_net_keys
-        # Setup specs for each network
-        builder.store.net_spec_keys = {}
-        for i in range(len(unique_net_keys)):
-            builder.store.net_spec_keys[unique_net_keys[i]] = builder.store.agents[
-                i % len(builder.store.agents)
-            ]
-
-        # Setup table_network_config
-        builder.store.table_network_config = {}
-        for trainer_key in builder.store.trainer_networks.keys():
-            most_matches = 0
-            trainer_nets = builder.store.trainer_networks[trainer_key]
-            for sample in builder.store.network_sampling_setup:
-                matches = 0
-                for entry in sample:
-                    if entry in trainer_nets:
-                        matches += 1
-                if most_matches < matches:
-                    matches = most_matches
-                    builder.store.table_network_config[trainer_key] = sample
-
-        builder.store.networks = builder.store.network_factory()
-
-        builder.store.policy_opt_states = {}
-        builder.store.opt_state_key = "opt_state"
-        for net_key in builder.store.networks["networks"].keys():
-            builder.store.policy_opt_states[net_key] = {
-                builder.store.opt_state_key: builder.store.policy_optimiser.init(
-                    builder.store.networks["networks"][net_key].policy_params
-                )
-            }  # pytype: disable=attribute-error
-
-        builder.store.critic_opt_states = {}
-        for net_key in builder.store.networks["networks"].keys():
-            builder.store.critic_opt_states[net_key] = {
-                builder.store.opt_state_key: builder.store.critic_optimiser.init(
-                    builder.store.networks["networks"][net_key].critic_params
-                )
-            }  # pytype: disable=attribute-error
-
-    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """Set up trainer agents.
-
-        Args:
-            trainer: SystemTrainer.
-
-        Returns:
-            None.
-        """
-        # Convert network keys for the trainer.
-        trainer.store.trainer_table_entry = trainer.store.table_network_config[
-            trainer.store.trainer_id
-        ]
-        trainer.store.trainer_agents = trainer.store.agents[
-            : len(trainer.store.trainer_table_entry)
-        ]
-        trainer.store.trainer_agent_net_keys = {
-            agent: trainer.store.trainer_table_entry[a_i]
-            for a_i, agent in enumerate(trainer.store.trainer_agents)
-        }
+        super(OneTrainerPerNetworkInit, self).on_building_init_end(builder)
 
 
 @dataclass
@@ -298,81 +222,7 @@ class CustomTrainerInit(BaseTrainerInit):
             ValueError: Raises an error when trainer_networks is not
                         passed in as a dictionary.
         """
-        trainer_networks = self.config.trainer_networks
-        unique_net_keys = builder.store.unique_net_keys
-
         # Setup trainer_networks
-        if not isinstance(trainer_networks, dict) or trainer_networks == {}:
-
-            raise ValueError("trainer_networks must be a non-empty dictionary.")
-
+        trainer_networks = self.config.trainer_networks
         builder.store.trainer_networks = trainer_networks
-
-        # Get all the unique trainer network keys
-        all_trainer_net_keys = []
-        for trainer_nets in builder.store.trainer_networks.values():
-            all_trainer_net_keys.extend(trainer_nets)
-        unique_trainer_net_keys = sort_str_num(list(set(all_trainer_net_keys)))
-
-        # Check that all agent_net_keys are in trainer_networks
-        assert unique_net_keys == unique_trainer_net_keys
-        # Setup specs for each network
-        builder.store.net_spec_keys = {}
-        for i in range(len(unique_net_keys)):
-            builder.store.net_spec_keys[unique_net_keys[i]] = builder.store.agents[
-                i % len(builder.store.agents)
-            ]
-
-        # Setup table_network_config
-        builder.store.table_network_config = {}
-        for trainer_key in builder.store.trainer_networks.keys():
-            most_matches = 0
-            trainer_nets = builder.store.trainer_networks[trainer_key]
-            for sample in builder.store.network_sampling_setup:
-                matches = 0
-                for entry in sample:
-                    if entry in trainer_nets:
-                        matches += 1
-                if most_matches < matches:
-                    matches = most_matches
-                    builder.store.table_network_config[trainer_key] = sample
-
-        builder.store.networks = builder.store.network_factory()
-
-        builder.store.policy_opt_states = {}
-        builder.store.opt_state_key = "opt_state"
-        for net_key in builder.store.networks["networks"].keys():
-            builder.store.policy_opt_states[net_key] = {
-                builder.store.opt_state_key: builder.store.policy_optimiser.init(
-                    builder.store.networks["networks"][net_key].policy_params
-                )
-            }  # pytype: disable=attribute-error
-
-        builder.store.critic_opt_states = {}
-        for net_key in builder.store.networks["networks"].keys():
-            builder.store.critic_opt_states[net_key] = {
-                builder.store.opt_state_key: builder.store.critic_optimiser.init(
-                    builder.store.networks["networks"][net_key].critic_params
-                )
-            }  # pytype: disable=attribute-error
-
-    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """Set up and store trainer agents.
-
-        Args:
-            trainer: SystemTrainer.
-
-        Returns:
-            None.
-        """
-        # Convert network keys for the trainer.
-        trainer.store.trainer_table_entry = trainer.store.table_network_config[
-            trainer.store.trainer_id
-        ]
-        trainer.store.trainer_agents = trainer.store.agents[
-            : len(trainer.store.trainer_table_entry)
-        ]
-        trainer.store.trainer_agent_net_keys = {
-            agent: trainer.store.trainer_table_entry[a_i]
-            for a_i, agent in enumerate(trainer.store.trainer_agents)
-        }
+        super(CustomTrainerInit, self).on_building_init_end(builder)
