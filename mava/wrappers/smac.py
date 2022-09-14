@@ -285,7 +285,7 @@ class SMACWrapper(ParallelEnvWrapper):
             extra stats to be logged.
         """
         stats = self._environment.get_stats()
-        stats["cumulative_win"] = stats["win_rate"]
+        stats["cumulative_win_rate"] = stats["win_rate"]
         del stats["win_rate"]
         return stats
 
