@@ -48,6 +48,7 @@ def ippo_system_single_process() -> System:
     base_dir = "~/mava"
     mava_id = str(datetime.now())
     checkpoint_subpath = f"{base_dir}/{mava_id}"
+
     # Log every [log_every] seconds.
     log_every = 1
     logger_factory = functools.partial(
@@ -58,10 +59,14 @@ def ippo_system_single_process() -> System:
         time_stamp=mava_id,
         time_delta=log_every,
     )
-    # Optimizer.
-    optimizer = optax.chain(
-        optax.clip_by_global_norm(40.0),
-        optax.adam(1e-4),
+
+    # Optimisers.
+    policy_optimiser = optax.chain(
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+    )
+
+    critic_optimiser = optax.chain(
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
     # Create ippo system
@@ -73,8 +78,9 @@ def ippo_system_single_process() -> System:
         network_factory=network_factory,
         logger_factory=logger_factory,
         experiment_path=checkpoint_subpath,
-        optimizer=optimizer,
-        executor_parameter_update_period=10,
+        policy_optimiser=policy_optimiser,
+        critic_optimiser=critic_optimiser,
+        executor_parameter_update_period=1,
         multi_process=False,  # Single process case
         run_evaluator=True,
         num_executors=1,
@@ -87,6 +93,7 @@ def ippo_system_single_process() -> System:
         nodes_on_gpu=[],
         sequence_length=4,
         period=4,
+        trainer_parameter_update_period=1,
     )
 
     return test_system
@@ -104,7 +111,7 @@ def ippo_system_multi_thread() -> System:
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return ippo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(254, 254, 254),
+            policy_layer_sizes=(256, 256, 256),
             critic_layer_sizes=(512, 512, 256),
             *args,
             **kwargs,
@@ -126,8 +133,12 @@ def ippo_system_multi_thread() -> System:
         time_delta=log_every,
     )
 
-    # Optimizer.
-    optimizer = optax.chain(
+    # Optimisers.
+    policy_optimiser = optax.chain(
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+    )
+
+    critic_optimiser = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
@@ -140,7 +151,8 @@ def ippo_system_multi_thread() -> System:
         network_factory=network_factory,
         logger_factory=logger_factory,
         experiment_path=checkpoint_subpath,
-        optimizer=optimizer,
+        policy_optimiser=policy_optimiser,
+        critic_optimiser=critic_optimiser,
         executor_parameter_update_period=1,
         multi_process=True,
         run_evaluator=True,
@@ -150,5 +162,6 @@ def ippo_system_multi_thread() -> System:
         sample_batch_size=5,
         nodes_on_gpu=[],
         is_test=True,
+        trainer_parameter_update_period=1,
     )
     return test_system

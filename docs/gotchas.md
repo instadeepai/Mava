@@ -20,7 +20,24 @@ In order to have access to the underlying jax.numpy arrays that are in these var
 with jax.disable_jit():
     pdb.set_trace()
 ```
-## Installing from source
-- In order to edit the MAVA source code, you must ensure that you have cloned the repo and installed from source using `pip install -e .`
-- A common mistake is to `run pip install id-mava`, which installs MAVA from pypi, resulting in a duplicate version of MAVA being stored as a dependancy.
-- If you encounter `ModuleNotFoundError: No module named 'mava'` or Mava is executed by the example systems via site-packages (mava is stored as a package), a likely fix is to add the home directroy of the cloned Mava source code to `PYTHONPATH` with `export PYTHONPATH=<mava_homedir>`. On a linux-based, this command can be added to `.bashrc`, to avoid having to export the path every time a new terminal is opened.
+
+## Components
+When creating components, it is important to include variable types for both the config class and component class `__init__` method. This is necessary because Mava uses it to determine which config variables are available in the system. In the example below, we provide the types for the config variables and also the config class variable inside the `Distributor` component. For the config class variable we use the `DistributorConfig` as the type, which points the system to the config class that is used.
+
+```python
+@dataclass
+class DistributorConfig:
+    num_executors: int = 1
+    multi_process: bool = True
+    nodes_on_gpu: Union[List[str], str] = "trainer"
+    run_evaluator: bool = True
+    distributor_name: str = "System"
+    terminal: str = "current_terminal"
+    single_process_max_episodes: Optional[int] = None
+    is_test: Optional[bool] = False
+
+
+class Distributor(Component):
+    def __init__(self, config: DistributorConfig = DistributorConfig()):
+```
+

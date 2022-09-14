@@ -19,6 +19,7 @@ import abc
 import copy
 import functools
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import dm_env
@@ -260,13 +261,8 @@ def mock_queue(
     return reverb.Table.queue(name=name, max_size=max_queue_size, signature=signature)
 
 
-@dataclass
-class MockDataServerConfig:
-    pass
-
-
 class MockDataServer(Component):
-    def __init__(self, config: MockDataServerConfig = MockDataServerConfig()) -> None:
+    def __init__(self, config: SimpleNamespace = SimpleNamespace()) -> None:
         """_summary_
 
         Args:
@@ -311,15 +307,6 @@ class MockDataServer(Component):
     def name() -> str:
         """Static method that returns component name."""
         return "data_server"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MockDataServerConfig
 
 
 class MockOnPolicyDataServer(MockDataServer):
@@ -382,15 +369,6 @@ class MockOnPolicyDataServer(MockDataServer):
             signature=signature,
         )
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return OnPolicyDataServerConfig
-
 
 class MockOffPolicyDataServer(MockDataServer):
     def __init__(
@@ -449,15 +427,6 @@ class MockOffPolicyDataServer(MockDataServer):
             rate_limiter=builder.store.rate_limiter_fn(),
             signature=builder.store.adder_signature_fn(environment_spec, extras_spec),
         )
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return OffPolicyDataServerConfig
 
 
 @dataclass
@@ -558,6 +527,7 @@ class MockTrainerParameterClientConfig:
 
     trainer_parameter_client_param_0: int = 1
     trainer_parameter_client_param_1: str = "param"
+    trainer_parameter_update_period: int = 1
 
 
 class MockTrainerParameterClient(Component):
@@ -576,15 +546,6 @@ class MockTrainerParameterClient(Component):
     def name() -> str:
         """Static method that returns component name."""
         return "trainer_parameter_client"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MockTrainerParameterClientConfig
 
 
 @dataclass
@@ -661,15 +622,6 @@ class MockExecutorEnvironmentLoop(Component):
         """Static method that returns component name."""
         return "executor_environment_loop"
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MockExecutorEnvironmentLoopConfig
-
 
 @dataclass
 class MockNetworksConfig:
@@ -691,10 +643,10 @@ class MockNetworks(Component):
         """Summary"""
 
         # Setup the jax key for network initialisations
-        builder.store.key = jax.random.PRNGKey(self.config.seed)
+        builder.store.base_key = jax.random.PRNGKey(self.config.seed)
 
         # Build network function here
-        network_key, builder.store.key = jax.random.split(builder.store.key)
+        network_key, builder.store.base_key = jax.random.split(builder.store.base_key)
         builder.store.network_factory = (
             lambda: self.config.network_factory(  # type: ignore
                 environment_spec=builder.store.ma_environment_spec,
@@ -707,15 +659,6 @@ class MockNetworks(Component):
     def name() -> str:
         """_summary_"""
         return "networks"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MockNetworksConfig
 
 
 @dataclass
@@ -746,15 +689,6 @@ class MockTrainerDataset(Component):
         """Static method that returns component name."""
         return "trainer_dataset"
 
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return MockTrainerDatasetConfig
-
 
 @dataclass
 class MockTrainerConfig:
@@ -775,9 +709,9 @@ class MockTrainer(Component):
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """TODO: Add description here."""
         builder.store.table_network_config = {
-            "trainer": ["network_agent", "network_agent", "network_agent"]
+            "trainer_0": ["network_agent", "network_agent", "network_agent"]
         }
-        builder.store.trainer_networks = {"trainer": ["network_agent"]}
+        builder.store.trainer_networks = {"trainer_0": ["network_agent"]}
 
     def on_building_trainer(self, builder: SystemBuilder) -> None:
         """_summary_"""
@@ -815,16 +749,23 @@ class MockDistributor(Component):
 
     def on_building_program_nodes(self, builder: SystemBuilder) -> None:
         """_summary_"""
+        builder.store.data_key = [1234, 1234]
+        builder.store.eval_key = [1234, 1234]
+        builder.store.param_key = [1234, 1234]
+        builder.store.executor_keys = [[1234, 1234]]
+        builder.store.trainer_keys = [[1234, 1234]]
+
         data_server = builder.data_server()
+
         parameter_server = builder.parameter_server()
 
         trainer = builder.trainer(
-            trainer_id="trainer",
+            trainer_id="trainer_0",
             data_server_client=data_server,
             parameter_server_client=parameter_server,
         )
         executor = builder.executor(
-            executor_id="executor",
+            executor_id="executor_0",
             data_server_client=data_server,
             parameter_server_client=parameter_server,
         )

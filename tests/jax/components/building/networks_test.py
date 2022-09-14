@@ -49,7 +49,7 @@ def test_network_factory() -> Callable:
 
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return make_default_networks(  # type: ignore
-            policy_layer_sizes=(254, 254, 254),
+            policy_layer_sizes=(256, 256, 256),
             critic_layer_sizes=(512, 512, 256),
             *args,
             **kwargs,
@@ -105,12 +105,12 @@ def test_key_in_store(
     Returns:
         None.
     """
-    assert not hasattr(test_builder.store, "key")
+    assert not hasattr(test_builder.store, "base_key")
     test_default_networks.on_building_init_start(test_builder)
-    assert hasattr(test_builder.store, "key")
-    assert isinstance(test_builder.store.key, jax.random.PRNGKeyArray) or isinstance(
-        test_builder.store.key, jax.numpy.DeviceArray
-    )
+    assert hasattr(test_builder.store, "base_key")
+    assert isinstance(
+        test_builder.store.base_key, jax.random.PRNGKeyArray
+    ) or isinstance(test_builder.store.base_key, jax.numpy.DeviceArray)
 
 
 def test_config_set(test_default_networks: Networks) -> None:

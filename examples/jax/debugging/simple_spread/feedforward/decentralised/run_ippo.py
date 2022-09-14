@@ -15,7 +15,6 @@
 
 """Example running IPPO on debug MPE environments."""
 import functools
-import os
 from datetime import datetime
 from typing import Any
 
@@ -26,8 +25,6 @@ from mava.systems.jax import ippo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
-# Without this flag, JAX uses the whole GPU from the beginning and our trainer crashes.
-os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "env_name",
@@ -64,7 +61,7 @@ def main(_: Any) -> None:
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return ippo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(254, 254, 254),
+            policy_layer_sizes=(256, 256, 256),
             critic_layer_sizes=(512, 512, 256),
             *args,
             **kwargs,
@@ -84,8 +81,12 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # Optimizer.
-    optimizer = optax.chain(
+    # Optimisers.
+    policy_optimiser = optax.chain(
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+    )
+
+    critic_optimiser = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
@@ -98,7 +99,8 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         experiment_path=experiment_path,
-        optimizer=optimizer,
+        policy_optimiser=policy_optimiser,
+        critic_optimiser=critic_optimiser,
         run_evaluator=True,
         sample_batch_size=5,
         num_epochs=15,
