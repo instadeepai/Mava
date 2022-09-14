@@ -120,11 +120,6 @@ class ExecutorParameterClient(BaseParameterClient):
         executor_type = "evaluator" if builder.store.is_evaluator else "executor"
         set_keys = [x for x in get_keys if x.startswith(executor_type)]
         get_keys = [x for x in get_keys if not x.startswith(executor_type)]
-            set_keys = [x for x in get_keys if x.startswith("evaluator")]
-            get_keys = [x for x in get_keys if not x.startswith("evaluator")]
-        else:
-            set_keys = [x for x in get_keys if x.startswith("executor")]
-            get_keys = [x for x in get_keys if not x.startswith("executor")]
 
         parameter_client = None
         if builder.store.parameter_server_client:

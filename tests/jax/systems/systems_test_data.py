@@ -22,7 +22,6 @@ from typing import Any
 
 import optax
 
-from mava.components.jax.updating.checkpointer import Checkpointer
 from mava.systems.jax import System, ippo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -73,7 +72,6 @@ def ippo_system_single_process() -> System:
 
     # Create ippo system
     test_system = ippo.IPPOSystem()
-    test_system.add(Checkpointer)
 
     # Build the test_system
     test_system.build(
@@ -148,7 +146,6 @@ def ippo_system_multi_thread() -> System:
 
     # Create the ippo system
     test_system = ippo.IPPOSystem()
-    test_system.add(Checkpointer)
 
     # Build the system.
     test_system.build(
