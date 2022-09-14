@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 
 class HookOrderTracking:
@@ -231,7 +231,7 @@ class HookOrderTracking:
         """[summary]"""
         self.hook_list.append("on_execution_update_start")
 
-    def on_execution_update(self) -> None:
+    def on_execution_update(self, force_update: Optional[bool] = False) -> None:
         """[summary]"""
         self.hook_list.append("on_execution_update")
 

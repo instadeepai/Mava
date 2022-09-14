@@ -16,7 +16,7 @@
 """Jax system executor."""
 
 from types import SimpleNamespace
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import dm_env
 from acme.types import NestedArray
@@ -154,7 +154,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
         return self.store.actions_info, self.store.policies_info
 
-    def update(self, wait: bool = False) -> None:
+    def update(self, wait: bool = False, force_update: Optional[bool] = False) -> None:
         """Update executor parameters.
 
         Args:
@@ -167,6 +167,6 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
         self.on_execution_update_start()
 
-        self.on_execution_update()
+        self.on_execution_update(force_update=force_update)
 
         self.on_execution_update_end()

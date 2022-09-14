@@ -16,6 +16,7 @@
 """Abstract base class used to build new system components."""
 
 from abc import ABC
+from typing import Optional
 
 from mava.core_jax import (
     SystemBuilder,
@@ -251,7 +252,9 @@ class Callback(ABC):
         """Start of updating executor parameters."""
         pass
 
-    def on_execution_update(self, executor: SystemExecutor) -> None:
+    def on_execution_update(
+        self, executor: SystemExecutor, force_update: Optional[bool] = False
+    ) -> None:
         """Update executor parameters."""
         pass
 

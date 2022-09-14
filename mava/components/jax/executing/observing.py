@@ -17,7 +17,7 @@
 
 import abc
 from dataclasses import dataclass
-from typing import Any, Dict, List, Type
+from typing import Any, Dict, List, Optional, Type
 
 from mava.callbacks import Callback
 from mava.components.jax import Component
@@ -55,7 +55,9 @@ class ExecutorObserve(Component):
         pass
 
     @abc.abstractmethod
-    def on_execution_update(self, executor: SystemExecutor) -> None:
+    def on_execution_update(
+        self, executor: SystemExecutor, force_update: Optional[bool] = False
+    ) -> None:
         """Update the executor variables."""
         pass
 
@@ -156,7 +158,11 @@ class FeedforwardExecutorObserve(ExecutorObserve):
             adder_actions, executor.store.next_timestep, executor.store.next_extras
         )
 
-    def on_execution_update(self, executor: SystemExecutor) -> None:
+    def on_execution_update(
+        self, executor: SystemExecutor, force_update: Optional[bool] = False
+    ) -> None:
         """Update the executor variables."""
         if executor.store.executor_parameter_client:
+            if force_update:
+                executor.store.executor_parameter_client.force_get_async()
             executor.store.executor_parameter_client.get_async()

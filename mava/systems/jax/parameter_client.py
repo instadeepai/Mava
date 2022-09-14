@@ -129,6 +129,23 @@ class ParameterClient:
             self._copy(self._get_future.result())
             self._get_future = None
 
+    def force_get_async(self) -> None:
+        """Force asynchronously updates the parameters with the latest copy from server.
+
+        Returns:
+            None.
+        """
+        if self._get_future is None:
+            # The update period has been reached and no request has been sent yet, so
+            # making an asynchronous request now.
+            self._get_future = self._async_request()
+            self._get_call_counter = 0
+
+        if self._get_future is not None and self._get_future.done():
+            # The active request is done so copy the result and remove the future.\
+            self._copy(self._get_future.result())
+            self._get_future = None
+
     def set_async(self) -> None:
         """Asynchronously updates server with the set parameters.
 

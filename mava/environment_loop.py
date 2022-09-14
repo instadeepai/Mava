@@ -637,4 +637,4 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 time.sleep(1)
             # We need to get the latest counts if we are using eval intervals.
             if environment_loop_schedule:
-                self._executor.update()
+                self._executor.update(force_update=True)

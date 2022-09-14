@@ -16,7 +16,7 @@
 """Abstract mixin class used to call system component hooks."""
 
 from abc import ABC
-from typing import List
+from typing import List, Optional
 
 
 class ExecutorHookMixin(ABC):
@@ -123,10 +123,10 @@ class ExecutorHookMixin(ABC):
         for callback in self.callbacks:
             callback.on_execution_update_start(self)
 
-    def on_execution_update(self) -> None:
+    def on_execution_update(self, force_update: Optional[bool] = False) -> None:
         """Update executor parameters."""
         for callback in self.callbacks:
-            callback.on_execution_update(self)
+            callback.on_execution_update(self, force_update)
 
     def on_execution_update_end(self) -> None:
         """End of updating executor parameters."""
