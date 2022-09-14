@@ -35,7 +35,7 @@ class ExecutorObserve(Component):
         """Abstract component parses observations and updates executor variables.
 
         Args:
-            config: ExecutorObserveConfig.
+            config: SimpleNamespace.
         """
         self.config = config
 
@@ -159,11 +159,11 @@ class FeedforwardExecutorObserve(ExecutorObserve):
 
 
 class RecurrentExecutorObserve(FeedforwardExecutorObserve):
-    def __init__(self, config: ExecutorObserveConfig = ExecutorObserveConfig()):
+    def __init__(self, config: SimpleNamespace = SimpleNamespace()):
         """Component handles observations for a feedforward executor.
 
         Args:
-            config: ExecutorObserveConfig.
+            config: SimpleNamespace.
         """
         self.config = config
 

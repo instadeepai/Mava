@@ -186,12 +186,12 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
 class RecurrentExecutorSelectAction(ExecutorSelectAction):
     def __init__(
         self,
-        config: ExecutorSelectActionConfig = ExecutorSelectActionConfig(),
+        config: SimpleNamespace = SimpleNamespace(),
     ):
         """Component defines hooks for the executor selecting actions.
 
         Args:
-            config: ExecutorSelectActionConfig.
+            config: SimpleNamespace.
         """
         self.config = config
 
