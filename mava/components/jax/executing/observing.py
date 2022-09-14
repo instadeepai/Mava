@@ -16,7 +16,7 @@
 """Observation components for system builders"""
 
 import abc
-from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Type
 
 from mava.callbacks import Callback
@@ -29,14 +29,9 @@ from mava.core_jax import SystemExecutor
 from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 
 
-@dataclass
-class ExecutorObserveConfig:
-    pass
-
-
 class ExecutorObserve(Component):
     @abc.abstractmethod
-    def __init__(self, config: ExecutorObserveConfig = ExecutorObserveConfig()):
+    def __init__(self, config: SimpleNamespace = SimpleNamespace()):
         """Abstract component parses observations and updates executor variables.
 
         Args:
@@ -85,11 +80,11 @@ class ExecutorObserve(Component):
 
 
 class FeedforwardExecutorObserve(ExecutorObserve):
-    def __init__(self, config: ExecutorObserveConfig = ExecutorObserveConfig()):
+    def __init__(self, config: SimpleNamespace = SimpleNamespace()):
         """Component handles observations for a feedforward executor.
 
         Args:
-            config: ExecutorObserveConfig.
+            config: SimpleNamespace.
         """
         self.config = config
 

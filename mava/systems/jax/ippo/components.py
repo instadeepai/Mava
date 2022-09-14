@@ -15,7 +15,7 @@
 
 """Custom components for IPPO system."""
 import abc
-from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -23,11 +23,6 @@ from dm_env import specs
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
-
-
-@dataclass
-class ExtrasLogProbSpecConfig:
-    pass
 
 
 class ExtrasSpec(Component):
@@ -53,12 +48,12 @@ class ExtrasSpec(Component):
 class ExtrasLogProbSpec(ExtrasSpec):
     def __init__(
         self,
-        config: ExtrasLogProbSpecConfig = ExtrasLogProbSpecConfig(),
+        config: SimpleNamespace = SimpleNamespace(),
     ):
         """Class that adds log probs to the extras spec
 
         Args:
-            config : ExtrasLogProbSpecConfig
+            config : SimpleNamespace
         """
         self.config = config
 

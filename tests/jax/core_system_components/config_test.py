@@ -52,7 +52,7 @@ class SameParameterNameConfig:
 class DummyComponentNoConfigClass(Component):
     def __init__(
         self,
-        config: Any,
+        config: SimpleNamespace,
     ):
         """Initialize component
 
@@ -84,12 +84,6 @@ class DummyComponent(Component):
         """Returns component name"""
 
         return "dummy_component_name"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Returns component config class"""
-
-        return ComponentConfig_1
 
 
 @pytest.fixture

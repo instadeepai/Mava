@@ -66,15 +66,6 @@ class ExecutorInit(Component):
         return "executor_init"
 
     @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return ExecutorInitConfig
-
-    @staticmethod
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 

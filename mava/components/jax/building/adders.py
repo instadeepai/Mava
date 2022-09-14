@@ -16,7 +16,8 @@
 """Commonly used adder components for system builders"""
 import abc
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Type
+from types import SimpleNamespace
+from typing import Any, Dict, List, Type
 
 from mava import specs
 from mava.adders import reverb as reverb_adders
@@ -59,22 +60,17 @@ class Adder(Component):
         return [BaseTrainerInit, BaseSystemInit]
 
 
-@dataclass
-class AdderPriorityConfig:
-    pass
-
-
 class AdderPriority(Component):
     """Abstract AdderPriority component defining which hooks should be used."""
 
     def __init__(
         self,
-        config: AdderPriorityConfig = AdderPriorityConfig(),
+        config: SimpleNamespace = SimpleNamespace(),
     ):
         """Component creates priority functions for reverb adders.
 
         Args:
-            config: AdderPriorityConfig.
+            config: SimpleNamespace.
         """
         self.config = config
 
@@ -95,15 +91,6 @@ class AdderPriority(Component):
         return "adder_priority"
 
     @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return AdderPriorityConfig
-
-    @staticmethod
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
@@ -115,22 +102,17 @@ class AdderPriority(Component):
         return [BaseTrainerInit]
 
 
-@dataclass
-class AdderSignatureConfig:
-    pass
-
-
 class AdderSignature(Component):
     """Abstract AdderSignature component defining which hooks should be used."""
 
     def __init__(
         self,
-        config: AdderSignatureConfig = AdderSignatureConfig(),
+        config: SimpleNamespace = SimpleNamespace(),
     ):
         """Component creates an adder signature for reverb adders.
 
         Args:
-            config: AdderSignatureConfig.
+            config: SimpleNamespace.
         """
         self.config = config
 
@@ -149,15 +131,6 @@ class AdderSignature(Component):
     def name() -> str:
         """Static method that returns component name."""
         return "data_server_adder_signature"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return AdderSignatureConfig
 
 
 @dataclass
@@ -198,15 +171,6 @@ class ParallelTransitionAdder(Adder):
         )
 
         builder.store.adder = adder
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return ParallelTransitionAdderConfig
 
 
 class UniformAdderPriority(AdderPriority):
@@ -295,15 +259,6 @@ class ParallelSequenceAdder(Adder):
         )
 
         builder.store.adder = adder
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return ParallelSequenceAdderConfig
 
 
 class ParallelSequenceAdderSignature(AdderSignature):
