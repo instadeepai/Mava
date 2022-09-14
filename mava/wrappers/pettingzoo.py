@@ -444,11 +444,11 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
             return self.reset()
 
         # Get valid actions for active agents
-        if not all(type(value) == int for value in actions.values()):
-            actions = {key: actions[key] for key in self.agents}
+        actions = {key: actions[key] for key in self.agents}
 
         # Convert Jax device array actions to python integers
-        actions = jax.tree_map(lambda x: x.tolist(), actions)
+        if not all(type(value) == int for value in actions.values()):
+            actions = jax.tree_map(lambda x: x.tolist(), actions)
 
         observations, rewards, dones, infos = self._environment.step(actions)
 
