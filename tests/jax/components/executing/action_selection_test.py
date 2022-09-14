@@ -226,28 +226,3 @@ def test_on_execution_select_actions(
     for agent in mock_executor.store.observations.keys():
         assert mock_executor.store.actions_info[agent] == "action_info_" + agent
         assert mock_executor.store.policies_info[agent] == "policy_info_" + agent
-
-
-# Test on_execution_select_action_compute
-def test_on_execution_select_action_compute(
-    mock_executor: Executor,
-    ff_executor_select_action: FeedforwardExecutorSelectAction,
-) -> None:
-    """Test on_execution_select_action_compute.
-
-    Args:
-        ff_executor_select_action: FeedforwardExecutorSelectAction
-        mock_executor: Executor
-    """
-    for agent in mock_executor.store.observations.keys():
-        mock_executor.set_agent(agent)  # type: ignore
-        ff_executor_select_action.on_execution_select_action_compute(
-            executor=mock_executor
-        )
-        observation = utils.add_batch_dim(mock_executor.store.observations[agent])
-        assert mock_executor.store.action_info == "action_info_after_get_action_" + str(
-            observation[0]
-        )
-        assert mock_executor.store.policy_info == "policy_info_after_get_action_" + str(
-            observation[0]
-        )

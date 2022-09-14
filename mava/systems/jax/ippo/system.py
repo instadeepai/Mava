@@ -95,20 +95,3 @@ class IPPOSystem(System):
             component_dependency_guardrails=ComponentDependencyGuardrails,
         )
         return system, default_params
-
-class IPPOSystemRecurrentPolicy(System):
-    def design(self) -> Tuple[DesignSpec, Any]:
-        """System design for PPO with a recurrent policy.
-
-        Returns:
-            system callback components, default system parameters
-        """
-
-        # Get the IPPOSystemSeparateNetworks system setup.
-        system, default_params = IPPOSystem.design()
-
-        # Update trainer components with seperate networks
-        system.set({"executor_select_action": executing.RecurrentExecutorSelectAction,
-                    "executor_observe": executing.RecurrentExecutorObserve})
-
-        return system, default_params

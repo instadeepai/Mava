@@ -208,7 +208,6 @@ def test_select_action_hook_order(
     assert test_executor.hook_list == [
         "on_execution_select_action_start",
         "on_execution_select_action_preprocess",
-        "on_execution_select_action_compute",
         "on_execution_select_action_sample",
         "on_execution_select_action_end",
     ]

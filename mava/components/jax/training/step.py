@@ -108,6 +108,12 @@ class DefaultTrainerStep(TrainerStep):
 
         # Do a batch of SGD.
         sample = next(trainer.store.dataset_iterator)
+
+        # print("Sampled exprience: ", sample)
+        # import tensorflow as tf
+        # tf.print("Sampled exprience: ", sample)
+        # exit()
+
         results = trainer.store.step_fn(sample)
 
         # Update our counts and record it.

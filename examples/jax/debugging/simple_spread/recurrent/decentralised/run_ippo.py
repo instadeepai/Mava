@@ -63,8 +63,7 @@ def main(_: Any) -> None:
         return ippo.make_default_networks(  # type: ignore
             policy_layer_sizes=(256, 256, 256),
             critic_layer_sizes=(512, 512, 256),
-            single_network=False,
-            recurrent=True,
+            policy_recurrent_layer_sizes=(256,),
             *args,
             **kwargs,
         )
@@ -92,8 +91,11 @@ def main(_: Any) -> None:
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
-    # Create the recurrent actor IPPO system.
-    system = ippo.IPPOSystemRecurrentPolicy()
+    # Initialise the feedforward IPPO system.
+    system = ippo.IPPOSystem()
+
+    # Update the system to make the policy recurrent.
+    system.update(ippo.recurrent_policy_components)
 
     # Build the system.
     system.build(
@@ -109,6 +111,9 @@ def main(_: Any) -> None:
         num_executors=1,
         multi_process=True,
     )
+
+    print("System built :)")
+    exit()
 
     # Launch the system.
     system.launch()

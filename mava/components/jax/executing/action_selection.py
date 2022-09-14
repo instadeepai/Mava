@@ -51,12 +51,6 @@ class ExecutorSelectAction(Component):
         """Hook to override for selecting actions for each agent."""
         pass
 
-    # Select action
-    @abc.abstractmethod
-    def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
-        """Hook to override for selecting an action for a single agent."""
-        pass
-
     @staticmethod
     def name() -> str:
         """Static method that returns component name."""

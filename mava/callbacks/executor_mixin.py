@@ -54,11 +54,6 @@ class ExecutorHookMixin(ABC):
         for callback in self.callbacks:
             callback.on_execution_select_action_preprocess(self)
 
-    def on_execution_select_action_compute(self) -> None:
-        """Call to agent networks when executor selecting an action for agent."""
-        for callback in self.callbacks:
-            callback.on_execution_select_action_compute(self)
-
     def on_execution_select_action_sample(self) -> None:
         """Sample an action when executor selecting an action for agent."""
         for callback in self.callbacks:

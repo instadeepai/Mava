@@ -17,7 +17,7 @@
 import abc
 import copy
 from types import SimpleNamespace
-from typing import Any, Dict, List, Tuple, Type
+from typing import Any, Dict, List, Tuple, Type, Union
 
 from mava.components.jax import Component
 from mava.core_jax import BaseSystem
@@ -72,11 +72,11 @@ class System(BaseSystem):
             Tuple[system callback components, system config].
         """
 
-    def update(self, component: Any) -> None:
-        """Update a component that has already been added to the system.
+    def update(self, components: Union[List, Component]) -> None:
+        """Update components that has already been added to the system.
 
         Args:
-            component: system callback component.
+            components: system callback component or list of components.
 
         Returns:
             None.
@@ -86,19 +86,24 @@ class System(BaseSystem):
                 "System already built. Must call .update() on components before the \
                     system has been built."
             )
-        name = component.name()
 
-        if name in list(self._design.get().keys()):
-            self._design.get()[name] = component
-            config_class = component.__init__.__annotations__["config"]
-            if config_class:
-                config_feed = {name: config_class()}
-                self.config.update(**config_feed)
-        else:
-            raise Exception(
-                f"The given component ({name}) is not part of the current system.\
-                Perhaps try adding it instead using .add()."
-            )
+        if not isinstance(components, list):
+            components = [components]
+        
+        for component in components:
+            name = component.name()
+
+            if name in list(self._design.get().keys()):
+                self._design.get()[name] = component
+                config_class = component.__init__.__annotations__["config"]
+                if config_class:
+                    config_feed = {name: config_class()}
+                    self.config.update(**config_feed)
+            else:
+                raise Exception(
+                    f"The given component ({name}) is not part of the current system.\
+                    Perhaps try adding it instead using .add()."
+                )
 
     def add(self, component: Any) -> None:
         """Add a new component to the system.

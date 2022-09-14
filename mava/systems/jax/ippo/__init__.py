@@ -15,4 +15,5 @@
 
 """Jax IPPO system."""
 from mava.systems.jax.ippo.networks import make_default_networks
-from mava.systems.jax.ippo.system import IPPOSystem, IPPOSystemRecurrentPolicy
+from mava.systems.jax.ippo.system import IPPOSystem
+from mava.systems.jax.ippo.config import recurrent_policy_components

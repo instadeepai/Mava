@@ -195,10 +195,6 @@ class Callback(ABC):
         """Preprocessing when executor selecting an action for agent."""
         pass
 
-    def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
-        """Call to agent networks when executor selecting an action for agent."""
-        pass
-
     def on_execution_select_action_sample(self, executor: SystemExecutor) -> None:
         """Sample an action when executor selecting an action for agent."""
         pass

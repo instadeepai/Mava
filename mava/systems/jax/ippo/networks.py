@@ -186,6 +186,7 @@ def make_discrete_networks(
     key: networks_lib.PRNGKey,
     policy_layer_sizes: Sequence[int],
     critic_layer_sizes: Sequence[int],
+    policy_recurrent_layer_sizes: Sequence[int],
     observation_network: Callable = utils.batch_concat,
     # default behaviour is to flatten observations
 ) -> PPONetworks:
@@ -196,30 +197,40 @@ def make_discrete_networks(
         key: jax random key for initializing network parameters
         policy_layer_sizes: sizes of hidden layers for the policy network
         critic_layer_sizes: sizes of hidden layers for the critic network
+        policy_recurrent_layer_sizes: Optionally add recurrent layers to the policy
         observation_network: optional network for processing observations.
             Defaults to utils.batch_concat.
-        single_network: True if shared layer network with separate heads should be used
-            for policy and critic and False if separate policy and critic networks
-            should be used.
-            Defaults to True.
-
     Returns:
         PPONetworks class
     """
 
     num_actions = environment_spec.actions.num_values
 
+    
     def policy_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
-        policy_network = hk.Sequential(
-            [
-                observation_network,
-                hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
-                networks_lib.CategoricalHead(
+        # Add the observation network and an MLP network.
+        policy_network = [
+                        observation_network,
+                        hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu)
+                        ]
+
+
+        # Add optional recurrent layers
+        net_type = hk.Sequential
+        if len(policy_recurrent_layer_sizes) > 0:
+            net_type = hk.DeepRNN
+            policy_network.append(
+                hk.GRU(policy_recurrent_layer_sizes)
+                )
+
+
+        # Add a categorical value head.
+        policy_network.append(networks_lib.CategoricalHead(
                     num_values=num_actions, dtype=environment_spec.actions.dtype
-                ),
-            ]
-        )
-        return policy_network(inputs)
+                ))
+        
+        
+        return net_type(policy_network)(inputs)
 
     def critic_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
         critic_network = hk.Sequential(
@@ -256,12 +267,9 @@ def make_discrete_networks(
 def make_networks(
     spec: specs.EnvironmentSpec,
     key: networks_lib.PRNGKey,
-    policy_layer_sizes: Sequence[int] = (
-        256,
-        256,
-        256,
-    ),
-    critic_layer_sizes: Sequence[int] = (512, 512, 256),
+    policy_layer_sizes: Sequence[int],
+    critic_layer_sizes: Sequence[int],
+    policy_recurrent_layer_sizes: Sequence[int],
     observation_network: Callable = utils.batch_concat,
 ) -> PPONetworks:
     """Function for creating PPO networks to be used.
@@ -274,12 +282,12 @@ def make_networks(
         key: pseudo-random value used to initialise distributions
         policy_layer_sizes: size of each layer of the policy network
         critic_layer_sizes: size of each layer of the critic network
+        policy_recurrent_layer_sizes: Optionally add recurrent layers to the policy
         observation_network: Network used for feature extraction layers
-        single_network: If a shared represnetation netowrk should be used.
+        
 
     Returns:
         make_discrete_networks: function to create a discrete network
-        make_continuous_networks: function to create a continuous network
 
     Raises:
         NotImplementedError: Raises an error if continous network is not
@@ -292,6 +300,7 @@ def make_networks(
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
             observation_network=observation_network,
+            policy_recurrent_layer_sizes=policy_recurrent_layer_sizes,
         )
 
     else:
@@ -313,6 +322,7 @@ def make_default_networks(
         256,
     ),
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
+    policy_recurrent_layer_sizes: bool = (),
     observation_network: Callable = utils.batch_concat,
 ) -> Dict[str, Any]:
     """Create default PPO networks
@@ -325,12 +335,11 @@ def make_default_networks(
         net_spec_keys: keys for each agent network
         policy_layer_sizes: policy network layers
         critic_layer_sizes: critic network layers
+        policy_recurrent_layer_sizes: Optionally add recurrent layers to the policy
         observation_network: network for processing environment observations
                              defaults to flattening observations but could be
                              a CNN or similar observation processing network
-        single_network: details whether a single network with a policy and value
-                        head should be used if true or whether separate policy
-                        and critic networks should be used if false.
+        
 
     Returns:
         networks: networks created to given spec
@@ -351,6 +360,7 @@ def make_default_networks(
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
             observation_network=observation_network,
+            policy_recurrent_layer_sizes=policy_recurrent_layer_sizes,
         )
 
     return {

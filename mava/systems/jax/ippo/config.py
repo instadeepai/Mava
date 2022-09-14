@@ -15,7 +15,7 @@
 
 """Default hyperparameters for IPPO system."""
 from dataclasses import dataclass
-
+from mava.components.jax import executing
 
 @dataclass
 class IPPODefaultConfig:
@@ -23,3 +23,7 @@ class IPPODefaultConfig:
     sequence_length: int = 20
     period: int = 10
     use_next_extras: bool = False
+
+# The components that a needed for IPPO with a recurrent policy.
+recurrent_policy_components = [executing.RecurrentExecutorSelectAction,
+                               executing.RecurrentExecutorObserve]
