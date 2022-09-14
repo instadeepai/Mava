@@ -21,6 +21,8 @@ from typing import Any, List, Optional, Union
 import dm_env
 import numpy as np
 
+from mava.utils.jax_training_utils import set_jax_double_precision
+
 try:
     import supersuit
 
@@ -108,6 +110,7 @@ def make_environment(
     """
     if _has_petting_zoo:
         del evaluation
+        set_jax_double_precision()
 
         if env_class == "smac":
             if _has_smac:
