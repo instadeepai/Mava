@@ -314,5 +314,6 @@ class ParameterClient:
                         self._parameters[key][i] = new_parameters[key][i]
             else:
                 raise NotImplementedError(
-                    f"Parameter type of {type(new_parameters[key])} not implemented."
+                    f"""Parameter type {type(new_parameters[key])} of '{key}' not implemented.
+                    Please use a mutable type for '{key}'"""
                 )
