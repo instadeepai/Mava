@@ -2,7 +2,7 @@
 
 > 🚧 **Note:** This only applies to the callback redesign of Mava.
 
-Components relating to the period updating of system wide parameters.
+Components relating to the periodic updating of system wide parameters.
 
 ## Checkpointing components
 ::: mava.components.jax.updating.checkpointers
