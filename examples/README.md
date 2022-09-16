@@ -149,8 +149,15 @@ We also have various Jax-based examples which make use of the callback design pa
     an IPPO system running on the discrete action space simple_spread MPE environment.
   - *Feedforward*
     - [decentralised][debug_ippo_ff_dec_jax]
-    - [decentralised record agents][debug_ippo_ff_dec_record_jax] (***recording agents acting in the environment***)
-    - [decentralised single process][debug_ippo_ff_dec_single_process_jax] (***runs the system as a non-distributed single process***)
+    - [decentralised record agents][debug_ippo_ff_dec_jax_record] (***recording agents acting in the environment***).
+    - [decentralised single process][debug_ippo_ff_dec_jax_single_process] (***running in single process mode***).
+    - [decentralised resotore checkpoint][debug_ippo_ff_dec_jax_checkpoint] (***continuing training by restoring from an existing checkpoint***).
+
+
+[debug_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo.py
+[debug_ippo_ff_dec_jax_record]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo_with_monitoring.py
+[debug_ippo_ff_dec_jax_single_process]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo_single_process.py
+[debug_ippo_ff_dec_jax_checkpoint]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo_restore_checkpoint.py
 
 ### Flatland
 
@@ -240,6 +247,9 @@ We also have various Jax-based examples which make use of the callback design pa
 [openspiel_madqn_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/openspiel/tic_tac_toe/feedforward/decentralised/run_madqn.py
 
 [debug_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo.py
+[debug_ippo_ff_dec_jax_record]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo_with_monitoring.py
+[debug_ippo_ff_dec_jax_single_process]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo_single_process.py
+[debug_ippo_ff_dec_jax_checkpoint]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo_restore_checkpoint.py
 [flatland_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/flatland/feedforward/decentralised/run_ippo.py
 [pz_coop_pong_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/petting_zoo/butterfly/cooperative_pong/feedforward/decentralised/run_ippo.py
 [smac_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/smac/feedforward/decentralised/run_ippo.py

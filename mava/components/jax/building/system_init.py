@@ -15,7 +15,7 @@
 
 import abc
 from dataclasses import dataclass, field
-from typing import Any, Callable, List, Optional, Type, Union
+from typing import Any, List, Type, Union
 
 from mava.callbacks import Callback
 from mava.components.jax import Component

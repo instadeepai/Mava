@@ -16,7 +16,7 @@
 """Trainer components for calculating losses."""
 import abc
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Tuple, Type
 
 import jax
 import jax.numpy as jnp
