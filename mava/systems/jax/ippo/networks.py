@@ -353,6 +353,4 @@ def make_default_networks(
             observation_network=observation_network,
         )
 
-    return {
-        "networks": networks,
-    }
+    return networks
