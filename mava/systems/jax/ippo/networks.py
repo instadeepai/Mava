@@ -353,4 +353,5 @@ def make_default_networks(
             observation_network=observation_network,
         )
 
+    # No longer returning a dictionary since this is handled in PPONetworks above
     return networks
