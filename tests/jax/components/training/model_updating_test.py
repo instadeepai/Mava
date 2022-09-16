@@ -15,7 +15,6 @@
 
 """Tests for MAPGMinibatchUpdate and MAPGEpochUpdate class for Jax-based Mava systems"""
 
-import copy
 from types import SimpleNamespace
 from typing import Any, Callable, Dict, Tuple
 
@@ -24,6 +23,7 @@ import jax.numpy as jnp
 import optax
 import pytest
 
+from mava import constants
 from mava.components.jax.training import Batch
 from mava.components.jax.training.model_updating import (
     MAPGEpochUpdate,
@@ -127,8 +127,27 @@ def fake_ppo_critic_grad_fn(
     return (gradient, agent_metrics)
 
 
+class MockOptimiser:
+    """Mock optimiser configuration"""
+
+    def __init__(self) -> None:
+        """Initialize mock optimiser."""
+        self.initialized = "Done"
+        pass
+
+    def init(self, params: Dict[str, Any]) -> list:
+        """Mock optax optimiser init method"""
+        return list(params)
+
+    def update(
+        self, gradient: Dict[str, Any], opt_states: Dict[str, Any]
+    ) -> Tuple[Dict, str]:
+        """Mock optax optimiser update method."""
+        return (gradient, "opt_states_after_update")
+
+
 class MockTrainer(Trainer):
-    """Mock trainer component for separate networks."""
+    """Mock trainer component"""
 
     def __init__(self) -> None:
         """Initialize mock trainer component."""
@@ -154,6 +173,26 @@ class MockTrainer(Trainer):
             "agent_1": "network_agent_1",
             "agent_2": "network_agent_2",
         }
+
+        policy_optimiser = MockOptimiser()
+        critic_optimiser = MockOptimiser()
+
+        policy_opt_states = {}
+        for net_key in networks["networks"].keys():
+            policy_opt_states[net_key] = {
+                constants.OPT_STATE_DICT_KEY: policy_optimiser.init(
+                    networks["networks"][net_key].policy_params
+                )
+            }  # pytype: disable=attribute-error
+
+        critic_opt_states = {}
+        for net_key in networks["networks"].keys():
+            critic_opt_states[net_key] = {
+                constants.OPT_STATE_DICT_KEY: critic_optimiser.init(
+                    networks["networks"][net_key].critic_params
+                )
+            }  # pytype: disable=attribute-error
+
         self.store = SimpleNamespace(
             networks=networks,
             policy_grad_fn=fake_ppo_policy_grad_fn,
@@ -161,38 +200,17 @@ class MockTrainer(Trainer):
             trainer_agents=trainer_agents,
             trainer_agent_net_keys=trainer_agent_net_keys,
             full_batch_size=2,
+            policy_optimiser=policy_optimiser,
+            critic_optimiser=critic_optimiser,
+            policy_opt_states=policy_opt_states,
+            critic_opt_states=critic_opt_states,
         )
 
 
 @pytest.fixture
-def mock_trainer_separate_networks() -> MockTrainer:
-    """Create mock trainer component for separate networks"""
+def mock_trainer() -> MockTrainer:
+    """Create mock trainer component"""
     return MockTrainer()
-
-
-class MockOptimizer:
-    """Mock optimizer configuration"""
-
-    def __init__(self) -> None:
-        """Initialize mock optimizer."""
-        self.initialized = "Done"
-        pass
-
-    def init(self, params: Dict[str, Any]) -> list:
-        """Mock optax optimzer init method"""
-        return list(params)
-
-    def update(
-        self, gradient: Dict[str, Any], opt_states: Dict[str, Any]
-    ) -> Tuple[Dict, str]:
-        """Mock optax optimizer update method."""
-        return (gradient, "opt_states_after_update")
-
-
-@pytest.fixture
-def mock_optimizer() -> MockOptimizer:
-    """Create mock optimizer"""
-    return MockOptimizer()
 
 
 @pytest.fixture
@@ -230,52 +248,48 @@ def fake_batch() -> Batch:
 
 
 @pytest.fixture
-def mock_state_and_trainer_separate_networks(
-    mock_trainer_separate_networks: MockTrainer,
+def mock_state_and_trainer(
+    mock_trainer: MockTrainer,
     fake_batch: Batch,
-    mock_optimizer: MockOptimizer,
 ) -> Any:
     """Fake state dictionary and mock trainer component
 
     Args:
-        mock_trainer_separate_networks: mock trainer
+        mock_trainer: mock trainer
         fake_batch: fake batch
-        mock_optimizer: mock optimizer
     Returns:
         state dictionary: with keys - random_key, params,
             policy_opt_states, critic_opt_states, batch
-        mock_trainer: mock_trainer_separate_networks
+        mock_trainer: mock_trainer
     """
     mini_batch_update = MAPGMinibatchUpdate()
-    mini_batch_update.config.policy_optimiser = copy.copy(mock_optimizer)
-    mini_batch_update.config.critic_optimiser = copy.copy(mock_optimizer)
-    mini_batch_update.on_training_utility_fns(trainer=mock_trainer_separate_networks)
+    mini_batch_update.on_training_utility_fns(trainer=mock_trainer)
 
     random_key = jax.random.PRNGKey(5)
     policy_params = {
-        "network_agent_0": mock_trainer_separate_networks.store.networks["networks"][
+        "network_agent_0": mock_trainer.store.networks["networks"][
             "network_agent_0"
         ].policy_params,
-        "network_agent_1": mock_trainer_separate_networks.store.networks["networks"][
+        "network_agent_1": mock_trainer.store.networks["networks"][
             "network_agent_1"
         ].policy_params,
-        "network_agent_2": mock_trainer_separate_networks.store.networks["networks"][
+        "network_agent_2": mock_trainer.store.networks["networks"][
             "network_agent_2"
         ].policy_params,
     }
     critic_params = {
-        "network_agent_0": mock_trainer_separate_networks.store.networks["networks"][
+        "network_agent_0": mock_trainer.store.networks["networks"][
             "network_agent_0"
         ].critic_params,
-        "network_agent_1": mock_trainer_separate_networks.store.networks["networks"][
+        "network_agent_1": mock_trainer.store.networks["networks"][
             "network_agent_1"
         ].critic_params,
-        "network_agent_2": mock_trainer_separate_networks.store.networks["networks"][
+        "network_agent_2": mock_trainer.store.networks["networks"][
             "network_agent_2"
         ].critic_params,
     }
-    policy_opt_state = mock_trainer_separate_networks.store.policy_opt_states
-    critic_opt_state = mock_trainer_separate_networks.store.critic_opt_states
+    policy_opt_state = mock_trainer.store.policy_opt_states
+    critic_opt_state = mock_trainer.store.critic_opt_states
 
     return (
         {
@@ -286,13 +300,11 @@ def mock_state_and_trainer_separate_networks(
             "critic_opt_states": critic_opt_state,
             "batch": fake_batch,
         },
-        mock_trainer_separate_networks,
+        mock_trainer,
     )
 
 
-def mock_minibatch_update_separate_networks(
-    carry: Tuple[Any, Any], minibatches: Any
-) -> Tuple[Any, Any]:
+def mock_minibatch_update(carry: Tuple[Any, Any], minibatches: Any) -> Tuple[Any, Any]:
     """Mock minibatch update to test model_update_epoch in \
         MAPGEpochUpdate class
 
@@ -327,177 +339,36 @@ def mock_minibatch_update_separate_networks(
 
 
 @pytest.fixture
-def mock_minibatch_update_fn_separate_networks() -> Callable:
-    """Create mock minibatch_update function \
-        for separate networks tests"""
-    return mock_minibatch_update_separate_networks
+def mock_minibatch_update_fn() -> Callable:
+    """Create mock minibatch_update function"""
+    return mock_minibatch_update
 
 
-########################
-# SEPARATE NETWORK TESTS
-########################
-
-
-def test_on_training_utility_fns_empty_config_optimizer_sep_netwoks(
-    mock_trainer_separate_networks: MockTrainer,
-) -> None:
-    """Test on_training_utility_fns from \
-        MAPGMinibatchUpdate with MAPGMinibatchUpdateConfig does not include optimizer
-
-    Args:
-        mock_trainer_separate_networks: Trainer
-    """
-    mini_batch_update = MAPGMinibatchUpdate()
-    mini_batch_update.config.policy_optimiser = None
-    mini_batch_update.config.critic_optimiser = None
-    mini_batch_update.on_training_utility_fns(trainer=mock_trainer_separate_networks)
-
-    assert mock_trainer_separate_networks.store.policy_optimiser is not None
-    assert isinstance(
-        mock_trainer_separate_networks.store.policy_optimiser,
-        optax.GradientTransformation,
-    )
-    assert mock_trainer_separate_networks.store.critic_optimiser is not None
-    assert isinstance(
-        mock_trainer_separate_networks.store.critic_optimiser,
-        optax.GradientTransformation,
-    )
-
-    assert list(mock_trainer_separate_networks.store.policy_opt_states.keys()) == [
-        "network_agent_0",
-        "network_agent_1",
-        "network_agent_2",
-    ]
-    assert list(mock_trainer_separate_networks.store.critic_opt_states.keys()) == [
-        "network_agent_0",
-        "network_agent_1",
-        "network_agent_2",
-    ]
-
-    for net_key in mock_trainer_separate_networks.store.networks["networks"].keys():
-        assert (
-            mock_trainer_separate_networks.store.policy_opt_states[net_key][0]
-            == optax.EmptyState()
-        )
-        assert (
-            mock_trainer_separate_networks.store.critic_opt_states[net_key][0]
-            == optax.EmptyState()
-        )
-
-        assert isinstance(
-            mock_trainer_separate_networks.store.policy_opt_states[net_key][1],
-            optax.ScaleByAdamState,
-        )
-        assert isinstance(
-            mock_trainer_separate_networks.store.critic_opt_states[net_key][1],
-            optax.ScaleByAdamState,
-        )
-
-        assert mock_trainer_separate_networks.store.policy_opt_states[net_key][1][
-            0
-        ] == jnp.array([0])
-        assert mock_trainer_separate_networks.store.critic_opt_states[net_key][1][
-            0
-        ] == jnp.array([0])
-
-        assert list(
-            mock_trainer_separate_networks.store.policy_opt_states[net_key][1][1]
-        ) == list(
-            jax.tree_util.tree_map(
-                lambda t: jnp.zeros_like(t, dtype=float),
-                mock_trainer_separate_networks.store.networks["networks"][
-                    net_key
-                ].policy_params,
-            )
-        )
-        assert list(
-            mock_trainer_separate_networks.store.critic_opt_states[net_key][1][1]
-        ) == list(
-            jax.tree_util.tree_map(
-                lambda t: jnp.zeros_like(t, dtype=float),
-                mock_trainer_separate_networks.store.networks["networks"][
-                    net_key
-                ].critic_params,
-            )
-        )
-
-        assert list(
-            mock_trainer_separate_networks.store.policy_opt_states[net_key][1][2]
-        ) == list(
-            jax.tree_util.tree_map(
-                jnp.zeros_like,
-                mock_trainer_separate_networks.store.networks["networks"][
-                    net_key
-                ].policy_params,
-            )
-        )
-        assert list(
-            mock_trainer_separate_networks.store.critic_opt_states[net_key][1][2]
-        ) == list(
-            jax.tree_util.tree_map(
-                jnp.zeros_like,
-                mock_trainer_separate_networks.store.networks["networks"][
-                    net_key
-                ].critic_params,
-            )
-        )
-
-        assert (
-            mock_trainer_separate_networks.store.policy_opt_states[net_key][2]
-            == optax.EmptyState()
-        )
-        assert (
-            mock_trainer_separate_networks.store.critic_opt_states[net_key][2]
-            == optax.EmptyState()
-        )
-
-    assert callable(mock_trainer_separate_networks.store.minibatch_update_fn)
-
-
-def test_on_training_utility_fns_separate_networks(
-    mock_trainer_separate_networks: MockTrainer,
-    mock_optimizer: MockOptimizer,
+def test_on_training_utility_fns(
+    mock_trainer: MockTrainer,
 ) -> None:
     """Test on_training_utility_fns from MAPGMinibatchUpdate
 
     Args:
-        mock_trainer_separate_networks: Trainer
-        mock_optimizer: Optimizer
+        mock_trainer: Trainer
     """
     mini_batch_update = MAPGMinibatchUpdate()
-    mini_batch_update.config.policy_optimiser = copy.copy(mock_optimizer)
-    mini_batch_update.config.critic_optimiser = copy.copy(mock_optimizer)
-    mini_batch_update.on_training_utility_fns(trainer=mock_trainer_separate_networks)
+    mini_batch_update.on_training_utility_fns(trainer=mock_trainer)
 
-    assert mock_trainer_separate_networks.store.policy_optimiser.initialized == "Done"
-    assert mock_trainer_separate_networks.store.critic_optimiser.initialized == "Done"
-
-    for net_key in mock_trainer_separate_networks.store.networks["networks"].keys():
-        assert mock_trainer_separate_networks.store.policy_opt_states[net_key] == list(
-            mock_trainer_separate_networks.store.networks["networks"][
-                net_key
-            ].policy_params
-        )
-        assert mock_trainer_separate_networks.store.critic_opt_states[net_key] == list(
-            mock_trainer_separate_networks.store.networks["networks"][
-                net_key
-            ].critic_params
-        )
-
-    assert callable(mock_trainer_separate_networks.store.minibatch_update_fn)
+    assert callable(mock_trainer.store.minibatch_update_fn)
 
 
-def test_minibatch_update_fn_separate_networks(
-    mock_state_and_trainer_separate_networks: Tuple[Dict[str, Any], MockTrainer]
+def test_minibatch_update_fn(
+    mock_state_and_trainer: Tuple[Dict[str, Any], MockTrainer]
 ) -> None:
     """Test on_minibatch_update_fn
 
     Args:
-        mock_state_and_trainer_separate_networks: tuple
+        mock_state_and_trainer: tuple
             include fake state and mock trainer
     """
-    state = mock_state_and_trainer_separate_networks[0]
-    mock_trainer = mock_state_and_trainer_separate_networks[1]
+    state = mock_state_and_trainer[0]
+    mock_trainer = mock_state_and_trainer[1]
     carry = [
         state["policy_params"],
         state["critic_params"],
@@ -531,11 +402,6 @@ def test_minibatch_update_fn_separate_networks(
     assert list(new_critic_params["network_agent_1"]) == [6.0, 6.0, 6.0]
     assert list(new_critic_params["network_agent_2"]) == [7.0, 7.0, 7.0]
 
-    for net_key in new_policy_opt_states.keys():
-        assert new_policy_opt_states[net_key] == "opt_states_after_update"
-    for net_key in new_critic_opt_states.keys():
-        assert new_critic_opt_states[net_key] == "opt_states_after_update"
-
     assert sorted(list(metrics.keys())) == ["agent_0", "agent_1", "agent_2"]
     for agent in metrics.keys():
         assert list(metrics[agent].keys()) == [
@@ -558,38 +424,38 @@ def test_minibatch_update_fn_separate_networks(
         )
 
 
-def test_on_training_utility_fns_epoch_separate_networks(
-    mock_trainer_separate_networks: MockTrainer,
+def test_on_training_utility_fns_epoch(
+    mock_trainer: MockTrainer,
 ) -> None:
     """Test on_training_utility_fns from MAPGEpochUpdate
 
     Args:
-        mock_trainer_separate_networks: trainer
+        mock_trainer: trainer
     """
-    mini_epoch_update = MAPGEpochUpdate()
-    mini_epoch_update.on_training_utility_fns(trainer=mock_trainer_separate_networks)
-
-    assert callable(mock_trainer_separate_networks.store.epoch_update_fn)
-
-
-def test_epoch_update_fn_separate_networks(
-    mock_state_and_trainer_separate_networks: Tuple[Dict[str, Any], MockTrainer],
-    mock_minibatch_update_fn_separate_networks: Callable,
-) -> None:
-    """Test epoch_update_fn function for separate networks case
-
-    Args:
-        mock_state_and_trainer_separate_networks: tuple including \
-            fake state and mock trainer
-        mock_minibatch_update_fn_separate_networks: minibatch \
-            update function
-    """
-    mock_trainer = mock_state_and_trainer_separate_networks[1]
     mini_epoch_update = MAPGEpochUpdate()
     mini_epoch_update.on_training_utility_fns(trainer=mock_trainer)
-    mock_trainer.store.minibatch_update_fn = mock_minibatch_update_fn_separate_networks
 
-    state = mock_state_and_trainer_separate_networks[0]
+    assert callable(mock_trainer.store.epoch_update_fn)
+
+
+def test_epoch_update_fn(
+    mock_state_and_trainer: Tuple[Dict[str, Any], MockTrainer],
+    mock_minibatch_update_fn: Callable,
+) -> None:
+    """Test epoch_update_fn function
+
+    Args:
+        mock_state_and_trainer: tuple including \
+            fake state and mock trainer
+        mock_minibatch_update_fn: minibatch \
+            update function
+    """
+    mock_trainer = mock_state_and_trainer[1]
+    mini_epoch_update = MAPGEpochUpdate()
+    mini_epoch_update.on_training_utility_fns(trainer=mock_trainer)
+    mock_trainer.store.minibatch_update_fn = mock_minibatch_update_fn
+
+    state = mock_state_and_trainer[0]
     # update params and opt_state to function in jax.lax.scan function
     state["policy_params"] = jnp.array([0, 0, 0])
     state["critic_params"] = jnp.array([0, 0, 0])

@@ -15,7 +15,7 @@
 """Tests for Jax-based Mava system implementation."""
 from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import pytest
 

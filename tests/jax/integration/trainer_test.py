@@ -44,13 +44,13 @@ def test_trainer_single_process(test_system_sp: System) -> None:
     # Before run step method
     for net_key in trainer.store.networks["networks"].keys():
         # Policy
-        mu = trainer.store.policy_opt_states[net_key][1].mu  # network
+        mu = trainer.store.policy_opt_states[net_key]["opt_state"][1].mu  # network
         for categorical_value_head in mu.values():
             assert jnp.all(categorical_value_head["b"] == 0)
             assert jnp.all(categorical_value_head["w"] == 0)
 
         # Critic
-        mu = trainer.store.critic_opt_states[net_key][1].mu  # network
+        mu = trainer.store.critic_opt_states[net_key]["opt_state"][1].mu  # network
         for categorical_value_head in mu.values():
             assert jnp.all(categorical_value_head["b"] == 0)
             assert jnp.all(categorical_value_head["w"] == 0)
@@ -60,13 +60,13 @@ def test_trainer_single_process(test_system_sp: System) -> None:
     # After run step method
     for net_key in trainer.store.networks["networks"].keys():
         # Policy
-        mu = trainer.store.policy_opt_states[net_key][1].mu  # network
+        mu = trainer.store.policy_opt_states[net_key]["opt_state"][1].mu  # network
         for categorical_value_head in mu.values():
             assert not jnp.all(categorical_value_head["b"] == 0)
             assert not jnp.all(categorical_value_head["w"] == 0)
 
         # Critic
-        mu = trainer.store.critic_opt_states[net_key][1].mu  # network
+        mu = trainer.store.critic_opt_states[net_key]["opt_state"][1].mu  # network
         for categorical_value_head in mu.values():
             assert not jnp.all(categorical_value_head["b"] == 0)
             assert not jnp.all(categorical_value_head["w"] == 0)

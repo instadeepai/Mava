@@ -16,7 +16,7 @@
 """Trainer components for advantage calculations."""
 
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Tuple, Type
+from typing import List, Tuple, Type
 
 import jax
 import jax.numpy as jnp

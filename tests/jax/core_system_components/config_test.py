@@ -17,7 +17,6 @@
 
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Any, Callable, Optional
 
 import pytest
 

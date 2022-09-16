@@ -19,6 +19,7 @@ from typing import Any, Dict, Iterator, List, Optional, Union
 
 import dm_env
 import gym
+import jax
 import numpy as np
 from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
@@ -444,6 +445,11 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
 
         # Get valid actions for active agents
         actions = {key: actions[key] for key in self.agents}
+
+        # Convert Jax device array actions to python integers
+        if not all(type(value) == int for value in actions.values()):  # type: ignore
+            actions = jax.tree_map(lambda x: x.tolist(), actions)
+
         observations, rewards, dones, infos = self._environment.step(actions)
 
         rewards = self._convert_reward(rewards)
