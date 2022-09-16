@@ -68,8 +68,9 @@ def main(_: Any) -> None:
             **kwargs,
         )
 
-    # Used for checkpoints, tensorboard logging and env monitoring
-    # Experiment_path must point to an existing folder to restore the checkpoint
+    # experiment_path used for checkpoints, tensorboard logging and env monitoring
+    # To restore a checkpoint, experiment_path must point to a folder that contains
+    # the 'checkpoints' folder, generated from a previous run
     experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
