@@ -20,7 +20,7 @@ from mava.utils.wrapper_utils import (
     broadcast_timestep_to_all_agents,
     convert_seq_timestep_and_actions_to_parallel,
 )
-from tests.tf.utils.test_data import (
+from tests.test_utils.test_data import (
     get_expected_parallel_timesteps_1,
     get_expected_parallel_timesteps_2,
     get_seq_timesteps_1,
