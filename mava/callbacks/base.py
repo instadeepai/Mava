@@ -259,7 +259,7 @@ class Callback(ABC):
         """End of updating executor parameters."""
         pass
 
-    #FORCE UPDATE
+    # FORCE UPDATE
     def on_execution_force_update_start(self, executor: SystemExecutor) -> None:
         """Start of forcing the update of the executor parameters."""
         pass

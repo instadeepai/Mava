@@ -17,7 +17,7 @@
 
 import abc
 from types import SimpleNamespace
-from typing import Any, Dict, List, Type 
+from typing import Any, Dict, List, Type
 
 from mava.callbacks import Callback
 from mava.components.jax import Component

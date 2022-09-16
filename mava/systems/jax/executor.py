@@ -171,7 +171,6 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
         self.on_execution_update_end()
 
-    
     def force_update(self, wait: bool = False) -> None:
         """Force immediate update executor parameters.
 
