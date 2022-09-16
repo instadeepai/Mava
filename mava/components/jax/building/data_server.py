@@ -17,7 +17,7 @@
 import abc
 import copy
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Type
+from typing import Any, Dict, List, Type
 
 import reverb
 

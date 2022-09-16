@@ -41,7 +41,7 @@ class Networks(Component):
         self,
         config: NetworksConfig = NetworksConfig(),
     ):
-        """Abstract component defines the skeleton for initialising networks.
+        """Abstract component defining the skeleton for initialising networks.
 
         Args:
             config: NetworksConfig.
