@@ -21,7 +21,7 @@ from typing import Any, Dict
 import optax
 from absl import app, flags
 
-from mava.systems.jax import ippo
+from mava.systems import ippo
 from mava.utils.environments.flatland_utils import make_environment
 from mava.utils.loggers import logger_utils
 

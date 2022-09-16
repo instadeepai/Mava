@@ -3,11 +3,11 @@ from typing import Any, Callable, Dict, List, Sequence
 import jax
 import pytest
 
-from mava.components.jax.building import DefaultNetworks
-from mava.components.jax.building.networks import Networks, NetworksConfig
+from mava.components.building import DefaultNetworks
+from mava.components.building.networks import Networks, NetworksConfig
 from mava.core_jax import SystemBuilder
 from mava.specs import MAEnvironmentSpec
-from mava.systems.jax import Builder
+from mava.systems import Builder
 from tests.jax.mocks import make_fake_env_specs
 
 

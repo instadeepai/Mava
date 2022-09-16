@@ -23,15 +23,15 @@ import pytest
 from optax import EmptyState
 
 from mava import constants
-from mava.components.jax.building.parameter_client import (
+from mava.components.building.parameter_client import (
     BaseParameterClient,
     ExecutorParameterClient,
     ExecutorParameterClientConfig,
     TrainerParameterClient,
     TrainerParameterClientConfig,
 )
-from mava.systems.jax.builder import Builder
-from mava.systems.jax.parameter_server import ParameterServer
+from mava.systems.builder import Builder
+from mava.systems.parameter_server import ParameterServer
 
 
 class MockBaseParameterClient(BaseParameterClient):

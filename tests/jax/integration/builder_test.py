@@ -20,12 +20,12 @@ from typing import Dict, Tuple
 import acme
 import pytest
 
-from mava.components.jax.building.adders import ParallelTransitionAdderSignature
-from mava.components.jax.building.environments import EnvironmentSpec
-from mava.components.jax.building.system_init import FixedNetworkSystemInit
+from mava.components.building.adders import ParallelTransitionAdderSignature
+from mava.components.building.environments import EnvironmentSpec
+from mava.components.building.system_init import FixedNetworkSystemInit
 from mava.specs import DesignSpec
-from mava.systems.jax import ParameterServer, Trainer
-from mava.systems.jax.system import System
+from mava.systems import ParameterServer, Trainer
+from mava.systems.system import System
 from tests.jax import mocks
 
 

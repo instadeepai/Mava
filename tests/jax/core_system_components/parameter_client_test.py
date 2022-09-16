@@ -24,8 +24,8 @@ import numpy as np
 import pytest
 
 from mava.callbacks.base import Callback
-from mava.systems.jax.parameter_client import ParameterClient
-from mava.systems.jax.parameter_server import ParameterServer
+from mava.systems.parameter_client import ParameterClient
+from mava.systems.parameter_server import ParameterServer
 
 
 class MockParameterServer(ParameterServer):

@@ -17,11 +17,8 @@ from typing import Dict, List, Tuple
 
 import pytest
 
-from mava.components.jax.building.environments import (
-    EnvironmentSpec,
-    EnvironmentSpecConfig,
-)
-from mava.components.jax.building.system_init import (
+from mava.components.building.environments import EnvironmentSpec, EnvironmentSpecConfig
+from mava.components.building.system_init import (
     CustomSamplingSystemInit,
     CustomSamplingSystemInitConfig,
     FixedNetworkSystemInit,
@@ -29,7 +26,7 @@ from mava.components.jax.building.system_init import (
     RandomSamplingSystemInit,
     RandomSamplingSystemInitConfig,
 )
-from mava.systems.jax.builder import Builder
+from mava.systems.builder import Builder
 from mava.utils import enums
 from tests.jax.mocks import make_fake_environment_factory
 

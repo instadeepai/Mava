@@ -22,7 +22,7 @@ import numpy as np
 import pytest
 
 from mava.callbacks import Callback
-from mava.systems.jax import Executor
+from mava.systems import Executor
 from mava.types import NestedArray
 from tests.jax.hook_order_tracking import HookOrderTracking
 

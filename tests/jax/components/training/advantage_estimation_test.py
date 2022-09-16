@@ -20,8 +20,8 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from mava.components.jax.training.advantage_estimation import GAE, GAEConfig
-from mava.systems.jax.trainer import Trainer
+from mava.components.training.advantage_estimation import GAE, GAEConfig
+from mava.systems.trainer import Trainer
 
 
 def different_reward_values() -> List[Tuple]:

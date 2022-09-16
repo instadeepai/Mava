@@ -19,7 +19,7 @@ from typing import Any, Dict, Optional, Type
 import numpy as np
 import pytest
 
-from mava.components.jax.updating.terminators import (
+from mava.components.updating.terminators import (
     CountConditionTerminator,
     CountConditionTerminatorConfig,
     TimeTerminator,

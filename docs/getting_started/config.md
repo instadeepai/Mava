@@ -12,4 +12,4 @@ If a user wants to make a new component that needs a config or wants to change a
 ## The config handler
 To maintain all the existing configurations and ensure that the necessary constraints are fulfilled, we have a class named `Config`:
 
-::: mava.systems.jax.config
+::: mava.systems.config

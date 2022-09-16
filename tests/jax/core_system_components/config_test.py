@@ -20,8 +20,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from mava.components.jax.component import Component
-from mava.systems.jax import Config
+from mava.components.component import Component
+from mava.systems import Config
 
 
 @dataclass

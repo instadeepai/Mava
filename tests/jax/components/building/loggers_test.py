@@ -3,9 +3,9 @@ from typing import Callable
 
 import pytest
 
-from mava.components.jax.building.loggers import Logger, LoggerConfig
+from mava.components.building.loggers import Logger, LoggerConfig
 from mava.core_jax import SystemBuilder
-from mava.systems.jax import Builder
+from mava.systems import Builder
 from mava.utils.loggers import logger_utils
 
 

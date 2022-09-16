@@ -24,13 +24,13 @@ from tensorflow.python.framework import dtypes, ops
 
 from mava import specs
 from mava.adders import reverb as reverb_adders
-from mava.components.jax.building.datasets import (
+from mava.components.building.datasets import (
     TrajectoryDataset,
     TrajectoryDatasetConfig,
     TransitionDataset,
     TransitionDatasetConfig,
 )
-from mava.systems.jax.builder import Builder
+from mava.systems.builder import Builder
 from tests.jax.mocks import make_fake_env_specs
 
 env_spec = make_fake_env_specs()
@@ -76,6 +76,11 @@ def mock_builder() -> MockBuilder:
 
 @pytest.fixture
 def transition_dataset() -> TransitionDataset:
+    """Transition dataset test fixture.
+
+    Returns:
+        Transition dataset test fixture.
+    """
     config = TransitionDatasetConfig()
     config.sample_batch_size = 512
     config.prefetch_size = None
@@ -89,6 +94,11 @@ def transition_dataset() -> TransitionDataset:
 
 @pytest.fixture
 def trajectory_dataset() -> TrajectoryDataset:
+    """Trajectory dataset test fixture.
+
+    Returns:
+        Trajectory dataset test fixture.
+    """
     config = TrajectoryDatasetConfig()
     config.sample_batch_size = 512
     config.max_in_flight_samples_per_worker = 1024
@@ -102,7 +112,11 @@ def trajectory_dataset() -> TrajectoryDataset:
 
 
 def test_init_transition_dataset(transition_dataset: TransitionDataset) -> None:
-    """Test initiator of TransitionDataset component"""
+    """Test init of TransitionDataset component
+
+    Args:
+        transition_dataset : transition_dataset to test.
+    """
     assert transition_dataset.config.sample_batch_size == 512
     assert transition_dataset.config.prefetch_size is None
     assert transition_dataset.config.num_parallel_calls == 24
@@ -113,11 +127,14 @@ def test_init_transition_dataset(transition_dataset: TransitionDataset) -> None:
 def test_on_building_trainer_dataset_transition_dataset_non_max_in_flight(
     mock_builder: MockBuilder,
 ) -> None:
-    """Test on_building_trainer_dataset of TransitionDataset Component
-        Case max_in_flight_samples_per_worker is None and sample_batch_size not None
+    """Test on_building_trainer_dataset of TransitionDataset Component.
+
+    Case max_in_flight_samples_per_worker is None and sample_batch_size not None
+
     Args:
-        mock_builder: Builder
+        mock_builder : Builder
     """
+
     transition_dataset = TransitionDataset()
     transition_dataset.on_building_trainer_dataset(builder=mock_builder)
 
@@ -150,7 +167,9 @@ def test_on_building_trainer_dataset_transition_dataset_non_max_in_flight_non_ba
     mock_builder: MockBuilder,
 ) -> None:
     """Test on_building_trainer_dataset of TransitionDataset Component
-        Case max_in_flight_samples_per_worker is None and sample_batch_size is None
+
+    Case max_in_flight_samples_per_worker is None and sample_batch_size is None
+
     Args:
         mock_builder: Builder
     """
@@ -178,7 +197,9 @@ def test_on_building_trainer_dataset_transition_dataset(
     mock_builder: MockBuilder,
 ) -> None:
     """Test on_building_trainer_dataset of TransitionDataset Component
-        With max_in_flight_samples_per_worker and with sample_batch_size
+
+    With max_in_flight_samples_per_worker and with sample_batch_size
+
     Args:
         mock_builder: Builder
     """
@@ -210,7 +231,11 @@ def test_on_building_trainer_dataset_transition_dataset(
 
 
 def test_init_trajectory_dataset(trajectory_dataset: TrajectoryDataset) -> None:
-    """Test initiator of TrajectoryDataset component"""
+    """Test init of TrajectoryDataset component
+
+    Args:
+        trajectory_dataset : trajectory_dataset to test.
+    """
     assert trajectory_dataset.config.sample_batch_size == 512
     assert trajectory_dataset.config.max_in_flight_samples_per_worker == 1024
     assert trajectory_dataset.config.num_workers_per_iterator == -2

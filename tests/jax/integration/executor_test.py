@@ -20,7 +20,7 @@ import functools
 
 import pytest
 
-from mava.systems.jax import System
+from mava.systems import System
 from mava.types import OLT
 from mava.utils.environments import debugging_utils
 from tests.jax.systems.systems_test_data import ippo_system_single_process

@@ -22,7 +22,7 @@ from typing import List
 import pytest
 
 from mava.callbacks import Callback
-from mava.systems.jax import ParameterServer
+from mava.systems import ParameterServer
 from tests.jax.hook_order_tracking import HookOrderTracking
 
 

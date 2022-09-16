@@ -20,7 +20,7 @@ import pytest
 from mava import types
 from mava.adders import reverb as reverb_adders
 from mava.adders.reverb import base as reverb_base
-from mava.components.jax.building.adders import (
+from mava.components.building.adders import (
     ParallelSequenceAdder,
     ParallelSequenceAdderConfig,
     ParallelSequenceAdderSignature,
@@ -30,7 +30,7 @@ from mava.components.jax.building.adders import (
     UniformAdderPriority,
 )
 from mava.specs import MAEnvironmentSpec
-from mava.systems.jax.builder import Builder
+from mava.systems.builder import Builder
 from tests.jax.mocks import MockDataServer, make_fake_env_specs
 
 
@@ -309,6 +309,6 @@ def test_uniform_priority(
     assert mock_builder.store.priority_fns
     assert uniform_priority.name() == "adder_priority"
     assert issubclass(
-        uniform_priority.__init__.__annotations__["config"], SimpleNamespace  # type: ignore
+        uniform_priority.__init__.__annotations__["config"], SimpleNamespace  # type: ignore # noqa:E501
     )
     assert all(mock_builder.store.priority_fns) == 1

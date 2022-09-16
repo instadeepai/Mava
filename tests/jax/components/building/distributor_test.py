@@ -15,7 +15,6 @@
 
 """Tests for Distributor class for Jax-based Mava systems"""
 
-from multiprocessing.connection import Client
 from types import SimpleNamespace
 from typing import Any, List
 
@@ -25,9 +24,9 @@ from reverb import client as reverb_client
 from reverb import item_selectors, rate_limiters
 from reverb import server as reverb_server
 
-from mava.components.jax.building.distributor import Distributor
-from mava.systems.jax.builder import Builder
-from mava.systems.jax.launcher import Launcher
+from mava.components.building.distributor import Distributor
+from mava.systems.builder import Builder
+from mava.systems.launcher import Launcher
 
 
 class MockBuilder(Builder):

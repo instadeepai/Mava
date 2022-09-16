@@ -16,7 +16,7 @@
 
 import pytest
 
-from mava.systems.jax.system import System
+from mava.systems.system import System
 from tests.jax.systems.systems_test_data import ippo_system_multi_thread
 
 #########################################################################

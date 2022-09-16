@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from mava import MAEnvironmentSpec, specs
-from mava.components.jax.building.environments import (
+from mava.components.building.environments import (
     EnvironmentSpec,
     EnvironmentSpecConfig,
     ExecutorEnvironmentLoop,
@@ -14,7 +14,7 @@ from mava.components.jax.building.environments import (
     ParallelExecutorEnvironmentLoop,
 )
 from mava.core_jax import SystemBuilder
-from mava.systems.jax import Builder
+from mava.systems import Builder
 from mava.utils.environments import debugging_utils
 from mava.utils.sort_utils import sort_str_num
 

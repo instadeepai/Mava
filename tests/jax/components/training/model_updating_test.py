@@ -24,12 +24,9 @@ import optax
 import pytest
 
 from mava import constants
-from mava.components.jax.training import Batch
-from mava.components.jax.training.model_updating import (
-    MAPGEpochUpdate,
-    MAPGMinibatchUpdate,
-)
-from mava.systems.jax.trainer import Trainer
+from mava.components.training import Batch
+from mava.components.training.model_updating import MAPGEpochUpdate, MAPGMinibatchUpdate
+from mava.systems.trainer import Trainer
 from mava.types import OLT
 
 

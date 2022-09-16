@@ -24,7 +24,7 @@ from absl import app, flags
 from acme.jax.networks.atari import DeepAtariTorso
 from supersuit import dtype_v0
 
-from mava.systems.jax import ippo
+from mava.systems import ippo
 from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
 

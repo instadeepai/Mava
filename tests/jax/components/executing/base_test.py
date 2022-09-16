@@ -19,9 +19,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from mava.components.jax.executing.base import ExecutorInit, ExecutorInitConfig
-from mava.systems.jax.builder import Builder
-from mava.systems.jax.executor import Executor
+from mava.components.executing.base import ExecutorInit, ExecutorInitConfig
+from mava.systems.builder import Builder
+from mava.systems.executor import Executor
 
 
 @pytest.fixture
@@ -88,5 +88,5 @@ def test_config_class() -> None:
     """Test config_class method from ExecutorInit"""
     executor_init = ExecutorInit()
 
-    assert ExecutorInit.__init__.__annotations__["config"] == ExecutorInitConfig  # type: ignore
-    assert executor_init.__init__.__annotations__["config"] == ExecutorInitConfig  # type: ignore
+    assert ExecutorInit.__init__.__annotations__["config"] == ExecutorInitConfig  # type: ignore # noqa: E501
+    assert executor_init.__init__.__annotations__["config"] == ExecutorInitConfig  # type: ignore # noqa: E501

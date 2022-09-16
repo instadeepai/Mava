@@ -23,8 +23,8 @@ import jax.numpy as jnp
 import pytest
 from dm_env import StepType, TimeStep
 
-from mava.components.jax.executing.observing import FeedforwardExecutorObserve
-from mava.systems.jax.executor import Executor
+from mava.components.executing.observing import FeedforwardExecutorObserve
+from mava.systems.executor import Executor
 from mava.types import OLT
 
 
@@ -328,4 +328,4 @@ def test_on_execution_update(
     """
     feedforward_executor_observe.on_execution_update(executor=mock_executor)
 
-    assert mock_executor.store.executor_parameter_client.parm == True
+    assert mock_executor.store.executor_parameter_client.parm is True

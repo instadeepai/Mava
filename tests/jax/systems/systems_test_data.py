@@ -22,7 +22,7 @@ from typing import Any
 
 import optax
 
-from mava.systems.jax import System, ippo
+from mava.systems import System, ippo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 

@@ -22,8 +22,8 @@ from typing import Any, Dict, Optional
 import pytest
 from acme.jax import savers as acme_savers
 
-from mava.components.jax.updating import Checkpointer
-from mava.components.jax.updating.checkpointer import CheckpointerConfig
+from mava.components.updating import Checkpointer
+from mava.components.updating.checkpointer import CheckpointerConfig
 from mava.core_jax import SystemParameterServer
 
 

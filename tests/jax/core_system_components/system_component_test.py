@@ -19,10 +19,10 @@ from typing import Dict, List, Tuple
 
 import pytest
 
-from mava.components.jax import Component
+from mava.components import Component
 from mava.core_jax import SystemBuilder
 from mava.specs import DesignSpec
-from mava.systems.jax.system import System
+from mava.systems.system import System
 
 
 # Mock components

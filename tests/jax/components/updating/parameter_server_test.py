@@ -4,7 +4,7 @@ from typing import Any, Dict, Sequence, Union
 import numpy as np
 import pytest
 
-from mava.components.jax.updating.parameter_server import (
+from mava.components.updating.parameter_server import (
     DefaultParameterServer,
     ParameterServerConfig,
 )

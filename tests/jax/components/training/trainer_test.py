@@ -23,14 +23,14 @@ import pytest
 
 from mava import constants
 from mava.callbacks.base import Callback
-from mava.components.jax.training.trainer import (
+from mava.components.training.trainer import (
     CustomTrainerInit,
     CustomTrainerInitConfig,
     OneTrainerPerNetworkInit,
     SingleTrainerInit,
 )
-from mava.systems.jax.builder import Builder
-from mava.systems.jax.trainer import Trainer
+from mava.systems.builder import Builder
+from mava.systems.trainer import Trainer
 
 #######################
 # TrainerInit Fixtures

@@ -23,15 +23,9 @@ import reverb
 
 from mava.adders import reverb as reverb_adders
 from mava.callbacks.base import Callback
-from mava.components.jax.building.data_server import (
-    OffPolicyDataServer,
-    OnPolicyDataServer,
-)
-from mava.components.jax.building.environments import (
-    EnvironmentSpec,
-    EnvironmentSpecConfig,
-)
-from mava.systems.jax.builder import Builder
+from mava.components.building.data_server import OffPolicyDataServer, OnPolicyDataServer
+from mava.components.building.environments import EnvironmentSpec, EnvironmentSpecConfig
+from mava.systems.builder import Builder
 from mava.utils import enums
 from tests.jax.mocks import make_fake_environment_factory
 

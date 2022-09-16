@@ -20,7 +20,7 @@ import jax.numpy as jnp
 import pytest
 from acme.jax import savers as acme_savers
 
-from mava.systems.jax import System
+from mava.systems import System
 from tests.jax.systems.systems_test_data import ippo_system_single_process
 
 

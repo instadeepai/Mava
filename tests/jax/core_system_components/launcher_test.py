@@ -19,7 +19,7 @@ import launchpad as lp
 import pytest
 from reverb import Client, pybind
 
-from mava.systems.jax.launcher import Launcher, NodeType
+from mava.systems.launcher import Launcher, NodeType
 from tests.jax.components.building.distributor_test import MockBuilder
 
 
@@ -33,7 +33,7 @@ def test_initiator_multi_process() -> None:
     """Test the constructor of Launcher in the case of multi process"""
     launcher = Launcher(multi_process=True)
 
-    assert launcher._multi_process == True
+    assert launcher._multi_process is True
     assert launcher._name == "System"
     assert launcher._single_process_trainer_period == 1
     assert launcher._single_process_evaluator_period == 10
@@ -43,7 +43,7 @@ def test_initiator_multi_process() -> None:
     assert isinstance(launcher._program, lp.Program)
     assert launcher._program._name == "System"
     assert launcher._program._groups == {}
-    assert launcher._program._current_group == None
+    assert launcher._program._current_group is None
 
     assert not hasattr(launcher, "_nodes")
     assert not hasattr(launcher, "_node_dict")
@@ -53,7 +53,7 @@ def test_initiator_non_multi_process() -> None:
     """Test the constructor of Launcher in the case of one process"""
     launcher = Launcher(multi_process=False)
 
-    assert launcher._multi_process == False
+    assert launcher._multi_process is False
     assert launcher._name == "System"
     assert launcher._single_process_trainer_period == 1
     assert launcher._single_process_evaluator_period == 10
@@ -102,7 +102,7 @@ def test_add_multi_process(mock_builder: MockBuilder) -> None:
 
 
 def test_add_multi_process_two_add_calls(mock_builder: MockBuilder) -> None:
-    """Test calling add more than one time method in the Launcher for the case of multi process
+    """Test calling add more than one time method in the Launcher for the case of multi process # noqa:E501
 
     Args:
         mock_data_server_fn
@@ -208,7 +208,7 @@ def test_add_non_multi_process_reverb_node(mock_builder: MockBuilder) -> None:
 
     assert not hasattr(launcher, "_program")
 
-    assert launcher._replay_server._port != None
+    assert launcher._replay_server._port is not None
     assert type(launcher._replay_server._port) == int
     assert isinstance(launcher._replay_server._server, pybind.Server)
 
@@ -275,7 +275,7 @@ def test_add_non_multi_process_two_add_calls(mock_builder: MockBuilder) -> None:
     assert launcher._node_dict["data_server"] == data_server
     assert launcher._node_dict["parameter_server"] == parameter_server
 
-    assert launcher._replay_server._port != None
+    assert launcher._replay_server._port is not None
     assert type(launcher._replay_server._port) == int
     assert isinstance(launcher._replay_server._server, pybind.Server)
     assert isinstance(launcher._node_dict["data_server"], Client)
@@ -289,20 +289,20 @@ def test_add_non_multi_process_two_add_calls(mock_builder: MockBuilder) -> None:
 
 
 def test_add_non_multi_process_two_add_same_name(mock_builder: MockBuilder) -> None:
-    """Test calling twice add method for two nodes with same name and for the case of one process and for node_type reverb
+    """Test calling twice add method for two nodes with same name and for the case of one process and for node_type reverb # noqa:E501
 
     Args:
         mock_builder
     """
     launcher = Launcher(multi_process=False)
 
-    parameter_server_1 = launcher.add(
+    _ = launcher.add(
         mock_builder.parameter_server,
         node_type=NodeType.courier,
         name="parameter_server",
     )
     with pytest.raises(ValueError):
-        parameter_server_2 = launcher.add(
+        _ = launcher.add(
             mock_builder.parameter_server,
             node_type=NodeType.courier,
             name="parameter_server",

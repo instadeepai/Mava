@@ -27,10 +27,8 @@ from acme.jax import networks as networks_lib
 from acme.jax import utils
 from acme.types import NestedArray
 
-from mava.components.jax.executing.action_selection import (
-    FeedforwardExecutorSelectAction,
-)
-from mava.systems.jax.executor import Executor
+from mava.components.executing.action_selection import FeedforwardExecutorSelectAction
+from mava.systems.executor import Executor
 
 
 @dataclass

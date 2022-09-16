@@ -5,11 +5,11 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from mava.components.jax.training.losses import (
+from mava.components.training.losses import (
     MAPGTrustRegionClippingLossConfig,
     MAPGWithTrustRegionClippingLoss,
 )
-from mava.systems.jax.trainer import Trainer
+from mava.systems.trainer import Trainer
 
 
 class MockNet:

@@ -21,7 +21,7 @@ from typing import List
 import pytest
 
 from mava.callbacks import Callback
-from mava.systems.jax.trainer import Trainer
+from mava.systems.trainer import Trainer
 from tests.jax.hook_order_tracking import HookOrderTracking
 
 

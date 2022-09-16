@@ -5,10 +5,10 @@
 Components relating to agent execution in an environment.
 
 ## Action selection components
-::: mava.components.jax.executing.action_selection
+::: mava.components.executing.action_selection
 
 ## Executor initialization components
-::: mava.components.jax.executing.base
+::: mava.components.executing.base
 
 ## Observing components
-::: mava.components.jax.executing.observing
+::: mava.components.executing.observing

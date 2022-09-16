@@ -1,13 +1,13 @@
 import optax
 import pytest
 
-from mava.components.jax.building.optimisers import (
+from mava.components.building.optimisers import (
     DefaultOptimisers,
     DefaultOptimisersConfig,
     Optimisers,
 )
 from mava.core_jax import SystemBuilder
-from mava.systems.jax import Builder
+from mava.systems import Builder
 
 
 @pytest.fixture
