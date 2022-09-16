@@ -17,7 +17,7 @@
 
 import abc
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Type 
 
 from mava.callbacks import Callback
 from mava.components.jax import Component
@@ -50,10 +50,13 @@ class ExecutorObserve(Component):
         pass
 
     @abc.abstractmethod
-    def on_execution_update(
-        self, executor: SystemExecutor, force_update: Optional[bool] = False
-    ) -> None:
+    def on_execution_update(self, executor: SystemExecutor) -> None:
         """Update the executor variables."""
+        pass
+
+    @abc.abstractmethod
+    def on_execution_force_update(self, executor: SystemExecutor) -> None:
+        """Force updating the executor variables."""
         pass
 
     @staticmethod
@@ -153,12 +156,12 @@ class FeedforwardExecutorObserve(ExecutorObserve):
             adder_actions, executor.store.next_timestep, executor.store.next_extras
         )
 
-    def on_execution_update(
-        self, executor: SystemExecutor, force_update: Optional[bool] = False
-    ) -> None:
+    def on_execution_update(self, executor: SystemExecutor) -> None:
         """Update the executor variables."""
         if executor.store.executor_parameter_client:
-            if force_update:
-                executor.store.executor_parameter_client.force_get_async()
-            else:
-                executor.store.executor_parameter_client.get_async()
+            executor.store.executor_parameter_client.get_async()
+
+    def on_execution_force_update(self, executor: SystemExecutor) -> None:
+        """Force updating the executor variables."""
+        if executor.store.executor_parameter_client:
+            executor.store.executor_parameter_client.force_get_async()

@@ -154,7 +154,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
         return self.store.actions_info, self.store.policies_info
 
-    def update(self, wait: bool = False, force_update: Optional[bool] = False) -> None:
+    def update(self, wait: bool = False) -> None:
         """Update executor parameters.
 
         Args:
@@ -167,6 +167,24 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
         self.on_execution_update_start()
 
-        self.on_execution_update(force_update=force_update)
+        self.on_execution_update()
 
         self.on_execution_update_end()
+
+    
+    def force_update(self, wait: bool = False) -> None:
+        """Force immediate update executor parameters.
+
+        Args:
+            wait : whether to stall the executor's request for new parameter.
+
+        Returns:
+            None.
+        """
+        self.store._wait = wait
+
+        self.on_execution_force_update_start()
+
+        self.on_execution_force_update()
+
+        self.on_execution_force_update_end()
