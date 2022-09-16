@@ -31,7 +31,7 @@ def dummy_config() -> ExecutorInitConfig:
     Returns:
         ExecutorInitConfig
     """
-    return ExecutorInitConfig(evaluation_interval={"test": 1})
+    return ExecutorInitConfig(evaluation_interval={"test": 1}, evaluation_duration=2)
 
 
 @pytest.fixture
@@ -73,7 +73,7 @@ def test_on_execution_init_start(
     executor_init = ExecutorInit(config=dummy_config)
     executor_init.on_execution_init_start(executor=mock_executor)
 
-    assert mock_executor.store._evaluation_interval == None  # type: ignore # noqa: E501
+    assert mock_executor.store._evaluation_interval is None  # type: ignore # noqa: E501
 
 
 def test_on_execution_init_start_with_evaluator(
@@ -90,6 +90,7 @@ def test_on_execution_init_start_with_evaluator(
     executor_init.on_execution_init_start(executor=mock_executor)
 
     assert mock_executor.store._evaluation_interval == dummy_config.evaluation_interval  # type: ignore # noqa: E501
+    assert mock_executor.store._evaluation_duration == dummy_config.evaluation_duration  # type: ignore # noqa: E501
 
 
 def test_name() -> None:
@@ -104,5 +105,5 @@ def test_config_class() -> None:
     """Test config_class method from ExecutorInit"""
     executor_init = ExecutorInit()
 
-    assert ExecutorInit.__init__.__annotations__["config"] == ExecutorInitConfig  # type: ignore
-    assert executor_init.__init__.__annotations__["config"] == ExecutorInitConfig  # type: ignore
+    assert ExecutorInit.__init__.__annotations__["config"] == ExecutorInitConfig  # type: ignore # noqa: E501
+    assert executor_init.__init__.__annotations__["config"] == ExecutorInitConfig  # type: ignore # noqa: E501
