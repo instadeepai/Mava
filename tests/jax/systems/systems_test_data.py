@@ -16,6 +16,7 @@
 """Built systems to be used in the integration tests"""
 
 import functools
+import tempfile
 from datetime import datetime
 from typing import Any
 
@@ -45,7 +46,7 @@ def ippo_system_single_process() -> System:
         )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir.
-    base_dir = "~/mava"
+    base_dir = tempfile.mkdtemp()
     mava_id = str(datetime.now())
     checkpoint_subpath = f"{base_dir}/{mava_id}"
 
@@ -93,6 +94,7 @@ def ippo_system_single_process() -> System:
         nodes_on_gpu=[],
         sequence_length=4,
         period=4,
+        checkpoint_minute_interval=3 / 60,
         trainer_parameter_update_period=1,
     )
 
@@ -118,7 +120,7 @@ def ippo_system_multi_thread() -> System:
         )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir.
-    base_dir = "~/mava"
+    base_dir = tempfile.mkdtemp()
     mava_id = str(datetime.now())
     checkpoint_subpath = f"{base_dir}/{mava_id}"
 
@@ -162,6 +164,7 @@ def ippo_system_multi_thread() -> System:
         sample_batch_size=5,
         nodes_on_gpu=[],
         is_test=True,
+        checkpoint_minute_interval=3 / 60,
         trainer_parameter_update_period=1,
     )
     return test_system

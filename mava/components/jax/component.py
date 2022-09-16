@@ -16,7 +16,7 @@
 """Base components for system builder"""
 
 import abc
-from typing import Any, Callable, List, Optional, Type
+from typing import Any, List, Type
 
 from mava.callbacks import Callback
 

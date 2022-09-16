@@ -114,6 +114,7 @@ setup(
         "dataclasses",
         "box2d-py",
         "gym<=0.23.0",
+        "typing-extensions",
     ],
     extras_require={
         "tf": tf_requirements,

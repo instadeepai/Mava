@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Wrapper classes for Mava systems."""
 from mava.wrappers.debugging_envs import DebuggingEnvWrapper, TwoStepWrapper
 from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
 from mava.wrappers.environment_loop_wrappers import (
@@ -38,6 +39,7 @@ try:
 except ModuleNotFoundError:
     pass
 
+from mava.wrappers.saveable import SaveableWrapper
 from mava.wrappers.system_trainer_statistics import (
     DetailedTrainerStatistics,
     NetworkStatisticsActorCritic,

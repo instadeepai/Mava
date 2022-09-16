@@ -15,7 +15,7 @@
 
 """Parameter client for system builders"""
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Tuple, Type
 
 import numpy as np
 
@@ -116,13 +116,10 @@ class ExecutorParameterClient(BaseParameterClient):
 
         builder.store.executor_counts = {name: params[name] for name in count_names}
 
-        set_keys = get_keys.copy()
-
         # Executors should only be able to update relevant params.
-        if builder.store.is_evaluator is True:
-            set_keys = [x for x in set_keys if x.startswith("evaluator")]
-        else:
-            set_keys = [x for x in set_keys if x.startswith("executor")]
+        executor_type = "evaluator" if builder.store.is_evaluator else "executor"
+        set_keys = [x for x in get_keys if x.startswith(executor_type)]
+        get_keys = [x for x in get_keys if not x.startswith(executor_type)]
 
         parameter_client = None
         if builder.store.parameter_server_client:
@@ -199,13 +196,15 @@ class TrainerParameterClient(BaseParameterClient):
                     get_keys.append(f"policy_{net_type_key}-{net_key}")
                     get_keys.append(f"critic_{net_type_key}-{net_key}")
 
-        # Add the optimizers to the variable server.
-        # TODO (dries): Adjust this if using policy and critic optimizers.
-        # TODO (dries): Add this back if we want the optimizer_state to
-        # be store in the variable source. However some code might
-        # need to be moved around as the builder currently does not
-        # have access to the opt_states yet.
-        # params["optimizer_state"] = trainer.store.opt_states
+                if net_type_key == "networks":
+                    params[
+                        f"policy_opt_state-{net_key}"
+                    ] = builder.store.policy_opt_states[net_key]
+                    params[
+                        f"critic_opt_state-{net_key}"
+                    ] = builder.store.critic_opt_states[net_key]
+                    set_keys.append(f"policy_opt_state-{net_key}")
+                    set_keys.append(f"critic_opt_state-{net_key}")
 
         count_names, params = self._set_up_count_parameters(params=params)
 

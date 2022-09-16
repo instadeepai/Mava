@@ -15,7 +15,7 @@
 
 """Jax IPPO system networks."""
 import dataclasses
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import chex
 import haiku as hk  # type: ignore

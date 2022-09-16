@@ -25,6 +25,9 @@ Components used during build time to set up a system.
 ## Network components
 ::: mava.components.jax.building.networks
 
+## Optimiser components
+::: mava.components.jax.building.optimisers
+
 ## Parameter client components
 ::: mava.components.jax.building.parameter_client
 
