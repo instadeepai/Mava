@@ -44,6 +44,7 @@ class PPONetworks:
         self,
         policy_network: networks_lib.FeedForwardNetwork,
         policy_params: networks_lib.Params,
+        policy_init_state: Any,
         critic_network: networks_lib.FeedForwardNetwork,
         critic_params: networks_lib.Params,
         log_prob: Optional[networks_lib.LogProbFn] = None,
@@ -69,6 +70,7 @@ class PPONetworks:
         """
         self.policy_network = policy_network
         self.policy_params = policy_params
+        self.policy_init_state = policy_init_state
         self.critic_network = critic_network
         self.critic_params = critic_params
         self.log_prob = log_prob
@@ -79,6 +81,7 @@ class PPONetworks:
             policy_params: Dict[str, jnp.ndarray],
             observations: networks_lib.Observation,
             key: networks_lib.PRNGKey,
+            policy_state: Tuple[jnp.ndarray] = None,
             mask: chex.Array = None,
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
             """Get actions and relevant log probabilities from the \
@@ -89,6 +92,7 @@ class PPONetworks:
                 observations: agent observations
                 key: jax random key for sampling from the policy
                     distribution
+                policy_state: Optional state used for recurrent policies
                 mask: optional mask for selecting only legal actions
                     Defaults to None.
 
@@ -98,7 +102,11 @@ class PPONetworks:
             """
             # The parameters of the network might change. So it has to
             # be fed into the jitted function.
-            distribution = self.policy_network.apply(policy_params, observations)
+            if isinstance(self.policy_network, hk.Sequential):
+                distribution = self.policy_network.apply(policy_params, observations)
+            else:
+                distribution = self.policy_network.apply([policy_params, observations], policy_state)
+
             if mask is not None:
                 distribution = action_mask_categorical_policies(distribution, mask)
 
@@ -126,6 +134,9 @@ class PPONetworks:
         """Get state value from critic network given observations."""
         value = self.critic_network.apply(self.critic_params, observations)
         return value
+    
+    def get_init_state(self):
+        return self.policy_init_state
 
     def get_params(
         self,
@@ -139,26 +150,6 @@ class PPONetworks:
             "policy_network": self.policy_params,
             "critic_network": self.critic_params,
         }
-
-
-def make_ppo_networks(
-    policy_network: networks_lib.FeedForwardNetwork,
-    policy_params: Dict[str, jnp.ndarray],
-    critic_network: networks_lib.FeedForwardNetwork,
-    critic_params: Dict[str, jnp.ndarray],
-) -> PPONetworks:
-    """Instantiate PPO networks class which has separate policy and \
-        critic networks."""
-    return PPONetworks(
-        policy_network=policy_network,
-        policy_params=policy_params,
-        critic_network=critic_network,
-        critic_params=critic_params,
-        log_prob=lambda distribution, action: distribution.log_prob(action),
-        entropy=lambda distribution: distribution.entropy(),
-        sample=lambda distribution, key: distribution.sample(seed=key),
-    )
-
 
 # This class is made to replicate the behaviour of the categorical value head
 # which squeezes the value inside the __call__ method before returning it.
@@ -179,7 +170,6 @@ class ValueHead(hk.Module):
         """Return output given network inputs."""
         value = jnp.squeeze(self._value_layer(inputs), axis=-1)
         return value
-
 
 def make_discrete_networks(
     environment_spec: specs.EnvironmentSpec,
@@ -206,7 +196,8 @@ def make_discrete_networks(
 
     num_actions = environment_spec.actions.num_values
 
-    
+    @hk.without_apply_rng
+    @hk.transform
     def policy_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
         # Add the observation network and an MLP network.
         policy_network = [
@@ -219,9 +210,10 @@ def make_discrete_networks(
         net_type = hk.Sequential
         if len(policy_recurrent_layer_sizes) > 0:
             net_type = hk.DeepRNN
-            policy_network.append(
-                hk.GRU(policy_recurrent_layer_sizes)
-                )
+            for size in policy_recurrent_layer_sizes:
+                policy_network.append(
+                    hk.GRU(size)
+                    )
 
 
         # Add a categorical value head.
@@ -229,9 +221,21 @@ def make_discrete_networks(
                     num_values=num_actions, dtype=environment_spec.actions.dtype
                 ))
         
-        
-        return net_type(policy_network)(inputs)
+        if len(policy_recurrent_layer_sizes) > 0:
+            return net_type(policy_network)(inputs[0], inputs[1])
+        else:
+            return net_type(policy_network)(inputs[0])
 
+    @hk.without_apply_rng
+    @hk.transform
+    def initial_state_fn():
+        state = []
+        for size in policy_recurrent_layer_sizes:
+            state.append(hk.GRU(size).initial_state(1))
+        return state
+
+    @hk.without_apply_rng
+    @hk.transform
     def critic_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
         critic_network = hk.Sequential(
             [
@@ -242,25 +246,31 @@ def make_discrete_networks(
         )
         return critic_network(inputs)
 
-    # Transform into pure functions.
-    policy_fn = hk.without_apply_rng(hk.transform(policy_fn))
-    critic_fn = hk.without_apply_rng(hk.transform(critic_fn))
-
     dummy_obs = utils.zeros_like(environment_spec.observations.observation)
     dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
 
     network_key, key = jax.random.split(key)
-    policy_params = policy_fn.init(network_key, dummy_obs)  # type: ignore
+
+    if len(policy_recurrent_layer_sizes) > 0:
+        policy_state = initial_state_fn.apply(None)
+        
+        policy_params = policy_fn.init(network_key, [dummy_obs, policy_state])  # type: ignore
+    else:
+        policy_params = policy_fn.init(network_key, dummy_obs)  # type: ignore
 
     network_key, key = jax.random.split(key)
     critic_params = critic_fn.init(network_key, dummy_obs)  # type: ignore
 
     # Create PPONetworks to add functionality required by the agent.
-    return make_ppo_networks(
+    return PPONetworks(
         policy_network=policy_fn,
         policy_params=policy_params,
+        policy_init_state=policy_state,
         critic_network=critic_fn,
         critic_params=critic_params,
+        log_prob=lambda distribution, action: distribution.log_prob(action),
+        entropy=lambda distribution: distribution.entropy(),
+        sample=lambda distribution, key: distribution.sample(seed=key),
     )
 
 
