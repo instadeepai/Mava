@@ -23,10 +23,10 @@ import jax.numpy as jnp
 import pytest
 import rlax
 
+from mava import constants
 from mava.components.jax.training.step import (
     DefaultTrainerStep,
     MAPGWithTrustRegionStep,
-    MAPGWithTrustRegionStepSeparateNetworks,
 )
 from mava.systems.jax.trainer import Trainer
 from tests.jax.components.training.step_test_data import dummy_sample
@@ -125,57 +125,6 @@ class MockTrainer(Trainer):
         networks = {
             "networks": {
                 "network_agent_0": SimpleNamespace(
-                    params={"key": jnp.array([0.0, 0.0, 0.0])},
-                    network=SimpleNamespace(apply=apply),
-                ),
-                "network_agent_1": SimpleNamespace(
-                    params={"key": jnp.array([1.0, 1.0, 1.0])},
-                    network=SimpleNamespace(apply=apply),
-                ),
-                "network_agent_2": SimpleNamespace(
-                    params={"key": jnp.array([2.0, 2.0, 2.0])},
-                    network=SimpleNamespace(apply=apply),
-                ),
-            }
-        }
-        opt_states = {
-            "network_agent_0": 0,
-            "network_agent_1": 1,
-            "network_agent_2": 2,
-        }
-        store = SimpleNamespace(
-            dataset_iterator=iter([1, 2, 3]),
-            step_fn=step_fn,
-            timestamp=1657703548.5225394,  # time.time() format
-            trainer_parameter_client=MockParameterClient(),
-            trainer_counts={"next_sample": 2},
-            trainer_logger=MockTrainerLogger(),
-            trainer_agent_net_keys=trainer_agent_net_keys,
-            networks=networks,
-            gae_fn=gae_advantages,
-            opt_states=opt_states,
-            base_key=jax.random.PRNGKey(5),
-            epoch_update_fn=epoch_update,
-            global_config=SimpleNamespace(
-                num_minibatches=1, num_epochs=2, sample_batch_size=2, sequence_length=3
-            ),
-        )
-        self.store = store
-
-
-class MockTrainerSeparateNetworks(Trainer):
-    """Mock of Trainer"""
-
-    def __init__(self) -> None:
-        """Initialize mock trainer"""
-        trainer_agent_net_keys = {
-            "agent_0": "network_agent_0",
-            "agent_1": "network_agent_1",
-            "agent_2": "network_agent_2",
-        }
-        networks = {
-            "networks": {
-                "network_agent_0": SimpleNamespace(
                     policy_params={"key": jnp.array([0.0, 0.0, 0.0])},
                     critic_params={"key": jnp.array([0.0, 0.0, 0.0])},
                     policy_network=SimpleNamespace(apply=apply),
@@ -195,10 +144,11 @@ class MockTrainerSeparateNetworks(Trainer):
                 ),
             }
         }
+
         opt_states = {
-            "network_agent_0": 0,
-            "network_agent_1": 1,
-            "network_agent_2": 2,
+            "network_agent_0": {constants.OPT_STATE_DICT_KEY: 0},
+            "network_agent_1": {constants.OPT_STATE_DICT_KEY: 1},
+            "network_agent_2": {constants.OPT_STATE_DICT_KEY: 2},
         }
         store = SimpleNamespace(
             dataset_iterator=iter([1, 2, 3]),
@@ -227,31 +177,19 @@ def mock_trainer() -> MockTrainer:
     return MockTrainer()
 
 
-@pytest.fixture
-def mock_trainer_separate_networks() -> MockTrainerSeparateNetworks:
-    """Build fixture from MockTrainerSeparateNetworks"""
-    return MockTrainerSeparateNetworks()
-
-
-##############
-# SHARED TESTS
-##############
-
-
 def test_default_trainer_step_initiator() -> None:
     """Test constructor of DefaultTrainerStep component"""
     trainer_step = DefaultTrainerStep()
     assert trainer_step.config.random_key == 42
 
 
-######################
-# SINGLE NETWORK TESTS
-######################
-
-
-def test_on_training_step_with_timestamp(mock_trainer: Trainer) -> None:
+def test_on_training_step_with_timestamp(
+    mock_trainer: Trainer,
+) -> None:
     """Test on_training_step method from TrainerStep case of existing timestamp"""
     trainer_step = DefaultTrainerStep()
+    mock_trainer = mock_trainer
+
     old_timestamp = mock_trainer.store.timestamp
     trainer_step.on_training_step(trainer=mock_trainer)
 
@@ -272,9 +210,12 @@ def test_on_training_step_with_timestamp(mock_trainer: Trainer) -> None:
     assert mock_trainer.store.trainer_logger.written == {"next_sample": 2, "sample": 1}
 
 
-def test_on_training_step_without_timestamp(mock_trainer: Trainer) -> None:
+def test_on_training_step_without_timestamp(
+    mock_trainer: Trainer,
+) -> None:
     """Test on_training_step method from TrainerStep case of no timestamp"""
     trainer_step = DefaultTrainerStep()
+
     del mock_trainer.store.timestamp
     trainer_step.on_training_step(trainer=mock_trainer)
 
@@ -300,179 +241,27 @@ def test_mapg_with_trust_region_step_initiator() -> None:
     assert mapg_with_trust_region_step.config.discount == 0.99
 
 
-def test_on_training_init_start(mock_trainer: MockTrainer) -> None:
-    """Test on_training_init_start method from MAPGWITHTrustRegionStep component"""
-    mapg_with_trust_region_step = MAPGWithTrustRegionStep()
-    mapg_with_trust_region_step.on_training_init_start(trainer=mock_trainer)
-
-    assert mock_trainer.store.full_batch_size == 4
-
-
-def test_on_training_step_fn(mock_trainer: MockTrainer) -> None:
-    """Test on_training_step_fn method from MAPGWITHTrustRegionStep component"""
-    mapg_with_trust_region_step = MAPGWithTrustRegionStep()
-    del mock_trainer.store.step_fn
-    mapg_with_trust_region_step.on_training_step_fn(trainer=mock_trainer)
-
-    assert callable(mock_trainer.store.step_fn)
-
-
-def test_step(mock_trainer: MockTrainer) -> None:
-    """Test step function"""
-    mapg_with_trust_region_step = MAPGWithTrustRegionStep()
-    del mock_trainer.store.step_fn
-    mapg_with_trust_region_step.on_training_step_fn(trainer=mock_trainer)
-    old_key = mock_trainer.store.base_key
-    metrics = mock_trainer.store.step_fn(dummy_sample)
-
-    # Check that metrics were correctly computed
-    assert list(metrics.keys()) == [
-        "norm_params",
-        "observations_mean",
-        "observations_std",
-        "rewards_mean",
-        "rewards_std",
-    ]
-
-    assert jnp.isclose(metrics["norm_params"], 3.8729835)
-
-    assert jnp.isclose(metrics["observations_mean"], 0.5667871)
-
-    assert jnp.isclose(metrics["observations_std"], 0.104980744)
-
-    assert sorted(list(metrics["rewards_mean"].keys())) == [
-        "agent_0",
-        "agent_1",
-        "agent_2",
-    ]
-    sorted_reward_mean = sorted(list(metrics["rewards_mean"].values()))
-    assert round(float(sorted_reward_mean[0]), 3) == 0.000
-    assert round(float(sorted_reward_mean[1]), 3) == 0.072
-    assert round(float(sorted_reward_mean[2]), 3) == 0.083
-
-    assert sorted(list(metrics["rewards_std"].keys())) == [
-        "agent_0",
-        "agent_1",
-        "agent_2",
-    ]
-    sorted_reward_std = sorted(list(metrics["rewards_std"].values()))
-    assert round(float(sorted_reward_std[0]), 3) == 0.000
-    assert round(float(sorted_reward_std[1]), 3) == 0.070
-    assert round(float(sorted_reward_std[2]), 3) == 0.077
-
-    # check that trainer random key has been updated
-    assert list(mock_trainer.store.base_key) != list(old_key)
-    num_expected_update_steps = (
-        mock_trainer.store.global_config.num_epochs
-        * mock_trainer.store.global_config.num_minibatches
-    )
-
-    # check that network parameters and optimizer states were updated the correct
-    # number of times
-    for i, net_key in enumerate(mock_trainer.store.networks["networks"]):
-        assert jnp.array_equal(
-            mock_trainer.store.networks["networks"][net_key].params["key"],
-            jnp.array(
-                [
-                    i + num_expected_update_steps,
-                    i + num_expected_update_steps,
-                    i + num_expected_update_steps,
-                ]
-            ),
-        )
-
-    assert mock_trainer.store.opt_states == {
-        "network_agent_0": 0 + num_expected_update_steps,
-        "network_agent_1": 1 + num_expected_update_steps,
-        "network_agent_2": 2 + num_expected_update_steps,
-    }
-
-
-########################
-# SEPARATE NETWORK TESTS
-########################
-
-
-def test_on_training_step_with_timestamp_separate_networks(
-    mock_trainer_separate_networks: Trainer,
-) -> None:
-    """Test on_training_step method from TrainerStep case of existing timestamp"""
-    trainer_step = DefaultTrainerStep()
-    mock_trainer = mock_trainer_separate_networks
-
-    old_timestamp = mock_trainer.store.timestamp
-    trainer_step.on_training_step(trainer=mock_trainer)
-
-    assert mock_trainer.store.timestamp > old_timestamp
-
-    assert list(mock_trainer.store.trainer_parameter_client.params.keys()) == [
-        "trainer_steps",
-        "trainer_walltime",
-    ]
-    assert mock_trainer.store.trainer_parameter_client.params["trainer_steps"] == 1
-
-    assert (
-        int(mock_trainer.store.trainer_parameter_client.params["trainer_walltime"]) > 0
-    )
-
-    assert mock_trainer.store.trainer_parameter_client.call_set_and_get_async is True
-
-    assert mock_trainer.store.trainer_logger.written == {"next_sample": 2, "sample": 1}
-
-
-def test_on_training_step_without_timestamp_separate_networks(
-    mock_trainer_separate_networks: Trainer,
-) -> None:
-    """Test on_training_step method from TrainerStep case of no timestamp"""
-    trainer_step = DefaultTrainerStep()
-    mock_trainer = mock_trainer_separate_networks
-
-    del mock_trainer.store.timestamp
-    trainer_step.on_training_step(trainer=mock_trainer)
-
-    assert mock_trainer.store.timestamp != 0
-
-    assert list(mock_trainer.store.trainer_parameter_client.params.keys()) == [
-        "trainer_steps",
-        "trainer_walltime",
-    ]
-    assert mock_trainer.store.trainer_parameter_client.params["trainer_steps"] == 1
-    assert (
-        int(mock_trainer.store.trainer_parameter_client.params["trainer_walltime"]) == 0
-    )
-
-    assert mock_trainer.store.trainer_parameter_client.call_set_and_get_async is True
-
-    assert mock_trainer.store.trainer_logger.written == {"next_sample": 2, "sample": 1}
-
-
-def test_mapg_with_trust_region_step_initiator_separate_networks() -> None:
-    """Test constructor of MAPGWITHTrustRegionStep component"""
-    mapg_with_trust_region_step = MAPGWithTrustRegionStepSeparateNetworks()
-    assert mapg_with_trust_region_step.config.discount == 0.99
-
-
-def test_on_training_init_start_separate_networks(
-    mock_trainer_separate_networks: Trainer,
+def test_on_training_init_start(
+    mock_trainer: Trainer,
 ) -> None:
     """Test on_training_init_start method from \
-        MAPGWITHTrustRegionStepSeparateNetworks component"""
-    mapg_with_trust_region_step = MAPGWithTrustRegionStepSeparateNetworks()
-    mock_trainer = mock_trainer_separate_networks
+        MAPGWITHTrustRegionStep component"""
+    mapg_with_trust_region_step = MAPGWithTrustRegionStep()
+    mock_trainer = mock_trainer
 
     mapg_with_trust_region_step.on_training_init_start(trainer=mock_trainer)
 
     assert mock_trainer.store.full_batch_size == 4
 
 
-def test_on_training_step_fn_separate_networks(
-    mock_trainer_separate_networks: Trainer,
+def test_on_training_step_fn(
+    mock_trainer: Trainer,
 ) -> None:
     """Test on_training_step_fn method from \
-        MAPGWITHTrustRegionStepSeparateNetworks component"""
+        MAPGWITHTrustRegionStep component"""
 
-    mapg_with_trust_region_step = MAPGWithTrustRegionStepSeparateNetworks()
-    mock_trainer = mock_trainer_separate_networks
+    mapg_with_trust_region_step = MAPGWithTrustRegionStep()
+    mock_trainer = mock_trainer
 
     del mock_trainer.store.step_fn
     mapg_with_trust_region_step.on_training_step_fn(trainer=mock_trainer)
@@ -480,10 +269,10 @@ def test_on_training_step_fn_separate_networks(
     assert callable(mock_trainer.store.step_fn)
 
 
-def test_step_separate_networks(mock_trainer_separate_networks: Trainer) -> None:
+def test_step(mock_trainer: Trainer) -> None:
     """Test step function"""
-    mapg_with_trust_region_step = MAPGWithTrustRegionStepSeparateNetworks()
-    mock_trainer = mock_trainer_separate_networks
+    mapg_with_trust_region_step = MAPGWithTrustRegionStep()
+    mock_trainer = mock_trainer
     del mock_trainer.store.step_fn
 
     mapg_with_trust_region_step.on_training_step_fn(trainer=mock_trainer)
@@ -532,7 +321,7 @@ def test_step_separate_networks(mock_trainer_separate_networks: Trainer) -> None
         * mock_trainer.store.global_config.num_minibatches
     )
 
-    # check that network parameters and optimizer states were updated the correct
+    # check that network parameters and optimiser states were updated the correct
     # number of times
     for i, net_key in enumerate(mock_trainer.store.networks["networks"]):
         assert jnp.array_equal(
@@ -558,13 +347,25 @@ def test_step_separate_networks(mock_trainer_separate_networks: Trainer) -> None
         )
 
     assert mock_trainer.store.policy_opt_states == {
-        "network_agent_0": 0 + num_expected_update_steps,
-        "network_agent_1": 1 + num_expected_update_steps,
-        "network_agent_2": 2 + num_expected_update_steps,
+        "network_agent_0": {
+            constants.OPT_STATE_DICT_KEY: 0 + num_expected_update_steps
+        },
+        "network_agent_1": {
+            constants.OPT_STATE_DICT_KEY: 1 + num_expected_update_steps
+        },
+        "network_agent_2": {
+            constants.OPT_STATE_DICT_KEY: 2 + num_expected_update_steps
+        },
     }
 
     assert mock_trainer.store.critic_opt_states == {
-        "network_agent_0": 0 + num_expected_update_steps,
-        "network_agent_1": 1 + num_expected_update_steps,
-        "network_agent_2": 2 + num_expected_update_steps,
+        "network_agent_0": {
+            constants.OPT_STATE_DICT_KEY: 0 + num_expected_update_steps
+        },
+        "network_agent_1": {
+            constants.OPT_STATE_DICT_KEY: 1 + num_expected_update_steps
+        },
+        "network_agent_2": {
+            constants.OPT_STATE_DICT_KEY: 2 + num_expected_update_steps
+        },
     }

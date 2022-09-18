@@ -16,6 +16,7 @@
 """Jax-based Mava system implementation."""
 import abc
 import copy
+from types import SimpleNamespace
 from typing import Any, Dict, List, Tuple, Type
 
 from mava.components.jax import Component
@@ -35,6 +36,7 @@ class System(BaseSystem):
         match their assigned names.
         """
         self._design, self._default_params = self.design()
+
         self.config = Config()  # Mava config
         self.components: List = []
         self._built = False
@@ -56,8 +58,9 @@ class System(BaseSystem):
             None.
         """
         for component in self._design.get().values():
-            config_class = component.config_class()
-            if config_class:
+            config_class = component.__init__.__annotations__["config"]
+
+            if config_class is not SimpleNamespace:
                 input = {component.name(): config_class()}
                 self.config.add(**input)
 
@@ -87,7 +90,7 @@ class System(BaseSystem):
 
         if name in list(self._design.get().keys()):
             self._design.get()[name] = component
-            config_class = component.config_class()
+            config_class = component.__init__.__annotations__["config"]
             if config_class:
                 config_feed = {name: config_class()}
                 self.config.update(**config_feed)
@@ -119,7 +122,7 @@ class System(BaseSystem):
             )
         else:
             self._design.get()[name] = component
-            config_class = component.config_class()
+            config_class = component.__init__.__annotations__["config"]
             if config_class:
                 config_feed = {name: config_class()}
                 self.config.add(**config_feed)

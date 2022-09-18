@@ -14,8 +14,8 @@
 # limitations under the License.
 
 """Example running IPPO on debug MPE environments."""
+
 import functools
-from datetime import datetime
 from typing import Any
 
 import optax
@@ -37,12 +37,13 @@ flags.DEFINE_string(
     "Environment action space type (str).",
 )
 
+flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
+
 flags.DEFINE_string(
     "mava_id",
-    str(datetime.now()),
+    "exp_id",
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
@@ -63,13 +64,14 @@ def main(_: Any) -> None:
         return ippo.make_default_networks(  # type: ignore
             policy_layer_sizes=(256, 256, 256),
             critic_layer_sizes=(512, 512, 256),
-            single_network=False,
             *args,
             **kwargs,
         )
 
-    # Checkpointer appends "Checkpoints" to checkpoint_dir
-    checkpoint_subpath = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+    # experiment_path used for checkpoints, tensorboard logging and env monitoring
+    # To restore a checkpoint, experiment_path must point to a folder that contains
+    # the 'checkpoints' folder, generated from a previous run
+    experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
     log_every = 10
@@ -82,31 +84,32 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # Optimizer.
-    policy_optimizer = optax.chain(
+    # Optimisers.
+    policy_optimiser = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
-    critic_optimizer = optax.chain(
+    critic_optimiser = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
     # Create the system.
-    system = ippo.IPPOSystemSeparateNetworks()
+    system = ippo.IPPOSystem()
 
     # Build the system.
     system.build(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        experiment_path=checkpoint_subpath,
-        policy_optimizer=policy_optimizer,
-        critic_optimizer=critic_optimizer,
+        experiment_path=experiment_path,
+        policy_optimiser=policy_optimiser,
+        critic_optimiser=critic_optimiser,
         run_evaluator=True,
         sample_batch_size=5,
         num_epochs=15,
         num_executors=1,
         multi_process=True,
+        clip_value=False,
     )
 
     # Launch the system.

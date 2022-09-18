@@ -54,6 +54,7 @@ class IPPOSystem(System):
             adder_priority=building.UniformAdderPriority,
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
             networks=building.DefaultNetworks,
+            optimisers=building.DefaultOptimisers,
         ).get()
 
         # Trainer
@@ -81,6 +82,7 @@ class IPPOSystem(System):
             executor_parameter_client=building.ExecutorParameterClient,
             trainer_parameter_client=building.TrainerParameterClient,
             termination_condition=updating.CountConditionTerminator,
+            checkpointer=updating.Checkpointer,
         ).get()
 
         system = DesignSpec(
@@ -93,37 +95,4 @@ class IPPOSystem(System):
             logger=building.Logger,
             component_dependency_guardrails=ComponentDependencyGuardrails,
         )
-        return system, default_params
-
-
-class IPPOSystemSeparateNetworks(System):
-    def design(self) -> Tuple[DesignSpec, Any]:
-        """System design for PPO with separate policy and critic networks.
-
-        Returns:
-            system callback components, default system parameters
-        """
-
-        # Get the generic IPPO system setup.
-        system, default_params = IPPOSystem().design()
-
-        # Update trainer components with seperate networks
-        # TODO (dries): Investigate whether the names (below) are necessary or if they can be removed.
-        system.set("loss", training.MAPGWithTrustRegionClippingLossSeparateNetworks)
-        system.set("minibatch_update", training.MAPGMinibatchUpdateSeparateNetworks)
-        system.set("sgd_step", training.MAPGWithTrustRegionStepSeparateNetworks)
-        system.set("epoch_update", training.MAPGEpochUpdateSeparateNetworks)
-
-        # Update parameter server components with seperate networks
-        # TODO (dries): See if we can somehow reuse the same parameter client and server components
-        # as is used in the shared networks system. We can then remove the below components.
-        system.set("parameter_server", updating.ParameterServerSeparateNetworks)
-        system.set(
-            "executor_parameter_client",
-            building.ExecutorParameterClientSeparateNetworks,
-        )
-        system.set(
-            "trainer_parameter_client", building.TrainerParameterClientSeparateNetworks
-        )
-
         return system, default_params

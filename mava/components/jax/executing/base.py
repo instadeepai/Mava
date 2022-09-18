@@ -16,7 +16,7 @@
 """Execution components for system builders"""
 
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Type
+from typing import List, Optional, Type
 
 from mava.callbacks import Callback
 from mava.components.jax import Component
@@ -52,15 +52,6 @@ class ExecutorInit(Component):
     def name() -> str:
         """Static method that returns component name."""
         return "executor_init"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return ExecutorInitConfig
 
     @staticmethod
     def required_components() -> List[Type[Callback]]:

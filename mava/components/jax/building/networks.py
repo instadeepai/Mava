@@ -41,7 +41,7 @@ class Networks(Component):
         self,
         config: NetworksConfig = NetworksConfig(),
     ):
-        """Abstract component defines the skeleton for initialising networks.
+        """Abstract component defining the skeleton for initialising networks.
 
         Args:
             config: NetworksConfig.
@@ -99,15 +99,6 @@ class DefaultNetworks(Networks):
             agent_net_keys=builder.store.agent_net_keys,
             rng_key=network_key,
         )
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return NetworksConfig
 
     @staticmethod
     def required_components() -> List[Type[Callback]]:

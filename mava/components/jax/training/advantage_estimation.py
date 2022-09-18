@@ -16,7 +16,7 @@
 """Trainer components for advantage calculations."""
 
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Tuple, Type
+from typing import List, Tuple, Type
 
 import jax
 import jax.numpy as jnp
@@ -92,15 +92,6 @@ class GAE(Utility):
     def name() -> str:
         """Static method that returns component name."""
         return "gae_fn"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return GAEConfig
 
     @staticmethod
     def required_components() -> List[Type[Callback]]:

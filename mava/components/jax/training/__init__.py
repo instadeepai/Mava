@@ -14,34 +14,17 @@
 # limitations under the License.
 
 """Trainer components for Mava systems."""
-from mava.components.jax.training.advantage_estimation import (
-    GAE,
-    NormalizeGAE,
-)
-from mava.components.jax.training.base import (
-    Batch,
-    TrainingState,
-    TrainingStateStats,
-    TrainingStateSeparateNetworks,
-    TrainingStateStatsSeparateNetworks,
-    Utility,
-)
-from mava.components.jax.training.losses import (
-    MAPGWithTrustRegionClippingLoss,
-    MAPGWithTrustRegionClippingLossSeparateNetworks,
-)
+from mava.components.jax.training.advantage_estimation import GAE, NormalizeGAE
+from mava.components.jax.training.base import Batch, TrainingState, TrainingStateStats, Utility
+from mava.components.jax.training.losses import MAPGWithTrustRegionClippingLoss
 from mava.components.jax.training.model_updating import (
     MAPGEpochUpdate,
-    MAPGEpochUpdateSeparateNetworks,
     MAPGMinibatchUpdate,
-    MAPGMinibatchUpdateSeparateNetworks,
 )
 from mava.components.jax.training.step import (
     DefaultTrainerStep,
     MAPGWithTrustRegionStep,
     MAPGWithTrustRegionStepNorm,
-    MAPGWithTrustRegionStepSeparateNetworks,
-    MAPGWithTrustRegionStepSeparateNetworksNorm
 )
 from mava.components.jax.training.trainer import (
     BaseTrainerInit,

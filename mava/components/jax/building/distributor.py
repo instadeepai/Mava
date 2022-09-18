@@ -15,7 +15,7 @@
 
 """Commonly used distributor components for system builders"""
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Type, Union
+from typing import List, Optional, Type, Union
 
 import jax
 
@@ -150,15 +150,6 @@ class Distributor(Component):
     def name() -> str:
         """Static method that returns component name."""
         return "distributor"
-
-    @staticmethod
-    def config_class() -> Optional[Callable]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return DistributorConfig
 
     @staticmethod
     def required_components() -> List[Type[Callback]]:

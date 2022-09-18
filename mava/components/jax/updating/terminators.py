@@ -108,15 +108,6 @@ class CountConditionTerminator(Terminator):
             self.config.termination_function()
 
     @staticmethod
-    def config_class() -> Type[CountConditionTerminatorConfig]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return CountConditionTerminatorConfig
-
-    @staticmethod
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
@@ -174,12 +165,3 @@ class TimeTerminator(Terminator):
                 f"Run time of {self.config.run_seconds} seconds reached, terminating."
             )
             self.config.termination_function()
-
-    @staticmethod
-    def config_class() -> Type[TimeTerminatorConfig]:
-        """Config class used for component.
-
-        Returns:
-            config class/dataclass for component.
-        """
-        return TimeTerminatorConfig

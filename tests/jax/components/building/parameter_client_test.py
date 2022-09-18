@@ -20,21 +20,18 @@ from typing import Any
 
 import numpy as np
 import pytest
+from optax import EmptyState
 
+from mava import constants
 from mava.components.jax.building.parameter_client import (
     BaseParameterClient,
     ExecutorParameterClient,
     ExecutorParameterClientConfig,
-    ExecutorParameterClientSeparateNetworks,
     TrainerParameterClient,
-    TrainerParameterClientSeparateNetworks,
+    TrainerParameterClientConfig,
 )
 from mava.systems.jax.builder import Builder
 from mava.systems.jax.parameter_server import ParameterServer
-
-##############
-# SHARED DATA
-##############
 
 
 class MockBaseParameterClient(BaseParameterClient):
@@ -49,7 +46,7 @@ class MockBaseParameterClient(BaseParameterClient):
         return "dummy_base_parameter_client_name"
 
 
-# data for checking that the components have been initialized correctly
+# Data for checking that the components have been initialized correctly
 expected_count_keys = {
     "evaluator_episodes",
     "evaluator_steps",
@@ -68,54 +65,36 @@ initial_count_parameters = {
     "executor_steps": np.array(0, dtype=np.int32),
 }
 
-######################
-# SINGLE NETWORK DATA
-######################
-
 expected_network_keys = {
-    "networks-network_agent_0",
-    "networks-network_agent_1",
-    "networks-network_agent_2",
+    "policy_networks-network_agent_0",
+    "policy_networks-network_agent_1",
+    "policy_networks-network_agent_2",
+    "policy_opt_state-network_agent_0",
+    "policy_opt_state-network_agent_1",
+    "policy_opt_state-network_agent_2",
+    "critic_networks-network_agent_0",
+    "critic_networks-network_agent_1",
+    "critic_networks-network_agent_2",
+    "critic_opt_state-network_agent_0",
+    "critic_opt_state-network_agent_1",
+    "critic_opt_state-network_agent_2",
 }
 
 expected_keys = expected_count_keys.union(expected_network_keys)
 
-initial_parameters = {
-    "networks-network_agent_0": {"weights": 0, "biases": 0},
-    "networks-network_agent_1": {"weights": 1, "biases": 1},
-    "networks-network_agent_2": {"weights": 2, "biases": 2},
-    "trainer_steps": np.array(0, dtype=np.int32),
-    "trainer_walltime": np.array(0.0, dtype=np.float32),
-    "evaluator_steps": np.array(0, dtype=np.int32),
-    "evaluator_episodes": np.array(0, dtype=np.int32),
-    "executor_episodes": np.array(0, dtype=np.int32),
-    "executor_steps": np.array(0, dtype=np.int32),
-}
-
-########################
-# SEPARATE NETWORK DATA
-########################
-
-expected_separate_network_keys = {
-    "policy_networks-network_agent_0",
-    "policy_networks-network_agent_1",
-    "policy_networks-network_agent_2",
-    "critic_networks-network_agent_0",
-    "critic_networks-network_agent_1",
-    "critic_networks-network_agent_2",
-}
-
-expected_separate_network_keys = expected_count_keys.union(
-    expected_separate_network_keys
-)
-
-initial_separate_network_parameters = {
+initial_parameters_trainer = {
     "policy_networks-network_agent_0": {"weights": 0, "biases": 0},
     "policy_networks-network_agent_1": {"weights": 1, "biases": 1},
     "policy_networks-network_agent_2": {"weights": 2, "biases": 2},
     "critic_networks-network_agent_0": {"weights": 0, "biases": 0},
     "critic_networks-network_agent_1": {"weights": 1, "biases": 1},
     "critic_networks-network_agent_2": {"weights": 2, "biases": 2},
+    "policy_opt_state-network_agent_0": {constants.OPT_STATE_DICT_KEY: EmptyState()},
+    "policy_opt_state-network_agent_1": {constants.OPT_STATE_DICT_KEY: EmptyState()},
+    "policy_opt_state-network_agent_2": {constants.OPT_STATE_DICT_KEY: EmptyState()},
+    "critic_opt_state-network_agent_0": {constants.OPT_STATE_DICT_KEY: EmptyState()},
+    "critic_opt_state-network_agent_1": {constants.OPT_STATE_DICT_KEY: EmptyState()},
+    "critic_opt_state-network_agent_2": {constants.OPT_STATE_DICT_KEY: EmptyState()},
     "trainer_steps": np.array(0, dtype=np.int32),
     "trainer_walltime": np.array(0.0, dtype=np.float32),
     "evaluator_steps": np.array(0, dtype=np.int32),
@@ -124,49 +103,14 @@ initial_separate_network_parameters = {
     "executor_steps": np.array(0, dtype=np.int32),
 }
 
-#########################
-# SINGLE NETWORK FIXTURES
-#########################
+# Executor parameter client prameters does not include opt states
+initial_parameters_executor = {
+    k: v for k, v in initial_parameters_trainer.items() if "opt_state" not in k
+}
 
 
 @pytest.fixture
 def mock_builder_with_parameter_client() -> Builder:
-    """Create a mock builder for testing that has a parameter client."""
-
-    builder = Builder(components=[])
-
-    builder.store.networks = {
-        "networks": {
-            "network_agent_0": SimpleNamespace(params={"weights": 0, "biases": 0}),
-            "network_agent_1": SimpleNamespace(params={"weights": 1, "biases": 1}),
-            "network_agent_2": SimpleNamespace(params={"weights": 2, "biases": 2}),
-        }
-    }
-
-    builder.store.trainer_networks = {
-        "trainer_0": ["network_agent_0", "network_agent_1", "network_agent_2"]
-    }
-    builder.store.trainer_id = "trainer_0"
-
-    builder.store.parameter_server_client = ParameterServer(
-        store=SimpleNamespace(
-            get_parameters={"trainer_steps": np.array(0, dtype=np.int32)}
-        ),
-        components=[],
-    )
-
-    builder.store.parameter_server_client._update_period = 5
-
-    return builder
-
-
-###########################
-# SEPARATE NETWORK FIXTURES
-###########################
-
-
-@pytest.fixture
-def mock_builder_with_parameter_client_separate_networks() -> Builder:
     """Create a mock builder for testing.
 
     Has a parameter server and is designed for testing separate
@@ -197,6 +141,17 @@ def mock_builder_with_parameter_client_separate_networks() -> Builder:
     }
     builder.store.trainer_id = "trainer_0"
 
+    builder.store.policy_opt_states = {}
+    for net_key in builder.store.networks["networks"].keys():
+        builder.store.policy_opt_states[net_key] = {
+            constants.OPT_STATE_DICT_KEY: EmptyState()
+        }
+    builder.store.critic_opt_states = {}
+    for net_key in builder.store.networks["networks"].keys():
+        builder.store.critic_opt_states[net_key] = {
+            constants.OPT_STATE_DICT_KEY: EmptyState()
+        }
+
     builder.store.parameter_server_client = ParameterServer(
         store=SimpleNamespace(
             get_parameters={"trainer_steps": np.array(0, dtype=np.int32)}
@@ -204,14 +159,7 @@ def mock_builder_with_parameter_client_separate_networks() -> Builder:
         components=[],
     )
 
-    builder.store.parameter_server_client._update_period = 5
-
     return builder
-
-
-###############
-# SHARED TESTS
-###############
 
 
 def test_base_parameter_client() -> None:
@@ -227,11 +175,6 @@ def test_base_parameter_client() -> None:
     assert params == initial_count_parameters
 
 
-######################
-# SINGLE NETWORK TESTS
-######################
-
-
 def test_executor_parameter_client_no_evaluator_with_parameter_client(
     mock_builder_with_parameter_client: Builder,
 ) -> None:
@@ -244,9 +187,18 @@ def test_executor_parameter_client_no_evaluator_with_parameter_client(
     mock_builder = mock_builder_with_parameter_client
     mock_builder.store.is_evaluator = False
     exec_param_client = ExecutorParameterClient(
-        config=ExecutorParameterClientConfig(executor_parameter_update_period=1)
+        config=ExecutorParameterClientConfig(executor_parameter_update_period=500)
     )
     exec_param_client.on_building_executor_parameter_client(builder=mock_builder)
+
+    # Ensure that set_keys and get_keys have no common elements
+    assert (
+        len(
+            set(mock_builder.store.executor_parameter_client._get_keys)
+            & set(mock_builder.store.executor_parameter_client._set_keys)
+        )
+        == 0
+    )
 
     assert all(
         [
@@ -265,13 +217,15 @@ def test_executor_parameter_client_no_evaluator_with_parameter_client(
         "executor_episodes",
         "executor_steps",
     ]
+
     assert (
-        mock_builder.store.executor_parameter_client._parameters == initial_parameters
+        mock_builder.store.executor_parameter_client._parameters
+        == initial_parameters_executor
     )
     assert mock_builder.store.executor_parameter_client._get_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_get_call_counter == 0
-    assert mock_builder.store.executor_parameter_client._update_period == 1
+    assert mock_builder.store.executor_parameter_client._update_period == 500
     assert isinstance(
         mock_builder.store.executor_parameter_client._client, ParameterServer
     )
@@ -291,9 +245,18 @@ def test_executor_parameter_client_evaluator_with_parameter_client(
     mock_builder = mock_builder_with_parameter_client
     mock_builder.store.is_evaluator = True
     exec_param_client = ExecutorParameterClient(
-        config=ExecutorParameterClientConfig(executor_parameter_update_period=200)
+        config=ExecutorParameterClientConfig(executor_parameter_update_period=500)
     )
     exec_param_client.on_building_executor_parameter_client(builder=mock_builder)
+
+    # Ensure that set_keys and get_keys have no common elements
+    assert (
+        len(
+            set(mock_builder.store.executor_parameter_client._get_keys)
+            & set(mock_builder.store.executor_parameter_client._set_keys)
+        )
+        == 0
+    )
 
     assert hasattr(mock_builder.store, "executor_parameter_client")
 
@@ -315,12 +278,13 @@ def test_executor_parameter_client_evaluator_with_parameter_client(
         "evaluator_episodes",
     ]
     assert (
-        mock_builder.store.executor_parameter_client._parameters == initial_parameters
+        mock_builder.store.executor_parameter_client._parameters
+        == initial_parameters_executor
     )
     assert mock_builder.store.executor_parameter_client._get_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_call_counter == 0
     assert mock_builder.store.executor_parameter_client._set_get_call_counter == 0
-    assert mock_builder.store.executor_parameter_client._update_period == 200
+    assert mock_builder.store.executor_parameter_client._update_period == 500
     assert isinstance(
         mock_builder.store.executor_parameter_client._client, ParameterServer
     )
@@ -356,9 +320,19 @@ def test_trainer_parameter_client(
     """
 
     mock_builder = mock_builder_with_parameter_client
-    trainer_param_client = TrainerParameterClient()
+    trainer_param_client = TrainerParameterClient(
+        config=TrainerParameterClientConfig(trainer_parameter_update_period=500)
+    )
     trainer_param_client.on_building_trainer_parameter_client(mock_builder)
 
+    # Ensure that set_keys and get_keys have no common elements
+    assert (
+        len(
+            set(mock_builder.store.trainer_parameter_client._get_keys)
+            & set(mock_builder.store.trainer_parameter_client._set_keys)
+        )
+        == 0
+    )
     assert all(
         [
             key in expected_keys
@@ -373,15 +347,27 @@ def test_trainer_parameter_client(
     )
 
     assert mock_builder.store.trainer_parameter_client._set_keys == [
-        "networks-network_agent_0",
-        "networks-network_agent_1",
-        "networks-network_agent_2",
+        "policy_networks-network_agent_0",
+        "critic_networks-network_agent_0",
+        "policy_opt_state-network_agent_0",
+        "critic_opt_state-network_agent_0",
+        "policy_networks-network_agent_1",
+        "critic_networks-network_agent_1",
+        "policy_opt_state-network_agent_1",
+        "critic_opt_state-network_agent_1",
+        "policy_networks-network_agent_2",
+        "critic_networks-network_agent_2",
+        "policy_opt_state-network_agent_2",
+        "critic_opt_state-network_agent_2",
     ]
-    assert mock_builder.store.trainer_parameter_client._parameters == initial_parameters
+    assert (
+        mock_builder.store.trainer_parameter_client._parameters
+        == initial_parameters_trainer
+    )
     assert mock_builder.store.trainer_parameter_client._get_call_counter == 0
     assert mock_builder.store.trainer_parameter_client._set_call_counter == 0
     assert mock_builder.store.trainer_parameter_client._set_get_call_counter == 0
-    assert mock_builder.store.trainer_parameter_client._update_period == 5
+    assert mock_builder.store.trainer_parameter_client._update_period == 500
     assert isinstance(
         mock_builder.store.trainer_parameter_client._client, ParameterServer
     )
@@ -398,191 +384,6 @@ def test_trainer_parameter_client_with_no_parameter_client(
     mock_builder = mock_builder_with_parameter_client
     mock_builder.store.parameter_server_client = False
     trainer_param_client = TrainerParameterClient()
-
-    trainer_param_client.on_building_trainer_parameter_client(mock_builder)
-
-    assert mock_builder.store.trainer_parameter_client is None
-
-
-########################
-# SEPARATE NETWORK TESTS
-########################
-
-
-def test_executor_parameter_client_no_evaluator_with_parameter_client_separate_networks(
-    mock_builder_with_parameter_client_separate_networks: Builder,
-) -> None:
-    """Test executor parameter client.
-
-    Args:
-        mock_builder_with_parameter_client_separate_networks : mava builder object
-    """
-
-    mock_builder = mock_builder_with_parameter_client_separate_networks
-    mock_builder.store.is_evaluator = False
-    exec_param_client = ExecutorParameterClientSeparateNetworks(
-        config=ExecutorParameterClientConfig(executor_parameter_update_period=200)
-    )
-    exec_param_client.on_building_executor_parameter_client(builder=mock_builder)
-
-    assert all(
-        [
-            key in expected_separate_network_keys
-            for key in mock_builder.store.executor_parameter_client._all_keys
-        ]
-    )
-    assert all(
-        [
-            key in expected_separate_network_keys
-            for key in mock_builder.store.executor_parameter_client._get_keys
-        ]
-    )
-
-    assert mock_builder.store.executor_parameter_client._set_keys == [
-        "executor_episodes",
-        "executor_steps",
-    ]
-    assert (
-        mock_builder.store.executor_parameter_client._parameters
-        == initial_separate_network_parameters
-    )
-    assert mock_builder.store.executor_parameter_client._get_call_counter == 0
-    assert mock_builder.store.executor_parameter_client._set_call_counter == 0
-    assert mock_builder.store.executor_parameter_client._set_get_call_counter == 0
-    assert mock_builder.store.executor_parameter_client._update_period == 200
-    assert isinstance(
-        mock_builder.store.executor_parameter_client._client, ParameterServer
-    )
-
-    assert mock_builder.store.executor_counts == initial_count_parameters
-
-
-def test_executor_parameter_client_evaluator_with_parameter_client_separate_networks(
-    mock_builder_with_parameter_client_separate_networks: Builder,
-) -> None:
-    """Test evaluator parameter client.
-
-    Args:
-        mock_builder_with_parameter_client_separate_networks: mava builder object
-    """
-
-    mock_builder = mock_builder_with_parameter_client_separate_networks
-    mock_builder.store.is_evaluator = True
-    exec_param_client = ExecutorParameterClientSeparateNetworks(
-        config=ExecutorParameterClientConfig(executor_parameter_update_period=200)
-    )
-    exec_param_client.on_building_executor_parameter_client(builder=mock_builder)
-
-    assert hasattr(mock_builder.store, "executor_parameter_client")
-
-    assert all(
-        [
-            key in expected_separate_network_keys
-            for key in mock_builder.store.executor_parameter_client._all_keys
-        ]
-    )
-    assert all(
-        [
-            key in expected_separate_network_keys
-            for key in mock_builder.store.executor_parameter_client._get_keys
-        ]
-    )
-
-    assert mock_builder.store.executor_parameter_client._set_keys == [
-        "evaluator_steps",
-        "evaluator_episodes",
-    ]
-    assert (
-        mock_builder.store.executor_parameter_client._parameters
-        == initial_separate_network_parameters
-    )
-    assert mock_builder.store.executor_parameter_client._get_call_counter == 0
-    assert mock_builder.store.executor_parameter_client._set_call_counter == 0
-    assert mock_builder.store.executor_parameter_client._set_get_call_counter == 0
-    assert mock_builder.store.executor_parameter_client._update_period == 200
-    assert isinstance(
-        mock_builder.store.executor_parameter_client._client, ParameterServer
-    )
-
-    assert mock_builder.store.executor_counts == initial_count_parameters
-
-
-def test_executor_parameter_client_with_no_parameter_client_separate_networks(
-    mock_builder_with_parameter_client_separate_networks: Builder,
-) -> None:
-    """Test executor parameter server client when no parameter \
-        server client is added to the builder"""
-
-    mock_builder = mock_builder_with_parameter_client_separate_networks
-    mock_builder.store.is_evaluator = True
-    mock_builder.store.parameter_server_client = False
-    exec_param_client = ExecutorParameterClientSeparateNetworks(
-        config=ExecutorParameterClientConfig(executor_parameter_update_period=100)
-    )
-
-    exec_param_client.on_building_executor_parameter_client(mock_builder)
-
-    assert mock_builder.store.executor_parameter_client is None
-
-
-def test_trainer_parameter_client_separate_networks(
-    mock_builder_with_parameter_client_separate_networks: Builder,
-) -> None:
-    """Test trainer parameter client.
-
-    Args:
-        mock_builder_with_parameter_client_separate_networks: mava builder object
-    """
-
-    mock_builder = mock_builder_with_parameter_client_separate_networks
-    trainer_param_client = TrainerParameterClientSeparateNetworks()
-    trainer_param_client.on_building_trainer_parameter_client(mock_builder)
-
-    assert all(
-        [
-            key in expected_separate_network_keys
-            for key in mock_builder.store.trainer_parameter_client._all_keys
-        ]
-    )
-    assert all(
-        [
-            key in expected_count_keys
-            for key in mock_builder.store.trainer_parameter_client._get_keys
-        ]
-    )
-
-    assert mock_builder.store.trainer_parameter_client._set_keys == [
-        "policy_networks-network_agent_0",
-        "critic_networks-network_agent_0",
-        "policy_networks-network_agent_1",
-        "critic_networks-network_agent_1",
-        "policy_networks-network_agent_2",
-        "critic_networks-network_agent_2",
-    ]
-    assert (
-        mock_builder.store.trainer_parameter_client._parameters
-        == initial_separate_network_parameters
-    )
-    assert mock_builder.store.trainer_parameter_client._get_call_counter == 0
-    assert mock_builder.store.trainer_parameter_client._set_call_counter == 0
-    assert mock_builder.store.trainer_parameter_client._set_get_call_counter == 0
-    assert mock_builder.store.trainer_parameter_client._update_period == 5
-    assert isinstance(
-        mock_builder.store.trainer_parameter_client._client, ParameterServer
-    )
-
-    assert mock_builder.store.trainer_counts == initial_count_parameters
-
-
-def test_trainer_parameter_client_with_no_parameter_client_separate_networks(
-    mock_builder_with_parameter_client_separate_networks: Builder,
-) -> None:
-    """Test trainer parameter server client when no parameter \
-        server client is added to the builder"""
-
-    mock_builder = mock_builder_with_parameter_client_separate_networks
-    mock_builder.store.parameter_server_client = False
-    trainer_param_client = TrainerParameterClientSeparateNetworks()
 
     trainer_param_client.on_building_trainer_parameter_client(mock_builder)
 
