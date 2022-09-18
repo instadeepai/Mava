@@ -16,7 +16,7 @@
 """Execution components for system builders"""
 
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Type
+from typing import List, Optional, Type
 
 from mava.callbacks import Callback
 from mava.components.jax import Component
