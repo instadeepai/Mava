@@ -3,9 +3,8 @@ import os
 import jax.numpy as jnp
 import tensorflow_probability.substrates.jax.distributions as tfd
 from chex import Array
-from typing import Any, Dict, List, Tuple, Union
-
 from jax.config import config as jax_config
+
 
 def action_mask_categorical_policies(
     distribution: tfd.Categorical, mask: Array
@@ -19,21 +18,13 @@ def action_mask_categorical_policies(
 
     return tfd.Categorical(logits=masked_logits, dtype=distribution.dtype)
 
-def compute_running_mean_var_count(
-    stats: Array,
-    batch: Array
-) -> Array:
 
-    """
-    Updates the running mean, variance and data counts for Normalisation
-    during training
-    TODO consider the case where we can normlaise multidimensional arrays on specified axes
-    For now we will get the mean of the whole array
-    Args:
-        stats (array)
-            mean, var, count
-        batch (array)
-            current batch of data
+def compute_running_mean_var_count(stats: Array, batch: Array) -> Array:
+    """Updates the running mean, variance and data counts during training.
+
+    stats (array) -- mean, var, count.
+    batch (array) -- current batch of data.
+
     Returns:
         stats (array)
     """
@@ -56,46 +47,38 @@ def compute_running_mean_var_count(
 
     return jnp.array([new_mean, new_var, new_count])
 
-def normalize(
-    stats: Array, 
-    batch: Array
-    ):
-    """Normlaise batch of data using the running mean and variance 
-    TODO consider the case where we can normlaise multidimensional arrays on specified axes
-    Args
-        stats (array)
-            mean, var, count
-        batch (array)
-            current batch of data
+
+def normalize(stats: Array, batch: Array) -> Array:
+    """Normlaise batch of data using the running mean and variance.
+
+    stats (array) -- mean, var, count.
+    batch (array) -- current batch of data.
+
     Returns:
         denormalize batch (array)
     """
-    
+
     mean, var, _ = stats
-    normalize_batch = (batch - mean) / (jnp.sqrt(jnp.clip(var, a_min=1e-2))) 
-    
+    normalize_batch = (batch - mean) / (jnp.sqrt(jnp.clip(var, a_min=1e-2)))
+
     return normalize_batch
 
 
-def denormalize(
-    stats: Array, 
-    batch: Array
-    ):
-    """Transform normalized data back into original distribution 
-    Args
-        stats (array)
-            mean, var, count
-        batch (array)
-            current batch of data
+def denormalize(stats: Array, batch: Array) -> Array:
+    """Transform normalized data back into original distribution
+
+    stats (array) -- mean, var, count
+    batch (array) -- current batch of data
+
     Returns:
         denormalize batch (array)
     """
-    
+
     mean, var, _ = stats
     denormalize_batch = batch * jnp.sqrt(var) + mean
-    
+
     return denormalize_batch
-  
+
 
 def set_growing_gpu_memory() -> None:
     """Solve gpu mem issues.
@@ -113,4 +96,3 @@ def set_jax_double_precision() -> None:
     More on this - https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#double-64bit-precision. # noqa: E501
     """
     jax_config.update("jax_enable_x64", True)
-

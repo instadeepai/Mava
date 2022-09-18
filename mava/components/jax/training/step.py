@@ -40,8 +40,8 @@ from mava.components.jax.training.advantage_estimation import GAE, NormalizeGAE
 from mava.components.jax.training.base import Batch, TrainingState, TrainingStateStats
 from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
+from mava.utils.jax_training_utils import compute_running_mean_var_count, normalize
 
-from mava.utils.jax_training_utils import compute_running_mean_var_count, normalize, denormalize
 
 @dataclass
 class TrainerStepConfig:
@@ -518,7 +518,7 @@ class MAPGWithTrustRegionStepNorm(Step):
             """Performs a minibatch SGD step.
 
             Args:
-                states: Training states (network params, optimiser states and running statisitics).
+                states: Training states (network params, optimiser states).
                 sample: Reverb sample.
 
             Returns:
@@ -571,14 +571,21 @@ class MAPGWithTrustRegionStepNorm(Step):
 
             advantages = {}
             target_values = {}
-            stats = states.stats 
+            stats = states.stats
             for key in rewards.keys():
                 bacth_tmp = rewards[key].shape[0]
                 advantages[key], target_values[key] = batch_gae_advantages(
-                    rewards[key], discounts[key], behavior_values[key], jnp.repeat(stats[key][None,:], bacth_tmp, axis=0)
+                    rewards[key],
+                    discounts[key],
+                    behavior_values[key],
+                    jnp.repeat(stats[key][None, :], bacth_tmp, axis=0),
                 )
-                stats[key] = compute_running_mean_var_count(stats[key], target_values[key])
-                target_values[key] = jax.lax.stop_gradient(normalize(stats[key], target_values[key]))
+                stats[key] = compute_running_mean_var_count(
+                    stats[key], target_values[key]
+                )
+                target_values[key] = jax.lax.stop_gradient(
+                    normalize(stats[key], target_values[key])
+                )
 
             # Exclude the last step - it was only used for bootstrapping.
             # The shape is [num_sequences, num_steps, ..]
@@ -670,7 +677,7 @@ class MAPGWithTrustRegionStepNorm(Step):
                 policy_opt_states=new_policy_opt_states,
                 critic_opt_states=new_critic_opt_states,
                 random_key=new_key,
-                stats=stats
+                stats=stats,
             )
             return new_states, metrics
 
@@ -705,7 +712,7 @@ class MAPGWithTrustRegionStepNorm(Step):
                 policy_opt_states=policy_opt_states,
                 critic_opt_states=critic_opt_states,
                 random_key=random_key,
-                stats=stats
+                stats=stats,
             )
 
             new_states, metrics = sgd_step(states, sample)

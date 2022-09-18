@@ -26,8 +26,8 @@ import rlax
 from mava.callbacks import Callback
 from mava.components.jax.training.base import Utility
 from mava.core_jax import SystemTrainer
+from mava.utils.jax_training_utils import denormalize
 
-from mava.utils.jax_training_utils import normalize, denormalize
 
 @dataclass
 class GAEConfig:
@@ -104,11 +104,9 @@ class GAE(Utility):
         """
         return []
 
+
 class NormalizeGAE(GAE):
-    def __init__(
-        self,
-        config: GAEConfig = GAEConfig()
-    ):
+    def __init__(self, config: GAEConfig = GAEConfig()):
         """Component defines advantage estimation function with normalised state values.
 
         Args:
@@ -127,8 +125,10 @@ class NormalizeGAE(GAE):
         """
 
         def gae_advantages(
-            rewards: jnp.ndarray, discounts: jnp.ndarray, values: jnp.ndarray,
-            stats: Tuple[float, float, float]
+            rewards: jnp.ndarray,
+            discounts: jnp.ndarray,
+            values: jnp.ndarray,
+            stats: Tuple[float, float, float],
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
             """Use truncated GAE to compute advantages.
 
@@ -146,7 +146,10 @@ class NormalizeGAE(GAE):
             rewards = jnp.clip(rewards, -max_abs_reward, max_abs_reward)
 
             advantages = rlax.truncated_generalized_advantage_estimation(
-                rewards[:-1], discounts[:-1], self.config.gae_lambda, denormalize(stats, values)
+                rewards[:-1],
+                discounts[:-1],
+                self.config.gae_lambda,
+                denormalize(stats, values),
             )
             advantages = jax.lax.stop_gradient(advantages)
 
