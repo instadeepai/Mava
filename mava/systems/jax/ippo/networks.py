@@ -81,8 +81,8 @@ class PPONetworks:
             policy_params: Dict[str, jnp.ndarray],
             observations: networks_lib.Observation,
             key: networks_lib.PRNGKey,
-            policy_state: Tuple[jnp.ndarray] = None,
             mask: chex.Array = None,
+            policy_state: Tuple[jnp.ndarray] = None,
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
             """Get actions and relevant log probabilities from the \
                 policy network given some observations.
@@ -102,7 +102,7 @@ class PPONetworks:
             """
             # The parameters of the network might change. So it has to
             # be fed into the jitted function.
-            if isinstance(self.policy_network, hk.Sequential):
+            if not self.policy_init_state:
                 distribution = self.policy_network.apply(policy_params, observations)
             else:
                 distribution, policy_state = self.policy_network.apply(policy_params, [observations, policy_state])
@@ -121,15 +121,24 @@ class PPONetworks:
         self,
         observations: networks_lib.Observation,
         params: Any,
-        policy_state: Any,
         key: networks_lib.PRNGKey,
         mask: chex.Array = None,
+        policy_state: Any = None,
     ) -> Tuple[jnp.ndarray, Dict]:
         """Get actions from policy network given observations."""
+        
         actions, log_prob, policy_state = self.forward_fn(
-            params["policy_network"], observations, key, policy_state, mask
+            policy_params=params["policy_network"],
+            observations=observations,
+            key=key,
+            mask=mask,
+            policy_state=policy_state, 
         )
-        return actions, {"log_prob": log_prob}, policy_state
+
+        if self.policy_init_state:
+            return actions, {"log_prob": log_prob}, policy_state
+        else:
+            return actions, {"log_prob": log_prob}
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
         """Get state value from critic network given observations."""
@@ -208,9 +217,7 @@ def make_discrete_networks(
 
 
         # Add optional recurrent layers
-        net_type = hk.Sequential
         if len(policy_recurrent_layer_sizes) > 0:
-            net_type = hk.DeepRNN
             for size in policy_recurrent_layer_sizes:
                 policy_network.append(
                     hk.GRU(size)
@@ -223,9 +230,9 @@ def make_discrete_networks(
                 ))
         
         if len(policy_recurrent_layer_sizes) > 0:
-            return net_type(policy_network)(inputs[0], inputs[1])
+            return hk.DeepRNN(policy_network)(inputs[0], inputs[1])
         else:
-            return net_type(policy_network)(inputs[0])
+            return hk.Sequential(policy_network)(inputs)
 
     @hk.without_apply_rng
     @hk.transform
@@ -257,6 +264,7 @@ def make_discrete_networks(
         
         policy_params = policy_fn.init(network_key, [dummy_obs, policy_state])  # type: ignore
     else:
+        policy_state = None
         policy_params = policy_fn.init(network_key, dummy_obs)  # type: ignore
 
     network_key, key = jax.random.split(key)

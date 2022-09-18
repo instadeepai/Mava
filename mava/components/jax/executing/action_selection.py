@@ -139,12 +139,11 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             # We use the subkey immediately and keep the new key for future splits.
             new_key, sub_key = jax.random.split(key)
             action_info, policy_info = network.get_action(
-                observation_data,
-                current_params,
-                sub_key,
-                utils.add_batch_dim(observation.legal_actions),
+                observations=observation_data,
+                params=current_params,
+                key=sub_key,
+                mask=utils.add_batch_dim(observation.legal_actions),
             )
-
             return action_info, policy_info, new_key
 
         def select_actions(
@@ -171,7 +170,10 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             for agent, observation in observations.items():
                 network = networks["networks"][agent_net_keys[agent]]
                 actions_info[agent], policies_info[agent], key = select_action(
-                    observation, current_params[agent_net_keys[agent]], network, key
+                    observation=observation,
+                    current_params=current_params[agent_net_keys[agent]],
+                    network=network,
+                    key=key,
                 )
             return actions_info, policies_info, key
 
@@ -250,13 +252,12 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             # We use the subkey immediately and keep the new key for future splits.
             new_key, sub_key = jax.random.split(key)
             action_info, policy_info, policy_state = network.get_action(
-                observation_data,
-                current_params,
-                policy_state,
-                sub_key,
-                utils.add_batch_dim(observation.legal_actions),
+                observations=observation_data,
+                params=current_params,
+                policy_state=policy_state,
+                key=sub_key,
+                mask=utils.add_batch_dim(observation.legal_actions),
             )
-
             return action_info, policy_info, policy_state, new_key
 
         def select_actions(
@@ -284,7 +285,11 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             for agent, observation in observations.items():
                 network = networks["networks"][agent_net_keys[agent]]
                 actions_info[agent], policies_info[agent], new_policy_states[agent], key = select_action(
-                    observation, current_params[agent_net_keys[agent]], policy_states[agent], network, key
+                    observation=observation,
+                    current_params=current_params[agent_net_keys[agent]],
+                    policy_state=policy_states[agent],
+                    network=network,
+                    key=key,
                 )
             return actions_info, policies_info, new_policy_states, key
 

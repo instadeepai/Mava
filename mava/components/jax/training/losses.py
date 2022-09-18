@@ -128,7 +128,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
                     """Inner policy loss function: see outer function for parameters."""
 
-                    # TODO (dries): Remove this if and replace it with something more general
+                    # TODO (dries): Remove this if and replace it with something more general.
                     if policy_states:
                         # Recurrent networks
                         batch_size = trainer.store.sample_batch_size

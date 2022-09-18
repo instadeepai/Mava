@@ -281,16 +281,25 @@ class MAPGWithTrustRegionStep(Step):
 
             # Exclude the last step - it was only used for bootstrapping.
             # The shape is [num_sequences, num_steps, ..]
+            
             (
                 observations,
                 actions,
                 behavior_log_probs,
                 behavior_values,
-                policy_states,
             ) = jax.tree_util.tree_map(
                 lambda x: x[:, :-1],
-                (observations, actions, behavior_log_probs, behavior_values, extra["policy_states"]),
+                (observations, actions, behavior_log_probs, behavior_values),
             )
+            
+            if "policy_states" in extra:
+                policy_states = jax.tree_util.tree_map(
+                    lambda x: x[:, :-1],
+                    extra["policy_states"],
+                )
+            else:
+                policy_states = {agent: None for agent in trainer.store.agents}
+
 
             trajectories = Batch(
                 observations=observations,
