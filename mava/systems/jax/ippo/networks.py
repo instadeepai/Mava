@@ -105,7 +105,7 @@ class PPONetworks:
             if isinstance(self.policy_network, hk.Sequential):
                 distribution = self.policy_network.apply(policy_params, observations)
             else:
-                distribution = self.policy_network.apply([policy_params, observations], policy_state)
+                distribution, policy_state = self.policy_network.apply([policy_params, observations], policy_state)
 
             if mask is not None:
                 distribution = action_mask_categorical_policies(distribution, mask)
@@ -113,7 +113,7 @@ class PPONetworks:
             actions = jnp.squeeze(distribution.sample(seed=key))
             log_prob = jnp.squeeze(distribution.log_prob(actions))
 
-            return actions, log_prob
+            return actions, log_prob, policy_state
 
         self.forward_fn = forward_fn
 
@@ -121,14 +121,15 @@ class PPONetworks:
         self,
         observations: networks_lib.Observation,
         params: Any,
+        policy_state: Any,
         key: networks_lib.PRNGKey,
         mask: chex.Array = None,
     ) -> Tuple[jnp.ndarray, Dict]:
         """Get actions from policy network given observations."""
-        actions, log_prob = self.forward_fn(
-            params["policy_network"], observations, key, mask
+        actions, log_prob, policy_state = self.forward_fn(
+            params["policy_network"], observations, key, policy_state, mask
         )
-        return actions, {"log_prob": log_prob}
+        return actions, {"log_prob": log_prob}, policy_state
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
         """Get state value from critic network given observations."""

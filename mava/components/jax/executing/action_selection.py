@@ -210,9 +210,9 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             executor.store.actions_info,
             executor.store.policies_info,
             executor.store.policy_states,
-            executor.store.key,
+            executor.store.base_key,
         ) = executor.store.select_actions_fn(
-            executor.store.observations, current_agent_params, executor.store.policy_states, executor.store.key
+            executor.store.observations, current_agent_params, executor.store.policy_states, executor.store.base_key
         )
 
     def on_execution_init_end(self, executor: SystemExecutor) -> None:

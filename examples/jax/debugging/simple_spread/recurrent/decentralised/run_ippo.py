@@ -112,9 +112,6 @@ def main(_: Any) -> None:
         multi_process=True,
     )
 
-    print("System built :)")
-    exit()
-
     # Launch the system.
     system.launch()
 

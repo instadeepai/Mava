@@ -183,8 +183,8 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
 
         # Initialise the recurrent states of the agents 
         executor.store.policy_states = {}
-        for agent in self.store.agent_net_keys.keys():
-            network = self.store.agent_net_keys(agent)
+        for agent in executor.store.agent_net_keys.keys():
+            network = executor.store.agent_net_keys[agent]
             executor.store.policy_states[agent] = executor.store.networks["networks"][network].get_init_state()
 
 
