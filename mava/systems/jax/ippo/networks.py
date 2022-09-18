@@ -105,7 +105,7 @@ class PPONetworks:
             if isinstance(self.policy_network, hk.Sequential):
                 distribution = self.policy_network.apply(policy_params, observations)
             else:
-                distribution, policy_state = self.policy_network.apply([policy_params, observations], policy_state)
+                distribution, policy_state = self.policy_network.apply(policy_params, [observations, policy_state])
 
             if mask is not None:
                 distribution = action_mask_categorical_policies(distribution, mask)

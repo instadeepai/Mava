@@ -178,8 +178,6 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
         Returns:
             None.
         """
-        if not executor.store.adder:
-            return
 
         # Initialise the recurrent states of the agents 
         executor.store.policy_states = {}
@@ -187,6 +185,9 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
             network = executor.store.agent_net_keys[agent]
             executor.store.policy_states[agent] = executor.store.networks["networks"][network].get_init_state()
 
+        # Return if the executor has no adder.
+        if not executor.store.adder:
+            return
 
         # Select new networks from the sampler at the start of each episode.
         agents = sort_str_num(list(executor.store.agent_net_keys.keys()))
