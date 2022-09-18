@@ -45,7 +45,7 @@ class Executor(acme.Actor):
       # Update the actor policy/parameters.
       system.update()
     """
-    
+
     @abc.abstractmethod
     def select_actions(
         self, observations: Dict[str, types.NestedArray]

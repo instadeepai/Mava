@@ -89,7 +89,7 @@ class System(BaseSystem):
 
         if not isinstance(components, list):
             components = [components]
-        
+
         for component in components:
             name = component.name()
 

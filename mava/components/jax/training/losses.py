@@ -17,8 +17,8 @@
 import abc
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Type
-import haiku as hk  # type: ignore
 
+import haiku as hk  # type: ignore
 import jax
 import jax.numpy as jnp
 import rlax
@@ -132,32 +132,39 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                     if policy_states:
                         # Recurrent networks
                         batch_size = trainer.store.sample_batch_size
-                        seq_len = trainer.store.sequence_length-1
+                        seq_len = trainer.store.sequence_length - 1
 
                         observations = observations.reshape(batch_size, seq_len, -1)
                         # Note: Assuming discrete actions.
                         actions = actions.reshape(batch_size, seq_len)
 
-                        policy_states = policy_states[0].reshape(batch_size, seq_len, -1)
+                        policy_states = policy_states[0].reshape(
+                            batch_size, seq_len, -1
+                        )
 
                         # TODO (dries): Get a better method than a manual unroll using a for loop.
                         state = policy_states[:, 0]
                         log_probs = []
                         entropy = []
                         for t in range(seq_len):
-                            distribution_params, state = network.policy_network.apply(policy_params, (observations[:, t], state))
-                            log_probs.append(network.log_prob(distribution_params, actions[:, t]))
+                            distribution_params, state = network.policy_network.apply(
+                                policy_params, (observations[:, t], state)
+                            )
+                            log_probs.append(
+                                network.log_prob(distribution_params, actions[:, t])
+                            )
                             entropy.append(network.entropy(distribution_params))
-                        
+
                         log_probs = jnp.concatenate(log_probs)
                         entropy = jnp.concatenate(entropy)
                     else:
                         distribution_params = network.policy_network.apply(
-                        policy_params, observations)
+                            policy_params, observations
+                        )
 
                         log_probs = network.log_prob(distribution_params, actions)
                         entropy = network.entropy(distribution_params)
-                    
+
                     # Compute importance sampling weights:
                     # current policy / behavior policy.
                     rhos = jnp.exp(log_probs - behaviour_log_probs)

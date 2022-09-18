@@ -179,6 +179,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
 
         executor.store.select_actions_fn = jax.jit(select_actions)
 
+
 class RecurrentExecutorSelectAction(ExecutorSelectAction):
     def __init__(
         self,
@@ -214,7 +215,10 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             executor.store.policy_states,
             executor.store.base_key,
         ) = executor.store.select_actions_fn(
-            executor.store.observations, current_agent_params, executor.store.policy_states, executor.store.base_key
+            executor.store.observations,
+            current_agent_params,
+            executor.store.policy_states,
+            executor.store.base_key,
         )
 
     def on_execution_init_end(self, executor: SystemExecutor) -> None:
@@ -284,7 +288,12 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             # long, we should vectorize this.
             for agent, observation in observations.items():
                 network = networks["networks"][agent_net_keys[agent]]
-                actions_info[agent], policies_info[agent], new_policy_states[agent], key = select_action(
+                (
+                    actions_info[agent],
+                    policies_info[agent],
+                    new_policy_states[agent],
+                    key,
+                ) = select_action(
                     observation=observation,
                     current_params=current_params[agent_net_keys[agent]],
                     policy_state=policy_states[agent],

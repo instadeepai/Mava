@@ -105,7 +105,9 @@ class PPONetworks:
             if not self.policy_init_state:
                 distribution = self.policy_network.apply(policy_params, observations)
             else:
-                distribution, policy_state = self.policy_network.apply(policy_params, [observations, policy_state])
+                distribution, policy_state = self.policy_network.apply(
+                    policy_params, [observations, policy_state]
+                )
 
             if mask is not None:
                 distribution = action_mask_categorical_policies(distribution, mask)
@@ -126,13 +128,13 @@ class PPONetworks:
         policy_state: Any = None,
     ) -> Tuple[jnp.ndarray, Dict]:
         """Get actions from policy network given observations."""
-        
+
         actions, log_prob, policy_state = self.forward_fn(
             policy_params=params["policy_network"],
             observations=observations,
             key=key,
             mask=mask,
-            policy_state=policy_state, 
+            policy_state=policy_state,
         )
 
         if self.policy_init_state:
@@ -144,7 +146,7 @@ class PPONetworks:
         """Get state value from critic network given observations."""
         value = self.critic_network.apply(self.critic_params, observations)
         return value
-    
+
     def get_init_state(self):
         return self.policy_init_state
 
@@ -160,6 +162,7 @@ class PPONetworks:
             "policy_network": self.policy_params,
             "critic_network": self.critic_params,
         }
+
 
 # This class is made to replicate the behaviour of the categorical value head
 # which squeezes the value inside the __call__ method before returning it.
@@ -180,6 +183,7 @@ class ValueHead(hk.Module):
         """Return output given network inputs."""
         value = jnp.squeeze(self._value_layer(inputs), axis=-1)
         return value
+
 
 def make_discrete_networks(
     environment_spec: specs.EnvironmentSpec,
@@ -211,24 +215,22 @@ def make_discrete_networks(
     def policy_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
         # Add the observation network and an MLP network.
         policy_network = [
-                        observation_network,
-                        hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu)
-                        ]
-
+            observation_network,
+            hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
+        ]
 
         # Add optional recurrent layers
         if len(policy_recurrent_layer_sizes) > 0:
             for size in policy_recurrent_layer_sizes:
-                policy_network.append(
-                    hk.GRU(size)
-                    )
-
+                policy_network.append(hk.GRU(size))
 
         # Add a categorical value head.
-        policy_network.append(networks_lib.CategoricalHead(
-                    num_values=num_actions, dtype=environment_spec.actions.dtype
-                ))
-        
+        policy_network.append(
+            networks_lib.CategoricalHead(
+                num_values=num_actions, dtype=environment_spec.actions.dtype
+            )
+        )
+
         if len(policy_recurrent_layer_sizes) > 0:
             return hk.DeepRNN(policy_network)(inputs[0], inputs[1])
         else:
@@ -261,7 +263,7 @@ def make_discrete_networks(
 
     if len(policy_recurrent_layer_sizes) > 0:
         policy_state = initial_state_fn.apply(None)
-        
+
         policy_params = policy_fn.init(network_key, [dummy_obs, policy_state])  # type: ignore
     else:
         policy_state = None
@@ -303,7 +305,7 @@ def make_networks(
         critic_layer_sizes: size of each layer of the critic network
         policy_recurrent_layer_sizes: Optionally add recurrent layers to the policy
         observation_network: Network used for feature extraction layers
-        
+
 
     Returns:
         make_discrete_networks: function to create a discrete network
@@ -358,7 +360,7 @@ def make_default_networks(
         observation_network: network for processing environment observations
                              defaults to flattening observations but could be
                              a CNN or similar observation processing network
-        
+
 
     Returns:
         networks: networks created to given spec

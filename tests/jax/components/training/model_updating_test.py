@@ -244,7 +244,8 @@ def fake_batch() -> Batch:
         target_values=jnp.array([3.1, 3.5, 3.7]),
         behavior_values=jnp.array([4.1, 4.5, 4.7]),
         behavior_log_probs=jnp.array([5.1, 5.5, 5.7]),
-    policy_states=None)
+        policy_states=None,
+    )
     return batch
 
 

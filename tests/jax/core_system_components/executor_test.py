@@ -103,6 +103,7 @@ def test_observe_store(
     assert test_executor.store.next_timestep == dummy_time_step
     assert test_executor.store.next_extras == dummy_extras
 
+
 def test_select_actions_store(
     test_executor: Executor,
 ) -> None:
@@ -177,6 +178,7 @@ def test_observe_hook_order(
         "on_execution_observe",
         "on_execution_observe_end",
     ]
+
 
 def test_select_actions_hook_order(
     test_executor: TestExecutor,

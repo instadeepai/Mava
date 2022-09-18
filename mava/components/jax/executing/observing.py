@@ -157,7 +157,6 @@ class FeedforwardExecutorObserve(ExecutorObserve):
             executor.store.executor_parameter_client.get_async()
 
 
-
 class RecurrentExecutorObserve(FeedforwardExecutorObserve):
     def __init__(self, config: SimpleNamespace = SimpleNamespace()):
         """Component handles observations for a feedforward executor.
@@ -179,11 +178,13 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
             None.
         """
 
-        # Initialise the recurrent states of the agents 
+        # Initialise the recurrent states of the agents
         executor.store.policy_states = {}
         for agent in executor.store.agent_net_keys.keys():
             network = executor.store.agent_net_keys[agent]
-            executor.store.policy_states[agent] = executor.store.networks["networks"][network].get_init_state()
+            executor.store.policy_states[agent] = executor.store.networks["networks"][
+                network
+            ].get_init_state()
 
         # Return if the executor has no adder.
         if not executor.store.adder:
@@ -204,9 +205,7 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
             "network_int_keys"
         ] = executor.store.network_int_keys_extras
 
-        executor.store.extras[
-            "policy_states"
-        ] = executor.store.policy_states
+        executor.store.extras["policy_states"] = executor.store.policy_states
 
         # executor.store.timestep set by Executor
         executor.store.adder.add_first(executor.store.timestep, executor.store.extras)
@@ -240,9 +239,7 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
         ] = executor.store.network_int_keys_extras
 
         # executor.store.extras set by Executor
-        executor.store.next_extras[
-            "policy_states"
-        ] = executor.store.policy_states
+        executor.store.next_extras["policy_states"] = executor.store.policy_states
 
         executor.store.adder.add(
             adder_actions, executor.store.next_timestep, executor.store.next_extras
