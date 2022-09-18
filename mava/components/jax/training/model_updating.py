@@ -67,6 +67,7 @@ class MinibatchUpdate(Utility):
 class MAPGMinibatchUpdateConfig:
     normalize_advantage: bool = True
 
+
 class MAPGMinibatchUpdate(MinibatchUpdate):
     def __init__(
         self,
@@ -93,6 +94,7 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
         """
 
         # Initilaise running statisitics here
+
         trainer.store.stats = {}
         for net_key in trainer.store.trainer_agent_net_keys.keys():
             trainer.store.stats[net_key] = jnp.array([0, 0, 1e-4])

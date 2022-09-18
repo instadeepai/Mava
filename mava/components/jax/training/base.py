@@ -50,7 +50,7 @@ class TrainingState(NamedTuple):
 
 
 class TrainingStateStats(NamedTuple):
-    """Extends the training state for separate networks with a new field for the running statistics (mean, var, count)"""
+    """Training state for separate networks with a field for running statistics"""
 
     policy_params: Any
     critic_params: Any
@@ -58,6 +58,7 @@ class TrainingStateStats(NamedTuple):
     critic_opt_states: Dict[str, optax.OptState]
     random_key: Any
     stats: Any
+
 
 class Utility(Component):
     @abc.abstractmethod

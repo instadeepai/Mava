@@ -21,13 +21,10 @@ from typing import Any
 import optax
 from absl import app, flags
 
+from mava.components.jax.training import MAPGWithTrustRegionStepNorm, NormalizeGAE
 from mava.systems.jax import ippo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
-from mava.components.jax.training import (
-    NormalizeGAE,
-    MAPGWithTrustRegionStepNorm
-)
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -51,6 +48,7 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 def main(_: Any) -> None:
     """Run main script
+
     Args:
         _ : _
     """
@@ -92,7 +90,6 @@ def main(_: Any) -> None:
     critic_optimiser = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
-
 
     # Create the system.
     system = ippo.IPPOSystem()
