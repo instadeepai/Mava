@@ -110,11 +110,6 @@ class DefaultTrainerStep(TrainerStep):
         # Do a batch of SGD.
         sample = next(trainer.store.dataset_iterator)
 
-        # print("Sampled exprience: ", sample.data)
-        import tensorflow as tf
-        tf.print("Sampled exprience: ", sample.data.extras["policy_states"])
-        exit()
-
         results = trainer.store.step_fn(sample)
 
         # Update our counts and record it.
@@ -291,13 +286,15 @@ class MAPGWithTrustRegionStep(Step):
                 actions,
                 behavior_log_probs,
                 behavior_values,
+                policy_states,
             ) = jax.tree_util.tree_map(
                 lambda x: x[:, :-1],
-                (observations, actions, behavior_log_probs, behavior_values),
+                (observations, actions, behavior_log_probs, behavior_values, extra["policy_states"]),
             )
 
             trajectories = Batch(
                 observations=observations,
+                policy_states=policy_states,
                 actions=actions,
                 advantages=advantages,
                 behavior_log_probs=behavior_log_probs,

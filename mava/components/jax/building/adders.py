@@ -238,6 +238,17 @@ class ParallelSequenceAdder(Adder):
         """
         self.config = config
 
+    def on_building_init_start(self, builder: SystemBuilder) -> None:
+        """Add the sequence length variable to the builder store.
+
+        Args:
+            builder: SystemBuilder.
+
+        Returns:
+            None.
+        """
+        builder.store.sequence_length = self.config.sequence_length
+
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """Create a ParallelSequenceAdder.
 
@@ -247,7 +258,6 @@ class ParallelSequenceAdder(Adder):
         Returns:
             None.
         """
-
         adder = reverb_adders.ParallelSequenceAdder(
             priority_fns=builder.store.priority_fns,
             client=builder.store.data_server_client,  # Created by builder

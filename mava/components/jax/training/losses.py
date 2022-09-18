@@ -17,6 +17,7 @@
 import abc
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Type
+import haiku as hk  # type: ignore
 
 import jax
 import jax.numpy as jnp
@@ -89,6 +90,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
 
         def policy_loss_grad_fn(
             policy_params: Any,
+            policy_states: Any,
             observations: Any,
             actions: Dict[str, jnp.ndarray],
             behaviour_log_probs: Dict[str, jnp.ndarray],
@@ -118,17 +120,44 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                 # the case of non-shared weights.
                 def policy_loss_fn(
                     policy_params: Any,
+                    policy_states: Any,
                     observations: Any,
                     actions: jnp.ndarray,
                     behaviour_log_probs: jnp.ndarray,
                     advantages: jnp.ndarray,
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
                     """Inner policy loss function: see outer function for parameters."""
-                    distribution_params = network.policy_network.apply(
-                        policy_params, observations
-                    )
-                    log_probs = network.log_prob(distribution_params, actions)
-                    entropy = network.entropy(distribution_params)
+
+                    # TODO (dries): Remove this if and replace it with something more general
+                    if policy_states:
+                        # Recurrent networks
+                        batch_size = trainer.store.sample_batch_size
+                        seq_len = trainer.store.sequence_length-1
+
+                        observations = observations.reshape(batch_size, seq_len, -1)
+                        # Note: Assuming discrete actions.
+                        actions = actions.reshape(batch_size, seq_len)
+
+                        policy_states = policy_states[0].reshape(batch_size, seq_len, -1)
+
+                        # TODO (dries): Get a better method than a manual unroll using a for loop.
+                        state = policy_states[:, 0]
+                        log_probs = []
+                        entropy = []
+                        for t in range(seq_len):
+                            distribution_params, state = network.policy_network.apply(policy_params, (observations[:, t], state))
+                            log_probs.append(network.log_prob(distribution_params, actions[:, t]))
+                            entropy.append(network.entropy(distribution_params))
+                        
+                        log_probs = jnp.concatenate(log_probs)
+                        entropy = jnp.concatenate(entropy)
+                    else:
+                        distribution_params = network.policy_network.apply(
+                        policy_params, observations)
+
+                        log_probs = network.log_prob(distribution_params, actions)
+                        entropy = network.entropy(distribution_params)
+                    
                     # Compute importance sampling weights:
                     # current policy / behavior policy.
                     rhos = jnp.exp(log_probs - behaviour_log_probs)
@@ -159,6 +188,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                     policy_loss_fn, has_aux=True
                 )(
                     policy_params[agent_net_key],
+                    policy_states[agent_key],
                     observations[agent_key].observation,
                     actions[agent_key],
                     behaviour_log_probs[agent_key],

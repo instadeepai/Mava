@@ -114,6 +114,7 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
             # Calculate the gradients and agent metrics.
             policy_gradients, policy_agent_metrics = trainer.store.policy_grad_fn(
                 policy_params,
+                minibatch.policy_states,
                 minibatch.observations,
                 minibatch.actions,
                 minibatch.behavior_log_probs,
