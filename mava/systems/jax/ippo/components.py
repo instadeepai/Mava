@@ -81,3 +81,15 @@ class ExtrasLogProbSpec(ExtrasSpec):
         agents = builder.store.ma_environment_spec.get_agent_ids()
         net_spec = {"network_keys": {agent: int_spec for agent in agents}}
         builder.store.extras_spec.update(net_spec)
+
+        # Get the policy state specs
+        networks = builder.store.network_factory()
+
+        net_states = {}
+        for agent in builder.store.agent_net_keys.keys():
+            network = builder.store.agent_net_keys[agent]            
+            net_states[agent] = networks["networks"][network].get_init_state()
+
+        net_spec = {"policy_states": net_states}
+        builder.store.extras_spec.update(net_spec)
+

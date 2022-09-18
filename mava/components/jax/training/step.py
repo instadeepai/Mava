@@ -110,9 +110,9 @@ class DefaultTrainerStep(TrainerStep):
         # Do a batch of SGD.
         sample = next(trainer.store.dataset_iterator)
 
-        print("Sampled exprience: ", sample)
+        # print("Sampled exprience: ", sample.data)
         import tensorflow as tf
-        tf.print("Sampled exprience: ", sample)
+        tf.print("Sampled exprience: ", sample.data.extras["policy_states"])
         exit()
 
         results = trainer.store.step_fn(sample)

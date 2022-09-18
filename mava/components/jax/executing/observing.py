@@ -240,7 +240,7 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
         ] = executor.store.network_int_keys_extras
 
         # executor.store.extras set by Executor
-        executor.store.extras[
+        executor.store.next_extras[
             "policy_states"
         ] = executor.store.policy_states
 
