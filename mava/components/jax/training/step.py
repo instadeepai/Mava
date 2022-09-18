@@ -664,7 +664,7 @@ class MAPGWithTrustRegionStepNorm(Step):
                 lambda x: jnp.std(x, axis=(0, 1)), rewards
             )
 
-            new_states = TrainingState(
+            new_states = TrainingStateStats(
                 policy_params=new_policy_params,
                 critic_params=new_critic_params,
                 policy_opt_states=new_policy_opt_states,
