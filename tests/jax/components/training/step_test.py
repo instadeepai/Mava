@@ -158,6 +158,7 @@ class MockTrainer(Trainer):
             trainer_counts={"next_sample": 2},
             trainer_logger=MockTrainerLogger(),
             trainer_agent_net_keys=trainer_agent_net_keys,
+            agents=["agent_0", "agent_1", "agent_2"],
             networks=networks,
             gae_fn=gae_advantages,
             policy_opt_states=copy.copy(opt_states),

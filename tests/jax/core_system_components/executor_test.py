@@ -103,24 +103,6 @@ def test_observe_store(
     assert test_executor.store.next_timestep == dummy_time_step
     assert test_executor.store.next_extras == dummy_extras
 
-
-def test_select_action_store(
-    test_executor: Executor,
-) -> None:
-    """Test that store is handled properly in select_action"""
-    agent = "agent_0"
-    observation = np.array([1, 2, 3, 4])
-    state = np.array([5, 6, 7, 8])
-
-    # Manually load info into store
-    test_executor.store.action_info = "action_info"
-    test_executor.store.policy_info = "policy_info"
-
-    assert test_executor.store.agent == agent
-    assert (test_executor.store.observation == observation).all()
-    assert (test_executor.store.state == state).all()
-
-
 def test_select_actions_store(
     test_executor: Executor,
 ) -> None:
@@ -195,23 +177,6 @@ def test_observe_hook_order(
         "on_execution_observe",
         "on_execution_observe_end",
     ]
-
-
-def test_select_action_hook_order(
-    test_executor: TestExecutor,
-) -> None:
-    """Test if select_action hooks are called in the correct order"""
-    test_executor.reset_hook_list()
-    test_executor.store.action_info = None
-    test_executor.store.policy_info = None
-   
-    assert test_executor.hook_list == [
-        "on_execution_select_action_start",
-        "on_execution_select_action_preprocess",
-        "on_execution_select_action_sample",
-        "on_execution_select_action_end",
-    ]
-
 
 def test_select_actions_hook_order(
     test_executor: TestExecutor,

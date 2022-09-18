@@ -185,13 +185,14 @@ def test_mapg_loss(
         agent: jnp.array([3.0, 3.0, 3.0, 3.0])
         for agent in {"agent_0", "agent_1", "agent_2"}
     }
-
+    policy_states = {"agent_0": None, "agent_1": None, "agent_2": None}
     _, policy_loss_info = policy_grad_fn(
         policy_params=mock_trainer.store.parameters,
         observations=mock_trainer.store.observations,
         actions=actions,
         behaviour_log_probs=behaviour_log_probs,
         advantages=advantages,
+        policy_states=policy_states,
     )
 
     _, low_policy_loss_info = policy_grad_fn(
@@ -200,6 +201,7 @@ def test_mapg_loss(
         actions=actions,
         behaviour_log_probs=behaviour_log_probs,
         advantages=low_advantages,
+        policy_states=policy_states,
     )
 
     _, critic_loss_info = critic_grad_fn(
