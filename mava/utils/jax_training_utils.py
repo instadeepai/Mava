@@ -54,8 +54,6 @@ def compute_running_mean_var_count(
     new_var = M2 / tot_count
     new_count = tot_count
 
-    # convert to float before returning
-    # using emptying style () indexing because the ouptut can be a 0-dimensional array
     return jnp.array([new_mean, new_var, new_count])
 
 def normalize(
