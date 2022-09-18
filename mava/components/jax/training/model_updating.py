@@ -17,11 +17,7 @@
 
 import abc
 from dataclasses import dataclass
-<<<<<<< HEAD
-from typing import Any, Dict, List, Optional, Tuple, Type
-=======
 from typing import Any, Dict, List, Tuple, Type
->>>>>>> origin/develop
 
 import jax
 import jax.numpy as jnp
