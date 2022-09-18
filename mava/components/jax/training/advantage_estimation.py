@@ -128,7 +128,7 @@ class NormalizeGAE(GAE):
             rewards: jnp.ndarray,
             discounts: jnp.ndarray,
             values: jnp.ndarray,
-            stats: Tuple[float, float, float],
+            stats: jnp.ndarray,
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
             """Use truncated GAE to compute advantages.
 
