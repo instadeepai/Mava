@@ -29,6 +29,7 @@ from mava.components.jax.training.step import (
     MAPGWithTrustRegionStep,
 )
 from mava.systems.jax.trainer import Trainer
+from mava.utils.jax_training_utils import dummy_running_mean_var_count
 from tests.jax.components.training.step_test_data import dummy_sample
 
 
@@ -55,7 +56,10 @@ def critic_apply(params: Any, observations: Any) -> Tuple:
 
 
 def gae_advantages(
-    rewards: jnp.ndarray, discounts: jnp.ndarray, values: jnp.ndarray
+    rewards: jnp.ndarray,
+    discounts: jnp.ndarray,
+    values: jnp.ndarray,
+    stats: jnp.ndarray = jnp.array([0, 1, 1e-4]),
 ) -> Tuple:
     """Uses GAE to compute advantages."""
     # Apply reward clipping.
@@ -150,6 +154,13 @@ class MockTrainer(Trainer):
             "network_agent_1": {constants.OPT_STATE_DICT_KEY: 1},
             "network_agent_2": {constants.OPT_STATE_DICT_KEY: 2},
         }
+
+        running_stats = {
+            "agent_0": jnp.array([0, 1, 1e-4]),
+            "agent_1": jnp.array([0, 1, 1e-4]),
+            "agent_2": jnp.array([0, 1, 1e-4]),
+        }
+
         store = SimpleNamespace(
             dataset_iterator=iter([1, 2, 3]),
             step_fn=step_fn,
@@ -164,6 +175,8 @@ class MockTrainer(Trainer):
             critic_opt_states=copy.copy(opt_states),
             base_key=jax.random.PRNGKey(5),
             epoch_update_fn=epoch_update,
+            stats=running_stats,
+            running_stats_fn=dummy_running_mean_var_count,
             global_config=SimpleNamespace(
                 num_minibatches=1, num_epochs=2, sample_batch_size=2, sequence_length=3
             ),
