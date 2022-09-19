@@ -83,7 +83,7 @@ class PPONetworks:
             key: networks_lib.PRNGKey,
             mask: chex.Array = None,
             policy_state: Tuple[jnp.ndarray] = None,
-        ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+        ) -> Tuple[Any, Any, jnp.ndarray]:
             """Get actions and relevant log probabilities from the \
                 policy network given some observations.
 
