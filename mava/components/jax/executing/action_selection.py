@@ -239,7 +239,7 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             policy_state: NestedArray,
             network: Any,
             key: networks_lib.PRNGKey,
-        ) -> Tuple[NestedArray, NestedArray, networks_lib.PRNGKey]:
+        ) -> Tuple[NestedArray, NestedArray, NestedArray, networks_lib.PRNGKey]:
             """Action selection across a single agent.
 
             Args:
@@ -270,7 +270,10 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             policy_states: Dict[str, NestedArray],
             key: networks_lib.PRNGKey,
         ) -> Tuple[
-            Dict[str, NestedArray], Dict[str, NestedArray], networks_lib.PRNGKey
+            Dict[str, NestedArray],
+            NestedArray,
+            Dict[str, NestedArray],
+            networks_lib.PRNGKey,
         ]:
             """Select actions across all agents - this is jitted below.
 
