@@ -18,6 +18,8 @@ import abc
 from types import SimpleNamespace
 from typing import Any
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 from dm_env import specs
 
@@ -93,5 +95,11 @@ class ExtrasLogProbSpec(ExtrasSpec):
                 net_states[agent] = init_state
 
         if net_states:
+            # Convert to float format.
+            net_states = jax.tree_util.tree_map(
+                lambda x: x.astype(jnp.float32),
+                net_states,
+            )
             net_spec = {"policy_states": net_states}
+
         builder.store.extras_spec.update(net_spec)
