@@ -48,6 +48,24 @@ def compute_running_mean_var_count(stats: Array, batch: Array) -> Array:
     return jnp.array([new_mean, new_var, new_count])
 
 
+def dummy_running_mean_var_count(stats: Array, batch: Array) -> Array:
+    """Dummy stats to use if we do not want to normalise the target values.
+
+    stats (array) -- mean, var, count.
+    batch (array) -- current batch of data.
+
+    Returns:
+        stats (array)
+    """
+
+    batch_count = batch.size
+    new_mean, new_var, count = stats
+
+    new_count = count + batch_count
+
+    return jnp.array([new_mean, new_var, new_count])
+
+
 def normalize(stats: Array, batch: Array) -> Array:
     """Normlaise batch of data using the running mean and variance.
 

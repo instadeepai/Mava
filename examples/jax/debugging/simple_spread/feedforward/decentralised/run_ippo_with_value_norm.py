@@ -21,7 +21,6 @@ from typing import Any
 import optax
 from absl import app, flags
 
-from mava.components.jax.training import MAPGWithTrustRegionStepNorm, NormalizeGAE
 from mava.systems.jax import ippo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -95,8 +94,7 @@ def main(_: Any) -> None:
     system = ippo.IPPOSystem()
 
     # Update the system to use normalization of target values during training
-    system.update(NormalizeGAE)
-    system.update(MAPGWithTrustRegionStepNorm)
+    # system.update(MAPGWithTrustRegionStepNorm)
 
     # Build the system.
     system.build(
@@ -112,6 +110,7 @@ def main(_: Any) -> None:
         num_executors=1,
         multi_process=True,
         clip_value=False,
+        normalize_target_values=True,
     )
 
     # Launch the system.

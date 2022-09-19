@@ -47,16 +47,6 @@ class TrainingState(NamedTuple):
     policy_opt_states: Dict[str, optax.OptState]
     critic_opt_states: Dict[str, optax.OptState]
     random_key: Any
-
-
-class TrainingStateStats(NamedTuple):
-    """Training state for separate networks with a field for running statistics"""
-
-    policy_params: Any
-    critic_params: Any
-    policy_opt_states: Dict[str, optax.OptState]
-    critic_opt_states: Dict[str, optax.OptState]
-    random_key: Any
     stats: Any
 
 
