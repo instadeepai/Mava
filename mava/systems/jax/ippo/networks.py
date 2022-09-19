@@ -83,7 +83,7 @@ class PPONetworks:
             key: networks_lib.PRNGKey,
             mask: chex.Array = None,
             policy_state: Tuple[jnp.ndarray] = None,
-        ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+        ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
             """Get actions and relevant log probabilities from the \
                 policy network given some observations.
 
@@ -138,16 +138,16 @@ class PPONetworks:
         )
 
         if self.policy_init_state:
-            return actions, {"log_prob": log_prob}, policy_state
+            return actions, {"log_prob": log_prob}, policy_state  # type: ignore
         else:
-            return actions, {"log_prob": log_prob}
+            return actions, {"log_prob": log_prob}  # type: ignore
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
         """Get state value from critic network given observations."""
         value = self.critic_network.apply(self.critic_params, observations)
         return value
 
-    def get_init_state(self):
+    def get_init_state(self) -> jnp.ndarray:
         return self.policy_init_state
 
     def get_params(
@@ -238,7 +238,7 @@ def make_discrete_networks(
 
     @hk.without_apply_rng
     @hk.transform
-    def initial_state_fn():
+    def initial_state_fn() List[jnp.ndarray]:
         state = []
         for size in policy_recurrent_layer_sizes:
             state.append(hk.GRU(size).initial_state(1))
