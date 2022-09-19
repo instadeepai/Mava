@@ -61,7 +61,7 @@ class GAE(Utility):
             rewards: jnp.ndarray,
             discounts: jnp.ndarray,
             values: jnp.ndarray,
-            stats: jnp.ndarray,
+            stats: jnp.ndarray = jnp.array([0, 1, 1e-4]),
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
             """Use truncated GAE to compute advantages.
 

@@ -93,9 +93,6 @@ def main(_: Any) -> None:
     # Create the system.
     system = ippo.IPPOSystem()
 
-    # Update the system to use normalization of target values during training
-    # system.update(MAPGWithTrustRegionStepNorm)
-
     # Build the system.
     system.build(
         environment_factory=environment_factory,
