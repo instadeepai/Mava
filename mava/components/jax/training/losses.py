@@ -128,42 +128,32 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
                     """Inner policy loss function: see outer function for parameters."""
 
-                    # TODO (dries): Remove this if and replace it with something more general.
+                    # TODO (dries): Can we implement something more general here? Like a function call?
                     if policy_states:
-                        # Recurrent networks
+                        # Recurrent actor.
                         batch_size = trainer.store.sample_batch_size
                         seq_len = trainer.store.sequence_length - 1
 
-                        observations = observations.reshape(batch_size, seq_len, -1)
-                        # Note: Assuming discrete actions.
-                        actions = actions.reshape(batch_size, seq_len)
-
-                        policy_states = policy_states[0].reshape(
+                        bs_observations = observations.reshape(batch_size, seq_len, -1)
+                
+                        bs_policy_states = policy_states[0].reshape(
                             batch_size, seq_len, -1
                         )
 
-                        # TODO (dries): Get a better method than a manual unroll using a for loop.
-                        state = policy_states[:, 0]
-                        log_probs = []
-                        entropy = []
-                        for t in range(seq_len):
-                            distribution_params, state = network.policy_network.apply(
-                                policy_params, (observations[:, t], state)
-                            )
-                            log_probs.append(
-                                network.log_prob(distribution_params, actions[:, t])
-                            )
-                            entropy.append(network.entropy(distribution_params))
+                        # Use the state at the start of the sequence and unroll the policy.
+                        core = lambda x, y: network.policy_network.apply(policy_params, [x, y])
+                        distribution_params, _ = hk.static_unroll(core, bs_observations, bs_policy_states[:, 0], time_major=False)
 
-                        log_probs = jnp.concatenate(log_probs)
-                        entropy = jnp.concatenate(entropy)
+                        # Flatten the distribution_params
+                        distribution_params = jax.tree_util.tree_map(lambda x: x.reshape((-1,) + x.shape[2:]), distribution_params)
                     else:
+                        # Feedforward actor.
                         distribution_params = network.policy_network.apply(
                             policy_params, observations
                         )
 
-                        log_probs = network.log_prob(distribution_params, actions)
-                        entropy = network.entropy(distribution_params)
+                    log_probs = network.log_prob(distribution_params, actions)
+                    entropy = network.entropy(distribution_params)
 
                     # Compute importance sampling weights:
                     # current policy / behavior policy.

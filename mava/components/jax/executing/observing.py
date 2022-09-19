@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Type
 
 from mava.callbacks import Callback
 from mava.components.jax import Component
+import copy
 from mava.components.jax.building.adders import Adder
 from mava.components.jax.building.parameter_client import ExecutorParameterClient
 from mava.components.jax.building.system_init import BaseSystemInit
@@ -182,9 +183,9 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
         executor.store.policy_states = {}
         for agent in executor.store.agent_net_keys.keys():
             network = executor.store.agent_net_keys[agent]
-            executor.store.policy_states[agent] = executor.store.networks["networks"][
+            executor.store.policy_states[agent] = copy.copy(executor.store.networks["networks"][
                 network
-            ].get_init_state()
+            ].get_init_state())
 
         # Return if the executor has no adder.
         if not executor.store.adder:
