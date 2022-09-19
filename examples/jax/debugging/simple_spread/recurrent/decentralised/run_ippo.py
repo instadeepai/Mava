@@ -46,11 +46,8 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Run main script
+    """Example running recurrent IPPO on debugging environment."""
 
-    Args:
-        _ : _
-    """
     # Environment.
     environment_factory = functools.partial(
         debugging_utils.make_environment,
@@ -82,7 +79,7 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # Optimizer.
+    # Optimiser.
     policy_optimiser = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )

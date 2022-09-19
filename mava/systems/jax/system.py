@@ -64,8 +64,8 @@ class System(BaseSystem):
                 input = {component.name(): config_class()}
                 self.config.add(**input)
 
-    @abc.abstractmethod
-    def design(self) -> Tuple[DesignSpec, Dict]:
+    @staticmethod
+    def design() -> Tuple[DesignSpec, Dict]:
         """System design specifying the list of components to use.
 
         Returns:

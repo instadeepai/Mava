@@ -26,8 +26,8 @@ from mava.specs import DesignSpec
 class BaseSystem(abc.ABC):
     """Abstract system object."""
 
-    @abc.abstractmethod
-    def design(self) -> Tuple[DesignSpec, Dict]:
+    @staticmethod
+    def design() -> Tuple[DesignSpec, Dict]:
         """System design specifying the list of components to use.
 
         Returns:

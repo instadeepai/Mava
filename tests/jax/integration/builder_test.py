@@ -30,7 +30,9 @@ from tests.jax import mocks
 
 
 class TestSystem(System):
-    def design(self) -> Tuple[DesignSpec, Dict]:
+    
+    @staticmethod
+    def design() -> Tuple[DesignSpec, Dict]:
         """Mock system design with zero components.
 
         Returns:

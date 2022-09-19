@@ -84,6 +84,9 @@ class Config:
                         for new_param_name in new_param_names:
                             self._param_to_component[new_param_name] = name
                     self._config[name] = dataclass
+            elif isinstance(dataclass, SimpleNamespace):
+                # SimpleNamespace implies that this component does not have config variables.
+                pass
             else:
                 raise Exception(
                     f"""
