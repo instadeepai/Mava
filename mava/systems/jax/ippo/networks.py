@@ -343,7 +343,7 @@ def make_default_networks(
         256,
     ),
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
-    policy_recurrent_layer_sizes: bool = (),
+    policy_recurrent_layer_sizes: Sequence[int] = (),
     observation_network: Callable = utils.batch_concat,
 ) -> Dict[str, Any]:
     """Create default PPO networks
