@@ -238,7 +238,7 @@ def make_discrete_networks(
 
     @hk.without_apply_rng
     @hk.transform
-    def initial_state_fn() List[jnp.ndarray]:
+    def initial_state_fn() -> List[jnp.ndarray]:
         state = []
         for size in policy_recurrent_layer_sizes:
             state.append(hk.GRU(size).initial_state(1))
