@@ -23,7 +23,10 @@ import jax.numpy as jnp
 import pytest
 from dm_env import StepType, TimeStep
 
-from mava.components.jax.executing.observing import FeedforwardExecutorObserve, RecurrentExecutorObserve
+from mava.components.jax.executing.observing import (
+    FeedforwardExecutorObserve,
+    RecurrentExecutorObserve,
+)
 from mava.systems.jax.executor import Executor
 from mava.types import OLT
 
@@ -54,22 +57,32 @@ class MockExecutorParameterClient:
     def get_async(self) -> None:
         self.parm = True
 
+
 # Networks
 agent_net_keys = {
-            "agent_0": "network_agent_0",
-            "agent_1": "network_agent_1",
-            "agent_2": "network_agent_2",
-        }
-class network():
+    "agent_0": "network_agent_0",
+    "agent_1": "network_agent_1",
+    "agent_2": "network_agent_2",
+}
+
+
+class network:
+    def __init__(self) -> None:
+        pass
+
+    @staticmethod
     def get_init_state() -> int:
         return 12345
-networks = {"networks":
-                {
-                "network_agent_0": network,
-                "network_agent_1": network,
-                "network_agent_2": network,
-                }
-            }
+
+
+networks = {
+    "networks": {
+        "network_agent_0": network,
+        "network_agent_1": network,
+        "network_agent_2": network,
+    }
+}
+
 
 @pytest.fixture
 def executor_without_adder() -> Executor:
@@ -79,10 +92,14 @@ def executor_without_adder() -> Executor:
         "agent_1": jnp.array([1]),
         "agent_2": jnp.array([2]),
     }
-    
+
     store = SimpleNamespace(
-        is_evaluator=None, observations={}, adder=None, extras=extras,
-        agent_net_keys=agent_net_keys, networks=networks,
+        is_evaluator=None,
+        observations={},
+        adder=None,
+        extras=extras,
+        agent_net_keys=agent_net_keys,
+        networks=networks,
     )
     return Executor(store=store)
 
@@ -173,8 +190,9 @@ def mock_executor_fixed_net() -> MockExecutor:
     )
     return mock_executor_fixed_network
 
+
 #######################
-#Feedforward executors#
+# Feedforward executors#
 #######################
 @pytest.fixture
 def feedforward_executor_observe() -> FeedforwardExecutorObserve:
@@ -206,7 +224,7 @@ def test_on_execution_observe_first_without_adder(
         "agent_2": jnp.array([2]),
     }
     assert not hasattr(executor_without_adder.store, "network_int_keys_extras")
-    assert not hasattr(executor_without_adder.store, "agent_net_keys")
+    assert hasattr(executor_without_adder.store, "agent_net_keys")
 
 
 def test_on_execution_observe_first(
@@ -348,11 +366,12 @@ def test_on_execution_update(
 
     assert mock_executor.store.executor_parameter_client.parm == True
 
+
 #######################
-#Recurrent executors  #
+# Recurrent executors  #
 #######################
 @pytest.fixture
-def feedforward_executor_observe() -> RecurrentExecutorObserve:
+def recurrent_executor_observe() -> RecurrentExecutorObserve:
     """RecurrentExecutorObserve.
 
     Returns:
@@ -361,17 +380,17 @@ def feedforward_executor_observe() -> RecurrentExecutorObserve:
     return RecurrentExecutorObserve()
 
 
-def test_on_execution_observe_first_without_adder(
-    feedforward_executor_observe: RecurrentExecutorObserve,
+def test_on_execution_observe_first_without_adder_recurrent(
+    recurrent_executor_observe: RecurrentExecutorObserve,
     executor_without_adder: Executor,
 ) -> None:
     """Test entering executor without store.adder
 
     Args:
-        feedforward_executor_observe: RecurrentExecutorObserve,
+        recurrent_executor_observe: RecurrentExecutorObserve,
         executor_without_adder: Executor
     """
-    feedforward_executor_observe.on_execution_observe_first(
+    recurrent_executor_observe.on_execution_observe_first(
         executor=executor_without_adder
     )
 
@@ -384,17 +403,17 @@ def test_on_execution_observe_first_without_adder(
     assert hasattr(executor_without_adder.store, "agent_net_keys")
 
 
-def test_on_execution_observe_first(
-    feedforward_executor_observe: RecurrentExecutorObserve,
+def test_on_execution_observe_first_recurrent(
+    recurrent_executor_observe: RecurrentExecutorObserve,
     mock_executor: MockExecutor,
 ) -> None:
     """Test on_execution_observe_first method from RecurrentExecutorObserve
 
     Args:
-        feedforward_executor_observe: RecurrentExecutorObserve,
+        recurrent_executor_observe: RecurrentExecutorObserve,
         mock_executor: Executor
     """
-    feedforward_executor_observe.on_execution_observe_first(executor=mock_executor)
+    recurrent_executor_observe.on_execution_observe_first(executor=mock_executor)
 
     for agent, net in mock_executor.store.agent_net_keys.items():
         assert type(agent) == str
@@ -416,17 +435,17 @@ def test_on_execution_observe_first(
     assert mock_executor.store.adder.test_extras == mock_executor.store.extras
 
 
-def test_on_execution_observe_first_fixed_sampling(
-    feedforward_executor_observe: RecurrentExecutorObserve,
+def test_on_execution_observe_first_fixed_sampling_recurrent(
+    recurrent_executor_observe: RecurrentExecutorObserve,
     mock_executor_fixed_net: MockExecutor,
 ) -> None:
     """Test on_execution_observe_first method from RecurrentExecutorObserve
 
     Args:
-        feedforward_executor_observe: RecurrentExecutorObserve,
+        recurrent_executor_observe: RecurrentExecutorObserve,
         mock_executor_fixed_net: Executor with fixed network sampling setup
     """
-    feedforward_executor_observe.on_execution_observe_first(
+    recurrent_executor_observe.on_execution_observe_first(
         executor=mock_executor_fixed_net
     )
 
@@ -458,33 +477,33 @@ def test_on_execution_observe_first_fixed_sampling(
     )
 
 
-def test_on_execution_observe_without_adder(
-    feedforward_executor_observe: RecurrentExecutorObserve,
+def test_on_execution_observe_without_adder_recurrent(
+    recurrent_executor_observe: RecurrentExecutorObserve,
     executor_without_adder: Executor,
 ) -> None:
     """Test entering executor without store.adder
 
     Args:
-        feedforward_executor_observe: RecurrentExecutorObserve,
+        recurrent_executor_observe: RecurrentExecutorObserve,
         executor_without_adder: Executor
     """
-    feedforward_executor_observe.on_execution_observe(executor=executor_without_adder)
+    recurrent_executor_observe.on_execution_observe(executor=executor_without_adder)
 
     assert not hasattr(executor_without_adder.store, "next_extras")
     assert not hasattr(executor_without_adder.store.adder, "add")
 
 
-def test_on_execution_observe(
-    feedforward_executor_observe: RecurrentExecutorObserve,
+def test_on_execution_observe_recurrent(
+    recurrent_executor_observe: RecurrentExecutorObserve,
     mock_executor: MockExecutor,
 ) -> None:
     """Test on_execution_observe method from RecurrentExecutorObserve
 
     Args:
-        feedforward_executor_observe: RecurrentExecutorObserve,
+        recurrent_executor_observe: RecurrentExecutorObserve,
         mock_executor: Executor
     """
-    feedforward_executor_observe.on_execution_observe(executor=mock_executor)
+    recurrent_executor_observe.on_execution_observe(executor=mock_executor)
 
     for agent in mock_executor.store.policies_info.keys():
         assert mock_executor.store.next_extras["policy_info"][
@@ -512,16 +531,16 @@ def test_on_execution_observe(
     assert mock_executor.store.adder.test_next_extras["policy_states"] == 1234
 
 
-def test_on_execution_update(
-    feedforward_executor_observe: RecurrentExecutorObserve,
+def test_on_execution_update_recurrent(
+    recurrent_executor_observe: RecurrentExecutorObserve,
     mock_executor: MockExecutor,
 ) -> None:
     """Test on_execution_update method from RecurrentExecutorObserve
 
     Args:
-        feedforward_executor_observe: RecurrentExecutorObserve,
+        recurrent_executor_observe: RecurrentExecutorObserve,
         mock_executor: Executor
     """
-    feedforward_executor_observe.on_execution_update(executor=mock_executor)
+    recurrent_executor_observe.on_execution_update(executor=mock_executor)
 
     assert mock_executor.store.executor_parameter_client.parm == True
