@@ -151,7 +151,7 @@ We also have various Jax-based examples which make use of the callback design pa
     - [decentralised][debug_ippo_ff_dec_jax]
     - [decentralised record agents][debug_ippo_ff_dec_jax_record] (***recording agents acting in the environment***).
     - [decentralised single process][debug_ippo_ff_dec_jax_single_process] (***running in single process mode***).
-    - [decentralised resotore checkpoint][debug_ippo_ff_dec_jax_checkpoint] (***continuing training by restoring from an existing checkpoint***).
+    - [decentralised restore checkpoint][debug_ippo_ff_dec_jax_checkpoint] (***continuing training by restoring from an existing checkpoint***).
 
 
 [debug_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo.py
