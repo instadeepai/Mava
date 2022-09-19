@@ -83,7 +83,7 @@ class PPONetworks:
             key: networks_lib.PRNGKey,
             mask: chex.Array = None,
             policy_state: Tuple[jnp.ndarray] = None,
-        ) -> Tuple[Any, Any, jnp.ndarray]:
+        ) -> Tuple[Any, Any, Any]:
             """Get actions and relevant log probabilities from the \
                 policy network given some observations.
 
@@ -115,7 +115,7 @@ class PPONetworks:
             actions = jnp.squeeze(distribution.sample(seed=key))
             log_prob = jnp.squeeze(distribution.log_prob(actions))
 
-            return actions, log_prob, policy_state
+            return actions, log_prob, policy_state # type: ignore
 
         self.forward_fn = forward_fn
 
