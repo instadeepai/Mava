@@ -135,17 +135,27 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                         seq_len = trainer.store.sequence_length - 1
 
                         bs_observations = observations.reshape(batch_size, seq_len, -1)
-                
+
                         bs_policy_states = policy_states[0].reshape(
                             batch_size, seq_len, -1
                         )
 
                         # Use the state at the start of the sequence and unroll the policy.
-                        core = lambda x, y: network.policy_network.apply(policy_params, [x, y])
-                        distribution_params, _ = hk.static_unroll(core, bs_observations, bs_policy_states[:, 0], time_major=False)
+                        core = lambda x, y: network.policy_network.apply(
+                            policy_params, [x, y]
+                        )
+                        distribution_params, _ = hk.static_unroll(
+                            core,
+                            bs_observations,
+                            bs_policy_states[:, 0],
+                            time_major=False,
+                        )
 
                         # Flatten the distribution_params
-                        distribution_params = jax.tree_util.tree_map(lambda x: x.reshape((-1,) + x.shape[2:]), distribution_params)
+                        distribution_params = jax.tree_util.tree_map(
+                            lambda x: x.reshape((-1,) + x.shape[2:]),
+                            distribution_params,
+                        )
                     else:
                         # Feedforward actor.
                         distribution_params = network.policy_network.apply(
