@@ -164,7 +164,7 @@ class MockDistributorComponent(Component):
 
 class TestSystemWithZeroComponents(System):
     __test__ = False
-    
+
     @staticmethod
     def design() -> Tuple[DesignSpec, Dict]:
         """Mock system design with zero components.
@@ -178,7 +178,7 @@ class TestSystemWithZeroComponents(System):
 
 class TestSystemWithOneComponent(System):
     __test__ = False
-    
+
     @staticmethod
     def design() -> Tuple[DesignSpec, Dict]:
         """Mock system design with one component.
