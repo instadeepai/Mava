@@ -57,7 +57,7 @@ def mock_executor() -> Executor:
     """
     store = SimpleNamespace(is_evaluator=None)
     executor = Executor(store=store)
-    executor.store._evaluation_interval = None  # type: ignore
+    executor.store.evaluation_interval = None  # type: ignore
     return executor
 
 
@@ -73,7 +73,7 @@ def test_on_execution_init_start(
     executor_init = ExecutorInit(config=dummy_config)
     executor_init.on_execution_init_start(executor=mock_executor)
 
-    assert mock_executor.store._evaluation_interval is None  # type: ignore # noqa: E501
+    assert mock_executor.store.evaluation_interval is None  # type: ignore # noqa: E501
 
 
 def test_on_execution_init_start_with_evaluator(
@@ -89,8 +89,8 @@ def test_on_execution_init_start_with_evaluator(
     executor_init = ExecutorInit(config=dummy_config)
     executor_init.on_execution_init_start(executor=mock_executor)
 
-    assert mock_executor.store._evaluation_interval == dummy_config.evaluation_interval  # type: ignore # noqa: E501
-    assert mock_executor.store._evaluation_duration == dummy_config.evaluation_duration  # type: ignore # noqa: E501
+    assert mock_executor.store.evaluation_interval == dummy_config.evaluation_interval  # type: ignore # noqa: E501
+    assert mock_executor.store.evaluation_duration == dummy_config.evaluation_duration  # type: ignore # noqa: E501
 
 
 def test_name() -> None:
