@@ -43,5 +43,5 @@ class Distributor(Component):
 
 ## Installing from source
 - In order to edit the Mava source code, you must ensure that you have cloned the repo and installed from source using `pip install -e .`
-- A common mistake is to `run pip install id-mava`, which installs MAVA from PyPi, resulting in a duplicate version of MAVA being stored as a dependancy.
+- A common mistake is to `run pip install id-mava`, which installs Mava from PyPi, resulting in a duplicate version of Mava being stored as a dependancy.
 - If you encounter `ModuleNotFoundError: No module named 'mava'`, a likely fix is to add the home directory of the cloned Mava source code to `PYTHONPATH` with `export PYTHONPATH=<mava_homedir>`. On a linux-based system, this command can be added to `.bashrc`, to avoid having to export the path every time a new terminal is opened.
