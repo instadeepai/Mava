@@ -54,6 +54,7 @@ class IPPOSystem(System):
             adder_priority=building.UniformAdderPriority,
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
             networks=building.DefaultNetworks,
+            optimisers=building.DefaultOptimisers,
         ).get()
 
         # Trainer
@@ -81,6 +82,7 @@ class IPPOSystem(System):
             executor_parameter_client=building.ExecutorParameterClient,
             trainer_parameter_client=building.TrainerParameterClient,
             termination_condition=updating.CountConditionTerminator,
+            checkpointer=updating.Checkpointer,
         ).get()
 
         system = DesignSpec(

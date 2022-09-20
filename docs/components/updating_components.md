@@ -5,7 +5,7 @@
 Components relating to the periodic updating of system wide parameters.
 
 ## Checkpointing components
-::: mava.components.jax.updating.checkpointers
+::: mava.components.jax.updating.checkpointer
 
 ## Parameter server components
 ::: mava.components.jax.updating.parameter_server
