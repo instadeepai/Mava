@@ -59,11 +59,11 @@ def dummy_running_mean_var_count(stats: Array, batch: Array) -> Array:
     """
 
     batch_count = batch.size
-    new_mean, new_var, count = stats
+    _, _, count = stats
 
     new_count = count + batch_count
 
-    return jnp.array([new_mean, new_var, new_count])
+    return jnp.array([0, 1, new_count])
 
 
 def normalize(stats: Array, batch: Array) -> Array:
