@@ -5,7 +5,7 @@
 Components relating to the periodic updating of system wide parameters.
 
 ## Checkpointing components
-The latest values of all [parameters in the store of the parameter server][param_server_store] (such as `trainer_steps`, `executor_steps`, `network_weights` & `optmiser state`) are periodically checkpointed/ saved to disk every [checkpoint_minute_interval][checkpointer_config] minutes.This allows us to resume an experiment by restoring the checkpoint by setting the `experiment_path` to a folder that contains the 'checkpoints' folder generated from a previous experiment. More information on config parameters may be found [here](../getting_started/config.md).
+The latest values of all [parameters in the store of the parameter server][param_server_store] (such as `trainer_steps`, `executor_steps`, `network_weights` & `optmiser state`) are periodically saved to disk every [checkpoint_minute_interval][checkpointer_config] minutes. This allows for the resuming of an experiment by restoring the checkpoint through setting the `experiment_path` parameter to a folder that contains the 'checkpoints' folder generated from a previous experiment. More information on config parameters may be found [here](../getting_started/config.md).
 
 ::: mava.components.jax.updating.checkpointer
 
