@@ -617,6 +617,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         result = self.run_episode()
                         episode_count += 1
                         step_count += result["episode_length"]
+                        # Sum results for computing mean after all evaluation runs.
                         results = jax.tree_map(lambda x, y: x + y, results, result)
                     # compute the mean over all evaluation runs
                     results = jax.tree_map(lambda x: x / evaluation_duration, results)
