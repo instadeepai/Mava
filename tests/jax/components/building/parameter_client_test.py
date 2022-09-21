@@ -66,15 +66,15 @@ initial_count_parameters = {
 }
 
 expected_network_keys = {
-    "policy_networks-network_agent_0",
-    "policy_networks-network_agent_1",
-    "policy_networks-network_agent_2",
+    "policy_network-network_agent_0",
+    "policy_network-network_agent_1",
+    "policy_network-network_agent_2",
     "policy_opt_state-network_agent_0",
     "policy_opt_state-network_agent_1",
     "policy_opt_state-network_agent_2",
-    "critic_networks-network_agent_0",
-    "critic_networks-network_agent_1",
-    "critic_networks-network_agent_2",
+    "critic_network-network_agent_0",
+    "critic_network-network_agent_1",
+    "critic_network-network_agent_2",
     "critic_opt_state-network_agent_0",
     "critic_opt_state-network_agent_1",
     "critic_opt_state-network_agent_2",
@@ -83,12 +83,12 @@ expected_network_keys = {
 expected_keys = expected_count_keys.union(expected_network_keys)
 
 initial_parameters_trainer = {
-    "policy_networks-network_agent_0": {"weights": 0, "biases": 0},
-    "policy_networks-network_agent_1": {"weights": 1, "biases": 1},
-    "policy_networks-network_agent_2": {"weights": 2, "biases": 2},
-    "critic_networks-network_agent_0": {"weights": 0, "biases": 0},
-    "critic_networks-network_agent_1": {"weights": 1, "biases": 1},
-    "critic_networks-network_agent_2": {"weights": 2, "biases": 2},
+    "policy_network-network_agent_0": {"weights": 0, "biases": 0},
+    "policy_network-network_agent_1": {"weights": 1, "biases": 1},
+    "policy_network-network_agent_2": {"weights": 2, "biases": 2},
+    "critic_network-network_agent_0": {"weights": 0, "biases": 0},
+    "critic_network-network_agent_1": {"weights": 1, "biases": 1},
+    "critic_network-network_agent_2": {"weights": 2, "biases": 2},
     "policy_opt_state-network_agent_0": {constants.OPT_STATE_DICT_KEY: EmptyState()},
     "policy_opt_state-network_agent_1": {constants.OPT_STATE_DICT_KEY: EmptyState()},
     "policy_opt_state-network_agent_2": {constants.OPT_STATE_DICT_KEY: EmptyState()},
@@ -120,20 +120,18 @@ def mock_builder_with_parameter_client() -> Builder:
     builder = Builder(components=[])
 
     builder.store.networks = {
-        "networks": {
-            "network_agent_0": SimpleNamespace(
-                policy_params={"weights": 0, "biases": 0},
-                critic_params={"weights": 0, "biases": 0},
-            ),
-            "network_agent_1": SimpleNamespace(
-                policy_params={"weights": 1, "biases": 1},
-                critic_params={"weights": 1, "biases": 1},
-            ),
-            "network_agent_2": SimpleNamespace(
-                policy_params={"weights": 2, "biases": 2},
-                critic_params={"weights": 2, "biases": 2},
-            ),
-        }
+        "network_agent_0": SimpleNamespace(
+            policy_params={"weights": 0, "biases": 0},
+            critic_params={"weights": 0, "biases": 0},
+        ),
+        "network_agent_1": SimpleNamespace(
+            policy_params={"weights": 1, "biases": 1},
+            critic_params={"weights": 1, "biases": 1},
+        ),
+        "network_agent_2": SimpleNamespace(
+            policy_params={"weights": 2, "biases": 2},
+            critic_params={"weights": 2, "biases": 2},
+        ),
     }
 
     builder.store.trainer_networks = {
@@ -142,12 +140,11 @@ def mock_builder_with_parameter_client() -> Builder:
     builder.store.trainer_id = "trainer_0"
 
     builder.store.policy_opt_states = {}
-    for net_key in builder.store.networks["networks"].keys():
+    builder.store.critic_opt_states = {}
+    for net_key in builder.store.networks.keys():
         builder.store.policy_opt_states[net_key] = {
             constants.OPT_STATE_DICT_KEY: EmptyState()
         }
-    builder.store.critic_opt_states = {}
-    for net_key in builder.store.networks["networks"].keys():
         builder.store.critic_opt_states[net_key] = {
             constants.OPT_STATE_DICT_KEY: EmptyState()
         }
@@ -347,16 +344,16 @@ def test_trainer_parameter_client(
     )
 
     assert mock_builder.store.trainer_parameter_client._set_keys == [
-        "policy_networks-network_agent_0",
-        "critic_networks-network_agent_0",
+        "policy_network-network_agent_0",
+        "critic_network-network_agent_0",
         "policy_opt_state-network_agent_0",
         "critic_opt_state-network_agent_0",
-        "policy_networks-network_agent_1",
-        "critic_networks-network_agent_1",
+        "policy_network-network_agent_1",
+        "critic_network-network_agent_1",
         "policy_opt_state-network_agent_1",
         "critic_opt_state-network_agent_1",
-        "policy_networks-network_agent_2",
-        "critic_networks-network_agent_2",
+        "policy_network-network_agent_2",
+        "critic_network-network_agent_2",
         "policy_opt_state-network_agent_2",
         "critic_opt_state-network_agent_2",
     ]

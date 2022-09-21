@@ -152,20 +152,18 @@ class MockTrainer(Trainer):
     def __init__(self) -> None:
         """Initialize mock trainer component."""
         networks = {
-            "networks": {
-                "network_agent_0": SimpleNamespace(
-                    policy_params=jnp.array([0.0, 0.0, 0.0]),
-                    critic_params=jnp.array([0.0, 0.0, 0.0]),
-                ),
-                "network_agent_1": SimpleNamespace(
-                    policy_params=jnp.array([1.0, 1.0, 1.0]),
-                    critic_params=jnp.array([1.0, 1.0, 1.0]),
-                ),
-                "network_agent_2": SimpleNamespace(
-                    policy_params=jnp.array([2.0, 2.0, 2.0]),
-                    critic_params=jnp.array([2.0, 2.0, 2.0]),
-                ),
-            }
+            "network_agent_0": SimpleNamespace(
+                policy_params=jnp.array([0.0, 0.0, 0.0]),
+                critic_params=jnp.array([0.0, 0.0, 0.0]),
+            ),
+            "network_agent_1": SimpleNamespace(
+                policy_params=jnp.array([1.0, 1.0, 1.0]),
+                critic_params=jnp.array([1.0, 1.0, 1.0]),
+            ),
+            "network_agent_2": SimpleNamespace(
+                policy_params=jnp.array([2.0, 2.0, 2.0]),
+                critic_params=jnp.array([2.0, 2.0, 2.0]),
+            ),
         }
         trainer_agents = {"agent_0", "agent_1", "agent_2"}
         trainer_agent_net_keys = {
@@ -178,18 +176,18 @@ class MockTrainer(Trainer):
         critic_optimiser = MockOptimiser()
 
         policy_opt_states = {}
-        for net_key in networks["networks"].keys():
+        for net_key in networks.keys():
             policy_opt_states[net_key] = {
                 constants.OPT_STATE_DICT_KEY: policy_optimiser.init(
-                    networks["networks"][net_key].policy_params
+                    networks[net_key].policy_params
                 )
             }  # pytype: disable=attribute-error
 
         critic_opt_states = {}
-        for net_key in networks["networks"].keys():
+        for net_key in networks.keys():
             critic_opt_states[net_key] = {
                 constants.OPT_STATE_DICT_KEY: critic_optimiser.init(
-                    networks["networks"][net_key].critic_params
+                    networks[net_key].critic_params
                 )
             }  # pytype: disable=attribute-error
 
@@ -267,26 +265,14 @@ def mock_state_and_trainer(
 
     random_key = jax.random.PRNGKey(5)
     policy_params = {
-        "network_agent_0": mock_trainer.store.networks["networks"][
-            "network_agent_0"
-        ].policy_params,
-        "network_agent_1": mock_trainer.store.networks["networks"][
-            "network_agent_1"
-        ].policy_params,
-        "network_agent_2": mock_trainer.store.networks["networks"][
-            "network_agent_2"
-        ].policy_params,
+        "network_agent_0": mock_trainer.store.networks["network_agent_0"].policy_params,
+        "network_agent_1": mock_trainer.store.networks["network_agent_1"].policy_params,
+        "network_agent_2": mock_trainer.store.networks["network_agent_2"].policy_params,
     }
     critic_params = {
-        "network_agent_0": mock_trainer.store.networks["networks"][
-            "network_agent_0"
-        ].critic_params,
-        "network_agent_1": mock_trainer.store.networks["networks"][
-            "network_agent_1"
-        ].critic_params,
-        "network_agent_2": mock_trainer.store.networks["networks"][
-            "network_agent_2"
-        ].critic_params,
+        "network_agent_0": mock_trainer.store.networks["network_agent_0"].critic_params,
+        "network_agent_1": mock_trainer.store.networks["network_agent_1"].critic_params,
+        "network_agent_2": mock_trainer.store.networks["network_agent_2"].critic_params,
     }
     policy_opt_state = mock_trainer.store.policy_opt_states
     critic_opt_state = mock_trainer.store.critic_opt_states
