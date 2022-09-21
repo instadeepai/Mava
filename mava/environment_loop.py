@@ -589,14 +589,14 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         # this should be removed once we deprecate TF.
         if hasattr(self._executor, "store"):
             environment_loop_schedule = self._executor._evaluator and (
-                self._executor.store._evaluation_interval is not None
+                self._executor.store.evaluation_interval is not None
             )
 
             if environment_loop_schedule:
                 eval_condition = check_count_condition(
-                    self._executor.store._evaluation_interval
+                    self._executor.store.evaluation_interval
                 )
-                evaluation_duration = self._executor.store._evaluation_duration
+                evaluation_duration = self._executor.store.evaluation_duration
         else:
             environment_loop_schedule = (
                 self._executor._evaluator and self._executor._interval

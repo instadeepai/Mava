@@ -57,8 +57,8 @@ class ExecutorInit(Component):
             )
 
         if executor.store.is_evaluator:
-            executor.store._evaluation_interval = self.config.evaluation_interval  # type: ignore # noqa: E501
-            executor.store._evaluation_duration = self.config.evaluation_duration  # type: ignore # noqa: E501
+            executor.store.evaluation_interval = self.config.evaluation_interval  # type: ignore # noqa: E501
+            executor.store.evaluation_duration = self.config.evaluation_duration  # type: ignore # noqa: E501
 
     @staticmethod
     def name() -> str:
