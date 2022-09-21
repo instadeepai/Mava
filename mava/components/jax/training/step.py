@@ -231,7 +231,7 @@ class MAPGWithTrustRegionStep(Step):
             # Extract the data.
             data = sample.data
 
-            observations, actions, rewards, termination, extra = (
+            observations, actions, rewards, termination, extras = (
                 data.observations,
                 data.actions,
                 data.rewards,
@@ -243,7 +243,7 @@ class MAPGWithTrustRegionStep(Step):
                 lambda x: x * self.config.discount, termination
             )
 
-            behavior_log_probs = extra["policy_info"]
+            behavior_log_probs = extras["policy_info"]
 
             networks = trainer.store.networks["networks"]
 
@@ -292,10 +292,10 @@ class MAPGWithTrustRegionStep(Step):
                 (observations, actions, behavior_log_probs, behavior_values),
             )
 
-            if "policy_states" in extra:
+            if "policy_states" in extras:
                 policy_states = jax.tree_util.tree_map(
                     lambda x: x[:, :-1],
-                    extra["policy_states"],
+                    extras["policy_states"],
                 )
             else:
                 policy_states = {agent: None for agent in trainer.store.agents}

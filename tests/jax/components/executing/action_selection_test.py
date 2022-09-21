@@ -60,7 +60,7 @@ def ff_executor_select_action() -> FeedforwardExecutorSelectAction:
 
 
 @pytest.fixture
-def r_executor_select_action() -> RecurrentExecutorSelectAction:
+def recurrent_executor_select_action() -> RecurrentExecutorSelectAction:
     """Create an object of the class RecurrentExecutorSelectAction.
 
     Returns:
@@ -363,22 +363,22 @@ def test_constructor(dummy_config: DummyExecutorSelectActionConfig) -> None:  # 
         dummy_config : dummy config for test.
     """
 
-    r_executor_select_action = RecurrentExecutorSelectAction(config=dummy_config)  # type: ignore # noqa: E501
-    assert r_executor_select_action.config.parm_0 == dummy_config.parm_0
+    recurrent_executor_select_action = RecurrentExecutorSelectAction(config=dummy_config)  # type: ignore # noqa: E501
+    assert recurrent_executor_select_action.config.parm_0 == dummy_config.parm_0
 
 
 # Test on_execution_select_actions
 def test_on_execution_select_actions_with_empty_observations(  # type: ignore # noqa: E501
     mock_empty_executor: Executor,
-    r_executor_select_action: RecurrentExecutorSelectAction,
+    recurrent_executor_select_action: RecurrentExecutorSelectAction,
 ) -> None:
     """Test on_execution_select_actions with empty observations
 
     Args:
         mock_empty_executor: executor with no observations and no agents
-        r_executor_select_action: RecurrentExecutorSelectAction
+        recurrent_executor_select_action: RecurrentExecutorSelectAction
     """
-    r_executor_select_action.on_execution_select_actions(executor=mock_empty_executor)
+    recurrent_executor_select_action.on_execution_select_actions(executor=mock_empty_executor)
 
     assert mock_empty_executor.store.actions_info == {}
     assert mock_empty_executor.store.policies_info == {}
@@ -386,15 +386,15 @@ def test_on_execution_select_actions_with_empty_observations(  # type: ignore # 
 
 def test_on_execution_select_actions(  # type: ignore # noqa: E501
     mock_recurrent_executor: Executor,
-    r_executor_select_action: RecurrentExecutorSelectAction,
+    recurrent_executor_select_action: RecurrentExecutorSelectAction,
 ) -> None:
     """Test on_execution_select_actions.
 
     Args:
-        r_executor_select_action: RecurrentExecutorSelectAction
+        recurrent_executor_select_action: RecurrentExecutorSelectAction
         mock_recurrent_executor: Executor
     """
-    r_executor_select_action.on_execution_select_actions(
+    recurrent_executor_select_action.on_execution_select_actions(
         executor=mock_recurrent_executor
     )
 

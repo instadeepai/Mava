@@ -88,10 +88,10 @@ def main(_: Any) -> None:
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
-    # Initialise the feedforward IPPO system.
+    # Import the base IPPO system.
     system = ippo.IPPOSystem()
 
-    # Update the system to make the policy recurrent.
+    # Update the system with the components necessary to make the policy recurrent.
     system.update(ippo.recurrent_policy_components)
 
     # Build the system.

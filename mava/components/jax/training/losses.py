@@ -134,7 +134,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                         batch_size = trainer.store.sample_batch_size
                         seq_len = trainer.store.sequence_length - 1
 
-                        bs_observations = observations.reshape(batch_size, seq_len, -1)
+                        batch_seq_observations = observations.reshape(batch_size, seq_len, -1)
 
                         bs_policy_states = policy_states[0].reshape(
                             batch_size, seq_len, -1
@@ -146,7 +146,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                         )
                         distribution_params, _ = hk.static_unroll(
                             core,
-                            bs_observations,
+                            batch_seq_observations,
                             bs_policy_states[:, 0],
                             time_major=False,
                         )
