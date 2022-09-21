@@ -23,6 +23,7 @@ from mava.systems.jax import System
 from mava.systems.jax.ippo.components import ExtrasLogProbSpec
 from mava.systems.jax.ippo.config import IPPODefaultConfig
 
+
 class IPPOSystem(System):
     @staticmethod
     def design() -> Tuple[DesignSpec, Any]:

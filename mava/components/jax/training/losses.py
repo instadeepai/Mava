@@ -134,7 +134,9 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                         batch_size = trainer.store.sample_batch_size
                         seq_len = trainer.store.sequence_length - 1
 
-                        batch_seq_observations = observations.reshape(batch_size, seq_len, -1)
+                        batch_seq_observations = observations.reshape(
+                            batch_size, seq_len, -1
+                        )
 
                         bs_policy_states = policy_states[0].reshape(
                             batch_size, seq_len, -1

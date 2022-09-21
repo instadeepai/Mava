@@ -72,7 +72,7 @@ class System(BaseSystem):
             Tuple[system callback components, system config].
         """
 
-    def update(self, components: List[Any]) -> None:
+    def update(self, components: Union[Any, List[Any]]) -> None:
         """Update components that has already been added to the system.
 
         Args:

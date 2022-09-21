@@ -378,7 +378,9 @@ def test_on_execution_select_actions_with_empty_observations(  # type: ignore # 
         mock_empty_executor: executor with no observations and no agents
         recurrent_executor_select_action: RecurrentExecutorSelectAction
     """
-    recurrent_executor_select_action.on_execution_select_actions(executor=mock_empty_executor)
+    recurrent_executor_select_action.on_execution_select_actions(
+        executor=mock_empty_executor
+    )
 
     assert mock_empty_executor.store.actions_info == {}
     assert mock_empty_executor.store.policies_info == {}

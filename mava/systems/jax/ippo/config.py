@@ -16,6 +16,7 @@
 """Default hyperparameters for IPPO system."""
 from dataclasses import dataclass
 
+
 @dataclass
 class IPPODefaultConfig:
     sample_batch_size: int = 512
