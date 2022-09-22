@@ -213,11 +213,7 @@ def test_executor_parameter_client_no_evaluator_with_parameter_client(
         ]
     )
 
-    assert mock_builder.store.executor_parameter_client._set_keys == [
-        "executor_episodes",
-        "executor_steps",
-    ]
-
+    assert mock_builder.store.executor_parameter_client._set_keys == []
     assert (
         mock_builder.store.executor_parameter_client._parameters
         == initial_parameters_executor
@@ -273,10 +269,7 @@ def test_executor_parameter_client_evaluator_with_parameter_client(
         ]
     )
 
-    assert mock_builder.store.executor_parameter_client._set_keys == [
-        "evaluator_steps",
-        "evaluator_episodes",
-    ]
+    assert mock_builder.store.executor_parameter_client._set_keys == []
     assert (
         mock_builder.store.executor_parameter_client._parameters
         == initial_parameters_executor
