@@ -93,11 +93,11 @@ class ExecutorParameterClient(BaseParameterClient):
             builder: SystemBuilder.
         """
         # Create policy parameters
-        params = {}
+        params: Dict[str, Any] = {}
         # Executor does not explicitly set variables i.e. it adds to count variables
         # and hence set_keys is empty
-        set_keys = []
-        get_keys = []
+        set_keys: List[str] = []
+        get_keys: List[str] = []
         net_type_key = "networks"
 
         for agent_net_key in builder.store.networks[net_type_key].keys():
@@ -169,9 +169,9 @@ class TrainerParameterClient(BaseParameterClient):
             builder: SystemBuilder.
         """
         # Create parameter client
-        params = {}
-        set_keys = []
-        get_keys = []
+        params: Dict[str, Any] = {}
+        set_keys: List[str] = []
+        get_keys: List[str] = []
         # TODO (dries): Only add the networks this trainer is working with.
         # Not all of them.
         trainer_networks = builder.store.trainer_networks[builder.store.trainer_id]
