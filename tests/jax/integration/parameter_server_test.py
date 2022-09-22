@@ -44,8 +44,8 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     assert type(parameter_server.store.system_checkpointer) == acme_savers.Checkpointer
 
     param_without_net_and_opt = parameter_server.store.parameters.copy()
-    del param_without_net_and_opt["policy_networks-network_agent"]
-    del param_without_net_and_opt["critic_networks-network_agent"]
+    del param_without_net_and_opt["policy_network-network_agent"]
+    del param_without_net_and_opt["critic_network-network_agent"]
     del param_without_net_and_opt["policy_opt_state-network_agent"]
     del param_without_net_and_opt["critic_opt_state-network_agent"]
     assert param_without_net_and_opt == {
@@ -62,7 +62,7 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     checkpoint_init_time = parameter_server.store.last_checkpoint_time
 
     first_network_param = parameter_server.store.parameters[
-        "policy_networks-network_agent"
+        "policy_network-network_agent"
     ]
 
     # Test get and set parameters
@@ -77,7 +77,7 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
 
     # Check that the network is updated (at least one of the values updated)
     updated_networks_param = parameter_server.get_parameters(
-        "policy_networks-network_agent"
+        "policy_network-network_agent"
     )
     at_least_one_changed = False
     for key in updated_networks_param.keys():

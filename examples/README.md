@@ -154,7 +154,6 @@ We also have various Jax-based examples which make use of the callback design pa
     - [decentralised restore checkpoint][debug_ippo_ff_dec_jax_checkpoint] (***continuing training by restoring from an existing checkpoint***).
     - [decentralised evaluation intervals][debug_ippo_ff_dec_eval_intevals_jax] (***perform evaluation at custom intervals for custom durations***)
 
-
 [debug_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo.py
 [debug_ippo_ff_dec_jax_record]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo_with_monitoring.py
 [debug_ippo_ff_dec_jax_single_process]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo_single_process.py
