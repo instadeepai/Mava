@@ -70,7 +70,7 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # Optimiser.
+    # Optimisers.
     policy_optimiser = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
