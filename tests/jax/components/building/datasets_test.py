@@ -48,6 +48,8 @@ def adder_signature_fn(
 
 
 class MockBuilder(Builder):
+    """Mock builder class"""
+
     def __init__(self) -> None:
         """Creates a mock builder for testing"""
         self.simple_server = reverb.Server(

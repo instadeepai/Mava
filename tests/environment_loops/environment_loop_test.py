@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Environment loop unit test"""
+
 import pytest
 
 from tests.conftest import EnvSpec, EnvType, Helpers, MockedEnvironments
@@ -35,9 +37,11 @@ from tests.mocks import MockedExecutor, MockedSystem
     ],
 )
 class TestEnvironmentLoop:
-    # Test that we can load a env loop and that it contains
-    #   an env, executor, counter, logger and should_update.
+    """Test that we can load a env loop and that it contains
+    an env, executor, counter, logger and should_update."""
+
     def test_initialize_env_loop(self, env_spec: EnvSpec, helpers: Helpers) -> None:
+        """Test initialization of the environmnet loop"""
         wrapped_env, specs = helpers.get_wrapped_env(env_spec)
         env_loop_func = helpers.get_env_loop(env_spec)
 
@@ -58,8 +62,8 @@ class TestEnvironmentLoop:
             props_which_should_not_be_none
         ), "Failed to initialize env loop."
 
-    # Test that we can run an episode and that the episode returns valid data.
     def test_valid_episode(self, env_spec: EnvSpec, helpers: Helpers) -> None:
+        """Test that we can run an episode and that the episode returns valid data."""
         wrapped_env, specs = helpers.get_wrapped_env(env_spec)
         env_loop_func = helpers.get_env_loop(env_spec)
 
@@ -72,9 +76,9 @@ class TestEnvironmentLoop:
 
         helpers.assert_valid_episode(result)
 
-    # Test that we can run multiple episodes using train and eval loop, and no
-    # exception should be thrown
     def test_valid_multiple_episodes(self, env_spec: EnvSpec, helpers: Helpers) -> None:
+        """Test that we can run multiple episodes using train and eval loop, and no
+        exception should be thrown"""
         wrapped_env, specs = helpers.get_wrapped_env(env_spec)
         env_loop_func = helpers.get_env_loop(env_spec)
 

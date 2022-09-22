@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""GAE unit tests"""
+
 from types import SimpleNamespace
 from typing import Callable, List, Tuple
 
@@ -266,6 +268,7 @@ def test_gae_function_stop_gradient(
         inner_discounts: jnp.ndarray,
         inner_values: jnp.ndarray,
     ) -> jnp.ndarray:
+        """Scalar advantage function"""
         return jnp.sum(
             gae_fn(
                 rewards=inner_rewards, discounts=inner_discounts, values=inner_values

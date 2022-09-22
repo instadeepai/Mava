@@ -33,6 +33,8 @@ from mava.systems.executor import Executor
 
 @dataclass
 class DummyExecutorSelectActionConfig:
+    """Dummy config for executor select action"""
+
     parm_0: int
 
 
@@ -118,6 +120,8 @@ def select_actions(
 
 
 class MockExecutor(Executor):
+    """Mock for the executor"""
+
     def __init__(self) -> None:
         """Init for mock executor."""
         observations = {

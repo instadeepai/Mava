@@ -1,3 +1,20 @@
+# python3
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Network unit test"""
+
 from typing import Any, Callable, Dict, List, Sequence
 
 import jax
@@ -31,6 +48,7 @@ def test_network_factory() -> Callable:
         ),
         critic_layer_sizes: Sequence[int] = (512, 512, 256),
     ) -> Dict[str, Any]:
+        """Create default networks"""
         net_keys = {"net_1", "net_2", "net_3"}
         networks = {}
 
@@ -48,6 +66,7 @@ def test_network_factory() -> Callable:
         return networks
 
     def network_factory(*args: Any, **kwargs: Any) -> Any:
+        """Network factory"""
         return make_default_networks(  # type: ignore
             policy_layer_sizes=(256, 256, 256),
             critic_layer_sizes=(512, 512, 256),

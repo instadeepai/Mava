@@ -184,8 +184,8 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
                 tree.flatten(observed_item),
             )
 
-        # Make sure the signature matches was is being written by Reverb.
         def _check_signature(spec: tf.TensorSpec, value: np.ndarray) -> None:
+            """Make sure the signature matches was is being written by Reverb."""
             self.assertTrue(spec.is_compatible_with(tf.convert_to_tensor(value)))
 
         # Check that it is possible to unpack observed using the signature.

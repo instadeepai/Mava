@@ -1,3 +1,20 @@
+# python3
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Unit tests for environment components"""
+
 import functools
 from types import SimpleNamespace
 from typing import Any
@@ -54,7 +71,10 @@ def test_parallel_executor_environment_loop() -> ParallelExecutorEnvironmentLoop
     """Pytest fixture for executor environment loop"""
 
     class ExecutorStatsWrapperClass:
+        """Executor stats wrapper"""
+
         def __init__(self, executor_environment_loop: Any) -> None:
+            """Init"""
             self.executor_environment_loop = executor_environment_loop
             self.wrapped = True
 
@@ -70,6 +90,7 @@ def test_builder() -> SystemBuilder:
     """Pytest fixture for system builder."""
 
     def environment_factory(evaluation: bool) -> str:
+        """Function to construct the environment"""
         return "environment_eval_" + ("true" if evaluation else "false")
 
     global_config = SimpleNamespace(environment_factory=environment_factory)

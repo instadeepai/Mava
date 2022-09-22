@@ -13,10 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Utils for the tests"""
+
 from enum import Enum
 
 
 class EnvSource(str, Enum):
+    """Environment enumeration"""
+
     PettingZoo = "pettingzoo"
     RLLibMultiEnv = "rllibmultienv"
     Flatland = "flatland"
@@ -24,22 +28,29 @@ class EnvSource(str, Enum):
 
 
 class MockedEnvironments(str, Enum):
+    """Environment actions' type mocks"""
+
     Mocked_Dicrete = "discrete_mock"
     Mocked_Continous = "continous_mock"
 
 
 class EnvType(Enum):
+    """Environment type"""
+
     Sequential = 1
     Parallel = 2
 
 
 class EnvSpec:
+    """Environment spec"""
+
     def __init__(
         self,
         env_name: str,
         env_type: EnvType,
         env_source: EnvSource = EnvSource.PettingZoo,
     ):
+        """Init"""
         self.env_name = env_name
         self.env_type = env_type
         self.env_source = env_source

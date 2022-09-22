@@ -55,6 +55,7 @@ class Logger(MavaLogger):
         external_logger: Optional[base.Logger] = None,
         **external_logger_kwargs: Any,
     ):
+        """Init"""
         self._label = label
 
         if not isinstance(directory, Path):

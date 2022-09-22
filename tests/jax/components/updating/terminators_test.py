@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Terminator component unit tests"""
+
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Type
 
@@ -34,12 +36,16 @@ from tests.jax.components.updating.terminators_test_data import (
 
 @dataclass
 class MockParameterStore:
+    """Mock for the parameter store"""
+
     parameters: Optional[Dict[str, Any]] = None
     stopped: bool = False
 
 
 @dataclass
 class MockParameterServer:
+    """Mock for the parameter server"""
+
     store: Optional[MockParameterStore] = None
 
 
@@ -80,6 +86,7 @@ def test_count_condition_terminator_terminated(
     test_parameter_server = mock_parameter_server
 
     def _set_stopped() -> None:
+        """Stop flag"""
         test_parameter_server.store.stopped = True
 
     test_terminator = CountConditionTerminator(
@@ -106,6 +113,7 @@ def test_count_condition_terminator_not_terminated(
     test_parameter_server = mock_parameter_server
 
     def _set_stopped() -> None:
+        """Stop flag"""
         test_parameter_server.store.stopped = True
 
     test_terminator = CountConditionTerminator(
@@ -138,6 +146,7 @@ def test_count_condition_terminator_exceptions(
         test_parameter_server = mock_parameter_server
 
         def _set_stopped() -> None:
+            """Stop flag"""
             test_parameter_server.store.stopped = True
 
         test_terminator = CountConditionTerminator(
@@ -162,6 +171,7 @@ def test_time_terminator_terminated(
     test_parameter_server = mock_parameter_server
 
     def _set_stopped() -> None:
+        """Stop flag"""
         test_parameter_server.store.stopped = True
 
     test_terminator = TimeTerminator(
@@ -183,6 +193,7 @@ def test_time_terminator_not_terminated(
     test_parameter_server = mock_parameter_server
 
     def _set_stopped() -> None:
+        """Stop flag"""
         test_parameter_server.store.stopped = True
 
     test_terminator = TimeTerminator(

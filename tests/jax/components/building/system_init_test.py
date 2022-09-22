@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""System init unit tests"""
+
 from typing import Dict, List, Tuple
 
 import pytest

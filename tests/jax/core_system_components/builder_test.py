@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Builder unit test"""
+
 from types import SimpleNamespace
 from typing import List
 
@@ -25,6 +27,8 @@ from tests.jax.hook_order_tracking import HookOrderTracking
 
 
 class TestBuilder(HookOrderTracking, Builder):
+    """Mock for the builder"""
+
     __test__ = False
 
     def __init__(

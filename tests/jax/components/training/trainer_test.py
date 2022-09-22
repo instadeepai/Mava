@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Trainer unit test"""
+
 from types import SimpleNamespace
 from typing import List
 
@@ -55,6 +57,8 @@ def one_trainer_per_network_init() -> OneTrainerPerNetworkInit:
 
 
 class MockBuilder(Builder):
+    """Mock for the builder"""
+
     def __init__(
         self,
         components: List[Callback],
@@ -156,6 +160,8 @@ def mock_builder_no_shared_weights_random_sampling() -> Builder:
 
 
 class MockTrainer(Trainer):
+    """Mock for the trainer"""
+
     def __init__(
         self,
         store: SimpleNamespace,

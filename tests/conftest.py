@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Helper components for the tests"""
+
 import importlib
 import typing
 from typing import Any, Dict, List, Tuple, Union
@@ -80,6 +82,8 @@ Helpers contains re-usable test functions.
 
 
 class Helpers:
+    """Helper class for the tests"""
+
     @staticmethod
     def verify_all_props_not_none(props_which_should_not_be_none: list) -> bool:
         """Check all props are not none

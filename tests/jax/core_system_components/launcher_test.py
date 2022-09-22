@@ -76,7 +76,7 @@ def test_add_multi_process(mock_builder: MockBuilder) -> None:
     """Test add method in the Launcher for the case of multi process
 
     Args:
-        mock_data_server_fn
+        mock_builder: Mock of the builder
     """
     launcher = Launcher(multi_process=True)
     data_server = launcher.add(
@@ -105,8 +105,7 @@ def test_add_multi_process_two_add_calls(mock_builder: MockBuilder) -> None:
     """Test calling add more than one time method in the Launcher for the case of multi process # noqa:E501
 
     Args:
-        mock_data_server_fn
-        mock_parameter_server_fn
+        mock_builder: Mock of the builder
     """
     launcher = Launcher(multi_process=True)
     data_server = launcher.add(
@@ -151,8 +150,7 @@ def test_add_multi_process_two_add_same_name(mock_builder: MockBuilder) -> None:
     """Test calling twice add for two nodes with same name for the case of multi process
 
     Args:
-        mock_parameter_server_fn
-        mock_parameter_server_second_fn
+        mock_builder: mock of the builder
     """
     launcher = Launcher(multi_process=True)
 
@@ -191,7 +189,7 @@ def test_add_non_multi_process_reverb_node(mock_builder: MockBuilder) -> None:
     """Test the add method for the case of one process and for node_type reverb
 
     Args:
-        mock_builder
+        mock_builder: mock of the builder
     """
     launcher = Launcher(multi_process=False)
     with pytest.raises(ValueError):
@@ -227,7 +225,7 @@ def test_add_non_multi_process_courier_node(mock_builder: MockBuilder) -> None:
     """Test the add method for the case of one process and for node_type courier
 
     Args:
-        mock_builder
+        mock_builder: mock of the builder
     """
     launcher = Launcher(multi_process=False)
     with pytest.raises(ValueError):
@@ -255,7 +253,7 @@ def test_add_non_multi_process_two_add_calls(mock_builder: MockBuilder) -> None:
     """Test calling twice add method for the case of one process
 
     Args:
-        mock_builder
+        mock_builder: mock of the builder
     """
     launcher = Launcher(multi_process=False)
     data_server = launcher.add(
@@ -292,7 +290,7 @@ def test_add_non_multi_process_two_add_same_name(mock_builder: MockBuilder) -> N
     """Test calling twice add method for two nodes with same name and for the case of one process and for node_type reverb # noqa:E501
 
     Args:
-        mock_builder
+        mock_builder: mock of the builder
     """
     launcher = Launcher(multi_process=False)
 
@@ -328,7 +326,7 @@ def test_get_nodes_non_multi_process(mock_builder: MockBuilder) -> None:
     """Test get_nodes method in the case of one process with two nodes
 
     Args:
-        mock_builder
+        mock_builder: mock of the builder
     """
     launcher = Launcher(multi_process=False)
     data_server = launcher.add(

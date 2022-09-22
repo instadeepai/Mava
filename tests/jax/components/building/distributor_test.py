@@ -30,6 +30,8 @@ from mava.systems.launcher import Launcher
 
 
 class MockBuilder(Builder):
+    """Mock builder class"""
+
     def __init__(self) -> None:
         """Initiator of a MockBuilder
 

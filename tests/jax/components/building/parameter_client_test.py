@@ -35,6 +35,8 @@ from mava.systems.parameter_server import ParameterServer
 
 
 class MockBaseParameterClient(BaseParameterClient):
+    """Mock for Parameter client"""
+
     def __init__(self, config: Any) -> None:
         """Initialize mock base parameter client class to test the \
             _set_up_count_parameters method in BaseParameterClient."""

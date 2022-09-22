@@ -31,6 +31,8 @@ from tests.jax.mocks import make_fake_environment_factory
 
 
 class MockBuilder(Builder):
+    """Mock builder class"""
+
     def __init__(
         self,
         components: List[Callback],

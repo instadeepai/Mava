@@ -29,10 +29,14 @@ from mava.types import OLT
 
 
 class MockAdder:
+    """Mock for adder"""
+
     def __init__(self) -> None:
+        """Initiator of a mock adder"""
         pass
 
     def add_first(self, timestep: TimeStep, extras: Dict[str, Any]) -> None:
+        """Record the first observation of a trajectory."""
         self.test_timestep = timestep
         self.test_extras = extras
 
@@ -42,16 +46,21 @@ class MockAdder:
         next_timestep: TimeStep,
         next_extras: Dict[str, Any],
     ) -> None:
+        """Record the observation of a trajectory."""
         self.test_adder_actions = actions
         self.test_next_timestep = next_timestep
         self.test_next_extras = next_extras
 
 
 class MockExecutorParameterClient:
+    """Mock for the executor's parameter client"""
+
     def __init__(self) -> None:
+        """Initiator of an executor's parameter client"""
         self.parm = False
 
     def get_async(self) -> None:
+        """Asynchronously updates the get variables with the latest copy from source."""
         self.parm = True
 
 
@@ -70,7 +79,10 @@ def executor_without_adder() -> Executor:
 
 
 class MockExecutor(Executor):
+    """Mock for the executor"""
+
     def __init__(self, *args: object) -> None:
+        """Initiator of a mock for the executor"""
         # agent_net_keys
         agent_net_keys = {
             "agent_0": "network_agent_0",

@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Checkpointer unit test"""
+
 import os
 import tempfile
 import time
@@ -29,12 +31,16 @@ from mava.core_jax import SystemParameterServer
 
 @dataclass
 class MockParameterStore:
+    """Mock for the parameter store"""
+
     parameters: Optional[Dict[str, Any]] = None
     experiment_path: Optional[str] = None
 
 
 @dataclass
 class MockParameterServer:
+    """Mock for the parameter server"""
+
     store: Optional[MockParameterStore] = None
 
 
