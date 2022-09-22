@@ -94,6 +94,9 @@ class ExecutorParameterClient(BaseParameterClient):
         """
         # Create policy parameters
         params = {}
+        # Executor does not explicitly set variables i.e. it adds to count variables
+        # and hence set_keys is empty
+        set_keys = []
         get_keys = []
         net_type_key = "networks"
 
@@ -115,14 +118,6 @@ class ExecutorParameterClient(BaseParameterClient):
         get_keys.extend(count_names)
 
         builder.store.executor_counts = {name: params[name] for name in count_names}
-
-        set_keys = get_keys.copy()
-
-        # Executors should only be able to update relevant params.
-        if builder.store.is_evaluator is True:
-            set_keys = [x for x in set_keys if x.startswith("evaluator")]
-        else:
-            set_keys = [x for x in set_keys if x.startswith("executor")]
 
         parameter_client = None
         if builder.store.parameter_server_client:
