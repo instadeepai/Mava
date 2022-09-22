@@ -74,14 +74,12 @@ def mock_trainer() -> Trainer:
     }
 
     network = {
-        "networks": {
-            "network_agent": SimpleNamespace(
-                policy_network=MockPolicyNet,
-                critic_network=MockCriticNet,
-                log_prob=log_prob,
-                entropy=entropy,
-            )
-        }
+        "network_agent": SimpleNamespace(
+            policy_network=MockPolicyNet,
+            critic_network=MockCriticNet,
+            log_prob=log_prob,
+            entropy=entropy,
+        )
     }
 
     base_key = jax.random.PRNGKey(5)

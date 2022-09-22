@@ -3,7 +3,9 @@ from typing import Any, Dict, Sequence, Union
 
 import numpy as np
 import pytest
+from optax import EmptyState
 
+from mava import constants
 from mava.components.jax.updating.parameter_server import (
     DefaultParameterServer,
     ParameterServerConfig,
@@ -50,25 +52,26 @@ class MockSystemParameterServer(SystemParameterServer):
 def mock_system_parameter_server() -> SystemParameterServer:
     """Pytest fixture for mock system parameter server"""
     mock_system_parameter_server = MockSystemParameterServer()
-
     mock_system_parameter_server.store.network_factory = lambda: {
-        "net_type_1": {
-            "agent_net_1": SimpleNamespace(
-                policy_params="net_1_1_params", critic_params="net_1_1_params"
-            ),
-            "agent_net_2": SimpleNamespace(
-                policy_params="net_1_2_params", critic_params="net_1_2_params"
-            ),
-        },
-        "net_type_2": {
-            "agent_net_1": SimpleNamespace(
-                policy_params="net_2_1_params", critic_params="net_2_1_params"
-            ),
-            "agent_net_2": SimpleNamespace(
-                policy_params="net_2_2_params", critic_params="net_2_2_params"
-            ),
-        },
+        "agent_net_1": SimpleNamespace(
+            policy_params="net_1_1_params", critic_params="net_1_1_params"
+        ),
+        "agent_net_2": SimpleNamespace(
+            policy_params="net_1_2_params", critic_params="net_1_2_params"
+        ),
     }
+    mock_system_parameter_server.store.networks = (
+        mock_system_parameter_server.store.network_factory()
+    )
+    mock_system_parameter_server.store.policy_opt_states = {}
+    mock_system_parameter_server.store.critic_opt_states = {}
+    for net_key in mock_system_parameter_server.store.networks.keys():
+        mock_system_parameter_server.store.policy_opt_states[net_key] = {
+            constants.OPT_STATE_DICT_KEY: EmptyState()
+        }
+        mock_system_parameter_server.store.critic_opt_states[net_key] = {
+            constants.OPT_STATE_DICT_KEY: EmptyState()
+        }
 
     mock_system_parameter_server.store.parameters = {
         "param1": "param1_value",
@@ -126,36 +129,20 @@ def test_on_parameter_server_init_start_parameter_creation(
 
     # Parameter store network parameters
     assert (
-        mock_system_parameter_server.store.parameters["policy_net_type_1-agent_net_1"]
+        mock_system_parameter_server.store.parameters["policy_network-agent_net_1"]
         == "net_1_1_params"
     )
     assert (
-        mock_system_parameter_server.store.parameters["policy_net_type_1-agent_net_2"]
+        mock_system_parameter_server.store.parameters["policy_network-agent_net_2"]
         == "net_1_2_params"
     )
     assert (
-        mock_system_parameter_server.store.parameters["policy_net_type_2-agent_net_1"]
-        == "net_2_1_params"
-    )
-    assert (
-        mock_system_parameter_server.store.parameters["policy_net_type_2-agent_net_2"]
-        == "net_2_2_params"
-    )
-    assert (
-        mock_system_parameter_server.store.parameters["critic_net_type_1-agent_net_1"]
+        mock_system_parameter_server.store.parameters["critic_network-agent_net_1"]
         == "net_1_1_params"
     )
     assert (
-        mock_system_parameter_server.store.parameters["critic_net_type_1-agent_net_2"]
+        mock_system_parameter_server.store.parameters["critic_network-agent_net_2"]
         == "net_1_2_params"
-    )
-    assert (
-        mock_system_parameter_server.store.parameters["critic_net_type_2-agent_net_1"]
-        == "net_2_1_params"
-    )
-    assert (
-        mock_system_parameter_server.store.parameters["critic_net_type_2-agent_net_2"]
-        == "net_2_2_params"
     )
 
 

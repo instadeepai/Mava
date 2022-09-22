@@ -384,6 +384,5 @@ def make_default_networks(
             policy_recurrent_layer_sizes=policy_recurrent_layer_sizes,
         )
 
-    return {
-        "networks": networks,
-    }
+    # No longer returning a dictionary since this is handled in PPONetworks above
+    return networks
