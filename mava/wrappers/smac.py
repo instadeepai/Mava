@@ -290,7 +290,7 @@ class SMACWrapper(ParallelEnvWrapper):
         return stats
 
     def get_extra_stats(self) -> Optional[Dict]:
-        """Return extra stats to be logged.
+        """Return extra stats to be logged during the evaluation only.
 
         Returns:
            Win rate
