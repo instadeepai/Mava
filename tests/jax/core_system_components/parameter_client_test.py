@@ -47,7 +47,7 @@ class MockParameterServer(ParameterServer):
         for name in names:
             if name.split("_")[0] == "key" or name.split("_")[0] == "allkey":
                 self.store.parameters[name] += 1
-            elif name.split("-")[0] == "networks":
+            elif "network" in name.split("-")[0]:
                 self.store.parameters[name]["layer_0"]["weights"] += 1
                 self.store.parameters[name]["layer_0"]["biases"] += 1
 
@@ -80,7 +80,7 @@ def increment_set_parameters(
     for key in names:
         if key.split("_")[0] == "key" or key.split("_")[0] == "allkey":
             params[key] += 1
-        elif key.split("-")[0] == "networks":
+        elif "network" in key.split("-")[0]:
             params[key]["layer_0"]["weights"] += 1
             params[key]["layer_0"]["biases"] += 1
 
@@ -96,9 +96,12 @@ def mock_parameter_server() -> ParameterServer:
                 "key_2": np.array(2, dtype=np.int32),
                 "key_3": np.array(3, dtype=np.int32),
                 "key_4": np.array(4, dtype=np.int32),
-                "networks-network_key_0": {"layer_0": {"weights": 0, "biases": 0}},
-                "networks-network_key_1": {"layer_0": {"weights": 1, "biases": 1}},
-                "networks-network_key_2": {"layer_0": {"weights": 2, "biases": 2}},
+                "policy_network-network_key_0": {
+                    "layer_0": {"weights": 0, "biases": 0}
+                },
+                "critic_network-network_key_1": {
+                    "layer_0": {"weights": 1, "biases": 1}
+                },
                 "allkey_0": np.array(0, dtype=np.int32),
             },
         ),
@@ -128,9 +131,8 @@ def parameter_client(mock_parameter_server: ParameterServer) -> ParameterClient:
             "key_2": np.array(2, dtype=np.int32),
             "key_3": np.array(3, dtype=np.int32),
             "key_4": np.array(4, dtype=np.int32),
-            "networks-network_key_0": {"layer_0": {"weights": 0, "biases": 0}},
-            "networks-network_key_1": {"layer_0": {"weights": 1, "biases": 1}},
-            "networks-network_key_2": {"layer_0": {"weights": 2, "biases": 2}},
+            "policy_network-network_key_0": {"layer_0": {"weights": 0, "biases": 0}},
+            "critic_network-network_key_1": {"layer_0": {"weights": 1, "biases": 1}},
             "allkey_0": np.array(0, dtype=np.int32),
         },
         get_keys=[
@@ -139,9 +141,8 @@ def parameter_client(mock_parameter_server: ParameterServer) -> ParameterClient:
             "key_2",
             "key_3",
             "key_4",
-            "networks-network_key_0",
-            "networks-network_key_1",
-            "networks-network_key_2",
+            "policy_network-network_key_0",
+            "critic_network-network_key_1",
         ],
         set_keys=[
             "key_0",
@@ -171,9 +172,8 @@ def test_get_and_wait(parameter_client: ParameterClient) -> None:
         "key_2": np.array(2, dtype=np.int32),
         "key_3": np.array(4, dtype=np.int32),
         "key_4": np.array(5, dtype=np.int32),
-        "networks-network_key_0": {"layer_0": {"weights": 1, "biases": 1}},
-        "networks-network_key_1": {"layer_0": {"weights": 2, "biases": 2}},
-        "networks-network_key_2": {"layer_0": {"weights": 3, "biases": 3}},
+        "policy_network-network_key_0": {"layer_0": {"weights": 1, "biases": 1}},
+        "critic_network-network_key_1": {"layer_0": {"weights": 2, "biases": 2}},
         "allkey_0": np.array(0, dtype=np.int32),
     }
 
@@ -189,9 +189,8 @@ def test_get_all_and_wait(parameter_client: ParameterClient) -> None:
         "key_2": np.array(2, dtype=np.int32),
         "key_3": np.array(4, dtype=np.int32),
         "key_4": np.array(5, dtype=np.int32),
-        "networks-network_key_0": {"layer_0": {"weights": 1, "biases": 1}},
-        "networks-network_key_1": {"layer_0": {"weights": 2, "biases": 2}},
-        "networks-network_key_2": {"layer_0": {"weights": 3, "biases": 3}},
+        "policy_network-network_key_0": {"layer_0": {"weights": 1, "biases": 1}},
+        "critic_network-network_key_1": {"layer_0": {"weights": 2, "biases": 2}},
         "allkey_0": np.array(1, dtype=np.int32),
     }
 
@@ -216,9 +215,8 @@ def test_set_and_wait(parameter_client: ParameterClient) -> None:
         "key_2": np.array(3, dtype=np.int32),
         "key_3": np.array(3, dtype=np.int32),
         "key_4": np.array(4, dtype=np.int32),
-        "networks-network_key_0": {"layer_0": {"weights": 0, "biases": 0}},
-        "networks-network_key_1": {"layer_0": {"weights": 1, "biases": 1}},
-        "networks-network_key_2": {"layer_0": {"weights": 2, "biases": 2}},
+        "policy_network-network_key_0": {"layer_0": {"weights": 0, "biases": 0}},
+        "critic_network-network_key_1": {"layer_0": {"weights": 1, "biases": 1}},
         "allkey_0": np.array(0, dtype=np.int32),
     }
 
@@ -240,9 +238,8 @@ def test_get_async(parameter_client: ParameterClient) -> None:
         "key_2": np.array(2, dtype=np.int32),
         "key_3": np.array(4, dtype=np.int32),
         "key_4": np.array(5, dtype=np.int32),
-        "networks-network_key_0": {"layer_0": {"weights": 1, "biases": 1}},
-        "networks-network_key_1": {"layer_0": {"weights": 2, "biases": 2}},
-        "networks-network_key_2": {"layer_0": {"weights": 3, "biases": 3}},
+        "policy_network-network_key_0": {"layer_0": {"weights": 1, "biases": 1}},
+        "critic_network-network_key_1": {"layer_0": {"weights": 2, "biases": 2}},
         "allkey_0": np.array(0, dtype=np.int32),
     }
     assert parameter_client._get_call_counter == 0
@@ -294,16 +291,14 @@ def test_set_and_get_async(parameter_client: ParameterClient) -> None:
     )
 
     parameter_client.set_and_get_async()
-
     assert parameter_client._parameters == {
         "key_0": np.array(1, dtype=np.int32),
         "key_1": np.array(2, dtype=np.float32),
         "key_2": np.array(3, dtype=np.int32),
         "key_3": np.array(4, dtype=np.int32),
         "key_4": np.array(5, dtype=np.int32),
-        "networks-network_key_0": {"layer_0": {"weights": 1, "biases": 1}},
-        "networks-network_key_1": {"layer_0": {"weights": 2, "biases": 2}},
-        "networks-network_key_2": {"layer_0": {"weights": 3, "biases": 3}},
+        "policy_network-network_key_0": {"layer_0": {"weights": 1, "biases": 1}},
+        "critic_network-network_key_1": {"layer_0": {"weights": 2, "biases": 2}},
         "allkey_0": np.array(0, dtype=np.int32),
     }
 
@@ -346,7 +341,7 @@ def test__copy(parameter_client: ParameterClient) -> None:
     """Test _copy method with different kinds of new parameters"""
     parameter_client._copy(
         new_parameters={
-            "networks-network_key_0": {
+            "policy_network-network_key_0": {
                 "layer_0": {"weights": "new_weights", "biases": "new_biases"}
             },
             "key_2": np.array(20, dtype=np.int32),
@@ -354,7 +349,7 @@ def test__copy(parameter_client: ParameterClient) -> None:
         }
     )
 
-    assert parameter_client._parameters["networks-network_key_0"] == {
+    assert parameter_client._parameters["policy_network-network_key_0"] == {
         "layer_0": {"weights": "new_weights", "biases": "new_biases"}
     }
     assert parameter_client._parameters["key_2"] == 20
@@ -380,7 +375,7 @@ def test__copy_device_not_implemented_error(parameter_client: ParameterClient) -
     with pytest.raises(NotImplementedError):
         parameter_client._copy(
             new_parameters={
-                "networks-network_key_0": {
+                "policy_network-network_key_0": {
                     "layer_0": {"weights": "new_weights", "biases": "new_biases"}
                 }
             },

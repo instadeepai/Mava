@@ -69,20 +69,18 @@ class MockBuilder(Builder):
         super().__init__(components, global_config)
         self.store.agents = ["agent_0", "agent_1", "agent_2"]
         self.store.network_factory = lambda: {  # network factory to network
-            "networks": {
-                "network_agent_0": SimpleNamespace(
-                    policy_params={"weights": 0, "biases": 0},
-                    critic_params={"weights": 0, "biases": 0},
-                ),
-                "network_agent_1": SimpleNamespace(
-                    policy_params={"weights": 1, "biases": 1},
-                    critic_params={"weights": 1, "biases": 1},
-                ),
-                "network_agent_2": SimpleNamespace(
-                    policy_params={"weights": 2, "biases": 2},
-                    critic_params={"weights": 2, "biases": 2},
-                ),
-            }
+            "network_agent_0": SimpleNamespace(
+                policy_params={"weights": 0, "biases": 0},
+                critic_params={"weights": 0, "biases": 0},
+            ),
+            "network_agent_1": SimpleNamespace(
+                policy_params={"weights": 1, "biases": 1},
+                critic_params={"weights": 1, "biases": 1},
+            ),
+            "network_agent_2": SimpleNamespace(
+                policy_params={"weights": 2, "biases": 2},
+                critic_params={"weights": 2, "biases": 2},
+            ),
         }
 
         self.store.policy_optimiser = optax.chain(
@@ -303,7 +301,7 @@ def check_opt_states(mock_builder: Builder) -> None:
         "network_agent_2",
     ]
 
-    for net_key in mock_builder.store.networks["networks"].keys():
+    for net_key in mock_builder.store.networks.keys():
         assert (
             mock_builder.store.policy_opt_states[net_key][constants.OPT_STATE_DICT_KEY][
                 0
@@ -344,7 +342,7 @@ def check_opt_states(mock_builder: Builder) -> None:
         ) == list(
             jax.tree_util.tree_map(
                 lambda t: jnp.zeros_like(t, dtype=float),
-                mock_builder.store.networks["networks"][net_key].policy_params,
+                mock_builder.store.networks[net_key].policy_params,
             )
         )
         assert list(
@@ -354,7 +352,7 @@ def check_opt_states(mock_builder: Builder) -> None:
         ) == list(
             jax.tree_util.tree_map(
                 lambda t: jnp.zeros_like(t, dtype=float),
-                mock_builder.store.networks["networks"][net_key].critic_params,
+                mock_builder.store.networks[net_key].critic_params,
             )
         )
 
@@ -365,7 +363,7 @@ def check_opt_states(mock_builder: Builder) -> None:
         ) == list(
             jax.tree_util.tree_map(
                 jnp.zeros_like,
-                mock_builder.store.networks["networks"][net_key].policy_params,
+                mock_builder.store.networks[net_key].policy_params,
             )
         )
         assert list(
@@ -375,7 +373,7 @@ def check_opt_states(mock_builder: Builder) -> None:
         ) == list(
             jax.tree_util.tree_map(
                 jnp.zeros_like,
-                mock_builder.store.networks["networks"][net_key].critic_params,
+                mock_builder.store.networks[net_key].critic_params,
             )
         )
 
