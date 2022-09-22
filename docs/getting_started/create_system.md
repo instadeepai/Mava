@@ -34,6 +34,7 @@ class IPPOSystem(System):
             adder_priority=building.UniformAdderPriority,
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
             networks=building.DefaultNetworks,
+            optimisers=building.DefaultOptimisers,
         ).get()
 
         # Trainer
@@ -61,6 +62,7 @@ class IPPOSystem(System):
             executor_parameter_client=building.ExecutorParameterClient,
             trainer_parameter_client=building.TrainerParameterClient,
             termination_condition=updating.CountConditionTerminator,
+            checkpointer=updating.Checkpointer,
         ).get()
 
         system = DesignSpec(
@@ -86,7 +88,7 @@ When building the system, `system.build` can contain arguments that will overwri
 
 - `logger_factory` - used to construct the loggers.
 
-- `experiment_path` - the destination to save the experiment results.
+- `experiment_path` - the folder for saving experiment results and restoring a checkpoint from a previous experiment. **To load a pre-trained checkpoint, this variable must point to an existing folder that contains the checkpoint folder generated from a previous experiment.**
 
 - `policy_optimiser` - the optimiser used by the trainer to updated the policy weights.
 
