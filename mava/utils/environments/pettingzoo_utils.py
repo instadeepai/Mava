@@ -50,10 +50,8 @@ from mava.wrappers import (
     PettingZooParallelEnvWrapper,
     SequentialEnvWrapper,
 )
+from mava.wrappers.env_preprocess_wrappers import ConcatAgentIdToObservation
 
-from mava.wrappers.env_preprocess_wrappers import (
-    ConcatAgentIdToObservation,
-)
 
 def atari_preprocessing(
     env: Union[ParallelEnvWrapper, SequentialEnvWrapper]
@@ -151,6 +149,6 @@ def make_environment(
         raise Exception("Pettingzoo is not installed.")
 
     if concat_agent_id:
-            env = ConcatAgentIdToObservation(env)
+        env = ConcatAgentIdToObservation(env)
 
     return environment

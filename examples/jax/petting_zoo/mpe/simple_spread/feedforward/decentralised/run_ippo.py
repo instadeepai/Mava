@@ -57,7 +57,7 @@ def main(_: Any) -> None:
         pettingzoo_utils.make_environment,
         env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
-        concat_agent_id=True,                       # Concatenate agent_ids to the environment observations.
+        concat_agent_id=True,  # Concatenate agent_ids to the environment observations.
     )
 
     # Networks.

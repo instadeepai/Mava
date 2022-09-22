@@ -32,6 +32,7 @@ from mava.wrappers.env_preprocess_wrappers import (
 )
 
 if _found_smac:
+
     def make_environment(
         map_name: str = "3m",
         concat_prev_actions: bool = False,
