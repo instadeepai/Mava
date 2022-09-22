@@ -289,8 +289,13 @@ class SMACWrapper(ParallelEnvWrapper):
         del stats["win_rate"]
         return stats
 
-    def get_extra_stats(self) -> Optional[Dict]:
-        """Return extra stats to be logged during the evaluation only.
+    def get_interval_stats(self) -> Optional[Dict]:
+        """Computes environment statistics which should be exclusively \
+            computed over a given number of evaluation episodes.
+
+        An example would be a win rate calculation where it is required to
+        keep track of the number of games won over a given set of evaluation
+        episodes.
 
         Returns:
            Win rate

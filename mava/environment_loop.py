@@ -621,9 +621,9 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         results = jax.tree_map(lambda x, y: x + y, results, result)
                     # compute the mean over all evaluation runs
                     results = jax.tree_map(lambda x: x / evaluation_duration, results)
-                    # Check for extra loggs
-                    if hasattr(self._environment, "get_extra_stats"):
-                        results.update(self._environment.get_extra_stats())
+                    # Check for extra logs
+                    if hasattr(self._environment, "get_interval_stats"):
+                        results.update(self._environment.get_interval_stats())
                     self._logger.write(results)
 
                 else:
