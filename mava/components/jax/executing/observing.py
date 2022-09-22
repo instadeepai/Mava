@@ -184,7 +184,7 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
         for agent in executor.store.agent_net_keys.keys():
             network = executor.store.agent_net_keys[agent]
             executor.store.policy_states[agent] = copy.copy(
-                executor.store.networks["networks"][network].get_init_state()
+                executor.store.networks[network].get_init_state()
             )
 
         # Return if the executor has no adder.

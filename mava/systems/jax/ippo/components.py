@@ -90,7 +90,7 @@ class ExtrasLogProbSpec(ExtrasSpec):
         for agent in builder.store.agent_net_keys.keys():
             network = builder.store.agent_net_keys[agent]
 
-            init_state = networks["networks"][network].get_init_state()
+            init_state = networks[network].get_init_state()
             if init_state is not None:
                 net_states[agent] = init_state
 

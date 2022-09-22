@@ -205,7 +205,7 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
 
         # Dict with params per network
         current_agent_params = {
-            network: executor.store.networks["networks"][network].get_params()
+            network: executor.store.networks[network].get_params()
             for network in executor.store.agent_net_keys.values()
         }
 
@@ -290,7 +290,7 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             # Since this is jitted, compiling a forloop with lots of agents could take
             # long, we should vectorize this.
             for agent, observation in observations.items():
-                network = networks["networks"][agent_net_keys[agent]]
+                network = networks[agent_net_keys[agent]]
                 (
                     actions_info[agent],
                     policies_info[agent],
