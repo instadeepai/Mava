@@ -138,7 +138,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                             batch_size, seq_len, -1
                         )
 
-                        bs_policy_states = policy_states[0].reshape(
+                        batch_seq_policy_states = policy_states[0].reshape(
                             batch_size, seq_len, -1
                         )
 
@@ -149,7 +149,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                         distribution_params, _ = hk.static_unroll(
                             core,
                             batch_seq_observations,
-                            bs_policy_states[:, 0],
+                            batch_seq_policy_states[:, 0],
                             time_major=False,
                         )
 
