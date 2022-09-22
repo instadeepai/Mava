@@ -76,11 +76,9 @@ class network:
 
 
 networks = {
-    "networks": {
-        "network_agent_0": network,
-        "network_agent_1": network,
-        "network_agent_2": network,
-    }
+    "network_agent_0": network,
+    "network_agent_1": network,
+    "network_agent_2": network,
 }
 
 

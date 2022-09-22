@@ -304,17 +304,15 @@ class MockRecurrentExecutor(Executor):  # type: ignore # noqa: E501
             "agent_2": "agent_2",
         }
         networks = {
-            "networks": {
-                agent_net_keys["agent_0"]: SimpleNamespace(
-                    get_action=get_action, get_params=get_params
-                ),
-                agent_net_keys["agent_1"]: SimpleNamespace(
-                    get_action=get_action, get_params=get_params
-                ),
-                agent_net_keys["agent_2"]: SimpleNamespace(
-                    get_action=get_action, get_params=get_params
-                ),
-            }
+            agent_net_keys["agent_0"]: SimpleNamespace(
+                get_action=get_action, get_params=get_params
+            ),
+            agent_net_keys["agent_1"]: SimpleNamespace(
+                get_action=get_action, get_params=get_params
+            ),
+            agent_net_keys["agent_2"]: SimpleNamespace(
+                get_action=get_action, get_params=get_params
+            ),
         }
         base_key = jax.random.PRNGKey(5)
         action_info = "action_info_test"
