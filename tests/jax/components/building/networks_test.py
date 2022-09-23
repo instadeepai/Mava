@@ -202,6 +202,7 @@ def test_network_factory_rng_keys(
     # Ensure network factory passes the same key along to each network initialisation
     assert len(set(keys)) == 1
 
+
 @pytest.fixture
 def test_recurrent_network_factory() -> Callable:
     """Pytest fixture for network factory.
@@ -220,7 +221,7 @@ def test_recurrent_network_factory() -> Callable:
             256,
             256,
         ),
-        policy_recurrent_layer_sizes = (256,),
+        policy_recurrent_layer_sizes: Sequence[int] = (256,),
         critic_layer_sizes: Sequence[int] = (512, 512, 256),
     ) -> Dict[str, Any]:
         net_keys = {"net_1", "net_2", "net_3"}
@@ -251,6 +252,7 @@ def test_recurrent_network_factory() -> Callable:
 
     return network_factory
 
+
 @pytest.fixture
 def test_recurrent_networks(test_recurrent_network_factory: Callable) -> Networks:
     """Pytest fixture for default networks.
@@ -266,6 +268,7 @@ def test_recurrent_networks(test_recurrent_network_factory: Callable) -> Network
     networks_config.seed = 919
 
     return DefaultNetworks(networks_config)
+
 
 def test_network_factory_recurrent_layers(
     test_recurrent_networks: Networks, test_builder: SystemBuilder
