@@ -277,13 +277,13 @@ def test_step(mock_trainer: Trainer) -> None:
     mapg_with_trust_region_step.on_training_step_fn(trainer=mock_trainer)
     old_key = mock_trainer.store.base_key
 
-    # Step with policy states
+    # Step without policy states
+    metrics = mock_trainer.store.step_fn(dummy_sample)
+    
+     # Step with policy states
     states = jnp.zeros((1, 5))
     policy_states = {"agent_0": states, "agent_1": states, "agent_2": states}
     dummy_sample.data.extras["policy_states"] = policy_states
-    metrics = mock_trainer.store.step_fn(dummy_sample)
-
-    # Step without policy states
     metrics = mock_trainer.store.step_fn(dummy_sample)
 
     # Check that metrics were correctly computed
