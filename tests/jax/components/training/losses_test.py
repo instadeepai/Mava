@@ -35,10 +35,10 @@ class MockPolicyNet:
         """Mock function to apply the network to training data"""
         if len(observation_state) == 2:
             # Recurrent case
-            return observation_state[0][0], observation_state[1]  # noqa: E501
+            return observation_state[0][0], observation_state[1] # type: ignore
         else:
             # Feedforward case
-            return observation_state[0]  # noqa: E501
+            return observation_state[0]  # type: ignore
 
 
 class MockCriticNet:
