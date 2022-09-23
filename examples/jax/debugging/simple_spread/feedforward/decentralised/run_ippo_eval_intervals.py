@@ -81,7 +81,7 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # Optimiser.
+    # Optimisers.
     policy_optimiser = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
@@ -107,7 +107,7 @@ def main(_: Any) -> None:
         num_executors=1,
         multi_process=True,
         clip_value=False,
-        evaluation_interval={"executor_steps": 2000},
+        evaluation_interval={"executor_steps": 10000},
         evaluation_duration=32,
     )
 
