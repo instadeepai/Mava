@@ -112,7 +112,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
             loss_info_policy = {}
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
-                network = trainer.store.networks["networks"][agent_net_key]
+                network = trainer.store.networks[agent_net_key]
 
                 # Note (dries): This is placed here to set the networks correctly in
                 # the case of non-shared weights.
@@ -191,7 +191,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
             loss_info_critic = {}
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
-                network = trainer.store.networks["networks"][agent_net_key]
+                network = trainer.store.networks[agent_net_key]
 
                 def critic_loss_fn(
                     critic_params: Any,

@@ -244,7 +244,7 @@ class MAPGWithTrustRegionStep(Step):
 
             behavior_log_probs = extra["policy_info"]
 
-            networks = trainer.store.networks["networks"]
+            networks = trainer.store.networks
 
             def get_behavior_values(
                 net_key: Any, reward: Any, observation: Any
@@ -383,7 +383,7 @@ class MAPGWithTrustRegionStep(Step):
 
             # Repeat training for the given number of epoch, taking a random
             # permutation for every epoch.
-            networks = trainer.store.networks["networks"]
+            networks = trainer.store.networks
             policy_params = {
                 net_key: networks[net_key].policy_params for net_key in networks.keys()
             }
@@ -414,14 +414,14 @@ class MAPGWithTrustRegionStep(Step):
 
             # These updates must remain separate for loops since the policy and critic
             # networks could have different layers.
-            networks = trainer.store.networks["networks"]
+            networks = trainer.store.networks
 
             policy_params = {
                 net_key: networks[net_key].policy_params for net_key in networks.keys()
             }
             for net_key in policy_params.keys():
                 # The for loop below is needed to not lose the param reference.
-                net_params = trainer.store.networks["networks"][net_key].policy_params
+                net_params = trainer.store.networks[net_key].policy_params
                 for param_key in net_params.keys():
                     net_params[param_key] = new_states.policy_params[net_key][param_key]
 
@@ -437,7 +437,7 @@ class MAPGWithTrustRegionStep(Step):
             }
             for net_key in critic_params.keys():
                 # The for loop below is needed to not lose the param reference.
-                net_params = trainer.store.networks["networks"][net_key].critic_params
+                net_params = trainer.store.networks[net_key].critic_params
                 for param_key in net_params.keys():
                     net_params[param_key] = new_states.critic_params[net_key][param_key]
 

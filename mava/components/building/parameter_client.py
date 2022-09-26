@@ -95,17 +95,16 @@ class ExecutorParameterClient(BaseParameterClient):
         # Create policy parameters
         params = {}
         get_keys = []
-        net_type_key = "networks"
 
-        for agent_net_key in builder.store.networks[net_type_key].keys():
-            policy_param_key = f"policy_{net_type_key}-{agent_net_key}"
-            params[policy_param_key] = builder.store.networks[net_type_key][
+        for agent_net_key in builder.store.networks.keys():
+            policy_param_key = f"policy_network-{agent_net_key}"
+            params[policy_param_key] = builder.store.networks[
                 agent_net_key
             ].policy_params
             get_keys.append(policy_param_key)
 
-            critic_param_key = f"critic_{net_type_key}-{agent_net_key}"
-            params[critic_param_key] = builder.store.networks[net_type_key][
+            critic_param_key = f"critic_network-{agent_net_key}"
+            params[critic_param_key] = builder.store.networks[
                 agent_net_key
             ].critic_params
             get_keys.append(critic_param_key)
@@ -178,33 +177,29 @@ class TrainerParameterClient(BaseParameterClient):
         # Not all of them.
         trainer_networks = builder.store.trainer_networks[builder.store.trainer_id]
 
-        for net_type_key in builder.store.networks.keys():
-            for net_key in builder.store.networks[net_type_key].keys():
+        for net_key in builder.store.networks.keys():
+            params[f"policy_network-{net_key}"] = builder.store.networks[
+                net_key
+            ].policy_params
+            params[f"critic_network-{net_key}"] = builder.store.networks[
+                net_key
+            ].critic_params
 
-                params[f"policy_{net_type_key}-{net_key}"] = builder.store.networks[
-                    net_type_key
-                ][net_key].policy_params
+            if net_key in set(trainer_networks):
+                set_keys.append(f"policy_network-{net_key}")
+                set_keys.append(f"critic_network-{net_key}")
+            else:
+                get_keys.append(f"policy_network-{net_key}")
+                get_keys.append(f"critic_network-{net_key}")
 
-                params[f"critic_{net_type_key}-{net_key}"] = builder.store.networks[
-                    net_type_key
-                ][net_key].critic_params
-
-                if net_key in set(trainer_networks):
-                    set_keys.append(f"policy_{net_type_key}-{net_key}")
-                    set_keys.append(f"critic_{net_type_key}-{net_key}")
-                else:
-                    get_keys.append(f"policy_{net_type_key}-{net_key}")
-                    get_keys.append(f"critic_{net_type_key}-{net_key}")
-
-                if net_type_key == "networks":
-                    params[
-                        f"policy_opt_state-{net_key}"
-                    ] = builder.store.policy_opt_states[net_key]
-                    params[
-                        f"critic_opt_state-{net_key}"
-                    ] = builder.store.critic_opt_states[net_key]
-                    set_keys.append(f"policy_opt_state-{net_key}")
-                    set_keys.append(f"critic_opt_state-{net_key}")
+            params[f"policy_opt_state-{net_key}"] = builder.store.policy_opt_states[
+                net_key
+            ]
+            params[f"critic_opt_state-{net_key}"] = builder.store.critic_opt_states[
+                net_key
+            ]
+            set_keys.append(f"policy_opt_state-{net_key}")
+            set_keys.append(f"critic_opt_state-{net_key}")
 
         count_names, params = self._set_up_count_parameters(params=params)
 
