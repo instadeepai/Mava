@@ -300,13 +300,13 @@ class SMACWrapper(ParallelEnvWrapper):
         Returns:
            Win rate
         """
-        extra_stats: Dict[str, Any] = {}
-        extra_stats["win_rate"] = (
+        interval_stats: Dict[str, Any] = {}
+        interval_stats["win_rate"] = (
             self._environment.battles_won - self._battles_won
         ) / (self._environment.battles_game - self._battles_game)
         self._battles_won = self._environment.battles_won
         self._battles_game = self._environment.battles_game
-        return extra_stats
+        return interval_stats
 
     @property
     def agents(self) -> List:
