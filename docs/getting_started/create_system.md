@@ -103,5 +103,5 @@ When building the system, `system.build` can contain arguments that will overwri
 
 - `record_every` - determines how often the evaluator should record an agent gameplay video.
 
-[system]: https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/systems/jax/system.py#L28
+[system]: https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/systems/system.py#L28
 [design_spec]: https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/specs.py#L161

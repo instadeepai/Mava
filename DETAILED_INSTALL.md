@@ -6,10 +6,10 @@
 
 You can pull & run the latest pre-built images from our [DockerHub](https://hub.docker.com/r/instadeepct/mava) by specifying the docker image and example/file you want to run.
 
-For example, this will pull the latest mava tensorflow core image and run the `examples/debugging/simple_spread/feedforward/decentralised/run_maddpg.py` example:
+For example, this will pull the latest mava jax core image and run the `examples/debugging/simple_spread/feedforward/decentralised/run_maddpg.py` example:
 
 ```
-docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava instadeepct/mava:tf-core-latest python examples/debugging/simple_spread/feedforward/decentralised/run_maddpg.py --base_dir /home/app/mava/logs/
+docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava instadeepct/mava:jax-core-latest python examples/debugging/simple_spread/feedforward/decentralised/run_maddpg.py --base_dir /home/app/mava/logs/
 ```
 
 * For windows, replace `$(pwd)` with `$(curdir)`.
@@ -28,12 +28,6 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
 
     1.1 Only Mava core:
 
-    Tensorflow version:
-
-    ```bash
-    make build version=tf-core
-    ```
-
     Jax version:
 
     ```bash
@@ -41,8 +35,6 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
     ```
 
     1.2 For **optional** environments:
-
-    **Note for jax images, append `-jax` to the build command, e.g. `make build version=pz-jax`.**
 
     * PettingZoo:
 
@@ -143,16 +135,14 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
     * Install core dependencies:
 
     ```bash
-    pip install id-mava[tf,reverb]
+    pip install id-mava[jax,reverb]
     ```
 
     * Or for the latest version of mava from source (**you can do this for all pip install commands below for the latest depedencies**):
 
     ```bash
-    pip install git+https://github.com/instadeepai/Mava#egg=id-mava[reverb,tf]
+    pip install git+https://github.com/instadeepai/Mava#egg=id-mava[reverb,jax]
     ```
-
-    **For the jax version of mava, please replace `tf` with `jax`, e.g. `pip install id-mava[jax,reverb]`**.
 
     **If you are using `jax` and `CUDA`, you also need to run the following:**
 

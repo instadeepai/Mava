@@ -1,6 +1,6 @@
 # Examples
 
-We include a non-exhaustive number of examples for both Jax-based systems and Tensorflow-based systems, showing common use-cases for Mava. We also have a [Tensorflow quickstart notebook][tf_quickstart] and [Jax quickstart notebook][jax_quickstart] that can be used to quickly create and train your first multi-agent system.
+We include a non-exhaustive number of examples for both Jax-based systems, showing common use-cases for Mava. We also have a [Jax quickstart notebook][jax_quickstart] that can be used to quickly create and train your first multi-agent system.
 
 # Jax examples
 We also have various Jax-based examples which make use of the callback design paradigm. Our pre-implemented Jax-based systems are continually expanding so please check back often to see new implemented systems.

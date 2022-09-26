@@ -6,44 +6,17 @@ training. This allows for easy scaling of computational resources by changing on
 
 Below we list the different systems in Mava based on the action spaces they use. More systems will be added in future Mava updates.
 
-### Continuous control
-
-The following systems focus on this
-setting:
-
-System                                                                | Paper                    | Code
--------------------------------------------------------------------- | :----------------------: | :--:
-Multi-Agent Deep Deterministic Policy Gradient (MADDPG)             | [Lowe et al., 2017]   | [![TF][TF Logo]][MADDPG_TF2]
-Multi-Agent Distributed Distributional DDPG (MAD4PG)    | [Barth-Maron et al., 2018] | [![TF][TF Logo]][MAD4PG_TF2]
-
-### Discrete control
-We also include a number of systems built with discrete action-spaces in mind listed below:
-
-System                                                    | Paper                    | Code
--------------------------------------------------------- | :----------------------: | :--:
-Deep Q-Networks (DQN)                                    | [Horgan et al., 2018]      | [![TF][TF Logo]][DQN_TF2]
-VDN                                                     | [Sunehag et al., 2017]      | [![TF][TF Logo]][Value Decomposition_TF2]
-QMIX                                                     | [Rashid et al., 2018]      | [![TF][TF Logo]][Value Decomposition_TF2]
+For our TF2-based systems (maddpg, madqn, vdn and qmix), please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`). We will no longer be supporting these systems as we have moved to JAX-based systems.
 
 ### Mixed
 We also have a system that works with either discrete or continuous action-spaces:
 
 System                                                    | Paper                    | Code
 -------------------------------------------------------- | :----------------------: | :--:
-Multi-Agent Proximal Policy Optimization (MAPPO)        | [Yu et al., 2021], [Schroeder et al., 2020]      | [![TF][TF Logo]][MAPPO_TF2] [![Jax][Jax Logo]][IPPO_Jax]
-
-<!-- TF agents -->
-
-[MADDPG_TF2]: https://github.com/instadeepai/Mava/tree/main/mava/systems/tf/maddpg/
-[MAD4PG_TF2]: https://github.com/instadeepai/Mava/tree/main/mava/systems/tf/mad4pg/
-
-[DQN_TF2]: https://github.com/instadeepai/Mava/tree/main/mava/systems/tf/madqn/
-[Value Decomposition_TF2]: https://github.com/instadeepai/Mava/tree/main/mava/systems/tf/value_decomposition/
-
-[MAPPO_TF2]: https://github.com/instadeepai/Mava/tree/main/mava/systems/tf/mappo/
+Multi-Agent Proximal Policy Optimization (MAPPO)        | [Yu et al., 2021], [Schroeder et al., 2020]      | [![Jax][Jax Logo]][IPPO_Jax]
 
 <!-- Jax agents -->
-[IPPO_Jax]: https://github.com/instadeepai/Mava/tree/develop/mava/systems/jax/ippo
+[IPPO_Jax]: https://github.com/instadeepai/Mava/tree/develop/mava/systems/ippo
 
 <!-- Papers -->
 [Lowe et al., 2017]: https://arxiv.org/abs/1706.02275
@@ -56,7 +29,5 @@ Multi-Agent Proximal Policy Optimization (MAPPO)        | [Yu et al., 2021], [Sc
 
 [Yu et al., 2021]: https://arxiv.org/abs/2103.01955
 [Schroeder et al., 2020]: https://arxiv.org/abs/2011.09533
-
-[TF Logo]: https://raw.githubusercontent.com/instadeepai/Mava/main/docs/images/tf-small.png
 
 [Jax Logo]: https://raw.githubusercontent.com/instadeepai/Mava/develop/docs/images/jax_logo_small.png

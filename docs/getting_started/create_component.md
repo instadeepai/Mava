@@ -12,7 +12,7 @@ Each component requires:
 
 The component can be added to the system:
 
-* By adding it to the system design directly (see [here](https://github.com/instadeepai/Mava/blob/develop/mava/systems/jax/ippo/system.py))
+* By adding it to the system design directly (see [here](https://github.com/instadeepai/Mava/blob/develop/mava/systems/ippo/system.py))
 * Via system.add() if it is an entirely new component
 * Via system.update() if it overrides an existing component with the same name (see [here](https://github.com/instadeepai/Mava/blob/develop/examples/debugging/simple_spread/feedforward/decentralised/run_ippo_with_monitoring.py#L92)).
 
