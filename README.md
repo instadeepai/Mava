@@ -9,22 +9,22 @@
 </h2>
 
 <div align="center">
-<a rel="nofollow">
+<a  href="https://pypi.org/project/id-mava/">
     <img src="https://img.shields.io/pypi/pyversions/id-mava" alt="Python" />
 </a>
-<a rel="nofollow">
+<a  href="https://pypi.org/project/id-mava/">
     <img src="https://badge.fury.io/py/id-mava.svg" alt="PyPi" />
 </a>
-<a rel="nofollow">
+<a  href="https://github.com/instadeepai/Mava/actions/workflows/ci.yaml?query=branch%3Adevelop">
     <img src="https://github.com/instadeepai/Mava/workflows/format_and_test/badge.svg" alt="Formatting" />
 </a>
-<a rel="nofollow">
+<a  href="https://lgtm.com/projects/g/instadeepai/Mava/context:python">
     <img src="https://img.shields.io/lgtm/grade/python/g/instadeepai/Mava.svg?logo=lgtm&logoWidth=18" alt="Quality" />
 </a>
-<a rel="nofollow">
+<a  href="https://github.com/instadeepai/Mava/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License" />
 </a>
-<a rel="nofollow">
+<a  href="https://id-mava.readthedocs.io/">
     <img src="https://readthedocs.org/projects/id-mava/badge/?version=latest" alt="Docs" />
 </a>
 </div>
