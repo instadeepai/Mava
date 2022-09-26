@@ -161,7 +161,7 @@ class FeedforwardExecutorObserve(ExecutorObserve):
         """Update the executor variables."""
         if executor.store.executor_parameter_client:
             executor.store.executor_parameter_client.get_async()
-    
+
     def on_execution_force_update(self, executor: SystemExecutor) -> None:
         """Force updating the executor variables."""
         if executor.store.executor_parameter_client:

@@ -12,8 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Run feedforward MADQN on SMAC."""
 
-"""Example running IPPO on debug MPE environments."""
+
 import functools
 from datetime import datetime
 from typing import Any
@@ -22,19 +23,14 @@ import optax
 from absl import app, flags
 
 from mava.systems.jax import ippo
-from mava.utils.environments import debugging_utils
+from mava.utils.environments.smac_utils import make_environment
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
-)
-flags.DEFINE_string(
-    "action_space",
-    "discrete",
-    "Environment action space type (str).",
+    "map_name",
+    "3m",
+    "Starcraft 2 micromanagement map name (str).",
 )
 
 flags.DEFINE_string(
@@ -46,29 +42,16 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Example running recurrent IPPO on debugging environment."""
+    """Example running feedforward MADQN on SMAC environment."""
 
-<<<<<<<< HEAD:examples/jax/debugging/simple_spread/recurrent/decentralised/run_ippo.py
-    # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
-    )
-========
     # Environment
     environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
->>>>>>>> origin/develop:examples/jax/smac/feedforward/decentralised/run_ippo_eval_intervals.py
 
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return ippo.make_default_networks(  # type: ignore
             policy_layer_sizes=(256, 256, 256),
             critic_layer_sizes=(512, 512, 256),
-<<<<<<<< HEAD:examples/jax/debugging/simple_spread/recurrent/decentralised/run_ippo.py
-            policy_recurrent_layer_sizes=(256,),
-========
->>>>>>>> origin/develop:examples/jax/smac/feedforward/decentralised/run_ippo_eval_intervals.py
             *args,
             **kwargs,
         )
@@ -87,27 +70,17 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # Optimiser.
+    # Optimisers.
     policy_optimiser = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
-<<<<<<<< HEAD:examples/jax/debugging/simple_spread/recurrent/decentralised/run_ippo.py
-========
-    )
-
-    critic_optimiser = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
->>>>>>>> origin/develop:examples/jax/smac/feedforward/decentralised/run_ippo_eval_intervals.py
     )
 
     critic_optimiser = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
-    # Import the base IPPO system.
+    # Create the system.
     system = ippo.IPPOSystem()
-
-    # Update the system with the components necessary to make the policy recurrent.
-    system.update(ippo.recurrent_policy_components)
 
     # Build the system.
     system.build(
@@ -122,11 +95,8 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-<<<<<<<< HEAD:examples/jax/debugging/simple_spread/recurrent/decentralised/run_ippo.py
-========
         evaluation_interval={"executor_steps": 10000},
         evaluation_duration={"evaluator_episodes": 32},
->>>>>>>> origin/develop:examples/jax/smac/feedforward/decentralised/run_ippo_eval_intervals.py
     )
 
     # Launch the system.
