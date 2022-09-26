@@ -100,12 +100,31 @@ class SequentialEnvironmentLoop(acme.core.Worker):
             self.episode_returns.update({agent: generate_zeros_from_spec(spec)})
 
     def _get_action(self, agent_id: str, timestep: dm_env.TimeStep) -> Any:
+        """Get action for agent.
+
+        Args:
+            agent_id : agent id.
+            timestep : timestep.
+
+        Returns:
+            choosen action.
+        """
         return self._executor.select_action(agent_id, timestep.observation)
 
     def _get_running_stats(self) -> Dict:
+        """Get running stats.
+
+        Returns:
+            running stats.
+        """
         return self._running_statistics
 
     def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
+        """Compute step stats.
+
+        Args:
+            rewards : reward for step.
+        """
         pass
 
     def _compute_episode_statistics(
@@ -114,11 +133,27 @@ class SequentialEnvironmentLoop(acme.core.Worker):
         episode_steps: int,
         start_time: float,
     ) -> None:
+        """Compute episode stats.
+
+        Args:
+            episode_returns : returns for episode.
+            episode_steps : episode step count.
+            start_time : episode start time.
+        """
         pass
 
     def _set_step_type(
         self, timestep: dm_env.TimeStep, step_type: dm_env.StepType
     ) -> dm_env.TimeStep:
+        """Set step type.
+
+        Args:
+            timestep : timestep.
+            step_type : step type.
+
+        Returns:
+            dm timestep.
+        """
         return dm_env.TimeStep(
             observation=timestep.observation,
             reward=timestep.reward,
@@ -127,6 +162,7 @@ class SequentialEnvironmentLoop(acme.core.Worker):
         )
 
     def _send_observation(self) -> None:
+        """Record observations."""
         if len(self._agent_action_timestep) == self.num_agents:
             timesteps: Dict[str, SeqTimestepDict] = {
                 k: {"timestep": v[1], "action": v[0]}
@@ -153,6 +189,14 @@ class SequentialEnvironmentLoop(acme.core.Worker):
             self._agent_action_timestep = {}
 
     def _perform_turn(self, timestep: dm_env.TimeStep) -> dm_env.TimeStep:
+        """Perform env step.
+
+        Args:
+            timestep : dm timestep.
+
+        Returns:
+            dm timestep.
+        """
         # current agent
         agent = self._environment.current_agent
 
@@ -184,6 +228,11 @@ class SequentialEnvironmentLoop(acme.core.Worker):
         return timestep
 
     def _collect_last_timesteps(self, timestep: dm_env.TimeStep) -> None:
+        """Perform last timestep.
+
+        Args:
+            timestep : dm timestep.
+        """
         assert timestep.step_type == dm_env.StepType.LAST
         cache_tsp = [timestep]
 

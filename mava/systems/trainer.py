@@ -21,8 +21,10 @@ from typing import List
 
 from mava.callbacks import Callback, TrainerHookMixin
 from mava.core_jax import SystemTrainer
-from mava.utils.jax_training_utils import set_growing_gpu_memory
+from mava.utils.jax_training_utils import set_growing_gpu_memory_jax
+from mava.utils.training_utils import set_growing_gpu_memory
 
+set_growing_gpu_memory_jax()
 set_growing_gpu_memory()
 
 
