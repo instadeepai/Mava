@@ -44,9 +44,6 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 def main(_: Any) -> None:
     """Example running feedforward MADQN on SMAC environment."""
 
-    # WARNING (dries): This code has not been run yet. There might still
-    # be runtime errors in the code.
-
     # Environment
     environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
 
@@ -55,13 +52,12 @@ def main(_: Any) -> None:
         return ippo.make_default_networks(  # type: ignore
             policy_layer_sizes=(256, 256, 256),
             critic_layer_sizes=(512, 512, 256),
-            single_network=False,
             *args,
             **kwargs,
         )
 
-    # Checkpointer appends "Checkpoints" to checkpoint_dir
-    checkpoint_subpath = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+    # Used for checkpoints, tensorboard logging and env monitoring
+    experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
     log_every = 10
@@ -76,10 +72,11 @@ def main(_: Any) -> None:
 
     # Optimisers.
     policy_optimiser = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-3e-4)
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
+
     critic_optimiser = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-3)
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
     # Create the system.
@@ -90,7 +87,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        experiment_path=checkpoint_subpath,
+        experiment_path=experiment_path,
         policy_optimiser=policy_optimiser,
         critic_optimiser=critic_optimiser,
         run_evaluator=True,
@@ -98,7 +95,8 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        clip_value=True,
+        evaluation_interval={"executor_steps": 10000},
+        evaluation_duration={"evaluator_episodes": 32},
     )
 
     # Launch the system.
