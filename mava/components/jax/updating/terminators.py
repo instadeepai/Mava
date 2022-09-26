@@ -105,7 +105,8 @@ class CountConditionTerminator(Terminator):
                 f"Max {self.termination_key} of {self.termination_value}"
                 " reached, terminating."
             )
-            self.config.termination_function()
+            parameter_sever.store.exit = True
+            # self.config.termination_function()
 
     @staticmethod
     def required_components() -> List[Type[Callback]]:

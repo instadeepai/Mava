@@ -175,12 +175,13 @@ class Launcher:
                 nodes_on_gpu=self._nodes_on_gpu,
             )
 
-            lp.launch(
+            worker_manager = lp.launch(
                 self._program,
                 launch_type=launch_type,
                 terminal=self._terminal,
                 local_resources=local_resources,
             )
+            return worker_manager
 
         else:
             episode = 1
