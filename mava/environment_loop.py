@@ -554,17 +554,17 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 num_steps is not None and step_count >= num_steps
             )
 
-        def should_run_loop(eval_condition: Tuple) -> bool:
+        def should_run_loop(eval_interval_condition: Tuple) -> bool:
             """Check if the eval loop should run in current step.
 
             Args:
-                eval_condition : tuple containing interval key and count.
+                eval_interval_condition : tuple containing interval key and count.
 
             Returns:
                 a bool indicating if eval should run.
             """
             should_run_loop = False
-            eval_interval_key, eval_interval_count = eval_condition
+            eval_interval_key, eval_interval_count = eval_interval_condition
             counts = self.get_counts()
 
             if counts:
@@ -593,19 +593,26 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             )
 
             if environment_loop_schedule:
-                eval_condition = check_count_condition(
+                eval_interval_condition = check_count_condition(
                     self._executor.store.evaluation_interval
                 )
-                evaluation_duration = self._executor.store.evaluation_duration
+                eval_duration_condition = check_count_condition(
+                    self._executor.store.evaluation_duration
+                )
+                evaluation_duration = eval_duration_condition[1]
         else:
             environment_loop_schedule = (
                 self._executor._evaluator and self._executor._interval
             )
             if environment_loop_schedule:
-                eval_condition = check_count_condition(self._executor._interval)
+                eval_interval_condition = check_count_condition(
+                    self._executor._interval
+                )
 
         while not should_terminate(episode_count, step_count):
-            if (not environment_loop_schedule) or (should_run_loop(eval_condition)):
+            if (not environment_loop_schedule) or (
+                should_run_loop(eval_interval_condition)
+            ):
                 # TODO (Ruan): Remove store check once TF is deprecated.
                 if environment_loop_schedule and hasattr(self._executor, "store"):
                     # Get first result dictionary

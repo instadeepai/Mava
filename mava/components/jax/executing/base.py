@@ -26,7 +26,7 @@ from mava.core_jax import SystemExecutor
 @dataclass
 class ExecutorInitConfig:
     evaluation_interval: Optional[dict] = None
-    evaluation_duration: Optional[int] = 1
+    evaluation_duration: Optional[dict] = None
 
 
 class ExecutorInit(Component):
@@ -48,7 +48,7 @@ class ExecutorInit(Component):
             None.
         """
 
-        if self.config.evaluation_duration != 1 and (
+        if not self.config.evaluation_duration["evaluator_episodes"] is None and (
             self.config.evaluation_interval is None
         ):
             raise ValueError(
@@ -59,6 +59,8 @@ class ExecutorInit(Component):
         if executor.store.is_evaluator:
             executor.store.evaluation_interval = self.config.evaluation_interval  # type: ignore # noqa: E501
             executor.store.evaluation_duration = self.config.evaluation_duration  # type: ignore # noqa: E501
+        if self.config.evaluation_duration is None:
+            executor.store.evaluation_duration = {"evaluator_episodes": 1}
 
     @staticmethod
     def name() -> str:

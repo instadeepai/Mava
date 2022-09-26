@@ -31,7 +31,9 @@ def dummy_config() -> ExecutorInitConfig:
     Returns:
         ExecutorInitConfig
     """
-    return ExecutorInitConfig(evaluation_interval={"test": 1}, evaluation_duration=2)
+    return ExecutorInitConfig(
+        evaluation_interval={"test": 1}, evaluation_duration={"evaluator_episodes": 32}
+    )
 
 
 @pytest.fixture
