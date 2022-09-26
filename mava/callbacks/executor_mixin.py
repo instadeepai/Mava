@@ -127,3 +127,19 @@ class ExecutorHookMixin(ABC):
         """End of updating executor parameters."""
         for callback in self.callbacks:
             callback.on_execution_update_end(self)
+
+    # FORCE UPDATE
+    def on_execution_force_update_start(self) -> None:
+        """Start of forcing the update of the executor parameters."""
+        for callback in self.callbacks:
+            callback.on_execution_force_update_start(self)
+
+    def on_execution_force_update(self) -> None:
+        """Froce update executor parameters."""
+        for callback in self.callbacks:
+            callback.on_execution_force_update(self)
+
+    def on_execution_force_update_end(self) -> None:
+        """End of forcing the update of the executor parameters."""
+        for callback in self.callbacks:
+            callback.on_execution_force_update_end(self)

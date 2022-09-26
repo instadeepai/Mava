@@ -306,7 +306,6 @@ def make_networks(
         policy_recurrent_layer_sizes: Optionally add recurrent layers to the policy
         observation_network: Network used for feature extraction layers
 
-
     Returns:
         make_discrete_networks: function to create a discrete network
 
@@ -360,7 +359,6 @@ def make_default_networks(
         observation_network: network for processing environment observations
                              defaults to flattening observations but could be
                              a CNN or similar observation processing network
-
 
     Returns:
         networks: networks created to given spec
