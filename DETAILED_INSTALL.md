@@ -289,13 +289,13 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
 
   ```bash
   export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/x86_64-linux-gnu/
-  python examples/jax/smac/feedforward/decentralised/run_ippo.py
+  python  examples/smac/feedforward/decentralised/run_ippo.py
   ```
 
   or
 
   ```bash
-  LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/ python examples/jax/smac/feedforward/decentralised/run_ippo.py
+  LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/ python  examples/smac/feedforward/decentralised/run_ippo.py
   ```
 
 [pymarl]: https://github.com/oxwhirl/pymarl

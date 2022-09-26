@@ -75,7 +75,7 @@ class IPPOSystem(System):
         return system, default_params
 ```
 
-In the above example certain processes are grouped together, which has been done for readability but it is not strictly required. For an example of how a full system may be launched on a particular environment with logging included, please see [here](https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo.py).
+In the above example certain processes are grouped together, which has been done for readability but it is not strictly required. For an example of how a full system may be launched on a particular environment with logging included, please see [here](https://github.com/instadeepai/Mava/blob/develop/examples/debugging/simple_spread/feedforward/decentralised/run_ippo.py).
 
 When building the system, `system.build` can contain arguments that will overwrite the default config values from any existing component in the system. Commonly overwritten build arguments are:
 

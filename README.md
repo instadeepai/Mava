@@ -109,5 +109,5 @@ If you use Mava in your work, please cite the accompanying
 [openspiel]: https://github.com/deepmind/open_spiel
 [flatland]: https://gitlab.aicrowd.com/flatland/flatland
 [robocup]: https://github.com/rcsoccersim
-[quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/quickstart.ipynb
+[quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/quickstart.ipynb
 [documentation]: https://id-mava.readthedocs.io/
