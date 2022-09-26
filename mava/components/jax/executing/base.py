@@ -48,7 +48,7 @@ class ExecutorInit(Component):
             None.
         """
 
-        if not self.config.evaluation_duration["evaluator_episodes"] is None and (
+        if self.config.evaluation_duration is not None and (
             self.config.evaluation_interval is None
         ):
             raise ValueError(
