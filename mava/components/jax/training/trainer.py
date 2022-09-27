@@ -82,19 +82,16 @@ class BaseTrainerInit(Component):
 
         # Wrap opt_states in a mutable type (dict) since optax return an immutable tuple
         builder.store.policy_opt_states = {}
-
-        for net_key in builder.store.networks["networks"].keys():
+        builder.store.critic_opt_states = {}
+        for net_key in builder.store.networks.keys():
             builder.store.policy_opt_states[net_key] = {
                 constants.OPT_STATE_DICT_KEY: builder.store.policy_optimiser.init(
-                    builder.store.networks["networks"][net_key].policy_params
+                    builder.store.networks[net_key].policy_params
                 )
             }  # pytype: disable=attribute-error
-
-        builder.store.critic_opt_states = {}
-        for net_key in builder.store.networks["networks"].keys():
             builder.store.critic_opt_states[net_key] = {
                 constants.OPT_STATE_DICT_KEY: builder.store.critic_optimiser.init(
-                    builder.store.networks["networks"][net_key].critic_params
+                    builder.store.networks[net_key].critic_params
                 )
             }  # pytype: disable=attribute-error
 

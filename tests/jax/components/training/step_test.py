@@ -127,26 +127,24 @@ class MockTrainer(Trainer):
             "agent_2": "network_agent_2",
         }
         networks = {
-            "networks": {
-                "network_agent_0": SimpleNamespace(
-                    policy_params={"key": jnp.array([0.0, 0.0, 0.0])},
-                    critic_params={"key": jnp.array([0.0, 0.0, 0.0])},
-                    policy_network=SimpleNamespace(apply=apply),
-                    critic_network=SimpleNamespace(apply=critic_apply),
-                ),
-                "network_agent_1": SimpleNamespace(
-                    policy_params={"key": jnp.array([1.0, 1.0, 1.0])},
-                    critic_params={"key": jnp.array([1.0, 1.0, 1.0])},
-                    policy_network=SimpleNamespace(apply=apply),
-                    critic_network=SimpleNamespace(apply=critic_apply),
-                ),
-                "network_agent_2": SimpleNamespace(
-                    policy_params={"key": jnp.array([2.0, 2.0, 2.0])},
-                    critic_params={"key": jnp.array([2.0, 2.0, 2.0])},
-                    policy_network=SimpleNamespace(apply=apply),
-                    critic_network=SimpleNamespace(apply=critic_apply),
-                ),
-            }
+            "network_agent_0": SimpleNamespace(
+                policy_params={"key": jnp.array([0.0, 0.0, 0.0])},
+                critic_params={"key": jnp.array([0.0, 0.0, 0.0])},
+                policy_network=SimpleNamespace(apply=apply),
+                critic_network=SimpleNamespace(apply=critic_apply),
+            ),
+            "network_agent_1": SimpleNamespace(
+                policy_params={"key": jnp.array([1.0, 1.0, 1.0])},
+                critic_params={"key": jnp.array([1.0, 1.0, 1.0])},
+                policy_network=SimpleNamespace(apply=apply),
+                critic_network=SimpleNamespace(apply=critic_apply),
+            ),
+            "network_agent_2": SimpleNamespace(
+                policy_params={"key": jnp.array([2.0, 2.0, 2.0])},
+                critic_params={"key": jnp.array([2.0, 2.0, 2.0])},
+                policy_network=SimpleNamespace(apply=apply),
+                critic_network=SimpleNamespace(apply=critic_apply),
+            ),
         }
 
         opt_states = {
@@ -336,9 +334,9 @@ def test_step(mock_trainer: Trainer) -> None:
 
     # check that network parameters and optimiser states were updated the correct
     # number of times
-    for i, net_key in enumerate(mock_trainer.store.networks["networks"]):
+    for i, net_key in enumerate(mock_trainer.store.networks):
         assert jnp.array_equal(
-            mock_trainer.store.networks["networks"][net_key].policy_params["key"],
+            mock_trainer.store.networks[net_key].policy_params["key"],
             jnp.array(
                 [
                     i + num_expected_update_steps,
@@ -349,7 +347,7 @@ def test_step(mock_trainer: Trainer) -> None:
         )
 
         assert jnp.array_equal(
-            mock_trainer.store.networks["networks"][net_key].critic_params["key"],
+            mock_trainer.store.networks[net_key].critic_params["key"],
             jnp.array(
                 [
                     i + num_expected_update_steps,

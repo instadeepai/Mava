@@ -115,26 +115,22 @@ class DefaultParameterServer(ParameterServer):
             "executor_episodes": np.zeros(1, dtype=np.int32),
             "executor_steps": np.zeros(1, dtype=np.int32),
         }
-
         # Network parameters
-        for net_type_key in networks.keys():
-            for agent_net_key in networks[net_type_key].keys():
-                # Ensure obs and target networks are sonnet modules
-                server.store.parameters[
-                    f"policy_{net_type_key}-{agent_net_key}"
-                ] = networks[net_type_key][agent_net_key].policy_params
-
-                # Ensure obs and target networks are sonnet modules
-                server.store.parameters[
-                    f"critic_{net_type_key}-{agent_net_key}"
-                ] = networks[net_type_key][agent_net_key].critic_params
-                if net_type_key == "networks":
-                    server.store.parameters[
-                        f"policy_opt_state-{agent_net_key}"
-                    ] = server.store.policy_opt_states[agent_net_key]
-                    server.store.parameters[
-                        f"critic_opt_state-{agent_net_key}"
-                    ] = server.store.critic_opt_states[agent_net_key]
+        for agent_net_key in networks.keys():
+            # Ensure obs and target networks are sonnet modules
+            server.store.parameters[f"policy_network-{agent_net_key}"] = networks[
+                agent_net_key
+            ].policy_params
+            # Ensure obs and target networks are sonnet modules
+            server.store.parameters[f"critic_network-{agent_net_key}"] = networks[
+                agent_net_key
+            ].critic_params
+            server.store.parameters[
+                f"policy_opt_state-{agent_net_key}"
+            ] = server.store.policy_opt_states[agent_net_key]
+            server.store.parameters[
+                f"critic_opt_state-{agent_net_key}"
+            ] = server.store.critic_opt_states[agent_net_key]
 
         server.store.experiment_path = self.config.experiment_path
 

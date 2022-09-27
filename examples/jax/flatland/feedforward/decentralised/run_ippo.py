@@ -59,9 +59,6 @@ def main(_: Any) -> None:
         _ : _
     """
 
-    # WARNING (dries): This code has not been run yet. There might still
-    # be runtime errors in the code.
-
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return ippo.make_default_networks(  # type: ignore
