@@ -20,6 +20,7 @@ from mava.components.jax.training.losses import (
     MAPGWithTrustRegionClippingLoss,
     MAPGWithTrustRegionClippingPolicyLoss,
     MAPGWithTrustRegionClippingValueHuberLoss,
+    MAPGWithTrustRegionClippingValueLoss,
 )
 from mava.components.jax.training.model_updating import (
     MAPGEpochUpdate,

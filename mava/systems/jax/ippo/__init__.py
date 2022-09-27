@@ -14,5 +14,6 @@
 # limitations under the License.
 
 """Jax IPPO system."""
+from mava.systems.jax.component_groups import huber_value_loss_components
 from mava.systems.jax.ippo.networks import make_default_networks
-from mava.systems.jax.ippo.system import IPPOSystem, IPPOSystemHuber
+from mava.systems.jax.ippo.system import IPPOSystem
