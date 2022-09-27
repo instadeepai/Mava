@@ -126,7 +126,7 @@ setup(
         "record_episode": record_episode_requirements,
         "sc2": smac_requirements,
         "envs": pettingzoo_requirements + open_spiel_requirements + smac_requirements,
-        "jax==0.3.17": jax_requirements,
+        "jax": jax_requirements,
     },
     classifiers=[
         "Development Status :: 3 - Alpha",

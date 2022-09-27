@@ -33,4 +33,4 @@ def set_jax_double_precision() -> None:
 
     More on this - https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#double-64bit-precision. # noqa: E501
     """
-    jax_config.update("jax_enable_x64", False)
+    jax_config.update("jax_enable_x64", True)
