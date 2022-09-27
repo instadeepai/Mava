@@ -568,14 +568,14 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             counts = self.get_counts()
 
             if counts:
-                count = int(counts[eval_interval_key])  # type: ignore
+                count = counts[eval_interval_key]
                 # We run eval loops around every eval_interval_count (not exactly
                 # every eval_interval_count due to latency in getting updated counts).
                 should_run_loop = (
                     (count - self._last_evaluator_run_t) / eval_interval_count
                 ) >= 1.0
                 if should_run_loop:
-                    self._last_evaluator_run_t = count
+                    self._last_evaluator_run_t = int(count)
                     print(
                         "Running eval loop at executor step: "
                         + f"{self._last_evaluator_run_t}"
