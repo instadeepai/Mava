@@ -61,7 +61,7 @@ def dummy_running_mean_var_count(stats: jnp.ndarray, batch: jnp.ndarray) -> jnp.
     """
 
     batch_count = batch.size
-    _, _, count = stats
+    count = stats[3]
 
     new_count = count + batch_count
 
