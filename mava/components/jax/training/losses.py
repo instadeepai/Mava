@@ -132,8 +132,8 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                     if policy_states:
                         # Recurrent actor.
                         minibatch_size = (
-                            trainer.store.sample_batch_size
-                            / trainer.store.num_minibatches
+                            int(trainer.store.sample_batch_size
+                            / trainer.store.num_minibatches)
                         )
                         seq_len = trainer.store.sequence_length - 1
 

@@ -106,6 +106,7 @@ def main(_: Any) -> None:
         sample_batch_size=5,
         num_epochs=15,
         num_executors=1,
+        num_minibatches=2,
         multi_process=True,
         evaluation_interval={"executor_steps": 10000},
         evaluation_duration={"evaluator_episodes": 32},
