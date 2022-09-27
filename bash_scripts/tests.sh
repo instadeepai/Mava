@@ -46,7 +46,7 @@ apt-get -y install git
 apt-get install swig -y
 
 # Install depedencies
-pip install .[jax,envs,reverb,testing_formatting,record_episode]
+pip install .[envs,reverb,testing_formatting,record_episode,jax]
 
 # For atari envs
 apt-get -y install unrar-free
