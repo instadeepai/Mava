@@ -488,6 +488,7 @@ def test_mapg_loss(
 
     assert jnp.isclose(loss_entropy, -0.47500002)
     assert loss_policy_total == (loss_entropy * 0.01 + loss_policy)
+    assert loss_critic == 4.5
 
     assert low_loss_policy < loss_policy
     assert low_loss_critic < loss_critic

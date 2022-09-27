@@ -205,12 +205,8 @@ class MAPGWithTrustRegionClippingLoss(Loss):
 
                     # Value function loss. Exclude the bootstrap value
                     unclipped_value_error = target_values - values
-                    if self.config.use_huber:
-                        unclipped_value_loss = rlax.huber_loss(
-                            unclipped_value_error, self.config.huber_delta
-                        )
-                    else:
-                        unclipped_value_loss = unclipped_value_error**2
+
+                    unclipped_value_loss = unclipped_value_error**2
 
                     value_clip_parameter = self.config.value_clip_parameter
                     if self.config.clip_value:
@@ -222,6 +218,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                             value_clip_parameter,
                         )
                         clipped_value_error = target_values - clipped_values
+
                         clipped_value_loss = clipped_value_error**2
                         value_loss = jnp.mean(
                             jnp.fmax(unclipped_value_loss, clipped_value_loss)
