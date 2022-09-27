@@ -68,7 +68,7 @@ testing_formatting_requirements = [
     "pytest-cov",
     "interrogate",
     "pydocstyle",
-    "types-six==1.16.20",
+    "types-six",
 ]
 
 record_episode_requirements = ["array2gif", "pyglet"]
@@ -126,7 +126,7 @@ setup(
         "record_episode": record_episode_requirements,
         "sc2": smac_requirements,
         "envs": pettingzoo_requirements + open_spiel_requirements + smac_requirements,
-        "jax": jax_requirements,
+        "jax<=0.3.15": jax_requirements,
     },
     classifiers=[
         "Development Status :: 3 - Alpha",
