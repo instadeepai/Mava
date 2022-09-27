@@ -33,6 +33,7 @@ class SMACWrapper(ParallelEnvWrapper):
         self,
         environment: StarCraft2Env,
         return_state_info: bool = True,
+        death_masking: bool = False,
     ):
         """Constructor for parallel PZ wrapper.
 
@@ -41,6 +42,7 @@ class SMACWrapper(ParallelEnvWrapper):
             env_preprocess_wrappers (Optional[List], optional): Wrappers
                 that preprocess envs.
                 Format (env_preprocessor, dict_with_preprocessor_params).
+            death_masking: whether it allow the death masking or not.
             return_state_info: return extra state info
         """
         self._environment = environment
@@ -52,6 +54,8 @@ class SMACWrapper(ParallelEnvWrapper):
 
         self._battles_won = 0
         self._battles_game = 0
+
+        self._death_masking = death_masking
 
     def reset(self) -> dm_env.TimeStep:
         """Resets the env.
@@ -183,6 +187,17 @@ class SMACWrapper(ParallelEnvWrapper):
             )
         return legal_actions
 
+    def is_dead(self, agent: Any) -> bool:
+        """Check if the agent is dead.
+
+        Returns:
+            is_dead: bool about whether the agent still alive or is he dead.
+        """
+        is_dead = False
+        if self._environment.agents[agent].health == 0.0:
+            is_dead = True
+        return is_dead
+
     def _convert_observations(
         self, observations: List, legal_actions: List, done: bool
     ) -> types.Observation:
@@ -197,9 +212,14 @@ class SMACWrapper(ParallelEnvWrapper):
         """
         olt_observations = {}
         for i, agent in enumerate(self._agents):
+            # Check if the agent is dead and we allow death masking
+            if self._death_masking and self.is_dead(i):
+                observation = np.zeros_like(observations[i])
+            else:
+                observation = observations[i]
 
             olt_observations[agent] = types.OLT(
-                observation=observations[i],
+                observation=observation,
                 legal_actions=legal_actions[i],
                 terminal=np.asarray([done], dtype=np.float32),
             )
