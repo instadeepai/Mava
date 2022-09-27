@@ -239,6 +239,18 @@ class HookOrderTracking:
         """[summary]"""
         self.hook_list.append("on_execution_update_end")
 
+    def on_execution_force_update_start(self) -> None:
+        """[summary]"""
+        self.hook_list.append("on_execution_force_update_start")
+
+    def on_execution_force_update(self) -> None:
+        """[summary]"""
+        self.hook_list.append("on_execution_force_update")
+
+    def on_execution_force_update_end(self) -> None:
+        """[summary]"""
+        self.hook_list.append("on_execution_force_update_end")
+
     ######################
     # system trainer hooks
     ######################

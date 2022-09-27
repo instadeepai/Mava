@@ -15,7 +15,7 @@
 
 """Parameter client for system builders"""
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Tuple, Type
 
 import numpy as np
 
@@ -93,19 +93,21 @@ class ExecutorParameterClient(BaseParameterClient):
             builder: SystemBuilder.
         """
         # Create policy parameters
-        params = {}
-        get_keys = []
-        net_type_key = "networks"
+        params: Dict[str, Any] = {}
+        # Executor does not explicitly set variables i.e. it adds to count variables
+        # and hence set_keys is empty
+        set_keys: List[str] = []
+        get_keys: List[str] = []
 
-        for agent_net_key in builder.store.networks[net_type_key].keys():
-            policy_param_key = f"policy_{net_type_key}-{agent_net_key}"
-            params[policy_param_key] = builder.store.networks[net_type_key][
+        for agent_net_key in builder.store.networks.keys():
+            policy_param_key = f"policy_network-{agent_net_key}"
+            params[policy_param_key] = builder.store.networks[
                 agent_net_key
             ].policy_params
             get_keys.append(policy_param_key)
 
-            critic_param_key = f"critic_{net_type_key}-{agent_net_key}"
-            params[critic_param_key] = builder.store.networks[net_type_key][
+            critic_param_key = f"critic_network-{agent_net_key}"
+            params[critic_param_key] = builder.store.networks[
                 agent_net_key
             ].critic_params
             get_keys.append(critic_param_key)
@@ -115,14 +117,6 @@ class ExecutorParameterClient(BaseParameterClient):
         get_keys.extend(count_names)
 
         builder.store.executor_counts = {name: params[name] for name in count_names}
-
-        set_keys = get_keys.copy()
-
-        # Executors should only be able to update relevant params.
-        if builder.store.is_evaluator is True:
-            set_keys = [x for x in set_keys if x.startswith("evaluator")]
-        else:
-            set_keys = [x for x in set_keys if x.startswith("executor")]
 
         parameter_client = None
         if builder.store.parameter_server_client:
@@ -174,38 +168,36 @@ class TrainerParameterClient(BaseParameterClient):
             builder: SystemBuilder.
         """
         # Create parameter client
-        params = {}
-        set_keys = []
-        get_keys = []
+        params: Dict[str, Any] = {}
+        set_keys: List[str] = []
+        get_keys: List[str] = []
         # TODO (dries): Only add the networks this trainer is working with.
         # Not all of them.
         trainer_networks = builder.store.trainer_networks[builder.store.trainer_id]
 
-        for net_type_key in builder.store.networks.keys():
-            for net_key in builder.store.networks[net_type_key].keys():
+        for net_key in builder.store.networks.keys():
+            params[f"policy_network-{net_key}"] = builder.store.networks[
+                net_key
+            ].policy_params
+            params[f"critic_network-{net_key}"] = builder.store.networks[
+                net_key
+            ].critic_params
 
-                params[f"policy_{net_type_key}-{net_key}"] = builder.store.networks[
-                    net_type_key
-                ][net_key].policy_params
+            if net_key in set(trainer_networks):
+                set_keys.append(f"policy_network-{net_key}")
+                set_keys.append(f"critic_network-{net_key}")
+            else:
+                get_keys.append(f"policy_network-{net_key}")
+                get_keys.append(f"critic_network-{net_key}")
 
-                params[f"critic_{net_type_key}-{net_key}"] = builder.store.networks[
-                    net_type_key
-                ][net_key].critic_params
-
-                if net_key in set(trainer_networks):
-                    set_keys.append(f"policy_{net_type_key}-{net_key}")
-                    set_keys.append(f"critic_{net_type_key}-{net_key}")
-                else:
-                    get_keys.append(f"policy_{net_type_key}-{net_key}")
-                    get_keys.append(f"critic_{net_type_key}-{net_key}")
-
-        # Add the optimizers to the variable server.
-        # TODO (dries): Adjust this if using policy and critic optimizers.
-        # TODO (dries): Add this back if we want the optimizer_state to
-        # be store in the variable source. However some code might
-        # need to be moved around as the builder currently does not
-        # have access to the opt_states yet.
-        # params["optimizer_state"] = trainer.store.opt_states
+            params[f"policy_opt_state-{net_key}"] = builder.store.policy_opt_states[
+                net_key
+            ]
+            params[f"critic_opt_state-{net_key}"] = builder.store.critic_opt_states[
+                net_key
+            ]
+            set_keys.append(f"policy_opt_state-{net_key}")
+            set_keys.append(f"critic_opt_state-{net_key}")
 
         count_names, params = self._set_up_count_parameters(params=params)
 

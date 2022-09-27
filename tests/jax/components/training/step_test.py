@@ -23,6 +23,7 @@ import jax.numpy as jnp
 import pytest
 import rlax
 
+from mava import constants
 from mava.components.jax.training.step import (
     DefaultTrainerStep,
     MAPGWithTrustRegionStep,
@@ -122,31 +123,30 @@ class MockTrainer(Trainer):
             "agent_2": "network_agent_2",
         }
         networks = {
-            "networks": {
-                "network_agent_0": SimpleNamespace(
-                    policy_params={"key": jnp.array([0.0, 0.0, 0.0])},
-                    critic_params={"key": jnp.array([0.0, 0.0, 0.0])},
-                    policy_network=SimpleNamespace(apply=apply),
-                    critic_network=SimpleNamespace(apply=critic_apply),
-                ),
-                "network_agent_1": SimpleNamespace(
-                    policy_params={"key": jnp.array([1.0, 1.0, 1.0])},
-                    critic_params={"key": jnp.array([1.0, 1.0, 1.0])},
-                    policy_network=SimpleNamespace(apply=apply),
-                    critic_network=SimpleNamespace(apply=critic_apply),
-                ),
-                "network_agent_2": SimpleNamespace(
-                    policy_params={"key": jnp.array([2.0, 2.0, 2.0])},
-                    critic_params={"key": jnp.array([2.0, 2.0, 2.0])},
-                    policy_network=SimpleNamespace(apply=apply),
-                    critic_network=SimpleNamespace(apply=critic_apply),
-                ),
-            }
+            "network_agent_0": SimpleNamespace(
+                policy_params={"key": jnp.array([0.0, 0.0, 0.0])},
+                critic_params={"key": jnp.array([0.0, 0.0, 0.0])},
+                policy_network=SimpleNamespace(apply=apply),
+                critic_network=SimpleNamespace(apply=critic_apply),
+            ),
+            "network_agent_1": SimpleNamespace(
+                policy_params={"key": jnp.array([1.0, 1.0, 1.0])},
+                critic_params={"key": jnp.array([1.0, 1.0, 1.0])},
+                policy_network=SimpleNamespace(apply=apply),
+                critic_network=SimpleNamespace(apply=critic_apply),
+            ),
+            "network_agent_2": SimpleNamespace(
+                policy_params={"key": jnp.array([2.0, 2.0, 2.0])},
+                critic_params={"key": jnp.array([2.0, 2.0, 2.0])},
+                policy_network=SimpleNamespace(apply=apply),
+                critic_network=SimpleNamespace(apply=critic_apply),
+            ),
         }
+
         opt_states = {
-            "network_agent_0": 0,
-            "network_agent_1": 1,
-            "network_agent_2": 2,
+            "network_agent_0": {constants.OPT_STATE_DICT_KEY: 0},
+            "network_agent_1": {constants.OPT_STATE_DICT_KEY: 1},
+            "network_agent_2": {constants.OPT_STATE_DICT_KEY: 2},
         }
         store = SimpleNamespace(
             dataset_iterator=iter([1, 2, 3]),
@@ -175,34 +175,18 @@ def mock_trainer() -> MockTrainer:
     return MockTrainer()
 
 
-@pytest.fixture
-def mock_trainer_separate_networks() -> MockTrainer:
-    """Build fixture from MockTrainer"""
-    return MockTrainer()
-
-
-##############
-# SHARED TESTS
-##############
-
-
 def test_default_trainer_step_initiator() -> None:
     """Test constructor of DefaultTrainerStep component"""
     trainer_step = DefaultTrainerStep()
     assert trainer_step.config.random_key == 42
 
 
-########################
-# SEPARATE NETWORK TESTS
-########################
-
-
-def test_on_training_step_with_timestamp_separate_networks(
-    mock_trainer_separate_networks: Trainer,
+def test_on_training_step_with_timestamp(
+    mock_trainer: Trainer,
 ) -> None:
     """Test on_training_step method from TrainerStep case of existing timestamp"""
     trainer_step = DefaultTrainerStep()
-    mock_trainer = mock_trainer_separate_networks
+    mock_trainer = mock_trainer
 
     old_timestamp = mock_trainer.store.timestamp
     trainer_step.on_training_step(trainer=mock_trainer)
@@ -224,12 +208,11 @@ def test_on_training_step_with_timestamp_separate_networks(
     assert mock_trainer.store.trainer_logger.written == {"next_sample": 2, "sample": 1}
 
 
-def test_on_training_step_without_timestamp_separate_networks(
-    mock_trainer_separate_networks: Trainer,
+def test_on_training_step_without_timestamp(
+    mock_trainer: Trainer,
 ) -> None:
     """Test on_training_step method from TrainerStep case of no timestamp"""
     trainer_step = DefaultTrainerStep()
-    mock_trainer = mock_trainer_separate_networks
 
     del mock_trainer.store.timestamp
     trainer_step.on_training_step(trainer=mock_trainer)
@@ -250,33 +233,33 @@ def test_on_training_step_without_timestamp_separate_networks(
     assert mock_trainer.store.trainer_logger.written == {"next_sample": 2, "sample": 1}
 
 
-def test_mapg_with_trust_region_step_initiator_separate_networks() -> None:
+def test_mapg_with_trust_region_step_initiator() -> None:
     """Test constructor of MAPGWITHTrustRegionStep component"""
     mapg_with_trust_region_step = MAPGWithTrustRegionStep()
     assert mapg_with_trust_region_step.config.discount == 0.99
 
 
-def test_on_training_init_start_separate_networks(
-    mock_trainer_separate_networks: Trainer,
+def test_on_training_init_start(
+    mock_trainer: Trainer,
 ) -> None:
     """Test on_training_init_start method from \
         MAPGWITHTrustRegionStep component"""
     mapg_with_trust_region_step = MAPGWithTrustRegionStep()
-    mock_trainer = mock_trainer_separate_networks
+    mock_trainer = mock_trainer
 
     mapg_with_trust_region_step.on_training_init_start(trainer=mock_trainer)
 
     assert mock_trainer.store.full_batch_size == 4
 
 
-def test_on_training_step_fn_separate_networks(
-    mock_trainer_separate_networks: Trainer,
+def test_on_training_step_fn(
+    mock_trainer: Trainer,
 ) -> None:
     """Test on_training_step_fn method from \
         MAPGWITHTrustRegionStep component"""
 
     mapg_with_trust_region_step = MAPGWithTrustRegionStep()
-    mock_trainer = mock_trainer_separate_networks
+    mock_trainer = mock_trainer
 
     del mock_trainer.store.step_fn
     mapg_with_trust_region_step.on_training_step_fn(trainer=mock_trainer)
@@ -284,10 +267,10 @@ def test_on_training_step_fn_separate_networks(
     assert callable(mock_trainer.store.step_fn)
 
 
-def test_step_separate_networks(mock_trainer_separate_networks: Trainer) -> None:
+def test_step(mock_trainer: Trainer) -> None:
     """Test step function"""
     mapg_with_trust_region_step = MAPGWithTrustRegionStep()
-    mock_trainer = mock_trainer_separate_networks
+    mock_trainer = mock_trainer
     del mock_trainer.store.step_fn
 
     mapg_with_trust_region_step.on_training_step_fn(trainer=mock_trainer)
@@ -336,11 +319,11 @@ def test_step_separate_networks(mock_trainer_separate_networks: Trainer) -> None
         * mock_trainer.store.global_config.num_minibatches
     )
 
-    # check that network parameters and optimizer states were updated the correct
+    # check that network parameters and optimiser states were updated the correct
     # number of times
-    for i, net_key in enumerate(mock_trainer.store.networks["networks"]):
+    for i, net_key in enumerate(mock_trainer.store.networks):
         assert jnp.array_equal(
-            mock_trainer.store.networks["networks"][net_key].policy_params["key"],
+            mock_trainer.store.networks[net_key].policy_params["key"],
             jnp.array(
                 [
                     i + num_expected_update_steps,
@@ -351,7 +334,7 @@ def test_step_separate_networks(mock_trainer_separate_networks: Trainer) -> None
         )
 
         assert jnp.array_equal(
-            mock_trainer.store.networks["networks"][net_key].critic_params["key"],
+            mock_trainer.store.networks[net_key].critic_params["key"],
             jnp.array(
                 [
                     i + num_expected_update_steps,
@@ -362,13 +345,25 @@ def test_step_separate_networks(mock_trainer_separate_networks: Trainer) -> None
         )
 
     assert mock_trainer.store.policy_opt_states == {
-        "network_agent_0": 0 + num_expected_update_steps,
-        "network_agent_1": 1 + num_expected_update_steps,
-        "network_agent_2": 2 + num_expected_update_steps,
+        "network_agent_0": {
+            constants.OPT_STATE_DICT_KEY: 0 + num_expected_update_steps
+        },
+        "network_agent_1": {
+            constants.OPT_STATE_DICT_KEY: 1 + num_expected_update_steps
+        },
+        "network_agent_2": {
+            constants.OPT_STATE_DICT_KEY: 2 + num_expected_update_steps
+        },
     }
 
     assert mock_trainer.store.critic_opt_states == {
-        "network_agent_0": 0 + num_expected_update_steps,
-        "network_agent_1": 1 + num_expected_update_steps,
-        "network_agent_2": 2 + num_expected_update_steps,
+        "network_agent_0": {
+            constants.OPT_STATE_DICT_KEY: 0 + num_expected_update_steps
+        },
+        "network_agent_1": {
+            constants.OPT_STATE_DICT_KEY: 1 + num_expected_update_steps
+        },
+        "network_agent_2": {
+            constants.OPT_STATE_DICT_KEY: 2 + num_expected_update_steps
+        },
     }

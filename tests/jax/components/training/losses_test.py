@@ -11,10 +11,6 @@ from mava.components.jax.training.losses import (
 )
 from mava.systems.jax.trainer import Trainer
 
-########################
-# SEPARATE NETWORKS TEST
-########################
-
 
 class MockNet:
     """Creates a mock network for loss function"""
@@ -61,7 +57,7 @@ def entropy(distribution_params: jnp.ndarray) -> jnp.ndarray:
 
 
 @pytest.fixture
-def mock_separate_networks_trainer() -> Trainer:
+def mock_trainer() -> Trainer:
     """Creates mock trainer fixture"""
 
     observation = SimpleNamespace(observation=jnp.array([0.5, 0.5, 0.7, 0.2]))
@@ -78,14 +74,12 @@ def mock_separate_networks_trainer() -> Trainer:
     }
 
     network = {
-        "networks": {
-            "network_agent": SimpleNamespace(
-                policy_network=MockPolicyNet,
-                critic_network=MockCriticNet,
-                log_prob=log_prob,
-                entropy=entropy,
-            )
-        }
+        "network_agent": SimpleNamespace(
+            policy_network=MockPolicyNet,
+            critic_network=MockCriticNet,
+            log_prob=log_prob,
+            entropy=entropy,
+        )
     }
 
     base_key = jax.random.PRNGKey(5)
@@ -124,7 +118,7 @@ def mock_separate_networks_trainer() -> Trainer:
 
 
 @pytest.fixture
-def mapg_trust_region_clipping_loss_separate_networks() -> MAPGWithTrustRegionClippingLoss:  # noqa: E501
+def mapg_trust_region_clipping_loss() -> MAPGWithTrustRegionClippingLoss:  # noqa: E501
     """Creates an MAPG loss fixture with trust region and clipping"""
 
     test_mapg = MAPGWithTrustRegionClippingLoss(
@@ -134,35 +128,31 @@ def mapg_trust_region_clipping_loss_separate_networks() -> MAPGWithTrustRegionCl
     return test_mapg
 
 
-def test_mapg_creation_separate_networks(
-    mock_separate_networks_trainer: Trainer,
-    mapg_trust_region_clipping_loss_separate_networks: MAPGWithTrustRegionClippingLoss,  # noqa: E501
+def test_mapg_creation(
+    mock_trainer: Trainer,
+    mapg_trust_region_clipping_loss: MAPGWithTrustRegionClippingLoss,  # noqa: E501
 ) -> None:
     """Test whether mapg functions are successfully created"""
 
-    mapg_trust_region_clipping_loss_separate_networks.on_training_loss_fns(
-        trainer=mock_separate_networks_trainer
-    )
-    assert hasattr(mock_separate_networks_trainer.store, "policy_grad_fn")
-    assert hasattr(mock_separate_networks_trainer.store, "critic_grad_fn")
+    mapg_trust_region_clipping_loss.on_training_loss_fns(trainer=mock_trainer)
+    assert hasattr(mock_trainer.store, "policy_grad_fn")
+    assert hasattr(mock_trainer.store, "critic_grad_fn")
     assert isinstance(
-        mock_separate_networks_trainer.store.policy_grad_fn, Callable  # type:ignore
+        mock_trainer.store.policy_grad_fn, Callable  # type:ignore
     )
     assert isinstance(
-        mock_separate_networks_trainer.store.critic_grad_fn, Callable  # type:ignore
+        mock_trainer.store.critic_grad_fn, Callable  # type:ignore
     )
 
 
-def test_mapg_loss_separate_networks(
-    mock_separate_networks_trainer: Trainer,
-    mapg_trust_region_clipping_loss_separate_networks: MAPGWithTrustRegionClippingLoss,  # noqa: E501
+def test_mapg_loss(
+    mock_trainer: Trainer,
+    mapg_trust_region_clipping_loss: MAPGWithTrustRegionClippingLoss,  # noqa: E501
 ) -> None:
     """Test whether mapg loss output is as expected"""
-    mapg_trust_region_clipping_loss_separate_networks.on_training_loss_fns(
-        trainer=mock_separate_networks_trainer
-    )
-    policy_grad_fn = mock_separate_networks_trainer.store.policy_grad_fn
-    critic_grad_fn = mock_separate_networks_trainer.store.critic_grad_fn
+    mapg_trust_region_clipping_loss.on_training_loss_fns(trainer=mock_trainer)
+    policy_grad_fn = mock_trainer.store.policy_grad_fn
+    critic_grad_fn = mock_trainer.store.critic_grad_fn
 
     actions = {
         agent: jnp.array([1.0, 1.0, 1.0, 1.0])
@@ -195,31 +185,31 @@ def test_mapg_loss_separate_networks(
     }
 
     _, policy_loss_info = policy_grad_fn(
-        policy_params=mock_separate_networks_trainer.store.parameters,
-        observations=mock_separate_networks_trainer.store.observations,
+        policy_params=mock_trainer.store.parameters,
+        observations=mock_trainer.store.observations,
         actions=actions,
         behaviour_log_probs=behaviour_log_probs,
         advantages=advantages,
     )
 
     _, low_policy_loss_info = policy_grad_fn(
-        policy_params=mock_separate_networks_trainer.store.parameters,
-        observations=mock_separate_networks_trainer.store.observations,
+        policy_params=mock_trainer.store.parameters,
+        observations=mock_trainer.store.observations,
         actions=actions,
         behaviour_log_probs=behaviour_log_probs,
         advantages=low_advantages,
     )
 
     _, critic_loss_info = critic_grad_fn(
-        critic_params=mock_separate_networks_trainer.store.parameters,
-        observations=mock_separate_networks_trainer.store.observations,
+        critic_params=mock_trainer.store.parameters,
+        observations=mock_trainer.store.observations,
         target_values=target_values,
         behavior_values=behavior_values,
     )
 
     _, low_critic_loss_info = critic_grad_fn(
-        critic_params=mock_separate_networks_trainer.store.parameters,
-        observations=mock_separate_networks_trainer.store.observations,
+        critic_params=mock_trainer.store.parameters,
+        observations=mock_trainer.store.observations,
         target_values=low_target_values,
         behavior_values=behavior_values,
     )

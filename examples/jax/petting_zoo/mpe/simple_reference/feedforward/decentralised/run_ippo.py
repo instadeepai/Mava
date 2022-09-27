@@ -12,9 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run feedforward MADQN on SMAC."""
 
-
+"""Example running IPPO on debug MPE environments."""
 import functools
 from datetime import datetime
 from typing import Any
@@ -23,14 +22,19 @@ import optax
 from absl import app, flags
 
 from mava.systems.jax import ippo
-from mava.utils.environments.smac_utils import make_environment
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "map_name",
-    "3m",
-    "Starcraft 2 micromanagement map name (str).",
+    "env_class",
+    "mpe",
+    "Pettingzoo environment class, e.g. atari (str).",
+)
+flags.DEFINE_string(
+    "env_name",
+    "simple_reference_v2",
+    "Pettingzoo environment name, e.g. pong (str).",
 )
 
 flags.DEFINE_string(
@@ -38,30 +42,34 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
+
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Example running feedforward MADQN on SMAC environment."""
+    """Run main script
 
-    # WARNING (dries): This code has not been run yet. There might still
-    # be runtime errors in the code.
-
-    # Environment
-    environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
+    Args:
+        _ : _
+    """
+    # Environment.
+    environment_factory = functools.partial(
+        pettingzoo_utils.make_environment,
+        env_class=FLAGS.env_class,
+        env_name=FLAGS.env_name,
+    )
 
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return ippo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(256, 256, 256),
-            critic_layer_sizes=(512, 512, 256),
-            single_network=False,
+            policy_layer_sizes=(64,),
+            critic_layer_sizes=(256,),
             *args,
             **kwargs,
         )
 
-    # Checkpointer appends "Checkpoints" to checkpoint_dir
-    checkpoint_subpath = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+    # Used for checkpoints, tensorboard logging and env monitoring
+    experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
     log_every = 10
@@ -76,10 +84,11 @@ def main(_: Any) -> None:
 
     # Optimisers.
     policy_optimiser = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-3e-4)
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
+
     critic_optimiser = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-3)
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
     # Create the system.
@@ -90,7 +99,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        experiment_path=checkpoint_subpath,
+        experiment_path=experiment_path,
         policy_optimiser=policy_optimiser,
         critic_optimiser=critic_optimiser,
         run_evaluator=True,
@@ -98,7 +107,6 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        clip_value=True,
     )
 
     # Launch the system.

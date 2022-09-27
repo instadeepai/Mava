@@ -39,7 +39,7 @@ class CheckpointingRunner(savers.CheckpointingRunner):
     """Wrap an object and expose a run method which checkpoints periodically.
 
     This internally creates a Checkpointer around `wrapped` object and exposes
-    all of the methods of `wrapped`. Additionally, anay `**kwargs` passed to the
+    all of the methods of `wrapped`. Additionally, any `**kwargs` passed to the
     runner are forwarded to the internal Checkpointer.
     """
 
