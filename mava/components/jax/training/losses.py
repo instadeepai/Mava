@@ -131,15 +131,18 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                     # TODO (dries): Can we implement something more general here? Like a function call?
                     if policy_states:
                         # Recurrent actor.
-                        batch_size = trainer.store.sample_batch_size
+                        minibatch_size = (
+                            trainer.store.sample_batch_size
+                            / trainer.store.num_minibatches
+                        )
                         seq_len = trainer.store.sequence_length - 1
 
                         batch_seq_observations = observations.reshape(
-                            batch_size, seq_len, -1
+                            minibatch_size, seq_len, -1
                         )
 
                         batch_seq_policy_states = policy_states[0].reshape(
-                            batch_size, seq_len, -1
+                            minibatch_size, seq_len, -1
                         )
 
                         # Use the state at the start of the sequence and unroll the policy.
