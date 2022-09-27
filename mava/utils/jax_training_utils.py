@@ -19,7 +19,9 @@ def action_mask_categorical_policies(
     return tfd.Categorical(logits=masked_logits, dtype=distribution.dtype)
 
 
-def compute_running_mean_var_count(stats: Array, batch: Array) -> Array:
+def compute_running_mean_var_count(
+    stats: jnp.ndarray, batch: jnp.ndarray
+) -> jnp.ndarray:
     """Updates the running mean, variance and data counts during training.
 
     stats (array) -- mean, var, count.
@@ -33,7 +35,7 @@ def compute_running_mean_var_count(stats: Array, batch: Array) -> Array:
     batch_var = jnp.var(batch)
     batch_count = batch.size
 
-    mean, var, count = stats
+    mean, var, count = stats[0], stats[1], stats[2]
 
     delta = batch_mean - mean
     tot_count = count + batch_count
@@ -48,7 +50,7 @@ def compute_running_mean_var_count(stats: Array, batch: Array) -> Array:
     return jnp.array([new_mean, new_var, new_count])
 
 
-def dummy_running_mean_var_count(stats: Array, batch: Array) -> Array:
+def dummy_running_mean_var_count(stats: jnp.ndarray, batch: jnp.ndarray) -> jnp.ndarray:
     """Dummy stats to use if we do not want to normalise the target values.
 
     stats (array) -- mean, var, count.
@@ -66,7 +68,7 @@ def dummy_running_mean_var_count(stats: Array, batch: Array) -> Array:
     return jnp.array([0, 1, new_count])
 
 
-def normalize(stats: Array, batch: Array) -> Array:
+def normalize(stats: jnp.ndarray, batch: jnp.ndarray) -> jnp.ndarray:
     """Normlaise batch of data using the running mean and variance.
 
     stats (array) -- mean, var, count.
@@ -76,13 +78,13 @@ def normalize(stats: Array, batch: Array) -> Array:
         denormalize batch (array)
     """
 
-    mean, var, _ = stats
+    mean, var = stats[0], stats[1]
     normalize_batch = (batch - mean) / (jnp.sqrt(jnp.clip(var, a_min=1e-2)))
 
     return normalize_batch
 
 
-def denormalize(stats: Array, batch: Array) -> Array:
+def denormalize(stats: jnp.ndarray, batch: jnp.ndarray) -> jnp.ndarray:
     """Transform normalized data back into original distribution
 
     stats (array) -- mean, var, count
@@ -92,7 +94,7 @@ def denormalize(stats: Array, batch: Array) -> Array:
         denormalize batch (array)
     """
 
-    mean, var, _ = stats
+    mean, var = stats[0], stats[1]
     denormalize_batch = batch * jnp.sqrt(var) + mean
 
     return denormalize_batch
