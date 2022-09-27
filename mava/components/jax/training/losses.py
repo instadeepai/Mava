@@ -63,8 +63,6 @@ class MAPGTrustRegionClippingLossConfig:
     clip_value: bool = True
     entropy_cost: float = 0.01
     value_cost: float = 0.5
-    use_huber = True
-    huber_delta = 1.0
 
 
 class MAPGWithTrustRegionClippingLoss(Loss):
@@ -224,12 +222,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                             value_clip_parameter,
                         )
                         clipped_value_error = target_values - clipped_values
-                        if self.config.use_huber:
-                            clipped_value_loss = rlax.huber_loss(
-                                clipped_value_error, self.config.huber_delta
-                            )
-                        else:
-                            clipped_value_loss = clipped_value_error**2
+                        clipped_value_loss = clipped_value_error**2
                         value_loss = jnp.mean(
                             jnp.fmax(unclipped_value_loss, clipped_value_loss)
                         )
