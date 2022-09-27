@@ -40,7 +40,7 @@ jax_requirements = [
     "chex",
     # TODO Unpin JAX, once new rlax and acme version is released.
     # To fix cannot import name 'tree_multimap' from 'jax.tree_util'.
-    "jax<=0.3.15",
+    "jax==0.3.17",
     "jaxlib",
     "dm-haiku",
     "flax",
@@ -126,7 +126,7 @@ setup(
         "record_episode": record_episode_requirements,
         "sc2": smac_requirements,
         "envs": pettingzoo_requirements + open_spiel_requirements + smac_requirements,
-        "jax<=0.3.15": jax_requirements,
+        "jax": jax_requirements,
     },
     classifiers=[
         "Development Status :: 3 - Alpha",
