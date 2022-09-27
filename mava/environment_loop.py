@@ -568,7 +568,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             counts = self.get_counts()
 
             if counts:
-                count = int(counts[eval_interval_key])
+                count = int(counts[eval_interval_key])  # type: ignore
                 # We run eval loops around every eval_interval_count (not exactly
                 # every eval_interval_count due to latency in getting updated counts).
                 should_run_loop = (
