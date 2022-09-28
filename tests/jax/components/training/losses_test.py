@@ -113,6 +113,7 @@ def mock_trainer() -> Trainer:
             "agent_1": "network_agent",
             "agent_2": "network_agent",
         },
+        num_minibatches=1,
         base_key=base_key,
         action_info=action_info,
         policy_info=policy_info,
