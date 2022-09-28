@@ -49,53 +49,26 @@ flags.DEFINE_string(
 )
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
+import psutil
+
 
 def terminator(worker_manager):
-    if worker_manager._active_workers != {}:
-        if "data_server/0" in list(worker_manager._active_workers.keys()):
-            if len(worker_manager._active_workers["data_server/0"]) > 0:
-                print(worker_manager._active_workers["data_server/0"])
-                parent_pid = worker_manager._active_workers["data_server/0"][0]._pid
+    still_running = [
+        label
+        for label in worker_manager._active_workers
+        if worker_manager._active_workers[label]
+    ]
+    for process in still_running:
+        if process in list(worker_manager._active_workers.keys()):
+            if len(worker_manager._active_workers[process]) > 0:
+                print(worker_manager._active_workers[process])
+                parent_pid = worker_manager._active_workers[process][0]._pid
                 parent = psutil.Process(parent_pid)
                 for child in parent.children(recursive=True):
                     child.kill()
                 parent.kill()
-        if "executor/0" in list(worker_manager._active_workers.keys()):
-            if len(worker_manager._active_workers["executor/0"]) > 0:
-                print(worker_manager._active_workers["executor/0"])
-                parent_pid = worker_manager._active_workers["executor/0"][0]._pid
-                parent = psutil.Process(parent_pid)
-                for child in parent.children(recursive=True):
-                    child.kill()
-                parent.kill()
-        if "trainer/0" in list(worker_manager._active_workers.keys()):
-            if len(worker_manager._active_workers["trainer/0"]) > 0:
-                print(worker_manager._active_workers["trainer/0"])
-                parent_pid = worker_manager._active_workers["trainer/0"][0]._pid
-                parent = psutil.Process(parent_pid)
-                for child in parent.children(recursive=True):
-                    child.kill()
-                parent.kill()
-        if "evaluator/0" in list(worker_manager._active_workers.keys()):
-            if len(worker_manager._active_workers["evaluator/0"]) > 0:
-                print(worker_manager._active_workers["evaluator/0"])
-                parent_pid = worker_manager._active_workers["evaluator/0"][0]._pid
-                parent = psutil.Process(parent_pid)
-                for child in parent.children(recursive=True):
-                    child.kill()
-                parent.kill()
-        if "parameter_server/0" in list(worker_manager._active_workers.keys()):
-            if len(worker_manager._active_workers["parameter_server/0"]) > 0:
-                print(worker_manager._active_workers["parameter_server/0"])
-                parent_pid = worker_manager._active_workers["parameter_server/0"][
-                    0
-                ]._pid
-                parent = psutil.Process(parent_pid)
-                for child in parent.children(
-                    recursive=True
-                ):  # or parent.children() for recursive=False
-                    child.kill()
-                parent.kill()
+
+    print("STATE", worker_manager._active_workers)
 
 
 def main(_: Any) -> None:
@@ -161,7 +134,7 @@ def main(_: Any) -> None:
         num_executors=1,
         multi_process=True,
         clip_value=False,
-        # termination_condition={"executor_steps": 5000}
+        termination_condition={"executor_steps": 5000},
     )
 
     # Launch the system.
