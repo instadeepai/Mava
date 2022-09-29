@@ -20,6 +20,7 @@ import inspect
 from typing import Any, Callable, Dict, List, Optional
 
 import launchpad as lp
+import psutil
 from absl import flags, logging
 from acme.utils import counting
 from launchpad.nodes.python.local_multi_processing import PythonProcess
@@ -84,6 +85,17 @@ def partial_kwargs(function: Callable[..., Any], **kwargs: Any) -> Callable[...,
         raise ValueError(error_string.format(", ".join(unknown_kwargs)))
 
     return functools.partial(function, **kwargs)
+
+
+def termination_fn(parent_pid: int) -> None:
+    """Terminate the process
+    
+    Args:
+        parent_pid: the pid of the main thread process
+    """
+    parent = psutil.Process(parent_pid)
+    for child in parent.children(recursive=True):
+        child.kill()
 
 
 class StepsLimiter:

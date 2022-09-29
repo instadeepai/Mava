@@ -25,6 +25,7 @@ from mava.callbacks import Callback
 from mava.components.jax.component import Component
 from mava.components.jax.updating.parameter_server import ParameterServer
 from mava.core_jax import SystemParameterServer
+from mava.utils.lp_utils import termination_fn
 from mava.utils.training_utils import check_count_condition
 
 
@@ -64,7 +65,7 @@ class Terminator(Component):
 @dataclass
 class CountConditionTerminatorConfig:
     termination_condition: Optional[Dict[str, Any]] = None
-    termination_function: Callable = lp.stop
+    termination_function: Callable = termination_fn
 
 
 class CountConditionTerminator(Terminator):
@@ -105,8 +106,7 @@ class CountConditionTerminator(Terminator):
                 f"Max {self.termination_key} of {self.termination_value}"
                 " reached, terminating."
             )
-            parameter_sever.store.exit = True
-            # self.config.termination_function()
+            self.config.termination_function(parameter_sever.store.manager_pid)
 
     @staticmethod
     def required_components() -> List[Type[Callback]]:

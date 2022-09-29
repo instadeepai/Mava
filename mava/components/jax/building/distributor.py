@@ -144,7 +144,7 @@ class Distributor(Component):
         Returns:
             None.
         """
-        builder.store.worker_manager = builder.store.program.launch()
+        builder.store.program.launch()
 
     @staticmethod
     def name() -> str:
