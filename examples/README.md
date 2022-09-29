@@ -53,5 +53,5 @@ We also have various Jax-based examples which make use of the callback design pa
 [flatland_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/flatland/feedforward/decentralised/run_ippo.py
 [pz_coop_pong_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/butterfly/cooperative_pong/feedforward/decentralised/run_ippo.py
 [smac_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/smac/feedforward/decentralised/run_ippo.py
-[debug_ippo_ff_dec_eval_intevals_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo_eval_intervals.py
-[smac_ippo_ff_dec_eval_intervals_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/smac/feedforward/decentralised/run_ippo_eval_intervals.py
+[debug_ippo_ff_dec_eval_intevals_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/debugging/simple_spread/feedforward/decentralised/run_ippo_eval_intervals.py
+[smac_ippo_ff_dec_eval_intervals_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/smac/feedforward/decentralised/run_ippo_eval_intervals.py
