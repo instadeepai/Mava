@@ -16,6 +16,7 @@ We also have various Jax-based examples which make use of the callback design pa
     - [decentralised record agents][debug_ippo_ff_dec_jax_record] (***recording agents acting in the environment***).
     - [decentralised single process][debug_ippo_ff_dec_jax_single_process] (***running in single process mode***).
     - [decentralised restore checkpoint][debug_ippo_ff_dec_jax_checkpoint] (***continuing training by restoring from an existing checkpoint***).
+    - [decentralised evaluation intervals][debug_ippo_ff_dec_eval_intevals_jax] (***perform evaluation at custom intervals for custom durations***)
 
 
 [debug_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/debugging/simple_spread/feedforward/decentralised/run_ippo.py
@@ -26,23 +27,24 @@ We also have various Jax-based examples which make use of the callback design pa
 ### Flatland
 
 - **IPPO**:
-    an IPPO system running on the discrete action space simple_spread MPE environment.
+    an IPPO system running on the discrete action space flatland environment.
   - *Feedforward*
     - [decentralised][flatland_ippo_ff_dec_jax]
 
 ### Pettingzoo - Cooperative pong
 
 - **IPPO**:
-    an IPPO system running on the discrete action space simple_spread MPE environment.
+    an IPPO system running on the discrete action space Cooperative pong MPE environment.
   - *Feedforward*
     - [decentralised][pz_coop_pong_ippo_ff_dec_jax]
 
 ### SMAC - StarCraft Multi-Agent Challenge
 
 - **IPPO**:
-    an IPPO system running on the discrete action space simple_spread MPE environment.
+    an IPPO system running on the discrete action space 3m SMAC environment.
   - *Feedforward*
     - [decentralised][smac_ippo_ff_dec_jax]
+    - [decentralised evaluation intervals][smac_ippo_ff_dec_eval_intervals_jax] (***perform evaluation at custom intervals for custom durations***)
 
 
 

@@ -16,10 +16,12 @@
 """A simple multi-agent-system-environment training loop."""
 
 import time
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 import acme
 import dm_env
+import jax
+import jax.numpy as jnp
 import numpy as np
 from acme.utils import counting, loggers
 
@@ -426,9 +428,11 @@ class ParallelEnvironmentLoop(acme.core.Worker):
     ) -> None:
         pass
 
-    def get_counts(self) -> counting.Counter:
+    def get_counts(self) -> Union[counting.Counter, Dict[str, jnp.ndarray]]:
         """Get latest counts"""
-        if hasattr(self._executor, "_counts"):
+        if hasattr(self._executor, "store"):
+            counts = self._executor.store.executor_counts
+        elif hasattr(self._executor, "_counts"):
             counts = self._executor._counts
         else:
             counts = self._counter.get_counts()
@@ -570,7 +574,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         self._logger.write(results)
         return results
 
-    def run(
+    def run(  # noqa: C901
         self, num_episodes: Optional[int] = None, num_steps: Optional[int] = None
     ) -> None:
         """Perform the run loop.
@@ -599,22 +603,23 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 num_steps is not None and step_count >= num_steps
             )
 
-        def should_run_loop(eval_condtion: Tuple) -> bool:
+        def should_run_loop(eval_interval_condition: Tuple) -> bool:
             """Check if the eval loop should run in current step.
 
             Args:
-                eval_condition : tuple containing interval key and count.
+                eval_interval_condition : tuple containing interval key and count.
 
             Returns:
-                a bool indicatings if eval should run.
+                a bool indicating if eval should run.
             """
             should_run_loop = False
-            eval_interval_key, eval_interval_count = eval_condition
+            eval_interval_key, eval_interval_count = eval_interval_condition
             counts = self.get_counts()
+
             if counts:
-                count = counts.get(eval_interval_key)
-                # We run eval loops around every eval_interval_count (not exactly every
-                # eval_interval_count due to latency in getting updated counts).
+                count = counts[eval_interval_key]
+                # We run eval loops around every eval_interval_count (not exactly
+                # every eval_interval_count due to latency in getting updated counts).
                 should_run_loop = (
                     (count - self._last_evaluator_run_t) / eval_interval_count
                 ) >= 1.0
@@ -624,28 +629,69 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         "Running eval loop at executor step: "
                         + f"{self._last_evaluator_run_t}"
                     )
+
             return should_run_loop
 
         episode_count, step_count = 0, 0
 
-        # Currently, we only use intervals for eval loops.
-        environment_loop_schedule = (
-            self._executor._evaluator and self._executor._interval
-        )
-        if environment_loop_schedule:
-            eval_condition = check_count_condition(self._executor._interval)
+        # TODO (Ruan): Checking whether we are using Jax or TF here
+        # this should be removed once we deprecate TF.
+        if hasattr(self._executor, "store"):
+            environment_loop_schedule = self._executor._evaluator and (
+                self._executor.store.evaluation_interval is not None
+            )
+
+            if environment_loop_schedule:
+                eval_interval_condition = check_count_condition(
+                    self._executor.store.evaluation_interval
+                )
+                eval_duration_condition = check_count_condition(
+                    self._executor.store.evaluation_duration
+                )
+                evaluation_duration = eval_duration_condition[1]
+        else:
+            environment_loop_schedule = (
+                self._executor._evaluator and self._executor._interval
+            )
+            if environment_loop_schedule:
+                eval_interval_condition = check_count_condition(
+                    self._executor._interval
+                )
 
         while not should_terminate(episode_count, step_count):
-            if (not environment_loop_schedule) or should_run_loop(eval_condition):
-                result = self.run_episode()
-                episode_count += 1
-                step_count += result["episode_length"]
-                # Log the given results.
-                self._logger.write(result)
+            if (not environment_loop_schedule) or (
+                should_run_loop(eval_interval_condition)
+            ):
+                # TODO (Ruan): Remove store check once TF is deprecated.
+                if environment_loop_schedule and hasattr(self._executor, "store"):
+                    # Get first result dictionary
+                    results = self.run_episode()
+                    episode_count += 1
+                    step_count += results["episode_length"]
+                    for _ in range(evaluation_duration - 1):
+                        # Add consecutive evaluation run data
+                        result = self.run_episode()
+                        episode_count += 1
+                        step_count += result["episode_length"]
+                        # Sum results for computing mean after all evaluation runs.
+                        results = jax.tree_map(lambda x, y: x + y, results, result)
+                    # compute the mean over all evaluation runs
+                    results = jax.tree_map(lambda x: x / evaluation_duration, results)
+                    # Check for extra logs
+                    if hasattr(self._environment, "get_interval_stats"):
+                        results.update(self._environment.get_interval_stats())
+                    self._logger.write(results)
+
+                else:
+                    result = self.run_episode()
+                    episode_count += 1
+                    step_count += result["episode_length"]
+                    # Log the given results.
+                    self._logger.write(result)
             else:
                 # Note: We assume that the evaluator will be running less
                 # than once per second.
                 time.sleep(1)
             # We need to get the latest counts if we are using eval intervals.
             if environment_loop_schedule:
-                self._executor.update()
+                self._executor.force_update()

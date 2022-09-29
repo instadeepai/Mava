@@ -12,20 +12,30 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Example running feedforward MADQN on Flatland."""
 
+"""Example running IPPO on debug MPE environments."""
 import functools
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
 import optax
 from absl import app, flags
 
-from mava.systems import ippo
-from mava.utils.environments.flatland_utils import make_environment
+from mava.systems.jax import ippo
+from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
+flags.DEFINE_string(
+    "env_name",
+    "simple_spread",
+    "Debugging environment name (str).",
+)
+flags.DEFINE_string(
+    "action_space",
+    "discrete",
+    "Environment action space type (str).",
+)
 
 flags.DEFINE_string(
     "mava_id",
@@ -35,29 +45,18 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
-# flatland environment config
-flatland_env_config: Dict = {
-    "n_agents": 3,
-    "x_dim": 30,
-    "y_dim": 30,
-    "n_cities": 2,
-    "max_rails_between_cities": 2,
-    "max_rails_in_city": 3,
-    "seed": 0,
-    "malfunction_rate": 1 / 200,
-    "malfunction_min_duration": 20,
-    "malfunction_max_duration": 50,
-    "observation_max_path_depth": 30,
-    "observation_tree_depth": 2,
-}
-
-
 def main(_: Any) -> None:
     """Run main script
 
     Args:
         _ : _
     """
+    # Environment.
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name=FLAGS.env_name,
+        action_space=FLAGS.action_space,
+    )
 
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
@@ -67,9 +66,6 @@ def main(_: Any) -> None:
             *args,
             **kwargs,
         )
-
-    # Environment.
-    environment_factory = functools.partial(make_environment, **flatland_env_config)
 
     # Used for checkpoints, tensorboard logging and env monitoring
     experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
@@ -110,6 +106,9 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
+        clip_value=False,
+        evaluation_interval={"executor_steps": 10000},
+        evaluation_duration={"evaluator_episodes": 32},
     )
 
     # Launch the system.
