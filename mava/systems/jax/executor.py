@@ -16,7 +16,7 @@
 """Jax system executor."""
 
 from types import SimpleNamespace
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import dm_env
 from acme.types import NestedArray
@@ -45,13 +45,13 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         self.store = store
         self.callbacks = components
 
+        self._evaluator = self.store.is_evaluator
+
         self.on_execution_init_start()
 
         self.on_execution_init()
 
         self.on_execution_init_end()
-
-        self._evaluator = self.store.is_evaluator
 
     def observe_first(
         self,
@@ -170,3 +170,20 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         self.on_execution_update()
 
         self.on_execution_update_end()
+
+    def force_update(self, wait: bool = False) -> None:
+        """Force immediate update executor parameters.
+
+        Args:
+            wait : whether to stall the executor's request for new parameter.
+
+        Returns:
+            None.
+        """
+        self.store._wait = wait
+
+        self.on_execution_force_update_start()
+
+        self.on_execution_force_update()
+
+        self.on_execution_force_update_end()
