@@ -39,7 +39,7 @@ class Terminator(Component):
 
     @abc.abstractmethod
     def on_parameter_server_run_loop_termination(
-        self, parameter_sever: SystemParameterServer
+        self, parameter_server: SystemParameterServer
     ) -> None:
         """Terminate system if some condition is met."""
         pass
@@ -111,7 +111,7 @@ class CountConditionTerminator(Terminator):
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
-        ParameterServer required to set parameter_sever.store.parameters.
+        ParameterServer required to set parameter_server.store.parameters.
 
         Returns:
             List of required component classes.
