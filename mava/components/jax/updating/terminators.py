@@ -86,26 +86,26 @@ class CountConditionTerminator(Terminator):
 
     def on_parameter_server_run_loop_termination(
         self,
-        parameter_sever: SystemParameterServer,
+        parameter_server: SystemParameterServer,
     ) -> None:
         """Terminate a run when a parameter exceeds the given threshold.
 
         Args:
-            parameter_sever: SystemParameterServer.
+            parameter_server: SystemParameterServer.
 
         Returns:
             None.
         """
         if (
             self.config.termination_condition is not None
-            and parameter_sever.store.parameters[self.termination_key]
+            and parameter_server.store.parameters[self.termination_key]
             > self.termination_value
         ):
             print(
                 f"Max {self.termination_key} of {self.termination_value}"
                 " reached, terminating."
             )
-            self.config.termination_function(parameter_sever)
+            self.config.termination_function(parameter_server)
 
     @staticmethod
     def required_components() -> List[Type[Callback]]:
@@ -138,11 +138,11 @@ class TimeTerminator(Terminator):
         self.config = config
         self._start_time = 0.0
 
-    def on_parameter_server_init(self, parameter_sever: SystemParameterServer) -> None:
+    def on_parameter_server_init(self, parameter_server: SystemParameterServer) -> None:
         """Store the time at which the system was initialised.
 
         Args:
-            parameter_sever: SystemParameterServer.
+            parameter_server: SystemParameterServer.
 
         Returns:
             None.
@@ -150,12 +150,12 @@ class TimeTerminator(Terminator):
         self._start_time = time.time()
 
     def on_parameter_server_run_loop_termination(
-        self, parameter_sever: SystemParameterServer
+        self, parameter_server: SystemParameterServer
     ) -> None:
         """Terminate the system if the time elapsed has exceeded the limit.
 
         Args:
-            parameter_sever: SystemParameterServer.
+            parameter_server: SystemParameterServer.
 
         Returns:
             None.
@@ -164,4 +164,4 @@ class TimeTerminator(Terminator):
             print(
                 f"Run time of {self.config.run_seconds} seconds reached, terminating."
             )
-            self.config.termination_function(parameter_sever)
+            self.config.termination_function(parameter_server)
