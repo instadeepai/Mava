@@ -89,7 +89,7 @@ def partial_kwargs(function: Callable[..., Any], **kwargs: Any) -> Callable[...,
 
 def termination_fn(parent_pid: int) -> None:
     """Terminate the process
-    
+
     Args:
         parent_pid: the pid of the main thread process
     """
