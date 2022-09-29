@@ -41,7 +41,7 @@ jax_requirements = [
     # TODO Unpin JAX, once new rlax and acme version is released.
     # To fix cannot import name 'tree_multimap' from 'jax.tree_util'.
     "jax<=0.3.15",
-    "jaxlib",
+    "jaxlib<=0.3.19",
     "dm-haiku",
     "flax",
     "optax",
