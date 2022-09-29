@@ -18,7 +18,6 @@ import abc
 import time
 from typing import Any, Callable, Dict, List, Optional, Type
 
-import launchpad as lp
 from chex import dataclass
 
 from mava.callbacks import Callback
@@ -106,7 +105,7 @@ class CountConditionTerminator(Terminator):
                 f"Max {self.termination_key} of {self.termination_value}"
                 " reached, terminating."
             )
-            self.config.termination_function(parameter_sever.store.manager_pid)
+            self.config.termination_function(parameter_sever)
 
     @staticmethod
     def required_components() -> List[Type[Callback]]:
@@ -123,7 +122,7 @@ class CountConditionTerminator(Terminator):
 @dataclass
 class TimeTerminatorConfig:
     run_seconds: float = 60.0
-    termination_function: Callable = lp.stop
+    termination_function: Callable = termination_fn
 
 
 class TimeTerminator(Terminator):
@@ -165,4 +164,4 @@ class TimeTerminator(Terminator):
             print(
                 f"Run time of {self.config.run_seconds} seconds reached, terminating."
             )
-            self.config.termination_function()
+            self.config.termination_function(parameter_sever)

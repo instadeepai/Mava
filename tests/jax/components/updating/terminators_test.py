@@ -79,7 +79,7 @@ def test_count_condition_terminator_terminated(
     """Test if count condition terminator terminates"""
     test_parameter_server = mock_parameter_server
 
-    def _set_stopped() -> None:
+    def _set_stopped(parameter_server: MockParameterServer) -> None:
         test_parameter_server.store.stopped = True
 
     test_terminator = CountConditionTerminator(
@@ -105,7 +105,7 @@ def test_count_condition_terminator_not_terminated(
     """Test if count condition terminator does not terminate"""
     test_parameter_server = mock_parameter_server
 
-    def _set_stopped() -> None:
+    def _set_stopped(parameter_server: MockParameterServer) -> None:
         test_parameter_server.store.stopped = True
 
     test_terminator = CountConditionTerminator(
@@ -137,7 +137,7 @@ def test_count_condition_terminator_exceptions(
     with pytest.raises(failure):
         test_parameter_server = mock_parameter_server
 
-        def _set_stopped() -> None:
+        def _set_stopped(parameter_server: MockParameterServer) -> None:
             test_parameter_server.store.stopped = True
 
         test_terminator = CountConditionTerminator(
@@ -161,7 +161,7 @@ def test_time_terminator_terminated(
 
     test_parameter_server = mock_parameter_server
 
-    def _set_stopped() -> None:
+    def _set_stopped(parameter_server: MockParameterServer) -> None:
         test_parameter_server.store.stopped = True
 
     test_terminator = TimeTerminator(
@@ -182,7 +182,7 @@ def test_time_terminator_not_terminated(
 
     test_parameter_server = mock_parameter_server
 
-    def _set_stopped() -> None:
+    def _set_stopped(parameter_server: MockParameterServer) -> None:
         test_parameter_server.store.stopped = True
 
     test_terminator = TimeTerminator(
