@@ -45,7 +45,7 @@ To join us in these efforts, please feel free to reach out, raise issues or read
 
 <hr>
 
-👋 **UPDATE - 01/10/2022**: We have deprecated our TF2-based systems, to still use them please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`). We will no longer be supporting these systems as we have moved to JAX-based systems.
+👋 **UPDATE - 01/10/2022**: In the next few weeks, we will release our first JAX system! Using a more modular and flexible build method, with many more developments to come soon. These will include more components and utilities, state-of-the-art system implementations, notebooks and tutorials as well as detailed benchmarking and performance guides. After this release, our TF2-based systems will be deprecated. To still use them please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`). Please note, we will no longer be supporting these systems after our next release (`v0.1.4`).
 
 <hr>
 
