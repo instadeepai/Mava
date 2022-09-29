@@ -198,7 +198,7 @@ class Launcher:
             trainer = self._node_dict["trainer"]
 
             # getting the maximum queue size
-            queue_threshold = data_server.server_info()["trainer"].max_size
+            queue_threshold = data_server.server_info()["trainer_0"].max_size
 
             while (
                 self._single_process_max_episodes is None
@@ -206,7 +206,7 @@ class Launcher:
             ):
                 # if the queue is too full we skip the executor to ensure that the
                 # executor won't hang when trying to push experience
-                if data_server.server_info()["trainer"].current_size < int(
+                if data_server.server_info()["trainer_0"].current_size < int(
                     queue_threshold * 0.75
                 ):
                     executor_stats = executor.run_episode_and_log()
@@ -218,7 +218,7 @@ class Launcher:
                 # if the queue has less than sample_batch_size samples in it we skip
                 # the trainer to ensure that the trainer won't hang
                 if (
-                    data_server.server_info()["trainer"].current_size
+                    data_server.server_info()["trainer_0"].current_size
                     >= trainer.store.global_config.sample_batch_size
                     and step % self._single_process_trainer_period == 0
                 ):

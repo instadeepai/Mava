@@ -259,6 +259,19 @@ class Callback(ABC):
         """End of updating executor parameters."""
         pass
 
+    # FORCE UPDATE
+    def on_execution_force_update_start(self, executor: SystemExecutor) -> None:
+        """Start of forcing the update of the executor parameters."""
+        pass
+
+    def on_execution_force_update(self, executor: SystemExecutor) -> None:
+        """Force updating executor parameters."""
+        pass
+
+    def on_execution_force_update_end(self, executor: SystemExecutor) -> None:
+        """End of forcing the update of the executor parameters."""
+        pass
+
     ######################
     # system trainer hooks
     ######################
