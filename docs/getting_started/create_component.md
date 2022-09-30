@@ -1,6 +1,6 @@
 # Creating your own component
 
-> 🚧 **Note:** This only applies to the callback redesign of Mava.
+
 
 If a desired functionality does not exist in Mava, a system can easily be extended by creating a new component. In order to create a component, a class must be created that inherits from the base [`Component`][component] class with the relevant hooks overwritten.
 

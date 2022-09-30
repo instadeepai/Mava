@@ -1,6 +1,6 @@
 # Creating a system in Mava
 
-> 🚧 **Note:** This only applies to the callback redesign of Mava.
+
 
 In order to create a new system in Mava, a system class must be defined that inherits from the base [`System`][system] class. The `design` method must then be overwritten to return a [`DesignSpec`][design_spec] object containing all the components to be used by a particular system. A default system config may also be created as a `dataclass` which contains the default system hyperparameters to be used.
 

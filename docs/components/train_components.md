@@ -1,6 +1,6 @@
 # Training components
 
-> 🚧 **Note:** This only applies to the callback redesign of Mava.
+
 
 Components related to the trainer process of a system.
 

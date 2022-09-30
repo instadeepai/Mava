@@ -1,6 +1,6 @@
 # Core Mava components
 
-> 🚧 **Note:** This only applies to the callback redesign of Mava.
+
 
 Core Mava components needed for creating a system.
 

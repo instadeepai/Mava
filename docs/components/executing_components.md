@@ -1,6 +1,6 @@
 # Execution components
 
-> 🚧 **Note:** This only applies to the callback redesign of Mava.
+
 
 Components relating to agent execution in an environment.
 

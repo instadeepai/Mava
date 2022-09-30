@@ -1,6 +1,6 @@
 # Updating components
 
-> 🚧 **Note:** This only applies to the callback redesign of Mava.
+
 
 Components relating to the periodic updating of system wide parameters.
 
