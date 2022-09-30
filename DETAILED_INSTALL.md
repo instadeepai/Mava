@@ -6,10 +6,10 @@
 
 You can pull & run the latest pre-built images from our [DockerHub](https://hub.docker.com/r/instadeepct/mava) by specifying the docker image and example/file you want to run.
 
-For example, this will pull the latest mava jax core image and run the `examples/debugging/simple_spread/feedforward/decentralised/run_maddpg.py` example:
+For example, this will pull the latest mava jax core image and run the `examples/debugging/simple_spread/feedforward/decentralised/run_ippo.py` example:
 
 ```
-docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava instadeepct/mava:jax-core-latest python examples/debugging/simple_spread/feedforward/decentralised/run_maddpg.py --base_dir /home/app/mava/logs/
+docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava instadeepct/mava:jax-core-latest python examples/debugging/simple_spread/feedforward/decentralised/run_ippo.py --base_dir /home/app/mava/logs/
 ```
 
 * For windows, replace `$(pwd)` with `$(curdir)`.
