@@ -182,7 +182,7 @@ class MAPGWithTrustRegionStep(Step):
         self,
         config: MAPGWithTrustRegionStepConfig = MAPGWithTrustRegionStepConfig(),
     ):
-        """Component defines the MAPGWithTrustRegion SGD step with target value normalisation.
+        """Component defines the MAPGWithTrustRegion SGD step.
 
         Args:
             config: MAPGWithTrustRegionStepConfig.
@@ -221,7 +221,7 @@ class MAPGWithTrustRegionStep(Step):
             """Performs a minibatch SGD step.
 
             Args:
-                states: Training states (network params, optimiser states).
+                states: Training states (network params and optimiser states).
                 sample: Reverb sample.
 
             Returns:
@@ -276,12 +276,12 @@ class MAPGWithTrustRegionStep(Step):
             target_values = {}
             stats = states.stats
             for key in rewards.keys():
-                bacth_tmp = rewards[key].shape[0]
+                batch_tmp = rewards[key].shape[0]
                 advantages[key], target_values[key] = batch_gae_advantages(
                     rewards[key],
                     discounts[key],
                     behavior_values[key],
-                    jnp.repeat(stats[key][None, :], bacth_tmp, axis=0),
+                    jnp.repeat(stats[key][None, :], batch_tmp, axis=0),
                 )
                 stats[key] = trainer.store.running_stats_fn(
                     stats[key], target_values[key]
