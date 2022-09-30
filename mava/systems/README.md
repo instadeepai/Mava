@@ -13,7 +13,7 @@ We also have a system that works with either discrete or continuous action-space
 
 System                                                    | Paper                    | Code
 -------------------------------------------------------- | :----------------------: | :--:
-Multi-Agent Proximal Policy Optimization (MAPPO)        | [Yu et al., 2021], [Schroeder et al., 2020]      | [![Jax][Jax Logo]][IPPO_Jax]
+Independent Proximal Policy Optimization (IPPO)        | [Witt et al., 2020]      | [![Jax][Jax Logo]][IPPO_Jax]
 
 <!-- Jax agents -->
 [IPPO_Jax]: https://github.com/instadeepai/Mava/tree/develop/mava/systems/ippo
