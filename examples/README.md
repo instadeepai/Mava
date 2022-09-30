@@ -1,8 +1,8 @@
 # Examples
 
-We include a non-exhaustive number of examples for Jax-based systems, showing common use-cases for Mava. We also have a [Jax quickstart notebook][jax_quickstart] that can be used to quickly create and train your first multi-agent system.
+We include a non-exhaustive number of examples for Jax-based systems, showing common use-cases for Mava. We also have a [quickstart notebook][quickstart] that can be used to quickly create and train your first multi-agent system.
 
-# Jax examples
+# Examples
 We also have various Jax-based examples which make use of the callback design paradigm. Our pre-implemented Jax-based systems are continually expanding so please check back often to see new implemented systems.
 
 ## Discrete control
@@ -44,7 +44,7 @@ We also have various Jax-based examples which make use of the callback design pa
 
 
 <!-- Examples -->
-[jax_quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/quickstart.ipynb
+[quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/quickstart.ipynb
 
 [debug_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/debugging/simple_spread/feedforward/decentralised/run_ippo.py
 [debug_ippo_ff_dec_jax_record]: https://github.com/instadeepai/Mava/blob/develop/examples/debugging/simple_spread/feedforward/decentralised/run_ippo_with_monitoring.py
