@@ -183,3 +183,6 @@ class System(BaseSystem):
 
         # Launch system
         self._builder.launch()
+
+        if self._builder.store.worker_manager:
+            return self._builder.store.worker_manager

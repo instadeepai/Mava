@@ -22,7 +22,7 @@ import reverb
 
 from mava.utils import lp_utils
 from mava.utils.builder_utils import copy_node_fn
-
+from launchpad.launch import worker_manager
 
 class NodeType:
     """Specify launchpad node types that systems can use."""
@@ -162,7 +162,7 @@ class Launcher:
 
         return self._nodes
 
-    def launch(self) -> None:
+    def launch(self) -> Optional[worker_manager.WorkerManager]:
         """Launch the launchpad program or start the single-process system loop.
 
         Returns:
@@ -179,12 +179,14 @@ class Launcher:
                 nodes_on_gpu=self._nodes_on_gpu,
             )
 
-            lp.launch(
+            worker_manager = lp.launch(
                 self._program,
                 launch_type=launch_type,
                 terminal=self._terminal,
                 local_resources=local_resources,
             )
+
+            return worker_manager
 
         else:
             episode = 1
