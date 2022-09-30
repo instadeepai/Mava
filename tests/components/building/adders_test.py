@@ -33,7 +33,7 @@ from mava.components.building.adders import (
 )
 from mava.specs import MAEnvironmentSpec
 from mava.systems.builder import Builder
-from tests.jax.mocks import MockDataServer, make_fake_env_specs
+from tests.mocks import MockDataServer, make_fake_env_specs
 
 
 @pytest.fixture

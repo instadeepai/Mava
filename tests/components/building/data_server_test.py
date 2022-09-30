@@ -27,7 +27,7 @@ from mava.components.building.data_server import OffPolicyDataServer, OnPolicyDa
 from mava.components.building.environments import EnvironmentSpec, EnvironmentSpecConfig
 from mava.systems.builder import Builder
 from mava.utils import enums
-from tests.jax.mocks import make_fake_environment_factory
+from tests.mocks import make_fake_environment_factory
 
 
 class MockBuilder(Builder):

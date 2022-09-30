@@ -23,7 +23,7 @@ import pytest
 
 from mava.callbacks import Callback
 from mava.systems import ParameterServer
-from tests.jax.hook_order_tracking import HookOrderTracking
+from tests.hook_order_tracking import HookOrderTracking
 
 
 class TestParameterServer(HookOrderTracking, ParameterServer):

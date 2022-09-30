@@ -28,7 +28,7 @@ from mava.components.updating.terminators import (
     TimeTerminatorConfig,
 )
 from mava.core_jax import SystemParameterServer
-from tests.jax.components.updating.terminators_test_data import (
+from tests.components.updating.terminators_test_data import (
     count_condition_terminator_data,
     count_condition_terminator_failure_cases,
 )

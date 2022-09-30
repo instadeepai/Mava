@@ -31,7 +31,7 @@ from mava.components.building.datasets import (
     TransitionDatasetConfig,
 )
 from mava.systems.builder import Builder
-from tests.jax.mocks import make_fake_env_specs
+from tests.mocks import make_fake_env_specs
 
 env_spec = make_fake_env_specs()
 Transform = Callable[[reverb.ReplaySample], reverb.ReplaySample]

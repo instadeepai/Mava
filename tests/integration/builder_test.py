@@ -26,7 +26,7 @@ from mava.components.building.system_init import FixedNetworkSystemInit
 from mava.specs import DesignSpec
 from mava.systems import ParameterServer, Trainer
 from mava.systems.system import System
-from tests.jax import mocks
+from tests import mocks
 
 
 class TestSystem(System):

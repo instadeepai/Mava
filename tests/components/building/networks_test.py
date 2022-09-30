@@ -25,7 +25,7 @@ from mava.components.building.networks import Networks, NetworksConfig
 from mava.core_jax import SystemBuilder
 from mava.specs import MAEnvironmentSpec
 from mava.systems import Builder
-from tests.jax.mocks import make_fake_env_specs
+from tests.mocks import make_fake_env_specs
 
 
 @pytest.fixture

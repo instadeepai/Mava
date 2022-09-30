@@ -30,7 +30,7 @@ from mava.components.building.system_init import (
 )
 from mava.systems.builder import Builder
 from mava.utils import enums
-from tests.jax.mocks import make_fake_environment_factory
+from tests.mocks import make_fake_environment_factory
 
 
 @pytest.fixture

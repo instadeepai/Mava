@@ -26,7 +26,7 @@ import rlax
 from mava import constants
 from mava.components.training.step import DefaultTrainerStep, MAPGWithTrustRegionStep
 from mava.systems.trainer import Trainer
-from tests.jax.components.training.step_test_data import dummy_sample
+from tests.components.training.step_test_data import dummy_sample
 
 
 def step_fn(sample: int) -> Dict[str, int]:

@@ -18,7 +18,7 @@
 import pytest
 
 from mava.systems import System
-from tests.jax.systems.systems_test_data import ippo_system_multi_thread
+from tests.systems.systems_test_data import ippo_system_multi_thread
 
 
 @pytest.fixture

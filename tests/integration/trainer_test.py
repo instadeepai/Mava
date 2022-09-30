@@ -19,7 +19,7 @@ import jax.numpy as jnp
 import pytest
 
 from mava.systems import System
-from tests.jax.systems.systems_test_data import ippo_system_single_process
+from tests.systems.systems_test_data import ippo_system_single_process
 
 
 @pytest.fixture

@@ -20,7 +20,7 @@ import pytest
 from reverb import Client, pybind
 
 from mava.systems.launcher import Launcher, NodeType
-from tests.jax.components.building.distributor_test import MockBuilder
+from tests.components.building.distributor_test import MockBuilder
 
 
 @pytest.fixture

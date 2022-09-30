@@ -24,7 +24,7 @@ import pytest
 from mava.callbacks import Callback
 from mava.systems import Executor
 from mava.types import NestedArray
-from tests.jax.hook_order_tracking import HookOrderTracking
+from tests.hook_order_tracking import HookOrderTracking
 
 
 class TestExecutor(HookOrderTracking, Executor):
