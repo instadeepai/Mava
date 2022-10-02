@@ -33,10 +33,7 @@ from mava.components.jax.training.losses import Loss
 from mava.components.jax.training.step import Step
 from mava.components.jax.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
-from mava.utils.jax_training_utils import (
-    compute_running_mean_var_count,
-    dummy_running_mean_var_count,
-)
+from mava.utils.jax_training_utils import compute_running_mean_var_count
 
 
 class MinibatchUpdate(Utility):
@@ -105,7 +102,6 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
             running_stats = jnp.array([0, 0, 1e-4])
         else:
             running_stats = jnp.array([0, 1, 1e-4])
-            trainer.store.running_stats_fn = dummy_running_mean_var_count
 
         trainer.store.stats = {}
         for net_key in trainer.store.trainer_agent_net_keys.keys():

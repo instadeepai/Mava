@@ -4,7 +4,6 @@ import numpy as np
 from mava.utils.jax_training_utils import (
     compute_running_mean_var_count,
     denormalize,
-    dummy_running_mean_var_count,
     normalize,
 )
 
@@ -25,26 +24,6 @@ def test_compute_running_mean_var_count() -> None:
 
         x = jnp.array(np.concatenate([x1, x2, x3], axis=0))
         stats2 = jnp.array([jnp.mean(x), jnp.var(x), x.size + 1e-4])
-
-        assert jnp.allclose(stats, stats2)
-
-
-def test_dummy_running_mean_var_count() -> None:
-    """Test if the running mean, variance and data counts are computed correctly"""
-
-    for (x1, x2, x3) in [
-        (np.random.randn(6), np.random.randn(8), np.random.randn(10)),
-        (np.random.randn(10, 1), np.random.randn(15, 1), np.random.randn(20, 1)),
-    ]:
-
-        stats = jnp.array([0, 0, 1e-4])
-
-        stats = dummy_running_mean_var_count(stats, jnp.array(x1))
-        stats = dummy_running_mean_var_count(stats, jnp.array(x2))
-        stats = dummy_running_mean_var_count(stats, jnp.array(x3))
-
-        x = jnp.array(np.concatenate([x1, x2, x3], axis=0))
-        stats2 = jnp.array([0, 1, x.size + 1e-4])
 
         assert jnp.allclose(stats, stats2)
 

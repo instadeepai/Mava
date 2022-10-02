@@ -283,9 +283,13 @@ class MAPGWithTrustRegionStep(Step):
                     behavior_values[key],
                     jnp.repeat(stats[key][None, :], batch_tmp, axis=0),
                 )
-                stats[key] = trainer.store.running_stats_fn(
-                    stats[key], target_values[key]
-                )
+
+                # Update the running stats if the running stats function exist.
+                if hasattr(trainer.store, "running_stats_fn"):
+                    stats[key] = trainer.store.running_stats_fn(
+                        stats[key], target_values[key]
+                    )
+
                 target_values[key] = jax.lax.stop_gradient(
                     normalize(stats[key], target_values[key])
                 )
