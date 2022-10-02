@@ -29,7 +29,6 @@ from mava.components.jax.training.step import (
     MAPGWithTrustRegionStep,
 )
 from mava.systems.jax.trainer import Trainer
-from mava.utils.jax_training_utils import dummy_running_mean_var_count
 from tests.jax.components.training.step_test_data import dummy_sample
 
 
@@ -174,7 +173,6 @@ class MockTrainer(Trainer):
             base_key=jax.random.PRNGKey(5),
             epoch_update_fn=epoch_update,
             stats=running_stats,
-            running_stats_fn=dummy_running_mean_var_count,
             global_config=SimpleNamespace(
                 num_minibatches=1, num_epochs=2, sample_batch_size=2, sequence_length=3
             ),
