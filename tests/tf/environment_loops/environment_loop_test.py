@@ -16,7 +16,7 @@
 import pytest
 
 from tests.tf.conftest import EnvSpec, EnvType, Helpers, MockedEnvironments
-from tests.tf.mocks import MockedExecutor, MockedSystem
+from tests.tf.mocks import MockedSystem
 
 
 @pytest.mark.parametrize(
@@ -71,19 +71,3 @@ class TestEnvironmentLoop:
         result = env_loop.run_episode()
 
         helpers.assert_valid_episode(result)
-
-    # Test that we can run multiple episodes using train and eval loop, and no
-    # exception should be thrown
-    def test_valid_multiple_episodes(self, env_spec: EnvSpec, helpers: Helpers) -> None:
-        wrapped_env, specs = helpers.get_wrapped_env(env_spec)
-        env_loop_func = helpers.get_env_loop(env_spec)
-
-        train_loop = env_loop_func(wrapped_env, MockedSystem(specs), label="train_loop")
-        eval_loop = env_loop_func(wrapped_env, MockedExecutor(specs), label="eval_loop")
-
-        num_episodes = 10
-        num_episodes_per_eval = 2
-
-        for _ in range(num_episodes // num_episodes_per_eval):
-            train_loop.run(num_episodes=num_episodes_per_eval)
-            eval_loop.run(num_episodes=1)
