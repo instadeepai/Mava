@@ -106,7 +106,6 @@ def mock_trainer() -> Trainer:
         parameters=parameters,
         trainer_agents=["agent_0", "agent_1", "agent_2"],
         networks=network,
-        # network=network,
         agent_net_keys=agent_net_keys,
         trainer_agent_net_keys={
             "agent_0": "network_agent",
@@ -149,8 +148,6 @@ def mock_trainer_separate() -> Trainer:
         )
     }
 
-    network = {"networks": network}  # type:ignore
-
     base_key = jax.random.PRNGKey(5)
     action_info = "action_info_test"
     policy_info = "policy_info_test"
@@ -169,7 +166,6 @@ def mock_trainer_separate() -> Trainer:
         parameters=parameters,
         trainer_agents=["agent_0", "agent_1", "agent_2"],
         networks=network,
-        # network=network,
         agent_net_keys=agent_net_keys,
         trainer_agent_net_keys={
             "agent_0": "network_agent",
