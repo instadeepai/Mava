@@ -381,12 +381,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
     def get_counts(self) -> Union[counting.Counter, Dict[str, jnp.ndarray]]:
         """Get latest counts"""
-        if hasattr(self._executor, "store"):
-            counts = self._executor.store.executor_counts
-        elif hasattr(self._executor, "_counts"):
-            counts = self._executor._counts
-        else:
-            counts = self._counter.get_counts()
+        counts = self._executor.store.executor_counts
         return counts
 
     def record_counts(self, episode_steps: int) -> counting.Counter:
@@ -585,36 +580,24 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
         episode_count, step_count = 0, 0
 
-        # TODO (Ruan): Checking whether we are using Jax or TF here
-        # this should be removed once we deprecate TF.
-        if hasattr(self._executor, "store"):
-            environment_loop_schedule = self._executor._evaluator and (
-                self._executor.store.evaluation_interval is not None
-            )
+        environment_loop_schedule = self._executor._evaluator and (
+            self._executor.store.evaluation_interval is not None
+        )
 
-            if environment_loop_schedule:
-                eval_interval_condition = check_count_condition(
-                    self._executor.store.evaluation_interval
-                )
-                eval_duration_condition = check_count_condition(
-                    self._executor.store.evaluation_duration
-                )
-                evaluation_duration = eval_duration_condition[1]
-        else:
-            environment_loop_schedule = (
-                self._executor._evaluator and self._executor._interval
+        if environment_loop_schedule:
+            eval_interval_condition = check_count_condition(
+                self._executor.store.evaluation_interval
             )
-            if environment_loop_schedule:
-                eval_interval_condition = check_count_condition(
-                    self._executor._interval
-                )
+            eval_duration_condition = check_count_condition(
+                self._executor.store.evaluation_duration
+            )
+            evaluation_duration = eval_duration_condition[1]
 
         while not should_terminate(episode_count, step_count):
             if (not environment_loop_schedule) or (
                 should_run_loop(eval_interval_condition)
             ):
-                # TODO (Ruan): Remove store check once TF is deprecated.
-                if environment_loop_schedule and hasattr(self._executor, "store"):
+                if environment_loop_schedule:
                     # Get first result dictionary
                     results = self.run_episode()
                     episode_count += 1
@@ -631,14 +614,12 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     # Check for extra logs
                     if hasattr(self._environment, "get_interval_stats"):
                         results.update(self._environment.get_interval_stats())
-                    self._logger.write(results)
-
                 else:
                     result = self.run_episode()
                     episode_count += 1
                     step_count += result["episode_length"]
                     # Log the given results.
-                    self._logger.write(result)
+                self._logger.write(result)
             else:
                 # Note: We assume that the evaluator will be running less
                 # than once per second.
