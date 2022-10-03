@@ -111,6 +111,7 @@ setup(
         "dataclasses",
         "box2d-py",
         "gym<=0.23.0",
+        "importlib-metadata<5.0",
         "typing-extensions",
     ],
     extras_require={
