@@ -77,17 +77,18 @@ class GAE(Utility):
             # Apply reward clipping.
             max_abs_reward = self.config.max_abs_reward
             rewards = jnp.clip(rewards, -max_abs_reward, max_abs_reward)
+            values = denormalize(stats, values)
 
             advantages = rlax.truncated_generalized_advantage_estimation(
                 rewards[:-1],
                 discounts[:-1],
                 self.config.gae_lambda,
-                denormalize(stats, values),
+                values,
             )
             advantages = jax.lax.stop_gradient(advantages)
 
             # Exclude the bootstrap value
-            target_values = denormalize(stats, values[:-1]) + advantages
+            target_values = values[:-1] + advantages
             target_values = jax.lax.stop_gradient(target_values)
 
             return advantages, target_values
