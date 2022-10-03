@@ -38,10 +38,8 @@ tf_requirements = [
 
 jax_requirements = [
     "chex",
-    # TODO Unpin JAX, once new rlax and acme version is released.
-    # To fix cannot import name 'tree_multimap' from 'jax.tree_util'.
-    "jax<=0.3.15",
-    "jaxlib",
+    "jax~=0.3.20",
+    "jaxlib~=0.3.20",
     "dm-haiku",
     "flax",
     "optax",
