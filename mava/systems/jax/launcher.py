@@ -14,7 +14,6 @@
 # limitations under the License.
 
 """General launcher for systems"""
-import os
 from typing import Any, Dict, List, Optional, Union
 
 import launchpad as lp
@@ -120,8 +119,6 @@ class Launcher:
         if self._multi_process:
             with self._program.group(name):
                 # Save the current PID to manage the termination of the process
-                node_fn.__self__.store.manager_pid = os.getpid()
-
                 if self._is_test:
                     node_fn = copy_node_fn(node_fn)
                 node = self._program.add_node(node_type(node_fn, *arguments))

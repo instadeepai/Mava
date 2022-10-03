@@ -15,6 +15,7 @@
 
 """Custom components for IPPO system."""
 import abc
+import os
 from types import SimpleNamespace
 from typing import Any
 
@@ -67,6 +68,7 @@ class ExtrasLogProbSpec(ExtrasSpec):
             None.
 
         """
+        builder.store.manager_pid = os.getpid()
         agent_specs = builder.store.ma_environment_spec.get_agent_environment_specs()
         builder.store.extras_spec = {"policy_info": {}}
 
