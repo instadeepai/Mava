@@ -19,10 +19,11 @@ from typing import Any, Dict, List, Optional, Union
 
 import launchpad as lp
 import reverb
+from launchpad.launch import worker_manager
 
 from mava.utils import lp_utils
 from mava.utils.builder_utils import copy_node_fn
-from launchpad.launch import worker_manager
+
 
 class NodeType:
     """Specify launchpad node types that systems can use."""
@@ -166,7 +167,7 @@ class Launcher:
         """Launch the launchpad program or start the single-process system loop.
 
         Returns:
-            None.
+            worker_manager: worker_manager.WorkerManager
         """
         if self._multi_process:
             if self._is_test:
@@ -231,3 +232,4 @@ class Launcher:
                     print("Performed evaluator run.")
 
                 step += 1
+            return None

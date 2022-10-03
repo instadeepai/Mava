@@ -17,7 +17,9 @@
 import abc
 import copy
 from types import SimpleNamespace
-from typing import Any, Dict, List, Tuple, Type
+from typing import Any, Dict, List, Optional, Tuple, Type
+
+from launchpad.launch import worker_manager
 
 from mava.components.jax import Component
 from mava.core_jax import BaseSystem
@@ -167,14 +169,14 @@ class System(BaseSystem):
         self._builder.build()
         self._built = True
 
-    def launch(self) -> None:
+    def launch(self) -> Optional[worker_manager.WorkerManager]:
         """Run the system by launching the builder.
 
         Raises:
             Exception: if system has not already been built.
 
         Returns:
-            None.
+            worker_manager: worker_manager.WorkerManager
         """
         if not self._built:
             raise Exception(
@@ -186,3 +188,5 @@ class System(BaseSystem):
 
         if self._builder.store.worker_manager:
             return self._builder.store.worker_manager
+        else:
+            return None

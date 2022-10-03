@@ -15,7 +15,6 @@
 
 """Example running IPPO on debug MPE environments, using grid search over num_epochs."""
 import functools
-import multiprocessing as mp
 from datetime import datetime
 from typing import Any, Dict
 
@@ -115,6 +114,7 @@ def create_and_run_lp_program(config: Dict) -> None:
     # Wait for worker to finish - this critical to waiting for program to finish.
     if worker_manager:
         worker_manager.wait()
+
 
 def main(_: Any) -> None:
     """Runs lp inside a new thread.
