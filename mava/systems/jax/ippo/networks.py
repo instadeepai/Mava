@@ -198,10 +198,6 @@ def make_discrete_networks(
         critic_layer_sizes: sizes of hidden layers for the critic network
         observation_network: optional network for processing observations.
             Defaults to utils.batch_concat.
-        single_network: True if shared layer network with separate heads should be used
-            for policy and critic and False if separate policy and critic networks
-            should be used.
-            Defaults to True.
 
     Returns:
         PPONetworks class
@@ -275,7 +271,6 @@ def make_networks(
         policy_layer_sizes: size of each layer of the policy network
         critic_layer_sizes: size of each layer of the critic network
         observation_network: Network used for feature extraction layers
-        single_network: If a shared represnetation netowrk should be used.
 
     Returns:
         make_discrete_networks: function to create a discrete network
@@ -328,9 +323,6 @@ def make_default_networks(
         observation_network: network for processing environment observations
                              defaults to flattening observations but could be
                              a CNN or similar observation processing network
-        single_network: details whether a single network with a policy and value
-                        head should be used if true or whether separate policy
-                        and critic networks should be used if false.
 
     Returns:
         networks: networks created to given spec

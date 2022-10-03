@@ -38,10 +38,8 @@ tf_requirements = [
 
 jax_requirements = [
     "chex",
-    # TODO Unpin JAX, once new rlax and acme version is released.
-    # To fix cannot import name 'tree_multimap' from 'jax.tree_util'.
-    "jax<=0.3.15",
-    "jaxlib",
+    "jax~=0.3.20",
+    "jaxlib~=0.3.20",
     "dm-haiku",
     "flax",
     "optax",
@@ -104,7 +102,6 @@ setup(
     packages=find_packages(),
     install_requires=[
         "dm-acme~=0.4.0",
-        "chex",
         "absl-py",
         "dm_env",
         "dm-tree",
