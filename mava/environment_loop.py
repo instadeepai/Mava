@@ -597,10 +597,10 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             if (not environment_loop_schedule) or (
                 should_run_loop(eval_interval_condition)
             ):
+                results = self.run_episode()
+                episode_count += 1
                 if environment_loop_schedule:
                     # Get first result dictionary
-                    results = self.run_episode()
-                    episode_count += 1
                     step_count += results["episode_length"]
                     for _ in range(evaluation_duration - 1):
                         # Add consecutive evaluation run data
@@ -614,12 +614,11 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     # Check for extra logs
                     if hasattr(self._environment, "get_interval_stats"):
                         results.update(self._environment.get_interval_stats())
+                    self._logger.write(results)
                 else:
-                    result = self.run_episode()
-                    episode_count += 1
                     step_count += result["episode_length"]
                     # Log the given results.
-                self._logger.write(result)
+                    self._logger.write(result)
             else:
                 # Note: We assume that the evaluator will be running less
                 # than once per second.
