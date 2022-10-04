@@ -31,15 +31,15 @@ from acme import types
 from reverb import rate_limiters, reverb_types
 
 from mava import specs
-from mava.components.jax import Component
-from mava.components.jax.building.data_server import (
+from mava.components import Component
+from mava.components.building.data_server import (
     OffPolicyDataServerConfig,
     OnPolicyDataServerConfig,
 )
 from mava.core_jax import SystemBuilder
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.specs import DesignSpec, MAEnvironmentSpec
-from mava.systems.jax.system import System
+from mava.systems.system import System
 from mava.utils.builder_utils import convert_specs
 from tests.enums import EnvType, MockedEnvironments
 from tests.mocks import (
