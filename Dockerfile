@@ -33,72 +33,9 @@ RUN if [ "$record" = "true" ]; then \
 EXPOSE 6006
 ##########################################################
 
+# Jax Images
 ##########################################################
-# Core Mava-TF image
-FROM mava-core as tf-core
-# Tensorflow gpu config.
-ENV TF_FORCE_GPU_ALLOW_GROWTH=true
-ENV CUDA_DEVICE_ORDER=PCI_BUS_ID
-ENV TF_CPP_MIN_LOG_LEVEL=3
-## Install core tf dependencies.
-RUN pip install -e .[tf]
-##########################################################
-
-##########################################################
-# PZ image
-FROM tf-core AS pz
-RUN pip install -e .[pz]
-# PettingZoo Atari envs
-RUN apt-get update
-RUN apt-get install ffmpeg libsm6 libxext6  -y
-RUN apt-get install -y unrar-free
-RUN pip install autorom
-RUN AutoROM -v
-##########################################################
-
-##########################################################
-# SMAC image
-FROM tf-core AS sc2
-## Install smac environment
-RUN apt-get -y install git
-RUN pip install .[sc2]
-# We use the pz wrapper for smac
-RUN pip install .[pz]
-ENV SC2PATH /home/app/mava/3rdparty/StarCraftII
-##########################################################
-
-##########################################################
-# Flatland Image
-FROM tf-core AS flatland
-RUN pip install -e .[flatland]
-##########################################################
-
-#########################################################
-## Robocup Image
-FROM tf-core AS robocup
-RUN apt-get install sudo -y
-RUN ./bash_scripts/install_robocup.sh
-##########################################################
-
-##########################################################
-## OpenSpiel Image
-FROM tf-core AS openspiel
-RUN pip install .[open_spiel]
-##########################################################
-
-##########################################################
-# MeltingPot Image
-FROM tf-core AS meltingpot
-# Install meltingpot
-RUN apt-get install -y git
-RUN ./bash_scripts/install_meltingpot.sh
-# Add meltingpot to python path
-ENV PYTHONPATH "${PYTHONPATH}:${folder}/../packages/meltingpot"
-##########################################################
-
-# New Jax Images
-##########################################################
-# Core Mava-Jax image
+# Core Mava image
 FROM mava-core as jax-core
 # Jax gpu config.
 ENV XLA_PYTHON_CLIENT_PREALLOCATE=false
@@ -110,7 +47,7 @@ RUN pip install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-rele
 
 ##########################################################
 # PZ image
-FROM jax-core AS pz-jax
+FROM jax-core AS pz
 RUN pip install -e .[pz]
 # PettingZoo Atari envs
 RUN apt-get update
@@ -122,7 +59,7 @@ RUN AutoROM -v
 
 ##########################################################
 # SMAC image
-FROM jax-core AS sc2-jax
+FROM jax-core AS sc2
 ## Install smac environment
 RUN apt-get -y install git
 RUN pip install .[sc2]
@@ -133,7 +70,7 @@ ENV SC2PATH /home/app/mava/3rdparty/StarCraftII
 
 ##########################################################
 # Flatland Image
-FROM jax-core AS flatland-jax
+FROM jax-core AS flatland
 RUN pip install -e .[flatland]
 # To fix module 'jaxlib.xla_extension' has no attribute '__path__'
 RUN pip install cloudpickle -U
@@ -141,20 +78,20 @@ RUN pip install cloudpickle -U
 
 #########################################################
 ## Robocup Image
-FROM jax-core AS robocup-jax
+FROM jax-core AS robocup
 RUN apt-get install sudo -y
 RUN ./bash_scripts/install_robocup.sh
 ##########################################################
 
 ##########################################################
 ## OpenSpiel Image
-FROM jax-core AS openspiel-jax
+FROM jax-core AS openspiel
 RUN pip install .[open_spiel]
 ##########################################################
 
 ##########################################################
 # MeltingPot Image
-FROM jax-core AS meltingpot-jax
+FROM jax-core AS meltingpot
 # Install meltingpot
 RUN apt-get install -y git
 RUN ./bash_scripts/install_meltingpot.sh

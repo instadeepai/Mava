@@ -82,7 +82,7 @@ def denormalize(stats: jnp.ndarray, batch: jnp.ndarray) -> jnp.ndarray:
     return denormalize_batch
 
 
-def set_growing_gpu_memory() -> None:
+def set_growing_gpu_memory_jax() -> None:
     """Solve gpu mem issues.
 
     More on this - https://jax.readthedocs.io/en/latest/gpu_memory_allocation.html.

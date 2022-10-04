@@ -1,6 +1,6 @@
 # Annotation
 
-> 🚧 **Note:** This only applies to the callback redesign of Mava.
+
 
 It is common for MARL algorithms to have slightly different names across multiple studies.  In order to avoid this confusion in MAVA, we want to clarify some annotation conventions that we used in building our systems.
 
