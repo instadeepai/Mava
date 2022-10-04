@@ -42,10 +42,7 @@ from mava.specs import DesignSpec, MAEnvironmentSpec
 from mava.systems.system import System
 from mava.utils.builder_utils import convert_specs
 from tests.enums import EnvType, MockedEnvironments
-from tests.mocks import (
-    ParallelMAContinuousEnvironment,
-    ParallelMADiscreteEnvironment,
-)
+from tests.mocks import ParallelMAContinuousEnvironment, ParallelMADiscreteEnvironment
 
 # Mock components to feed to the builder
 

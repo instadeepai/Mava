@@ -37,7 +37,7 @@ except ModuleNotFoundError:
     pass
 
 from mava import specs as mava_specs
-from mava.environment_loop import ParallelEnvironmentLoop, SequentialEnvironmentLoop
+from mava.environment_loop import ParallelEnvironmentLoop
 from mava.types import Observation, Reward
 
 try:
@@ -172,8 +172,6 @@ class Helpers:
         env_loop = None
         if env_spec.env_type == EnvType.Parallel:
             env_loop = ParallelEnvironmentLoop
-        elif env_spec.env_type == EnvType.Sequential:
-            env_loop = SequentialEnvironmentLoop
         else:
             raise Exception("Env_spec is not valid.")
         return env_loop
