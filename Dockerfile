@@ -84,12 +84,6 @@ RUN ./bash_scripts/install_robocup.sh
 ##########################################################
 
 ##########################################################
-## OpenSpiel Image
-FROM jax-core AS openspiel
-RUN pip install .[open_spiel]
-##########################################################
-
-##########################################################
 # MeltingPot Image
 FROM jax-core AS meltingpot
 # Install meltingpot

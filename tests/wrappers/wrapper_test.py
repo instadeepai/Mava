@@ -49,7 +49,6 @@ This is meant to flexibily test various environments wrappers.
         EnvSpec("pettingzoo.sisl.multiwalker_v8"),
         EnvSpec("pettingzoo.sisl.multiwalker_v8"),
         EnvSpec("flatland", EnvSource.Flatland) if _has_flatland else None,
-        EnvSpec("tic_tac_toe", EnvSource.OpenSpiel),
     ],
 )
 class TestEnvWrapper:
@@ -117,15 +116,7 @@ class TestEnvWrapper:
         assert (
             dm_env_timestep.step_type == dm_env.StepType.FIRST
         ), "Failed to have correct StepType."
-        if (
-            env_spec.env_name == "tic_tac_toe"
-            and env_spec.env_source == EnvSource.OpenSpiel
-        ):
-            pytest.skip(
-                "This test is only applicable to parralel wrappers and only works "
-                "for the provided PZ sequential envs because they have 3 agents, and"
-                "an OLT has length of 3 (a bug, i'd say)"
-            )
+       
         assert (
             len(dm_env_timestep.observation) == num_agents
         ), "Failed to generate observation for all agents."
@@ -366,9 +357,6 @@ class TestEnvWrapper:
         if env_spec is None:
             pytest.skip()
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
-
-        if env_spec.env_source == EnvSource.OpenSpiel:
-            pytest.skip("Open Spiel does not use the .last() method")
 
         # Seed environment since we are sampling actions.
         # We need to seed env and action space.
