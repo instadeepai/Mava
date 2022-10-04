@@ -91,7 +91,6 @@ def atari_preprocessing(
 
 def make_environment(
     evaluation: bool = False,
-    env_type: str = "parallel",
     env_class: str = "mpe",
     env_name: str = "simple_spread_v2",
     env_preprocess_wrappers: Optional[List] = None,
@@ -123,23 +122,13 @@ def make_environment(
                 raise Exception("Smac is not installed.")
         else:
             env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
-
-            if env_type == "parallel":
-                env = env_module.parallel_env(**kwargs)  # type: ignore
-                if env_class == "atari" or "pong" in env_name:
-                    env = atari_preprocessing(env)
-                # wrap parallel environment
-                environment = PettingZooParallelEnvWrapper(
-                    env, env_preprocess_wrappers=env_preprocess_wrappers
-                )
-            elif env_type == "sequential":
-                env = env_module.env(**kwargs)  # type: ignore
-                if env_class == "atari":
-                    env = atari_preprocessing(env)
-                # wrap sequential environment
-                environment = PettingZooAECEnvWrapper(
-                    env, env_preprocess_wrappers=env_preprocess_wrappers
-                )
+            env = env_module.parallel_env(**kwargs)  # type: ignore
+            if env_class == "atari" or "pong" in env_name:
+                env = atari_preprocessing(env)
+            # wrap parallel environment
+            environment = PettingZooParallelEnvWrapper(
+                env, env_preprocess_wrappers=env_preprocess_wrappers
+            )
 
         if random_seed and hasattr(environment, "seed"):
             environment.seed(random_seed)

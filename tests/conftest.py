@@ -51,12 +51,7 @@ from mava.wrappers.pettingzoo import (
     PettingZooParallelEnvWrapper,
 )
 from tests.enums import EnvSource, EnvSpec, MockedEnvironments
-from tests.mocks import (
-    ParallelDiscreteEnvironment,
-    ParallelMAContinuousEnvironment,
-    SequentialMAContinuousEnvironment,
-    SequentialMADiscreteEnvironment,
-)
+from tests.mocks import ParallelDiscreteEnvironment, ParallelMAContinuousEnvironment
 
 # flatland environment config
 flatland_env_config = {
@@ -169,12 +164,7 @@ class Helpers:
     @staticmethod
     def get_mocked_env(
         env_spec: EnvSpec,
-    ) -> Union[
-        ParallelDiscreteEnvironment,
-        SequentialMADiscreteEnvironment,
-        ParallelMAContinuousEnvironment,
-        SequentialMAContinuousEnvironment,
-    ]:
+    ) -> Union[ParallelDiscreteEnvironment, ParallelMAContinuousEnvironment,]:
         """Function that retrieves a mocked env.
 
         Args:

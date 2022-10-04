@@ -133,7 +133,6 @@ def make_fake_env(
 
     Args:
         env_name : env name.
-        env_type : type of env.
         evaluation: whether env is used for eval or not.
             Not sure we should use this in spec.
 
@@ -173,7 +172,6 @@ def make_fake_environment_factory(
 
     Args:
         env_name : env name.
-        env_type : env type.
 
     Returns:
         a mocked env factory.
@@ -181,7 +179,6 @@ def make_fake_environment_factory(
     return functools.partial(
         make_fake_env,
         env_name=env_name,
-        env_type=env_type,
     )
 
 

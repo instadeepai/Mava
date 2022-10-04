@@ -219,102 +219,6 @@ def get_ma_environment(
     return MockedMAEnvironment
 
 
-"""Class that updates functions for sequential environment.
-This class should be inherited with a MockedMAEnvironment. """
-
-
-class SequentialEnvironment(MockedEnvironment, SequentialEnvWrapper):
-    def __init__(self, agents: List, specs: EnvironmentSpec) -> None:
-        self._agents = agents
-        self._possible_agents = agents
-        self._specs = specs
-        self.agent_step_counter = 0
-
-    def agent_iter(self, n_agents: int) -> Iterator[str]:
-        return iter(self.agents)
-
-    @property
-    def current_agent(self) -> Any:
-        return self.agent_selection
-
-    @property
-    def agent_selection(self) -> str:
-        return self.possible_agents[self.agent_step_counter]
-
-    def observation_spec(self) -> OLT:
-
-        if hasattr(self, "agent_selection"):
-            active_agent = self.agent_selection
-        else:
-            active_agent = self.agents[0]
-        return OLT(
-            observation=super().observation_spec(),
-            legal_actions=self.action_spec()[active_agent],
-            terminal=acme_specs.Array(
-                (1,),
-                np.float32,
-            ),
-        )
-
-    def _generate_fake_reward(self) -> types.NestedArray:
-        return _generate_from_spec(self._specs[self.agent_selection].rewards)
-
-    def _generate_fake_discount(self) -> types.NestedArray:
-        return _generate_from_spec(self._specs[self.agent_selection].discounts)
-
-    def action_spec(
-        self,
-    ) -> Dict[str, Union[acme_specs.DiscreteArray, acme_specs.BoundedArray]]:
-        action_specs = {}
-        for agent in self.agents:
-            action_specs[agent] = super().action_spec()
-        return action_specs
-
-    def reset(self) -> dm_env.TimeStep:
-        observation = self._generate_fake_observation()
-        discount = convert_np_type("float32", 1)  # Not used in pettingzoo
-        reward = convert_np_type("float32", 0)
-        self._step = 1
-        return parameterized_restart(
-            reward=reward, discount=discount, observation=observation
-        )
-
-    def _generate_fake_observation(self) -> OLT:
-        return _generate_from_spec(self.observation_spec())
-
-    def step(self, action: Union[float, int, types.NestedArray]) -> dm_env.TimeStep:
-        # Return a reset timestep if we haven't touched the environment yet.
-        if not self._step:
-            return self.reset()
-
-        _validate_spec(self._spec.actions, action)
-
-        observation = self._generate_fake_observation()
-        reward = self._generate_fake_reward()
-        discount = self._generate_fake_discount()
-
-        self.agent_step_counter += 1
-
-        if self._episode_length and (self._step == self._episode_length):
-            # Only reset step once all all agents have taken their turn.
-            if self.agent_step_counter == len(self.agents):
-                self._step = 0
-                self.agent_step_counter = 0
-
-            # We can't use dm_env.termination directly because then the discount
-            # wouldn't necessarily conform to the spec (if eg. we want float32).
-            return dm_env.TimeStep(dm_env.StepType.LAST, reward, discount, observation)
-        else:
-            # Only update step counter once all agents have taken their turn.
-            if self.agent_step_counter == len(self.agents):
-                self._step += 1
-                self.agent_step_counter = 0
-
-            return dm_env.transition(
-                reward=reward, observation=observation, discount=discount
-            )
-
-
 """Class that updates functions for parallel environment.
 This class should be inherited with a MockedMAEnvironment. """
 
@@ -438,17 +342,7 @@ class ParallelMAContinuousEnvironment(
 """Mocked Multi-Agent Sequential Continuous Environment"""
 
 
-class SequentialMAContinuousEnvironment(
-    SequentialEnvironment, MockedMAContinuousEnvironment
-):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        MockedMAContinuousEnvironment.__init__(self, *args, **kwargs)
-        SequentialEnvironment.__init__(self, self.agents, self._specs)
-
-
 # Mock components to feed to the builder
-
-
 @dataclass
 class MockAdderConfig:
     adder_param: float = 2.7
@@ -575,7 +469,6 @@ def make_fake_environment_factory(
 
     Args:
         env_name : env name.
-        env_type : env type.
 
     Returns:
         a mocked env factory.
@@ -583,7 +476,6 @@ def make_fake_environment_factory(
     return functools.partial(
         make_fake_env,
         env_name=env_name,
-        env_type=env_type,
     )
 
 
