@@ -30,6 +30,7 @@ class RoboCupWrapper(SpecWrapper):
     """Environment wrapper for 2D RoboCup environment."""
 
     def __init__(self, environment: RoboCup2D) -> None:
+        """Initialise robocup environment."""
         self._environment = environment
         self._reset_next_step = True
         assert environment.game_setting in ["reward_shaping", "domain_randomisation"]
@@ -80,3 +81,26 @@ class RoboCupWrapper(SpecWrapper):
     def environment(self) -> gym.Env:
         """Returns the wrapped environment."""
         return self._environment
+
+    def _make_robocup_task_name(self) -> str:
+        """A simple helper function to create a robocup task name
+
+        The task name will be a string created as:
+        `<game_setting>_<num_players>_players`. For example in a
+        reward_shaping game with 22 players in total the task name
+        will be `reward_shaping_22_players`.
+        """
+
+        game_setting = str(self._environment.game_setting)
+        num_players = str(self.environment.num_players)
+
+        task_name = f"{game_setting}_{num_players}_players"
+
+        return task_name
+
+    def environment_task_name(self) -> Dict[str, str]:
+        """Return environment and task name for logging."""
+        return {
+            "environment_name": "robocup",
+            "task_name": self._make_robocup_task_name(),
+        }

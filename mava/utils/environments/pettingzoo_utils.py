@@ -117,7 +117,11 @@ def make_environment(
                 env = StarCraft2PZEnv.parallel_env(map_name=env_name)
                 # wrap parallel environment
                 environment = PettingZooParallelEnvWrapper(
-                    env, env_preprocess_wrappers=[], return_state_info=True
+                    env,
+                    environment_class_name=env_class,
+                    environment_task_name=env_name,
+                    env_preprocess_wrappers=[],
+                    return_state_info=True,
                 )
             else:
                 raise Exception("Smac is not installed.")
@@ -130,7 +134,10 @@ def make_environment(
                     env = atari_preprocessing(env)
                 # wrap parallel environment
                 environment = PettingZooParallelEnvWrapper(
-                    env, env_preprocess_wrappers=env_preprocess_wrappers
+                    env,
+                    environment_class_name=env_class,
+                    environment_task_name=env_name,
+                    env_preprocess_wrappers=env_preprocess_wrappers,
                 )
             elif env_type == "sequential":
                 env = env_module.env(**kwargs)  # type: ignore
@@ -138,7 +145,10 @@ def make_environment(
                     env = atari_preprocessing(env)
                 # wrap sequential environment
                 environment = PettingZooAECEnvWrapper(
-                    env, env_preprocess_wrappers=env_preprocess_wrappers
+                    env,
+                    environment_class_name=env_class,
+                    environment_task_name=env_name,
+                    env_preprocess_wrappers=env_preprocess_wrappers,
                 )
 
         if random_seed and hasattr(environment, "seed"):

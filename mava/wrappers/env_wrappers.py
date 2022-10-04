@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from abc import abstractmethod
-from typing import Any, Iterator, List
+from typing import Any, Dict, Iterator, List
 
 import dm_env
 
@@ -35,6 +35,10 @@ class ParallelEnvWrapper(dm_env.Environment):
     @abstractmethod
     def possible_agents(self) -> List:
         """Returns all the possible agents in the env."""
+
+    @abstractmethod
+    def environment_task_name(self) -> Dict[str, str]:
+        """Returns environment and task name."""
 
 
 class SequentialEnvWrapper(ParallelEnvWrapper):

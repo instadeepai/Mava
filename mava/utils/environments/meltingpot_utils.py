@@ -70,7 +70,7 @@ class EnvironmentFactory:
             [Substrate]: A substrate
         """
         env = load_substrate(self._substrate_name)
-        return MeltingpotEnvWrapper(env)
+        return MeltingpotEnvWrapper(env, substrate_name=self._substrate_name)
 
     def _scenario(self) -> Scenario:
         """Returns a scenario as an environment
@@ -80,7 +80,7 @@ class EnvironmentFactory:
         """
 
         env = load_scenario(self._scenario_name)
-        return MeltingpotEnvWrapper(env)
+        return MeltingpotEnvWrapper(env, scenario_name=self._scenario_name)
 
     def __call__(self, evaluation: bool = False) -> Union[Substrate, Scenario]:
         """Creates an environment
