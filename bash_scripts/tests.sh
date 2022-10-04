@@ -57,10 +57,10 @@ N_CPU=$(grep -c ^processor /proc/cpuinfo)
 
 if [ "$integration" = "true" ]; then \
     # Run all tests
-    pytest --cov-report html -n "${N_CPU}" tests ;
+    pytest --cov-report xml -n "${N_CPU}" tests ;
 else
     # Run all unit tests (non integration tests).
-    pytest --durations=10 --cov-report html -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
+    pytest --durations=10 --cov-report xml -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
 fi
 
 # Code coverage
