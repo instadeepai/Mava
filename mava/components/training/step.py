@@ -467,6 +467,9 @@ class MAPGWithTrustRegionStep(Step):
                     constants.OPT_STATE_DICT_KEY
                 ] = new_states.critic_opt_states[net_key][constants.OPT_STATE_DICT_KEY]
 
+            # update the running stats
+            trainer.store.stats = new_states.stats
+
             return metrics
 
         trainer.store.step_fn = step
