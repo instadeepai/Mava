@@ -157,10 +157,10 @@ class MockedSystem(MockedExecutor):
 base_class: DiscreteEnvironment or ContinuousEnvironment. """
 
 
-def get_ma_environment(
+def get_environment(
     base_class: Union[DiscreteEnvironment, ContinuousEnvironment]
 ) -> Any:
-    class MockedMAEnvironment(base_class):  # type: ignore
+    class MockedEnvironment(base_class):  # type: ignore
         """Mocked Multi-Agent Environment.
         This simply creates multiple agents, with a spec per agent
         and updates the spec functions of base_class."""
@@ -216,11 +216,11 @@ def get_ma_environment(
         def env_done(self) -> bool:
             return not self.agents
 
-    return MockedMAEnvironment
+    return MockedEnvironment
 
 
 """Class that updates functions for parallel environment.
-This class should be inherited with a MockedMAEnvironment. """
+This class should be inherited with a MockedEnvironment. """
 
 
 class ParallelEnvironment(MockedEnvironment, ParallelEnvWrapper):
@@ -299,8 +299,8 @@ class ParallelEnvironment(MockedEnvironment, ParallelEnvWrapper):
 """Mocked Multi-Agent Discrete Environment"""
 
 
-DiscreteEnvironment = get_ma_environment(DiscreteEnvironment)
-ContinuousMAEnvironment = get_ma_environment(ContinuousEnvironment)
+DiscreteEnvironment = get_environment(DiscreteEnvironment)
+ContinuousMAEnvironment = get_environment(ContinuousEnvironment)
 
 
 class MockedDiscreteEnvironment(
