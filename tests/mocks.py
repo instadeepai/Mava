@@ -419,21 +419,9 @@ class MockedMAContinuousEnvironment(
 """Mocked Multi-Agent Parallel Discrete Environment"""
 
 
-class ParallelDiscreteEnvironment(ParallelEnvironment, MockedMADiscreteEnvironment):
+class ParallelDiscreteEnvironment(ParallelEnvironment):
     def __init__(self, *args: Any, **kwargs: Any):
-        MockedMADiscreteEnvironment.__init__(self, *args, **kwargs)
         ParallelEnvironment.__init__(self, self.agents, self._specs)
-
-
-"""Mocked Multi-Agent Sequential Discrete Environment"""
-
-
-class SequentialMADiscreteEnvironment(
-    SequentialEnvironment, MockedMADiscreteEnvironment
-):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        MockedMADiscreteEnvironment.__init__(self, *args, **kwargs)
-        SequentialEnvironment.__init__(self, self.agents, self._specs)
 
 
 """Mocked Multi-Agent Parallel Continuous Environment"""

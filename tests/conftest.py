@@ -388,6 +388,7 @@ class Helpers:
             assert (
                 rewards[agent] >= min and rewards[agent] <= max
             ), "Failed to normalize reward."
+
     @staticmethod
     def verify_observations_are_standardized(
         observations: Observation, agents: List, env_spec: EnvSpec
@@ -407,7 +408,6 @@ class Helpers:
             npt.assert_almost_equal(
                 observations[agent].observation.std(), 1, decimal=2  # type: ignore
             )
-
 
     @staticmethod
     def mock_done() -> bool:
