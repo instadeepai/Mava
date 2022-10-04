@@ -331,7 +331,7 @@ class ParallelDiscreteEnvironment(ParallelEnvironment):
 """Mocked Multi-Agent Parallel Continuous Environment"""
 
 
-class ParallelMAContinuousEnvironment(
+class ParallelContinuousEnvironment(
     ParallelEnvironment, MockedMAContinuousEnvironment
 ):
     def __init__(self, *args: Any, **kwargs: Any):
@@ -449,7 +449,7 @@ def make_fake_env(
         )
 
     elif env_name is MockedEnvironments.Mocked_Continous:
-        env = ParallelMAContinuousEnvironment(
+        env = ParallelContinuousEnvironment(
             action_dim=2,
             observation_dim=2,
             bounded=True,
