@@ -303,9 +303,7 @@ DiscreteEnvironment = get_environment(DiscreteEnvironment)
 ContinuousMAEnvironment = get_environment(ContinuousEnvironment)
 
 
-class MockedDiscreteEnvironment(
-    DiscreteEnvironment  # type: ignore
-):
+class MockedDiscreteEnvironment(DiscreteEnvironment):  # type: ignore
     def __init__(self, *args: Any, **kwargs: Any):
         DiscreteEnvironment.__init__(self, *args, **kwargs)
 
