@@ -65,6 +65,7 @@ class Logger(Component):
             builder.store.executor_id, **logger_config
         )
 
+        # Add json logger to evaluator process.
         if name == "evaluator":
             # Instantiate an environment from a factory to get access to the
             # environment name and task name
