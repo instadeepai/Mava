@@ -26,38 +26,20 @@ DOCKER_RUN=docker run $(RUN_FLAGS) $(IMAGE)
 DOCKER_RUN_TENSORBOARD=docker run $(RUN_FLAGS_TENSORBOARD) $(IMAGE)
 
 # Choose correct image for example
-ifneq (,$(findstring jax,$(example)))
-	ifneq (,$(findstring debugging,$(example)))
-	DOCKER_IMAGE_TAG=jax-core
-	else ifneq (,$(findstring petting,$(example)))
-	DOCKER_IMAGE_TAG=pz-jax
-	else ifneq (,$(findstring flatland,$(example)))
-	DOCKER_IMAGE_TAG=flatland-jax
-	else ifneq (,$(findstring openspiel,$(example)))
-	DOCKER_IMAGE_TAG=openspiel-jax
-	else ifneq (,$(findstring robocup,$(example)))
-	DOCKER_IMAGE_TAG=robocup-jax
-	else ifneq (,$(findstring smac,$(example)))
-	DOCKER_IMAGE_TAG=sc2-jax
-	else ifneq (,$(findstring meltingpot,$(example)))
-	DOCKER_IMAGE_TAG=meltingpot-jax
-	endif
-else
-	ifneq (,$(findstring debugging,$(example)))
-	DOCKER_IMAGE_TAG=tf-core
-	else ifneq (,$(findstring petting,$(example)))
-	DOCKER_IMAGE_TAG=pz
-	else ifneq (,$(findstring flatland,$(example)))
-	DOCKER_IMAGE_TAG=flatland
-	else ifneq (,$(findstring openspiel,$(example)))
-	DOCKER_IMAGE_TAG=openspiel
-	else ifneq (,$(findstring robocup,$(example)))
-	DOCKER_IMAGE_TAG=robocup
-	else ifneq (,$(findstring smac,$(example)))
-	DOCKER_IMAGE_TAG=sc2
-	else ifneq (,$(findstring meltingpot,$(example)))
-	DOCKER_IMAGE_TAG=meltingpot
-	endif
+ifneq (,$(findstring debugging,$(example)))
+DOCKER_IMAGE_TAG=jax-core
+else ifneq (,$(findstring petting,$(example)))
+DOCKER_IMAGE_TAG=pz
+else ifneq (,$(findstring flatland,$(example)))
+DOCKER_IMAGE_TAG=flatland
+else ifneq (,$(findstring openspiel,$(example)))
+DOCKER_IMAGE_TAG=openspiel
+else ifneq (,$(findstring robocup,$(example)))
+DOCKER_IMAGE_TAG=robocup
+else ifneq (,$(findstring smac,$(example)))
+DOCKER_IMAGE_TAG=sc2
+else ifneq (,$(findstring meltingpot,$(example)))
+DOCKER_IMAGE_TAG=meltingpot
 endif
 
 # make file commands

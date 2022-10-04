@@ -28,6 +28,7 @@ def flatten_dict(
         d : dictionary to be flattened
         parent_key : optional parent key identifier
         sep : optional separator between parent and leaf keys
+
     Returns:
         Flattened dictionary
     """
