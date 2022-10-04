@@ -18,6 +18,7 @@ import os
 from typing import Any, Dict
 
 import jax
+from acme.utils import paths
 
 
 class JSONLogger:
@@ -39,8 +40,12 @@ class JSONLogger:
             system_name: name of system being evaluated. eg. "IPPO"
         """
 
-        self._log_dir = experiment_path + f"{task_name}/"
-        self._logs_file_dir = f"{self._log_dir}evaluation_data.json"
+        # Create subfolder for storing json file
+        self._log_dir = experiment_path + f"/json_data/{task_name}/"
+        self._log_dir = paths.process_path(self._log_dir, add_uid=False)
+
+        self._logs_file_dir = f"{self._log_dir}/evaluation_data.json"
+
         self._step_count = 0
         self._random_seed = str(random_seed)
         self._env_name = env_name

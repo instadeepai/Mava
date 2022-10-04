@@ -411,6 +411,8 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         # We need this to schedule evaluation/test runs
         self._last_evaluator_run_t = -1
 
+        self._steps = 10000
+
     def _get_actions(self, timestep: dm_env.TimeStep) -> Any:
         return self._executor.select_actions(timestep.observation)
 
@@ -664,23 +666,49 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             ):
                 # TODO (Ruan): Remove store check once TF is deprecated.
                 if environment_loop_schedule and hasattr(self._executor, "store"):
+
+                    # Initialise list for capturing episode returns
+                    eval_returns = []
+
                     # Get first result dictionary
                     results = self.run_episode()
+                    eval_returns.append(results["raw_episode_return"])
                     episode_count += 1
                     step_count += results["episode_length"]
                     for _ in range(evaluation_duration - 1):
                         # Add consecutive evaluation run data
                         result = self.run_episode()
+                        eval_returns.append(result["raw_episode_return"])
                         episode_count += 1
                         step_count += result["episode_length"]
                         # Sum results for computing mean after all evaluation runs.
                         results = jax.tree_map(lambda x, y: x + y, results, result)
                     # compute the mean over all evaluation runs
                     results = jax.tree_map(lambda x: x / evaluation_duration, results)
+
+                    # Log evaluation interval rsults for json logging
+                    eval_result = {
+                        "step_count": jnp.array([self._last_evaluator_run_t]),
+                        "return": jnp.array(eval_returns),
+                    }
+
                     # Check for extra logs
                     if hasattr(self._environment, "get_interval_stats"):
-                        results.update(self._environment.get_interval_stats())
+                        interval_stats = self._environment.get_interval_stats()
+                        results.update(interval_stats)
+
+                        # Add interval stats to dictionary for json logging
+                        eval_result.update(
+                            jax.tree_util.tree_map(
+                                lambda leaf: jnp.array([leaf]), interval_stats
+                            )
+                        )
+
                     self._logger.write(results)
+
+                    self._executor.store.eval_json_logger.write(
+                        results_dict=eval_result
+                    )
 
                 else:
                     result = self.run_episode()
