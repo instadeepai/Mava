@@ -37,7 +37,6 @@ def make_environment(
     random_seed: Optional[int] = None,
     recurrent_test: bool = False,
 ) -> dm_env.Environment:
-    """Create debugging environment."""
 
     assert action_space == "continuous" or action_space == "discrete"
 

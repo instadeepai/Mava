@@ -429,29 +429,6 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         """Expose any other attributes of the underlying environment."""
         return getattr(self._environment, name)
 
-    def _make_flatland_task_name(self) -> str:
-        """A simple helper function to create a flatland task name
-
-        The task name will be a string created as:
-        `<map_width>x<map_height>_<num_agents>_trains`. For example on a
-        5x5 maps with 3 agents the task name will be `5x5_3_trains`.
-        """
-
-        env_width = str(self._environment.width)
-        env_height = str(self._environment.height)
-        num_trains = str(self._environment.number_of_agents)
-
-        task_name = f"{env_width}x{env_height}_{num_trains}_trains"
-
-        return task_name
-
-    def environment_task_name(self) -> Dict[str, str]:
-        """Return environment and task name for logging."""
-        return {
-            "environment_name": "flatland",
-            "task_name": self._make_flatland_task_name(),
-        }
-
 
 # Utility functions
 

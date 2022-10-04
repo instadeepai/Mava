@@ -348,7 +348,3 @@ class SMACWrapper(ParallelEnvWrapper):
             return self.__getattribute__(name)
         else:
             return getattr(self._environment, name)
-
-    def environment_task_name(self) -> Dict[str, str]:
-        """Return environment and task name for logging."""
-        return {"environment_name": "SMAC", "task_name": self._environment.map_name}

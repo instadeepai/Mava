@@ -38,12 +38,7 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
         environment: MultiAgentEnv,
         return_state_info: bool = False,
     ):
-        """Initialise debug environment."""
-        super().__init__(
-            environment=environment,
-            environment_class_name="debugging",
-            environment_task_name="simple_spread",
-        )
+        super().__init__(environment=environment)
 
         self.return_state_info = return_state_info
 
@@ -151,7 +146,6 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
         return observations
 
     def observation_spec(self) -> Dict[str, OLT]:
-        """Return observation spec."""
         observation_specs = {}
         for agent in self._environment.agent_ids:
 
@@ -177,7 +171,6 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
         return observation_specs
 
     def extras_spec(self) -> Dict[str, specs.BoundedArray]:
-        """Return extras spec."""
         extras = {}
         if self.return_state_info:
             shape = self.environment._get_state().shape
@@ -192,28 +185,14 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
             extras.update({"s_t": ex_spec})
         return extras
 
-    def environment_task_name(self) -> Dict[str, str]:
-        """Return environment and task name for logging."""
-        return {"environment_name": "debugging", "task_name": "simple_spread"}
-
 
 class SwitchGameWrapper(PettingZooParallelEnvWrapper):
     """Environment wrapper for Debugging Switch environment."""
 
     def __init__(self, environment: MultiAgentSwitchGame):
-        """Initialise switch environment."""
-        super().__init__(
-            environment=environment,
-            environment_class_name="debugging",
-            environment_task_name="switch",
-        )
+        super().__init__(environment=environment)
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
-        """Step the environment.
-
-        Args:
-            actions : actions taken by agents.
-        """
         if self._reset_next_step:
             return self.reset()
 
@@ -236,28 +215,15 @@ class SwitchGameWrapper(PettingZooParallelEnvWrapper):
         )
 
     def extras_spec(self) -> Dict[str, specs.BoundedArray]:
-        """Returns extras spec."""
         return {}
-
-    def environment_task_name(self) -> Dict[str, str]:
-        """Return environment and task name for logging."""
-        return {"environment_name": "debugging", "task_name": "switch"}
 
 
 class TwoStepWrapper(PettingZooParallelEnvWrapper):
-    """Wraps simple two-step matrix game from Qmix paper.
-
-    Useful for debugging and quick comparison of
-    cooperative performance.
-    """
+    """Wraps simple two-step matrix game from Qmix paper. Useful for
+    debugging and quick comparison of cooperative performance."""
 
     def __init__(self, environment: TwoStepEnv) -> None:
-        """Initialise two step environment."""
-        super().__init__(
-            environment=environment,
-            environment_class_name="debugging",
-            environment_task_name="two_step",
-        )
+        super().__init__(environment=environment)
         self._reset_next_step = False
         self.environment.action_spaces = {}
         self.environment.observation_spaces = {}
@@ -331,9 +297,4 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
         )
 
     def extras_spec(self) -> Dict[str, specs.BoundedArray]:
-        """Return extras spec."""
         return self.environment._extras_specs
-
-    def environment_task_name(self) -> Dict[str, str]:
-        """Return environment and task name for logging."""
-        return {"environment_name": "debugging", "task_name": "two_step"}

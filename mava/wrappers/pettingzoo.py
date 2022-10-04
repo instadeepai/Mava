@@ -46,24 +46,18 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
     def __init__(
         self,
         environment: "AECEnv",
-        environment_class_name: str,
-        environment_task_name: str,
         env_preprocess_wrappers: Optional[List] = None,
     ):
         """Constructor for sequential PZ wrapper.
 
         Args:
             environment (AECEnv): sequential PZ env.
-            environment_class_name: name of environment class. eg. MPE
-            environment_task_name: name of environment tasks. eg. simple_spread
             env_preprocess_wrappers (Optional[List], optional): Wrappers
                 that preprocess envs.
                 Format (env_preprocessor, dict_with_preprocessor_params).
         """
         self._environment = environment
         self._reset_next_step = True
-        self._environment_class_name = environment_class_name
-        self._environment_task_name = environment_task_name
 
         if env_preprocess_wrappers:
             self._environment = apply_env_wrapper_preprocessors(
@@ -364,13 +358,6 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         else:
             return getattr(self._environment, name)
 
-    def environment_task_name(self) -> Dict[str, str]:
-        """Return environment and task name for logging."""
-        return {
-            "environment_name": "pettingzoo_sequential_{self._environment_class_name}",
-            "task_name": self._environment_task_name,
-        }
-
 
 class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
     """Environment wrapper for PettingZoo MARL environments."""
@@ -378,8 +365,6 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
     def __init__(
         self,
         environment: "ParallelEnv",
-        environment_class_name: str,
-        environment_task_name: str,
         return_state_info: bool = False,
         env_preprocess_wrappers: Optional[List] = None,
     ):
@@ -387,8 +372,6 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
 
         Args:
             environment (ParallelEnv): parallel PZ env.
-            environment_class_name: name of environment class. eg. MPE
-            environment_task_name: name of environment tasks. eg. simple_spread
             return_state_info: whether or not the wrapper should return
                 extra state info.
             env_preprocess_wrappers (Optional[List], optional): Wrappers
@@ -398,8 +381,6 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         self._environment = environment
         self._reset_next_step = True
         self._return_state_info = return_state_info
-        self._environment_class_name = environment_class_name
-        self._environment_task_name = environment_task_name
 
         if env_preprocess_wrappers:
             self._environment = apply_env_wrapper_preprocessors(
@@ -733,10 +714,3 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
             return self.__getattribute__(name)
         else:
             return getattr(self._environment, name)
-
-    def environment_task_name(self) -> Dict[str, str]:
-        """Return environment and task name for logging."""
-        return {
-            "environment_name": "pettingzoo_parallel_{self._environment_class_name}",
-            "task_name": self._environment_task_name,
-        }
