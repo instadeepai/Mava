@@ -63,13 +63,13 @@ class GAE(Utility):
             values: jnp.ndarray,
             stats: jnp.ndarray = jnp.array([0, 1, 1e-4]),
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
-            """Use truncated GAE to compute advantages. 
-            
+            """Use truncated GAE to compute advantages.
+
             Args:
                 rewards: Agent rewards.
                 discounts: Agent discount factors.
                 values: Agent value estimations.
-                stats: Running statistics
+                stats: Running statistics.
 
             Returns:
                 Tuple of advantage values, target values.
@@ -79,8 +79,8 @@ class GAE(Utility):
             max_abs_reward = self.config.max_abs_reward
             rewards = jnp.clip(rewards, -max_abs_reward, max_abs_reward)
 
-            # When the target_value normalisation option is not set true,
-            # the mean and variance are set to 0 and 1.
+            # When the target_value normalisation option is not set to true,
+            # the mean and variance are set to 0 and 1 respectively.
             # Hence the code below does not modify the agent values.
             values = denormalize(stats, values)
 
