@@ -28,6 +28,11 @@ python --version
 pip install --upgrade pip setuptools
 pip --version
 
+# Code coverage
+curl -Os https://uploader.codecov.io/latest/linux/codecov
+chmod +x codecov
+./codecov
+
 # Set up a virtual environment.
 pip install virtualenv
 virtualenv mava_testing
