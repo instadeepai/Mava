@@ -17,7 +17,7 @@
 
 import pytest
 
-from tests.conftest import EnvSpec, EnvType, Helpers, MockedEnvironments
+from tests.conftest import EnvSpec, Helpers, MockedEnvironments
 from tests.mocks import MockedExecutor, MockedSystem
 
 
@@ -25,15 +25,15 @@ from tests.mocks import MockedExecutor, MockedSystem
     "env_spec",
     [
         # Mocked environments
-        EnvSpec(MockedEnvironments.Mocked_Dicrete, EnvType.Parallel),
-        EnvSpec(MockedEnvironments.Mocked_Dicrete, EnvType.Sequential),
-        EnvSpec(MockedEnvironments.Mocked_Continous, EnvType.Parallel),
-        EnvSpec(MockedEnvironments.Mocked_Continous, EnvType.Sequential),
+        EnvSpec(MockedEnvironments.Mocked_Dicrete),
+        EnvSpec(MockedEnvironments.Mocked_Dicrete),
+        EnvSpec(MockedEnvironments.Mocked_Continous),
+        EnvSpec(MockedEnvironments.Mocked_Continous),
         # Real Environments
-        EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Parallel),
-        EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Sequential),
-        EnvSpec("pettingzoo.sisl.multiwalker_v8", EnvType.Parallel),
-        EnvSpec("pettingzoo.sisl.multiwalker_v8", EnvType.Sequential),
+        EnvSpec("pettingzoo.mpe.simple_spread_v2"),
+        EnvSpec("pettingzoo.mpe.simple_spread_v2"),
+        EnvSpec("pettingzoo.sisl.multiwalker_v8"),
+        EnvSpec("pettingzoo.sisl.multiwalker_v8"),
     ],
 )
 class TestEnvironmentLoop:

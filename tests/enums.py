@@ -34,23 +34,14 @@ class MockedEnvironments(str, Enum):
     Mocked_Continous = "continous_mock"
 
 
-class EnvType(Enum):
-    """Environment type"""
-
-    Sequential = 1
-    Parallel = 2
-
-
 class EnvSpec:
     """Environment spec"""
 
     def __init__(
         self,
         env_name: str,
-        env_type: EnvType,
         env_source: EnvSource = EnvSource.PettingZoo,
     ):
         """Init"""
         self.env_name = env_name
-        self.env_type = env_type
         self.env_source = env_source

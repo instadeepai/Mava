@@ -47,7 +47,7 @@ from mava.types import OLT, Observation
 from mava.utils.builder_utils import convert_specs
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
-from tests.enums import EnvType, MockedEnvironments
+from tests.enums import MockedEnvironments
 
 """Mock Objects for Tests"""
 
@@ -395,15 +395,15 @@ class ParallelEnvironment(MockedEnvironment, ParallelEnvWrapper):
 """Mocked Multi-Agent Discrete Environment"""
 
 
-DiscreteMAEnvironment = get_ma_environment(DiscreteEnvironment)
+DiscreteEnvironment = get_ma_environment(DiscreteEnvironment)
 ContinuousMAEnvironment = get_ma_environment(ContinuousEnvironment)
 
 
-class MockedMADiscreteEnvironment(
-    DiscreteMAEnvironment, DiscreteEnvironment  # type: ignore
+class MockedDiscreteEnvironment(
+    DiscreteEnvironment, DiscreteEnvironment  # type: ignore
 ):
     def __init__(self, *args: Any, **kwargs: Any):
-        DiscreteMAEnvironment.__init__(self, *args, **kwargs)
+        DiscreteEnvironment.__init__(self, *args, **kwargs)
 
 
 """Mocked Multi-Agent Continuous Environment"""
@@ -419,7 +419,7 @@ class MockedMAContinuousEnvironment(
 """Mocked Multi-Agent Parallel Discrete Environment"""
 
 
-class ParallelMADiscreteEnvironment(ParallelEnvironment, MockedMADiscreteEnvironment):
+class ParallelDiscreteEnvironment(ParallelEnvironment, MockedMADiscreteEnvironment):
     def __init__(self, *args: Any, **kwargs: Any):
         MockedMADiscreteEnvironment.__init__(self, *args, **kwargs)
         ParallelEnvironment.__init__(self, self.agents, self._specs)
@@ -541,14 +541,12 @@ def make_fake_env_specs() -> MAEnvironmentSpec:
 
 def make_fake_env(
     env_name: MockedEnvironments = MockedEnvironments.Mocked_Dicrete,
-    env_type: EnvType = EnvType.Parallel,
     evaluation: bool = False,
 ) -> Any:
     """Func that creates a fake env.
 
     Args:
         env_name : env name.
-        env_type : type of env.
         evaluation: whether env is used for eval or not.
             Not sure we should use this in spec.
 
@@ -560,37 +558,21 @@ def make_fake_env(
     """
     del evaluation
     if env_name is MockedEnvironments.Mocked_Dicrete:
-        if env_type == EnvType.Parallel:
-            env = ParallelMADiscreteEnvironment(
-                num_actions=18,
-                num_observations=2,
-                obs_shape=(84, 84, 4),
-                obs_dtype=np.float32,
-                episode_length=10,
-            )
-        elif env_type == EnvType.Sequential:
-            env = SequentialMADiscreteEnvironment(
-                num_actions=18,
-                num_observations=2,
-                obs_shape=(84, 84, 4),
-                obs_dtype=np.float32,
-                episode_length=10,
-            )
+        env = ParallelDiscreteEnvironment(
+            num_actions=18,
+            num_observations=2,
+            obs_shape=(84, 84, 4),
+            obs_dtype=np.float32,
+            episode_length=10,
+        )
+
     elif env_name is MockedEnvironments.Mocked_Continous:
-        if env_type == EnvType.Parallel:
-            env = ParallelMAContinuousEnvironment(
-                action_dim=2,
-                observation_dim=2,
-                bounded=True,
-                episode_length=10,
-            )
-        elif env_type == EnvType.Sequential:
-            env = SequentialMAContinuousEnvironment(
-                action_dim=2,
-                observation_dim=2,
-                bounded=True,
-                episode_length=10,
-            )
+        env = ParallelMAContinuousEnvironment(
+            action_dim=2,
+            observation_dim=2,
+            bounded=True,
+            episode_length=10,
+        )
 
     if env is None:
         raise Exception("Env_spec is not valid.")
@@ -600,7 +582,6 @@ def make_fake_env(
 
 def make_fake_environment_factory(
     env_name: MockedEnvironments = MockedEnvironments.Mocked_Dicrete,
-    env_type: EnvType = EnvType.Parallel,
 ) -> Any:
     """Returns a mock env factory.
 
