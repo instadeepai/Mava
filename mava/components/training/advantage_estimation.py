@@ -63,12 +63,8 @@ class GAE(Utility):
             values: jnp.ndarray,
             stats: jnp.ndarray = jnp.array([0, 1, 1e-4]),
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
-            """Use truncated GAE to compute advantages.
+            """Use truncated GAE to compute advantages. 
             
-            The stats argument stores running mean and variance statisitcs
-            that is used to denormalised the Agent values when the
-            target_value_normalization option was set to True.
-
             Args:
                 rewards: Agent rewards.
                 discounts: Agent discount factors.
