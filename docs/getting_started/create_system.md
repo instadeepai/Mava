@@ -1,6 +1,6 @@
 # Creating a system in Mava
 
-> 🚧 **Note:** This only applies to the callback redesign of Mava.
+
 
 In order to create a new system in Mava, a system class must be defined that inherits from the base [`System`][system] class. The `design` method must then be overwritten to return a [`DesignSpec`][design_spec] object containing all the components to be used by a particular system. A default system config may also be created as a `dataclass` which contains the default system hyperparameters to be used.
 
@@ -77,7 +77,7 @@ class IPPOSystem(System):
         return system, default_params
 ```
 
-In the above example certain processes are grouped together, which has been done for readability but it is not strictly required. For an example of how a full system may be launched on a particular environment with logging included, please see [here](https://github.com/instadeepai/Mava/blob/develop/examples/jax/debugging/simple_spread/feedforward/decentralised/run_ippo.py).
+In the above example certain processes are grouped together, which has been done for readability but it is not strictly required. For an example of how a full system may be launched on a particular environment with logging included, please see [here](https://github.com/instadeepai/Mava/blob/develop/examples/debugging/simple_spread/feedforward/decentralised/run_ippo.py).
 
 When building the system, `system.build` can contain arguments that will overwrite the default config values from any existing component in the system. Commonly overwritten build arguments are:
 
@@ -105,5 +105,5 @@ When building the system, `system.build` can contain arguments that will overwri
 
 - `record_every` - determines how often the evaluator should record an agent gameplay video.
 
-[system]: https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/systems/jax/system.py#L28
+[system]: https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/systems/system.py#L28
 [design_spec]: https://github.com/instadeepai/Mava/blob/7b11a082ba790e1b2c2f0acd633ff605fffbe768/mava/specs.py#L161
