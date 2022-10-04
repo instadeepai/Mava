@@ -64,11 +64,16 @@ class GAE(Utility):
             stats: jnp.ndarray = jnp.array([0, 1, 1e-4]),
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
             """Use truncated GAE to compute advantages.
+            
+            The stats argument stores running mean and variance statisitcs
+            that is used to denormalised the Agent values when the
+            target_value_normalization option was set to True.
 
             Args:
                 rewards: Agent rewards.
                 discounts: Agent discount factors.
                 values: Agent value estimations.
+                stats: Running statistics
 
             Returns:
                 Tuple of advantage values, target values.
@@ -77,6 +82,10 @@ class GAE(Utility):
             # Apply reward clipping.
             max_abs_reward = self.config.max_abs_reward
             rewards = jnp.clip(rewards, -max_abs_reward, max_abs_reward)
+
+            # When the target_value normalisation option is not set true,
+            # the mean and variance are set to 0 and 1.
+            # Hence the code below does not modify the agent values.
             values = denormalize(stats, values)
 
             advantages = rlax.truncated_generalized_advantage_estimation(

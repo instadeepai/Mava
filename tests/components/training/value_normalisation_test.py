@@ -23,7 +23,7 @@ def test_compute_running_mean_var_count() -> None:
         stats = compute_running_mean_var_count(stats, jnp.array(x3))
 
         x = jnp.array(np.concatenate([x1, x2, x3], axis=0))
-        stats2 = jnp.array([jnp.mean(x), jnp.var(x), x.size + 1e-4])
+        stats2 = jnp.array([jnp.mean(x), jnp.var(x), x.size])
 
         assert jnp.allclose(stats, stats2)
 
