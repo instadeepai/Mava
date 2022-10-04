@@ -331,9 +331,7 @@ class ParallelDiscreteEnvironment(ParallelEnvironment):
 """Mocked Multi-Agent Parallel Continuous Environment"""
 
 
-class ParallelContinuousEnvironment(
-    ParallelEnvironment, MockedMAContinuousEnvironment
-):
+class ParallelContinuousEnvironment(ParallelEnvironment, MockedMAContinuousEnvironment):
     def __init__(self, *args: Any, **kwargs: Any):
         MockedMAContinuousEnvironment.__init__(self, *args, **kwargs)
         ParallelEnvironment.__init__(self, self.agents, self._specs)
