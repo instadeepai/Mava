@@ -1,5 +1,4 @@
 [run]
-
 omit =
     mava/environment_loops/open_spiel_environment_loop.py
     mava/environment_loops/debugging_envs.py
