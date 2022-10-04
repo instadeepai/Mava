@@ -24,7 +24,6 @@ class EnvSource(str, Enum):
     PettingZoo = "pettingzoo"
     RLLibMultiEnv = "rllibmultienv"
     Flatland = "flatland"
-    OpenSpiel = "openspiel"
 
 
 class MockedEnvironments(str, Enum):

@@ -116,7 +116,7 @@ class TestEnvWrapper:
         assert (
             dm_env_timestep.step_type == dm_env.StepType.FIRST
         ), "Failed to have correct StepType."
-       
+
         assert (
             len(dm_env_timestep.observation) == num_agents
         ), "Failed to generate observation for all agents."
