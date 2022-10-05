@@ -63,8 +63,6 @@ else
     pytest --cov=./ --cov-report=xml --durations=10 -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
 fi
 
-ls
-
 # Code coverage
 curl https://keybase.io/codecovsecurity/pgp_keys.asc | gpg --no-default-keyring --keyring trustedkeys.gpg --import # One-time step
 curl -Os https://uploader.codecov.io/latest/linux/codecov

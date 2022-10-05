@@ -27,8 +27,8 @@
 <a  href="https://id-mava.readthedocs.io/">
     <img src="https://readthedocs.org/projects/id-mava/badge/?version=latest" alt="Docs" />
 </a>
-<a href="https://codecov.io/gh/instadeepai/Mava" >
-    <img src="https://codecov.io/gh/instadeepai/Mava/branch/develop/graph/badge.svg?token=P3HO6DLKQ3"/>
+<a href="https://codecov.io/gh/instadeepai/Mava">
+    <img src="https://codecov.io/gh/instadeepai/Mava/branch/develop/graph/badge.svg?token=P3HO6DLKQ3" alt="coverage" />
 </a>
 </div>
 
