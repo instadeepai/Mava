@@ -1,6 +1,6 @@
 # Gotchas
 
-> 🚧 **Note:** This only applies to the callback redesign of Mava.
+
 
 ## Debugging
 While working on creating your own component, or your own system, you may encounter some errors that come from an unknown source. In order to help with locating and correcting issues, please see here some tricks for debugging in MAVA.
