@@ -22,7 +22,7 @@ from typing import Any
 import optax
 from absl import app, flags
 
-from mava.systems.jax import ippo
+from mava.systems import ippo
 from mava.utils.environments.smac_utils import make_environment
 from mava.utils.loggers import logger_utils
 
@@ -97,8 +97,6 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        evaluation_interval={"executor_steps": 10000},
-        evaluation_duration={"evaluator_episodes": 32},
     )
 
     # Launch the system.
