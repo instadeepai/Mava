@@ -59,10 +59,10 @@ N_CPU_INTEGRATION=`expr $N_CPU \* 3 / 4`
 
 if [ "$integration" = "true" ]; then \
     # Run all tests
-    pytest -n "${N_CPU_INTEGRATION}" tests ;
+    pytest --cov --cov-report=xml -n "${N_CPU_INTEGRATION}" tests ;
 else
     # Run all unit tests (non integration tests).
-    pytest --durations=10 -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
+    pytest --cov --cov-report=xml --durations=10 -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
 fi
 
 # Clean-up.
