@@ -69,10 +69,10 @@ class Logger(Component):
         if name == "evaluator":
             # Instantiate an environment from a factory to get access to the
             # environment name and task name
-            temp_environment = builder.store.global_config.environment_factory(
-                evaluation=False
-            )
-            environment_name_dict = temp_environment.environment_task_name()
+            (
+                temp_environment,
+                environment_name_dict,
+            ) = builder.store.global_config.environment_factory(evaluation=False)
             del temp_environment
 
             builder.store.eval_json_logger = JSONLogger(

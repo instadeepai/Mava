@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Utils for SMAC environment."""
-from typing import Any, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from mava.utils.jax_training_utils import set_jax_double_precision
 
@@ -39,7 +39,8 @@ if _found_smac:
         concat_agent_id: bool = True,
         evaluation: bool = False,
         random_seed: Optional[int] = None,
-    ) -> Any:
+    ) -> Tuple[Any, Dict[str, str]]:
+        """Make a SMAC enviroment."""
 
         # Env uses int64 action space due to the use of spac.Discrete.
         set_jax_double_precision()
@@ -53,4 +54,5 @@ if _found_smac:
         if concat_agent_id:
             env = ConcatAgentIdToObservation(env)
 
-        return env
+        environment_task_name = {"environment_name": "SMAC", "task_name": map_name}
+        return env, environment_task_name

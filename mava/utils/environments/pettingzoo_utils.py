@@ -16,7 +16,7 @@
 """Pettingzoo environment factory."""
 
 import importlib
-from typing import Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dm_env
 import numpy as np
@@ -97,7 +97,7 @@ def make_environment(
     env_preprocess_wrappers: Optional[List] = None,
     random_seed: Optional[int] = None,
     **kwargs: Any,
-) -> dm_env.Environment:
+) -> Tuple[dm_env.Environment, Dict[str, str]]:
     """Wraps an Pettingzoo environment.
 
     Args:
@@ -146,4 +146,9 @@ def make_environment(
     else:
         raise Exception("Pettingzoo is not installed.")
 
-    return environment
+    environment_task_name = {
+        "environment_name": "pettingzoo_{env_type}_{env_class}",
+        "task_name": env_name,
+    }
+
+    return environment, environment_task_name
