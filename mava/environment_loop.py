@@ -16,7 +16,7 @@
 """A simple multi-agent-system-environment training loop."""
 
 import time
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Tuple, Union
 
 import acme
 import dm_env
@@ -236,31 +236,12 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         self._logger.write(results)
         return results
 
-    def run(  # noqa: C901
-        self, num_episodes: Optional[int] = None, num_steps: Optional[int] = None
-    ) -> None:
+    def run(self) -> None:
         """Perform the run loop.
-        Run the environment loop either for `num_episodes` episodes or for at
-        least `num_steps` steps (the last episode is always run until completion,
-        so the total number of steps may be slightly more than `num_steps`).
-        At least one of these two arguments has to be None.
-        Upon termination of an episode a new episode will be started. If the number
-        of episodes and the number of steps are not given then this will interact
-        with the environment infinitely.
-        Args:
-            num_episodes: number of episodes to run the loop for.
-            num_steps: minimal number of steps to run the loop for.
+
         Raises:
             ValueError: If both 'num_episodes' and 'num_steps' are not None.
         """
-
-        if not (num_episodes is None or num_steps is None):
-            raise ValueError('Either "num_episodes" or "num_steps" should be None.')
-
-        def should_terminate(episode_count: int, step_count: int) -> bool:
-            return (num_episodes is not None and episode_count >= num_episodes) or (
-                num_steps is not None and step_count >= num_steps
-            )
 
         def should_run_loop(eval_interval_condition: Tuple) -> bool:
             """Check if the eval loop should run in current step.
