@@ -42,7 +42,7 @@ from mava.specs import DesignSpec, MAEnvironmentSpec
 from mava.systems.system import System
 from mava.utils.builder_utils import convert_specs
 from tests.enums import MockedEnvironments
-from tests.mocks import ParallelContinuousEnvironment, ParallelDiscreteEnvironment
+from tests.mocks import ParallelMAContinuousEnvironment, ParallelMADiscreteEnvironment
 
 # Mock components to feed to the builder
 
@@ -144,7 +144,7 @@ def make_fake_env(
     """
     del evaluation
     if env_name is MockedEnvironments.Mocked_Dicrete:
-        env = ParallelDiscreteEnvironment(
+        env = ParallelMADiscreteEnvironment(
             num_actions=18,
             num_observations=2,
             obs_shape=(84, 84, 4),
@@ -152,7 +152,7 @@ def make_fake_env(
             episode_length=10,
         )
     elif env_name is MockedEnvironments.Mocked_Continous:
-        env = ParallelContinuousEnvironment(
+        env = ParallelMAContinuousEnvironment(
             action_dim=2,
             observation_dim=2,
             bounded=True,

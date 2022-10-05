@@ -45,7 +45,7 @@ from mava.wrappers.pettingzoo import (
     PettingZooParallelEnvWrapper,
 )
 from tests.enums import EnvSource, EnvSpec, MockedEnvironments
-from tests.mocks import ParallelMADiscreteEnvironment, ParallelMAContinuousEnvironment
+from tests.mocks import ParallelMAContinuousEnvironment, ParallelMADiscreteEnvironment
 
 # flatland environment config
 flatland_env_config = {
