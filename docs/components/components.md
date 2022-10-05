@@ -1,6 +1,6 @@
 # Mava Components
 
-> 🚧 **Note:** This only applies to the callback redesign of Mava.
+
 
 ## Callbacks
 A callback is a function that is passed as an input to another function, and its execution is postponed until the function to which it is passed is run.

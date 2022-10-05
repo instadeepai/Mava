@@ -9,22 +9,22 @@
 </h2>
 
 <div align="center">
-<a rel="nofollow">
+<a  href="https://pypi.org/project/id-mava/">
     <img src="https://img.shields.io/pypi/pyversions/id-mava" alt="Python" />
 </a>
-<a rel="nofollow">
+<a  href="https://pypi.org/project/id-mava/">
     <img src="https://badge.fury.io/py/id-mava.svg" alt="PyPi" />
 </a>
-<a rel="nofollow">
+<a  href="https://github.com/instadeepai/Mava/actions/workflows/ci.yaml?query=branch%3Adevelop">
     <img src="https://github.com/instadeepai/Mava/workflows/format_and_test/badge.svg" alt="Formatting" />
 </a>
-<a rel="nofollow">
+<a  href="https://lgtm.com/projects/g/instadeepai/Mava/context:python">
     <img src="https://img.shields.io/lgtm/grade/python/g/instadeepai/Mava.svg?logo=lgtm&logoWidth=18" alt="Quality" />
 </a>
-<a rel="nofollow">
+<a  href="https://github.com/instadeepai/Mava/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License" />
 </a>
-<a rel="nofollow">
+<a  href="https://id-mava.readthedocs.io/">
     <img src="https://readthedocs.org/projects/id-mava/badge/?version=latest" alt="Docs" />
 </a>
 </div>
@@ -45,7 +45,7 @@ To join us in these efforts, please feel free to reach out, raise issues or read
 
 <hr>
 
-👋 **UPDATE - 02/09/2022**: As mentioned in our previous update, we are in the process of fully moving to JAX. In the next few weeks, we will release our first JAX system! Using a more modular and flexible build method, with many more develops to come soon. These will include more components and utilities, state-of-the-art system implementations, notebooks and tutorials as well as detailed benchmarking and performance guides. Please note that all TF2-based systems using the old build method will be deprecated in the near future. As part of this update, we have also restructured the readme and our documentation to reflect our move to JAX.
+👋 **UPDATE - 01/10/2022**: In the next few weeks, we will release our first JAX system! Using a more modular and flexible build method, with many more developments to come soon. These will include more components and utilities, state-of-the-art system implementations, notebooks and tutorials as well as detailed benchmarking and performance guides. After this release, our TF2-based systems will be deprecated. To still use them please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`). Please note, we will no longer be supporting these systems after our next release (`v0.1.4`).
 
 <hr>
 
@@ -57,13 +57,13 @@ To join us in these efforts, please feel free to reach out, raise issues or read
 
 ## Installation 🎬
 
-You can install the latest release of Mava for **Tensorflow** from PyPI (to be deprecated soon). Note that you will still be able to use TF2 systems by pinning to an older version of Mava.
+You can install the latest release of Mava as follows:
 
 ```bash
-pip install id-mava[reverb,tf,envs]
+pip install id-mava[reverb,jax,envs]
 ```
 
-For **JAX**, please install the latest development version directly from GitHub (PyPI release coming soon!).
+You can also install directly from source:
 
 ```bash
 pip install "id-mava[reverb,jax,envs] @ git+https://github.com/instadeepai/mava.git"
@@ -109,5 +109,5 @@ If you use Mava in your work, please cite the accompanying
 [openspiel]: https://github.com/deepmind/open_spiel
 [flatland]: https://gitlab.aicrowd.com/flatland/flatland
 [robocup]: https://github.com/rcsoccersim
-[quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/jax/quickstart.ipynb
+[quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/quickstart.ipynb
 [documentation]: https://id-mava.readthedocs.io/
