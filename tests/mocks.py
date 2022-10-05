@@ -157,7 +157,7 @@ class MockedSystem(MockedExecutor):
 base_class: DiscreteEnvironment or ContinuousEnvironment. """
 
 
-def get_environment(
+def get_ma_environment(
     base_class: Union[DiscreteEnvironment, ContinuousEnvironment]
 ) -> Any:
     class MockedEnvironment(base_class):  # type: ignore
@@ -299,13 +299,13 @@ class ParallelEnvironment(MockedEnvironment, ParallelEnvWrapper):
 """Mocked Multi-Agent Discrete Environment"""
 
 
-DiscreteEnvironment = get_environment(DiscreteEnvironment)
-ContinuousMAEnvironment = get_environment(ContinuousEnvironment)
+DiscreteMAEnvironment = get_ma_environment(DiscreteEnvironment)
+ContinuousMAEnvironment = get_ma_environment(ContinuousEnvironment)
 
 
-class MockedDiscreteEnvironment(DiscreteEnvironment):  # type: ignore
+class MockedMADiscreteEnvironment(DiscreteMAEnvironment, DiscreteEnvironment):  # type: ignore
     def __init__(self, *args: Any, **kwargs: Any):
-        DiscreteEnvironment.__init__(self, *args, **kwargs)
+        DiscreteMAEnvironment.__init__(self, *args, **kwargs)
 
 
 """Mocked Multi-Agent Continuous Environment"""
@@ -321,15 +321,17 @@ class MockedMAContinuousEnvironment(
 """Mocked Multi-Agent Parallel Discrete Environment"""
 
 
-class ParallelDiscreteEnvironment(ParallelEnvironment):
+
+class ParallelMADiscreteEnvironment(ParallelEnvironment, MockedMADiscreteEnvironment):
     def __init__(self, *args: Any, **kwargs: Any):
+        MockedMADiscreteEnvironment.__init__(self, *args, **kwargs)
         ParallelEnvironment.__init__(self, self.agents, self._specs)
 
 
 """Mocked Multi-Agent Parallel Continuous Environment"""
 
 
-class ParallelContinuousEnvironment(ParallelEnvironment, MockedMAContinuousEnvironment):
+class ParallelMAContinuousEnvironment(ParallelEnvironment, MockedMAContinuousEnvironment):
     def __init__(self, *args: Any, **kwargs: Any):
         MockedMAContinuousEnvironment.__init__(self, *args, **kwargs)
         ParallelEnvironment.__init__(self, self.agents, self._specs)
@@ -436,7 +438,7 @@ def make_fake_env(
     """
     del evaluation
     if env_name is MockedEnvironments.Mocked_Dicrete:
-        env = ParallelDiscreteEnvironment(
+        env = ParallelMADiscreteEnvironment(
             num_actions=18,
             num_observations=2,
             obs_shape=(84, 84, 4),
