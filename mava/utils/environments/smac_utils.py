@@ -35,8 +35,8 @@ if _found_smac:
 
     def make_environment(
         map_name: str = "3m",
-        concat_prev_actions: bool = True,
-        concat_agent_id: bool = True,
+        concat_prev_actions: bool = False,
+        concat_agent_id: bool = False,
         evaluation: bool = False,
         random_seed: Optional[int] = None,
         death_masking: bool = False,
