@@ -57,11 +57,21 @@ N_CPU=$(grep -c ^processor /proc/cpuinfo)
 
 if [ "$integration" = "true" ]; then \
     # Run all tests
-    pytest --cov --cov-report=xml -n "${N_CPU}" tests ;
+    pytest --cov=./ --cov-report=xml -n "${N_CPU}" tests ;
 else
     # Run all unit tests (non integration tests).
-    pytest --cov --cov-report=xml --durations=10 -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
+    pytest --cov=./ --cov-report=xml --durations=10 -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
 fi
+
+# Code coverage
+curl https://keybase.io/codecovsecurity/pgp_keys.asc | gpg --no-default-keyring --keyring trustedkeys.gpg --import # One-time step
+curl -Os https://uploader.codecov.io/latest/linux/codecov
+curl -Os https://uploader.codecov.io/latest/linux/codecov.SHA256SUM
+curl -Os https://uploader.codecov.io/latest/linux/codecov.SHA256SUM.sig
+gpgv codecov.SHA256SUM.sig codecov.SHA256SUM
+shasum -a 256 -c codecov.SHA256SUM
+chmod +x codecov
+./codecov
 
 # Clean-up.
 deactivate
