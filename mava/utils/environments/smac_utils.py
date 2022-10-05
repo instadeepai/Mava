@@ -41,7 +41,16 @@ if _found_smac:
         random_seed: Optional[int] = None,
         death_masking: bool = False,
     ) -> Any:
-        """Create smac environmnet wrapper."""
+        """Create smac environmnet wrapper.
+
+        Args:
+            map_name: the name of the scenario
+            concat_prev_actions: bool
+            concat_agent_id: bool
+            evaluation: bool
+            random_seed: optional
+            death_masking: whether to use death masking or not
+        """
         # Env uses int64 action space due to the use of spac.Discrete.
         set_jax_double_precision()
         env = StarCraft2Env(map_name=map_name, seed=random_seed)
