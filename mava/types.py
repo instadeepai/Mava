@@ -21,11 +21,6 @@ import numpy as np
 from acme import types
 from acme.utils import loggers
 
-from mava.components.tf.modules.exploration.exploration_scheduling import (
-    BaseExplorationScheduler,
-    BaseExplorationTimestepScheduler,
-)
-
 NestedArray = Any
 
 
@@ -47,11 +42,6 @@ Reward = Union[SingleAgentReward, Dict[str, SingleAgentReward]]
 Discount = Reward
 
 Observation = Union[OLT, Dict[str, OLT], Dict[str, np.ndarray]]
-
-EpsilonScheduler = Union[
-    BaseExplorationTimestepScheduler,
-    BaseExplorationScheduler,
-]
 
 
 class Transition(NamedTuple):

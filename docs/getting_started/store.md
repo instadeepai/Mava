@@ -1,6 +1,6 @@
 # The store
 
-> 🚧 **Note:** This only applies to the callback redesign of Mava.
+
 
 The store is a key element that acts as a container for the variables of the various components and is dynamically updated as the system runs. It also serves as a means for different components to have access to variables that were created by other components when overwritten hooks were called.
 
