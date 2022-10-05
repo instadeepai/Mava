@@ -192,7 +192,7 @@ def make_discrete_networks(
     critic_layer_sizes: Sequence[int],
     policy_recurrent_layer_sizes: Sequence[int],
     recurrent_architecture_fn: Any,
-    observation_network: Callable = utils.batch_concat,
+    policy_layers_after_recurrent: Sequence[int],
     # default behaviour is to flatten observations
 ) -> PPONetworks:
     """Create PPO network for environments with discrete action spaces.
@@ -204,8 +204,8 @@ def make_discrete_networks(
         critic_layer_sizes: sizes of hidden layers for the critic network
         policy_recurrent_layer_sizes: Optionally add recurrent layers to the policy
         recurrent_architecture_fn: Architecture to use for the recurrent units.
-        observation_network: optional network for processing observations.
-            Defaults to utils.batch_concat.
+        policy_layers_after_recurrent: sizes of hidden layers for the policy network after the recurrent layers.
+        This is only used if an recurrent architecture is used.
     Returns:
         PPONetworks class
     """
@@ -217,7 +217,6 @@ def make_discrete_networks(
     def policy_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
         # Add the observation network and an MLP network.
         policy_network = [
-            observation_network,
             hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
         ]
 
@@ -225,6 +224,9 @@ def make_discrete_networks(
         if len(policy_recurrent_layer_sizes) > 0:
             for size in policy_recurrent_layer_sizes:
                 policy_network.append(recurrent_architecture_fn(size))
+
+            # Add optional feedforward layers after the recurrent layers
+            hk.nets.MLP(policy_layers_after_recurrent, activation=jax.nn.relu),
 
         # Add a categorical value head.
         policy_network.append(
@@ -251,7 +253,6 @@ def make_discrete_networks(
     def critic_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
         critic_network = hk.Sequential(
             [
-                observation_network,
                 hk.nets.MLP(critic_layer_sizes, activation=jax.nn.relu),
                 ValueHead(),
             ]
@@ -294,7 +295,7 @@ def make_networks(
     critic_layer_sizes: Sequence[int],
     policy_recurrent_layer_sizes: Sequence[int],
     recurrent_architecture_fn: Any,
-    observation_network: Callable = utils.batch_concat,
+    policy_layers_after_recurrent: Sequence[int],
 ) -> PPONetworks:
     """Function for creating PPO networks to be used.
 
@@ -308,7 +309,8 @@ def make_networks(
         critic_layer_sizes: size of each layer of the critic network
         policy_recurrent_layer_sizes: Optionally add recurrent layers to the policy
         recurrent_architecture_fn: Architecture to use for the recurrent units
-        observation_network: Network used for feature extraction layers
+        sizes of hidden layers for the policy network after the recurrent layers.
+        This is only used if an recurrent architecture is used.
 
     Returns:
         make_discrete_networks: function to create a discrete network
@@ -323,7 +325,7 @@ def make_networks(
             key=key,
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
-            observation_network=observation_network,
+            policy_layers_after_recurrent=policy_layers_after_recurrent,
             policy_recurrent_layer_sizes=policy_recurrent_layer_sizes,
             recurrent_architecture_fn=recurrent_architecture_fn,
         )
@@ -349,7 +351,7 @@ def make_default_networks(
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
     policy_recurrent_layer_sizes: Sequence[int] = (),
     recurrent_architecture_fn: Any = hk.GRU,
-    observation_network: Callable = utils.batch_concat,
+    policy_layers_after_recurrent: Sequence[int] = (),
 ) -> Dict[str, Any]:
     """Create default PPO networks
 
@@ -363,10 +365,8 @@ def make_default_networks(
         critic_layer_sizes: critic network layers
         policy_recurrent_layer_sizes: Optionally add recurrent layers to the policy
         recurrent_architecture_fn: Architecture to use for the recurrent units
-        observation_network: network for processing environment observations
-                             defaults to flattening observations but could be
-                             a CNN or similar observation processing network
-
+        sizes of hidden layers for the policy network after the recurrent layers.
+        This is only used if an recurrent architecture is used.
     Returns:
         networks: networks created to given spec
     """
@@ -385,9 +385,9 @@ def make_default_networks(
             key=rng_key,
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
-            observation_network=observation_network,
             policy_recurrent_layer_sizes=policy_recurrent_layer_sizes,
             recurrent_architecture_fn=recurrent_architecture_fn,
+            policy_layers_after_recurrent=policy_layers_after_recurrent,
         )
 
     # No longer returning a dictionary since this is handled in PPONetworks above

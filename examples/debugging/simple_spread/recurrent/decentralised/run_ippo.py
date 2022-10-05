@@ -58,9 +58,10 @@ def main(_: Any) -> None:
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return ippo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(256, 256, 256),
-            critic_layer_sizes=(512, 512, 256),
-            policy_recurrent_layer_sizes=(256,),
+            policy_layer_sizes=(64, 64),
+            critic_layer_sizes=(64, 64, 64),
+            policy_recurrent_layer_sizes=(64,),
+            policy_layers_after_recurrent=(64,),
             *args,
             **kwargs,
         )
