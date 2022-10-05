@@ -16,7 +16,7 @@
 """Jax system executor."""
 
 from types import SimpleNamespace
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import dm_env
 from acme.types import NestedArray

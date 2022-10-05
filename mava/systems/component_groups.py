@@ -1,4 +1,4 @@
-from mava.components.jax import training
+from mava.components import training
 
 training.MAPGWithTrustRegionClippingValueHuberLoss
 # IPPO Huber loss.
