@@ -209,7 +209,9 @@ def make_discrete_networks(
         policy_network = hk.Sequential(
             [
                 observation_network,
-                hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
+                hk.nets.MLP(
+                    policy_layer_sizes, activation=jax.nn.relu, activate_final=True
+                ),
                 networks_lib.CategoricalHead(
                     num_values=num_actions, dtype=environment_spec.actions.dtype
                 ),
@@ -221,7 +223,9 @@ def make_discrete_networks(
         critic_network = hk.Sequential(
             [
                 observation_network,
-                hk.nets.MLP(critic_layer_sizes, activation=jax.nn.relu),
+                hk.nets.MLP(
+                    critic_layer_sizes, activation=jax.nn.relu, activate_final=True
+                ),
                 ValueHead(),
             ]
         )
