@@ -17,7 +17,7 @@
 
 import functools
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Dict, Tuple
 
 import numpy as np
 import pytest
@@ -89,9 +89,12 @@ def test_parallel_executor_environment_loop() -> ParallelExecutorEnvironmentLoop
 def test_builder() -> SystemBuilder:
     """Pytest fixture for system builder."""
 
-    def environment_factory(evaluation: bool) -> str:
+    def environment_factory(evaluation: bool) -> Tuple[str, Dict[str, str]]:
         """Function to construct the environment"""
-        return "environment_eval_" + ("true" if evaluation else "false")
+        return "environment_eval_" + ("true" if evaluation else "false"), {
+            "environment_name": "env",
+            "task_name": "task",
+        }
 
     global_config = SimpleNamespace(environment_factory=environment_factory)
     system_builder = Builder(components=[], global_config=global_config)
@@ -108,7 +111,7 @@ class TestEnvironmentSpec:
     def test_init(self, test_environment_spec: EnvironmentSpec) -> None:
         """Test that class loads config properly"""
 
-        environment = test_environment_spec.config.environment_factory()
+        environment, _ = test_environment_spec.config.environment_factory()
         assert environment.environment.num_agents == 10
 
     def test_on_building_init_start(
@@ -120,7 +123,7 @@ class TestEnvironmentSpec:
         # Assert for type and extra spec
         environment_spec = test_builder.store.ma_environment_spec
         assert isinstance(environment_spec, specs.MAEnvironmentSpec)
-        environment = test_environment_spec.config.environment_factory()
+        environment, _ = test_environment_spec.config.environment_factory()
 
         # Assert correct spec created
         expected_spec = MAEnvironmentSpec(environment)

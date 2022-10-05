@@ -55,6 +55,7 @@ def test_builder() -> SystemBuilder:
     system_builder = Builder(components=[])
     system_builder.store.executor_id = "executor_1"
     system_builder.store.trainer_id = "trainer_2"
+    system_builder.store.global_config.evaluation_interval = None
     return system_builder
 
 
