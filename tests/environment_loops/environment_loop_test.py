@@ -18,7 +18,7 @@
 import pytest
 
 from tests.conftest import EnvSpec, Helpers, MockedEnvironments
-from tests.mocks import MockedExecutor, MockedSystem
+from tests.mocks import MockedSystem
 
 
 @pytest.mark.parametrize(
@@ -37,8 +37,7 @@ from tests.mocks import MockedExecutor, MockedSystem
     ],
 )
 class TestEnvironmentLoop:
-    """Test that we can load a env loop and that it contains
-    an env, executor, counter, logger and should_update."""
+    """Test that we can load a env loop"""
 
     def test_initialize_env_loop(self, env_spec: EnvSpec, helpers: Helpers) -> None:
         """Test initialization of the environmnet loop"""
@@ -75,19 +74,3 @@ class TestEnvironmentLoop:
         result = env_loop.run_episode()
 
         helpers.assert_valid_episode(result)
-
-    def test_valid_multiple_episodes(self, env_spec: EnvSpec, helpers: Helpers) -> None:
-        """Test that we can run multiple episodes using train and eval loop, and no
-        exception should be thrown"""
-        wrapped_env, specs = helpers.get_wrapped_env(env_spec)
-        env_loop_func = helpers.get_env_loop(env_spec)
-
-        train_loop = env_loop_func(wrapped_env, MockedSystem(specs), label="train_loop")
-        eval_loop = env_loop_func(wrapped_env, MockedExecutor(specs), label="eval_loop")
-
-        num_episodes = 10
-        num_episodes_per_eval = 2
-
-        for _ in range(num_episodes // num_episodes_per_eval):
-            train_loop.run(num_episodes=num_episodes_per_eval)
-            eval_loop.run(num_episodes=1)
