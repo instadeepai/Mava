@@ -187,7 +187,7 @@ class ValueHead(hk.Module):
 
 def make_discrete_networks(
     environment_spec: specs.EnvironmentSpec,
-    key: networks_lib.PRNGKey,
+    base_key: networks_lib.PRNGKey,
     policy_layer_sizes: Sequence[int],
     critic_layer_sizes: Sequence[int],
     policy_recurrent_layer_sizes: Sequence[int],
@@ -262,7 +262,7 @@ def make_discrete_networks(
     dummy_obs = utils.zeros_like(environment_spec.observations.observation)
     dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
 
-    network_key, key = jax.random.split(key)
+    base_key, network_key = jax.random.split(base_key)
 
     if len(policy_recurrent_layer_sizes) > 0:
         policy_state = initial_state_fn.apply(None)
@@ -272,7 +272,7 @@ def make_discrete_networks(
         policy_state = None
         policy_params = policy_fn.init(network_key, dummy_obs)  # type: ignore
 
-    network_key, key = jax.random.split(key)
+    base_key, network_key = jax.random.split(base_key)
     critic_params = critic_fn.init(network_key, dummy_obs)  # type: ignore
 
     # Create PPONetworks to add functionality required by the agent.

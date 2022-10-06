@@ -93,7 +93,7 @@ class DefaultNetworks(Networks):
         builder.store.base_key = jax.random.PRNGKey(self.config.seed)
 
         # Build network function here
-        network_key, builder.store.base_key = jax.random.split(builder.store.base_key)
+        builder.store.base_key, network_key = jax.random.split(builder.store.base_key)
         builder.store.network_factory = lambda: self.config.network_factory(
             environment_spec=builder.store.ma_environment_spec,
             agent_net_keys=builder.store.agent_net_keys,

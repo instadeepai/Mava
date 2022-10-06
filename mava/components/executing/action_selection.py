@@ -122,7 +122,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             observation: NestedArray,
             current_params: NestedArray,
             network: Any,
-            key: networks_lib.PRNGKey,
+            base_key: networks_lib.PRNGKey,
         ) -> Tuple[NestedArray, NestedArray, networks_lib.PRNGKey]:
             """Action selection across a single agent.
 
@@ -136,15 +136,15 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
                 action info, policy info and new key.
             """
             observation_data = utils.add_batch_dim(observation.observation)
-            # We use the subkey immediately and keep the new key for future splits.
-            new_key, sub_key = jax.random.split(key)
+            # We use the action_key immediately and keep the new key for future splits.
+            base_key, action_key = jax.random.split(base_key)
             action_info, policy_info = network.get_action(
                 observations=observation_data,
                 params=current_params,
-                key=sub_key,
+                key=action_key,
                 mask=utils.add_batch_dim(observation.legal_actions),
             )
-            return action_info, policy_info, new_key
+            return action_info, policy_info, base_key
 
         def select_actions(
             observations: Dict[str, NestedArray],
@@ -254,15 +254,15 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             """
             observation_data = utils.add_batch_dim(observation.observation)
             # We use the subkey immediately and keep the new key for future splits.
-            new_key, sub_key = jax.random.split(key)
+            base_key, action_key = jax.random.split(key)
             action_info, policy_info, policy_state = network.get_action(
                 observations=observation_data,
                 params=current_params,
                 policy_state=policy_state,
-                key=sub_key,
+                key=action_key,
                 mask=utils.add_batch_dim(observation.legal_actions),
             )
-            return action_info, policy_info, policy_state, new_key
+            return action_info, policy_info, policy_state, base_key
 
         def select_actions(
             observations: Dict[str, NestedArray],

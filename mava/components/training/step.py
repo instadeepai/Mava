@@ -404,7 +404,7 @@ class MAPGWithTrustRegionStep(Step):
             policy_opt_states = trainer.store.policy_opt_states
             critic_opt_states = trainer.store.critic_opt_states
 
-            random_key, _ = jax.random.split(trainer.store.base_key)
+            _, random_key = jax.random.split(trainer.store.base_key)
 
             states = TrainingState(
                 policy_params=policy_params,
