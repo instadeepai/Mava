@@ -260,7 +260,7 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
                 observations=observation_data,
                 params=current_params,
                 policy_state=policy_state,
-                key=action_key,
+                base_key=action_key,
                 mask=utils.add_batch_dim(observation.legal_actions),
             )
             return action_info, policy_info, policy_state, base_key

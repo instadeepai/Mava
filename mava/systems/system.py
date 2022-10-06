@@ -63,14 +63,6 @@ class System(BaseSystem):
                 input = {component.name(): config_class()}
                 self.config.add(**input)
 
-    @staticmethod
-    def design() -> Tuple[DesignSpec, Dict]:
-        """System design specifying the list of components to use.
-
-        Returns:
-            Tuple[system callback components, system config].
-        """
-
     def update(self, components: Union[Any, List[Any]]) -> None:
         """Update components that has already been added to the system.
 
