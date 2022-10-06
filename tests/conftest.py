@@ -37,26 +37,15 @@ except ModuleNotFoundError:
     pass
 
 from mava import specs as mava_specs
-from mava.environment_loop import ParallelEnvironmentLoop, SequentialEnvironmentLoop
+from mava.environment_loop import ParallelEnvironmentLoop
 from mava.types import Observation, Reward
-
-try:
-    from mava.utils.environments.open_spiel_utils import load_open_spiel_env
-    from mava.wrappers.open_spiel import OpenSpielSequentialWrapper
-except ImportError:
-    pass
 from mava.utils.wrapper_utils import convert_np_type
 from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
     PettingZooParallelEnvWrapper,
 )
-from tests.enums import EnvSource, EnvSpec, EnvType, MockedEnvironments
-from tests.mocks import (
-    ParallelMAContinuousEnvironment,
-    ParallelMADiscreteEnvironment,
-    SequentialMAContinuousEnvironment,
-    SequentialMADiscreteEnvironment,
-)
+from tests.enums import EnvSource, EnvSpec, MockedEnvironments
+from tests.mocks import ParallelMAContinuousEnvironment, ParallelMADiscreteEnvironment
 
 # flatland environment config
 flatland_env_config = {
@@ -112,14 +101,10 @@ class Helpers:
         env = None
         if env_spec.env_source == EnvSource.PettingZoo:
             mod = importlib.import_module(env_spec.env_name)
-            if env_spec.env_type == EnvType.Parallel:
-                env = mod.parallel_env()  # type:ignore
-            elif env_spec.env_type == EnvType.Sequential:
-                env = mod.env()  # type:ignore
+
+            env = mod.parallel_env()  # type:ignore
         elif env_spec.env_source == EnvSource.Flatland:
             env = flatland_utils.make_environment(**flatland_env_config)  # type:ignore
-        elif env_spec.env_source == EnvSource.OpenSpiel:
-            env = load_open_spiel_env(env_spec.env_name)
         else:
             raise Exception("Env_spec is not valid.")
         env.reset()  # type:ignore
@@ -142,14 +127,9 @@ class Helpers:
         """
         wrapper: dm_env.Environment = None
         if env_spec.env_source == EnvSource.PettingZoo:
-            if env_spec.env_type == EnvType.Parallel:
-                wrapper = PettingZooParallelEnvWrapper
-            elif env_spec.env_type == EnvType.Sequential:
-                wrapper = PettingZooAECEnvWrapper
+            wrapper = PettingZooParallelEnvWrapper
         elif env_spec.env_source == EnvSource.Flatland:
             wrapper = FlatlandEnvWrapper
-        elif env_spec.env_source == EnvSource.OpenSpiel:
-            wrapper = OpenSpielSequentialWrapper
         else:
             raise Exception("Env_spec is not valid.")
         return wrapper
@@ -169,24 +149,12 @@ class Helpers:
         Returns:
             env loop.
         """
-        env_loop = None
-        if env_spec.env_type == EnvType.Parallel:
-            env_loop = ParallelEnvironmentLoop
-        elif env_spec.env_type == EnvType.Sequential:
-            env_loop = SequentialEnvironmentLoop
-        else:
-            raise Exception("Env_spec is not valid.")
-        return env_loop
+        return ParallelEnvironmentLoop
 
     @staticmethod
     def get_mocked_env(
         env_spec: EnvSpec,
-    ) -> Union[
-        ParallelMADiscreteEnvironment,
-        SequentialMADiscreteEnvironment,
-        ParallelMAContinuousEnvironment,
-        SequentialMAContinuousEnvironment,
-    ]:
+    ) -> Union[ParallelMADiscreteEnvironment, ParallelMAContinuousEnvironment,]:
         """Function that retrieves a mocked env.
 
         Args:
@@ -201,37 +169,20 @@ class Helpers:
         env_name = env_spec.env_name
 
         if env_name is MockedEnvironments.Mocked_Dicrete:
-            if env_spec.env_type == EnvType.Parallel:
-                env = ParallelMADiscreteEnvironment(
-                    num_actions=18,
-                    num_observations=2,
-                    obs_shape=(84, 84, 4),
-                    obs_dtype=np.float32,
-                    episode_length=10,
-                )
-            elif env_spec.env_type == EnvType.Sequential:
-                env = SequentialMADiscreteEnvironment(
-                    num_actions=18,
-                    num_observations=2,
-                    obs_shape=(84, 84, 4),
-                    obs_dtype=np.float32,
-                    episode_length=10,
-                )
+            env = ParallelMADiscreteEnvironment(
+                num_actions=18,
+                num_observations=2,
+                obs_shape=(84, 84, 4),
+                obs_dtype=np.float32,
+                episode_length=10,
+            )
         elif env_name is MockedEnvironments.Mocked_Continous:
-            if env_spec.env_type == EnvType.Parallel:
-                env = ParallelMAContinuousEnvironment(
-                    action_dim=2,
-                    observation_dim=2,
-                    bounded=True,
-                    episode_length=10,
-                )
-            elif env_spec.env_type == EnvType.Sequential:
-                env = SequentialMAContinuousEnvironment(
-                    action_dim=2,
-                    observation_dim=2,
-                    bounded=True,
-                    episode_length=10,
-                )
+            env = ParallelMAContinuousEnvironment(
+                action_dim=2,
+                observation_dim=2,
+                bounded=True,
+                episode_length=10,
+            )
 
         if env is None:
             raise Exception("Env_spec is not valid.")
@@ -353,42 +304,26 @@ class Helpers:
             dm_env_timestep : timestep.
             env_spec : env spec.
         """
-        if env_spec.env_type == EnvType.Parallel:
-            rewards_spec = wrapped_env.reward_spec()
-            expected_rewards = {
-                agent: convert_np_type(rewards_spec[agent].dtype, 0)
-                for agent in wrapped_env.agents
-            }
+        rewards_spec = wrapped_env.reward_spec()
+        expected_rewards = {
+            agent: convert_np_type(rewards_spec[agent].dtype, 0)
+            for agent in wrapped_env.agents
+        }
 
-            discount_spec = wrapped_env.discount_spec()
-            expected_discounts = {
-                agent: convert_np_type(rewards_spec[agent].dtype, 1)
-                for agent in wrapped_env.agents
-            }
+        discount_spec = wrapped_env.discount_spec()
+        expected_discounts = {
+            agent: convert_np_type(rewards_spec[agent].dtype, 1)
+            for agent in wrapped_env.agents
+        }
 
-            Helpers.compare_dicts(
-                dm_env_timestep.reward,
-                expected_rewards,
-            ), "Failed to reset reward."
-            Helpers.compare_dicts(
-                dm_env_timestep.discount,
-                expected_discounts,
-            ), "Failed to reset discount."
-
-        elif env_spec.env_type == EnvType.Sequential:
-            for agent in wrapped_env.agents:
-                rewards_spec = wrapped_env.reward_spec()
-                expected_reward = convert_np_type(rewards_spec[agent].dtype, 0)
-
-                discount_spec = wrapped_env.discount_spec()
-                expected_discount = convert_np_type(discount_spec[agent].dtype, 1)
-
-                assert dm_env_timestep.reward == expected_reward and type(
-                    dm_env_timestep.reward
-                ) == type(expected_reward), "Failed to reset reward."
-                assert dm_env_timestep.discount == expected_discount and type(
-                    dm_env_timestep.discount
-                ) == type(expected_discount), "Failed to reset discount."
+        Helpers.compare_dicts(
+            dm_env_timestep.reward,
+            expected_rewards,
+        ), "Failed to reset reward."
+        Helpers.compare_dicts(
+            dm_env_timestep.discount,
+            expected_discounts,
+        ), "Failed to reset discount."
 
     @staticmethod
     @typing.no_type_check
@@ -409,18 +344,10 @@ class Helpers:
             min : min for normalization.
             max : max for normalization.
         """
-        if env_spec.env_type == EnvType.Parallel:
-            for agent in agents:
-                assert (
-                    observations[agent].observation.min() >= min
-                    and observations[agent].observation.max() <= max
-                ), "Failed to normalize observations."
-
-        elif env_spec.env_type == EnvType.Sequential:
-            assert (
-                observations.observation.min() >= min
-                and observations.observation.max() <= max
-            ), "Failed to normalize observations."
+        assert (
+            observations.observation.min() >= min
+            and observations.observation.max() <= max
+        ), "Failed to normalize observations."
 
     @staticmethod
     @typing.no_type_check
@@ -437,14 +364,10 @@ class Helpers:
             min : min for normalization.
             max : max for normalization.
         """
-        if env_spec.env_type == EnvType.Parallel:
-            for agent in agents:
-                assert (
-                    rewards[agent] >= min and rewards[agent] <= max
-                ), "Failed to normalize reward."
-
-        elif env_spec.env_type == EnvType.Sequential:
-            assert rewards >= min and rewards <= max, "Failed to normalize reward."
+        for agent in agents:
+            assert (
+                rewards[agent] >= min and rewards[agent] <= max
+            ), "Failed to normalize reward."
 
     @staticmethod
     def verify_observations_are_standardized(
@@ -457,21 +380,13 @@ class Helpers:
             agents : env agents.
             env_spec : env spec.
         """
-        if env_spec.env_type == EnvType.Parallel:
-            for agent in agents:
-                npt.assert_almost_equal(
-                    observations[agent].observation.mean(), 0, decimal=2  # type: ignore
-                )
-                npt.assert_almost_equal(
-                    observations[agent].observation.std(), 1, decimal=2  # type: ignore
-                )
 
-        elif env_spec.env_type == EnvType.Sequential:
+        for agent in agents:
             npt.assert_almost_equal(
-                observations.observation.mean(), 0, decimal=2  # type: ignore
+                observations[agent].observation.mean(), 0, decimal=2  # type: ignore
             )
             npt.assert_almost_equal(
-                observations.observation.std(), 1, decimal=2  # type: ignore
+                observations[agent].observation.std(), 1, decimal=2  # type: ignore
             )
 
     @staticmethod

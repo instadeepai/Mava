@@ -41,11 +41,8 @@ from mava.environment_loop import ParallelEnvironmentLoop
 from mava.specs import DesignSpec, MAEnvironmentSpec
 from mava.systems.system import System
 from mava.utils.builder_utils import convert_specs
-from tests.enums import EnvType, MockedEnvironments
-from tests.mocks import (
-    ParallelMAContinuousEnvironment,
-    ParallelMADiscreteEnvironment,
-)
+from tests.enums import MockedEnvironments
+from tests.mocks import ParallelMAContinuousEnvironment, ParallelMADiscreteEnvironment
 
 # Mock components to feed to the builder
 
@@ -130,14 +127,12 @@ def make_fake_env_specs() -> MAEnvironmentSpec:
 
 def make_fake_env(
     env_name: MockedEnvironments = MockedEnvironments.Mocked_Dicrete,
-    env_type: EnvType = EnvType.Parallel,
     evaluation: bool = False,
 ) -> Any:
     """Func that creates a fake env.
 
     Args:
         env_name : env name.
-        env_type : type of env.
         evaluation: whether env is used for eval or not.
             Not sure we should use this in spec.
 
@@ -172,13 +167,11 @@ def make_fake_env(
 
 def make_fake_environment_factory(
     env_name: MockedEnvironments = MockedEnvironments.Mocked_Dicrete,
-    env_type: EnvType = EnvType.Parallel,
 ) -> Any:
     """Returns a mock env factory.
 
     Args:
         env_name : env name.
-        env_type : env type.
 
     Returns:
         a mocked env factory.
@@ -186,7 +179,6 @@ def make_fake_environment_factory(
     return functools.partial(
         make_fake_env,
         env_name=env_name,
-        env_type=env_type,
     )
 
 

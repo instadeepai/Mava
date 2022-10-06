@@ -16,7 +16,7 @@
 """A simple multi-agent-system-environment training loop."""
 
 import time
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Tuple, Union
 
 import acme
 import dm_env

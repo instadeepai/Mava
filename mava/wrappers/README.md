@@ -11,7 +11,6 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 * [SMAC][smac]
 * [Flatland][flatland]
 * [2D RoboCup][robocup]
-* [OpenSpiel][openspiel]
 * [Melting pot][meltingpot]
 
 |<img  src="../../docs/images/multiw_animation.gif" width="300px"/> | <img src="../../docs/images/sc2_animation.gif" width="200px"/>  | <img src="../../docs/images/flatland.gif" width="200px" />  |
@@ -30,7 +29,6 @@ Our wrapper for the PettingZoo environment provides a good starting example on h
 
 [pettingzoo]: https://github.com/PettingZoo-Team/PettingZoo
 [smac]: https://github.com/oxwhirl/smac
-[openspiel]: https://github.com/deepmind/open_spiel
 [meltingpot]: https://github.com/deepmind/meltingpot
 [flatland]: https://gitlab.aicrowd.com/flatland/flatland
 [robocup]: https://github.com/rcsoccersim
