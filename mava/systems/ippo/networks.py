@@ -79,7 +79,7 @@ class PPONetworks:
         def forward_fn(
             policy_params: Dict[str, jnp.ndarray],
             observations: networks_lib.Observation,
-            key: networks_lib.PRNGKey,
+            rng_key: networks_lib.PRNGKey,
             mask: chex.Array = None,
             policy_state: Tuple[jnp.ndarray] = None,
         ) -> Tuple[Any, Any, Any]:
@@ -111,7 +111,7 @@ class PPONetworks:
             if mask is not None:
                 distribution = action_mask_categorical_policies(distribution, mask)
 
-            actions = jnp.squeeze(distribution.sample(seed=key))
+            actions = jnp.squeeze(distribution.sample(seed=rng_key))
             log_prob = jnp.squeeze(distribution.log_prob(actions))
 
             return actions, log_prob, policy_state
@@ -122,7 +122,7 @@ class PPONetworks:
         self,
         observations: networks_lib.Observation,
         params: Any,
-        key: networks_lib.PRNGKey,
+        base_key: networks_lib.PRNGKey,
         mask: chex.Array = None,
         policy_state: Any = None,
     ) -> Tuple[jnp.ndarray, Dict]:
@@ -131,7 +131,7 @@ class PPONetworks:
         actions, log_prob, policy_state = self.forward_fn(
             policy_params=params["policy_network"],
             observations=observations,
-            key=key,
+            rng_key=base_key,
             mask=mask,
             policy_state=policy_state,
         )
@@ -233,7 +233,7 @@ def make_discrete_networks(
                 policy_network.append(recurrent_architecture_fn(size))
 
             # Add optional feedforward layers after the recurrent layers
-            hk.nets.MLP(policy_layers_after_recurrent, activation=jax.nn.relu),
+            hk.nets.MLP(policy_layers_after_recurrent, activation=jax.nn.relu, activate_final=True),
 
         # Add a categorical value head.
         policy_network.append(
@@ -277,7 +277,7 @@ def make_discrete_networks(
         """
         critic_network = hk.Sequential(
             [
-                hk.nets.MLP(critic_layer_sizes, activation=jax.nn.relu),
+                hk.nets.MLP(critic_layer_sizes, activation=jax.nn.relu, activate_final=True),
                 ValueHead(),
             ]
         )
