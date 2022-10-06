@@ -35,7 +35,6 @@ DiscreteArray = dm_specs.DiscreteArray
 EntropyFn = Callable[[Any], jnp.ndarray]
 
 
-# TODO JAX Networks should be stateless.
 @dataclasses.dataclass
 class PPONetworks:
     """Separate policy and critic networks for IPPO."""
@@ -115,7 +114,7 @@ class PPONetworks:
             actions = jnp.squeeze(distribution.sample(seed=key))
             log_prob = jnp.squeeze(distribution.log_prob(actions))
 
-            return actions, log_prob, policy_state  # type: ignore
+            return actions, log_prob, policy_state
 
         self.forward_fn = forward_fn
 
