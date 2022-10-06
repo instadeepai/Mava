@@ -1,23 +1,23 @@
 # Training components
 
-> 🚧 **Note:** This only applies to the callback redesign of Mava.
+
 
 Components related to the trainer process of a system.
 
 ## Advantage estimation components
-::: mava.components.jax.training.advantage_estimation
+::: mava.components.training.advantage_estimation
 
 ## Base training components
-::: mava.components.jax.training.base
+::: mava.components.training.base
 
 ## Loss components
-::: mava.components.jax.training.losses
+::: mava.components.training.losses
 
 ## System network updating components
-::: mava.components.jax.training.model_updating
+::: mava.components.training.model_updating
 
 ## Trainer step components
-::: mava.components.jax.training.step
+::: mava.components.training.step
 
 ## Trainer initialization components
-::: mava.components.jax.training.trainer
+::: mava.components.training.trainer

@@ -16,12 +16,14 @@
 """Utilities for logging to the terminal."""
 import time
 import warnings
-from typing import Dict, List
+from typing import Dict
 
 import numpy as np
 import tensorflow as tf
 from acme.utils.loggers import base
 from tensorflow import Tensor
+
+from mava.utils.config_utils import flatten_dict
 
 
 def format_key(key: str) -> str:
@@ -36,12 +38,14 @@ def format_key_histograms(key: str) -> str:
 
 class TFSummaryLogger(base.Logger):
     """Logs to a tf.summary created in a given logdir.
+
     If multiple TFSummaryLogger are created with the same logdir, results will be
     categorized by labels.
     """
 
     def __init__(self, logdir: str, label: str = "Logs"):
         """Initializes the logger.
+
         Args:
             logdir: directory to which we should log files.
             label: label string to use when logging. Default to 'Logs'.
@@ -53,7 +57,11 @@ class TFSummaryLogger(base.Logger):
         self._summary = tf.summary.create_file_writer(self._logdir)
 
     def write(self, values: base.LoggingData) -> None:
+        """Write logging data.
 
+        Args:
+            values : values to write.
+        """
         with self._summary.as_default():
             try:
                 if isinstance(values, dict):
@@ -66,10 +74,8 @@ class TFSummaryLogger(base.Logger):
                         elif hasattr(value, "shape"):
                             self.histogram_summary(key, value)
                         elif isinstance(value, dict):
-                            flatten_dict = self._flatten_dict(
-                                parent_key=key, dict_info=value
-                            )
-                            self.write(flatten_dict)
+                            flattened_dict = flatten_dict(parent_key=key, d=value)
+                            self.write(flattened_dict)
                         elif isinstance(value, tuple) or isinstance(value, list):
                             for index, elements in enumerate(value):
                                 self.write({f"{key}_info_{index}": elements})
@@ -92,36 +98,36 @@ class TFSummaryLogger(base.Logger):
             self._iter += 1
 
     def scalar_summary(self, key: str, value: float) -> None:
+        """Log scalar.
+
+        Args:
+            key : key.
+            value : value.
+        """
         tf.summary.scalar(f"{self._label}/{format_key(key)}", value, step=self._iter)
 
     def dict_summary(self, key: str, value: Dict) -> None:
-        dict_info = self._flatten_dict(parent_key=key, dict_info=value)
+        """Log dict.
+
+        Args:
+            key : key.
+            value : value.
+        """
+        dict_info = flatten_dict(parent_key=key, d=value)
         for (k, v) in dict_info.items():
             self.scalar_summary(k, v)
 
     def histogram_summary(self, key: str, value: Tensor) -> None:
+        """Log histogram.
+
+        Args:
+            key : key.
+            value : value.
+        """
         tf.summary.histogram(
             f"{self._label}/{format_key_histograms(key)}", value, step=self._iter
         )
 
-    # Flatten dict, adapted from
-    # https://stackoverflow.com/questions/6027558/flatten-nested-dictionaries-compressing-keys
-    # Converts {'agent_0': {'critic_loss': 0.1, 'policy_loss': 0.2},...}
-    #   to  {'agent_0_critic_loss':0.1,'agent_0_policy_loss':0.1 ,...}
-    def _flatten_dict(
-        self, parent_key: str, dict_info: Dict, sep: str = "_"
-    ) -> Dict[str, float]:
-        items: List = []
-        for k, v in dict_info.items():
-            k = str(k)
-            new_key = parent_key + sep + k if parent_key else k
-            if isinstance(v, dict):
-                items.extend(
-                    self._flatten_dict(parent_key=new_key, dict_info=v, sep=sep).items()
-                )
-            else:
-                items.append((new_key, v))
-        return dict(items)
-
     def close(self) -> None:
+        """Close logger."""
         self._summary.close()

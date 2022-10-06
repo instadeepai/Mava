@@ -13,13 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import copy
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict
 
-from mava.components.tf.modules.exploration.exploration_scheduling import (
-    BaseExplorationScheduler,
-    BaseExplorationTimestepScheduler,
-    ConstantScheduler,
-)
 from mava.utils.sort_utils import sort_str_num
 
 
@@ -63,42 +58,3 @@ def convert_specs(
         for key in spec.keys():
             converted_spec[key] = convert_specs(agent_net_keys, spec[key], num_networks)
     return converted_spec
-
-
-def initialize_epsilon_schedulers(
-    exploration_schedules: Dict[
-        str,
-        Union[
-            BaseExplorationScheduler,
-            BaseExplorationTimestepScheduler,
-            ConstantScheduler,
-        ],
-    ],
-    action_selectors: Dict[str, Callable],
-    agent_net_keys: Dict[str, str],
-    seed: Optional[int] = None,
-) -> Dict:
-    """Function that initializes action selectors.
-
-    Args:
-        exploration_schedules : epsilon decay schedule per agent.
-        action_selectors : dict containing the action selector functions
-            (e.g. LinearExplorationTimestepScheduler) per network.
-        agent_net_keys: specifies what network each agent uses.
-        evaluator: boolean indicator if the executor is used for
-            for evaluation only.
-        seed: seed for reproducible sampling.
-
-    Returns:
-        dict with initialized action selectors with schedules.
-    """
-    # Pass scheduler and initialize action selectors
-    action_selectors_with_scheduler: Dict = dict.fromkeys(exploration_schedules, [])
-    for agent in exploration_schedules.keys():
-        schedule = exploration_schedules[agent]
-        network_for_agent = agent_net_keys[agent]
-        action_selectors_with_scheduler[agent] = action_selectors[network_for_agent](
-            schedule, seed=seed
-        )
-
-    return action_selectors_with_scheduler
