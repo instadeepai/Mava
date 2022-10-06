@@ -187,6 +187,7 @@ def make_discrete_networks(
     policy_layer_sizes: Sequence[int],
     critic_layer_sizes: Sequence[int],
     observation_network: Callable = utils.batch_concat,
+    activate_mlp_final: bool = False,
     # default behaviour is to flatten observations
 ) -> PPONetworks:
     """Create PPO network for environments with discrete action spaces.
@@ -210,7 +211,9 @@ def make_discrete_networks(
             [
                 observation_network,
                 hk.nets.MLP(
-                    policy_layer_sizes, activation=jax.nn.relu, activate_final=True
+                    policy_layer_sizes,
+                    activation=jax.nn.relu,
+                    activate_final=activate_mlp_final,
                 ),
                 networks_lib.CategoricalHead(
                     num_values=num_actions, dtype=environment_spec.actions.dtype
@@ -224,7 +227,9 @@ def make_discrete_networks(
             [
                 observation_network,
                 hk.nets.MLP(
-                    critic_layer_sizes, activation=jax.nn.relu, activate_final=True
+                    critic_layer_sizes,
+                    activation=jax.nn.relu,
+                    activate_final=activate_mlp_final,
                 ),
                 ValueHead(),
             ]
@@ -263,6 +268,7 @@ def make_networks(
     ),
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
     observation_network: Callable = utils.batch_concat,
+    activate_mlp_final: bool = False,
 ) -> PPONetworks:
     """Function for creating PPO networks to be used.
 
@@ -291,6 +297,7 @@ def make_networks(
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
             observation_network=observation_network,
+            activate_mlp_final=activate_mlp_final,
         )
 
     else:
@@ -313,6 +320,7 @@ def make_default_networks(
     ),
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
     observation_network: Callable = utils.batch_concat,
+    activate_mlp_final: bool = False,
 ) -> Dict[str, Any]:
     """Create default PPO networks
 
@@ -327,6 +335,9 @@ def make_default_networks(
         observation_network: network for processing environment observations
                              defaults to flattening observations but could be
                              a CNN or similar observation processing network
+        activate_mlp_final: whether to apply an activation to the final
+                            layer of the MLP that makes up the middle
+                            layers of the policy and critic networks
 
     Returns:
         networks: networks created to given spec
@@ -347,6 +358,7 @@ def make_default_networks(
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
             observation_network=observation_network,
+            activate_mlp_final=activate_mlp_final,
         )
 
     # No longer returning a dictionary since this is handled in PPONetworks above
