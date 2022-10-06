@@ -45,8 +45,6 @@ from tests.enums import EnvType, MockedEnvironments
 from tests.mocks import (
     ParallelMAContinuousEnvironment,
     ParallelMADiscreteEnvironment,
-    SequentialMAContinuousEnvironment,
-    SequentialMADiscreteEnvironment,
 )
 
 # Mock components to feed to the builder
@@ -151,37 +149,20 @@ def make_fake_env(
     """
     del evaluation
     if env_name is MockedEnvironments.Mocked_Dicrete:
-        if env_type == EnvType.Parallel:
-            env = ParallelMADiscreteEnvironment(
-                num_actions=18,
-                num_observations=2,
-                obs_shape=(84, 84, 4),
-                obs_dtype=np.float32,
-                episode_length=10,
-            )
-        elif env_type == EnvType.Sequential:
-            env = SequentialMADiscreteEnvironment(
-                num_actions=18,
-                num_observations=2,
-                obs_shape=(84, 84, 4),
-                obs_dtype=np.float32,
-                episode_length=10,
-            )
+        env = ParallelMADiscreteEnvironment(
+            num_actions=18,
+            num_observations=2,
+            obs_shape=(84, 84, 4),
+            obs_dtype=np.float32,
+            episode_length=10,
+        )
     elif env_name is MockedEnvironments.Mocked_Continous:
-        if env_type == EnvType.Parallel:
-            env = ParallelMAContinuousEnvironment(
-                action_dim=2,
-                observation_dim=2,
-                bounded=True,
-                episode_length=10,
-            )
-        elif env_type == EnvType.Sequential:
-            env = SequentialMAContinuousEnvironment(
-                action_dim=2,
-                observation_dim=2,
-                bounded=True,
-                episode_length=10,
-            )
+        env = ParallelMAContinuousEnvironment(
+            action_dim=2,
+            observation_dim=2,
+            bounded=True,
+            episode_length=10,
+        )
 
     if env is None:
         raise Exception("Env_spec is not valid.")

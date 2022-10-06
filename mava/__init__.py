@@ -13,7 +13,7 @@ from mava._metadata import __version__
 from mava.core import Executor, Trainer
 
 # Expose the environment loop.
-from mava.environment_loop import ParallelEnvironmentLoop, SequentialEnvironmentLoop
+from mava.environment_loop import ParallelEnvironmentLoop
 from mava.specs import MAEnvironmentSpec
 
 # Mava loves you too! ;)
