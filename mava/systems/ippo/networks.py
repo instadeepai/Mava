@@ -290,7 +290,7 @@ def make_discrete_networks(
 
 def make_networks(
     spec: specs.EnvironmentSpec,
-    key: networks_lib.PRNGKey,
+    base_key: networks_lib.PRNGKey,
     policy_layer_sizes: Sequence[int],
     critic_layer_sizes: Sequence[int],
     policy_recurrent_layer_sizes: Sequence[int],
@@ -304,7 +304,7 @@ def make_networks(
 
     Args:
         spec: specifications of training environment
-        key: pseudo-random value used to initialise distributions
+        base_key: pseudo-random value used to initialise distributions
         policy_layer_sizes: size of each layer of the policy network
         critic_layer_sizes: size of each layer of the critic network
         policy_recurrent_layer_sizes: Optionally add recurrent layers to the policy
@@ -322,7 +322,7 @@ def make_networks(
     if isinstance(spec.actions, specs.DiscreteArray):
         return make_discrete_networks(
             environment_spec=spec,
-            key=key,
+            base_key=base_key,
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
             policy_layers_after_recurrent=policy_layers_after_recurrent,
@@ -341,7 +341,7 @@ def make_networks(
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     agent_net_keys: Dict[str, str],
-    rng_key: List[int],
+    base_key: List[int],
     net_spec_keys: Dict[str, str] = {},
     policy_layer_sizes: Sequence[int] = (
         256,
@@ -359,7 +359,7 @@ def make_default_networks(
         environment_spec: mava multi-agent environment spec
         agent_net_keys: dictionary specifiying which networks are
                         used by which agent
-        rng_key: jax random key to be used for network initialization
+        base_key: jax random key to be used for network initialization
         net_spec_keys: keys for each agent network
         policy_layer_sizes: policy network layers
         critic_layer_sizes: critic network layers
@@ -374,7 +374,9 @@ def make_default_networks(
     # Create agent_type specs.
     specs = environment_spec.get_agent_environment_specs()
     if not net_spec_keys:
-        specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
+        specs = {
+            agent_net_keys[agent_key]: specs[agent_key] for agent_key in specs.keys()
+        }
     else:
         specs = {net_key: specs[value] for net_key, value in net_spec_keys.items()}
 
@@ -382,7 +384,7 @@ def make_default_networks(
     for net_key in specs.keys():
         networks[net_key] = make_networks(
             specs[net_key],
-            key=rng_key,
+            base_key=base_key,
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
             policy_recurrent_layer_sizes=policy_recurrent_layer_sizes,

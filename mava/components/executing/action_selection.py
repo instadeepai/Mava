@@ -141,7 +141,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             action_info, policy_info = network.get_action(
                 observations=observation_data,
                 params=current_params,
-                key=action_key,
+                base_key=action_key,
                 mask=utils.add_batch_dim(observation.legal_actions),
             )
             return action_info, policy_info, base_key
@@ -149,7 +149,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
         def select_actions(
             observations: Dict[str, NestedArray],
             current_params: Dict[str, NestedArray],
-            key: networks_lib.PRNGKey,
+            base_key: networks_lib.PRNGKey,
         ) -> Tuple[
             Dict[str, NestedArray], Dict[str, NestedArray], networks_lib.PRNGKey
         ]:
@@ -158,7 +158,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             Args:
                 observations : all obs.
                 current_params : current params.
-                key : prng_key.
+                base_key : prng_key.
 
             Returns:
                 action info, policy info and new prng key.
@@ -169,13 +169,13 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             # long, we should vectorize this.
             for agent, observation in observations.items():
                 network = networks[agent_net_keys[agent]]
-                actions_info[agent], policies_info[agent], key = select_action(
+                actions_info[agent], policies_info[agent], base_key = select_action(
                     observation=observation,
                     current_params=current_params[agent_net_keys[agent]],
                     network=network,
-                    key=key,
+                    base_key=base_key,
                 )
-            return actions_info, policies_info, key
+            return actions_info, policies_info, base_key
 
         executor.store.select_actions_fn = jax.jit(select_actions)
 
@@ -238,7 +238,7 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             current_params: NestedArray,
             policy_state: NestedArray,
             network: Any,
-            key: networks_lib.PRNGKey,
+            base_key: networks_lib.PRNGKey,
         ) -> Tuple[NestedArray, NestedArray, NestedArray, networks_lib.PRNGKey]:
             """Action selection across a single agent.
 
@@ -254,7 +254,7 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             """
             observation_data = utils.add_batch_dim(observation.observation)
             # We use the subkey immediately and keep the new key for future splits.
-            base_key, action_key = jax.random.split(key)
+            base_key, action_key = jax.random.split(base_key)
             action_info, policy_info, policy_state = network.get_action(
                 observations=observation_data,
                 params=current_params,
@@ -268,7 +268,7 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             observations: Dict[str, NestedArray],
             current_params: Dict[str, NestedArray],
             policy_states: Dict[str, NestedArray],
-            key: networks_lib.PRNGKey,
+            base_key: networks_lib.PRNGKey,
         ) -> Tuple[
             Dict[str, NestedArray],
             NestedArray,
@@ -295,14 +295,14 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
                     actions_info[agent],
                     policies_info[agent],
                     new_policy_states[agent],
-                    key,
+                    base_key,
                 ) = select_action(
                     observation=observation,
                     current_params=current_params[agent_net_keys[agent]],
                     policy_state=policy_states[agent],
                     network=network,
-                    key=key,
+                    base_key=base_key,
                 )
-            return actions_info, policies_info, new_policy_states, key
+            return actions_info, policies_info, new_policy_states, base_key
 
         executor.store.select_actions_fn = jax.jit(select_actions)

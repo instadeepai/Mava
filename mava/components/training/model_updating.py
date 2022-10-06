@@ -273,7 +273,9 @@ class MAPGEpochUpdate(EpochUpdate):
                 == trainer.store.full_batch_size
             )
 
-            permutation = jax.random.permutation(shuffle_key, trainer.store.full_batch_size)
+            permutation = jax.random.permutation(
+                shuffle_key, trainer.store.full_batch_size
+            )
 
             shuffled_batch = jax.tree_util.tree_map(
                 lambda x: jnp.take(x, permutation, axis=0), batch
