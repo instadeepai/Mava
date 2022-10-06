@@ -16,12 +16,11 @@
 """A simple multi-agent-system-environment training loop."""
 
 import time
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Tuple
 
 import acme
 import dm_env
 import jax
-import jax.numpy as jnp
 import numpy as np
 from acme.utils import counting, loggers
 
@@ -95,33 +94,10 @@ class ParallelEnvironmentLoop(acme.core.Worker):
     ) -> None:
         pass
 
-    def get_counts(self) -> Union[counting.Counter, Dict[str, jnp.ndarray]]:
-        """Get latest counts"""
-        counts = self._executor.store.executor_counts
-        return counts
-
     def record_counts(self, episode_steps: int) -> counting.Counter:
         """Record latest counts"""
         # Record counts.
-        if hasattr(self._executor, "_counts"):
-            loop_type = "evaluator" if self._executor._evaluator else "executor"
-
-            if hasattr(self._executor, "_variable_client"):
-                self._executor._variable_client.add_async(
-                    [f"{loop_type}_episodes", f"{loop_type}_steps"],
-                    {
-                        f"{loop_type}_episodes": 1,
-                        f"{loop_type}_steps": episode_steps,
-                    },
-                )
-            else:
-                self._executor._counts[f"{loop_type}_episodes"] += 1
-                self._executor._counts[f"{loop_type}_steps"] += episode_steps
-
-            counts = self._executor._counts
-        else:
-            counts = self._counter.increment(episodes=1, steps=episode_steps)
-
+        counts = self._counter.increment(episodes=1, steps=episode_steps)
         return counts
 
     def run_episode(self) -> loggers.LoggingData:
@@ -189,20 +165,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
             # Book-keeping.
             episode_steps += 1
-
-            if hasattr(self._executor, "after_action_selection"):
-                if hasattr(self._executor, "_counts"):
-                    loop_type = "evaluator" if self._executor._evaluator else "executor"
-                    total_steps_before_current_episode = self._executor._counts[
-                        f"{loop_type}_steps"
-                    ].numpy()
-                else:
-                    total_steps_before_current_episode = self._counter.get_counts().get(
-                        "executor_steps", 0
-                    )
-                current_step_t = total_steps_before_current_episode + episode_steps
-                self._executor.after_action_selection(current_step_t)
-
             self._compute_step_statistics(rewards)
 
             for agent, reward in rewards.items():
@@ -216,7 +178,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         if self._get_running_stats():
             return self._get_running_stats()
         else:
-
             counts = self.record_counts(episode_steps)
 
             # Collect the results and combine with counts.
@@ -254,7 +215,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             """
             should_run_loop = False
             eval_interval_key, eval_interval_count = eval_interval_condition
-            counts = self.get_counts()
+            counts = self._executor.store.executor_counts
 
             if counts:
                 count = counts[eval_interval_key]
@@ -271,8 +232,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     )
 
             return should_run_loop
-
-        episode_count, step_count = 0, 0
 
         environment_loop_schedule = self._executor._evaluator and (
             self._executor.store.evaluation_interval is not None
@@ -293,14 +252,10 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             ):
                 if environment_loop_schedule:
                     results = self.run_episode()
-                    episode_count += 1
                     # Get first result dictionary
-                    step_count += results["episode_length"]
                     for _ in range(evaluation_duration - 1):
                         # Add consecutive evaluation run data
                         result = self.run_episode()
-                        episode_count += 1
-                        step_count += result["episode_length"]
                         # Sum results for computing mean after all evaluation runs.
                         results = jax.tree_map(lambda x, y: x + y, results, result)
                     # compute the mean over all evaluation runs
@@ -311,8 +266,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     self._logger.write(results)
                 else:
                     result = self.run_episode()
-                    episode_count += 1
-                    step_count += result["episode_length"]
                     # Log the given results.
                     self._logger.write(result)
             else:
