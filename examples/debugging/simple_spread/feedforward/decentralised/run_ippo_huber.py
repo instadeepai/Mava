@@ -90,11 +90,8 @@ def main(_: Any) -> None:
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
-    # Create the base IPPO system.
+    # Create the system.
     system = ippo.IPPOSystem()
-
-    # Update with huber loss component
-    system.update(ippo.huber_value_loss_components)
 
     # Build the system.
     system.build(
@@ -110,6 +107,8 @@ def main(_: Any) -> None:
         num_executors=1,
         multi_process=True,
         clip_value=False,
+        use_huber=True,  # Use huber loss
+        huber_delta=1.0,
     )
 
     # Launch the system.

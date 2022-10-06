@@ -61,8 +61,7 @@ class IPPOSystem(System):
         trainer_process = DesignSpec(
             trainer_init=training.SingleTrainerInit,
             gae_fn=training.GAE,
-            value_loss=training.MAPGWithTrustRegionClippingValueLoss,
-            policy_loss=training.MAPGWithTrustRegionClippingPolicyLoss,
+            loss=training.MAPGWithTrustRegionClippingLoss,
             epoch_update=training.MAPGEpochUpdate,
             minibatch_update=training.MAPGMinibatchUpdate,
             sgd_step=training.MAPGWithTrustRegionStep,

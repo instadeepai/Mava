@@ -16,12 +16,7 @@
 """Trainer components for Mava systems."""
 from mava.components.training.advantage_estimation import GAE
 from mava.components.training.base import Batch, TrainingState, Utility
-from mava.components.training.losses import (
-    MAPGWithTrustRegionClippingLoss,
-    MAPGWithTrustRegionClippingPolicyLoss,
-    MAPGWithTrustRegionClippingValueHuberLoss,
-    MAPGWithTrustRegionClippingValueLoss,
-)
+from mava.components.training.losses import MAPGWithTrustRegionClippingLoss
 from mava.components.training.model_updating import MAPGEpochUpdate, MAPGMinibatchUpdate
 from mava.components.training.step import DefaultTrainerStep, MAPGWithTrustRegionStep
 from mava.components.training.trainer import (
