@@ -170,10 +170,11 @@ class ValueHead(hk.Module):
     def __init__(
         self,
         name: Optional[str] = None,
+        w_init: Optional[hk.initializers.Initializer] = None,
     ):
         """Initialize the class"""
         super().__init__(name=name)
-        self._value_layer = hk.Linear(1)
+        self._value_layer = hk.Linear(1, w_init=w_init)
 
     def __call__(self, inputs: jnp.ndarray) -> Any:
         """Return output given network inputs."""
@@ -188,6 +189,7 @@ def make_discrete_networks(
     critic_layer_sizes: Sequence[int],
     observation_network: Callable = utils.batch_concat,
     activate_mlp_final: bool = False,
+    orthogonal_initialisation: bool = False
     # default behaviour is to flatten observations
 ) -> PPONetworks:
     """Create PPO network for environments with discrete action spaces.
@@ -200,6 +202,8 @@ def make_discrete_networks(
         observation_network: optional network for processing observations.
             Defaults to utils.batch_concat.
         activate_mlp_final: Activate final layer of intermediary MLP
+        orthogonal_initialisation: Whether network weights should be
+            initialised orthogonally.
 
     Returns:
         PPONetworks class
@@ -207,35 +211,75 @@ def make_discrete_networks(
 
     num_actions = environment_spec.actions.num_values
 
-    def policy_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
-        policy_network = hk.Sequential(
-            [
-                observation_network,
-                hk.nets.MLP(
-                    policy_layer_sizes,
-                    activation=jax.nn.relu,
-                    activate_final=activate_mlp_final,
-                ),
-                networks_lib.CategoricalHead(
-                    num_values=num_actions, dtype=environment_spec.actions.dtype
-                ),
-            ]
-        )
-        return policy_network(inputs)
+    if orthogonal_initialisation:
 
-    def critic_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
-        critic_network = hk.Sequential(
-            [
-                observation_network,
-                hk.nets.MLP(
-                    critic_layer_sizes,
-                    activation=jax.nn.relu,
-                    activate_final=activate_mlp_final,
-                ),
-                ValueHead(),
-            ]
-        )
-        return critic_network(inputs)
+        def policy_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+            policy_network = hk.Sequential(
+                [
+                    observation_network,
+                    hk.nets.MLP(
+                        policy_layer_sizes,
+                        activation=jax.nn.relu,
+                        activate_final=activate_mlp_final,
+                        w_init=hk.initializers.Orthogonal(scale=jnp.sqrt(2)),
+                        b_init=hk.initializers.Constant(constant=0.0),
+                    ),
+                    networks_lib.CategoricalHead(
+                        num_values=num_actions,
+                        dtype=environment_spec.actions.dtype,
+                        w_init=hk.initializers.Orthogonal(scale=0.01),
+                    ),
+                ]
+            )
+            return policy_network(inputs)
+
+        def critic_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+            critic_network = hk.Sequential(
+                [
+                    observation_network,
+                    hk.nets.MLP(
+                        critic_layer_sizes,
+                        activation=jax.nn.relu,
+                        activate_final=activate_mlp_final,
+                        w_init=hk.initializers.Orthogonal(scale=jnp.sqrt(2)),
+                        b_init=hk.initializers.Constant(constant=0.0),
+                    ),
+                    ValueHead(w_init=hk.initializers.Orthogonal(scale=1.0)),
+                ]
+            )
+            return critic_network(inputs)
+
+    else:
+
+        def policy_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+            policy_network = hk.Sequential(
+                [
+                    observation_network,
+                    hk.nets.MLP(
+                        policy_layer_sizes,
+                        activation=jax.nn.relu,
+                        activate_final=activate_mlp_final,
+                    ),
+                    networks_lib.CategoricalHead(
+                        num_values=num_actions, dtype=environment_spec.actions.dtype
+                    ),
+                ]
+            )
+            return policy_network(inputs)
+
+        def critic_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+            critic_network = hk.Sequential(
+                [
+                    observation_network,
+                    hk.nets.MLP(
+                        critic_layer_sizes,
+                        activation=jax.nn.relu,
+                        activate_final=activate_mlp_final,
+                    ),
+                    ValueHead(),
+                ]
+            )
+            return critic_network(inputs)
 
     # Transform into pure functions.
     policy_fn = hk.without_apply_rng(hk.transform(policy_fn))
@@ -270,6 +314,7 @@ def make_networks(
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
     observation_network: Callable = utils.batch_concat,
     activate_mlp_final: bool = False,
+    orthogonal_initialisation: bool = False,
 ) -> PPONetworks:
     """Function for creating PPO networks to be used.
 
@@ -283,6 +328,8 @@ def make_networks(
         critic_layer_sizes: size of each layer of the critic network
         observation_network: Network used for feature extraction layers
         activate_mlp_final: Activate final layer of intermediary MLP
+        orthogonal_initialisation: Whether network weights should be
+            initialised orthogonally.
 
     Returns:
         make_discrete_networks: function to create a discrete network
@@ -300,6 +347,7 @@ def make_networks(
             critic_layer_sizes=critic_layer_sizes,
             observation_network=observation_network,
             activate_mlp_final=activate_mlp_final,
+            orthogonal_initialisation=orthogonal_initialisation,
         )
 
     else:
@@ -323,6 +371,7 @@ def make_default_networks(
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
     observation_network: Callable = utils.batch_concat,
     activate_mlp_final: bool = False,
+    orthogonal_initialisation: bool = False,
 ) -> Dict[str, Any]:
     """Create default PPO networks
 
@@ -340,6 +389,16 @@ def make_default_networks(
         activate_mlp_final: whether to apply an activation to the final
                             layer of the MLP that makes up the middle
                             layers of the policy and critic networks
+        orthogonal_initialisation: whether network weights should be
+                            initialised orthogonally. This will initialise
+                            all hidden layers weights with scale sqrt(2) and
+                            all hidden layer biases with a constant value
+                            of 0.0. The policy network output head weights are
+                            orthogonally initialised with scale 0.01 and
+                            the critic network output head weights are
+                            orthogonally initialised with scale 1.0.
+                            Scale value obtained from:
+                            https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/ # noqa: E501
 
     Returns:
         networks: networks created to given spec
@@ -361,6 +420,7 @@ def make_default_networks(
             critic_layer_sizes=critic_layer_sizes,
             observation_network=observation_network,
             activate_mlp_final=activate_mlp_final,
+            orthogonal_initialisation=orthogonal_initialisation,
         )
 
     # No longer returning a dictionary since this is handled in PPONetworks above
