@@ -18,7 +18,7 @@ import abc
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Type
 
-import haiku as hk  # type: ignore
+import haiku as hk
 import jax
 import jax.numpy as jnp
 import rlax

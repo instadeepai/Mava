@@ -18,7 +18,7 @@ import dataclasses
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import chex
-import haiku as hk  # type: ignore
+import haiku as hk
 import jax
 import jax.numpy as jnp
 from acme import specs
@@ -203,7 +203,7 @@ def make_discrete_networks(
         policy_layer_sizes: sizes of hidden layers for the policy network
         critic_layer_sizes: sizes of hidden layers for the critic network
         policy_recurrent_layer_sizes: Optionally add recurrent layers to the policy
-        recurrent_architecture_fn: Architecture to use for the recurrent units.
+        recurrent_architecture_fn: Architecture to use for the recurrent units, e.g. LSTM or GRU.
         policy_layers_after_recurrent: sizes of hidden layers for the policy network after the recurrent layers.
         This is only used if an recurrent architecture is used.
     Returns:
@@ -215,6 +215,14 @@ def make_discrete_networks(
     @hk.without_apply_rng
     @hk.transform
     def policy_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+        """Create a policy network function and transform it using Haiku.
+
+        Args:
+            inputs: The inputs required for hk.DeepRNN or hk.Sequential.
+            
+        Returns:
+            FeedForwardNetwork class
+        """
         # Add the observation network and an MLP network.
         policy_network = [
             hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
@@ -243,6 +251,15 @@ def make_discrete_networks(
     @hk.without_apply_rng
     @hk.transform
     def initial_state_fn() -> List[jnp.ndarray]:
+        """Returns an intial state for the 
+        recurrent layers.
+
+        Args:
+            None.
+            
+        Returns:
+            Intial state for the recurrent layers.
+        """
         state = []
         for size in policy_recurrent_layer_sizes:
             state.append(recurrent_architecture_fn(size).initial_state(1))
@@ -251,6 +268,14 @@ def make_discrete_networks(
     @hk.without_apply_rng
     @hk.transform
     def critic_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+        """Create a critic network function and transform it using Haiku.
+
+        Args:
+            inputs: The inputs required for hk.Sequential.
+            
+        Returns:
+            FeedForwardNetwork class
+        """
         critic_network = hk.Sequential(
             [
                 hk.nets.MLP(critic_layer_sizes, activation=jax.nn.relu),
@@ -308,7 +333,7 @@ def make_networks(
         policy_layer_sizes: size of each layer of the policy network
         critic_layer_sizes: size of each layer of the critic network
         policy_recurrent_layer_sizes: Optionally add recurrent layers to the policy
-        recurrent_architecture_fn: Architecture to use for the recurrent units
+        recurrent_architecture_fn: Architecture to use for the recurrent units, e.g. LSTM or GRU.
         sizes of hidden layers for the policy network after the recurrent layers.
         This is only used if an recurrent architecture is used.
 
@@ -364,7 +389,7 @@ def make_default_networks(
         policy_layer_sizes: policy network layers
         critic_layer_sizes: critic network layers
         policy_recurrent_layer_sizes: Optionally add recurrent layers to the policy
-        recurrent_architecture_fn: Architecture to use for the recurrent units
+        recurrent_architecture_fn: Architecture to use for the recurrent units, e.g. LSTM or GRU.
         sizes of hidden layers for the policy network after the recurrent layers.
         This is only used if an recurrent architecture is used.
     Returns:

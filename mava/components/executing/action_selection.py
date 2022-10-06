@@ -127,10 +127,10 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             """Action selection across a single agent.
 
             Args:
-                observation : obs for current agent.
-                current_params : params for current agent's network.
-                network : network object.
-                key : prng key.
+                observation : The observation for the current agent.
+                current_params : The parameters for current agent's network.
+                network : The network object used by the current agent.
+                key : A JAX prng key.
 
             Returns:
                 action info, policy info and new key.
@@ -156,9 +156,9 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             """Select actions across all agents - this is jitted below.
 
             Args:
-                observations : all obs.
-                current_params : current params.
-                base_key : prng_key.
+                observations : The observations for all the agents.
+                current_params : The parameters for all the agents.
+                base_key : A JAX prng_key.
 
             Returns:
                 action info, policy info and new prng key.
@@ -243,11 +243,12 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             """Action selection across a single agent.
 
             Args:
-                observation : obs for current agent.
-                current_params : params for current agent's network.
-                policy_state: State of the recurrent units
-                network : network object.
-                key : prng key.
+
+                observation : The observation for the current agent.
+                current_params : The parameters for current agent's network.
+                policy_state: State of the recurrent units for the current agent.
+                network : The network object used by the current agent.
+                key : A JAX prng key.
 
             Returns:
                 action info, policy info and new key.
@@ -278,9 +279,9 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             """Select actions across all agents - this is jitted below.
 
             Args:
-                observations : all obs.
-                current_params : current params.
-                key : prng_key.
+                observations : The observations for all the agents.
+                current_params : The parameters for all the agents.
+                base_key : A JAX prng_key.
 
             Returns:
                 action info, policy info and new prng key.
