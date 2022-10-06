@@ -15,7 +15,7 @@
 
 """Jax IPPO system."""
 from typing import Any, Tuple
-import abc
+
 from mava.components import building, executing, training, updating
 from mava.components.building.guardrails import ComponentDependencyGuardrails
 from mava.specs import DesignSpec
@@ -25,8 +25,8 @@ from mava.systems.ippo.config import IPPODefaultConfig
 
 
 class IPPOSystem(System):
+    
     @staticmethod
-    @abc.abstractmethod
     def design() -> Tuple[DesignSpec, Any]:
         """System design for IPPO with single optimiser.
 

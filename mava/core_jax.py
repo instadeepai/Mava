@@ -27,7 +27,6 @@ class BaseSystem(abc.ABC):
     """Abstract system object."""
 
     @staticmethod
-    @abc.abstractmethod
     def design() -> Tuple[DesignSpec, Dict]:
         """System design specifying the list of components to use.
 

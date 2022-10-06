@@ -219,7 +219,7 @@ def make_discrete_networks(
 
         Args:
             inputs: The inputs required for hk.DeepRNN or hk.Sequential.
-            
+
         Returns:
             FeedForwardNetwork class
         """
@@ -251,12 +251,12 @@ def make_discrete_networks(
     @hk.without_apply_rng
     @hk.transform
     def initial_state_fn() -> List[jnp.ndarray]:
-        """Returns an intial state for the 
+        """Returns an intial state for the
         recurrent layers.
 
         Args:
             None.
-            
+
         Returns:
             Intial state for the recurrent layers.
         """
@@ -272,7 +272,7 @@ def make_discrete_networks(
 
         Args:
             inputs: The inputs required for hk.Sequential.
-            
+
         Returns:
             FeedForwardNetwork class
         """
