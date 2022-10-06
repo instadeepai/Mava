@@ -199,6 +199,7 @@ def make_discrete_networks(
         critic_layer_sizes: sizes of hidden layers for the critic network
         observation_network: optional network for processing observations.
             Defaults to utils.batch_concat.
+        activate_mlp_final: Activate final layer of intermediary MLP
 
     Returns:
         PPONetworks class
@@ -281,13 +282,14 @@ def make_networks(
         policy_layer_sizes: size of each layer of the policy network
         critic_layer_sizes: size of each layer of the critic network
         observation_network: Network used for feature extraction layers
+        activate_mlp_final: Activate final layer of intermediary MLP
 
     Returns:
         make_discrete_networks: function to create a discrete network
         make_continuous_networks: function to create a continuous network
 
     Raises:
-        NotImplementedError: Raises an error if continous network is not
+        NotImplementedError: Raises an error if continuous network is not
                         available
     """
     if isinstance(spec.actions, specs.DiscreteArray):
