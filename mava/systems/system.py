@@ -14,7 +14,6 @@
 # limitations under the License.
 
 """Jax-based Mava system implementation."""
-import abc
 import copy
 from types import SimpleNamespace
 from typing import Any, Dict, List, Tuple, Type, Union

@@ -39,7 +39,7 @@ def test_network_factory() -> Callable:
     def make_default_networks(
         environment_spec: MAEnvironmentSpec,
         agent_net_keys: Dict[str, str],
-        rng_key: List[int],
+        base_key: List[int],
         net_spec_keys: Dict[str, str] = {},
         policy_layer_sizes: Sequence[int] = (
             256,
@@ -56,7 +56,7 @@ def test_network_factory() -> Callable:
             networks[net_key] = {
                 "environment_spec": environment_spec,
                 "agent_net_keys": agent_net_keys,
-                "rng_key": rng_key,
+                "base_key": base_key,
                 "net_spec_keys": net_spec_keys,
                 "policy_layer_sizes": policy_layer_sizes,
                 "critic_layer_sizes": critic_layer_sizes,
@@ -213,10 +213,10 @@ def test_network_factory_rng_keys(
     keys = []
     for network in networks.values():
         # Ensure keys are all the correct type
-        assert isinstance(network["rng_key"], jax.random.PRNGKeyArray) or isinstance(
-            network["rng_key"], jax.numpy.DeviceArray
+        assert isinstance(network["base_key"], jax.random.PRNGKeyArray) or isinstance(
+            network["base_key"], jax.numpy.DeviceArray
         )
-        keys.append(tuple(network["rng_key"].tolist()))
+        keys.append(tuple(network["base_key"].tolist()))
 
     # Ensure network factory passes the same key along to each network initialisation
     assert len(set(keys)) == 1
@@ -233,7 +233,7 @@ def test_recurrent_network_factory() -> Callable:
     def make_default_networks(
         environment_spec: MAEnvironmentSpec,
         agent_net_keys: Dict[str, str],
-        rng_key: List[int],
+        base_key: List[int],
         net_spec_keys: Dict[str, str] = {},
         policy_layer_sizes: Sequence[int] = (
             256,
@@ -250,7 +250,7 @@ def test_recurrent_network_factory() -> Callable:
             networks[net_key] = {
                 "environment_spec": environment_spec,
                 "agent_net_keys": agent_net_keys,
-                "rng_key": rng_key,
+                "base_key": base_key,
                 "net_spec_keys": net_spec_keys,
                 "policy_layer_sizes": policy_layer_sizes,
                 "critic_layer_sizes": critic_layer_sizes,

@@ -97,7 +97,7 @@ class DefaultNetworks(Networks):
         builder.store.network_factory = lambda: self.config.network_factory(
             environment_spec=builder.store.ma_environment_spec,
             agent_net_keys=builder.store.agent_net_keys,
-            rng_key=network_key,
+            base_key=network_key,
         )
 
     @staticmethod

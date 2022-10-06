@@ -87,7 +87,7 @@ def mock_empty_executor() -> Executor:
 
 def get_action(
     observation: networks_lib.Observation,
-    rng_key: networks_lib.PRNGKey,
+    base_key: networks_lib.PRNGKey,
     legal_actions: chex.Array,
 ) -> Any:
     """Function used in the networks.
