@@ -233,7 +233,11 @@ def make_discrete_networks(
                 policy_network.append(recurrent_architecture_fn(size))
 
             # Add optional feedforward layers after the recurrent layers
-            hk.nets.MLP(policy_layers_after_recurrent, activation=jax.nn.relu, activate_final=True),
+            hk.nets.MLP(
+                policy_layers_after_recurrent,
+                activation=jax.nn.relu,
+                activate_final=True,
+            ),
 
         # Add a categorical value head.
         policy_network.append(
@@ -277,7 +281,9 @@ def make_discrete_networks(
         """
         critic_network = hk.Sequential(
             [
-                hk.nets.MLP(critic_layer_sizes, activation=jax.nn.relu, activate_final=True),
+                hk.nets.MLP(
+                    critic_layer_sizes, activation=jax.nn.relu, activate_final=True
+                ),
                 ValueHead(),
             ]
         )
