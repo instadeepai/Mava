@@ -179,10 +179,6 @@ class HookOrderTracking:
         """[summary]"""
         self.hook_list.append("on_execution_select_action_preprocess")
 
-    def on_execution_select_action_compute(self) -> None:
-        """[summary]"""
-        self.hook_list.append("on_execution_select_action_compute")
-
     def on_execution_select_action_sample(self) -> None:
         """[summary]"""
         self.hook_list.append("on_execution_select_action_sample")

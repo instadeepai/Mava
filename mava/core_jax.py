@@ -26,8 +26,9 @@ from mava.specs import DesignSpec
 class BaseSystem(abc.ABC):
     """Abstract system object."""
 
+    @staticmethod
     @abc.abstractmethod
-    def design(self) -> Tuple[DesignSpec, Dict]:
+    def design() -> Tuple[DesignSpec, Dict]:
         """System design specifying the list of components to use.
 
         Returns:
@@ -149,12 +150,6 @@ class SystemExecutor(abc.ABC):
         self._observations: Dict[str, Any]
         self._actions: Dict[str, Any]
         self._extras: Dict[str, Any]
-
-    @abc.abstractmethod
-    def select_action(
-        self, agent: str, observation: Any
-    ) -> Union[Any, Tuple[Any, Any]]:
-        """Select an action for a single agent in the system."""
 
     @abc.abstractmethod
     def select_actions(
