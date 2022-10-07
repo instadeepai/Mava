@@ -96,7 +96,7 @@ class JSONLogger:
     def write(self, results_dict: Dict[str, jax.numpy.ndarray]) -> None:
         """Write current evaluation data to a json file.
 
-        It should be noted the the input data here should be in one of two
+        It should be noted that the input data here should be in one of two
         forms depending on whether evaluation metrics for a particular
         evaluation step are being logged or whether absolute metrics are
         being logged.

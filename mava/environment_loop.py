@@ -684,7 +684,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     # compute the mean over all evaluation runs
                     results = jax.tree_map(lambda x: x / evaluation_duration, results)
 
-                    # Log evaluation interval rsults for json logging
+                    # Log evaluation interval results for json logging
                     eval_result = {
                         "step_count": jnp.array([self._last_evaluator_run_t]),
                         "return": jnp.array(eval_returns),
