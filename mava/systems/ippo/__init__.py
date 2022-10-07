@@ -14,6 +14,5 @@
 # limitations under the License.
 
 """Jax IPPO system."""
-from mava.systems.component_groups import recurrent_policy_components
 from mava.systems.ippo.networks import make_default_networks
 from mava.systems.ippo.system import IPPOSystem

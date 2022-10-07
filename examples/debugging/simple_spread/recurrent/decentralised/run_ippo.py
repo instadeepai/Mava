@@ -21,6 +21,7 @@ from typing import Any
 import optax
 from absl import app, flags
 
+from mava.components.component_groups import recurrent_policy_components
 from mava.systems import ippo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -93,7 +94,7 @@ def main(_: Any) -> None:
     system = ippo.IPPOSystem()
 
     # Update the system with the components necessary to make the policy recurrent.
-    system.update(ippo.recurrent_policy_components)
+    system.update(recurrent_policy_components)
 
     # Build the system.
     system.build(
