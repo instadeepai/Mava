@@ -23,6 +23,8 @@ import jax.numpy as jnp
 import pytest
 
 from mava.components.training.losses import (
+    DefaultValueLossFunction,
+    HuberValueLossFunction,
     MAPGTrustRegionClippingLossConfig,
     MAPGWithTrustRegionClippingLoss,
 )
@@ -134,35 +136,22 @@ def mock_trainer() -> Trainer:
 
 
 @pytest.fixture
-def mapg_trust_region_clipping_loss() -> MAPGWithTrustRegionClippingLoss:  # noqa: E501
+def mapg_loss() -> MAPGWithTrustRegionClippingLoss:  # noqa: E501
     """Creates an MAPG loss fixture with trust region and clipping"""
-
-    test_mapg = MAPGWithTrustRegionClippingLoss(
+    test_loss = MAPGWithTrustRegionClippingLoss(
         config=MAPGTrustRegionClippingLossConfig(value_cost=0.5, entropy_cost=0.01)
     )
-
-    return test_mapg
-
-
-@pytest.fixture
-def mapg_trust_region_huber_loss() -> MAPGWithTrustRegionClippingLoss:  # noqa: E501
-    """Creates a huber loss component"""
-
-    test_huber_critic = MAPGWithTrustRegionClippingLoss(
-        config=MAPGTrustRegionClippingLossConfig(value_cost=0.5)
-    )
-
-    return test_huber_critic
+    return test_loss
 
 
 def test_mapg_creation(
     mock_trainer: Trainer,
-    mapg_trust_region_clipping_loss: MAPGWithTrustRegionClippingLoss,  # noqa: E501
-    mapg_trust_region_huber_loss: MAPGWithTrustRegionClippingLoss,
+    mapg_loss: MAPGWithTrustRegionClippingLoss,  # noqa: E501
 ) -> None:
     """Test whether mapg functions are successfully created"""
-    mapg_trust_region_clipping_loss.on_training_utility_fns(trainer=mock_trainer)
-    mapg_trust_region_clipping_loss.on_training_loss_fns(trainer=mock_trainer)
+    default_loss = DefaultValueLossFunction()
+    default_loss.on_training_utility_fns(trainer=mock_trainer)
+    mapg_loss.on_training_loss_fns(trainer=mock_trainer)
     assert hasattr(mock_trainer.store, "policy_grad_fn")
     assert hasattr(mock_trainer.store, "critic_grad_fn")
     assert isinstance(
@@ -171,8 +160,9 @@ def test_mapg_creation(
     assert isinstance(
         mock_trainer.store.critic_grad_fn, Callable  # type:ignore
     )
-    mapg_trust_region_huber_loss.on_training_utility_fns(trainer=mock_trainer)
-    mapg_trust_region_huber_loss.on_training_loss_fns(trainer=mock_trainer)
+    huber_loss = HuberValueLossFunction()
+    huber_loss.on_training_utility_fns(trainer=mock_trainer)
+    mapg_loss.on_training_loss_fns(trainer=mock_trainer)
     assert hasattr(mock_trainer.store, "policy_grad_fn")
     assert hasattr(mock_trainer.store, "critic_grad_fn")
     assert isinstance(
@@ -185,11 +175,12 @@ def test_mapg_creation(
 
 def test_mapg_loss(
     mock_trainer: Trainer,
-    mapg_trust_region_clipping_loss: MAPGWithTrustRegionClippingLoss,  # noqa: E501
+    mapg_loss: MAPGWithTrustRegionClippingLoss,  # noqa: E501
 ) -> None:
     """Test whether mapg loss output is as expected"""
-    mapg_trust_region_clipping_loss.on_training_utility_fns(trainer=mock_trainer)
-    mapg_trust_region_clipping_loss.on_training_loss_fns(trainer=mock_trainer)
+    default_loss = DefaultValueLossFunction()
+    default_loss.on_training_utility_fns(trainer=mock_trainer)
+    mapg_loss.on_training_loss_fns(trainer=mock_trainer)
     policy_grad_fn = mock_trainer.store.policy_grad_fn
     critic_grad_fn = mock_trainer.store.critic_grad_fn
 
@@ -277,11 +268,12 @@ def test_mapg_loss(
 
 def test_mapg_huber_loss(
     mock_trainer: Trainer,
-    mapg_trust_region_huber_loss: MAPGWithTrustRegionClippingLoss,  # noqa: E501
+    mapg_loss: MAPGWithTrustRegionClippingLoss,  # noqa: E501
 ) -> None:
     """Test whether mapg huber loss output is as expected"""
-    mapg_trust_region_huber_loss.on_training_utility_fns(trainer=mock_trainer)
-    mapg_trust_region_huber_loss.on_training_loss_fns(trainer=mock_trainer)
+    huber_loss = HuberValueLossFunction()
+    huber_loss.on_training_utility_fns(trainer=mock_trainer)
+    mapg_loss.on_training_loss_fns(trainer=mock_trainer)
     policy_grad_fn = mock_trainer.store.policy_grad_fn
     critic_grad_fn = mock_trainer.store.critic_grad_fn
 
