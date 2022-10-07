@@ -70,6 +70,7 @@ def fake_ppo_policy_grad_fn(
     actions: Dict[str, jnp.ndarray],
     behaviour_log_probs: Dict[str, jnp.ndarray],
     advantages: Dict[str, jnp.ndarray],
+    policy_states: Any,
 ) -> Tuple[Dict, Dict]:
     """Fake policy grad function to be used in MockTrainer
 
@@ -238,6 +239,7 @@ def fake_batch() -> Batch:
         target_values=jnp.array([3.1, 3.5, 3.7]),
         behavior_values=jnp.array([4.1, 4.5, 4.7]),
         behavior_log_probs=jnp.array([5.1, 5.5, 5.7]),
+        policy_states=None,
     )
     return batch
 

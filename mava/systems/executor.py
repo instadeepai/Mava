@@ -19,10 +19,10 @@ from types import SimpleNamespace
 from typing import Dict, List, Tuple, Union
 
 import dm_env
-from acme.types import NestedArray
 
 from mava.callbacks import Callback, ExecutorHookMixin
 from mava.core_jax import SystemExecutor
+from mava.types import NestedArray
 
 
 class Executor(SystemExecutor, ExecutorHookMixin):
@@ -95,39 +95,6 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         self.on_execution_observe()
 
         self.on_execution_observe_end()
-
-    # NB: Not currently used. TODO Deprecate in future.
-    def select_action(
-        self,
-        agent: str,
-        observation: NestedArray,
-        state: NestedArray = None,
-    ) -> NestedArray:
-        """Agent specific policy function.
-
-        Args:
-            agent : agent id.
-            observation : observation tensor received from the environment.
-            state : recurrent state.
-
-        Returns:
-            Action and policy info for agent.
-        """
-        self.store.agent = agent
-        self.store.observation = observation
-        self.store.state = state
-
-        self.on_execution_select_action_start()
-
-        self.on_execution_select_action_preprocess()
-
-        self.on_execution_select_action_compute()
-
-        self.on_execution_select_action_sample()
-
-        self.on_execution_select_action_end()
-
-        return self.store.action_info, self.store.policy_info
 
     def select_actions(
         self, observations: Dict[str, NestedArray]

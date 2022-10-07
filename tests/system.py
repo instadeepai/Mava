@@ -18,9 +18,9 @@
 from typing import Any, Dict, Sequence, Tuple, Union
 
 import dm_env
-from acme import types
 
 import mava
+from mava import types
 
 
 def _calculate_num_learner_steps(
