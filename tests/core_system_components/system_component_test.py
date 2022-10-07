@@ -98,7 +98,6 @@ class ComponentOne(SubComponent):
             float plus boolean cast as float
         """
         builder.store.float_plus_bool = self.config.param_2 + float(self.config.param_3)
-        builder.store.worker_manager = None
 
 
 @dataclass

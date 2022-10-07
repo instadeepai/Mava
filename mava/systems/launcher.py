@@ -18,7 +18,6 @@ from typing import Any, Dict, List, Optional, Union
 
 import launchpad as lp
 import reverb
-from launchpad.launch import worker_manager
 
 from mava.utils import lp_utils
 from mava.utils.builder_utils import copy_node_fn
@@ -45,6 +44,7 @@ class Launcher:
         name: str = "System",
         terminal: str = "current_terminal",
         is_test: Optional[bool] = False,
+        wait: Optional[bool] = False,
     ) -> None:
         """Initialise the launcher.
 
@@ -63,8 +63,10 @@ class Launcher:
             name : launchpad program name.
             terminal : terminal for launchpad processes to be shown on.
             is_test : whether to set testing launchpad launch_type.
+            wait: the worker manager will wait worker_manager.wait()
         """
         self._is_test = is_test
+        self._wait = wait
         self._multi_process = multi_process
         self._name = name
         self._single_process_trainer_period = single_process_trainer_period
@@ -160,12 +162,8 @@ class Launcher:
 
         return self._nodes
 
-    def launch(self) -> Optional[worker_manager.WorkerManager]:
-        """Launch the launchpad program or start the single-process system loop.
-
-        Returns:
-            worker_manager: worker_manager.WorkerManager
-        """
+    def launch(self) -> None:
+        """Launch the launchpad program or start the single-process system loop."""
         if self._multi_process:
             if self._is_test:
                 launch_type = lp.LaunchType.TEST_MULTI_THREADING
@@ -184,7 +182,8 @@ class Launcher:
                 local_resources=local_resources,
             )
 
-            return worker_manager
+            if self._wait:
+                worker_manager.wait()
 
         else:
             episode = 1
@@ -229,4 +228,3 @@ class Launcher:
                     print("Performed evaluator run.")
 
                 step += 1
-            return None

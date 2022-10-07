@@ -108,12 +108,11 @@ def create_and_run_lp_program(config: Dict) -> None:
         multi_process=True,
         clip_value=False,
         termination_condition={"executor_steps": 10000},
+        # Wait for worker to finish - this critical to waiting for program to finish.
+        wait=True,
     )
     # Launch the system.
-    worker_manager = system.launch()
-    # Wait for worker to finish - this critical to waiting for program to finish.
-    if worker_manager:
-        worker_manager.wait()
+    system.launch()
 
 
 def main(_: Any) -> None:

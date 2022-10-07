@@ -36,6 +36,7 @@ class DistributorConfig:
     terminal: str = "current_terminal"
     single_process_max_episodes: Optional[int] = None
     is_test: Optional[bool] = False
+    wait: Optional[bool] = False
 
 
 class Distributor(Component):
@@ -68,6 +69,7 @@ class Distributor(Component):
             terminal=self.config.terminal,
             single_process_max_episodes=self.config.single_process_max_episodes,
             is_test=self.config.is_test,
+            wait=self.config.wait,
         )
 
         # Generate keys for the data_server, parameter_server and evaluator.
@@ -144,10 +146,7 @@ class Distributor(Component):
         Returns:
             None.
         """
-        worker_manager = builder.store.program.launch()
-
-        if worker_manager:
-            builder.store.worker_manager = worker_manager
+        builder.store.program.launch()
 
     @staticmethod
     def name() -> str:
