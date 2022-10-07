@@ -188,7 +188,8 @@ def make_discrete_networks(
     policy_layer_sizes: Sequence[int],
     critic_layer_sizes: Sequence[int],
     observation_network: Callable = utils.batch_concat,
-    orthogonal_initialisation: bool = False
+    orthogonal_initialisation: bool = False,
+    activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     # default behaviour is to flatten observations
 ) -> PPONetworks:
     """Create PPO network for environments with discrete action spaces.
@@ -202,6 +203,8 @@ def make_discrete_networks(
             Defaults to utils.batch_concat.
         orthogonal_initialisation: Whether network weights should be
             initialised orthogonally.
+        activation_function: activation function to be used for
+            network hidden layers.
 
     Returns:
         PPONetworks class
@@ -217,7 +220,7 @@ def make_discrete_networks(
                     observation_network,
                     hk.nets.MLP(
                         policy_layer_sizes,
-                        activation=jax.nn.relu,
+                        activation=activation_function,
                         w_init=hk.initializers.Orthogonal(scale=jnp.sqrt(2)),
                         b_init=hk.initializers.Constant(constant=0.0),
                         activate_final=True,
@@ -237,7 +240,7 @@ def make_discrete_networks(
                     observation_network,
                     hk.nets.MLP(
                         critic_layer_sizes,
-                        activation=jax.nn.relu,
+                        activation=activation_function,
                         w_init=hk.initializers.Orthogonal(scale=jnp.sqrt(2)),
                         b_init=hk.initializers.Constant(constant=0.0),
                         activate_final=True,
@@ -255,7 +258,7 @@ def make_discrete_networks(
                     observation_network,
                     hk.nets.MLP(
                         policy_layer_sizes,
-                        activation=jax.nn.relu,
+                        activation=activation_function,
                         activate_final=True,
                     ),
                     networks_lib.CategoricalHead(
@@ -271,7 +274,7 @@ def make_discrete_networks(
                     observation_network,
                     hk.nets.MLP(
                         critic_layer_sizes,
-                        activation=jax.nn.relu,
+                        activation=activation_function,
                         activate_final=True,
                     ),
                     ValueHead(),
@@ -312,6 +315,7 @@ def make_networks(
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
     observation_network: Callable = utils.batch_concat,
     orthogonal_initialisation: bool = False,
+    activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
 ) -> PPONetworks:
     """Function for creating PPO networks to be used.
 
@@ -326,6 +330,8 @@ def make_networks(
         observation_network: Network used for feature extraction layers
         orthogonal_initialisation: Whether network weights should be
             initialised orthogonally.
+        activation_function: activation function to be used for
+            network hidden layers.
 
     Returns:
         make_discrete_networks: function to create a discrete network
@@ -343,6 +349,7 @@ def make_networks(
             critic_layer_sizes=critic_layer_sizes,
             observation_network=observation_network,
             orthogonal_initialisation=orthogonal_initialisation,
+            activation_function=activation_function,
         )
 
     else:
@@ -366,6 +373,7 @@ def make_default_networks(
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
     observation_network: Callable = utils.batch_concat,
     orthogonal_initialisation: bool = False,
+    activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
 ) -> Dict[str, Any]:
     """Create default PPO networks
 
@@ -390,6 +398,8 @@ def make_default_networks(
                             orthogonally initialised with scale 1.0.
                             Scale value obtained from:
                             https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/ # noqa: E501
+        activation_function: activation function to be used for
+                            network hidden layers.
 
     Returns:
         networks: networks created to given spec
@@ -411,6 +421,7 @@ def make_default_networks(
             critic_layer_sizes=critic_layer_sizes,
             observation_network=observation_network,
             orthogonal_initialisation=orthogonal_initialisation,
+            activation_function=activation_function,
         )
 
     # No longer returning a dictionary since this is handled in PPONetworks above
