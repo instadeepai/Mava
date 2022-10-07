@@ -27,10 +27,9 @@ import jax
 import numpy as np
 import reverb
 from acme import specs as acme_specs
-from acme import types
 from reverb import rate_limiters, reverb_types
 
-from mava import specs
+from mava import specs, types
 from mava.components import Component
 from mava.components.building.data_server import (
     OffPolicyDataServerConfig,

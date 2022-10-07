@@ -25,7 +25,8 @@ from typing import Dict, Generic, Optional, Sequence, Tuple, TypeVar, Union
 
 import acme
 import dm_env
-from acme import types
+
+from mava import types
 
 T = TypeVar("T")
 

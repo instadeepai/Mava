@@ -22,7 +22,6 @@ from typing import Any, Dict, List, Tuple, Type
 import jax
 from acme.jax import networks as networks_lib
 from acme.jax import utils
-from acme.types import NestedArray
 
 from mava.callbacks import Callback
 from mava.components import Component
@@ -30,6 +29,7 @@ from mava.components.building.networks import Networks
 from mava.components.building.system_init import BaseSystemInit
 from mava.components.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemExecutor
+from mava.types import NestedArray
 
 
 class ExecutorSelectAction(Component):

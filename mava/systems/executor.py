@@ -19,10 +19,10 @@ from types import SimpleNamespace
 from typing import Dict, List, Tuple, Union
 
 import dm_env
-from acme.types import NestedArray
 
 from mava.callbacks import Callback, ExecutorHookMixin
 from mava.core_jax import SystemExecutor
+from mava.types import NestedArray
 
 
 class Executor(SystemExecutor, ExecutorHookMixin):

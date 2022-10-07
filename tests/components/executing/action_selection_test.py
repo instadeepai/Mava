@@ -24,13 +24,13 @@ import jax
 import jax.numpy as jnp
 import pytest
 from acme.jax import networks as networks_lib
-from acme.types import NestedArray
 
 from mava.components.executing.action_selection import (
     FeedforwardExecutorSelectAction,
     RecurrentExecutorSelectAction,
 )
 from mava.systems.executor import Executor
+from mava.types import NestedArray
 
 
 @dataclass
