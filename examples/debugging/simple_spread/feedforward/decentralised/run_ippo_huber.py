@@ -91,10 +91,10 @@ def main(_: Any) -> None:
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
-    # Create the system.
+    # Create the default system.
     system = ippo.IPPOSystem()
 
-    # Use the huber value loss.
+    # Use the system to use the huber value loss.
     system.update(huber_value_loss_components)
 
     # Build the system.

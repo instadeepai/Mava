@@ -149,7 +149,7 @@ def mapg_trust_region_huber_loss() -> MAPGWithTrustRegionClippingLoss:  # noqa: 
     """Creates a huber loss component"""
 
     test_huber_critic = MAPGWithTrustRegionClippingLoss(
-        config=MAPGTrustRegionClippingLossConfig(value_cost=0.5, use_huber=True)
+        config=MAPGTrustRegionClippingLossConfig(value_cost=0.5)
     )
 
     return test_huber_critic

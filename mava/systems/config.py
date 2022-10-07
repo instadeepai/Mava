@@ -84,6 +84,8 @@ class Config:
                         for new_param_name in new_param_names:
                             self._param_to_component[new_param_name] = name
                     self._config[name] = dataclass
+            elif isinstance(dataclass, SimpleNamespace):
+                self._config[name] = dataclass
             else:
                 raise Exception(
                     f"""
@@ -94,10 +96,8 @@ class Config:
 
     def update(self, **kwargs: Any) -> None:
         """Update the given component config dataclasses based on their names.
-
         Args:
             **kwargs: dictionary with format {name: dataclass}.
-
         Raises:
             Exception: if a config shares a parameter name with another config.
             Exception: if a config is not already part of the system.
@@ -134,10 +134,14 @@ class Config:
                         self._config[name] = dataclass
                 else:
                     raise Exception(
-                        "The given component config is not part of the current \
+                        f"The given component config ({name}) is not part of the current \
                         system. Perhaps try adding the component using .add() \
                         in the system builder."
                     )
+            elif isinstance(dataclass, SimpleNamespace):
+                # SimpleNamespace implies that this component does
+                # not have config variables.
+                pass
             else:
                 raise Exception("Component configs must be a dataclass.")
 

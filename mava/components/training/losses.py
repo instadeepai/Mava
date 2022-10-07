@@ -28,67 +28,7 @@ from mava.components import Component, training
 from mava.core_jax import SystemTrainer
 
 
-class Loss(Component):
-    @abc.abstractmethod
-    def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
-
-    @staticmethod
-    def name() -> str:
-        """_summary_
-
-        Returns:
-            _description_
-        """
-        return "loss"
-
-    @staticmethod
-    def required_components() -> List[Type[Callback]]:
-        """List of other Components required in the system for this Component to function.
-
-        BaseTrainerInit required to set up trainer.store.trainer_agents,
-        trainer.store.trainer_agent_net_keys and trainer.store.networks.
-
-        Returns:
-            List of required component classes.
-        """
-        return [
-            training.BaseTrainerInit
-        ]  # import from training to avoid partial dependency
-
-
-class HuberValueLossFunction(Loss):
-    def __init__(
-        self,
-        config: SimpleNamespace = SimpleNamespace(),
-    ):
-        """Component defines a HuberValueLossFunction loss function.
-
-        Args:
-            config: SimpleNamespace.
-        """
-        self.config = config
-
-    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """Creates and stores the huber value loss function.
-
-        Args:
-            trainer: SystemTrainer.
-
-        Returns:
-            None.
-        """
-
-        def huber_loss_fn(
-            value_error: jax.interpreters.ad.JVPTracer,
-        ) -> jax.interpreters.ad.JVPTracer:
-            """Huber loss function"""
-            return rlax.huber_loss(value_error, self.config.huber_delta)
-
-        trainer.store.value_loss_fn = huber_loss_fn
-
-
-class DefaultValueLossFunction(Loss):
+class DefaultValueLossFunction(Component):
     def __init__(
         self,
         config: SimpleNamespace = SimpleNamespace(),
@@ -118,6 +58,89 @@ class DefaultValueLossFunction(Loss):
 
         trainer.store.value_loss_fn = squared_error_loss_fn
 
+    @staticmethod
+    def name() -> str:
+        return "value_loss"
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        BaseTrainerInit required to set up trainer.store.trainer_agents,
+        trainer.store.trainer_agent_net_keys and trainer.store.networks.
+
+        Returns:
+            List of required component classes.
+        """
+        return [
+            training.BaseTrainerInit
+        ]  # import from training to avoid partial dependency
+
+
+@dataclass
+class HuberValueLossFunctionConfig:
+    huber_delta: float = 1.0
+
+
+class HuberValueLossFunction(DefaultValueLossFunction):
+    def __init__(
+        self,
+        config: HuberValueLossFunctionConfig = HuberValueLossFunctionConfig(),
+    ):
+        """Component defines a HuberValueLossFunction loss function.
+
+        Args:
+            config: HuberValueLossFunctionConfig.
+        """
+        self.config = config
+
+    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
+        """Creates and stores the huber value loss function.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
+
+        def huber_loss_fn(
+            value_error: jax.interpreters.ad.JVPTracer,
+        ) -> jax.interpreters.ad.JVPTracer:
+            """Huber loss function"""
+            return rlax.huber_loss(value_error, self.config.huber_delta)
+
+        trainer.store.value_loss_fn = huber_loss_fn
+
+
+class Loss(Component):
+    @abc.abstractmethod
+    def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "loss"
+
+    @staticmethod
+    def required_components() -> List[Type[Callback]]:
+        """List of other Components required in the system for this Component to function.
+
+        BaseTrainerInit required to set up trainer.store.trainer_agents,
+        trainer.store.trainer_agent_net_keys and trainer.store.networks.
+
+        Returns:
+            List of required component classes.
+        """
+        return [
+            training.BaseTrainerInit
+        ]  # import from training to avoid partial dependency
+
 
 @dataclass
 class MAPGTrustRegionClippingLossConfig:
@@ -126,8 +149,6 @@ class MAPGTrustRegionClippingLossConfig:
     clip_value: bool = True
     entropy_cost: float = 0.01
     value_cost: float = 0.5
-    use_huber: bool = False
-    huber_delta: float = 1.0
 
 
 class MAPGWithTrustRegionClippingLoss(Loss):
