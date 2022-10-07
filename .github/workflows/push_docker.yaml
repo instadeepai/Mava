@@ -94,7 +94,7 @@ jobs:
 
   # Action pushes new docker image if we have a PR to dev and have the label benchmark
   build-push-branches:
-    if:  ${{ github.event.label.name == 'benchmark' }}
+    if:  ${{ github.event.label.name == 'benchmark required' }}
     runs-on: ubuntu-latest
     steps:
       -
