@@ -212,75 +212,67 @@ def make_discrete_networks(
 
     num_actions = environment_spec.actions.num_values
 
-    if orthogonal_initialisation:
+    def policy_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+        policy_network = hk.Sequential(
+            [
+                observation_network,
+                hk.nets.MLP(
+                    policy_layer_sizes,
+                    activation=activation_function,
+                    w_init=(
+                        lambda x: hk.initializers.Orthogonal(scale=jnp.sqrt(2))
+                        if (x is True)
+                        else None
+                    )(orthogonal_initialisation),
+                    b_init=(
+                        lambda x: hk.initializers.Constant(constant=0.0)
+                        if (x is True)
+                        else None
+                    )(orthogonal_initialisation),
+                    activate_final=True,
+                ),
+                networks_lib.CategoricalHead(
+                    num_values=num_actions,
+                    dtype=environment_spec.actions.dtype,
+                    w_init=(
+                        lambda x: hk.initializers.Orthogonal(scale=0.01)
+                        if (x is True)
+                        else None
+                    )(orthogonal_initialisation),
+                ),
+            ]
+        )
+        return policy_network(inputs)
 
-        def policy_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
-            policy_network = hk.Sequential(
-                [
-                    observation_network,
-                    hk.nets.MLP(
-                        policy_layer_sizes,
-                        activation=activation_function,
-                        w_init=hk.initializers.Orthogonal(scale=jnp.sqrt(2)),
-                        b_init=hk.initializers.Constant(constant=0.0),
-                        activate_final=True,
-                    ),
-                    networks_lib.CategoricalHead(
-                        num_values=num_actions,
-                        dtype=environment_spec.actions.dtype,
-                        w_init=hk.initializers.Orthogonal(scale=0.01),
-                    ),
-                ]
-            )
-            return policy_network(inputs)
-
-        def critic_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
-            critic_network = hk.Sequential(
-                [
-                    observation_network,
-                    hk.nets.MLP(
-                        critic_layer_sizes,
-                        activation=activation_function,
-                        w_init=hk.initializers.Orthogonal(scale=jnp.sqrt(2)),
-                        b_init=hk.initializers.Constant(constant=0.0),
-                        activate_final=True,
-                    ),
-                    ValueHead(w_init=hk.initializers.Orthogonal(scale=1.0)),
-                ]
-            )
-            return critic_network(inputs)
-
-    else:
-
-        def policy_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
-            policy_network = hk.Sequential(
-                [
-                    observation_network,
-                    hk.nets.MLP(
-                        policy_layer_sizes,
-                        activation=activation_function,
-                        activate_final=True,
-                    ),
-                    networks_lib.CategoricalHead(
-                        num_values=num_actions, dtype=environment_spec.actions.dtype
-                    ),
-                ]
-            )
-            return policy_network(inputs)
-
-        def critic_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
-            critic_network = hk.Sequential(
-                [
-                    observation_network,
-                    hk.nets.MLP(
-                        critic_layer_sizes,
-                        activation=activation_function,
-                        activate_final=True,
-                    ),
-                    ValueHead(),
-                ]
-            )
-            return critic_network(inputs)
+    def critic_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+        critic_network = hk.Sequential(
+            [
+                observation_network,
+                hk.nets.MLP(
+                    critic_layer_sizes,
+                    activation=activation_function,
+                    w_init=(
+                        lambda x: hk.initializers.Orthogonal(scale=jnp.sqrt(2))
+                        if (x is True)
+                        else None
+                    )(orthogonal_initialisation),
+                    b_init=(
+                        lambda x: hk.initializers.Constant(constant=0.0)
+                        if (x is True)
+                        else None
+                    )(orthogonal_initialisation),
+                    activate_final=True,
+                ),
+                ValueHead(
+                    w_init=(
+                        lambda x: hk.initializers.Orthogonal(scale=1.0)
+                        if (x is True)
+                        else None
+                    )(orthogonal_initialisation)
+                ),
+            ]
+        )
+        return critic_network(inputs)
 
     # Transform into pure functions.
     policy_fn = hk.without_apply_rng(hk.transform(policy_fn))
