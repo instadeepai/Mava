@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run IPPO on SMAC and allowing death masking."""
+"""Run IPPO on SMAC with death masking."""
 
 
 import functools
@@ -42,8 +42,7 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Example running feedforward MADQN on SMAC environment."""
-
+    """Run IPPO on SMAC with death masking."""
     # Environment
     environment_factory = functools.partial(
         make_environment, map_name=FLAGS.map_name, death_masking=True
@@ -52,8 +51,8 @@ def main(_: Any) -> None:
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return ippo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(256, 256, 256),
-            critic_layer_sizes=(512, 512, 256),
+            policy_layer_sizes=(64, 64),
+            critic_layer_sizes=(64, 64, 64),
             *args,
             **kwargs,
         )

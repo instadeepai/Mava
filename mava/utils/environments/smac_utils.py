@@ -41,15 +41,15 @@ if _found_smac:
         random_seed: Optional[int] = None,
         death_masking: bool = False,
     ) -> Any:
-        """Create smac environmnet wrapper.
+        """Create smac environment wrapper.
 
         Args:
             map_name: the name of the scenario
-            concat_prev_actions: bool
-            concat_agent_id: bool
-            evaluation: bool
-            random_seed: optional
-            death_masking: whether to use death masking or not
+            concat_prev_actions: Concat one-hot vector of agent prev_action to obs.
+            concat_agent_id: Concat one-hot vector of agent ID to obs.
+            evaluation: extra param for evaluation
+            random_seed: seed
+            death_masking: whether to mask out agent observations once dead
         """
         # Env uses int64 action space due to the use of spac.Discrete.
         set_jax_double_precision()

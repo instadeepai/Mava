@@ -42,7 +42,7 @@ class SMACWrapper(ParallelEnvWrapper):
             env_preprocess_wrappers (Optional[List], optional): Wrappers
                 that preprocess envs.
                 Format (env_preprocessor, dict_with_preprocessor_params).
-            death_masking: whether it allow the death masking or not.
+            death_masking: whether to mask out agent observations once dead.
             return_state_info: return extra state info
         """
         self._environment = environment
@@ -191,7 +191,7 @@ class SMACWrapper(ParallelEnvWrapper):
         """Check if the agent is dead.
 
         Returns:
-            is_dead: bool about whether the agent still alive or is he dead.
+            is_dead: boolean indicating whether the agent is alive or dead.
         """
         is_dead = False
         if self._environment.agents[agent].health == 0.0:
@@ -212,7 +212,7 @@ class SMACWrapper(ParallelEnvWrapper):
         """
         olt_observations = {}
         for i, agent in enumerate(self._agents):
-            # Check if the agent is dead and we allow death masking
+            # Check if agent is dead, if so, apply death mask.
             if self._death_masking and self.is_dead(i):
                 observation = np.zeros_like(observations[i])
             else:
