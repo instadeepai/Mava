@@ -1,6 +1,6 @@
 from mava.components import executing
 
-# The components that a needed for IPPO with a recurrent policy.
+# The components that are needed for a recurrent policy.
 recurrent_policy_components = [
     executing.RecurrentExecutorSelectAction,
     executing.RecurrentExecutorObserve,

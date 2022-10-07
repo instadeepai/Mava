@@ -24,6 +24,7 @@ import jax.numpy as jnp
 from acme import specs
 from acme.jax import networks as networks_lib
 from acme.jax import utils
+from acme.types import NestedArray
 from dm_env import specs as dm_specs
 
 from mava import specs as mava_specs
@@ -82,7 +83,7 @@ class PPONetworks:
             rng_key: networks_lib.PRNGKey,
             mask: chex.Array = None,
             policy_state: Tuple[jnp.ndarray] = None,
-        ) -> Tuple[Any, Any, Any]:
+        ) -> Tuple[NestedArray, NestedArray, NestedArray]:
             """Get actions and relevant log probabilities from the \
                 policy network given some observations.
 

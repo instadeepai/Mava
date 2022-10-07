@@ -18,8 +18,6 @@ import abc
 from types import SimpleNamespace
 from typing import Any
 
-import jax
-import jax.numpy as jnp
 import numpy as np
 from dm_env import specs
 
