@@ -24,11 +24,13 @@ import jax
 import jax.numpy as jnp
 import pytest
 from acme.jax import networks as networks_lib
-from acme.jax import utils
-from acme.types import NestedArray
 
-from mava.components.executing.action_selection import FeedforwardExecutorSelectAction
+from mava.components.executing.action_selection import (
+    FeedforwardExecutorSelectAction,
+    RecurrentExecutorSelectAction,
+)
 from mava.systems.executor import Executor
+from mava.types import NestedArray
 
 
 @dataclass
@@ -40,7 +42,7 @@ class DummyExecutorSelectActionConfig:
 
 @pytest.fixture
 def dummy_config() -> DummyExecutorSelectActionConfig:
-    """Dummy config attribute for FeedforwardExecutorSelectAction class
+    """Dummy config attribute for FeedforwardExecutorSelectAction and RecurrentExecutorSelectAction classes
 
     Returns:
         ExecutorSelectActionConfig
@@ -60,6 +62,16 @@ def ff_executor_select_action() -> FeedforwardExecutorSelectAction:
 
 
 @pytest.fixture
+def recurrent_executor_select_action() -> RecurrentExecutorSelectAction:
+    """Create an object of the class RecurrentExecutorSelectAction.
+
+    Returns:
+        RecurrentExecutorSelectAction
+    """
+    return RecurrentExecutorSelectAction()
+
+
+@pytest.fixture
 def mock_empty_executor() -> Executor:
     """Mock executore component with empty observations"""
     store = SimpleNamespace(
@@ -68,13 +80,14 @@ def mock_empty_executor() -> Executor:
         agent_net_keys={},
         select_actions_fn=select_actions,
         base_key=42,
+        policy_states=1234,
     )
     return Executor(store=store)
 
 
 def get_action(
     observation: networks_lib.Observation,
-    rng_key: networks_lib.PRNGKey,
+    base_key: networks_lib.PRNGKey,
     legal_actions: chex.Array,
 ) -> Any:
     """Function used in the networks.
@@ -96,6 +109,9 @@ def get_params() -> Dict[str, jnp.ndarray]:
     return {"params": jnp.zeros(10)}
 
 
+#######################
+# Feedforward executors#
+#######################
 def select_actions(
     observations: Dict[str, NestedArray],
     current_params: Dict[str, NestedArray],
@@ -119,8 +135,8 @@ def select_actions(
     return action_info, policy_info, key
 
 
-class MockExecutor(Executor):
-    """Mock for the executor"""
+class MockFeedForwardExecutor(Executor):
+    """Mock for the feedforward executor"""
 
     def __init__(self) -> None:
         """Init for mock executor."""
@@ -133,6 +149,11 @@ class MockExecutor(Executor):
             "agent_0": "network_agent_0",
             "agent_1": "network_agent_1",
             "agent_2": "network_agent_2",
+        }
+        policy_states = {
+            "agent_0": 1234,
+            "agent_1": 1234,
+            "agent_2": 1234,
         }
         networks = {
             agent_net_keys["agent_0"]: SimpleNamespace(
@@ -153,7 +174,7 @@ class MockExecutor(Executor):
             is_evaluator=None,
             observations=observations,
             observation=SimpleNamespace(observation=[0.1, 0.5, 0.7], legal_actions=[1]),
-            agent="agent_0",
+            policy_states=policy_states,
             networks=networks,
             agent_net_keys=agent_net_keys,
             base_key=base_key,
@@ -177,9 +198,9 @@ class MockExecutor(Executor):
 
 
 @pytest.fixture
-def mock_executor() -> Executor:
+def mock_feedforward_executor() -> Executor:
     """Mock executor component."""
-    return MockExecutor()
+    return MockFeedForwardExecutor()
 
 
 # Test initiator
@@ -212,42 +233,180 @@ def test_on_execution_select_actions_with_empty_observations(
 
 
 def test_on_execution_select_actions(
-    mock_executor: Executor,
+    mock_feedforward_executor: Executor,
     ff_executor_select_action: FeedforwardExecutorSelectAction,
 ) -> None:
     """Test on_execution_select_actions.
 
     Args:
         ff_executor_select_action: FeedforwardExecutorSelectAction
-        mock_executor: Executor
+        mock_feedforward_executor: Executor
     """
-    ff_executor_select_action.on_execution_select_actions(executor=mock_executor)
+    ff_executor_select_action.on_execution_select_actions(
+        executor=mock_feedforward_executor
+    )
 
-    for agent in mock_executor.store.observations.keys():
-        assert mock_executor.store.actions_info[agent] == "action_info_" + agent
-        assert mock_executor.store.policies_info[agent] == "policy_info_" + agent
+    for agent in mock_feedforward_executor.store.observations.keys():
+        assert (
+            mock_feedforward_executor.store.actions_info[agent]
+            == "action_info_" + agent
+        )
+        assert (
+            mock_feedforward_executor.store.policies_info[agent]
+            == "policy_info_" + agent
+        )
 
 
-# Test on_execution_select_action_compute
-def test_on_execution_select_action_compute(
-    mock_executor: Executor,
-    ff_executor_select_action: FeedforwardExecutorSelectAction,
-) -> None:
-    """Test on_execution_select_action_compute.
+#######################
+# Recurrent executors  #
+#######################
+def select_actions(  # type: ignore # noqa: E501
+    observations: Dict[str, NestedArray],
+    current_params: Dict[str, NestedArray],
+    policy_states: Dict[str, NestedArray],
+    key: networks_lib.PRNGKey,
+) -> Tuple[
+    Dict[str, NestedArray],
+    Dict[str, NestedArray],
+    Dict[str, NestedArray],
+    networks_lib.PRNGKey,
+]:
+    """Dummy select actions.
 
     Args:
-        ff_executor_select_action: FeedforwardExecutorSelectAction
-        mock_executor: Executor
+        observations : dummy obs.
+        params : unused params.
+        key : dummy key.
+
+    Returns:
+        _description_
     """
-    for agent in mock_executor.store.observations.keys():
-        mock_executor.set_agent(agent)  # type: ignore
-        ff_executor_select_action.on_execution_select_action_compute(
-            executor=mock_executor
+    action_info = {}
+    policy_info = {}
+    for agent in observations.keys():
+        action_info[agent] = "action_info_" + str(agent)
+        policy_info[agent] = "policy_info_" + str(agent)
+    return action_info, policy_info, policy_states, key
+
+
+class MockRecurrentExecutor(Executor):  # type: ignore # noqa: E501
+    """Mock for the recurrent executor"""
+
+    def __init__(self) -> None:
+        """Init for mock executor."""
+        observations = {
+            "agent_0": [0.1, 0.5, 0.7],
+            "agent_1": [0.8, 0.3, 0.7],
+            "agent_2": [0.9, 0.9, 0.8],
+        }
+        agent_net_keys = {
+            "agent_0": "network_agent_0",
+            "agent_1": "network_agent_1",
+            "agent_2": "network_agent_2",
+        }
+        policy_states = {
+            "agent_0": "agent_0",
+            "agent_1": "agent_1",
+            "agent_2": "agent_2",
+        }
+        networks = {
+            agent_net_keys["agent_0"]: SimpleNamespace(
+                get_action=get_action, get_params=get_params
+            ),
+            agent_net_keys["agent_1"]: SimpleNamespace(
+                get_action=get_action, get_params=get_params
+            ),
+            agent_net_keys["agent_2"]: SimpleNamespace(
+                get_action=get_action, get_params=get_params
+            ),
+        }
+        base_key = jax.random.PRNGKey(5)
+        action_info = "action_info_test"
+        policy_info = "policy_info_test"
+
+        store = SimpleNamespace(
+            is_evaluator=None,
+            observations=observations,
+            observation=SimpleNamespace(observation=[0.1, 0.5, 0.7], legal_actions=[1]),
+            policy_states=policy_states,
+            networks=networks,
+            agent_net_keys=agent_net_keys,
+            base_key=base_key,
+            action_info=action_info,
+            policy_info=policy_info,
+            select_actions_fn=select_actions,
         )
-        observation = utils.add_batch_dim(mock_executor.store.observations[agent])
-        assert mock_executor.store.action_info == "action_info_after_get_action_" + str(
-            observation[0]
+        self.store = store
+
+    def set_agent(self, agent: str) -> None:
+        """Update agent, observation
+
+        Args:
+            agent: the new agent to be in store.agent
+        """
+        if agent not in self.store.observations.keys():
+            pass
+
+        self.store.agent = agent
+        self.store.observation.observation = self.store.observations[agent]
+
+
+@pytest.fixture
+def mock_recurrent_executor() -> Executor:  # type: ignore # noqa: E501
+    """Mock executor component."""
+    return MockRecurrentExecutor()  # type: ignore # noqa: E501
+
+
+# Test initiator
+def test_constructor(dummy_config: DummyExecutorSelectActionConfig) -> None:  # type: ignore # noqa: E501
+    """Test adding config as an attribute.
+
+    Args:
+        dummy_config : dummy config for test.
+    """
+
+    recurrent_executor_select_action = RecurrentExecutorSelectAction(config=dummy_config)  # type: ignore # noqa: E501
+    assert recurrent_executor_select_action.config.parm_0 == dummy_config.parm_0
+
+
+# Test on_execution_select_actions
+def test_on_execution_select_actions_with_empty_observations(  # type: ignore # noqa: E501
+    mock_empty_executor: Executor,
+    recurrent_executor_select_action: RecurrentExecutorSelectAction,
+) -> None:
+    """Test on_execution_select_actions with empty observations
+
+    Args:
+        mock_empty_executor: executor with no observations and no agents
+        recurrent_executor_select_action: RecurrentExecutorSelectAction
+    """
+    recurrent_executor_select_action.on_execution_select_actions(
+        executor=mock_empty_executor
+    )
+
+    assert mock_empty_executor.store.actions_info == {}
+    assert mock_empty_executor.store.policies_info == {}
+
+
+def test_on_execution_select_actions(  # type: ignore # noqa: E501
+    mock_recurrent_executor: Executor,
+    recurrent_executor_select_action: RecurrentExecutorSelectAction,
+) -> None:
+    """Test on_execution_select_actions.
+
+    Args:
+        recurrent_executor_select_action: RecurrentExecutorSelectAction
+        mock_recurrent_executor: Executor
+    """
+    recurrent_executor_select_action.on_execution_select_actions(
+        executor=mock_recurrent_executor
+    )
+
+    for agent in mock_recurrent_executor.store.observations.keys():
+        assert (
+            mock_recurrent_executor.store.actions_info[agent] == "action_info_" + agent
         )
-        assert mock_executor.store.policy_info == "policy_info_after_get_action_" + str(
-            observation[0]
+        assert (
+            mock_recurrent_executor.store.policies_info[agent] == "policy_info_" + agent
         )
+        assert mock_recurrent_executor.store.policy_states[agent] == agent

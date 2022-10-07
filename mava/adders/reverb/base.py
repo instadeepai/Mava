@@ -48,12 +48,12 @@ DEFAULT_PRIORITY_TABLE = "priority_table"
 class Step(NamedTuple):
     """Step class used internally for reverb adders."""
 
-    observations: Dict[str, types.NestedArray]
-    actions: Dict[str, types.NestedArray]
-    rewards: Dict[str, types.NestedArray]
-    discounts: Dict[str, types.NestedArray]
+    observations: Dict[str, mava_types.NestedArray]
+    actions: Dict[str, mava_types.NestedArray]
+    rewards: Dict[str, mava_types.NestedArray]
+    discounts: Dict[str, mava_types.NestedArray]
     start_of_episode: Union[bool, acme_specs.Array, tf.Tensor, Tuple[()]]
-    extras: Dict[str, types.NestedArray]
+    extras: Dict[str, mava_types.NestedArray]
 
 
 Trajectory = Step
@@ -364,7 +364,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
         self._writer.flush(self._max_in_flight_items)
 
     def add_first(
-        self, timestep: dm_env.TimeStep, extras: Dict[str, types.NestedArray] = {}
+        self, timestep: dm_env.TimeStep, extras: Dict[str, mava_types.NestedArray] = {}
     ) -> None:
         """Record the first observation of a trajectory."""
         if not timestep.first():
@@ -391,9 +391,9 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
 
     def add(
         self,
-        actions: Dict[str, types.NestedArray],
+        actions: Dict[str, mava_types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extras: Dict[str, types.NestedArray] = {},
+        next_extras: Dict[str, mava_types.NestedArray] = {},
     ) -> None:
         """Record an action and the following timestep."""
         if not self._add_first_called:

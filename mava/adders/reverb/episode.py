@@ -27,11 +27,10 @@ import dm_env
 import reverb
 import tensorflow as tf
 import tree
-from acme import types
 from acme.adders.reverb import utils as acme_utils
 from acme.adders.reverb.episode import EpisodeAdder, _PaddingFn
 
-from mava import specs
+from mava import specs, types
 from mava.adders.reverb import base
 from mava.adders.reverb import utils as mava_utils
 from mava.adders.reverb.base import ReverbParallelAdder

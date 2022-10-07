@@ -84,6 +84,9 @@ class Config:
                         for new_param_name in new_param_names:
                             self._param_to_component[new_param_name] = name
                     self._config[name] = dataclass
+            elif isinstance(dataclass, SimpleNamespace):
+                # SimpleNamespace implies that this component does not have config variables.
+                pass
             else:
                 raise Exception(
                     f"""
@@ -107,7 +110,6 @@ class Config:
             raise Exception(
                 "Component configs cannot be updated if config has already been built."
             )
-
         for name, dataclass in kwargs.items():
             if is_dataclass(dataclass):
                 if name in list(self._config.keys()):
@@ -138,6 +140,9 @@ class Config:
                         system. Perhaps try adding the component using .add() \
                         in the system builder."
                     )
+            elif isinstance(dataclass, SimpleNamespace):
+                # SimpleNamespace implies that this component does not have config variables.
+                pass
             else:
                 raise Exception("Component configs must be a dataclass.")
 
