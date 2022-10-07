@@ -188,7 +188,6 @@ def make_discrete_networks(
     policy_layer_sizes: Sequence[int],
     critic_layer_sizes: Sequence[int],
     observation_network: Callable = utils.batch_concat,
-    activate_mlp_final: bool = False,
     orthogonal_initialisation: bool = False
     # default behaviour is to flatten observations
 ) -> PPONetworks:
@@ -201,7 +200,6 @@ def make_discrete_networks(
         critic_layer_sizes: sizes of hidden layers for the critic network
         observation_network: optional network for processing observations.
             Defaults to utils.batch_concat.
-        activate_mlp_final: Activate final layer of intermediary MLP
         orthogonal_initialisation: Whether network weights should be
             initialised orthogonally.
 
@@ -220,7 +218,6 @@ def make_discrete_networks(
                     hk.nets.MLP(
                         policy_layer_sizes,
                         activation=jax.nn.relu,
-                        activate_final=activate_mlp_final,
                         w_init=hk.initializers.Orthogonal(scale=jnp.sqrt(2)),
                         b_init=hk.initializers.Constant(constant=0.0),
                     ),
@@ -240,7 +237,6 @@ def make_discrete_networks(
                     hk.nets.MLP(
                         critic_layer_sizes,
                         activation=jax.nn.relu,
-                        activate_final=activate_mlp_final,
                         w_init=hk.initializers.Orthogonal(scale=jnp.sqrt(2)),
                         b_init=hk.initializers.Constant(constant=0.0),
                     ),
@@ -258,7 +254,6 @@ def make_discrete_networks(
                     hk.nets.MLP(
                         policy_layer_sizes,
                         activation=jax.nn.relu,
-                        activate_final=activate_mlp_final,
                     ),
                     networks_lib.CategoricalHead(
                         num_values=num_actions, dtype=environment_spec.actions.dtype
@@ -274,7 +269,6 @@ def make_discrete_networks(
                     hk.nets.MLP(
                         critic_layer_sizes,
                         activation=jax.nn.relu,
-                        activate_final=activate_mlp_final,
                     ),
                     ValueHead(),
                 ]
@@ -313,7 +307,6 @@ def make_networks(
     ),
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
     observation_network: Callable = utils.batch_concat,
-    activate_mlp_final: bool = False,
     orthogonal_initialisation: bool = False,
 ) -> PPONetworks:
     """Function for creating PPO networks to be used.
@@ -327,7 +320,6 @@ def make_networks(
         policy_layer_sizes: size of each layer of the policy network
         critic_layer_sizes: size of each layer of the critic network
         observation_network: Network used for feature extraction layers
-        activate_mlp_final: Activate final layer of intermediary MLP
         orthogonal_initialisation: Whether network weights should be
             initialised orthogonally.
 
@@ -346,7 +338,6 @@ def make_networks(
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
             observation_network=observation_network,
-            activate_mlp_final=activate_mlp_final,
             orthogonal_initialisation=orthogonal_initialisation,
         )
 
@@ -370,7 +361,6 @@ def make_default_networks(
     ),
     critic_layer_sizes: Sequence[int] = (512, 512, 256),
     observation_network: Callable = utils.batch_concat,
-    activate_mlp_final: bool = False,
     orthogonal_initialisation: bool = False,
 ) -> Dict[str, Any]:
     """Create default PPO networks
@@ -386,9 +376,6 @@ def make_default_networks(
         observation_network: network for processing environment observations
                              defaults to flattening observations but could be
                              a CNN or similar observation processing network
-        activate_mlp_final: whether to apply an activation to the final
-                            layer of the MLP that makes up the middle
-                            layers of the policy and critic networks
         orthogonal_initialisation: whether network weights should be
                             initialised orthogonally. This will initialise
                             all hidden layers weights with scale sqrt(2) and
@@ -419,7 +406,6 @@ def make_default_networks(
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
             observation_network=observation_network,
-            activate_mlp_final=activate_mlp_final,
             orthogonal_initialisation=orthogonal_initialisation,
         )
 
