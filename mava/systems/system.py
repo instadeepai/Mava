@@ -168,9 +168,6 @@ class System(BaseSystem):
 
         Raises:
             Exception: if system has not already been built.
-
-        Returns:
-            None.
         """
         if not self._built:
             raise Exception(
