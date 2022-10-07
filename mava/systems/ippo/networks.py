@@ -220,6 +220,7 @@ def make_discrete_networks(
                         activation=jax.nn.relu,
                         w_init=hk.initializers.Orthogonal(scale=jnp.sqrt(2)),
                         b_init=hk.initializers.Constant(constant=0.0),
+                        activate_final=True,
                     ),
                     networks_lib.CategoricalHead(
                         num_values=num_actions,
@@ -239,6 +240,7 @@ def make_discrete_networks(
                         activation=jax.nn.relu,
                         w_init=hk.initializers.Orthogonal(scale=jnp.sqrt(2)),
                         b_init=hk.initializers.Constant(constant=0.0),
+                        activate_final=True,
                     ),
                     ValueHead(w_init=hk.initializers.Orthogonal(scale=1.0)),
                 ]
@@ -254,6 +256,7 @@ def make_discrete_networks(
                     hk.nets.MLP(
                         policy_layer_sizes,
                         activation=jax.nn.relu,
+                        activate_final=True,
                     ),
                     networks_lib.CategoricalHead(
                         num_values=num_actions, dtype=environment_spec.actions.dtype
@@ -269,6 +272,7 @@ def make_discrete_networks(
                     hk.nets.MLP(
                         critic_layer_sizes,
                         activation=jax.nn.relu,
+                        activate_final=True,
                     ),
                     ValueHead(),
                 ]
