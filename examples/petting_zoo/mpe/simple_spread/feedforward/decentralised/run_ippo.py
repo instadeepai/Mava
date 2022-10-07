@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running IPPO on debug MPE environments."""
+"""Example running IPPO on MPE environments."""
 import functools
 from datetime import datetime
 from typing import Any
