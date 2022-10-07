@@ -21,6 +21,7 @@ from typing import Any
 import optax
 from absl import app, flags
 
+from mava.components import huber_value_loss_components
 from mava.systems import ippo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -93,6 +94,9 @@ def main(_: Any) -> None:
     # Create the system.
     system = ippo.IPPOSystem()
 
+    # Use the huber value loss.
+    system.update(huber_value_loss_components)
+
     # Build the system.
     system.build(
         environment_factory=environment_factory,
@@ -107,7 +111,6 @@ def main(_: Any) -> None:
         num_executors=1,
         multi_process=True,
         clip_value=False,
-        use_huber=True,  # Use huber loss
         huber_delta=1.0,
     )
 
