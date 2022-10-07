@@ -16,4 +16,3 @@
 """Components for Mava systems."""
 
 from mava.components.component import Component
-from mava.components.component_groups import huber_value_loss_components
