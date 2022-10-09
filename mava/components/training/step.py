@@ -284,10 +284,11 @@ class MAPGWithTrustRegionStep(Step):
 
             # Denormalise the values here to keep the GAE function clean
             target_stats = states.target_stats
-            if hasattr(trainer.store, "running_stats_fn"):
-                behavior_values = jax.tree_util.tree_map(
-                    denormalize, target_stats, behavior_values
-                )
+            if hasattr(trainer.store, "target_running_stats_fn"):
+                for key in agent_nets:
+                    behavior_values[key] = denormalize(
+                        target_stats[key], behavior_values[key]
+                    )
 
             # Vmap over batch dimension
             batch_gae_advantages = jax.vmap(trainer.store.gae_fn, in_axes=0)
@@ -299,17 +300,16 @@ class MAPGWithTrustRegionStep(Step):
                     rewards[key], discounts[key], behavior_values[key]
                 )
                 # Update the running stats if the running stats function exist.
-                if hasattr(trainer.store, "running_stats_fn"):
+                if hasattr(trainer.store, "target_running_stats_fn"):
                     target_stats[key] = trainer.store.target_running_stats_fn(
                         target_stats[key], jnp.reshape(target_values[key], (-1, 1))
                     )
-                    target_values = jax.tree_util.tree_map(
-                        normalize, target_stats, target_values
+                    target_values[key] = normalize(
+                        target_stats[key], target_values[key]
                     )
 
             # Exclude the last step - it was only used for bootstrapping.
             # The shape is [num_sequences, num_steps, ..]
-
             (
                 observations,
                 actions,

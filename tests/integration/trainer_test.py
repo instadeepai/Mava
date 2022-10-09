@@ -118,6 +118,11 @@ def test_trainer_single_process_norm(test_system_sp_norm: System) -> None:
         assert jnp.all(obs_norm_params["var"] == 0)
         assert jnp.all(obs_norm_params["count"] == 1e-4)
 
+        target_stats = trainer.store.target_stats[agent]
+        assert jnp.all(target_stats["mean"] == 0)
+        assert jnp.all(target_stats["var"] == 0)
+        assert jnp.all(target_stats["count"] == 1e-4)
+
     trainer.step()
 
     # After run step method
@@ -141,3 +146,6 @@ def test_trainer_single_process_norm(test_system_sp_norm: System) -> None:
         assert not jnp.all(obs_norm_params["mean"] == 0)
         assert not jnp.all(obs_norm_params["var"] == 0)
         assert not jnp.all(obs_norm_params["count"] == 1e-4)
+
+        target_stats = trainer.store.target_stats[agent]
+        assert not jnp.all(target_stats["count"] == 1e-4)
