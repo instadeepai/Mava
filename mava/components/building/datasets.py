@@ -101,6 +101,7 @@ class TransitionDataset(TrainerDataset):
         Returns:
             None.
         """
+        builder.store.sample_batch_size = self.config.sample_batch_size
         max_in_flight_samples_per_worker = self.config.max_in_flight_samples_per_worker
         dataset = datasets.make_reverb_dataset(
             table=builder.store.trainer_id,  # Set by builder
@@ -151,6 +152,7 @@ class TrajectoryDataset(TrainerDataset):
         Returns:
             None.
         """
+        builder.store.sample_batch_size = self.config.sample_batch_size
         dataset = reverb.TrajectoryDataset.from_table_signature(
             server_address=builder.store.data_server_client.server_address,
             table=builder.store.trainer_id,

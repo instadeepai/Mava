@@ -110,6 +110,7 @@ class DefaultTrainerStep(TrainerStep):
 
         # Do a batch of SGD.
         sample = next(trainer.store.dataset_iterator)
+
         results = trainer.store.step_fn(sample)
 
         # Update our counts and record it.
@@ -204,6 +205,7 @@ class MAPGWithTrustRegionStep(Step):
             * (trainer.store.global_config.sequence_length - 1)
         )
 
+    # flake8: noqa: C901
     def on_training_step_fn(self, trainer: SystemTrainer) -> None:
         """Define and store the SGD step function for MAPGWithTrustRegion.
 
@@ -231,7 +233,7 @@ class MAPGWithTrustRegionStep(Step):
             # Extract the data.
             data = sample.data
 
-            observations, actions, rewards, termination, extra = (
+            observations, actions, rewards, termination, extras = (
                 data.observations,
                 data.actions,
                 data.rewards,
@@ -254,7 +256,7 @@ class MAPGWithTrustRegionStep(Step):
                 lambda x: x * self.config.discount, termination
             )
 
-            behavior_log_probs = extra["policy_info"]
+            behavior_log_probs = extras["policy_info"]
 
             networks = trainer.store.networks
 
@@ -307,6 +309,7 @@ class MAPGWithTrustRegionStep(Step):
 
             # Exclude the last step - it was only used for bootstrapping.
             # The shape is [num_sequences, num_steps, ..]
+
             (
                 observations,
                 actions,
@@ -317,8 +320,17 @@ class MAPGWithTrustRegionStep(Step):
                 (observations, actions, behavior_log_probs, behavior_values),
             )
 
+            if "policy_states" in extras:
+                policy_states = jax.tree_util.tree_map(
+                    lambda x: x[:, :-1],
+                    extras["policy_states"],
+                )
+            else:
+                policy_states = {agent: None for agent in trainer.store.agents}
+
             trajectories = Batch(
                 observations=observations,
+                policy_states=policy_states,
                 actions=actions,
                 advantages=advantages,
                 behavior_log_probs=behavior_log_probs,
@@ -422,7 +434,7 @@ class MAPGWithTrustRegionStep(Step):
             policy_opt_states = trainer.store.policy_opt_states
             critic_opt_states = trainer.store.critic_opt_states
 
-            random_key, _ = jax.random.split(trainer.store.base_key)
+            _, random_key = jax.random.split(trainer.store.base_key)
             target_stats = trainer.store.target_stats
             observation_stats = trainer.store.obs_norm_params[
                 constants.OBS_NORM_STATE_DICT_KEY
