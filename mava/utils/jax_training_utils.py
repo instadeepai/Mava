@@ -8,6 +8,8 @@ import tensorflow_probability.substrates.jax.distributions as tfd
 from chex import Array
 from jax.config import config as jax_config
 
+from mava.types import OLT
+
 
 def action_mask_categorical_policies(
     distribution: tfd.Categorical, mask: Array
@@ -83,7 +85,7 @@ def denormalize(stats: Any, batch: jnp.ndarray) -> jnp.ndarray:
     return denormalize_batch
 
 
-def update_and_normalize_observations(stats: Any, observation: Any) -> Tuple[Any, Any]:
+def update_and_normalize_observations(stats: Any, observation: OLT) -> Tuple[Any, OLT]:
     """Update running stats and normalise observations
 
     stats (Dictionary)   -- array with running mean, var, count.
@@ -106,7 +108,7 @@ def update_and_normalize_observations(stats: Any, observation: Any) -> Tuple[Any
     return upd_stats, observation._replace(observation=norm_obs)
 
 
-def normalize_observations(stats: Any, observation: Any) -> Tuple[Any, Any]:
+def normalize_observations(stats: Any, observation: OLT) -> OLT:
     """Normalise a single observation
 
     stats (Dictionary)   -- array with running mean, var, count.
