@@ -39,7 +39,7 @@ def test_network_factory() -> Callable:
     def make_default_networks(
         environment_spec: MAEnvironmentSpec,
         agent_net_keys: Dict[str, str],
-        rng_key: List[int],
+        base_key: List[int],
         net_spec_keys: Dict[str, str] = {},
         policy_layer_sizes: Sequence[int] = (
             256,
@@ -56,7 +56,7 @@ def test_network_factory() -> Callable:
             networks[net_key] = {
                 "environment_spec": environment_spec,
                 "agent_net_keys": agent_net_keys,
-                "rng_key": rng_key,
+                "base_key": base_key,
                 "net_spec_keys": net_spec_keys,
                 "policy_layer_sizes": policy_layer_sizes,
                 "critic_layer_sizes": critic_layer_sizes,
@@ -213,13 +213,98 @@ def test_network_factory_rng_keys(
     keys = []
     for network in networks.values():
         # Ensure keys are all the correct type
-        assert isinstance(network["rng_key"], jax.random.PRNGKeyArray) or isinstance(
-            network["rng_key"], jax.numpy.DeviceArray
+        assert isinstance(network["base_key"], jax.random.PRNGKeyArray) or isinstance(
+            network["base_key"], jax.numpy.DeviceArray
         )
-        keys.append(tuple(network["rng_key"].tolist()))
+        keys.append(tuple(network["base_key"].tolist()))
 
     # Ensure network factory passes the same key along to each network initialisation
     assert len(set(keys)) == 1
+
+
+@pytest.fixture
+def test_recurrent_network_factory() -> Callable:
+    """Pytest fixture for network factory.
+
+    Returns:
+        Network factory using custom make_default_networks.
+    """
+
+    def make_default_networks(
+        environment_spec: MAEnvironmentSpec,
+        agent_net_keys: Dict[str, str],
+        base_key: List[int],
+        net_spec_keys: Dict[str, str] = {},
+        policy_layer_sizes: Sequence[int] = (
+            256,
+            256,
+            256,
+        ),
+        policy_recurrent_layer_sizes: Sequence[int] = (256,),
+        critic_layer_sizes: Sequence[int] = (512, 512, 256),
+    ) -> Dict[str, Any]:
+        net_keys = {"net_1", "net_2", "net_3"}
+        networks = {}
+
+        for net_key in net_keys:
+            networks[net_key] = {
+                "environment_spec": environment_spec,
+                "agent_net_keys": agent_net_keys,
+                "base_key": base_key,
+                "net_spec_keys": net_spec_keys,
+                "policy_layer_sizes": policy_layer_sizes,
+                "critic_layer_sizes": critic_layer_sizes,
+                "policy_recurrent_layer_sizes": policy_recurrent_layer_sizes,
+                "net_key": net_key,
+            }
+
+        return networks
+
+    def network_factory(*args: Any, **kwargs: Any) -> Any:
+        return make_default_networks(  # type: ignore
+            policy_layer_sizes=(256, 256, 256),
+            critic_layer_sizes=(512, 512, 256),
+            policy_recurrent_layer_sizes=(256,),
+            *args,
+            **kwargs,
+        )
+
+    return network_factory
+
+
+@pytest.fixture
+def test_recurrent_networks(test_recurrent_network_factory: Callable) -> Networks:
+    """Pytest fixture for default networks.
+
+    Args:
+        test_recurrent_network_factory: factory to use in recurrent networks config.
+
+    Returns:
+        Default networks test component.
+    """
+    networks_config = NetworksConfig()
+    networks_config.network_factory = test_recurrent_network_factory
+    networks_config.seed = 919
+
+    return DefaultNetworks(networks_config)
+
+
+def test_network_factory_recurrent_layers(
+    test_recurrent_networks: Networks, test_builder: SystemBuilder
+) -> None:
+    """Test if rng keys are given to the network factory and stored by build.
+
+    Args:
+        test_recurrent_networks: Pytest fixture for recurrent networks component.
+        test_builder: Pytest fixture for test system builder
+
+    Returns:
+        None.
+    """
+    test_recurrent_networks.on_building_init_start(test_builder)
+    networks = test_builder.store.network_factory()
+
+    assert networks["net_2"]["policy_recurrent_layer_sizes"] == (256,)
 
 
 def test_no_network_factory_before_build(test_builder: SystemBuilder) -> None:

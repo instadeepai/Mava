@@ -44,6 +44,7 @@ class Launcher:
         name: str = "System",
         terminal: str = "current_terminal",
         is_test: Optional[bool] = False,
+        wait: Optional[bool] = False,
     ) -> None:
         """Initialise the launcher.
 
@@ -62,8 +63,10 @@ class Launcher:
             name : launchpad program name.
             terminal : terminal for launchpad processes to be shown on.
             is_test : whether to set testing launchpad launch_type.
+            wait: the worker manager will wait worker_manager.wait()
         """
         self._is_test = is_test
+        self._wait = wait
         self._multi_process = multi_process
         self._name = name
         self._single_process_trainer_period = single_process_trainer_period
@@ -117,6 +120,7 @@ class Launcher:
 
         if self._multi_process:
             with self._program.group(name):
+                # Save the current PID to manage the termination of the process
                 if self._is_test:
                     node_fn = copy_node_fn(node_fn)
                 node = self._program.add_node(node_type(node_fn, *arguments))
@@ -159,11 +163,7 @@ class Launcher:
         return self._nodes
 
     def launch(self) -> None:
-        """Launch the launchpad program or start the single-process system loop.
-
-        Returns:
-            None.
-        """
+        """Launch the launchpad program or start the single-process system loop."""
         if self._multi_process:
             if self._is_test:
                 launch_type = lp.LaunchType.TEST_MULTI_THREADING
@@ -175,12 +175,15 @@ class Launcher:
                 nodes_on_gpu=self._nodes_on_gpu,
             )
 
-            lp.launch(
+            worker_manager = lp.launch(
                 self._program,
                 launch_type=launch_type,
                 terminal=self._terminal,
                 local_resources=local_resources,
             )
+
+            if self._wait:
+                worker_manager.wait()
 
         else:
             episode = 1

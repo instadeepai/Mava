@@ -14,6 +14,12 @@
 # limitations under the License.
 
 """Executor components for Mava systems."""
-from mava.components.executing.action_selection import FeedforwardExecutorSelectAction
+from mava.components.executing.action_selection import (
+    FeedforwardExecutorSelectAction,
+    RecurrentExecutorSelectAction,
+)
 from mava.components.executing.base import ExecutorInit
-from mava.components.executing.observing import FeedforwardExecutorObserve
+from mava.components.executing.observing import (
+    FeedforwardExecutorObserve,
+    RecurrentExecutorObserve,
+)

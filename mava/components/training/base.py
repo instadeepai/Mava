@@ -28,6 +28,7 @@ class Batch(NamedTuple):
     """A batch of data; all shapes are expected to be [B, ...]."""
 
     observations: Any
+    policy_states: Any
     actions: Any
     advantages: Any
 
