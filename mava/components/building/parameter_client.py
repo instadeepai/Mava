@@ -206,7 +206,6 @@ class TrainerParameterClient(BaseParameterClient):
         # Add observations' normalisation parameters
         params["obs_norm_params"] = builder.store.obs_norm_params
         set_keys.append("obs_norm_params")
-        get_keys.append("obs_norm_params")
 
         count_names, params = self._set_up_count_parameters(params=params)
 

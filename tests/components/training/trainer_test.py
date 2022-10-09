@@ -97,7 +97,7 @@ class MockBuilder(Builder):
 
         # Added this to handle the observation normalisation parameters
         obs_spec = SimpleNamespace(
-            observations=SimpleNamespace(observation=np.zeros(10)),
+            observations=SimpleNamespace(observation=np.zeros(1)),
         )
         self.store.ma_environment_spec = SimpleNamespace(
             _agent_environment_specs={
