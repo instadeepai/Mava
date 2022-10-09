@@ -40,7 +40,7 @@ from mava.components.training.advantage_estimation import GAE
 from mava.components.training.base import Batch, TrainingState
 from mava.components.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
-from mava.utils.jax_training_utils import normalize
+from mava.utils.jax_training_utils import denormalize, normalize
 
 
 @dataclass
@@ -239,6 +239,17 @@ class MAPGWithTrustRegionStep(Step):
                 data.extras,
             )
 
+            # Perform observation normalization if neccesary before proceeding
+            observation_stats = states.observation_stats
+            if hasattr(trainer.store, "norm_obs_running_stats_fn"):
+                for key in observations.keys():
+                    (
+                        observation_stats[key],
+                        observations[key],
+                    ) = trainer.store.norm_obs_running_stats_fn(
+                        observation_stats[key], observations[key]
+                    )
+
             discounts = tree.map_structure(
                 lambda x: x * self.config.discount, termination
             )
@@ -269,30 +280,30 @@ class MAPGWithTrustRegionStep(Step):
                 for key in agent_nets.keys()
             }
 
+            # Denormalise the values here to keep the GAE function clean
+            target_stats = states.target_stats
+            if hasattr(trainer.store, "running_stats_fn"):
+                behavior_values = jax.tree_util.tree_map(
+                    denormalize, target_stats, behavior_values
+                )
+
             # Vmap over batch dimension
             batch_gae_advantages = jax.vmap(trainer.store.gae_fn, in_axes=0)
 
             advantages = {}
             target_values = {}
-            stats = states.stats
             for key in rewards.keys():
-                batch_tmp = rewards[key].shape[0]
                 advantages[key], target_values[key] = batch_gae_advantages(
-                    rewards[key],
-                    discounts[key],
-                    behavior_values[key],
-                    jnp.repeat(stats[key][None, :], batch_tmp, axis=0),
+                    rewards[key], discounts[key], behavior_values[key]
                 )
-
                 # Update the running stats if the running stats function exist.
                 if hasattr(trainer.store, "running_stats_fn"):
-                    stats[key] = trainer.store.running_stats_fn(
-                        stats[key], target_values[key]
+                    target_stats[key] = trainer.store.target_running_stats_fn(
+                        target_stats[key], jnp.reshape(target_values[key], (-1, 1))
                     )
-
-                target_values[key] = jax.lax.stop_gradient(
-                    normalize(stats[key], target_values[key])
-                )
+                    target_values = jax.tree_util.tree_map(
+                        normalize, target_stats, target_values
+                    )
 
             # Exclude the last step - it was only used for bootstrapping.
             # The shape is [num_sequences, num_steps, ..]
@@ -384,7 +395,8 @@ class MAPGWithTrustRegionStep(Step):
                 policy_opt_states=new_policy_opt_states,
                 critic_opt_states=new_critic_opt_states,
                 random_key=new_key,
-                stats=stats,
+                target_stats=target_stats,
+                observation_stats=observation_stats,
             )
             return new_states, metrics
 
@@ -411,7 +423,10 @@ class MAPGWithTrustRegionStep(Step):
             critic_opt_states = trainer.store.critic_opt_states
 
             random_key, _ = jax.random.split(trainer.store.base_key)
-            stats = trainer.store.stats
+            target_stats = trainer.store.target_stats
+            observation_stats = trainer.store.obs_norm_params[
+                constants.OBS_NORM_STATE_DICT_KEY
+            ]
 
             states = TrainingState(
                 policy_params=policy_params,
@@ -419,7 +434,8 @@ class MAPGWithTrustRegionStep(Step):
                 policy_opt_states=policy_opt_states,
                 critic_opt_states=critic_opt_states,
                 random_key=random_key,
-                stats=stats,
+                target_stats=target_stats,
+                observation_stats=observation_stats,
             )
 
             new_states, metrics = sgd_step(states, sample)
@@ -467,8 +483,27 @@ class MAPGWithTrustRegionStep(Step):
                     constants.OPT_STATE_DICT_KEY
                 ] = new_states.critic_opt_states[net_key][constants.OPT_STATE_DICT_KEY]
 
-            # update the running stats
-            trainer.store.stats = new_states.stats
+            # Update the observation normalization parameters
+            for agent in trainer.store.trainer_agent_net_keys.keys():
+                obs_shape = len(
+                    trainer.store.obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY][
+                        agent
+                    ]["mean"]
+                )
+                for x in range(obs_shape):
+                    trainer.store.obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY][
+                        agent
+                    ]["mean"][x] = new_states.observation_stats[agent]["mean"][x]
+                    trainer.store.obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY][
+                        agent
+                    ]["var"][x] = new_states.observation_stats[agent]["var"][x]
+
+                trainer.store.obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY][agent][
+                    "count"
+                ][0] = new_states.observation_stats[agent]["count"][x]
+
+            # update the running target stats
+            trainer.store.target_stats = new_states.target_stats
 
             return metrics
 

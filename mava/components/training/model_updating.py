@@ -33,7 +33,10 @@ from mava.components.training.losses import Loss
 from mava.components.training.step import Step
 from mava.components.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
-from mava.utils.jax_training_utils import compute_running_mean_var_count
+from mava.utils.jax_training_utils import (
+    compute_running_mean_var_count,
+    update_and_normalize_observations,
+)
 
 
 class MinibatchUpdate(Utility):
@@ -68,6 +71,7 @@ class MinibatchUpdate(Utility):
 class MAPGMinibatchUpdateConfig:
     normalize_advantage: bool = True
     normalize_target_values: bool = False
+    normalize_observations: bool = False
 
 
 class MAPGMinibatchUpdate(MinibatchUpdate):
@@ -95,17 +99,32 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
             None.
         """
 
-        # Initilaise running statisitics here
-
+        # Initilaise target values running statisitics here
         if self.config.normalize_target_values:
-            trainer.store.running_stats_fn = compute_running_mean_var_count
-            running_stats = jnp.array([0, 0, 1e-4])
-        else:
-            running_stats = jnp.array([0, 1, 1e-4])
+            trainer.store.target_running_stats_fn = compute_running_mean_var_count
+            running_stats = dict(
+                mean=jnp.array([0]), var=jnp.array([0]), count=jnp.array([1e-4])
+            )
 
-        trainer.store.stats = {}
-        for net_key in trainer.store.trainer_agent_net_keys.keys():
-            trainer.store.stats[net_key] = running_stats
+        trainer.store.target_stats = {}
+        for agent in trainer.store.trainer_agent_net_keys.keys():
+            trainer.store.target_stats[agent] = running_stats
+
+        # Initilaise observations running statisitics here
+        # We only need to modify the variance since this is actually intiailised
+        # in the training/trainer on_building_init_end callback.
+        if self.config.normalize_observations:
+            trainer.store.norm_obs_running_stats_fn = update_and_normalize_observations
+            for agent in trainer.store.trainer_agent_net_keys.keys():
+                obs_shape = len(
+                    trainer.store.obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY][
+                        agent
+                    ]["var"]
+                )
+                for x in range(obs_shape):
+                    trainer.store.obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY][
+                        agent
+                    ]["var"][x] = 0
 
         def model_update_minibatch(
             carry: Tuple[

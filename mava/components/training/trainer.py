@@ -20,6 +20,8 @@ from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any, Dict, List, Type
 
+import numpy as np
+
 from mava import constants
 from mava.callbacks import Callback
 from mava.components import Component
@@ -94,6 +96,21 @@ class BaseTrainerInit(Component):
                     builder.store.networks[net_key].critic_params
                 )
             }  # pytype: disable=attribute-error
+
+        # Initialise observations' normalisation parameters
+        builder.store.obs_norm_params = {}
+        builder.store.obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY] = {}
+        for agent in builder.store.agents:
+            obs_shape = builder.store.ma_environment_spec._agent_environment_specs[
+                agent
+            ].observations.observation.shape
+            builder.store.obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY][
+                agent
+            ] = dict(
+                mean=np.zeros(shape=obs_shape),
+                var=np.ones(shape=obs_shape),
+                count=np.array([1e-4]),
+            )
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """Set up and store trainer agents.

@@ -112,6 +112,10 @@ class ExecutorParameterClient(BaseParameterClient):
             ].critic_params
             get_keys.append(critic_param_key)
 
+        # Create observations' normalisation parameters
+        params["obs_norm_params"] = builder.store.obs_norm_params
+        get_keys.append("obs_norm_params")
+
         count_names, params = self._set_up_count_parameters(params=params)
 
         get_keys.extend(count_names)
@@ -198,6 +202,11 @@ class TrainerParameterClient(BaseParameterClient):
             ]
             set_keys.append(f"policy_opt_state-{net_key}")
             set_keys.append(f"critic_opt_state-{net_key}")
+
+        # Add observations' normalisation parameters
+        params["obs_norm_params"] = builder.store.obs_norm_params
+        set_keys.append("obs_norm_params")
+        get_keys.append("obs_norm_params")
 
         count_names, params = self._set_up_count_parameters(params=params)
 

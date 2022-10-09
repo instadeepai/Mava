@@ -1,6 +1,9 @@
 import os
+from typing import Any, Tuple
 
+import jax
 import jax.numpy as jnp
+import numpy as np
 import tensorflow_probability.substrates.jax.distributions as tfd
 from chex import Array
 from jax.config import config as jax_config
@@ -19,23 +22,21 @@ def action_mask_categorical_policies(
     return tfd.Categorical(logits=masked_logits, dtype=distribution.dtype)
 
 
-def compute_running_mean_var_count(
-    stats: jnp.ndarray, batch: jnp.ndarray
-) -> jnp.ndarray:
+def compute_running_mean_var_count(stats: Any, batch: jnp.ndarray) -> jnp.ndarray:
     """Updates the running mean, variance and data counts during training.
 
-    stats (array) -- mean, var, count.
+    stats (Any)   -- dictionary with running mean, var, count.
     batch (array) -- current batch of data.
 
     Returns:
         stats (array)
     """
 
-    batch_mean = jnp.mean(batch)
-    batch_var = jnp.var(batch)
-    batch_count = batch.size
+    batch_mean = jnp.mean(batch, axis=0)
+    batch_var = jnp.var(batch, axis=0)
+    batch_count = batch.shape[0]
 
-    mean, var, count = stats[0], stats[1], stats[2]
+    mean, var, count = stats["mean"], stats["var"], stats["count"]
 
     delta = batch_mean - mean
     tot_count = count + batch_count
@@ -47,39 +48,82 @@ def compute_running_mean_var_count(
     new_var = M2 / tot_count
     new_count = tot_count
 
-    return jnp.array([new_mean, new_var, new_count])
+    return dict(mean=new_mean, var=new_var, count=new_count)
 
 
-def normalize(stats: jnp.ndarray, batch: jnp.ndarray) -> jnp.ndarray:
+def normalize(stats: Any, batch: jnp.ndarray) -> jnp.ndarray:
     """Normlaise batch of data using the running mean and variance.
 
-    stats (array) -- mean, var, count.
+    stats (Any)   -- dictionary with running mean, var, count.
     batch (array) -- current batch of data.
 
     Returns:
         denormalize batch (array)
     """
 
-    mean, var = stats[0], stats[1]
+    mean, var = stats["mean"], stats["var"]
     normalize_batch = (batch - mean) / (jnp.sqrt(jnp.clip(var, a_min=1e-2)))
 
     return normalize_batch
 
 
-def denormalize(stats: jnp.ndarray, batch: jnp.ndarray) -> jnp.ndarray:
+def denormalize(stats: Any, batch: jnp.ndarray) -> jnp.ndarray:
     """Transform normalized data back into original distribution
 
-    stats (array) -- mean, var, count
+    stats (Any)   -- dictionary with running mean, var, count.
     batch (array) -- current batch of data
 
     Returns:
         denormalize batch (array)
     """
 
-    mean, var = stats[0], stats[1]
+    mean, var = stats["mean"], stats["var"]
     denormalize_batch = batch * jnp.sqrt(var) + mean
 
     return denormalize_batch
+
+
+def update_and_normalize_observations(stats: Any, observation: Any) -> Tuple[Any, Any]:
+    """Update running stats and normalise observations
+
+    stats (Dictionary)   -- array with running mean, var, count.
+    batch (OLT namespace)   -- current batch of data for a single agent.
+
+    Returns:
+        normalize batch (Dictionary)
+    """
+
+    obs_shape = observation.observation.shape
+    obs = jax.tree_util.tree_map(
+        lambda x: jnp.reshape(x, [-1] + list(x.shape[2:])), observation.observation
+    )
+    upd_stats = compute_running_mean_var_count(stats, obs)
+    norm_obs = normalize(upd_stats, obs)
+
+    # reshape before returning
+    norm_obs = jnp.reshape(norm_obs, obs_shape)
+
+    return upd_stats, observation._replace(observation=norm_obs)
+
+
+def normalize_observations(stats: Any, observation: Any) -> Tuple[Any, Any]:
+    """Normalise a single observation
+
+    stats (Dictionary)   -- array with running mean, var, count.
+    batch (OLT namespace) -- current batch of data in for an agent
+
+    Returns:
+        denormalize batch (Dictionary)
+    """
+
+    # The type casting is required because we need to preserve
+    # the data type before the policy info is computed else we will get
+    # an error from the table about the type of policy being double instead of float.
+    dtype = observation.observation.dtype
+    obs = observation.observation
+    norm_obs = np.array(normalize(stats, obs), dtype=dtype)
+
+    return observation._replace(observation=norm_obs)
 
 
 def set_growing_gpu_memory_jax() -> None:
