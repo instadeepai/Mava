@@ -46,6 +46,9 @@ def test_executor() -> Executor:
         store=SimpleNamespace(
             store_key="expected_value",
             is_evaluator=False,
+            global_config=SimpleNamespace(
+                normalize_observations=False, normalize_target_values=False
+            ),
         ),
         components=[],
     )
