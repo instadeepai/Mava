@@ -16,11 +16,10 @@
 """Jax-based Mava system implementation."""
 import copy
 from types import SimpleNamespace
-from typing import Any, Dict, List, Tuple, Type, Union
+from typing import Any, List, Type, Union
 
 from mava.components import Component
 from mava.core_jax import BaseSystem
-from mava.specs import DesignSpec
 from mava.systems import Builder, Config
 
 
@@ -58,22 +57,17 @@ class System(BaseSystem):
         """
         for component in self._design.get().values():
             config_class = component.__init__.__annotations__["config"]
-            input = {component.name(): config_class()}
-            self.config.add(**input)
 
-    @abc.abstractmethod
-    def design(self) -> Tuple[DesignSpec, Dict]:
-        """System design specifying the list of components to use.
-
-        Returns:
-            Tuple[system callback components, system config].
-        """
+            if config_class is not SimpleNamespace:
+                input = {component.name(): config_class()}
+                self.config.add(**input)
 
     def update(self, components: Union[Any, List[Any]]) -> None:
         """Update components that has already been added to the system.
-        
+
         Args:
             components: system callback component or list of components.
+
         Returns:
             None.
         """
