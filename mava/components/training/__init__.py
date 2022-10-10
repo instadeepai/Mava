@@ -17,9 +17,9 @@
 from mava.components.training.advantage_estimation import GAE
 from mava.components.training.base import Batch, TrainingState, Utility
 from mava.components.training.losses import (
-    DefaultValueLossFunction,
     HuberValueLossFunction,
     MAPGWithTrustRegionClippingLoss,
+    SquaredErrorLoss,
 )
 from mava.components.training.model_updating import MAPGEpochUpdate, MAPGMinibatchUpdate
 from mava.components.training.step import DefaultTrainerStep, MAPGWithTrustRegionStep

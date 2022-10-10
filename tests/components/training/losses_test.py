@@ -23,10 +23,11 @@ import jax.numpy as jnp
 import pytest
 
 from mava.components.training.losses import (
-    DefaultValueLossFunction,
     HuberValueLossFunction,
+    HuberValueLossFunctionConfig,
     MAPGTrustRegionClippingLossConfig,
     MAPGWithTrustRegionClippingLoss,
+    SquaredErrorLoss,
 )
 from mava.systems.trainer import Trainer
 
@@ -160,7 +161,7 @@ def test_mapg_creation(
     mapg_loss: MAPGWithTrustRegionClippingLoss,  # noqa: E501
 ) -> None:
     """Test whether mapg functions are successfully created"""
-    default_loss = DefaultValueLossFunction()
+    default_loss = SquaredErrorLoss()
     default_loss.on_training_utility_fns(trainer=mock_trainer)
     mapg_loss.on_training_loss_fns(trainer=mock_trainer)
     assert hasattr(mock_trainer.store, "policy_grad_fn")
@@ -171,7 +172,9 @@ def test_mapg_creation(
     assert isinstance(
         mock_trainer.store.critic_grad_fn, Callable  # type:ignore
     )
-    huber_loss = HuberValueLossFunction()
+    huber_loss = HuberValueLossFunction(
+        config=HuberValueLossFunctionConfig(huber_delta=2.0)
+    )
     huber_loss.on_training_utility_fns(trainer=mock_trainer)
     mapg_loss.on_training_loss_fns(trainer=mock_trainer)
     assert hasattr(mock_trainer.store, "policy_grad_fn")
@@ -182,6 +185,7 @@ def test_mapg_creation(
     assert isinstance(
         mock_trainer.store.critic_grad_fn, Callable  # type:ignore
     )
+    assert huber_loss.config.huber_delta == 2
 
 
 def test_mapg_loss(
@@ -189,7 +193,7 @@ def test_mapg_loss(
     mapg_loss: MAPGWithTrustRegionClippingLoss,  # noqa: E501
 ) -> None:
     """Test whether mapg loss output is as expected"""
-    default_loss = DefaultValueLossFunction()
+    default_loss = SquaredErrorLoss()
     default_loss.on_training_utility_fns(trainer=mock_trainer)
     mapg_loss.on_training_loss_fns(trainer=mock_trainer)
     policy_grad_fn = mock_trainer.store.policy_grad_fn

@@ -29,12 +29,12 @@ from mava.components import Component, training
 from mava.core_jax import SystemTrainer
 
 
-class DefaultValueLossFunction(Component):
+class SquaredErrorLoss(Component):
     def __init__(
         self,
         config: SimpleNamespace = SimpleNamespace(),
     ):
-        """Component defines a DefaultValueLossFunction loss function.
+        """Component defines a SquaredErrorLoss loss function.
 
         Args:
             config: SimpleNamespace.
@@ -61,6 +61,7 @@ class DefaultValueLossFunction(Component):
 
     @staticmethod
     def name() -> str:
+        """Static method that returns component name."""
         return "value_loss"
 
     @staticmethod
@@ -83,7 +84,7 @@ class HuberValueLossFunctionConfig:
     huber_delta: float = 1.0
 
 
-class HuberValueLossFunction(DefaultValueLossFunction):
+class HuberValueLossFunction(SquaredErrorLoss):
     def __init__(
         self,
         config: HuberValueLossFunctionConfig = HuberValueLossFunctionConfig(),
