@@ -20,9 +20,9 @@ from typing import Any, Callable, Dict, List, Optional, Union
 import dm_env
 import numpy as np
 from acme import specs
-from acme.types import NestedArray
 
 from mava import types
+from mava.types import NestedArray
 from mava.wrappers.env_wrappers import ParallelEnvWrapper
 
 try:

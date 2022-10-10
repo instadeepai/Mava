@@ -25,7 +25,6 @@ import jax
 import numpy as np
 import reverb
 from acme import specs as acme_specs
-from acme import types
 from acme.specs import EnvironmentSpec
 from acme.testing.fakes import Actor as ActorMock
 from acme.testing.fakes import ContinuousEnvironment, DiscreteEnvironment
@@ -43,7 +42,7 @@ from mava.core_jax import SystemBuilder
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.specs import DesignSpec, MAEnvironmentSpec
 from mava.systems.system import System
-from mava.types import OLT, Observation
+from mava.types import OLT, NestedArray, Observation
 from mava.utils.builder_utils import convert_specs
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
@@ -61,22 +60,20 @@ class MockedExecutor(ActorMock, core.Executor):
         self._evaluator = False
 
     def select_actions(
-        self, observations: Dict[str, types.NestedArray]
-    ) -> Dict[str, types.NestedArray]:
+        self, observations: Dict[str, NestedArray]
+    ) -> Dict[str, NestedArray]:
         return {
             agent: _generate_from_spec(self._spec[agent].actions)
             for agent, observation in observations.items()
         }
 
-    def select_action(
-        self, agent: str, observation: types.NestedArray
-    ) -> Union[float, int]:
+    def select_action(self, agent: str, observation: NestedArray) -> Union[float, int]:
         return _generate_from_spec(self._spec[agent].actions)
 
     def observe_first(
         self,
         timestep: dm_env.TimeStep,
-        extras: Dict[str, types.NestedArray] = {},
+        extras: Dict[str, NestedArray] = {},
     ) -> None:
         for agent, observation_spec in self._specs.items():
             _validate_spec(
@@ -91,9 +88,9 @@ class MockedExecutor(ActorMock, core.Executor):
 
     def observe(
         self,
-        action: Dict[str, types.NestedArray],
+        action: Dict[str, NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extras: Dict[str, types.NestedArray] = {},
+        next_extras: Dict[str, NestedArray] = {},
     ) -> None:
 
         for agent, observation_spec in self._spec.items():
@@ -118,7 +115,7 @@ class MockedExecutor(ActorMock, core.Executor):
     def agent_observe(
         self,
         agent: str,
-        action: Union[float, int, types.NestedArray],
+        action: Union[float, int, NestedArray],
         next_timestep: dm_env.TimeStep,
     ) -> None:
         observation_spec = self._spec[agent]
@@ -256,10 +253,10 @@ class SequentialEnvironment(MockedEnvironment, SequentialEnvWrapper):
             ),
         )
 
-    def _generate_fake_reward(self) -> types.NestedArray:
+    def _generate_fake_reward(self) -> NestedArray:
         return _generate_from_spec(self._specs[self.agent_selection].rewards)
 
-    def _generate_fake_discount(self) -> types.NestedArray:
+    def _generate_fake_discount(self) -> NestedArray:
         return _generate_from_spec(self._specs[self.agent_selection].discounts)
 
     def action_spec(
@@ -282,7 +279,7 @@ class SequentialEnvironment(MockedEnvironment, SequentialEnvWrapper):
     def _generate_fake_observation(self) -> OLT:
         return _generate_from_spec(self.observation_spec())
 
-    def step(self, action: Union[float, int, types.NestedArray]) -> dm_env.TimeStep:
+    def step(self, action: Union[float, int, NestedArray]) -> dm_env.TimeStep:
         # Return a reset timestep if we haven't touched the environment yet.
         if not self._step:
             return self.reset()
@@ -364,7 +361,7 @@ class ParallelEnvironment(MockedEnvironment, ParallelEnvWrapper):
         return parameterized_restart(rewards, discounts, observations)  # type: ignore
 
     def step(
-        self, actions: Dict[str, Union[float, int, types.NestedArray]]
+        self, actions: Dict[str, Union[float, int, NestedArray]]
     ) -> dm_env.TimeStep:
 
         # Return a reset timestep if we haven't touched the environment yet.
@@ -474,7 +471,7 @@ class MockAdderClass:
         pass
 
     def add_first(
-        self, timestep: dm_env.TimeStep, extras: Dict[str, types.NestedArray] = {}
+        self, timestep: dm_env.TimeStep, extras: Dict[str, NestedArray] = {}
     ) -> None:
         """_summary_
 
@@ -486,9 +483,9 @@ class MockAdderClass:
 
     def add(
         self,
-        actions: Dict[str, types.NestedArray],
+        actions: Dict[str, NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extras: Dict[str, types.NestedArray] = {},
+        next_extras: Dict[str, NestedArray] = {},
     ) -> None:
         """_summary_
 
@@ -1055,12 +1052,12 @@ class MockNetworks(Component):
         builder.store.base_key = jax.random.PRNGKey(self.config.seed)
 
         # Build network function here
-        network_key, builder.store.base_key = jax.random.split(builder.store.base_key)
+        builder.store.base_key, network_key = jax.random.split(builder.store.base_key)
         builder.store.network_factory = (
             lambda: self.config.network_factory(  # type: ignore
                 environment_spec=builder.store.ma_environment_spec,
                 agent_net_keys=builder.store.agent_net_keys,
-                rng_key=network_key,
+                base_key=network_key,
             )
         )
 
@@ -1212,7 +1209,8 @@ def return_test_system(components: Dict) -> System:
     """
 
     class TestSystem(System):
-        def design(self) -> Tuple[DesignSpec, Dict]:
+        @staticmethod
+        def design() -> Tuple[DesignSpec, Dict]:
             """Mock system design with zero components.
 
             Returns:

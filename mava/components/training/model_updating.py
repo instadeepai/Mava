@@ -114,6 +114,7 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
             # Calculate the gradients and agent metrics.
             policy_gradients, policy_agent_metrics = trainer.store.policy_grad_fn(
                 policy_params,
+                minibatch.policy_states,
                 minibatch.observations,
                 minibatch.actions,
                 minibatch.behavior_log_probs,
@@ -259,7 +260,7 @@ class MAPGEpochUpdate(EpochUpdate):
                 batch,
             ) = carry
 
-            new_key, subkey = jax.random.split(key)
+            base_key, shuffle_key = jax.random.split(key)
 
             # TODO (dries): This assert is ugly. Is there a better way to do this check?
             # Maybe using a tree map of some sort?
@@ -272,7 +273,9 @@ class MAPGEpochUpdate(EpochUpdate):
                 == trainer.store.full_batch_size
             )
 
-            permutation = jax.random.permutation(subkey, trainer.store.full_batch_size)
+            permutation = jax.random.permutation(
+                shuffle_key, trainer.store.full_batch_size
+            )
 
             shuffled_batch = jax.tree_util.tree_map(
                 lambda x: jnp.take(x, permutation, axis=0), batch
@@ -297,7 +300,7 @@ class MAPGEpochUpdate(EpochUpdate):
             )
 
             return (
-                new_key,
+                base_key,
                 new_policy_params,
                 new_critic_params,
                 new_policy_opt_states,
