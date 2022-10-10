@@ -377,7 +377,7 @@ def test_mapg_huber_loss(
 
     low_agent_0_critic_loss = low_critic_loss_info["agent_0"]
     low_loss_critic = low_agent_0_critic_loss["loss_critic"]
-    print("Loss", loss_entropy)
+
     assert jnp.isclose(loss_entropy, -0.5)
     assert loss_critic == 1.25
     assert loss_policy_total == (loss_entropy * 0.01 + loss_policy)
