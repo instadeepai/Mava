@@ -181,10 +181,7 @@ class ValueHead(hk.Module):
         """Initialize the value head.
 
         Args:
-            name: An optional string name for the class. Must be a valid
-                Python identifier. If ``name`` is not provided then the class
-                name for the current instance is converted to
-                ``lower_snake_case`` and used instead.
+            name: An optional string name for the class.
             w_init: Initializer for network weights.
         """
         super().__init__(name=name)
