@@ -61,8 +61,8 @@ def main(_: Any) -> None:
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return ippo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(64, 64),
-            critic_layer_sizes=(64, 64, 64),
+            policy_layer_sizes=(256, 256, 256),
+            critic_layer_sizes=(512, 512, 256),
             *args,
             **kwargs,
         )
@@ -107,6 +107,7 @@ def main(_: Any) -> None:
         num_executors=1,
         multi_process=True,
         clip_value=False,
+        normalize_target_values=True,
     )
 
     # Launch the system.

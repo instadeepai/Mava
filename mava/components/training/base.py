@@ -28,6 +28,7 @@ class Batch(NamedTuple):
     """A batch of data; all shapes are expected to be [B, ...]."""
 
     observations: Any
+    policy_states: Any
     actions: Any
     advantages: Any
 
@@ -47,6 +48,7 @@ class TrainingState(NamedTuple):
     policy_opt_states: Dict[str, optax.OptState]
     critic_opt_states: Dict[str, optax.OptState]
     random_key: Any
+    stats: Any
 
 
 class Utility(Component):

@@ -148,7 +148,7 @@ if _found_flatland:
         malfunction_max_duration: int = 50,
         observation_max_path_depth: int = 30,
         observation_tree_depth: int = 2,
-        concat_prev_actions: bool = True,
+        concat_prev_actions: bool = False,
         concat_agent_id: bool = False,
         evaluation: bool = False,
         random_seed: Optional[int] = None,

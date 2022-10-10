@@ -185,3 +185,12 @@ class DesignSpec(SimpleNamespace):
             None
         """
         self.__dict__[name] = component
+
+    def set(self, component_dict: Dict) -> None:  # type: ignore
+        """Set/override multiple components in the design spec dictionary.
+
+        Returns:
+            None
+        """
+        for key in component_dict.keys():
+            self.__dict__[key] = component_dict[key]

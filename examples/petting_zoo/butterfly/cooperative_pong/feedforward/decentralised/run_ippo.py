@@ -60,6 +60,7 @@ def main(_: Any) -> None:
         pettingzoo_utils.make_environment,
         env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
+        concat_agent_id=True,  # Concatenate agent_ids to the environment observations.
         env_preprocess_wrappers=[(dtype_v0, {"dtype": np.float32})],
     )
 

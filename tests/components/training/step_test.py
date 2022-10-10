@@ -52,7 +52,10 @@ def critic_apply(params: Any, observations: Any) -> Tuple:
 
 
 def gae_advantages(
-    rewards: jnp.ndarray, discounts: jnp.ndarray, values: jnp.ndarray
+    rewards: jnp.ndarray,
+    discounts: jnp.ndarray,
+    values: jnp.ndarray,
+    stats: jnp.ndarray = jnp.array([0, 1, 1e-4]),
 ) -> Tuple:
     """Uses GAE to compute advantages."""
     # Apply reward clipping.
@@ -145,6 +148,13 @@ class MockTrainer(Trainer):
             "network_agent_1": {constants.OPT_STATE_DICT_KEY: 1},
             "network_agent_2": {constants.OPT_STATE_DICT_KEY: 2},
         }
+
+        running_stats = {
+            "agent_0": jnp.array([0, 1, 1e-4]),
+            "agent_1": jnp.array([0, 1, 1e-4]),
+            "agent_2": jnp.array([0, 1, 1e-4]),
+        }
+
         store = SimpleNamespace(
             dataset_iterator=iter([1, 2, 3]),
             step_fn=step_fn,
@@ -153,12 +163,14 @@ class MockTrainer(Trainer):
             trainer_counts={"next_sample": 2},
             trainer_logger=MockTrainerLogger(),
             trainer_agent_net_keys=trainer_agent_net_keys,
+            agents=["agent_0", "agent_1", "agent_2"],
             networks=networks,
             gae_fn=gae_advantages,
             policy_opt_states=copy.copy(opt_states),
             critic_opt_states=copy.copy(opt_states),
             base_key=jax.random.PRNGKey(5),
             epoch_update_fn=epoch_update,
+            stats=running_stats,
             global_config=SimpleNamespace(
                 num_minibatches=1, num_epochs=2, sample_batch_size=2, sequence_length=3
             ),
@@ -272,6 +284,14 @@ def test_step(mock_trainer: Trainer) -> None:
 
     mapg_with_trust_region_step.on_training_step_fn(trainer=mock_trainer)
     old_key = mock_trainer.store.base_key
+
+    # Step without policy states
+    metrics = mock_trainer.store.step_fn(dummy_sample)
+
+    # Step with policy states
+    states = jnp.zeros((1, 5))
+    policy_states = {"agent_0": states, "agent_1": states, "agent_2": states}
+    dummy_sample.data.extras["policy_states"] = policy_states
     metrics = mock_trainer.store.step_fn(dummy_sample)
 
     # Check that metrics were correctly computed
@@ -283,8 +303,8 @@ def test_step(mock_trainer: Trainer) -> None:
         "rewards_mean",
         "rewards_std",
     ]
-    assert jnp.isclose(metrics["norm_policy_params"], 3.8729835)
-    assert jnp.isclose(metrics["norm_critic_params"], 3.8729835)
+    assert jnp.isclose(metrics["norm_policy_params"], 9.327378)
+    assert jnp.isclose(metrics["norm_critic_params"], 9.327378)
 
     assert jnp.isclose(metrics["observations_mean"], 0.5667871)
     assert jnp.isclose(metrics["observations_std"], 0.104980744)
@@ -312,7 +332,8 @@ def test_step(mock_trainer: Trainer) -> None:
     # check that trainer random key has been updated
     assert list(mock_trainer.store.base_key) != list(old_key)
     num_expected_update_steps = (
-        mock_trainer.store.global_config.num_epochs
+        2
+        * mock_trainer.store.global_config.num_epochs
         * mock_trainer.store.global_config.num_minibatches
     )
 

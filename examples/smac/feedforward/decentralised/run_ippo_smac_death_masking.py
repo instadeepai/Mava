@@ -12,8 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Run IPPO on SMAC with death masking."""
 
-"""Example running IPPO on debug MPE environments."""
+
 import functools
 from datetime import datetime
 from typing import Any
@@ -22,19 +23,14 @@ import optax
 from absl import app, flags
 
 from mava.systems import ippo
-from mava.utils.environments import debugging_utils
+from mava.utils.environments.smac_utils import make_environment
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
-)
-flags.DEFINE_string(
-    "action_space",
-    "discrete",
-    "Environment action space type (str).",
+    "map_name",
+    "3m",
+    "Starcraft 2 micromanagement map name (str).",
 )
 
 flags.DEFINE_string(
@@ -46,16 +42,10 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Run main script
-
-    Args:
-        _ : _
-    """
-    # Environment.
+    """Run IPPO on SMAC with death masking."""
+    # Environment
     environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
+        make_environment, map_name=FLAGS.map_name, death_masking=True
     )
 
     # Networks.
@@ -106,7 +96,6 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        clip_value=False,
     )
 
     # Launch the system.
