@@ -178,7 +178,15 @@ class ValueHead(hk.Module):
         name: Optional[str] = None,
         w_init: Optional[hk.initializers.Initializer] = None,
     ):
-        """Initialize the class"""
+        """Initialize the value head.
+
+        Args:
+            name: An optional string name for the class. Must be a valid
+                Python identifier. If ``name`` is not provided then the class
+                name for the current instance is converted to
+                ``lower_snake_case`` and used instead.
+            w_init: Initializer for network weights.
+        """
         super().__init__(name=name)
         self._value_layer = hk.Linear(1, w_init=w_init)
 
