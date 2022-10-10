@@ -18,7 +18,9 @@ import abc
 from typing import Dict
 
 import dm_env
-from acme import adders, types
+from acme import adders
+
+from mava import types
 
 DEFAULT_PRIORITY_TABLE = "priority_table"
 

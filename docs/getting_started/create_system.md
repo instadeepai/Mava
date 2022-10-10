@@ -8,7 +8,8 @@ Please consider the following example where an IPPO system is created:
 
 ```python
 class IPPOSystem(System):
-    def design(self) -> Tuple[DesignSpec, Any]:
+    @staticmethod
+    def design() -> Tuple[DesignSpec, Any]:
         """Design for IPPO system.
         Returns:
             system: system callback components

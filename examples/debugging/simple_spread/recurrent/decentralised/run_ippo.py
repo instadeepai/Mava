@@ -21,6 +21,7 @@ from typing import Any
 import optax
 from absl import app, flags
 
+from mava.components.component_groups import recurrent_policy_components
 from mava.systems import ippo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -46,11 +47,8 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Run main script
+    """Example running recurrent IPPO on debugging environment."""
 
-    Args:
-        _ : _
-    """
     # Environment.
     environment_factory = functools.partial(
         debugging_utils.make_environment,
@@ -63,6 +61,8 @@ def main(_: Any) -> None:
         return ippo.make_default_networks(  # type: ignore
             policy_layer_sizes=(64, 64),
             critic_layer_sizes=(64, 64, 64),
+            policy_recurrent_layer_sizes=(64,),
+            policy_layers_after_recurrent=(64,),
             *args,
             **kwargs,
         )
@@ -90,8 +90,11 @@ def main(_: Any) -> None:
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
-    # Create the system.
+    # Import the base IPPO system.
     system = ippo.IPPOSystem()
+
+    # Update the system with the components necessary to make the policy recurrent.
+    system.update(recurrent_policy_components)
 
     # Build the system.
     system.build(
@@ -106,7 +109,8 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        clip_value=False,
+        evaluation_interval={"executor_steps": 10000},
+        evaluation_duration={"evaluator_episodes": 32},
     )
 
     # Launch the system.
