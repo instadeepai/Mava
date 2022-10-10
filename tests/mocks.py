@@ -18,7 +18,7 @@ import copy
 import functools
 from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import dm_env
 import jax
@@ -45,7 +45,7 @@ from mava.systems.system import System
 from mava.types import OLT, NestedArray, Observation
 from mava.utils.builder_utils import convert_specs
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
-from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
+from mava.wrappers.env_wrappers import ParallelEnvWrapper
 from tests.enums import MockedEnvironments
 
 """Mock Objects for Tests"""
@@ -214,7 +214,6 @@ def get_ma_environment(
             return not self.agents
 
     return MockedEnvironment
-
 
 
 """Class that updates functions for parallel environment.
