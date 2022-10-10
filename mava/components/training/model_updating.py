@@ -33,6 +33,7 @@ from mava.components.training.losses import Loss
 from mava.components.training.step import Step
 from mava.components.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
+from mava.utils.jax_training_utils import compute_running_mean_var_count
 
 
 class MinibatchUpdate(Utility):
@@ -66,6 +67,7 @@ class MinibatchUpdate(Utility):
 @dataclass
 class MAPGMinibatchUpdateConfig:
     normalize_advantage: bool = True
+    normalize_target_values: bool = False
 
 
 class MAPGMinibatchUpdate(MinibatchUpdate):
@@ -92,6 +94,18 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
         Returns:
             None.
         """
+
+        # Initilaise running statisitics here
+
+        if self.config.normalize_target_values:
+            trainer.store.running_stats_fn = compute_running_mean_var_count
+            running_stats = jnp.array([0, 0, 1e-4])
+        else:
+            running_stats = jnp.array([0, 1, 1e-4])
+
+        trainer.store.stats = {}
+        for net_key in trainer.store.trainer_agent_net_keys.keys():
+            trainer.store.stats[net_key] = running_stats
 
         def model_update_minibatch(
             carry: Tuple[
