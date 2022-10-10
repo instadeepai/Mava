@@ -232,6 +232,19 @@ def make_discrete_networks(
 
     num_actions = environment_spec.actions.num_values
 
+    # Define weight and bias initialisation functions to be
+    # used in MLPs and policy and critic head networks.
+    w_init_fn = (
+        lambda x, scale: hk.initializers.Orthogonal(scale=scale)
+        if (x is True)
+        else None
+    )
+    b_init_fn = (
+        lambda x, constant: hk.initializers.Constant(constant=constant)
+        if (x is True)
+        else None
+    )
+
     @hk.without_apply_rng
     @hk.transform
     def policy_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
@@ -248,16 +261,8 @@ def make_discrete_networks(
             hk.nets.MLP(
                 policy_layer_sizes,
                 activation=activation_function,
-                w_init=(
-                    lambda x: hk.initializers.Orthogonal(scale=jnp.sqrt(2))
-                    if (x is True)
-                    else None
-                )(orthogonal_initialisation),
-                b_init=(
-                    lambda x: hk.initializers.Constant(constant=0.0)
-                    if (x is True)
-                    else None
-                )(orthogonal_initialisation),
+                w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
+                b_init=b_init_fn(orthogonal_initialisation, 0.0),
                 activate_final=True,
             ),
         ]
@@ -279,11 +284,7 @@ def make_discrete_networks(
             networks_lib.CategoricalHead(
                 num_values=num_actions,
                 dtype=environment_spec.actions.dtype,
-                w_init=(
-                    lambda x: hk.initializers.Orthogonal(scale=0.01)
-                    if (x is True)
-                    else None
-                )(orthogonal_initialisation),
+                w_init=w_init_fn(orthogonal_initialisation, 0.01),
             )
         )
 
@@ -324,25 +325,11 @@ def make_discrete_networks(
                 hk.nets.MLP(
                     critic_layer_sizes,
                     activation=activation_function,
-                    w_init=(
-                        lambda x: hk.initializers.Orthogonal(scale=jnp.sqrt(2))
-                        if (x is True)
-                        else None
-                    )(orthogonal_initialisation),
-                    b_init=(
-                        lambda x: hk.initializers.Constant(constant=0.0)
-                        if (x is True)
-                        else None
-                    )(orthogonal_initialisation),
+                    w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
+                    b_init=b_init_fn(orthogonal_initialisation, 0.0),
                     activate_final=True,
                 ),
-                ValueHead(
-                    w_init=(
-                        lambda x: hk.initializers.Orthogonal(scale=1.0)
-                        if (x is True)
-                        else None
-                    )(orthogonal_initialisation)
-                ),
+                ValueHead(w_init=w_init_fn(orthogonal_initialisation, 1.0)),
             ]
         )
         return critic_network(inputs)
