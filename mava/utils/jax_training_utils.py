@@ -15,7 +15,71 @@ def action_mask_categorical_policies(
         distribution.logits,
         jnp.finfo(distribution.logits.dtype).min,
     )
+
     return tfd.Categorical(logits=masked_logits, dtype=distribution.dtype)
+
+
+def compute_running_mean_var_count(
+    stats: jnp.ndarray, batch: jnp.ndarray
+) -> jnp.ndarray:
+    """Updates the running mean, variance and data counts during training.
+
+    stats (array) -- mean, var, count.
+    batch (array) -- current batch of data.
+
+    Returns:
+        stats (array)
+    """
+
+    batch_mean = jnp.mean(batch)
+    batch_var = jnp.var(batch)
+    batch_count = batch.size
+
+    mean, var, count = stats[0], stats[1], stats[2]
+
+    delta = batch_mean - mean
+    tot_count = count + batch_count
+
+    new_mean = mean + delta * batch_count / tot_count
+    m_a = var * count
+    m_b = batch_var * batch_count
+    M2 = m_a + m_b + jnp.square(delta) * count * batch_count / tot_count
+    new_var = M2 / tot_count
+    new_count = tot_count
+
+    return jnp.array([new_mean, new_var, new_count])
+
+
+def normalize(stats: jnp.ndarray, batch: jnp.ndarray) -> jnp.ndarray:
+    """Normlaise batch of data using the running mean and variance.
+
+    stats (array) -- mean, var, count.
+    batch (array) -- current batch of data.
+
+    Returns:
+        denormalize batch (array)
+    """
+
+    mean, var = stats[0], stats[1]
+    normalize_batch = (batch - mean) / (jnp.sqrt(jnp.clip(var, a_min=1e-2)))
+
+    return normalize_batch
+
+
+def denormalize(stats: jnp.ndarray, batch: jnp.ndarray) -> jnp.ndarray:
+    """Transform normalized data back into original distribution
+
+    stats (array) -- mean, var, count
+    batch (array) -- current batch of data
+
+    Returns:
+        denormalize batch (array)
+    """
+
+    mean, var = stats[0], stats[1]
+    denormalize_batch = batch * jnp.sqrt(var) + mean
+
+    return denormalize_batch
 
 
 def set_growing_gpu_memory_jax() -> None:
