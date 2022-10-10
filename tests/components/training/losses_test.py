@@ -50,7 +50,6 @@ class MockPolicyNet:
         parameters: Dict[str, jnp.ndarray],
         observation_state: List[jnp.ndarray],
     ) -> jnp.ndarray:
-
         """Mock function to apply the network to training data"""
         if len(observation_state) == 2:
             # Recurrent case
@@ -378,8 +377,8 @@ def test_mapg_huber_loss(
 
     low_agent_0_critic_loss = low_critic_loss_info["agent_0"]
     low_loss_critic = low_agent_0_critic_loss["loss_critic"]
-
-    assert jnp.isclose(loss_entropy, -0.47500002)
+    print("Loss", loss_entropy)
+    assert jnp.isclose(loss_entropy, -0.5)
     assert loss_critic == 1.25
     assert loss_policy_total == (loss_entropy * 0.01 + loss_policy)
 
