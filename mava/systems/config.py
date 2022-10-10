@@ -85,6 +85,7 @@ class Config:
                             self._param_to_component[new_param_name] = name
                     self._config[name] = dataclass
             elif isinstance(dataclass, SimpleNamespace):
+                # SimpleNamespace implies that this component does not have config variables.
                 self._config[name] = dataclass
             else:
                 raise Exception(
@@ -107,7 +108,6 @@ class Config:
             raise Exception(
                 "Component configs cannot be updated if config has already been built."
             )
-
         for name, dataclass in kwargs.items():
             if is_dataclass(dataclass):
                 if name in list(self._config.keys()):

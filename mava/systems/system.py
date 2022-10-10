@@ -14,8 +14,8 @@
 # limitations under the License.
 
 """Jax-based Mava system implementation."""
-import abc
 import copy
+from types import SimpleNamespace
 from typing import Any, Dict, List, Tuple, Type, Union
 
 from mava.components import Component
@@ -71,6 +71,7 @@ class System(BaseSystem):
 
     def update(self, components: Union[Any, List[Any]]) -> None:
         """Update components that has already been added to the system.
+        
         Args:
             components: system callback component or list of components.
         Returns:

@@ -25,7 +25,8 @@ from mava.systems.ippo.config import IPPODefaultConfig
 
 
 class IPPOSystem(System):
-    def design(self) -> Tuple[DesignSpec, Any]:
+    @staticmethod
+    def design() -> Tuple[DesignSpec, Any]:
         """System design for IPPO with single optimiser.
 
         Args:

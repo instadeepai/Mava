@@ -27,10 +27,9 @@ import jax
 import numpy as np
 import reverb
 from acme import specs as acme_specs
-from acme import types
 from reverb import rate_limiters, reverb_types
 
-from mava import specs
+from mava import specs, types
 from mava.components import Component
 from mava.components.building.data_server import (
     OffPolicyDataServerConfig,
@@ -646,12 +645,12 @@ class MockNetworks(Component):
         builder.store.base_key = jax.random.PRNGKey(self.config.seed)
 
         # Build network function here
-        network_key, builder.store.base_key = jax.random.split(builder.store.base_key)
+        builder.store.base_key, network_key = jax.random.split(builder.store.base_key)
         builder.store.network_factory = (
             lambda: self.config.network_factory(  # type: ignore
                 environment_spec=builder.store.ma_environment_spec,
                 agent_net_keys=builder.store.agent_net_keys,
-                rng_key=network_key,
+                base_key=network_key,
             )
         )
 
@@ -803,7 +802,8 @@ def return_test_system(components: Dict) -> System:
     """
 
     class TestSystem(System):
-        def design(self) -> Tuple[DesignSpec, Dict]:
+        @staticmethod
+        def design() -> Tuple[DesignSpec, Dict]:
             """Mock system design with zero components.
 
             Returns:

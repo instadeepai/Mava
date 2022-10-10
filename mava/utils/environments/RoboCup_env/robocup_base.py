@@ -19,8 +19,8 @@ from typing import Tuple
 import dm_env
 import gym
 import numpy as np
-from acme import types
 
+from mava import types
 from mava.utils.environments.RoboCup_env.RoboCup2D_env import RoboCup2D
 from mava.utils.environments.RoboCup_env.robocup_utils.util_functions import SpecWrapper
 
