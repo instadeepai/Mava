@@ -249,7 +249,7 @@ class StackObservations:
         if type(timestep.observation[agent_0]) == OLT:
             old_observations = timestep.observation
 
-            new_observations = {}
+            new_observations: Any = {}
             for agent in self._environment.possible_agents:
                 agent_olt = old_observations[agent]
                 agent_observation = agent_olt.observation
@@ -267,7 +267,7 @@ class StackObservations:
                     terminal=agent_olt.terminal,
                 )
         else:
-            new_observations = {}
+            new_observations: Any = {}
             for agent, agent_observation in timestep.observation.items():
                 for _ in range(self.num_frames):
                     self.frames[agent].append(agent_observation)
@@ -297,7 +297,7 @@ class StackObservations:
         if type(timestep.observation[agent_0]) == OLT:
             old_observations = timestep.observation
 
-            new_observations = {}
+            new_observations: Any = {}
             for agent in self._environment.possible_agents:
                 agent_olt = old_observations[agent]
                 agent_observation = agent_olt.observation
@@ -314,7 +314,7 @@ class StackObservations:
                     terminal=agent_olt.terminal,
                 )
         else:
-            new_observations = {}
+            new_observations: Any = {}
             for agent, agent_observation in timestep.observation.items():
                 self.frames[agent].append(agent_observation)
 
