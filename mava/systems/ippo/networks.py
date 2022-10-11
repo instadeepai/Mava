@@ -203,6 +203,7 @@ def make_discrete_networks(
     policy_layers_after_recurrent: Sequence[int],
     orthogonal_initialisation: bool = False,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
+    policy_network_head_weight_gain: float = 0.01,
     # default behaviour is to flatten observations
 ) -> PPONetworks:
     """Create PPO network for environments with discrete action spaces.
@@ -222,6 +223,8 @@ def make_discrete_networks(
             initialised orthogonally.
         activation_function: activation function to be used for
             network hidden layers.
+        policy_network_head_weight_gain: value for scaling the policy
+            network final layer weights by.
 
     Returns:
         PPONetworks class
@@ -276,7 +279,9 @@ def make_discrete_networks(
             networks_lib.CategoricalHead(
                 num_values=num_actions,
                 dtype=environment_spec.actions.dtype,
-                w_init=w_init_fn(orthogonal_initialisation, 0.01),
+                w_init=w_init_fn(
+                    orthogonal_initialisation, policy_network_head_weight_gain
+                ),
             )
         )
 
@@ -364,6 +369,7 @@ def make_networks(
     policy_layers_after_recurrent: Sequence[int],
     orthogonal_initialisation: bool = False,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
+    policy_network_head_weight_gain: float = 0.01,
 ) -> PPONetworks:
     """Function for creating PPO networks to be used.
 
@@ -385,6 +391,8 @@ def make_networks(
             initialised orthogonally.
         activation_function: activation function to be used for
             network hidden layers.
+        policy_network_head_weight_gain: value for scaling the policy
+            network final layer weights by.
 
     Returns:
         make_discrete_networks: function to create a discrete network
@@ -404,6 +412,7 @@ def make_networks(
             recurrent_architecture_fn=recurrent_architecture_fn,
             orthogonal_initialisation=orthogonal_initialisation,
             activation_function=activation_function,
+            policy_network_head_weight_gain=policy_network_head_weight_gain,
         )
 
     else:
@@ -430,6 +439,7 @@ def make_default_networks(
     policy_layers_after_recurrent: Sequence[int] = (),
     orthogonal_initialisation: bool = False,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
+    policy_network_head_weight_gain: float = 0.01,
 ) -> Dict[str, Any]:
     """Create default PPO networks
 
@@ -457,6 +467,8 @@ def make_default_networks(
             https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/ # noqa: E501
         activation_function: activation function to be used for
             network hidden layers.
+        policy_network_head_weight_gain: value for scaling the policy
+            network final layer weights by.
 
     Returns:
         networks: networks created to given spec
@@ -483,6 +495,7 @@ def make_default_networks(
             policy_layers_after_recurrent=policy_layers_after_recurrent,
             orthogonal_initialisation=orthogonal_initialisation,
             activation_function=activation_function,
+            policy_network_head_weight_gain=policy_network_head_weight_gain,
         )
 
     # No longer returning a dictionary since this is handled in PPONetworks above
