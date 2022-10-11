@@ -5,8 +5,3 @@ recurrent_policy_components = [
     executing.RecurrentExecutorSelectAction,
     executing.RecurrentExecutorObserve,
 ]
-
-# The components that a needed for the Huber value loss.
-huber_value_loss_components = [
-    training.HuberValueLoss,
-]
