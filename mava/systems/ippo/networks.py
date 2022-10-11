@@ -236,11 +236,6 @@ def make_discrete_networks(
         if (x is True)
         else None
     )
-    b_init_fn = (
-        lambda x, constant: hk.initializers.Constant(constant=constant)
-        if (x is True)
-        else None
-    )
 
     @hk.without_apply_rng
     @hk.transform
@@ -259,7 +254,6 @@ def make_discrete_networks(
                 policy_layer_sizes,
                 activation=activation_function,
                 w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
-                b_init=b_init_fn(orthogonal_initialisation, 0.0),
                 activate_final=True,
             ),
         ]
@@ -272,7 +266,8 @@ def make_discrete_networks(
             # Add optional feedforward layers after the recurrent layers
             hk.nets.MLP(
                 policy_layers_after_recurrent,
-                activation=jax.nn.relu,
+                activation=activation_function,
+                w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
                 activate_final=True,
             ),
 
@@ -323,7 +318,6 @@ def make_discrete_networks(
                     critic_layer_sizes,
                     activation=activation_function,
                     w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
-                    b_init=b_init_fn(orthogonal_initialisation, 0.0),
                     activate_final=True,
                 ),
                 ValueHead(w_init=w_init_fn(orthogonal_initialisation, 1.0)),
