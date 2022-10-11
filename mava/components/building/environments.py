@@ -91,6 +91,7 @@ class ExecutorEnvironmentLoopConfig:
     executor_stats_wrapper_class: Optional[
         Type[EnvironmentLoopStatisticsBase]
     ] = DetailedPerAgentStatistics
+    sum_episode_return: bool = False
 
 
 class ExecutorEnvironmentLoop(Component):
@@ -162,6 +163,7 @@ class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
             executor=builder.store.executor,  # Set up by builder
             logger=builder.store.executor_logger,
             should_update=self.config.should_update,
+            sum_episode_return=self.config.sum_episode_return,
         )
         del builder.store.executor_logger
 

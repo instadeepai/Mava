@@ -388,6 +388,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         logger: loggers.Logger = None,
         should_update: bool = True,
         label: str = "parallel_environment_loop",
+        sum_episode_return: bool = False,
     ):
         """Parallel environment loop init
 
@@ -398,6 +399,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             logger: an optional counter. Defaults to None.
             should_update: should update. Defaults to True.
             label: optional label. Defaults to "sequential_environment_loop".
+            sum_episode_return: the sum of the agents' return as a global one.
         """
         # Internalize agent and environment.
         self._environment = environment
@@ -410,6 +412,8 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
         # We need this to schedule evaluation/test runs
         self._last_evaluator_run_t = -1
+
+        self._sum_episode_return = sum_episode_return
 
     def _get_actions(self, timestep: dm_env.TimeStep) -> Any:
         return self._executor.select_actions(timestep.observation)

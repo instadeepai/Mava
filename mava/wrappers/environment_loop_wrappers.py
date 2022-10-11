@@ -98,6 +98,9 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
             for stat in self._summary_stats:
                 self._running_statistics[f"{stat}_{metric}"] = 0.0
 
+        if self._sum_episode_return:
+            self._running_statistics["sum_episode_return"] = 0.0
+
     def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
         pass
 
@@ -229,7 +232,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
         # Collect the results and combine with counts.
         steps_per_second = episode_steps / (time.time() - start_time)
         mean_episode_return = np.mean(np.array(list(episode_returns.values())))
-
+        sum_episode_return = np.sum(np.array(list(episode_returns.values())))
         # Record counts.
         if hasattr(self._executor, "_counts"):
             loop_type = "evaluator" if "_" not in self._loop_label else "executor"
@@ -254,6 +257,8 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
         self._episode_length_stats.push(episode_steps)
         self._episode_return_stats.push(mean_episode_return)
         self._steps_per_second_stats.push(steps_per_second)
+        if self._sum_episode_return:
+            self._running_statistics["sum_episode_return"] = sum_episode_return
 
         for metric in self._metrics:
             for stat in self._summary_stats:
