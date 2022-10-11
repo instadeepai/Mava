@@ -411,8 +411,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         # We need this to schedule evaluation/test runs
         self._last_evaluator_run_t = -1
 
-        self._sum_episode_return = sum_episode_return
-
     def _get_actions(self, timestep: dm_env.TimeStep) -> Any:
         return self._executor.select_actions(timestep.observation)
 
