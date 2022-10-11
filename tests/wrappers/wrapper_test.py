@@ -23,6 +23,7 @@ from _pytest.monkeypatch import MonkeyPatch
 
 from mava import types
 from mava.utils.environments.flatland_utils import check_flatland_import
+from mava.wrappers.env_preprocess_wrappers import StackObservations
 from tests.conftest import EnvSpec, EnvType, Helpers
 from tests.enums import EnvSource
 
@@ -56,9 +57,12 @@ This is meant to flexibily test various environments wrappers.
     ],
 )
 class TestEnvWrapper:
-    # Test that we can load a env module and that it contains agents,
-    #   agents and possible_agents.
     def test_loadmodule(self, env_spec: EnvSpec, helpers: Helpers) -> None:
+        """Test that we can load a env module
+
+        and that it contains agents and possible agents
+        """
+
         if env_spec is None:
             pytest.skip()
         env = helpers.get_env(env_spec)
@@ -67,9 +71,13 @@ class TestEnvWrapper:
             props_which_should_not_be_none
         ), "Failed to load module"
 
-    #  Test initialization of env wrapper, which should have
-    #   a nested environment, an observation and action space for each agent.
     def test_wrapper_initialization(self, env_spec: EnvSpec, helpers: Helpers) -> None:
+        """Test initialization of env wrapper,
+
+        which should have a nested environment,
+        an observation and action space for each agent.
+        """
+
         if env_spec is None:
             pytest.skip()
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
@@ -100,8 +108,9 @@ class TestEnvWrapper:
             len(wrapped_env.discount_spec()) == num_agents
         ), "Failed to generate discount specs for all agents."
 
-    # Test of reset of wrapper and that dm_env_timestep has basic props.
     def test_wrapper_env_reset(self, env_spec: EnvSpec, helpers: Helpers) -> None:
+        """Test of reset of wrapper and that dm_env_timestep has basic props."""
+
         if env_spec is None:
             pytest.skip()
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
@@ -137,12 +146,15 @@ class TestEnvWrapper:
 
         helpers.assert_env_reset(wrapped_env, dm_env_timestep, env_spec)
 
-    # Test that observations from petting zoo get converted to
-    #   dm observations correctly. This only runs
-    #   if wrapper has a _convert_observations or _convert_observation functions.
     def test_convert_env_to_dm_env_0_no_action_mask(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
+        """Test that observations from petting zoo get converted correctly.
+
+        This only runs if wrapper has a _convert_observations
+        or _convert_observation functions.
+        """
+
         if env_spec is None:
             pytest.skip()
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
@@ -197,11 +209,14 @@ class TestEnvWrapper:
                         bool(dm_env_timestep.terminal) is False
                     ), "Failed to set terminal."
 
-    # Test that observations from petting zoo get converted to
-    #   dm observations correctly when empty obs are returned.
     def test_convert_env_to_dm_env_0_empty_obs(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
+        """Test that observations from petting zoo get converted
+
+        to dm observations correctly when empty obs are returned.
+        """
+
         if env_spec is None:
             pytest.skip()
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
@@ -257,12 +272,16 @@ class TestEnvWrapper:
                         ),
                     )
 
-    # Test that observations **with actions masked** from petting zoo get
-    #   converted to dm observations correctly. This only runs
-    #   if wrapper has a _convert_observations or _convert_observation functions.
     def test_convert_env_to_dm_env_2_with_action_mask(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
+        """Test that observations **with actions masked**
+
+        from petting zoo get converted to dm observations correctly.
+        This only runs if wrapper has a _convert_observations
+        or _convert_observation functions.
+        """
+
         if env_spec is None:
             pytest.skip()
 
@@ -332,10 +351,11 @@ class TestEnvWrapper:
                         bool(dm_env_timestep.terminal) is False
                     ), "Failed to set terminal."
 
-    # Test we can take a action and it updates observations
     def test_step_0_valid_when_env_not_done(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
+        """Test we can take a action and it updates observations"""
+
         if env_spec is None:
             pytest.skip()
 
@@ -394,10 +414,11 @@ class TestEnvWrapper:
             curr_dm_timestep.step_type is dm_env.StepType.MID
         ), "Failed to update step type."
 
-    # Test we only step in our env once.
     def test_step_1_valid_when_env_not_done(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
+        """Test we only step in our env once."""
+
         if env_spec is None:
             pytest.skip()
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
@@ -430,10 +451,11 @@ class TestEnvWrapper:
                     _ = wrapped_env.step(test_agent_action)
                     seq_step.assert_called_once_with(test_agent_action)
 
-    # Test if all agents are done, env is set to done
     def test_step_2_invalid_when_env_done(
         self, env_spec: EnvSpec, helpers: Helpers, monkeypatch: MonkeyPatch
     ) -> None:
+        """Test if all agents are done, env is set to done"""
+
         if env_spec is None:
             pytest.skip()
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
@@ -518,3 +540,81 @@ class TestEnvWrapper:
         assert (
             curr_dm_timestep.step_type is dm_env.StepType.LAST
         ), "Failed to update step type."
+
+    def test_wrapper_env_obs_stacking(
+        self, env_spec: EnvSpec, helpers: Helpers
+    ) -> None:
+        """Test observations frame staking wrapper"""
+
+        if env_spec is None:
+            pytest.skip()
+
+        if (
+            env_spec.env_name == "tic_tac_toe"
+            and env_spec.env_source == EnvSource.OpenSpiel
+            or env_spec.env_type == EnvType.Sequential
+        ):
+            pytest.skip(
+                "This test is only applicable to parralel wrappers and only works "
+                "for the provided PZ sequential envs because they have 3 agents, and"
+                "an OLT has length of 3 (a bug, i'd say)"
+            )
+
+        print(env_spec.env_name)
+        wrapped_env, _ = helpers.get_wrapped_env(env_spec)
+        stacked_env = StackObservations(wrapped_env, num_frames=4)
+        agents = wrapped_env.agents
+        num_frames = 4
+
+        # test if the reset is done correctly
+        normal_step = wrapped_env.reset()
+        if type(normal_step) == tuple:
+            normal_step, _ = normal_step
+
+        stacked_step = stacked_env.reset()
+        if type(stacked_step) == tuple:
+            stacked_step, _ = stacked_step
+
+        olt_type = isinstance(normal_step.observation[agents[0]], types.OLT)
+
+        for agent in agents:
+            if olt_type:
+                wrap_obs = normal_step.observation[agent].observation
+                stacked_obs = stacked_step.observation[agent].observation
+            else:
+                wrap_obs = normal_step.observation[agent]
+                stacked_obs = stacked_step.observation[agent]
+
+            assert wrap_obs.shape[0] * num_frames == stacked_obs.shape[0]
+
+        # test if step is done correctly
+        # Parallel env_types
+        if env_spec.env_type == EnvType.Parallel:
+            test_agents_actions = {
+                agent: wrapped_env.action_spaces[agent].sample() for agent in agents
+            }
+            stacked_step = stacked_env.step(test_agents_actions)
+            if type(stacked_step) == tuple:
+                stacked_step, _ = stacked_step
+
+            for agent in agents:
+                if olt_type:
+                    wrap_obs = normal_step.observation[agent].observation
+                    stacked_obs = stacked_step.observation[agent].observation
+                else:
+                    wrap_obs = normal_step.observation[agent]
+                    stacked_obs = stacked_step.observation[agent]
+
+                assert wrap_obs.shape[0] * num_frames == stacked_obs.shape[0]
+
+                size = wrap_obs.shape[0]
+                old_obs = stacked_obs[:size]
+
+                for k in range(num_frames - 1):
+                    assert np.array_equal(
+                        old_obs, stacked_obs[k * size : (k + 1) * size]
+                    )
+
+                assert not np.array_equal(
+                    old_obs, stacked_obs[(num_frames - 1) * size :]
+                )

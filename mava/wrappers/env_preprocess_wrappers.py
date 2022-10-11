@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import deque
 from typing import TYPE_CHECKING, Any, Dict, Union
 
 import dm_env
@@ -47,6 +48,8 @@ class ConcatAgentIdToObservation:
     """
 
     def __init__(self, environment: Any) -> None:
+        """Intialise the environment"""
+
         self._environment = environment
         self._num_agents = len(environment.possible_agents)
 
@@ -137,6 +140,8 @@ class ConcatPrevActionToObservation:
     """
 
     def __init__(self, environment: Any):
+        """Intialise the environment"""
+
         self._environment = environment
 
     def reset(self) -> dm_env.TimeStep:
@@ -200,6 +205,142 @@ class ConcatPrevActionToObservation:
             types.Observation: spec for environment.
         """
         timestep, extras = self.reset()
+        observations = timestep.observation
+        return observations
+
+    def __getattr__(self, name: str) -> Any:
+        """Expose any other attributes of the underlying environment.
+
+        Args:
+            name (str): attribute.
+
+        Returns:
+            Any: return attribute from env or underlying env.
+        """
+        if hasattr(self.__class__, name):
+            return self.__getattribute__(name)
+        else:
+            return getattr(self._environment, name)
+
+
+class StackObservations:
+    """Stack frames of observations together"""
+
+    def __init__(self, environment: Any, num_frames: int = 1):
+        """Intialise the environment and observation frames"""
+
+        self._environment = environment
+        self.frames: Any = {
+            agent: deque([], maxlen=num_frames)
+            for agent in self._environment.possible_agents
+        }
+        self.num_frames = num_frames
+
+    def reset(self) -> dm_env.TimeStep:
+        """Reset the environment by setting the same observation to all the frames"""
+
+        timestep = self._environment.reset()
+        if type(timestep) == tuple:
+            timestep, env_extras = timestep
+        else:
+            env_extras = {}
+
+        agent_0 = self._environment.possible_agents[0]
+        if type(timestep.observation[agent_0]) == OLT:
+            old_observations = timestep.observation
+
+            new_observations = {}
+            for agent in self._environment.possible_agents:
+                agent_olt = old_observations[agent]
+                agent_observation = agent_olt.observation
+
+                for _ in range(self.num_frames):
+                    self.frames[agent].append(agent_observation)
+
+                agent_stack_observation = np.array(self.frames[agent])
+                agent_stack_observation = agent_stack_observation.reshape(
+                    (-1,) + agent_observation.shape[2:]
+                )
+                new_observations[agent] = OLT(
+                    observation=agent_stack_observation,
+                    legal_actions=agent_olt.legal_actions,
+                    terminal=agent_olt.terminal,
+                )
+        else:
+            new_observations = {}
+            for agent, agent_observation in timestep.observation.items():
+                for _ in range(self.num_frames):
+                    self.frames[agent].append(agent_observation)
+
+                agent_stack_observation = np.array(self.frames[agent])
+                agent_stack_observation = agent_stack_observation.reshape(
+                    (-1,) + agent_observation.shape[2:]
+                )
+                new_observations[agent] = agent_stack_observation
+
+        return (
+            dm_env.TimeStep(
+                timestep.step_type, timestep.reward, timestep.discount, new_observations
+            ),
+            env_extras,
+        )
+
+    def step(self, actions: Dict) -> dm_env.TimeStep:
+        """Step the environment and stack previous frames"""
+        timestep = self._environment.step(actions)
+        if type(timestep) == tuple:
+            timestep, env_extras = timestep
+        else:
+            env_extras = {}
+
+        agent_0 = self._environment.possible_agents[0]
+        if type(timestep.observation[agent_0]) == OLT:
+            old_observations = timestep.observation
+
+            new_observations = {}
+            for agent in self._environment.possible_agents:
+                agent_olt = old_observations[agent]
+                agent_observation = agent_olt.observation
+
+                self.frames[agent].append(agent_observation)
+
+                agent_stack_observation = np.array(self.frames[agent])
+                agent_stack_observation = agent_stack_observation.reshape(
+                    (-1,) + agent_observation.shape[2:]
+                )
+                new_observations[agent] = OLT(
+                    observation=agent_stack_observation,
+                    legal_actions=agent_olt.legal_actions,
+                    terminal=agent_olt.terminal,
+                )
+        else:
+            new_observations = {}
+            for agent, agent_observation in timestep.observation.items():
+                self.frames[agent].append(agent_observation)
+
+                agent_stack_observation = np.array(self.frames[agent])
+                agent_stack_observation = agent_stack_observation.reshape(
+                    (-1,) + agent_observation.shape[2:]
+                )
+                new_observations[agent] = agent_stack_observation
+
+        return (
+            dm_env.TimeStep(
+                timestep.step_type, timestep.reward, timestep.discount, new_observations
+            ),
+            env_extras,
+        )
+
+    def observation_spec(self) -> Dict[str, OLT]:
+        """Observation spec.
+
+        Returns:
+            types.Observation: spec for environment.
+        """
+        timestep = self.reset()
+        if type(timestep) == tuple:
+            timestep, _ = timestep
+
         observations = timestep.observation
         return observations
 

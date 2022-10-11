@@ -25,6 +25,7 @@ from mava.wrappers.debugging_envs import (
     SwitchGameWrapper,
     TwoStepWrapper,
 )
+from mava.wrappers.env_preprocess_wrappers import StackObservations
 
 
 def make_environment(
@@ -36,7 +37,9 @@ def make_environment(
     return_state_info: bool = False,
     random_seed: Optional[int] = None,
     recurrent_test: bool = False,
+    stack_frames: int = 1,
 ) -> dm_env.Environment:
+    """Make small size environnments for debugging."""
 
     assert action_space == "continuous" or action_space == "discrete"
 
@@ -66,4 +69,7 @@ def make_environment(
     if random_seed and hasattr(environment, "seed"):
         environment.seed(random_seed)
 
-    return environment
+    if stack_frames > 1:
+        return StackObservations(environment, num_frames=stack_frames)
+    else:
+        return environment
