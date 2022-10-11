@@ -39,13 +39,23 @@ if _found_smac:
         concat_agent_id: bool = False,
         evaluation: bool = False,
         random_seed: Optional[int] = None,
+        death_masking: bool = False,
     ) -> Any:
+        """Create smac environment wrapper.
 
+        Args:
+            map_name: the name of the scenario
+            concat_prev_actions: Concat one-hot vector of agent prev_action to obs.
+            concat_agent_id: Concat one-hot vector of agent ID to obs.
+            evaluation: extra param for evaluation
+            random_seed: seed
+            death_masking: whether to mask out agent observations once dead
+        """
         # Env uses int64 action space due to the use of spac.Discrete.
         set_jax_double_precision()
         env = StarCraft2Env(map_name=map_name, seed=random_seed)
 
-        env = SMACWrapper(env)
+        env = SMACWrapper(env, death_masking=death_masking)
 
         if concat_prev_actions:
             env = ConcatPrevActionToObservation(env)
