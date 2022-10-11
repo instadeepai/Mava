@@ -282,10 +282,10 @@ class MAPGEpochUpdate(EpochUpdate):
             #         lambda x: x.shape[0]==trainer.store.full_batch_size, batch
             #     )
             # assert ...
-            assert (
-                list(batch.observations.values())[0].observation.shape[0]
-                == trainer.store.full_batch_size
-            )
+            # assert (
+            #     list(batch.observations.values())[0].observation.shape[0]
+            #     == trainer.store.full_batch_size
+            # )
 
             permutation = jax.random.permutation(
                 shuffle_key, trainer.store.full_batch_size
