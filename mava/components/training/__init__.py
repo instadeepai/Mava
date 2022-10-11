@@ -17,7 +17,7 @@
 from mava.components.training.advantage_estimation import GAE
 from mava.components.training.base import Batch, TrainingState, Utility
 from mava.components.training.losses import (
-    HuberValueLossFunction,
+    HuberValueLoss,
     MAPGWithTrustRegionClippingLoss,
     SquaredErrorLoss,
 )

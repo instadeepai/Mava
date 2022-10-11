@@ -29,7 +29,23 @@ from mava.components import Component, training
 from mava.core_jax import SystemTrainer
 
 
-class SquaredErrorLoss(Component):
+class ValueLoss(Component):
+    @abc.abstractmethod
+    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
+        """An abstract class for a component that defines the
+        final value loss function."""
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "value_loss"
+
+
+class SquaredErrorLoss(ValueLoss):
     def __init__(
         self,
         config: SimpleNamespace = SimpleNamespace(),
@@ -59,40 +75,21 @@ class SquaredErrorLoss(Component):
 
         trainer.store.value_loss_fn = squared_error_loss_fn
 
-    @staticmethod
-    def name() -> str:
-        """Static method that returns component name."""
-        return "value_loss"
-
-    @staticmethod
-    def required_components() -> List[Type[Callback]]:
-        """List of other Components required in the system for this Component to function.
-
-        BaseTrainerInit required to set up trainer.store.trainer_agents,
-        trainer.store.trainer_agent_net_keys and trainer.store.networks.
-
-        Returns:
-            List of required component classes.
-        """
-        return [
-            training.BaseTrainerInit
-        ]  # import from training to avoid partial dependency
-
 
 @dataclass
-class HuberValueLossFunctionConfig:
+class HuberValueLossConfig:
     huber_delta: float = 1.0
 
 
-class HuberValueLossFunction(SquaredErrorLoss):
+class HuberValueLoss(ValueLoss):
     def __init__(
         self,
-        config: HuberValueLossFunctionConfig = HuberValueLossFunctionConfig(),
+        config: HuberValueLossConfig = HuberValueLossConfig(),
     ):
-        """Component defines a HuberValueLossFunction loss function.
+        """Component defines a HuberValueLoss loss function.
 
         Args:
-            config: HuberValueLossFunctionConfig.
+            config: HuberValueLossConfig.
         """
         self.config = config
 
@@ -118,7 +115,8 @@ class HuberValueLossFunction(SquaredErrorLoss):
 class Loss(Component):
     @abc.abstractmethod
     def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
+        """An abstract class for a component that defines the
+        entire policy and critic loss functions."""
 
     @staticmethod
     def name() -> str:

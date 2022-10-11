@@ -6,7 +6,7 @@ recurrent_policy_components = [
     executing.RecurrentExecutorObserve,
 ]
 
-# The components that a needed for IPPO with the Huber value loss.
+# The components that a needed for the Huber value loss.
 huber_value_loss_components = [
-    training.HuberValueLossFunction,
+    training.HuberValueLoss,
 ]

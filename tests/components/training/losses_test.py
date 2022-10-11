@@ -23,8 +23,8 @@ import jax.numpy as jnp
 import pytest
 
 from mava.components.training.losses import (
-    HuberValueLossFunction,
-    HuberValueLossFunctionConfig,
+    HuberValueLoss,
+    HuberValueLossConfig,
     MAPGTrustRegionClippingLossConfig,
     MAPGWithTrustRegionClippingLoss,
     SquaredErrorLoss,
@@ -172,9 +172,7 @@ def test_mapg_creation(
     assert isinstance(
         mock_trainer.store.critic_grad_fn, Callable  # type:ignore
     )
-    huber_loss = HuberValueLossFunction(
-        config=HuberValueLossFunctionConfig(huber_delta=2.0)
-    )
+    huber_loss = HuberValueLoss(config=HuberValueLossConfig(huber_delta=2.0))
     huber_loss.on_training_utility_fns(trainer=mock_trainer)
     mapg_loss.on_training_loss_fns(trainer=mock_trainer)
     assert hasattr(mock_trainer.store, "policy_grad_fn")
@@ -299,7 +297,7 @@ def test_mapg_huber_loss(
     mapg_loss: MAPGWithTrustRegionClippingLoss,  # noqa: E501
 ) -> None:
     """Test whether mapg huber loss output is as expected"""
-    huber_loss = HuberValueLossFunction()
+    huber_loss = HuberValueLoss()
     huber_loss.on_training_utility_fns(trainer=mock_trainer)
     mapg_loss.on_training_loss_fns(trainer=mock_trainer)
     policy_grad_fn = mock_trainer.store.policy_grad_fn
