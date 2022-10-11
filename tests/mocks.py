@@ -67,9 +67,6 @@ class MockedExecutor(ActorMock, core.Executor):
             for agent, observation in observations.items()
         }
 
-    def select_action(self, agent: str, observation: NestedArray) -> Union[float, int]:
-        return _generate_from_spec(self._spec[agent].actions)
-
     def observe_first(
         self,
         timestep: dm_env.TimeStep,
