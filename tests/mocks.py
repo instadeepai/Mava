@@ -432,22 +432,13 @@ def make_fake_env(
         mock env.
     """
     del evaluation
-    if env_name is MockedEnvironments.Mocked_Dicrete:
-        env = ParallelMADiscreteEnvironment(
-            num_actions=18,
-            num_observations=2,
-            obs_shape=(84, 84, 4),
-            obs_dtype=np.float32,
-            episode_length=10,
-        )
-
-    elif env_name is MockedEnvironments.Mocked_Continous:
-        env = ParallelMAContinuousEnvironment(
-            action_dim=2,
-            observation_dim=2,
-            bounded=True,
-            episode_length=10,
-        )
+    env = ParallelMADiscreteEnvironment(
+        num_actions=18,
+        num_observations=2,
+        obs_shape=(84, 84, 4),
+        obs_dtype=np.float32,
+        episode_length=10,
+    )
 
     if env is None:
         raise Exception("Env_spec is not valid.")
