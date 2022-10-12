@@ -30,7 +30,7 @@ except ModuleNotFoundError:
     pass
 
 import mava
-from mava.environment_loop import ParallelEnvironmentLoop, SequentialEnvironmentLoop
+from mava.environment_loop import ParallelEnvironmentLoop
 from mava.utils.loggers import Logger
 from mava.utils.wrapper_utils import RunningStatistics
 
@@ -42,7 +42,7 @@ class EnvironmentLoopStatisticsBase:
 
     def __init__(
         self,
-        environment_loop: Union[ParallelEnvironmentLoop, SequentialEnvironmentLoop],
+        environment_loop: ParallelEnvironmentLoop,
     ) -> None:
         self._environment_loop = environment_loop
         self._override_environment_loop_stats_methods()
@@ -85,7 +85,7 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
 
     def __init__(
         self,
-        environment_loop: Union[ParallelEnvironmentLoop, SequentialEnvironmentLoop],
+        environment_loop: ParallelEnvironmentLoop,
         summary_stats: List = ["mean", "max", "min", "var", "std", "raw"],
         metrics: List = ["episode_length", "episode_return", "steps_per_second"],
     ):
@@ -170,7 +170,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
 
     def __init__(
         self,
-        environment_loop: Union[ParallelEnvironmentLoop, SequentialEnvironmentLoop],
+        environment_loop: ParallelEnvironmentLoop,
     ):
         super().__init__(environment_loop)
 
