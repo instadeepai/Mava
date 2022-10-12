@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Tuple, Type
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optax
 from acme.jax import networks as networks_lib
 from jax.random import KeyArray
@@ -106,7 +107,7 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
         trainer.store.target_stats = {}
         for agent in trainer.store.trainer_agent_net_keys.keys():
             trainer.store.target_stats[agent] = dict(
-                mean=jnp.array([0]), var=jnp.array([0]), count=jnp.array([1e-4])
+                mean=np.array([0]), var=np.array([0]), count=np.array([1e-4])
             )
 
         # Initilaise observations running statisitics here
@@ -114,16 +115,14 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
         # in the training/trainer on_building_init_end callback.
         if self.config.normalize_observations:
             trainer.store.norm_obs_running_stats_fn = update_and_normalize_observations
+            obs_norm_key = constants.OBS_NORM_STATE_DICT_KEY
+
             for agent in trainer.store.trainer_agent_net_keys.keys():
                 obs_shape = len(
-                    trainer.store.obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY][
-                        agent
-                    ]["var"]
+                    trainer.store.obs_norm_params[obs_norm_key][agent]["var"]
                 )
                 for x in range(obs_shape):
-                    trainer.store.obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY][
-                        agent
-                    ]["var"][x] = 0
+                    trainer.store.obs_norm_params[obs_norm_key][agent]["var"][x] = 0
 
         def model_update_minibatch(
             carry: Tuple[

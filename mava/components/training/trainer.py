@@ -98,15 +98,15 @@ class BaseTrainerInit(Component):
             }  # pytype: disable=attribute-error
 
         # Initialise observations' normalisation parameters
+        obs_norm_key = constants.OBS_NORM_STATE_DICT_KEY
         builder.store.obs_norm_params = {}
-        builder.store.obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY] = {}
+        builder.store.obs_norm_params[obs_norm_key] = {}
         for agent in builder.store.agents:
             obs_shape = builder.store.ma_environment_spec._agent_environment_specs[
                 agent
             ].observations.observation.shape
-            builder.store.obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY][
-                agent
-            ] = dict(
+
+            builder.store.obs_norm_params[obs_norm_key][agent] = dict(
                 mean=np.zeros(shape=obs_shape),
                 var=np.ones(shape=obs_shape),
                 count=np.array([1e-4]),

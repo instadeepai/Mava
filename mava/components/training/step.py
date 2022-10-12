@@ -496,23 +496,23 @@ class MAPGWithTrustRegionStep(Step):
                 ] = new_states.critic_opt_states[net_key][constants.OPT_STATE_DICT_KEY]
 
             # Update the observation normalization parameters
+            obs_norm_key = constants.OBS_NORM_STATE_DICT_KEY
             for agent in trainer.store.trainer_agent_net_keys.keys():
                 obs_shape = len(
-                    trainer.store.obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY][
-                        agent
-                    ]["mean"]
+                    trainer.store.obs_norm_params[obs_norm_key][agent]["mean"]
                 )
-                for x in range(obs_shape):
-                    trainer.store.obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY][
-                        agent
-                    ]["mean"][x] = new_states.observation_stats[agent]["mean"][x]
-                    trainer.store.obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY][
-                        agent
-                    ]["var"][x] = new_states.observation_stats[agent]["var"][x]
 
-                trainer.store.obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY][agent][
-                    "count"
-                ][0] = new_states.observation_stats[agent]["count"][x]
+                for x in range(obs_shape):
+                    trainer.store.obs_norm_params[obs_norm_key][agent]["mean"][
+                        x
+                    ] = new_states.observation_stats[agent]["mean"][x]
+                    trainer.store.obs_norm_params[obs_norm_key][agent]["var"][
+                        x
+                    ] = new_states.observation_stats[agent]["var"][x]
+
+                trainer.store.obs_norm_params[obs_norm_key][agent]["count"][
+                    0
+                ] = new_states.observation_stats[agent]["count"][x]
 
             # update the running target stats
             trainer.store.target_stats = new_states.target_stats

@@ -83,10 +83,11 @@ expected_network_keys = {
 }
 
 observation_normalisation_keys = {"obs_norm_params"}
-obs_norm_params: Any = {constants.OBS_NORM_STATE_DICT_KEY: {}}
+obs_norm_key = constants.OBS_NORM_STATE_DICT_KEY
+obs_norm_params: Any = {obs_norm_key: {}}
 for agent in ["agent_0", "agent_1", "agent_2"]:
     obs_shape = 1  # something random
-    obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY][agent] = dict(
+    obs_norm_params[obs_norm_key][agent] = dict(
         mean=np.zeros(shape=obs_shape),
         var=np.ones(shape=obs_shape),
         count=np.array([1e-4]),
@@ -165,10 +166,10 @@ def mock_builder_with_parameter_client() -> Builder:
         }
 
     builder.store.obs_norm_params = {}
-    builder.store.obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY] = {}
+    builder.store.obs_norm_params[obs_norm_key] = {}
     for agent in ["agent_0", "agent_1", "agent_2"]:
         obs_shape = 1
-        builder.store.obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY][agent] = dict(
+        builder.store.obs_norm_params[obs_norm_key][agent] = dict(
             mean=np.zeros(shape=obs_shape),
             var=np.ones(shape=obs_shape),
             count=np.array([1e-4]),
