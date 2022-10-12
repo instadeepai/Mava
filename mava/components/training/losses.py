@@ -16,6 +16,7 @@
 """Trainer components for calculating losses."""
 import abc
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any, Dict, List, Tuple, Type
 
 import haiku as hk
@@ -28,10 +29,94 @@ from mava.components import Component, training
 from mava.core_jax import SystemTrainer
 
 
+class ValueLoss(Component):
+    @abc.abstractmethod
+    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
+        """An abstract class for a component that defines the
+        final value loss function."""
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "value_loss"
+
+
+class SquaredErrorValueLoss(ValueLoss):
+    def __init__(
+        self,
+        config: SimpleNamespace = SimpleNamespace(),
+    ):
+        """Component defines a SquaredErrorValueLoss loss function.
+
+        Args:
+            config: SimpleNamespace.
+        """
+        self.config = config
+
+    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
+        """Creates and stores the squared error value loss function.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
+
+        def squared_error_loss_fn(
+            value_error: jax.interpreters.ad.JVPTracer,
+        ) -> jax.interpreters.ad.JVPTracer:
+            """Default loss function"""
+            return value_error**2
+
+        trainer.store.value_loss_fn = squared_error_loss_fn
+
+
+@dataclass
+class HuberValueLossConfig:
+    huber_delta: float = 1.0
+
+
+class HuberValueLoss(ValueLoss):
+    def __init__(
+        self,
+        config: HuberValueLossConfig = HuberValueLossConfig(),
+    ):
+        """Component defines a HuberValueLoss loss function.
+
+        Args:
+            config: HuberValueLossConfig.
+        """
+        self.config = config
+
+    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
+        """Creates and stores the huber value loss function.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
+
+        def huber_loss_fn(
+            value_error: jax.interpreters.ad.JVPTracer,
+        ) -> jax.interpreters.ad.JVPTracer:
+            """Huber loss function"""
+            return rlax.huber_loss(value_error, self.config.huber_delta)
+
+        trainer.store.value_loss_fn = huber_loss_fn
+
+
 class Loss(Component):
     @abc.abstractmethod
     def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
+        """An abstract class for a component that defines the
+        entire policy and critic loss functions."""
 
     @staticmethod
     def name() -> str:
@@ -115,9 +200,9 @@ class MAPGWithTrustRegionClippingLoss(Loss):
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
                 network = trainer.store.networks[agent_net_key]
-
                 # Note (dries): This is placed here to set the networks correctly in
                 # the case of non-shared weights.
+
                 def policy_loss_fn(
                     policy_params: Any,
                     policy_states: Any,
@@ -247,7 +332,10 @@ class MAPGWithTrustRegionClippingLoss(Loss):
 
                     # Value function loss. Exclude the bootstrap value
                     unclipped_value_error = target_values - values
-                    unclipped_value_loss = unclipped_value_error**2
+
+                    unclipped_value_loss = trainer.store.value_loss_fn(
+                        unclipped_value_error
+                    )
 
                     value_clip_parameter = self.config.value_clip_parameter
                     if self.config.clip_value:
@@ -259,7 +347,9 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                             value_clip_parameter,
                         )
                         clipped_value_error = target_values - clipped_values
-                        clipped_value_loss = clipped_value_error**2
+                        clipped_value_loss = trainer.store.value_loss_fn(
+                            clipped_value_error
+                        )
                         value_loss = jnp.mean(
                             jnp.fmax(unclipped_value_loss, clipped_value_loss)
                         )

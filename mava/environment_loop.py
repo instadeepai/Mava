@@ -16,7 +16,7 @@
 """A simple multi-agent-system-environment training loop."""
 
 import time
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Tuple
 
 import acme
 import dm_env
@@ -26,341 +26,8 @@ import numpy as np
 from acme.utils import counting, loggers
 
 import mava
-from mava.types import Action
 from mava.utils.training_utils import check_count_condition
-from mava.utils.wrapper_utils import (
-    SeqTimestepDict,
-    convert_seq_timestep_and_actions_to_parallel,
-    generate_zeros_from_spec,
-)
-
-
-class SequentialEnvironmentLoop(acme.core.Worker):
-    """A Sequential MARL environment loop.
-
-    This takes `Environment` and `Executor` instances and coordinates their
-    interaction. Executors are updated if `should_update=True`. This can be used as:
-        loop = EnvironmentLoop(environment, executor)
-        loop.run(num_episodes)
-    A `Counter` instance can optionally be given in order to maintain counts
-    between different Mava components. If not given a local Counter will be
-    created to maintain counts between calls to the `run` method.
-    A `Logger` instance can also be passed in order to control the output of the
-    loop. If not given a platform-specific default logger will be used as defined
-    by utils.loggers.make_default_logger from acme. A string `label` can be passed
-    to easily change the label associated with the default logger; this is ignored
-    if a `Logger` instance is given.
-    """
-
-    def __init__(
-        self,
-        environment: dm_env.Environment,
-        executor: mava.core.Executor,
-        counter: counting.Counter = None,
-        logger: loggers.Logger = None,
-        should_update: bool = True,
-        label: str = "sequential_environment_loop",
-    ):
-        """Sequential environment loop
-
-        Args:
-            environment: an environment
-            executor: a Mava executor
-            counter: an optional counter. Defaults to None.
-            logger: an optional counter. Defaults to None.
-            should_update: should update. Defaults to True.
-            label: optional label. Defaults to "sequential_environment_loop".
-        """
-        # Internalize agent and environment.
-        self._environment = environment
-        self._executor = executor
-        self._counter = counter or counting.Counter()
-        self._logger = logger or loggers.make_default_logger(label)
-
-        self._should_update = should_update
-        self._running_statistics: Dict[str, float] = {}
-        self.num_agents = self._environment.num_agents
-
-        # keeps track of previous actions and timesteps
-        self._prev_action: Dict[str, Optional[Action]] = {
-            a: None for a in self._environment.possible_agents
-        }
-        self._prev_timestep: Dict[str, Optional[dm_env.TimeStep]] = {
-            a: None for a in self._environment.possible_agents
-        }
-        self._agent_action_timestep: Dict[str, Tuple[Action, dm_env.TimeStep]] = {}
-        self._step_type: Dict[str, dm_env.StepType] = {
-            a: dm_env.StepType.FIRST for a in self._environment.possible_agents
-        }
-
-        # For evaluation, this keeps track of the total undiscounted reward
-        # for each agent accumulated during the episode.
-        self.rewards: Dict[str, float] = {}
-        self.episode_returns: Dict[str, float] = {}
-        for agent, spec in self._environment.reward_spec().items():
-            self.rewards.update({agent: generate_zeros_from_spec(spec)})
-            self.episode_returns.update({agent: generate_zeros_from_spec(spec)})
-
-    def _get_action(self, agent_id: str, timestep: dm_env.TimeStep) -> Any:
-        """Get action for agent.
-
-        Args:
-            agent_id : agent id.
-            timestep : timestep.
-
-        Returns:
-            choosen action.
-        """
-        return self._executor.select_action(agent_id, timestep.observation)
-
-    def _get_running_stats(self) -> Dict:
-        """Get running stats.
-
-        Returns:
-            running stats.
-        """
-        return self._running_statistics
-
-    def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
-        """Compute step stats.
-
-        Args:
-            rewards : reward for step.
-        """
-        pass
-
-    def _compute_episode_statistics(
-        self,
-        episode_returns: Dict[str, float],
-        episode_steps: int,
-        start_time: float,
-    ) -> None:
-        """Compute episode stats.
-
-        Args:
-            episode_returns : returns for episode.
-            episode_steps : episode step count.
-            start_time : episode start time.
-        """
-        pass
-
-    def _set_step_type(
-        self, timestep: dm_env.TimeStep, step_type: dm_env.StepType
-    ) -> dm_env.TimeStep:
-        """Set step type.
-
-        Args:
-            timestep : timestep.
-            step_type : step type.
-
-        Returns:
-            dm timestep.
-        """
-        return dm_env.TimeStep(
-            observation=timestep.observation,
-            reward=timestep.reward,
-            discount=timestep.discount,
-            step_type=step_type,
-        )
-
-    def _send_observation(self) -> None:
-        """Record observations."""
-        if len(self._agent_action_timestep) == self.num_agents:
-            timesteps: Dict[str, SeqTimestepDict] = {
-                k: {"timestep": v[1], "action": v[0]}
-                for k, v in self._agent_action_timestep.items()
-            }
-            (
-                parallel_actions,
-                parallel_timestep,
-            ) = convert_seq_timestep_and_actions_to_parallel(
-                timesteps, self._environment.possible_agents
-            )
-
-            if parallel_timestep.step_type.first():
-                assert all([val is None for val in parallel_actions.values()])
-                self._executor.observe_first(parallel_timestep)
-            else:
-                self._executor.observe(
-                    parallel_actions, next_timestep=parallel_timestep
-                )
-
-            self.rewards = parallel_timestep.reward
-            for agent, reward in self.rewards.items():
-                self.episode_returns[agent] = self.episode_returns[agent] + reward
-            self._agent_action_timestep = {}
-
-    def _perform_turn(self, timestep: dm_env.TimeStep) -> dm_env.TimeStep:
-        """Perform env step.
-
-        Args:
-            timestep : dm timestep.
-
-        Returns:
-            dm timestep.
-        """
-        # current agent
-        agent = self._environment.current_agent
-
-        # save action, timestep pairs for current agent
-        timestep = self._set_step_type(timestep, self._step_type[agent])
-        self._agent_action_timestep[agent] = (
-            self._prev_action[agent],  # type: ignore
-            timestep,
-        )
-
-        self._prev_timestep[agent] = timestep
-
-        # obtain action given the timestep of current agent
-        action = self._get_action(agent, timestep)
-
-        # perform environment step; a new agent becomes the current agent and its
-        # timestep is returned
-        timestep = self._environment.step(action)
-
-        # save the action of the former agent
-        self._prev_action[agent] = action
-        self._step_type[agent] = dm_env.StepType.MID
-
-        # send observation to executor if (action, timestep) pairs are saved for all
-        # agents
-        # if true, executor observes the data
-        self._send_observation()
-
-        return timestep
-
-    def _collect_last_timesteps(self, timestep: dm_env.TimeStep) -> None:
-        """Perform last timestep.
-
-        Args:
-            timestep : dm timestep.
-        """
-        assert timestep.step_type == dm_env.StepType.LAST
-        cache_tsp = [timestep]
-
-        self._agent_action_timestep = {}
-
-        for _ in range(self.num_agents):
-            agent = self._environment.current_agent
-            timestep = self._set_step_type(timestep, dm_env.StepType.LAST)
-            self._agent_action_timestep[agent] = (
-                self._prev_action[agent],  # type: ignore
-                timestep,
-            )
-
-            timestep = self._environment.step(
-                generate_zeros_from_spec(self._environment.action_spec()[agent])
-            )
-            cache_tsp += [timestep]
-
-        assert len(self._agent_action_timestep) == self.num_agents
-
-        self._send_observation()
-
-    def run_episode(self) -> loggers.LoggingData:
-        """Run one episode.
-
-        Each episode is a loop which interacts first with the environment to get an
-        observation and then give that observation to the agent in order to retrieve
-        an action.
-
-        Returns:
-            An instance of `loggers.LoggingData`.
-        """
-        # Reset any counts and start the environment.
-        start_time = time.time()
-        episode_steps = 0
-
-        self._prev_action = {a: None for a in self._environment.possible_agents}
-        self._prev_timestep = {a: None for a in self._environment.possible_agents}
-        self._agent_action_timestep = {}
-        self._step_type = {
-            a: dm_env.StepType.FIRST for a in self._environment.possible_agents
-        }
-
-        self.rewards = {}
-        self.episode_returns = {}
-        for agent, spec in self._environment.reward_spec().items():
-            self.rewards.update({agent: generate_zeros_from_spec(spec)})
-            self.episode_returns.update({agent: generate_zeros_from_spec(spec)})
-
-        timestep = self._environment.reset()
-
-        # Run an episode.
-        while not timestep.last():
-            timestep = self._perform_turn(timestep)
-
-            # if Last timestep is encounterd, Env is frozen and observations for all
-            # agents are collected. (action, timestep) pairs must be obtained for all
-            # agents
-            if timestep.last():
-                self._collect_last_timesteps(timestep)
-
-            # Update all actors
-            if self._should_update:
-                self._executor.update()
-
-            # Book-keeping.
-            episode_steps += 1
-
-        self._compute_episode_statistics(
-            self.episode_returns,
-            episode_steps,
-            start_time,
-        )
-        if self._get_running_stats():
-            return self._get_running_stats()
-        else:
-            # Record counts.
-            counts = self._counter.increment(episodes=1, steps=episode_steps)
-
-            # Collect the results and combine with counts.
-            steps_per_second = episode_steps / (time.time() - start_time)
-            result = {
-                "episode_length": episode_steps,
-                "mean_episode_return": np.mean(list(self.episode_returns.values())),
-                "steps_per_second": steps_per_second,
-            }
-            result.update(counts)
-
-            return result
-
-    def run(
-        self, num_episodes: Optional[int] = None, num_steps: Optional[int] = None
-    ) -> None:
-        """Perform the run loop.
-
-        Run the environment loop either for `num_episodes` episodes or for at
-        least `num_steps` steps (the last episode is always run until completion,
-        so the total number of steps may be slightly more than `num_steps`).
-        At least one of these two arguments has to be None.
-        Upon termination of an episode a new episode will be started. If the number
-        of episodes and the number of steps are not given then this will interact
-        with the environment infinitely.
-
-        Args:
-            num_episodes: number of episodes to run the loop for.
-            num_steps: minimal number of steps to run the loop for.
-
-        Raises:
-            ValueError: If both 'num_episodes' and 'num_steps' are not None.
-        """
-
-        if not (num_episodes is None or num_steps is None):
-            raise ValueError('Either "num_episodes" or "num_steps" should be None.')
-
-        def should_terminate(episode_count: int, step_count: int) -> bool:
-            return (num_episodes is not None and episode_count >= num_episodes) or (
-                num_steps is not None and step_count >= num_steps
-            )
-
-        episode_count, step_count = 0, 0
-        while not should_terminate(episode_count, step_count):
-            result = self.run_episode()
-            episode_count += 1
-            step_count += result["episode_length"]
-            # Log the given results.
-            self._logger.write(result)
+from mava.utils.wrapper_utils import generate_zeros_from_spec
 
 
 class ParallelEnvironmentLoop(acme.core.Worker):
@@ -397,7 +64,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             counter: an optional counter. Defaults to None.
             logger: an optional counter. Defaults to None.
             should_update: should update. Defaults to True.
-            label: optional label. Defaults to "sequential_environment_loop".
+            label: optional label. Defaults to "parallel_environment_loop".
         """
         # Internalize agent and environment.
         self._environment = environment
@@ -428,38 +95,10 @@ class ParallelEnvironmentLoop(acme.core.Worker):
     ) -> None:
         pass
 
-    def get_counts(self) -> Union[counting.Counter, Dict[str, jnp.ndarray]]:
-        """Get latest counts"""
-        if hasattr(self._executor, "store"):
-            counts = self._executor.store.executor_counts
-        elif hasattr(self._executor, "_counts"):
-            counts = self._executor._counts
-        else:
-            counts = self._counter.get_counts()
-        return counts
-
     def record_counts(self, episode_steps: int) -> counting.Counter:
         """Record latest counts"""
         # Record counts.
-        if hasattr(self._executor, "_counts"):
-            loop_type = "evaluator" if self._executor._evaluator else "executor"
-
-            if hasattr(self._executor, "_variable_client"):
-                self._executor._variable_client.add_async(
-                    [f"{loop_type}_episodes", f"{loop_type}_steps"],
-                    {
-                        f"{loop_type}_episodes": 1,
-                        f"{loop_type}_steps": episode_steps,
-                    },
-                )
-            else:
-                self._executor._counts[f"{loop_type}_episodes"] += 1
-                self._executor._counts[f"{loop_type}_steps"] += episode_steps
-
-            counts = self._executor._counts
-        else:
-            counts = self._counter.increment(episodes=1, steps=episode_steps)
-
+        counts = self._counter.increment(episodes=1, steps=episode_steps)
         return counts
 
     def run_episode(self) -> loggers.LoggingData:
@@ -527,20 +166,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
             # Book-keeping.
             episode_steps += 1
-
-            if hasattr(self._executor, "after_action_selection"):
-                if hasattr(self._executor, "_counts"):
-                    loop_type = "evaluator" if self._executor._evaluator else "executor"
-                    total_steps_before_current_episode = self._executor._counts[
-                        f"{loop_type}_steps"
-                    ].numpy()
-                else:
-                    total_steps_before_current_episode = self._counter.get_counts().get(
-                        "executor_steps", 0
-                    )
-                current_step_t = total_steps_before_current_episode + episode_steps
-                self._executor.after_action_selection(current_step_t)
-
             self._compute_step_statistics(rewards)
 
             for agent, reward in rewards.items():
@@ -554,7 +179,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         if self._get_running_stats():
             return self._get_running_stats()
         else:
-
             counts = self.record_counts(episode_steps)
 
             # Collect the results and combine with counts.
@@ -568,40 +192,14 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             return result
 
     def run_episode_and_log(self) -> loggers.LoggingData:
-        """_summary_"""
+        """Run an episode and log the results"""
 
         results = self.run_episode()
         self._logger.write(results)
         return results
 
-    def run(  # noqa: C901
-        self, num_episodes: Optional[int] = None, num_steps: Optional[int] = None
-    ) -> None:
-        """Perform the run loop.
-
-        Run the environment loop either for `num_episodes` episodes or for at
-        least `num_steps` steps (the last episode is always run until completion,
-        so the total number of steps may be slightly more than `num_steps`).
-        At least one of these two arguments has to be None.
-        Upon termination of an episode a new episode will be started. If the number
-        of episodes and the number of steps are not given then this will interact
-        with the environment infinitely.
-
-        Args:
-            num_episodes: number of episodes to run the loop for.
-            num_steps: minimal number of steps to run the loop for.
-
-        Raises:
-            ValueError: If both 'num_episodes' and 'num_steps' are not None.
-        """
-
-        if not (num_episodes is None or num_steps is None):
-            raise ValueError('Either "num_episodes" or "num_steps" should be None.')
-
-        def should_terminate(episode_count: int, step_count: int) -> bool:
-            return (num_episodes is not None and episode_count >= num_episodes) or (
-                num_steps is not None and step_count >= num_steps
-            )
+    def run(self) -> None:
+        """Run the environment loop."""
 
         def should_run_loop(eval_interval_condition: Tuple) -> bool:
             """Check if the eval loop should run in current step.
@@ -614,7 +212,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             """
             should_run_loop = False
             eval_interval_key, eval_interval_count = eval_interval_condition
-            counts = self.get_counts()
+            counts = self._executor.store.executor_counts
 
             if counts:
                 count = counts[eval_interval_key]
@@ -632,38 +230,24 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
             return should_run_loop
 
-        episode_count, step_count = 0, 0
+        environment_loop_schedule = self._executor._evaluator and (
+            self._executor.store.evaluation_interval is not None
+        )
 
-        # TODO (Ruan): Checking whether we are using Jax or TF here
-        # this should be removed once we deprecate TF.
-        if hasattr(self._executor, "store"):
-            environment_loop_schedule = self._executor._evaluator and (
-                self._executor.store.evaluation_interval is not None
+        if environment_loop_schedule:
+            eval_interval_condition = check_count_condition(
+                self._executor.store.evaluation_interval
             )
-
-            if environment_loop_schedule:
-                eval_interval_condition = check_count_condition(
-                    self._executor.store.evaluation_interval
-                )
-                eval_duration_condition = check_count_condition(
-                    self._executor.store.evaluation_duration
-                )
-                evaluation_duration = eval_duration_condition[1]
-        else:
-            environment_loop_schedule = (
-                self._executor._evaluator and self._executor._interval
+            eval_duration_condition = check_count_condition(
+                self._executor.store.evaluation_duration
             )
-            if environment_loop_schedule:
-                eval_interval_condition = check_count_condition(
-                    self._executor._interval
-                )
+            evaluation_duration = eval_duration_condition[1]
 
-        while not should_terminate(episode_count, step_count):
+        while True:
             if (not environment_loop_schedule) or (
                 should_run_loop(eval_interval_condition)
             ):
-                # TODO (Ruan): Remove store check once TF is deprecated.
-                if environment_loop_schedule and hasattr(self._executor, "store"):
+                if environment_loop_schedule:
 
                     # Initialise list for capturing episode returns
                     eval_returns = []
@@ -671,14 +255,11 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     # Get first result dictionary
                     results = self.run_episode()
                     eval_returns.append(results["raw_episode_return"])
-                    episode_count += 1
-                    step_count += results["episode_length"]
+
                     for _ in range(evaluation_duration - 1):
                         # Add consecutive evaluation run data
                         result = self.run_episode()
                         eval_returns.append(result["raw_episode_return"])
-                        episode_count += 1
-                        step_count += result["episode_length"]
                         # Sum results for computing mean after all evaluation runs.
                         results = jax.tree_map(lambda x, y: x + y, results, result)
                     # compute the mean over all evaluation runs
@@ -703,15 +284,11 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         )
 
                     self._logger.write(results)
-
                     self._executor.store.eval_json_logger.write(
                         results_dict=eval_result
                     )
-
                 else:
                     result = self.run_episode()
-                    episode_count += 1
-                    step_count += result["episode_length"]
                     # Log the given results.
                     self._logger.write(result)
             else:

@@ -56,6 +56,7 @@ class PPONetworks:
         Args:
             policy_network: network to be used by the policy
             policy_params: parameters for the policy network
+            policy_init_state: initial policy hidden state.
             critic_network: network to be used by the critic
             critic_params: parameters for the critic network
             log_prob: lambda function for getting the log probability of
@@ -148,6 +149,7 @@ class PPONetworks:
         return value
 
     def get_init_state(self) -> jnp.ndarray:
+        """Get initial policy hidden state."""
         return self.policy_init_state
 
     def get_params(
@@ -174,10 +176,16 @@ class ValueHead(hk.Module):
     def __init__(
         self,
         name: Optional[str] = None,
+        w_init: Optional[hk.initializers.Initializer] = None,
     ):
-        """Initialize the class"""
+        """Initialize the value head.
+
+        Args:
+            name: An optional string name for the class.
+            w_init: Initializer for network weights.
+        """
         super().__init__(name=name)
-        self._value_layer = hk.Linear(1)
+        self._value_layer = hk.Linear(1, w_init=w_init)
 
     def __call__(self, inputs: jnp.ndarray) -> Any:
         """Return output given network inputs."""
@@ -193,6 +201,9 @@ def make_discrete_networks(
     policy_recurrent_layer_sizes: Sequence[int],
     recurrent_architecture_fn: Any,
     policy_layers_after_recurrent: Sequence[int],
+    orthogonal_initialisation: bool = False,
+    activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
+    policy_network_head_weight_gain: float = 0.01,
     # default behaviour is to flatten observations
 ) -> PPONetworks:
     """Create PPO network for environments with discrete action spaces.
@@ -203,14 +214,31 @@ def make_discrete_networks(
         policy_layer_sizes: sizes of hidden layers for the policy network
         critic_layer_sizes: sizes of hidden layers for the critic network
         policy_recurrent_layer_sizes: Optionally add recurrent layers to the policy
-        recurrent_architecture_fn: Architecture to use for the recurrent units, e.g. LSTM or GRU.
-        policy_layers_after_recurrent: sizes of hidden layers for the policy network after the recurrent layers.
-        This is only used if an recurrent architecture is used.
+        recurrent_architecture_fn: Architecture to use for the recurrent units,
+        e.g. LSTM or GRU.
+        policy_layers_after_recurrent: sizes of hidden layers for the
+            policy network after the recurrent layers. This is only used if a
+            recurrent architecture is used.
+        orthogonal_initialisation: Whether network weights should be
+            initialised orthogonally.
+        activation_function: activation function to be used for
+            network hidden layers.
+        policy_network_head_weight_gain: value for scaling the policy
+            network final layer weights by.
+
     Returns:
         PPONetworks class
     """
 
     num_actions = environment_spec.actions.num_values
+
+    # Define weight and bias initialisation functions to be
+    # used in MLPs and policy and critic head networks.
+    w_init_fn = (
+        lambda x, scale: hk.initializers.Orthogonal(scale=scale)
+        if (x is True)
+        else None
+    )
 
     @hk.without_apply_rng
     @hk.transform
@@ -225,7 +253,12 @@ def make_discrete_networks(
         """
         # Add the observation network and an MLP network.
         policy_network = [
-            hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
+            hk.nets.MLP(
+                policy_layer_sizes,
+                activation=activation_function,
+                w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
+                activate_final=True,
+            ),
         ]
 
         # Add optional recurrent layers
@@ -236,14 +269,19 @@ def make_discrete_networks(
             # Add optional feedforward layers after the recurrent layers
             hk.nets.MLP(
                 policy_layers_after_recurrent,
-                activation=jax.nn.relu,
+                activation=activation_function,
+                w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
                 activate_final=True,
             ),
 
         # Add a categorical value head.
         policy_network.append(
             networks_lib.CategoricalHead(
-                num_values=num_actions, dtype=environment_spec.actions.dtype
+                num_values=num_actions,
+                dtype=environment_spec.actions.dtype,
+                w_init=w_init_fn(
+                    orthogonal_initialisation, policy_network_head_weight_gain
+                ),
             )
         )
 
@@ -255,14 +293,13 @@ def make_discrete_networks(
     @hk.without_apply_rng
     @hk.transform
     def initial_state_fn() -> List[jnp.ndarray]:
-        """Returns an intial state for the
-        recurrent layers.
+        """Returns an intial state for the recurrent layers.
 
         Args:
             None.
 
         Returns:
-            Intial state for the recurrent layers.
+            Initial state for the recurrent layers.
         """
         state = []
         for size in policy_recurrent_layer_sizes:
@@ -283,9 +320,12 @@ def make_discrete_networks(
         critic_network = hk.Sequential(
             [
                 hk.nets.MLP(
-                    critic_layer_sizes, activation=jax.nn.relu, activate_final=True
+                    critic_layer_sizes,
+                    activation=activation_function,
+                    w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
+                    activate_final=True,
                 ),
-                ValueHead(),
+                ValueHead(w_init=w_init_fn(orthogonal_initialisation, 1.0)),
             ]
         )
         return critic_network(inputs)
@@ -298,7 +338,7 @@ def make_discrete_networks(
     if len(policy_recurrent_layer_sizes) > 0:
         policy_state = initial_state_fn.apply(None)
 
-        policy_params = policy_fn.init(network_key, [dummy_obs, policy_state])  # type: ignore
+        policy_params = policy_fn.init(network_key, [dummy_obs, policy_state])  # type: ignore # noqa: E501
     else:
         policy_state = None
         policy_params = policy_fn.init(network_key, dummy_obs)  # type: ignore
@@ -327,6 +367,9 @@ def make_networks(
     policy_recurrent_layer_sizes: Sequence[int],
     recurrent_architecture_fn: Any,
     policy_layers_after_recurrent: Sequence[int],
+    orthogonal_initialisation: bool = False,
+    activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
+    policy_network_head_weight_gain: float = 0.01,
 ) -> PPONetworks:
     """Function for creating PPO networks to be used.
 
@@ -339,15 +382,23 @@ def make_networks(
         policy_layer_sizes: size of each layer of the policy network
         critic_layer_sizes: size of each layer of the critic network
         policy_recurrent_layer_sizes: Optionally add recurrent layers to the policy
-        recurrent_architecture_fn: Architecture to use for the recurrent units, e.g. LSTM or GRU.
-        sizes of hidden layers for the policy network after the recurrent layers.
-        This is only used if an recurrent architecture is used.
+        recurrent_architecture_fn: Architecture to use for the recurrent units,
+            e.g. LSTM or GRU.
+        policy_layers_after_recurrent: sizes of hidden layers for the policy
+        network after the recurrent layers. This is only used if a
+        recurrent architecture is used.
+        orthogonal_initialisation: Whether network weights should be
+            initialised orthogonally.
+        activation_function: activation function to be used for
+            network hidden layers.
+        policy_network_head_weight_gain: value for scaling the policy
+            network final layer weights by.
 
     Returns:
         make_discrete_networks: function to create a discrete network
 
     Raises:
-        NotImplementedError: Raises an error if continous network is not
+        NotImplementedError: Raises an error if continuous network is not
                         available
     """
     if isinstance(spec.actions, specs.DiscreteArray):
@@ -356,9 +407,12 @@ def make_networks(
             base_key=base_key,
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
-            policy_layers_after_recurrent=policy_layers_after_recurrent,
             policy_recurrent_layer_sizes=policy_recurrent_layer_sizes,
+            policy_layers_after_recurrent=policy_layers_after_recurrent,
             recurrent_architecture_fn=recurrent_architecture_fn,
+            orthogonal_initialisation=orthogonal_initialisation,
+            activation_function=activation_function,
+            policy_network_head_weight_gain=policy_network_head_weight_gain,
         )
 
     else:
@@ -383,21 +437,39 @@ def make_default_networks(
     policy_recurrent_layer_sizes: Sequence[int] = (),
     recurrent_architecture_fn: Any = hk.GRU,
     policy_layers_after_recurrent: Sequence[int] = (),
+    orthogonal_initialisation: bool = False,
+    activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
+    policy_network_head_weight_gain: float = 0.01,
 ) -> Dict[str, Any]:
     """Create default PPO networks
 
     Args:
         environment_spec: mava multi-agent environment spec
-        agent_net_keys: dictionary specifiying which networks are
-                        used by which agent
+        agent_net_keys: dictionary specifying which networks are
+            used by which agent
         base_key: jax random key to be used for network initialization
         net_spec_keys: keys for each agent network
         policy_layer_sizes: policy network layers
         critic_layer_sizes: critic network layers
         policy_recurrent_layer_sizes: Optionally add recurrent layers to the policy
-        recurrent_architecture_fn: Architecture to use for the recurrent units, e.g. LSTM or GRU.
-        sizes of hidden layers for the policy network after the recurrent layers.
-        This is only used if an recurrent architecture is used.
+        recurrent_architecture_fn: Architecture to use for the recurrent units,
+            e.g. LSTM or GRU.
+        policy_layers_after_recurrent: sizes of hidden layers for the policy
+            network after the recurrent layers. This is only used if a
+            recurrent architecture is used.
+        orthogonal_initialisation: whether network weights should be
+            initialised orthogonally. This will initialise all hidden
+            layers weights with scale sqrt(2) and all hidden layer
+            biases with a constant value of 0.0. The policy network
+            output head weights are orthogonally initialised with scale 0.01 and
+            the critic network output head weights are orthogonally initialised
+            with scale 1.0.Scale value obtained from:
+            https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/ # noqa: E501
+        activation_function: activation function to be used for
+            network hidden layers.
+        policy_network_head_weight_gain: value for scaling the policy
+            network final layer weights by.
+
     Returns:
         networks: networks created to given spec
     """
@@ -421,6 +493,9 @@ def make_default_networks(
             policy_recurrent_layer_sizes=policy_recurrent_layer_sizes,
             recurrent_architecture_fn=recurrent_architecture_fn,
             policy_layers_after_recurrent=policy_layers_after_recurrent,
+            orthogonal_initialisation=orthogonal_initialisation,
+            activation_function=activation_function,
+            policy_network_head_weight_gain=policy_network_head_weight_gain,
         )
 
     # No longer returning a dictionary since this is handled in PPONetworks above

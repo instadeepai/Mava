@@ -67,6 +67,7 @@ class IPPOSystem(System):
             minibatch_update=training.MAPGMinibatchUpdate,
             sgd_step=training.MAPGWithTrustRegionStep,
             step=training.DefaultTrainerStep,
+            value_loss=training.SquaredErrorValueLoss,
             trainer_dataset=building.TrajectoryDataset,
         ).get()
 
