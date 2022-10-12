@@ -122,8 +122,10 @@ def normalize_observations(stats: Any, observation: OLT) -> OLT:
     # the data type before the policy info is computed else we will get
     # an error from the table about the type of policy being double instead of float.
     dtype = observation.observation.dtype
+    stats_cast = {key: np.array(value, dtype=dtype) for key, value in stats.items()}
+
     obs = observation.observation
-    norm_obs = np.array(normalize(stats, obs), dtype=dtype)
+    norm_obs = normalize(stats_cast, obs)
 
     return observation._replace(observation=norm_obs)
 
