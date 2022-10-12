@@ -15,16 +15,13 @@
 
 """Wrapper classes for Mava systems."""
 from mava.wrappers.debugging_envs import DebuggingEnvWrapper, TwoStepWrapper
-from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
+from mava.wrappers.env_wrappers import ParallelEnvWrapper
 from mava.wrappers.environment_loop_wrappers import (
     DetailedEpisodeStatistics,
     DetailedPerAgentStatistics,
     MonitorParallelEnvironmentLoop,
 )
-from mava.wrappers.pettingzoo import (
-    PettingZooAECEnvWrapper,
-    PettingZooParallelEnvWrapper,
-)
+from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 from mava.wrappers.robocup import RoboCupWrapper
 
 try:
