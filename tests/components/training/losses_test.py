@@ -27,7 +27,7 @@ from mava.components.training.losses import (
     HuberValueLossConfig,
     MAPGTrustRegionClippingLossConfig,
     MAPGWithTrustRegionClippingLoss,
-    SquaredErrorLoss,
+    SquaredErrorValueLoss,
 )
 from mava.systems.trainer import Trainer
 
@@ -161,7 +161,7 @@ def test_mapg_creation(
     mapg_loss: MAPGWithTrustRegionClippingLoss,  # noqa: E501
 ) -> None:
     """Test whether mapg functions are successfully created"""
-    default_loss = SquaredErrorLoss()
+    default_loss = SquaredErrorValueLoss()
     default_loss.on_training_utility_fns(trainer=mock_trainer)
     mapg_loss.on_training_loss_fns(trainer=mock_trainer)
     assert hasattr(mock_trainer.store, "policy_grad_fn")
@@ -191,7 +191,7 @@ def test_mapg_loss(
     mapg_loss: MAPGWithTrustRegionClippingLoss,  # noqa: E501
 ) -> None:
     """Test whether mapg loss output is as expected"""
-    default_loss = SquaredErrorLoss()
+    default_loss = SquaredErrorValueLoss()
     default_loss.on_training_utility_fns(trainer=mock_trainer)
     mapg_loss.on_training_loss_fns(trainer=mock_trainer)
     policy_grad_fn = mock_trainer.store.policy_grad_fn

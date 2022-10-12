@@ -45,12 +45,12 @@ class ValueLoss(Component):
         return "value_loss"
 
 
-class SquaredErrorLoss(ValueLoss):
+class SquaredErrorValueLoss(ValueLoss):
     def __init__(
         self,
         config: SimpleNamespace = SimpleNamespace(),
     ):
-        """Component defines a SquaredErrorLoss loss function.
+        """Component defines a SquaredErrorValueLoss loss function.
 
         Args:
             config: SimpleNamespace.
