@@ -191,18 +191,14 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             return result
 
     def run_episode_and_log(self) -> loggers.LoggingData:
-        """_summary_"""
+        """Run an episode and log the results"""
 
         results = self.run_episode()
         self._logger.write(results)
         return results
 
     def run(self) -> None:
-        """Perform the run loop.
-
-        Raises:
-            ValueError: If both 'num_episodes' and 'num_steps' are not None.
-        """
+        """Run the environment loop."""
 
         def should_run_loop(eval_interval_condition: Tuple) -> bool:
             """Check if the eval loop should run in current step.
