@@ -23,8 +23,11 @@ import jax.numpy as jnp
 import pytest
 
 from mava.components.training.losses import (
+    HuberValueLoss,
+    HuberValueLossConfig,
     MAPGTrustRegionClippingLossConfig,
     MAPGWithTrustRegionClippingLoss,
+    SquaredErrorValueLoss,
 )
 from mava.systems.trainer import Trainer
 
@@ -48,7 +51,6 @@ class MockPolicyNet:
         parameters: Dict[str, jnp.ndarray],
         observation_state: List[jnp.ndarray],
     ) -> jnp.ndarray:
-
         """Mock function to apply the network to training data"""
         if len(observation_state) == 2:
             # Recurrent case
@@ -146,23 +148,22 @@ def mock_trainer() -> Trainer:
 
 
 @pytest.fixture
-def mapg_trust_region_clipping_loss() -> MAPGWithTrustRegionClippingLoss:  # noqa: E501
+def mapg_loss() -> MAPGWithTrustRegionClippingLoss:  # noqa: E501
     """Creates an MAPG loss fixture with trust region and clipping"""
-
-    test_mapg = MAPGWithTrustRegionClippingLoss(
+    test_loss = MAPGWithTrustRegionClippingLoss(
         config=MAPGTrustRegionClippingLossConfig(value_cost=0.5, entropy_cost=0.01)
     )
-
-    return test_mapg
+    return test_loss
 
 
 def test_mapg_creation(
     mock_trainer: Trainer,
-    mapg_trust_region_clipping_loss: MAPGWithTrustRegionClippingLoss,  # noqa: E501
+    mapg_loss: MAPGWithTrustRegionClippingLoss,  # noqa: E501
 ) -> None:
     """Test whether mapg functions are successfully created"""
-
-    mapg_trust_region_clipping_loss.on_training_loss_fns(trainer=mock_trainer)
+    default_loss = SquaredErrorValueLoss()
+    default_loss.on_training_utility_fns(trainer=mock_trainer)
+    mapg_loss.on_training_loss_fns(trainer=mock_trainer)
     assert hasattr(mock_trainer.store, "policy_grad_fn")
     assert hasattr(mock_trainer.store, "critic_grad_fn")
     assert isinstance(
@@ -171,14 +172,28 @@ def test_mapg_creation(
     assert isinstance(
         mock_trainer.store.critic_grad_fn, Callable  # type:ignore
     )
+    huber_loss = HuberValueLoss(config=HuberValueLossConfig(huber_delta=2.0))
+    huber_loss.on_training_utility_fns(trainer=mock_trainer)
+    mapg_loss.on_training_loss_fns(trainer=mock_trainer)
+    assert hasattr(mock_trainer.store, "policy_grad_fn")
+    assert hasattr(mock_trainer.store, "critic_grad_fn")
+    assert isinstance(
+        mock_trainer.store.policy_grad_fn, Callable  # type:ignore
+    )
+    assert isinstance(
+        mock_trainer.store.critic_grad_fn, Callable  # type:ignore
+    )
+    assert huber_loss.config.huber_delta == 2
 
 
 def test_mapg_loss(
     mock_trainer: Trainer,
-    mapg_trust_region_clipping_loss: MAPGWithTrustRegionClippingLoss,  # noqa: E501
+    mapg_loss: MAPGWithTrustRegionClippingLoss,  # noqa: E501
 ) -> None:
     """Test whether mapg loss output is as expected"""
-    mapg_trust_region_clipping_loss.on_training_loss_fns(trainer=mock_trainer)
+    default_loss = SquaredErrorValueLoss()
+    default_loss.on_training_utility_fns(trainer=mock_trainer)
+    mapg_loss.on_training_loss_fns(trainer=mock_trainer)
     policy_grad_fn = mock_trainer.store.policy_grad_fn
     critic_grad_fn = mock_trainer.store.critic_grad_fn
 
@@ -274,4 +289,100 @@ def test_mapg_loss(
     low_loss_critic = low_agent_0_critic_loss["loss_critic"]
 
     assert loss_critic == 4.5
+    assert low_loss_critic < loss_critic
+
+
+def test_mapg_huber_loss(
+    mock_trainer: Trainer,
+    mapg_loss: MAPGWithTrustRegionClippingLoss,  # noqa: E501
+) -> None:
+    """Test whether mapg huber loss output is as expected"""
+    huber_loss = HuberValueLoss()
+    huber_loss.on_training_utility_fns(trainer=mock_trainer)
+    mapg_loss.on_training_loss_fns(trainer=mock_trainer)
+    policy_grad_fn = mock_trainer.store.policy_grad_fn
+    critic_grad_fn = mock_trainer.store.critic_grad_fn
+
+    actions = {
+        agent: jnp.array([1.0, 1.0, 1.0, 1.0])
+        for agent in {"agent_0", "agent_1", "agent_2"}
+    }
+    behaviour_log_probs = {
+        agent: jnp.array([-2.0, -2.0, -2.0, -2.0])
+        for agent in {"agent_0", "agent_1", "agent_2"}
+    }
+    target_values = {
+        agent: jnp.array([3.0, 3.0, 3.0, 3.0])
+        for agent in {"agent_0", "agent_1", "agent_2"}
+    }
+    advantages = {
+        agent: jnp.array([2.0, 2.0, 2.0, 2.0])
+        for agent in {"agent_0", "agent_1", "agent_2"}
+    }
+    behavior_values = {
+        agent: jnp.array([1.0, 1.0, 1.0, 1.0])
+        for agent in {"agent_0", "agent_1", "agent_2"}
+    }
+
+    low_target_values = {
+        agent: jnp.array([1.0, 1.0, 1.0, 1.0])
+        for agent in {"agent_0", "agent_1", "agent_2"}
+    }
+    low_advantages = {
+        agent: jnp.array([3.0, 3.0, 3.0, 3.0])
+        for agent in {"agent_0", "agent_1", "agent_2"}
+    }
+
+    policy_states = {"agent_0": None, "agent_1": None, "agent_2": None}  # type: ignore
+    _, policy_loss_info = policy_grad_fn(
+        policy_params=mock_trainer.store.parameters,
+        observations=mock_trainer.store.observations,
+        actions=actions,
+        behaviour_log_probs=behaviour_log_probs,
+        advantages=advantages,
+        policy_states=policy_states,
+    )
+
+    _, low_policy_loss_info = policy_grad_fn(
+        policy_params=mock_trainer.store.parameters,
+        observations=mock_trainer.store.observations,
+        actions=actions,
+        behaviour_log_probs=behaviour_log_probs,
+        advantages=low_advantages,
+        policy_states=policy_states,
+    )
+
+    _, critic_loss_info = critic_grad_fn(
+        critic_params=mock_trainer.store.parameters,
+        observations=mock_trainer.store.observations,
+        target_values=target_values,
+        behavior_values=behavior_values,
+    )
+
+    _, low_critic_loss_info = critic_grad_fn(
+        critic_params=mock_trainer.store.parameters,
+        observations=mock_trainer.store.observations,
+        target_values=low_target_values,
+        behavior_values=behavior_values,
+    )
+
+    agent_0_policy_loss = policy_loss_info["agent_0"]
+    agent_0_critic_loss = critic_loss_info["agent_0"]
+
+    loss_entropy = agent_0_policy_loss["loss_entropy"]
+    loss_critic = agent_0_critic_loss["loss_critic"]
+    loss_policy = agent_0_policy_loss["loss_policy"]
+    loss_policy_total = agent_0_policy_loss["policy_loss_total"]
+
+    low_agent_0_policy_loss = low_policy_loss_info["agent_0"]
+    low_loss_policy = low_agent_0_policy_loss["loss_policy"]
+
+    low_agent_0_critic_loss = low_critic_loss_info["agent_0"]
+    low_loss_critic = low_agent_0_critic_loss["loss_critic"]
+
+    assert jnp.isclose(loss_entropy, -0.5)
+    assert loss_critic == 1.25
+    assert loss_policy_total == (loss_entropy * 0.01 + loss_policy)
+
+    assert low_loss_policy < loss_policy
     assert low_loss_critic < loss_critic
