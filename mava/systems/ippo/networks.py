@@ -283,6 +283,7 @@ def make_discrete_networks(
         """
         critic_network = hk.Sequential(
             [
+                observation_network,
                 hk.nets.MLP(
                     critic_layer_sizes, activation=jax.nn.relu, activate_final=True
                 ),
