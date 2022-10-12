@@ -13,14 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running IPPO on debug MPE environments, using grid search over num_epochs."""
+"""Example running IPPO on debug MPE environments."""
 import functools
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
 import optax
 from absl import app, flags
 
+from mava.components.training import HuberValueLoss
 from mava.systems import ippo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -45,11 +46,11 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
-def create_and_run_lp_program(config: Dict) -> None:
-    """Code to run lp program using config.
+def main(_: Any) -> None:
+    """Run main script
 
     Args:
-        config : hyperparam config.
+        _ : _
     """
     # Environment.
     environment_factory = functools.partial(
@@ -90,8 +91,11 @@ def create_and_run_lp_program(config: Dict) -> None:
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
 
-    # Create the system.
+    # Create the default system.
     system = ippo.IPPOSystem()
+
+    # Use the system to use the huber value loss.
+    system.update(HuberValueLoss)
 
     # Build the system.
     system.build(
@@ -103,30 +107,15 @@ def create_and_run_lp_program(config: Dict) -> None:
         critic_optimiser=critic_optimiser,
         run_evaluator=True,
         sample_batch_size=5,
-        num_epochs=config["num_epochs"],
+        num_epochs=15,
         num_executors=1,
         multi_process=True,
         clip_value=False,
-        termination_condition={"executor_steps": 10000},
-        # Wait for worker to finish - this critical to waiting for program to finish.
-        wait=True,
+        huber_delta=1.0,
     )
+
     # Launch the system.
     system.launch()
-
-
-def main(_: Any) -> None:
-    """Runs lp inside a new thread.
-
-    Args:
-        _ : unused.
-    """
-    config = {}
-    # Loop through a hyperparam such as num_epochs
-    for num_epochs in [5, 10, 15]:
-        config["num_epochs"] = num_epochs
-        create_and_run_lp_program(config)
-        print(f"Completed: {config}")
 
 
 if __name__ == "__main__":
