@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from collections import deque
-from typing import TYPE_CHECKING, Any, Dict, Union
+from typing import TYPE_CHECKING, Any, Dict
 
 import dm_env
 import numpy as np
@@ -32,12 +32,9 @@ if _has_petting_zoo:
 
     # Prevent circular import issue.
     if TYPE_CHECKING:
-        from mava.wrappers.pettingzoo import (
-            PettingZooAECEnvWrapper,
-            PettingZooParallelEnvWrapper,
-        )
+        from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
-PettingZooEnv = Union["PettingZooAECEnvWrapper", "PettingZooParallelEnvWrapper"]
+PettingZooEnv = "PettingZooParallelEnvWrapper"
 
 
 class ConcatAgentIdToObservation:

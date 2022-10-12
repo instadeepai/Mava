@@ -32,8 +32,6 @@ else ifneq (,$(findstring petting,$(example)))
 DOCKER_IMAGE_TAG=pz
 else ifneq (,$(findstring flatland,$(example)))
 DOCKER_IMAGE_TAG=flatland
-else ifneq (,$(findstring openspiel,$(example)))
-DOCKER_IMAGE_TAG=openspiel
 else ifneq (,$(findstring robocup,$(example)))
 DOCKER_IMAGE_TAG=robocup
 else ifneq (,$(findstring smac,$(example)))
