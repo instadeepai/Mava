@@ -38,10 +38,7 @@ except ModuleNotFoundError:
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.utils.wrapper_utils import convert_np_type
-from mava.wrappers.pettingzoo import (
-    PettingZooAECEnvWrapper,
-    PettingZooParallelEnvWrapper,
-)
+from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 from tests.enums import EnvSource, EnvSpec, MockedEnvironments
 from tests.mocks import ParallelMAContinuousEnvironment, ParallelMADiscreteEnvironment
 
@@ -152,7 +149,7 @@ class Helpers:
     @staticmethod
     def get_mocked_env(
         env_spec: EnvSpec,
-    ) -> Union[ParallelMADiscreteEnvironment, ParallelMAContinuousEnvironment,]:
+    ) -> Union[ParallelMADiscreteEnvironment, ParallelMAContinuousEnvironment]:
         """Function that retrieves a mocked env.
 
         Args:
@@ -244,7 +241,7 @@ class Helpers:
 
     @staticmethod
     def seed_action_space(
-        env_wrapper: Union[PettingZooAECEnvWrapper, PettingZooParallelEnvWrapper],
+        env_wrapper: PettingZooParallelEnvWrapper,
         random_seed: int,
     ) -> None:
         """Seeds action space.

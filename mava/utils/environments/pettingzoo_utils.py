@@ -16,7 +16,7 @@
 """Pettingzoo environment factory."""
 
 import importlib
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional
 
 import dm_env
 import numpy as np
@@ -44,18 +44,11 @@ try:
 except ModuleNotFoundError:
     _has_petting_zoo = False
 
-from mava.wrappers import (
-    ParallelEnvWrapper,
-    PettingZooAECEnvWrapper,
-    PettingZooParallelEnvWrapper,
-    SequentialEnvWrapper,
-)
+from mava.wrappers import ParallelEnvWrapper, PettingZooParallelEnvWrapper
 from mava.wrappers.env_preprocess_wrappers import ConcatAgentIdToObservation
 
 
-def atari_preprocessing(
-    env: Union[ParallelEnvWrapper, SequentialEnvWrapper]
-) -> Union[ParallelEnvWrapper, SequentialEnvWrapper]:
+def atari_preprocessing(env: ParallelEnvWrapper) -> ParallelEnvWrapper:
     """Preprocess atari env.
 
     Args:

@@ -63,7 +63,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             counter: an optional counter. Defaults to None.
             logger: an optional counter. Defaults to None.
             should_update: should update. Defaults to True.
-            label: optional label. Defaults to "sequential_environment_loop".
+            label: optional label. Defaults to "parallel_environment_loop".
         """
         # Internalize agent and environment.
         self._environment = environment
