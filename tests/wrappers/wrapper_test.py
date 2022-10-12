@@ -20,10 +20,15 @@ import dm_env
 import numpy as np
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
+from dm_env.specs import DiscreteArray
 
 from mava import types
 from mava.utils.environments.flatland_utils import check_flatland_import
-from mava.wrappers.env_preprocess_wrappers import StackObservations
+from mava.wrappers.env_preprocess_wrappers import (
+    ConcatAgentIdToObservation,
+    ConcatPrevActionToObservation,
+    StackObservations,
+)
 from tests.conftest import EnvSpec, EnvType, Helpers
 from tests.enums import EnvSource
 
@@ -560,7 +565,6 @@ class TestEnvWrapper:
                 "an OLT has length of 3 (a bug, i'd say)"
             )
 
-        print(env_spec.env_name)
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
         stacked_env = StackObservations(wrapped_env, num_frames=4)
         agents = wrapped_env.agents
@@ -619,3 +623,61 @@ class TestEnvWrapper:
                 # assert not np.array_equal(
                 #     old_obs, stacked_obs[(num_frames - 1) * size :]
                 # )
+
+    def test_wrapper_env_obs_stacking_and_concate(
+        self, env_spec: EnvSpec, helpers: Helpers
+    ) -> None:
+        """Test observations frame staking wrapper"""
+
+        if env_spec is None:
+            pytest.skip()
+
+        if (
+            env_spec.env_name == "tic_tac_toe"
+            and env_spec.env_source == EnvSource.OpenSpiel
+            or env_spec.env_type == EnvType.Sequential
+        ):
+            pytest.skip(
+                "This test is only applicable to parralel wrappers and only works "
+                "for the provided PZ sequential envs because they have 3 agents, and"
+                "an OLT has length of 3 (a bug, i'd say)"
+            )
+
+        wrapped_env, _ = helpers.get_wrapped_env(env_spec)
+        stacked_env = StackObservations(wrapped_env, num_frames=4)
+        agents = wrapped_env.agents
+
+        stacked_step = stacked_env.reset()
+        if type(stacked_step) == tuple:
+            stacked_step, _ = stacked_step
+
+        olt_type = isinstance(stacked_step.observation[agents[0]], types.OLT)
+        if olt_type:
+            concat_id = ConcatAgentIdToObservation(stacked_env)
+
+            action_spec = concat_id.action_spec()
+            discrete = isinstance(action_spec[agents[0]], DiscreteArray)
+            if discrete:
+                concat_id_action = ConcatPrevActionToObservation(concat_id)
+
+                concat_id_step = concat_id.reset()
+                concat_id_action_step = concat_id_action.reset()
+
+                if type(concat_id_step) == tuple:
+                    concat_id_step, _ = concat_id_step
+
+                if type(concat_id_action_step) == tuple:
+                    concat_id_action_step, _ = concat_id_action_step
+
+                for agent in agents:
+                    stacked_shape = stacked_step.observation[agent].observation.shape[0]
+                    concat_id_shape = concat_id_step.observation[
+                        agent
+                    ].observation.shape[0]
+                    concat_id_action_shape = concat_id_action_step.observation[
+                        agent
+                    ].observation.shape[0]
+
+                    assert (stacked_shape < concat_id_shape) and (
+                        concat_id_shape < concat_id_action_shape
+                    )

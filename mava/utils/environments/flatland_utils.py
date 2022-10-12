@@ -14,12 +14,13 @@
 # limitations under the License.
 
 """Utils for making Flatland environment."""
-from typing import Optional
+from typing import Any, Optional
 
 from mava.utils.jax_training_utils import set_jax_double_precision
 from mava.wrappers.env_preprocess_wrappers import (
     ConcatAgentIdToObservation,
     ConcatPrevActionToObservation,
+    StackObservations,
 )
 from mava.wrappers.flatland import FlatlandEnvWrapper
 
@@ -134,6 +135,7 @@ if _found_flatland:
         observation_tree_depth: int = 2,
         concat_prev_actions: bool = False,
         concat_agent_id: bool = False,
+        stack_frames: int = 1,
         evaluation: bool = False,
         random_seed: Optional[int] = None,
     ) -> FlatlandEnvWrapper:
@@ -144,6 +146,7 @@ if _found_flatland:
         # Env uses int64 action space due to the use of spac.Discrete.
         set_jax_double_precision()
 
+        env: Any
         env = _create_rail_env_with_tree_obs(
             n_agents=n_agents,
             x_dim=x_dim,
@@ -160,6 +163,9 @@ if _found_flatland:
         )
 
         env = FlatlandEnvWrapper(env)
+
+        if stack_frames > 1:
+            env = StackObservations(env, num_frames=stack_frames)
 
         if concat_prev_actions:
             env = ConcatPrevActionToObservation(env)
