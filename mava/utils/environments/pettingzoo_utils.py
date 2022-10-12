@@ -110,6 +110,9 @@ def make_environment(
     Returns:
         A Pettingzoo environment wrapped as a DeepMind environment.
     """
+    
+    environment: Any 
+    
     if _has_petting_zoo:
         del evaluation
         set_jax_double_precision()
@@ -149,6 +152,6 @@ def make_environment(
         raise Exception("Pettingzoo is not installed.")
 
     if concat_agent_id:
-        env = ConcatAgentIdToObservation(env)
+        environment = ConcatAgentIdToObservation(environment)
 
     return environment
