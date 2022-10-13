@@ -25,6 +25,7 @@ import numpy as np
 from acme.utils import counting, loggers
 
 import mava
+from mava.utils.lp_utils import termination_fn
 from mava.utils.training_utils import check_count_condition
 from mava.utils.wrapper_utils import generate_zeros_from_spec
 
@@ -243,31 +244,38 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             evaluation_duration = eval_duration_condition[1]
 
         while True:
-            if (not environment_loop_schedule) or (
-                should_run_loop(eval_interval_condition)
-            ):
-                if environment_loop_schedule:
-                    results = self.run_episode()
-                    # Get first result dictionary
-                    for _ in range(evaluation_duration - 1):
-                        # Add consecutive evaluation run data
+            try:
+                if (not environment_loop_schedule) or (
+                    should_run_loop(eval_interval_condition)
+                ):
+                    if environment_loop_schedule:
+                        results = self.run_episode()
+                        # Get first result dictionary
+                        for _ in range(evaluation_duration - 1):
+                            # Add consecutive evaluation run data
+                            result = self.run_episode()
+                            # Sum results for computing mean after all evaluation runs.
+                            results = jax.tree_map(lambda x, y: x + y, results, result)
+                        # compute the mean over all evaluation runs
+                        results = jax.tree_map(
+                            lambda x: x / evaluation_duration, results
+                        )
+                        # Check for extra logs
+                        if hasattr(self._environment, "get_interval_stats"):
+                            results.update(self._environment.get_interval_stats())
+                        self._logger.write(results)
+                    else:
                         result = self.run_episode()
-                        # Sum results for computing mean after all evaluation runs.
-                        results = jax.tree_map(lambda x, y: x + y, results, result)
-                    # compute the mean over all evaluation runs
-                    results = jax.tree_map(lambda x: x / evaluation_duration, results)
-                    # Check for extra logs
-                    if hasattr(self._environment, "get_interval_stats"):
-                        results.update(self._environment.get_interval_stats())
-                    self._logger.write(results)
+                        # Log the given results.
+                        self._logger.write(result)
                 else:
-                    result = self.run_episode()
-                    # Log the given results.
-                    self._logger.write(result)
-            else:
-                # Note: We assume that the evaluator will be running less
-                # than once per second.
-                time.sleep(1)
-            # We need to get the latest counts if we are using eval intervals.
-            if environment_loop_schedule:
-                self._executor.force_update()
+                    # Note: We assume that the evaluator will be running less
+                    # than once per second.
+                    time.sleep(1)
+                # We need to get the latest counts if we are using eval intervals.
+                if environment_loop_schedule:
+                    self._executor.force_update()
+
+            except Exception as e:
+                print(e, ": Experiment terminated due to an error on a node.")
+                termination_fn(self._executor)

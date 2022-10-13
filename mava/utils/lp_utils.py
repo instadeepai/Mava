@@ -17,7 +17,7 @@
 
 import functools
 import inspect
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import launchpad as lp
 import psutil
@@ -25,7 +25,7 @@ from absl import flags, logging
 from acme.utils import counting
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
-from mava.core_jax import SystemParameterServer
+from mava.core_jax import SystemExecutor, SystemParameterServer
 from mava.utils.training_utils import non_blocking_sleep
 
 FLAGS = flags.FLAGS
@@ -88,17 +88,15 @@ def partial_kwargs(function: Callable[..., Any], **kwargs: Any) -> Callable[...,
     return functools.partial(function, **kwargs)
 
 
-def termination_fn(
-    parameter_server: SystemParameterServer,
-) -> None:
+def termination_fn(node: Union[SystemParameterServer, SystemExecutor]) -> None:
     """Terminate the process
 
     Args:
-        parameter_server: SystemParameterServer in order to get main pid
+        node: SystemParameterServer in order to get main pid
     """
-    if parameter_server.store.manager_pid:
+    if node.store.manager_pid:
         # parent_pid: the pid of the main thread process
-        parent_pid = parameter_server.store.manager_pid
+        parent_pid = node.store.manager_pid
         parent = psutil.Process(parent_pid)
         for child in parent.children(recursive=True):
             child.kill()
