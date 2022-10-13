@@ -27,7 +27,7 @@ def action_mask_categorical_policies(
 def compute_running_mean_var_count(stats: Any, batch: jnp.ndarray) -> jnp.ndarray:
     """Updates the running mean, variance and data counts during training.
 
-    stats (Any)   -- dictionary with running mean, var, count.
+    stats (Any)   -- dictionary with running mean, var, std, count
     batch (array) -- current batch of data.
 
     Returns:
@@ -49,22 +49,23 @@ def compute_running_mean_var_count(stats: Any, batch: jnp.ndarray) -> jnp.ndarra
     M2 = m_a + m_b + jnp.square(delta) * count * batch_count / tot_count
     new_var = M2 / tot_count
     new_count = tot_count
+    new_std = jnp.sqrt(new_var)
 
-    return dict(mean=new_mean, var=new_var, count=new_count)
+    return dict(mean=new_mean, var=new_var, std=new_std, count=new_count)
 
 
 def normalize(stats: Any, batch: jnp.ndarray) -> jnp.ndarray:
     """Normlaise batch of data using the running mean and variance.
 
-    stats (Any)   -- dictionary with running mean, var, count.
+    stats (Any)   -- dictionary with running mean, var, std, count.
     batch (array) -- current batch of data.
 
     Returns:
         denormalize batch (array)
     """
 
-    mean, var = stats["mean"], stats["var"]
-    normalize_batch = (batch - mean) / (jnp.sqrt(var) + 1e-8)
+    mean, std = stats["mean"], stats["std"]
+    normalize_batch = (batch - mean) / (std + 1e-8)
 
     return normalize_batch
 
@@ -79,8 +80,8 @@ def denormalize(stats: Any, batch: jnp.ndarray) -> jnp.ndarray:
         denormalize batch (array)
     """
 
-    mean, var = stats["mean"], stats["var"]
-    denormalize_batch = batch * jnp.sqrt(var) + mean
+    mean, std = stats["mean"], stats["std"]
+    denormalize_batch = batch * std + mean
 
     return denormalize_batch
 

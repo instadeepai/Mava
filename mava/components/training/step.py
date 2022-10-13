@@ -502,28 +502,18 @@ class MAPGWithTrustRegionStep(Step):
             # Update the observation normalization parameters
             obs_norm_key = constants.OBS_NORM_STATE_DICT_KEY
             for agent in trainer.store.trainer_agent_net_keys.keys():
-                trainer.store.norm_params[obs_norm_key][agent][
-                    "mean"
-                ] = new_states.observation_stats[agent]["mean"]
-                trainer.store.norm_params[obs_norm_key][agent][
-                    "var"
-                ] = new_states.observation_stats[agent]["var"]
-                trainer.store.norm_params[obs_norm_key][agent][
-                    "count"
-                ] = new_states.observation_stats[agent]["count"]
+                for param_key in new_states.observation_stats[agent].keys():
+                    trainer.store.norm_params[obs_norm_key][agent][
+                        param_key
+                    ] = new_states.observation_stats[agent][param_key]
 
             # update the running target stats
             values_norm_key = constants.VALUES_NORM_STATE_DICT_KEY
             for agent in trainer.store.trainer_agent_net_keys.keys():
-                trainer.store.norm_params[values_norm_key][agent][
-                    "mean"
-                ] = new_states.target_stats[agent]["mean"]
-                trainer.store.norm_params[values_norm_key][agent][
-                    "var"
-                ] = new_states.target_stats[agent]["var"]
-                trainer.store.norm_params[values_norm_key][agent][
-                    "count"
-                ] = new_states.target_stats[agent]["count"]
+                for param_key in new_states.target_stats[agent].keys():
+                    trainer.store.norm_params[values_norm_key][agent][
+                        param_key
+                    ] = new_states.target_stats[agent][param_key]
 
             return metrics
 

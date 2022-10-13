@@ -90,12 +90,13 @@ for agent in ["agent_0", "agent_1", "agent_2"]:
     obs_shape = 1  # something random
     norm_params[obs_norm_key][agent] = dict(
         mean=np.zeros(shape=obs_shape),
-        var=np.ones(shape=obs_shape),
+        var=np.zeros(shape=obs_shape),
+        std=np.ones(shape=obs_shape),
         count=np.array([1e-4]),
     )
 
     norm_params[values_norm_key][agent] = dict(
-        mean=np.array([0]), var=np.array([1]), count=np.array([1e-4])
+        mean=np.array([0]), var=np.array([0]), std=np.array([1]), count=np.array([1e-4])
     )
 
 expected_keys = expected_count_keys.union(expected_network_keys).union(
@@ -177,12 +178,16 @@ def mock_builder_with_parameter_client() -> Builder:
         obs_shape = 1
         builder.store.norm_params[obs_norm_key][agent] = dict(
             mean=np.zeros(shape=obs_shape),
-            var=np.ones(shape=obs_shape),
+            var=np.zeros(shape=obs_shape),
+            std=np.ones(shape=obs_shape),
             count=np.array([1e-4]),
         )
 
         builder.store.norm_params[values_norm_key][agent] = dict(
-            mean=np.array([0]), var=np.array([1]), count=np.array([1e-4])
+            mean=np.array([0]),
+            var=np.array([0]),
+            std=np.array([1]),
+            count=np.array([1e-4]),
         )
 
     builder.store.parameter_server_client = ParameterServer(

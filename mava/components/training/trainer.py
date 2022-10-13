@@ -108,7 +108,8 @@ class BaseTrainerInit(Component):
 
             builder.store.norm_params[obs_norm_key][agent] = dict(
                 mean=np.zeros(shape=obs_shape),
-                var=np.ones(shape=obs_shape),
+                var=np.zeros(shape=obs_shape),
+                std=np.ones(shape=obs_shape),
                 count=np.array([1e-4]),
             )
 
@@ -117,7 +118,10 @@ class BaseTrainerInit(Component):
         builder.store.norm_params[values_norm_key] = {}
         for agent in builder.store.agents:
             builder.store.norm_params[values_norm_key][agent] = dict(
-                mean=np.array([0]), var=np.array([1]), count=np.array([1e-4])
+                mean=np.array([0]),
+                var=np.array([0]),
+                std=np.array([1]),
+                count=np.array([1e-4]),
             )
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:

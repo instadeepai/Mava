@@ -19,7 +19,12 @@ def test_compute_running_mean_var_count() -> None:
         (np.random.randn(20, 15), np.random.randn(20, 15), np.random.randn(20, 15)),
     ]:
 
-        stats = dict(mean=jnp.zeros(15), var=jnp.zeros(15), count=jnp.array([1e-4]))
+        stats = dict(
+            mean=jnp.zeros(15),
+            var=jnp.zeros(15),
+            count=jnp.array([1e-4]),
+            std=np.ones(15),
+        )
 
         stats = compute_running_mean_var_count(stats, jnp.array(x1))
         stats = compute_running_mean_var_count(stats, jnp.array(x2))
@@ -41,7 +46,12 @@ def test_normalization() -> None:
     """Test if the normalization does the right thing"""
 
     x = jnp.array(np.random.randn(15))
-    stats = dict(mean=jnp.array([0.2]), var=jnp.array([1.5]), count=jnp.array([15]))
+    stats = dict(
+        mean=jnp.array([0.2]),
+        std=jnp.array([2]),
+        var=jnp.array([4]),
+        count=jnp.array([15]),
+    )
     x_norm = normalize(stats, x)
     x_denorm = denormalize(stats, x_norm)
 
@@ -63,7 +73,12 @@ def test_update_and_normalize_observations() -> None:
             np.random.randn(1, 20, 15),
         ),
     ]:
-        stats = dict(mean=jnp.zeros(15), var=jnp.zeros(15), count=jnp.array([1e-4]))
+        stats = dict(
+            mean=jnp.zeros(15),
+            var=jnp.zeros(15),
+            count=jnp.array([1e-4]),
+            std=np.ones(15),
+        )
 
         obs = OLT(observation=jnp.array(x1), legal_actions=[1], terminal=[0.0])
         stats, _ = update_and_normalize_observations(stats, obs)
@@ -90,7 +105,12 @@ def test_normalize_observations() -> None:
 
     x = np.random.randn(15)
     obs = OLT(observation=x, legal_actions=[1], terminal=[0.0])
-    stats = dict(mean=jnp.array([0.2]), var=jnp.array([1.5]), count=jnp.array([15]))
+    stats = dict(
+        mean=jnp.array([0.2]),
+        var=jnp.array([4]),
+        count=jnp.array([15]),
+        std=jnp.array([2]),
+    )
     obs = normalize_observations(stats, obs)
     obs_norm = jnp.array(obs.observation)
 

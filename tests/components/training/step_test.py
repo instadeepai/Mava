@@ -164,12 +164,16 @@ class MockTrainer(Trainer):
             obs_shape = 1  # something random
             norm_params[constants.OBS_NORM_STATE_DICT_KEY][agent] = dict(
                 mean=np.zeros(shape=obs_shape),
-                var=np.ones(shape=obs_shape),
+                var=np.zeros(shape=obs_shape),
+                std=np.ones(shape=obs_shape),
                 count=np.array([1e-4]),
             )
 
             norm_params[constants.VALUES_NORM_STATE_DICT_KEY][agent] = dict(
-                mean=np.array([0]), var=np.array([1]), count=np.array([1e-4])
+                mean=np.array([0]),
+                var=np.array([0]),
+                std=np.array([1]),
+                count=np.array([1e-4]),
             )
 
         store = SimpleNamespace(

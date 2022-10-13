@@ -103,17 +103,9 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
         if self.config.normalize_target_values:
             trainer.store.target_running_stats_fn = compute_running_mean_var_count
 
-        # Initilaise observations running statisitics here
-        # We only need to modify the variance since this is actually intiailised
-        # in the training/trainer on_building_init_end callback.
+        # Initilaise observations running mean/std function here
         if self.config.normalize_observations:
             trainer.store.norm_obs_running_stats_fn = update_and_normalize_observations
-            obs_norm_key = constants.OBS_NORM_STATE_DICT_KEY
-
-            for agent in trainer.store.trainer_agent_net_keys.keys():
-                obs_shape = len(trainer.store.norm_params[obs_norm_key][agent]["var"])
-                for x in range(obs_shape):
-                    trainer.store.norm_params[obs_norm_key][agent]["var"][x] = 0
 
         def model_update_minibatch(
             carry: Tuple[
