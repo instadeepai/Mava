@@ -48,7 +48,7 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
     del param_without_net_and_opt["critic_network-network_agent"]
     del param_without_net_and_opt["policy_opt_state-network_agent"]
     del param_without_net_and_opt["critic_opt_state-network_agent"]
-    del param_without_net_and_opt["obs_norm_params"]
+    del param_without_net_and_opt["norm_params"]
     assert param_without_net_and_opt == {
         "trainer_steps": jnp.zeros(1, dtype=jnp.int32),
         "trainer_walltime": jnp.zeros(1, dtype=jnp.float32),

@@ -115,7 +115,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
         # Normalise the observations before selecting actions.
         if self.store.global_config.normalize_observations:
-            observations_stats = self.store.obs_norm_params[
+            observations_stats = self.store.norm_params[
                 constants.OBS_NORM_STATE_DICT_KEY
             ]
             for key in observations.keys():

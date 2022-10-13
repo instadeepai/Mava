@@ -132,8 +132,8 @@ class DefaultParameterServer(ParameterServer):
                 f"critic_opt_state-{agent_net_key}"
             ] = server.store.critic_opt_states[agent_net_key]
 
-        # Observations normalization parameters
-        server.store.parameters["obs_norm_params"] = server.store.obs_norm_params
+        # Normalization parameters
+        server.store.parameters["norm_params"] = server.store.norm_params
 
         server.store.experiment_path = self.config.experiment_path
 

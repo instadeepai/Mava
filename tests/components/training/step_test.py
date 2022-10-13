@@ -156,13 +156,20 @@ class MockTrainer(Trainer):
             "agent_2": jnp.array([0, 1, 1e-4]),
         }
 
-        obs_norm_params: Any = {constants.OBS_NORM_STATE_DICT_KEY: {}}
+        norm_params: Any = {
+            constants.OBS_NORM_STATE_DICT_KEY: {},
+            constants.VALUES_NORM_STATE_DICT_KEY: {},
+        }
         for agent in trainer_agent_net_keys.keys():
-            obs_shape = 10  # something random
-            obs_norm_params[constants.OBS_NORM_STATE_DICT_KEY][agent] = dict(
+            obs_shape = 1  # something random
+            norm_params[constants.OBS_NORM_STATE_DICT_KEY][agent] = dict(
                 mean=np.zeros(shape=obs_shape),
                 var=np.ones(shape=obs_shape),
                 count=np.array([1e-4]),
+            )
+
+            norm_params[constants.VALUES_NORM_STATE_DICT_KEY][agent] = dict(
+                mean=np.array([0]), var=np.array([1]), count=np.array([1e-4])
             )
 
         store = SimpleNamespace(
@@ -181,7 +188,7 @@ class MockTrainer(Trainer):
             base_key=jax.random.PRNGKey(5),
             epoch_update_fn=epoch_update,
             target_stats=running_stats,
-            obs_norm_params=obs_norm_params,
+            norm_params=norm_params,
             global_config=SimpleNamespace(
                 num_minibatches=1, num_epochs=2, sample_batch_size=2, sequence_length=3
             ),

@@ -111,16 +111,18 @@ def test_trainer_single_process_norm(test_system_sp_norm: System) -> None:
 
     # Check normalisation parameters
     for agent in trainer.store.trainer_agent_net_keys.keys():
-        obs_norm_params = trainer.store.obs_norm_params[
-            constants.OBS_NORM_STATE_DICT_KEY
-        ][agent]
+        obs_norm_params = trainer.store.norm_params[constants.OBS_NORM_STATE_DICT_KEY][
+            agent
+        ]
         assert jnp.all(obs_norm_params["mean"] == 0)
         assert jnp.all(obs_norm_params["var"] == 0)
         assert jnp.all(obs_norm_params["count"] == 1e-4)
 
-        target_stats = trainer.store.target_stats[agent]
+        target_stats = trainer.store.norm_params[constants.VALUES_NORM_STATE_DICT_KEY][
+            agent
+        ]
         assert jnp.all(target_stats["mean"] == 0)
-        assert jnp.all(target_stats["var"] == 0)
+        assert jnp.all(target_stats["var"] == 1)
         assert jnp.all(target_stats["count"] == 1e-4)
 
     trainer.step()
@@ -140,12 +142,16 @@ def test_trainer_single_process_norm(test_system_sp_norm: System) -> None:
             assert not jnp.all(categorical_value_head["w"] == 0)
 
     for agent in trainer.store.trainer_agent_net_keys.keys():
-        obs_norm_params = trainer.store.obs_norm_params[
-            constants.OBS_NORM_STATE_DICT_KEY
-        ][agent]
+        obs_norm_params = trainer.store.norm_params[constants.OBS_NORM_STATE_DICT_KEY][
+            agent
+        ]
         assert not jnp.all(obs_norm_params["mean"] == 0)
         assert not jnp.all(obs_norm_params["var"] == 0)
         assert not jnp.all(obs_norm_params["count"] == 1e-4)
 
-        target_stats = trainer.store.target_stats[agent]
+        target_stats = trainer.store.norm_params[constants.VALUES_NORM_STATE_DICT_KEY][
+            agent
+        ]
+        assert not jnp.all(target_stats["mean"] == 0)
+        assert not jnp.all(target_stats["var"] == 1)
         assert not jnp.all(target_stats["count"] == 1e-4)

@@ -435,8 +435,12 @@ class MAPGWithTrustRegionStep(Step):
             critic_opt_states = trainer.store.critic_opt_states
 
             _, random_key = jax.random.split(trainer.store.base_key)
-            target_stats = trainer.store.target_stats
-            observation_stats = trainer.store.obs_norm_params[
+
+            target_stats = trainer.store.norm_params[
+                constants.VALUES_NORM_STATE_DICT_KEY
+            ]
+
+            observation_stats = trainer.store.norm_params[
                 constants.OBS_NORM_STATE_DICT_KEY
             ]
 
@@ -498,24 +502,28 @@ class MAPGWithTrustRegionStep(Step):
             # Update the observation normalization parameters
             obs_norm_key = constants.OBS_NORM_STATE_DICT_KEY
             for agent in trainer.store.trainer_agent_net_keys.keys():
-                obs_shape = len(
-                    trainer.store.obs_norm_params[obs_norm_key][agent]["mean"]
-                )
-
-                for x in range(obs_shape):
-                    trainer.store.obs_norm_params[obs_norm_key][agent]["mean"][
-                        x
-                    ] = new_states.observation_stats[agent]["mean"][x]
-                    trainer.store.obs_norm_params[obs_norm_key][agent]["var"][
-                        x
-                    ] = new_states.observation_stats[agent]["var"][x]
-
-                trainer.store.obs_norm_params[obs_norm_key][agent]["count"][
-                    0
-                ] = new_states.observation_stats[agent]["count"][x]
+                trainer.store.norm_params[obs_norm_key][agent][
+                    "mean"
+                ] = new_states.observation_stats[agent]["mean"]
+                trainer.store.norm_params[obs_norm_key][agent][
+                    "var"
+                ] = new_states.observation_stats[agent]["var"]
+                trainer.store.norm_params[obs_norm_key][agent][
+                    "count"
+                ] = new_states.observation_stats[agent]["count"]
 
             # update the running target stats
-            trainer.store.target_stats = new_states.target_stats
+            values_norm_key = constants.VALUES_NORM_STATE_DICT_KEY
+            for agent in trainer.store.trainer_agent_net_keys.keys():
+                trainer.store.norm_params[values_norm_key][agent][
+                    "mean"
+                ] = new_states.target_stats[agent]["mean"]
+                trainer.store.norm_params[values_norm_key][agent][
+                    "var"
+                ] = new_states.target_stats[agent]["var"]
+                trainer.store.norm_params[values_norm_key][agent][
+                    "count"
+                ] = new_states.target_stats[agent]["count"]
 
             return metrics
 

@@ -99,17 +99,25 @@ class BaseTrainerInit(Component):
 
         # Initialise observations' normalisation parameters
         obs_norm_key = constants.OBS_NORM_STATE_DICT_KEY
-        builder.store.obs_norm_params = {}
-        builder.store.obs_norm_params[obs_norm_key] = {}
+        builder.store.norm_params = {}
+        builder.store.norm_params[obs_norm_key] = {}
         for agent in builder.store.agents:
             obs_shape = builder.store.ma_environment_spec._agent_environment_specs[
                 agent
             ].observations.observation.shape
 
-            builder.store.obs_norm_params[obs_norm_key][agent] = dict(
+            builder.store.norm_params[obs_norm_key][agent] = dict(
                 mean=np.zeros(shape=obs_shape),
                 var=np.ones(shape=obs_shape),
                 count=np.array([1e-4]),
+            )
+
+        # Initialise target values normalisation parameters here
+        values_norm_key = constants.VALUES_NORM_STATE_DICT_KEY
+        builder.store.norm_params[values_norm_key] = {}
+        for agent in builder.store.agents:
+            builder.store.norm_params[values_norm_key][agent] = dict(
+                mean=np.array([0]), var=np.array([1]), count=np.array([1e-4])
             )
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:

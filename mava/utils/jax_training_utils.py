@@ -64,7 +64,7 @@ def normalize(stats: Any, batch: jnp.ndarray) -> jnp.ndarray:
     """
 
     mean, var = stats["mean"], stats["var"]
-    normalize_batch = (batch - mean) / (jnp.sqrt(jnp.clip(var, a_min=1e-2)))
+    normalize_batch = (batch - mean) / (jnp.sqrt(var) + 1e-8)
 
     return normalize_batch
 
