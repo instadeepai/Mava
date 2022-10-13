@@ -68,12 +68,6 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
         make build version=robocup
         ```
 
-    * Openspiel
-
-        ```
-        make build version=openspiel
-        ```
-
     * MeltingPot
 
         ```bash
@@ -161,12 +155,6 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
 
         ```
         pip install id-mava[flatland]
-        ```
-
-    * Openspiel:
-
-        ```
-        pip install id-mava[open_spiel]
         ```
 
     * 2D RoboCup environment:

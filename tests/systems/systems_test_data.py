@@ -189,8 +189,8 @@ def ippo_system_multi_thread() -> System:
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return ippo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(256, 256, 256),
-            critic_layer_sizes=(512, 512, 256),
+            policy_layer_sizes=(64, 64),
+            critic_layer_sizes=(64, 64, 64),
             *args,
             **kwargs,
         )
@@ -242,5 +242,76 @@ def ippo_system_multi_thread() -> System:
         is_test=True,
         checkpoint_minute_interval=3 / 60,
         trainer_parameter_update_period=1,
+    )
+    return test_system
+
+
+def ippo_system_multi_thread_eval() -> System:
+    """Multi thread IPPO test system using Launchpad"""
+    # Environment.
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name="simple_spread",
+        action_space="discrete",
+    )
+
+    # Networks.
+    def network_factory(*args: Any, **kwargs: Any) -> Any:
+        return ippo.make_default_networks(  # type: ignore
+            policy_layer_sizes=(64, 64),
+            critic_layer_sizes=(64, 64, 64),
+            *args,
+            **kwargs,
+        )
+
+    # Checkpointer appends "Checkpoints" to checkpoint_dir.
+    base_dir = tempfile.mkdtemp()
+    mava_id = str(datetime.now())
+    checkpoint_subpath = f"{base_dir}/{mava_id}"
+
+    # Log every [log_every] seconds.
+    log_every = 10
+    logger_factory = functools.partial(
+        logger_utils.make_logger,
+        directory=base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=mava_id,
+        time_delta=log_every,
+    )
+
+    # Optimisers.
+    policy_optimiser = optax.chain(
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+    )
+
+    critic_optimiser = optax.chain(
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+    )
+
+    # Create the ippo system
+    test_system = ippo.IPPOSystem()
+
+    # Build the system.
+    test_system.build(
+        environment_factory=environment_factory,
+        network_factory=network_factory,
+        logger_factory=logger_factory,
+        experiment_path=checkpoint_subpath,
+        policy_optimiser=policy_optimiser,
+        critic_optimiser=critic_optimiser,
+        executor_parameter_update_period=1,
+        multi_process=True,
+        run_evaluator=True,
+        num_executors=1,
+        max_queue_size=500,
+        use_next_extras=False,
+        sample_batch_size=5,
+        nodes_on_gpu=[],
+        is_test=True,
+        checkpoint_minute_interval=3 / 60,
+        trainer_parameter_update_period=1,
+        evaluation_interval={"executor_steps": 10000},
+        evaluation_duration={"evaluator_episodes": 32},
     )
     return test_system

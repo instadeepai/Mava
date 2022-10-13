@@ -13,14 +13,7 @@ try:
 except ModuleNotFoundError:
     _has_petting_zoo = False
 # Need to install typing_extensions since we support pre python 3.8
-from typing_extensions import TypedDict
-
 from mava import types
-
-SeqTimestepDict = TypedDict(
-    "SeqTimestepDict",
-    {"timestep": dm_env.TimeStep, "action": types.Action},
-)
 
 
 def convert_dm_compatible_observations(
@@ -181,33 +174,6 @@ def broadcast_timestep_to_all_agents(
     )
 
     return parallel_timestep
-
-
-def convert_seq_timestep_and_actions_to_parallel(
-    timesteps: Dict[str, SeqTimestepDict], possible_agents: list
-) -> Tuple[dict, dm_env.TimeStep]:
-    """Convert dict of seq timestep and actions to parallel"""
-
-    step_types = [timesteps[agent]["timestep"].step_type for agent in possible_agents]
-    assert all(
-        x == step_types[0] for x in step_types
-    ), f"Step types should be identical - {step_types} "
-    parallel_timestep = dm_env.TimeStep(
-        observation={
-            agent: timesteps[agent]["timestep"].observation for agent in possible_agents
-        },
-        reward={
-            agent: timesteps[agent]["timestep"].reward for agent in possible_agents
-        },
-        discount={
-            agent: timesteps[agent]["timestep"].discount for agent in possible_agents
-        },
-        step_type=step_types[0],
-    )
-
-    parallel_actions = {agent: timesteps[agent]["action"] for agent in possible_agents}
-
-    return parallel_actions, parallel_timestep
 
 
 def apply_env_wrapper_preprocessors(
