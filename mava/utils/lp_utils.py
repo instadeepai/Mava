@@ -92,7 +92,7 @@ def termination_fn(node: Union[SystemParameterServer, SystemExecutor]) -> None:
     """Terminate the process
 
     Args:
-        node: SystemParameterServer in order to get main pid
+        node: to have access to the manager pid from the store
     """
     if node.store.manager_pid:
         # parent_pid: the pid of the main thread process
