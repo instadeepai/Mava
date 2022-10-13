@@ -114,7 +114,7 @@ class SMACWrapper(ParallelEnvWrapper):
             return self.reset()
 
         # Convert dict of actions to list for SMAC
-        smac_actions = list(actions.values())
+        smac_actions = [actions[agent] for agent in self._agents]
 
         # Step the SMAC environment
         reward, self._done, self._info = self._environment.step(smac_actions)
