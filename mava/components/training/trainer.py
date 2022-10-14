@@ -20,8 +20,6 @@ from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any, Dict, List, Type
 
-import jax.numpy as jnp
-
 from mava import constants
 from mava.callbacks import Callback
 from mava.components import Component
@@ -30,6 +28,7 @@ from mava.components.building.networks import Networks
 from mava.components.building.optimisers import Optimisers
 from mava.components.building.system_init import BaseSystemInit
 from mava.core_jax import SystemBuilder, SystemTrainer
+from mava.utils.jax_training_utils import init_norm_params
 from mava.utils.sort_utils import sort_str_num
 
 
@@ -106,23 +105,13 @@ class BaseTrainerInit(Component):
                 agent
             ].observations.observation.shape
 
-            builder.store.norm_params[obs_norm_key][agent] = dict(
-                mean=jnp.zeros(shape=obs_shape),
-                var=jnp.zeros(shape=obs_shape),
-                std=jnp.ones(shape=obs_shape),
-                count=jnp.array([1e-4]),
-            )
+            builder.store.norm_params[obs_norm_key][agent] = init_norm_params(obs_shape)
 
         # Initialise target values normalisation parameters here
         values_norm_key = constants.VALUES_NORM_STATE_DICT_KEY
         builder.store.norm_params[values_norm_key] = {}
         for agent in builder.store.agents:
-            builder.store.norm_params[values_norm_key][agent] = dict(
-                mean=jnp.array([0]),
-                var=jnp.array([0]),
-                std=jnp.array([1]),
-                count=jnp.array([1e-4]),
-            )
+            builder.store.norm_params[values_norm_key][agent] = init_norm_params((1,))
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """Set up and store trainer agents.

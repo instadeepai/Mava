@@ -24,7 +24,22 @@ def action_mask_categorical_policies(
     return tfd.Categorical(logits=masked_logits, dtype=distribution.dtype)
 
 
-def compute_running_mean_var_count(stats: Any, batch: jnp.ndarray) -> jnp.ndarray:
+def init_norm_params(stats_shape: Tuple) -> Dict[str, Union[jnp.array, float]]:
+    """Initialise normalistion parameters"""
+
+    stats = dict(
+        mean=jnp.zeros(shape=stats_shape),
+        var=jnp.zeros(shape=stats_shape),
+        std=jnp.ones(shape=stats_shape),
+        count=jnp.array([1e-4]),
+    )
+
+    return stats
+
+
+def compute_running_mean_var_count(
+    stats: Dict[str, Union[jnp.array, float]], batch: jnp.ndarray
+) -> jnp.ndarray:
     """Updates the running mean, variance and data counts during training.
 
     stats (Any)   -- dictionary with running mean, var, std, count
@@ -90,7 +105,9 @@ def denormalize(
     return denormalize_batch
 
 
-def update_and_normalize_observations(stats: Any, observation: OLT) -> Tuple[Any, OLT]:
+def update_and_normalize_observations(
+    stats: Dict[str, Union[jnp.array, float]], observation: OLT
+) -> Tuple[Any, OLT]:
     """Update running stats and normalise observations
 
     stats (Dictionary)   -- array with running mean, var, count.
