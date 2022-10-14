@@ -33,6 +33,13 @@ We also have various Jax-based examples which make use of the callback design pa
   - *Feedforward*
     - [decentralised][pz_coop_pong_ippo_ff_dec_jax]
 
+### Pettingzoo - Multi-Agent Particle Environment
+
+- **IPPO**:
+    an IPPO system running on the Simple Spread environment.
+  - *Feedforward*
+    - [decentralised][pz_simple_spread]
+
 ### SMAC - StarCraft Multi-Agent Challenge
 
 - **IPPO**:
@@ -55,3 +62,4 @@ We also have various Jax-based examples which make use of the callback design pa
 [smac_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/smac/feedforward/decentralised/run_ippo.py
 [debug_ippo_ff_dec_eval_intevals_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/debugging/simple_spread/feedforward/decentralised/run_ippo_eval_intervals.py
 [smac_ippo_ff_dec_eval_intervals_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/smac/feedforward/decentralised/run_ippo_eval_intervals.py
+[pz_simple_spread]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/simple_spread/feedforward/decentralised/run_ippo.py
