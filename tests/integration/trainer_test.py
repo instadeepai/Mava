@@ -119,13 +119,13 @@ def test_trainer_single_process_norm(test_system_sp_norm: System) -> None:
         assert jnp.all(obs_norm_params["std"] == 1)
         assert jnp.all(obs_norm_params["count"] == 1e-4)
 
-        target_stats = trainer.store.norm_params[constants.VALUES_NORM_STATE_DICT_KEY][
-            agent
-        ]
-        assert jnp.all(target_stats["mean"] == 0)
-        assert jnp.all(target_stats["var"] == 0)
-        assert jnp.all(target_stats["std"] == 1)
-        assert jnp.all(target_stats["count"] == 1e-4)
+        target_value_stats = trainer.store.norm_params[
+            constants.VALUES_NORM_STATE_DICT_KEY
+        ][agent]
+        assert jnp.all(target_value_stats["mean"] == 0)
+        assert jnp.all(target_value_stats["var"] == 0)
+        assert jnp.all(target_value_stats["std"] == 1)
+        assert jnp.all(target_value_stats["count"] == 1e-4)
 
     trainer.step()
 
@@ -152,10 +152,10 @@ def test_trainer_single_process_norm(test_system_sp_norm: System) -> None:
         assert not jnp.all(obs_norm_params["std"] == 1)
         assert not jnp.all(obs_norm_params["count"] == 1e-4)
 
-        target_stats = trainer.store.norm_params[constants.VALUES_NORM_STATE_DICT_KEY][
-            agent
-        ]
-        assert not jnp.all(target_stats["mean"] == 0)
-        assert not jnp.all(target_stats["var"] == 0)
-        assert not jnp.all(target_stats["std"] == 1)
-        assert not jnp.all(target_stats["count"] == 1e-4)
+        target_value_stats = trainer.store.norm_params[
+            constants.VALUES_NORM_STATE_DICT_KEY
+        ][agent]
+        assert not jnp.all(target_value_stats["mean"] == 0)
+        assert not jnp.all(target_value_stats["var"] == 0)
+        assert not jnp.all(target_value_stats["std"] == 1)
+        assert not jnp.all(target_value_stats["count"] == 1e-4)

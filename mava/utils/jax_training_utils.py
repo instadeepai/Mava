@@ -1,11 +1,11 @@
 import os
-from typing import Any, Tuple
+from typing import Any, Dict, Tuple, Union
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 import tensorflow_probability.substrates.jax.distributions as tfd
 from chex import Array
+from haiku._src.basic import merge_leading_dims
 from jax.config import config as jax_config
 
 from mava.types import OLT
@@ -54,7 +54,9 @@ def compute_running_mean_var_count(stats: Any, batch: jnp.ndarray) -> jnp.ndarra
     return dict(mean=new_mean, var=new_var, std=new_std, count=new_count)
 
 
-def normalize(stats: Any, batch: jnp.ndarray) -> jnp.ndarray:
+def normalize(
+    stats: Dict[str, Union[jnp.array, float]], batch: jnp.ndarray
+) -> jnp.ndarray:
     """Normlaise batch of data using the running mean and variance.
 
     stats (Any)   -- dictionary with running mean, var, std, count.
@@ -70,7 +72,9 @@ def normalize(stats: Any, batch: jnp.ndarray) -> jnp.ndarray:
     return normalize_batch
 
 
-def denormalize(stats: Any, batch: jnp.ndarray) -> jnp.ndarray:
+def denormalize(
+    stats: Dict[str, Union[jnp.array, float]], batch: jnp.ndarray
+) -> jnp.ndarray:
     """Transform normalized data back into original distribution
 
     stats (Any)   -- dictionary with running mean, var, count.
@@ -98,7 +102,7 @@ def update_and_normalize_observations(stats: Any, observation: OLT) -> Tuple[Any
 
     obs_shape = observation.observation.shape
     obs = jax.tree_util.tree_map(
-        lambda x: jnp.reshape(x, [-1] + list(x.shape[2:])), observation.observation
+        lambda x: merge_leading_dims(x, num_dims=2), observation.observation
     )
     upd_stats = compute_running_mean_var_count(stats, obs)
     norm_obs = normalize(upd_stats, obs)
@@ -109,7 +113,9 @@ def update_and_normalize_observations(stats: Any, observation: OLT) -> Tuple[Any
     return upd_stats, observation._replace(observation=norm_obs)
 
 
-def normalize_observations(stats: Any, observation: OLT) -> OLT:
+def normalize_observations(
+    stats: Dict[str, Union[jnp.array, float]], observation: OLT
+) -> OLT:
     """Normalise a single observation
 
     stats (Dictionary)   -- array with running mean, var, count.
@@ -123,7 +129,7 @@ def normalize_observations(stats: Any, observation: OLT) -> OLT:
     # the data type before the policy info is computed else we will get
     # an error from the table about the type of policy being double instead of float.
     dtype = observation.observation.dtype
-    stats_cast = {key: np.array(value, dtype=dtype) for key, value in stats.items()}
+    stats_cast = {key: jnp.array(value, dtype=dtype) for key, value in stats.items()}
 
     obs = observation.observation
     norm_obs = normalize(stats_cast, obs)

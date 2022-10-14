@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any, Dict, List, Type
 
-import numpy as np
+import jax.numpy as jnp
 
 from mava import constants
 from mava.callbacks import Callback
@@ -107,10 +107,10 @@ class BaseTrainerInit(Component):
             ].observations.observation.shape
 
             builder.store.norm_params[obs_norm_key][agent] = dict(
-                mean=np.zeros(shape=obs_shape),
-                var=np.zeros(shape=obs_shape),
-                std=np.ones(shape=obs_shape),
-                count=np.array([1e-4]),
+                mean=jnp.zeros(shape=obs_shape),
+                var=jnp.zeros(shape=obs_shape),
+                std=jnp.ones(shape=obs_shape),
+                count=jnp.array([1e-4]),
             )
 
         # Initialise target values normalisation parameters here
@@ -118,10 +118,10 @@ class BaseTrainerInit(Component):
         builder.store.norm_params[values_norm_key] = {}
         for agent in builder.store.agents:
             builder.store.norm_params[values_norm_key][agent] = dict(
-                mean=np.array([0]),
-                var=np.array([0]),
-                std=np.array([1]),
-                count=np.array([1e-4]),
+                mean=jnp.array([0]),
+                var=jnp.array([0]),
+                std=jnp.array([1]),
+                count=jnp.array([1e-4]),
             )
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:

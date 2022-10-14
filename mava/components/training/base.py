@@ -48,7 +48,7 @@ class TrainingState(NamedTuple):
     policy_opt_states: Dict[str, optax.OptState]
     critic_opt_states: Dict[str, optax.OptState]
     random_key: Any
-    target_stats: Any
+    target_value_stats: Any
     observation_stats: Any
 
 

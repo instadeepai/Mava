@@ -283,11 +283,11 @@ class MAPGWithTrustRegionStep(Step):
             }
 
             # Denormalise the values here to keep the GAE function clean
-            target_stats = states.target_stats
+            target_value_stats = states.target_value_stats
             if hasattr(trainer.store, "target_running_stats_fn"):
                 for key in agent_nets:
                     behavior_values[key] = denormalize(
-                        target_stats[key], behavior_values[key]
+                        target_value_stats[key], behavior_values[key]
                     )
 
             # Vmap over batch dimension
@@ -301,11 +301,12 @@ class MAPGWithTrustRegionStep(Step):
                 )
                 # Update the running stats if the running stats function exist.
                 if hasattr(trainer.store, "target_running_stats_fn"):
-                    target_stats[key] = trainer.store.target_running_stats_fn(
-                        target_stats[key], jnp.reshape(target_values[key], (-1, 1))
+                    target_value_stats[key] = trainer.store.target_running_stats_fn(
+                        target_value_stats[key],
+                        jnp.reshape(target_values[key], (-1, 1)),
                     )
                     target_values[key] = normalize(
-                        target_stats[key], target_values[key]
+                        target_value_stats[key], target_values[key]
                     )
 
             # Exclude the last step - it was only used for bootstrapping.
@@ -407,7 +408,7 @@ class MAPGWithTrustRegionStep(Step):
                 policy_opt_states=new_policy_opt_states,
                 critic_opt_states=new_critic_opt_states,
                 random_key=new_key,
-                target_stats=target_stats,
+                target_value_stats=target_value_stats,
                 observation_stats=observation_stats,
             )
             return new_states, metrics
@@ -436,7 +437,7 @@ class MAPGWithTrustRegionStep(Step):
 
             _, random_key = jax.random.split(trainer.store.base_key)
 
-            target_stats = trainer.store.norm_params[
+            target_value_stats = trainer.store.norm_params[
                 constants.VALUES_NORM_STATE_DICT_KEY
             ]
 
@@ -450,7 +451,7 @@ class MAPGWithTrustRegionStep(Step):
                 policy_opt_states=policy_opt_states,
                 critic_opt_states=critic_opt_states,
                 random_key=random_key,
-                target_stats=target_stats,
+                target_value_stats=target_value_stats,
                 observation_stats=observation_stats,
             )
 
@@ -510,10 +511,10 @@ class MAPGWithTrustRegionStep(Step):
             # update the running target stats
             values_norm_key = constants.VALUES_NORM_STATE_DICT_KEY
             for agent in trainer.store.trainer_agent_net_keys.keys():
-                for param_key in new_states.target_stats[agent].keys():
+                for param_key in new_states.target_value_stats[agent].keys():
                     trainer.store.norm_params[values_norm_key][agent][
                         param_key
-                    ] = new_states.target_stats[agent][param_key]
+                    ] = new_states.target_value_stats[agent][param_key]
 
             return metrics
 
