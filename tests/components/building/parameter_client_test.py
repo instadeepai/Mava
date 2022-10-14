@@ -82,7 +82,26 @@ expected_network_keys = {
     "critic_opt_state-network_agent_2",
 }
 
-expected_keys = expected_count_keys.union(expected_network_keys)
+normalisation_keys = {"norm_params"}
+obs_norm_key = constants.OBS_NORM_STATE_DICT_KEY
+values_norm_key = constants.VALUES_NORM_STATE_DICT_KEY
+norm_params: Any = {obs_norm_key: {}, values_norm_key: {}}
+for agent in ["agent_0", "agent_1", "agent_2"]:
+    obs_shape = 1  # something random
+    norm_params[obs_norm_key][agent] = dict(
+        mean=np.zeros(shape=obs_shape),
+        var=np.zeros(shape=obs_shape),
+        std=np.ones(shape=obs_shape),
+        count=np.array([1e-4]),
+    )
+
+    norm_params[values_norm_key][agent] = dict(
+        mean=np.array([0]), var=np.array([0]), std=np.array([1]), count=np.array([1e-4])
+    )
+
+expected_keys = expected_count_keys.union(expected_network_keys).union(
+    normalisation_keys
+)
 
 initial_parameters_trainer = {
     "policy_network-network_agent_0": {"weights": 0, "biases": 0},
@@ -103,6 +122,7 @@ initial_parameters_trainer = {
     "evaluator_episodes": np.array(0, dtype=np.int32),
     "executor_episodes": np.array(0, dtype=np.int32),
     "executor_steps": np.array(0, dtype=np.int32),
+    "norm_params": norm_params,
 }
 
 # Executor parameter client prameters does not include opt states
@@ -150,6 +170,25 @@ def mock_builder_with_parameter_client() -> Builder:
         builder.store.critic_opt_states[net_key] = {
             constants.OPT_STATE_DICT_KEY: EmptyState()
         }
+
+    builder.store.norm_params = {}
+    builder.store.norm_params[obs_norm_key] = {}
+    builder.store.norm_params[values_norm_key] = {}
+    for agent in ["agent_0", "agent_1", "agent_2"]:
+        obs_shape = 1
+        builder.store.norm_params[obs_norm_key][agent] = dict(
+            mean=np.zeros(shape=obs_shape),
+            var=np.zeros(shape=obs_shape),
+            std=np.ones(shape=obs_shape),
+            count=np.array([1e-4]),
+        )
+
+        builder.store.norm_params[values_norm_key][agent] = dict(
+            mean=np.array([0]),
+            var=np.array([0]),
+            std=np.array([1]),
+            count=np.array([1e-4]),
+        )
 
     builder.store.parameter_server_client = ParameterServer(
         store=SimpleNamespace(
@@ -351,6 +390,7 @@ def test_trainer_parameter_client(
         "critic_network-network_agent_2",
         "policy_opt_state-network_agent_2",
         "critic_opt_state-network_agent_2",
+        "norm_params",
     ]
     assert (
         mock_builder.store.trainer_parameter_client._parameters

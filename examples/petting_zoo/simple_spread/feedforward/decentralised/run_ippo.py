@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running IPPO on debug MPE environments."""
+"""Example running IPPO on MPE environments."""
 import functools
 from datetime import datetime
 from typing import Any
@@ -22,19 +22,19 @@ import optax
 from absl import app, flags
 
 from mava.systems import ippo
-from mava.utils.environments import debugging_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
+    "env_class",
+    "mpe",
+    "Pettingzoo environment class, e.g. atari (str).",
 )
 flags.DEFINE_string(
-    "action_space",
-    "discrete",
-    "Environment action space type (str).",
+    "env_name",
+    "simple_spread_v2",
+    "Pettingzoo environment name, e.g. pong (str).",
 )
 
 flags.DEFINE_string(
@@ -42,27 +42,25 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
+
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Run main script
-
-    Args:
-        _ : _
-    """
+    """Run main script"""
     # Environment.
     environment_factory = functools.partial(
-        debugging_utils.make_environment,
+        pettingzoo_utils.make_environment,
+        env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
+        concat_agent_id=True,  # Concatenate agent_ids to the environment observations.
     )
 
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return ippo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(64, 64),
-            critic_layer_sizes=(64, 64, 64),
+            policy_layer_sizes=(64,),
+            critic_layer_sizes=(256,),
             *args,
             **kwargs,
         )
@@ -106,9 +104,8 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        clip_value=False,
-        normalize_target_values=True,
-        normalize_observations=True,
+        evaluation_interval={"executor_steps": 10000},
+        evaluation_duration={"evaluator_episodes": 32},
     )
 
     # Launch the system.
