@@ -108,6 +108,7 @@ def main(_: Any) -> None:
         multi_process=True,
         clip_value=False,
         normalize_target_values=True,
+        normalize_observations=True,
     )
 
     # Launch the system.
