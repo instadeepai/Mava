@@ -203,6 +203,17 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
 
         If this fails, follow instructions [here](https://github.com/deepmind/meltingpot#installation).
 
+    * Development
+ 
+        When developing mava locally one can just replace the `id-mava` part of the `pip install` with a `.`.  
+        For example when installing petting zoo dependencies for local development (inside of the mava folder):
+
+        ```bash
+        pip install -e ".[pz]"
+        ```
+
+        This installs the petting zoo mava dependencies into your current environment, but uses your local copy of mava, instead of one stored inside of your environments package directory.
+
 3. Run an example:
 
     ```
