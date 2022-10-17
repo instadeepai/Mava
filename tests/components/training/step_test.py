@@ -20,6 +20,7 @@ from typing import Any, Dict, Tuple
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pytest
 import rlax
 
@@ -149,11 +150,25 @@ class MockTrainer(Trainer):
             "network_agent_2": {constants.OPT_STATE_DICT_KEY: 2},
         }
 
-        running_stats = {
-            "agent_0": jnp.array([0, 1, 1e-4]),
-            "agent_1": jnp.array([0, 1, 1e-4]),
-            "agent_2": jnp.array([0, 1, 1e-4]),
+        norm_params: Any = {
+            constants.OBS_NORM_STATE_DICT_KEY: {},
+            constants.VALUES_NORM_STATE_DICT_KEY: {},
         }
+        for agent in trainer_agent_net_keys.keys():
+            obs_shape = 1  # something random
+            norm_params[constants.OBS_NORM_STATE_DICT_KEY][agent] = dict(
+                mean=np.zeros(shape=obs_shape),
+                var=np.zeros(shape=obs_shape),
+                std=np.ones(shape=obs_shape),
+                count=np.array([1e-4]),
+            )
+
+            norm_params[constants.VALUES_NORM_STATE_DICT_KEY][agent] = dict(
+                mean=np.array([0]),
+                var=np.array([0]),
+                std=np.array([1]),
+                count=np.array([1e-4]),
+            )
 
         store = SimpleNamespace(
             dataset_iterator=iter([1, 2, 3]),
@@ -170,7 +185,7 @@ class MockTrainer(Trainer):
             critic_opt_states=copy.copy(opt_states),
             base_key=jax.random.PRNGKey(5),
             epoch_update_fn=epoch_update,
-            stats=running_stats,
+            norm_params=norm_params,
             global_config=SimpleNamespace(
                 num_minibatches=1, num_epochs=2, sample_batch_size=2, sequence_length=3
             ),

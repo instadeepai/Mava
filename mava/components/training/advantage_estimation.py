@@ -26,7 +26,6 @@ import rlax
 from mava.callbacks import Callback
 from mava.components.training.base import Utility
 from mava.core_jax import SystemTrainer
-from mava.utils.jax_training_utils import denormalize
 
 
 @dataclass
@@ -61,7 +60,6 @@ class GAE(Utility):
             rewards: jnp.ndarray,
             discounts: jnp.ndarray,
             values: jnp.ndarray,
-            stats: jnp.ndarray = jnp.array([0, 1, 1e-4]),
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
             """Use truncated GAE to compute advantages.
 
@@ -69,7 +67,6 @@ class GAE(Utility):
                 rewards: Agent rewards.
                 discounts: Agent discount factors.
                 values: Agent value estimations.
-                stats: Running statistics.
 
             Returns:
                 Tuple of advantage values, target values.
@@ -78,11 +75,6 @@ class GAE(Utility):
             # Apply reward clipping.
             max_abs_reward = self.config.max_abs_reward
             rewards = jnp.clip(rewards, -max_abs_reward, max_abs_reward)
-
-            # When the target_value normalisation option is not set to true,
-            # the mean and variance are set to 0 and 1 respectively.
-            # Hence the code below does not modify the agent values.
-            values = denormalize(stats, values)
 
             advantages = rlax.truncated_generalized_advantage_estimation(
                 rewards[:-1],
