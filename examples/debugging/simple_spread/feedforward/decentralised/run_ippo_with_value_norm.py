@@ -105,7 +105,7 @@ def main(_: Any) -> None:
         sample_batch_size=5,
         num_epochs=15,
         num_executors=1,
-        multi_process=True,
+        multi_process=False,
         clip_value=False,
         normalize_target_values=True,
         normalize_observations=True,

@@ -18,7 +18,6 @@
 from typing import Any, Dict, List, Optional, Union
 
 import dm_env
-import gym
 import jax
 import numpy as np
 from acme import specs
@@ -364,6 +363,14 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
             List: all possible agents in env.
         """
         return self._environment.possible_agents
+
+    def death_masked_agents(self) -> List:
+        """Returns all death masked agents"""
+        return []
+
+    def obs_normalisation_start_index(self) -> int:
+        """Returns an interger to indicate which features should not be normalised"""
+        return 0
 
     @property
     def environment(self) -> "ParallelEnv":

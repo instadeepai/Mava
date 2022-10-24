@@ -331,6 +331,14 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
         """
         return [f"agent_{i}" for i in range(self._num_agents)]
 
+    def death_masked_agents(self) -> List:
+        """Returns all death masked agents"""
+        return []
+
+    def obs_normalisation_start_index(self) -> int:
+        """Returns an interger to indicate which features should not be normalised"""
+        return 0
+
     @property
     def environment(self) -> Union[Substrate, Scenario]:
         """Returns the wrapped environment.

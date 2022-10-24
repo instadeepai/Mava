@@ -210,6 +210,14 @@ def get_ma_environment(
         def env_done(self) -> bool:
             return not self.agents
 
+        def death_masked_agents(self) -> List:
+            """Returns all death masked agents"""
+            return []
+
+        def obs_normalisation_start_index(self) -> int:
+            """Returns an interger to indicate which features should not be normalised"""
+            return 0
+
     return MockedEnvironment
 
 
@@ -296,7 +304,7 @@ class ParallelEnvironment(MockedEnvironment, ParallelEnvWrapper):
 DiscreteMAEnvironment = get_ma_environment(DiscreteEnvironment)
 ContinuousMAEnvironment = get_ma_environment(ContinuousEnvironment)
 
-
+# flake8: noqa: E501
 class MockedMADiscreteEnvironment(DiscreteMAEnvironment, DiscreteEnvironment):  # type: ignore
     def __init__(self, *args: Any, **kwargs: Any):
         DiscreteMAEnvironment.__init__(self, *args, **kwargs)

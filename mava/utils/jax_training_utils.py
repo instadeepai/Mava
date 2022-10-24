@@ -38,12 +38,15 @@ def init_norm_params(stats_shape: Tuple) -> Dict[str, Union[jnp.array, float]]:
 
 
 def compute_running_mean_var_count(
-    stats: Dict[str, Union[jnp.array, float]], batch: jnp.ndarray
+    stats: Dict[str, Union[jnp.array, float]],
+    batch: jnp.ndarray,
+    start_axes: int = 0,
 ) -> jnp.ndarray:
     """Updates the running mean, variance and data counts during training.
 
     stats (Any)   -- dictionary with running mean, var, std, count
     batch (array) -- current batch of data.
+    start_axes (int or None) -- number of axes we do not want to normalise
 
     Returns:
         stats (array)
@@ -58,13 +61,23 @@ def compute_running_mean_var_count(
     delta = batch_mean - mean
     tot_count = count + batch_count
 
-    new_mean = mean + delta * batch_count / tot_count
+    mean = mean + delta * batch_count / tot_count
     m_a = var * count
     m_b = batch_var * batch_count
     M2 = m_a + m_b + jnp.square(delta) * count * batch_count / tot_count
-    new_var = M2 / tot_count
+    var = M2 / tot_count
+    std = jnp.sqrt(var)
     new_count = tot_count
-    new_std = jnp.sqrt(new_var)
+
+    # This assumes the all the features we don't want to
+    # normalise are all always at the front.
+    new_mean = jnp.zeros_like(mean)
+    new_var = jnp.zeros_like(var)
+    new_std = jnp.ones_like(std)
+
+    new_mean = new_mean.at[start_axes:].set(mean[start_axes:])
+    new_var = new_var.at[start_axes:].set(var[start_axes:])
+    new_std = new_std.at[start_axes:].set(std[start_axes:])
 
     return dict(mean=new_mean, var=new_var, std=new_std, count=new_count)
 

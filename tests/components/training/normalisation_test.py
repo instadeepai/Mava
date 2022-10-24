@@ -42,6 +42,31 @@ def test_compute_running_mean_var_count() -> None:
         assert jnp.allclose(stats["count"], stats2["count"])
 
 
+def test_compute_running_mean_var_count_axes() -> None:
+    """Test if the running stats correctly excludes specified axes"""
+
+    for (x1, x2, x3) in [
+        (np.random.randn(20, 15), np.random.randn(20, 15), np.random.randn(20, 15)),
+        (np.random.randn(20, 15), np.random.randn(20, 15), np.random.randn(20, 15)),
+    ]:
+
+        stats = dict(
+            mean=jnp.zeros(15),
+            var=jnp.zeros(15),
+            count=jnp.array([1e-4]),
+            std=np.ones(15),
+        )
+
+        s_axes = 5
+        stats = compute_running_mean_var_count(stats, jnp.array(x1), start_axes=s_axes)
+        stats = compute_running_mean_var_count(stats, jnp.array(x2), start_axes=s_axes)
+        stats = compute_running_mean_var_count(stats, jnp.array(x3), start_axes=s_axes)
+
+        assert jnp.allclose(stats["mean"][:s_axes], jnp.zeros(s_axes), atol=1e-8)
+        assert jnp.allclose(stats["var"][:s_axes], jnp.zeros(s_axes), atol=1e-8)
+        assert jnp.allclose(stats["std"][:s_axes], jnp.ones(s_axes), atol=1e-8)
+
+
 def test_normalization() -> None:
     """Test if the normalization does the right thing"""
 
