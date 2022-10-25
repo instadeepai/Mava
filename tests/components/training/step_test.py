@@ -187,7 +187,12 @@ class MockTrainer(Trainer):
             epoch_update_fn=epoch_update,
             norm_params=norm_params,
             global_config=SimpleNamespace(
-                num_minibatches=1, num_epochs=2, sample_batch_size=2, sequence_length=3
+                num_minibatches=1,
+                num_epochs=2,
+                sample_batch_size=2,
+                sequence_length=3,
+                normalize_observations=False,
+                normalize_target_values=False,
             ),
         )
         self.store = store

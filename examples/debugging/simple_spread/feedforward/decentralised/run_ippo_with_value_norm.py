@@ -56,6 +56,7 @@ def main(_: Any) -> None:
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
+        concat_id=True,
     )
 
     # Networks.
@@ -105,7 +106,7 @@ def main(_: Any) -> None:
         sample_batch_size=5,
         num_epochs=15,
         num_executors=1,
-        multi_process=False,
+        multi_process=True,
         clip_value=False,
         normalize_target_values=True,
         normalize_observations=True,

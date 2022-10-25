@@ -17,6 +17,7 @@
 
 import abc
 from dataclasses import dataclass
+from functools import partial
 from typing import Any, Dict, List, Tuple, Type
 
 import jax
@@ -105,7 +106,10 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
 
         # Initilaise observations running mean/std function here
         if self.config.normalize_observations:
-            trainer.store.norm_obs_running_stats_fn = update_and_normalize_observations
+            trainer.store.norm_obs_running_stats_fn = partial(
+                update_and_normalize_observations,
+                start_axes=trainer.store.obs_normalisation_start,
+            )
 
         def model_update_minibatch(
             carry: Tuple[

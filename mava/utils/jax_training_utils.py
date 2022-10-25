@@ -95,7 +95,7 @@ def normalize(
     """
 
     mean, std = stats["mean"], stats["std"]
-    normalize_batch = (batch - mean) / (std + 1e-8)
+    normalize_batch = (batch - mean) / jnp.fmax(std, 1e-6)
 
     return normalize_batch
 
@@ -113,13 +113,15 @@ def denormalize(
     """
 
     mean, std = stats["mean"], stats["std"]
-    denormalize_batch = batch * std + mean
+    denormalize_batch = batch * jnp.fmax(std, 1e-6) + mean
 
     return denormalize_batch
 
 
 def update_and_normalize_observations(
-    stats: Dict[str, Union[jnp.array, float]], observation: OLT
+    stats: Dict[str, Union[jnp.array, float]],
+    observation: OLT,
+    start_axes: int = 0,
 ) -> Tuple[Any, OLT]:
     """Update running stats and normalise observations
 
@@ -134,8 +136,15 @@ def update_and_normalize_observations(
     obs = jax.tree_util.tree_map(
         lambda x: merge_leading_dims(x, num_dims=2), observation.observation
     )
-    upd_stats = compute_running_mean_var_count(stats, obs)
+    upd_stats = compute_running_mean_var_count(stats, obs, start_axes)
     norm_obs = normalize(upd_stats, obs)
+
+    # the following code makes sure we do not normalise
+    # death masked observations. This uses the assumption
+    # that all death masked agens have zeroed observations
+    sum_obs = jnp.sum(obs[:, start_axes:], axis=1)
+    mask = jnp.array(sum_obs != 0, dtype=obs.dtype)
+    norm_obs = norm_obs.at[:, start_axes:].set(norm_obs[:, start_axes:] * mask[:, None])
 
     # reshape before returning
     norm_obs = jnp.reshape(norm_obs, obs_shape)

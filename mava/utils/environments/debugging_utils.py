@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
+from typing import Any, Optional
 
 import dm_env
 
@@ -25,6 +25,7 @@ from mava.wrappers.debugging_envs import (
     SwitchGameWrapper,
     TwoStepWrapper,
 )
+from mava.wrappers.env_preprocess_wrappers import ConcatAgentIdToObservation
 
 
 def make_environment(
@@ -36,9 +37,11 @@ def make_environment(
     return_state_info: bool = False,
     random_seed: Optional[int] = None,
     recurrent_test: bool = False,
+    concat_id: bool = False,
 ) -> dm_env.Environment:
 
     assert action_space == "continuous" or action_space == "discrete"
+    environment: Any
 
     if action_space == "discrete":
         # Env uses int64 action space due to the use of spac.Discrete.
@@ -62,6 +65,9 @@ def make_environment(
         environment = DebuggingEnvWrapper(
             env_module, return_state_info=return_state_info
         )
+
+    if concat_id:
+        environment = ConcatAgentIdToObservation(environment)
 
     if random_seed and hasattr(environment, "seed"):
         environment.seed(random_seed)

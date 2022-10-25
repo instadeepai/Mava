@@ -20,9 +20,14 @@ import dm_env
 import numpy as np
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
+from dm_env.specs import DiscreteArray
 
 from mava import types
 from mava.utils.environments.flatland_utils import check_flatland_import
+from mava.wrappers.env_preprocess_wrappers import (
+    ConcatAgentIdToObservation,
+    ConcatPrevActionToObservation,
+)
 from tests.conftest import EnvSpec, Helpers
 from tests.enums import EnvSource
 
@@ -385,3 +390,40 @@ class TestEnvWrapper:
         assert (
             curr_dm_timestep.step_type is dm_env.StepType.LAST
         ), "Failed to update step type."
+
+    def test_wrapper_env_obs_normalisation_attrs(
+        self, env_spec: EnvSpec, helpers: Helpers
+    ) -> None:
+        """Test observations start attribute"""
+
+        if env_spec is None:
+            pytest.skip()
+
+        wrapped_env, _ = helpers.get_wrapped_env(env_spec)
+        agents = wrapped_env.agents
+
+        # Frist check if the death masking is list is empty
+        assert len(wrapped_env.death_masked_agents()) == 0
+
+        wrapped_step = wrapped_env.reset()
+        if type(wrapped_step) == tuple:
+            wrapped_step, _ = wrapped_step
+
+        olt_type = isinstance(wrapped_step.observation[agents[0]], types.OLT)
+        if olt_type:
+            concat_id = ConcatAgentIdToObservation(wrapped_env)
+            assert (
+                concat_id.obs_normalisation_start_index()
+                > wrapped_env.obs_normalisation_start_index()
+            )
+            assert len(concat_id.death_masked_agents()) == 0
+
+            action_spec = concat_id.action_spec()
+            discrete = isinstance(action_spec[agents[0]], DiscreteArray)
+            if discrete:
+                concat_id_action = ConcatPrevActionToObservation(concat_id)
+                assert (
+                    concat_id_action.obs_normalisation_start_index()
+                    > concat_id.obs_normalisation_start_index()
+                )
+                assert len(concat_id_action.death_masked_agents()) == 0

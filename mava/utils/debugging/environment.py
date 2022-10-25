@@ -370,3 +370,11 @@ class MultiAgentEnv(gym.Env):
                 for y in np.linspace(-range_max, +range_max, 5):
                     dx.append(np.array([x, y]))
         return dx
+
+    def death_masked_agents(self) -> List:
+        """Returns all death masked agents"""
+        return []
+
+    def obs_normalisation_start_index(self) -> int:
+        """Returns an interger to indicate which features should not be normalised"""
+        return 0
