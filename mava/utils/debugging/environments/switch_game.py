@@ -152,11 +152,3 @@ class MultiAgentSwitchGame(gym.Env):
             if self.seen_all and self.tell
             else np.array(-1.0, dtype=np.float32)
         )
-
-    def death_masked_agents(self) -> List:
-        """Returns all death masked agents"""
-        return []
-
-    def obs_normalisation_start_index(self) -> int:
-        """Returns an interger to indicate which features should not be normalised"""
-        return 0

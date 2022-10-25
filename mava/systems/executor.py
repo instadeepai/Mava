@@ -119,9 +119,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
                 constants.OBS_NORM_STATE_DICT_KEY
             ]
             agents = list(observations.keys())
-            death_masked_agents = (
-                self.store.executor_environment._environment.death_masked_agents()
-            )
+            death_masked_agents = self.store.executor_environment.death_masked_agents
             agents_alive = list(set(agents) - set(death_masked_agents))
 
             for key in agents_alive:

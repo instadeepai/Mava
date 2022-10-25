@@ -346,19 +346,16 @@ class SMACWrapper(ParallelEnvWrapper):
         """
         return self._agents
 
+    @property
     def death_masked_agents(self) -> List:
         """Check and returns all death masked agents"""
 
-        death_masked_agents = []
+        masked_agents = []
         for i, agent in enumerate(self._agents):
             if self._death_masking and self.is_dead(i):
-                death_masked_agents.append(agent)
+                masked_agents.append(agent)
 
-        return death_masked_agents
-
-    def obs_normalisation_start_index(self) -> int:
-        """Returns an interger to indicate which features should not be normalised"""
-        return 0
+        return masked_agents
 
     @property
     def environment(self) -> StarCraft2Env:

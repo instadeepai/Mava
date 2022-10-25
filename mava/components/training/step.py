@@ -283,14 +283,9 @@ class MAPGWithTrustRegionStep(Step):
             }
 
             # Denormalise the values here to keep the GAE function clean
-            # Also update the target running stats based on behabiour values
             target_value_stats = states.target_value_stats
             if trainer.store.global_config.normalize_target_values:
                 for key in agent_nets:
-                    target_value_stats[key] = trainer.store.target_running_stats_fn(
-                        target_value_stats[key],
-                        jnp.reshape(behavior_values[key], (-1, 1)),
-                    )
                     behavior_values[key] = denormalize(
                         target_value_stats[key], behavior_values[key]
                     )
@@ -305,6 +300,10 @@ class MAPGWithTrustRegionStep(Step):
                     rewards[key], discounts[key], behavior_values[key]
                 )
                 if trainer.store.global_config.normalize_target_values:
+                    target_value_stats[key] = trainer.store.target_running_stats_fn(
+                        target_value_stats[key],
+                        jnp.reshape(target_values[key], (-1, 1)),
+                    )
                     target_values[key] = normalize(
                         target_value_stats[key], target_values[key]
                     )

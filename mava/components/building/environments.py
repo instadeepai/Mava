@@ -69,7 +69,7 @@ class EnvironmentSpec(Component):
         builder.store.extras_spec = {}
 
         builder.store.obs_normalisation_start = (
-            self.config.environment_factory().obs_normalisation_start_index()
+            self.config.environment_factory().obs_normalisation_start_index
         )
 
     @staticmethod

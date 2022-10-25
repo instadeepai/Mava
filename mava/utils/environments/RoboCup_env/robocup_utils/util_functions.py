@@ -15,7 +15,7 @@
 
 # type: ignore
 import time
-from typing import Dict, List, NamedTuple
+from typing import Dict, NamedTuple
 
 import dm_env
 import gym
@@ -728,11 +728,3 @@ class SpecWrapper(dm_env.Environment):
     def possible_agents(self) -> gym.Env:
         """Returns the number of possible agents."""
         return self.agents
-
-    def death_masked_agents(self) -> List:
-        """Returns all death masked agents"""
-        return []
-
-    def obs_normalisation_start_index(self) -> int:
-        """Returns an interger to indicate which features should not be normalised"""
-        return 0

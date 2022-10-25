@@ -364,14 +364,6 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         """
         return self._environment.possible_agents
 
-    def death_masked_agents(self) -> List:
-        """Returns all death masked agents"""
-        return []
-
-    def obs_normalisation_start_index(self) -> int:
-        """Returns an interger to indicate which features should not be normalised"""
-        return 0
-
     @property
     def environment(self) -> "ParallelEnv":
         """Returns the wrapped environment.

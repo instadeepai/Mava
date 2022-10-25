@@ -139,14 +139,6 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         """Return list of all possible agents."""
         return self._possible_agents
 
-    def death_masked_agents(self) -> List:
-        """Returns all death masked agents"""
-        return []
-
-    def obs_normalisation_start_index(self) -> int:
-        """Returns an interger to indicate which features should not be normalised"""
-        return 0
-
     def _update_stats(self, info: Dict, rewards: Dict) -> None:
         """Update flatland stats."""
         episode_return = sum(list(rewards.values()))

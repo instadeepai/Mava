@@ -403,7 +403,7 @@ class TestEnvWrapper:
         agents = wrapped_env.agents
 
         # Frist check if the death masking is list is empty
-        assert len(wrapped_env.death_masked_agents()) == 0
+        assert len(wrapped_env.death_masked_agents) == 0
 
         wrapped_step = wrapped_env.reset()
         if type(wrapped_step) == tuple:
@@ -413,17 +413,17 @@ class TestEnvWrapper:
         if olt_type:
             concat_id = ConcatAgentIdToObservation(wrapped_env)
             assert (
-                concat_id.obs_normalisation_start_index()
-                > wrapped_env.obs_normalisation_start_index()
+                concat_id.obs_normalisation_start_index
+                > wrapped_env.obs_normalisation_start_index
             )
-            assert len(concat_id.death_masked_agents()) == 0
+            assert len(concat_id.death_masked_agents) == 0
 
             action_spec = concat_id.action_spec()
             discrete = isinstance(action_spec[agents[0]], DiscreteArray)
             if discrete:
                 concat_id_action = ConcatPrevActionToObservation(concat_id)
                 assert (
-                    concat_id_action.obs_normalisation_start_index()
-                    > concat_id.obs_normalisation_start_index()
+                    concat_id_action.obs_normalisation_start_index
+                    > concat_id.obs_normalisation_start_index
                 )
-                assert len(concat_id_action.death_masked_agents()) == 0
+                assert len(concat_id_action.death_masked_agents) == 0

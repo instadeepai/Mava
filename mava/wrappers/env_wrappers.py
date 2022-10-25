@@ -36,10 +36,12 @@ class ParallelEnvWrapper(dm_env.Environment):
     def possible_agents(self) -> List:
         """Returns all the possible agents in the env."""
 
-    @abstractmethod
+    @property
     def death_masked_agents(self) -> List:
         """Returns all death masked agents"""
+        return []
 
-    @abstractmethod
+    @property
     def obs_normalisation_start_index(self) -> int:
         """Returns an interger to indicate which features should not be normalised"""
+        return 0
