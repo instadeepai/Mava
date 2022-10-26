@@ -25,7 +25,6 @@ import numpy as np
 from acme.utils import counting, loggers
 
 import mava
-from mava.utils.lp_utils import termination_fn
 from mava.utils.training_utils import check_count_condition
 from mava.utils.wrapper_utils import generate_zeros_from_spec
 
@@ -278,4 +277,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
             except Exception as e:
                 print(e, ": Experiment terminated due to an error on a node.")
-                termination_fn(self._executor)
+                self._executor.store.executor_parameter_client.add_and_wait(
+                    {"interrupt": True}
+                )
+                self._executor.force_update()
