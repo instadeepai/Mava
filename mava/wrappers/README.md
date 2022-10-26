@@ -12,7 +12,7 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 * [Flatland][flatland]
 * [2D RoboCup][robocup]
 
-|<img  src="../../docs/images/multiw_animation.gif" width="300px"/> | <img src="../../docs/images/sc2_animation.gif" width="300px"/>
+|<img  src="../../docs/images/multiw_animation.gif" width="400px"/> | <img src="../../docs/images/sc2_animation.gif" width="250px"/>
 |:---:|:---:|
 |MAD4PG on PettingZoo's Multi-Walker environment. | VDN on the SMAC 3m map.|
 
