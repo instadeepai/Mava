@@ -11,15 +11,10 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 * [SMAC][smac]
 * [Flatland][flatland]
 * [2D RoboCup][robocup]
-* [Melting pot][meltingpot]
 
 |<img  src="../../docs/images/multiw_animation.gif" width="300px"/> | <img src="../../docs/images/sc2_animation.gif" width="200px"/>  | <img src="../../docs/images/flatland.gif" width="200px" />  |
 |:---:|:---:|:---:|
 |MAD4PG on PettingZoo's Multi-Walker environment. | VDN on the SMAC 3m map.| MADQN on Flatland. |
-
-|<img  src="../../docs/images/robocup_animation.gif" width="300px"/> |<img  src="../../docs/images/madqn_meltingpot_cleanup_scenario.gif" width="300px"/> |
-|:---:|:---:|
-|MAD4PG on the 2D RoboCup environment using 6 executors.| MADQN on a melting pot clean up scenario |
 
 # Getting a new environment to work with Mava
 
@@ -29,7 +24,6 @@ Our wrapper for the PettingZoo environment provides a good starting example on h
 
 [pettingzoo]: https://github.com/PettingZoo-Team/PettingZoo
 [smac]: https://github.com/oxwhirl/smac
-[meltingpot]: https://github.com/deepmind/meltingpot
 [flatland]: https://gitlab.aicrowd.com/flatland/flatland
 [robocup]: https://github.com/rcsoccersim
 [dm_env]: https://github.com/deepmind/dm_env
