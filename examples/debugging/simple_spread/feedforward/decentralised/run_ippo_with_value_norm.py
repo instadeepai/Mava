@@ -56,7 +56,7 @@ def main(_: Any) -> None:
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
-        concat_id=True,
+        concat_agent_id=True,
     )
 
     # Networks.

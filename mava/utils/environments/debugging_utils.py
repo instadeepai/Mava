@@ -37,7 +37,7 @@ def make_environment(
     return_state_info: bool = False,
     random_seed: Optional[int] = None,
     recurrent_test: bool = False,
-    concat_id: bool = False,
+    concat_agent_id: bool = False,
 ) -> dm_env.Environment:
 
     assert action_space == "continuous" or action_space == "discrete"
@@ -66,7 +66,7 @@ def make_environment(
             env_module, return_state_info=return_state_info
         )
 
-    if concat_id:
+    if concat_agent_id:
         environment = ConcatAgentIdToObservation(environment)
 
     if random_seed and hasattr(environment, "seed"):
