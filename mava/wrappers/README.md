@@ -12,13 +12,13 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 * [Flatland][flatland]
 * [2D RoboCup][robocup]
 
-|<img  src="../../docs/images/multiw_animation.gif" width="300px"/> | <img src="../../docs/images/sc2_animation.gif" width="200px"/>  | <img src="../../docs/images/flatland.gif" width="200px" />  |
-|:---:|:---:|:---:|
-|MAD4PG on PettingZoo's Multi-Walker environment. | VDN on the SMAC 3m map.| MADQN on Flatland. |
+|<img  src="../../docs/images/multiw_animation.gif" width="300px"/> | <img src="../../docs/images/sc2_animation.gif" width="200px"/>
+|:---:|:---:|
+|MAD4PG on PettingZoo's Multi-Walker environment. | VDN on the SMAC 3m map.|
 
-|<img  src="../../docs/images/robocup_animation.gif" width="300px"/>
-|:---:|
-|MAD4PG on the 2D RoboCup environment using 6 executors.|
+|<img  src="../../docs/images/robocup_animation.gif" width="300px"/> | <img src="../../docs/images/flatland.gif" width="200px" />  |
+|:---:|:---:|
+|MAD4PG on the 2D RoboCup environment using 6 executors.| MADQN on Flatland. |
 
 # Getting a new environment to work with Mava
 
