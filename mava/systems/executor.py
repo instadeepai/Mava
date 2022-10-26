@@ -20,11 +20,9 @@ from typing import Dict, List, Tuple, Union
 
 import dm_env
 
-from mava import constants
 from mava.callbacks import Callback, ExecutorHookMixin
 from mava.core_jax import SystemExecutor
 from mava.types import NestedArray
-from mava.utils.jax_training_utils import normalize_observations
 
 
 class Executor(SystemExecutor, ExecutorHookMixin):
@@ -112,20 +110,6 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         Returns:
             Action and policy info for all agents in the system.
         """
-
-        # Normalise the observations before selecting actions.
-        if self.store.global_config.normalize_observations:
-            observations_stats = self.store.norm_params[
-                constants.OBS_NORM_STATE_DICT_KEY
-            ]
-            agents = list(observations.keys())
-            death_masked_agents = self.store.executor_environment.death_masked_agents
-            agents_alive = list(set(agents) - set(death_masked_agents))
-
-            for key in agents_alive:
-                observations[key] = normalize_observations(
-                    observations_stats[key], observations[key]
-                )
 
         self.store.observations = observations
 

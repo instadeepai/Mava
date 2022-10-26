@@ -23,6 +23,7 @@ import jax
 from acme.jax import networks as networks_lib
 from acme.jax import utils
 
+from mava import constants
 from mava.callbacks import Callback
 from mava.components import Component
 from mava.components.building.networks import Networks
@@ -30,6 +31,7 @@ from mava.components.building.system_init import BaseSystemInit
 from mava.components.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemExecutor
 from mava.types import NestedArray
+from mava.utils.jax_training_utils import normalize_observations
 
 
 class ExecutorSelectAction(Component):
@@ -93,6 +95,24 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             None.
         """
 
+        observations = executor.store.observations
+
+        # Normalise the observations before selecting actions.
+        if executor.store.global_config.normalize_observations:
+            observations_stats = executor.store.norm_params[
+                constants.OBS_NORM_STATE_DICT_KEY
+            ]
+            agents = list(observations.keys())
+            death_masked_agents = (
+                executor.store.executor_environment.death_masked_agents
+            )
+            agents_alive = list(set(agents) - set(death_masked_agents))
+
+            for key in agents_alive:
+                observations[key] = normalize_observations(
+                    observations_stats[key], observations[key]
+                )
+
         # Dict with params per network
         current_agent_params = {
             network: executor.store.networks[network].get_params()
@@ -103,7 +123,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             executor.store.policies_info,
             executor.store.base_key,
         ) = executor.store.select_actions_fn(
-            executor.store.observations, current_agent_params, executor.store.base_key
+            observations, current_agent_params, executor.store.base_key
         )
 
     def on_execution_init_end(self, executor: SystemExecutor) -> None:
@@ -203,6 +223,24 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             None.
         """
 
+        observations = executor.store.observations
+
+        # Normalise the observations before selecting actions.
+        if executor.store.global_config.normalize_observations:
+            observations_stats = executor.store.norm_params[
+                constants.OBS_NORM_STATE_DICT_KEY
+            ]
+            agents = list(observations.keys())
+            death_masked_agents = (
+                executor.store.executor_environment.death_masked_agents
+            )
+            agents_alive = list(set(agents) - set(death_masked_agents))
+
+            for key in agents_alive:
+                observations[key] = normalize_observations(
+                    observations_stats[key], observations[key]
+                )
+
         # Dict with params per network
         current_agent_params = {
             network: executor.store.networks[network].get_params()
@@ -215,7 +253,7 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             executor.store.policy_states,
             executor.store.base_key,
         ) = executor.store.select_actions_fn(
-            executor.store.observations,
+            observations,
             current_agent_params,
             executor.store.policy_states,
             executor.store.base_key,
