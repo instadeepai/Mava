@@ -16,6 +16,9 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 |:---:|:---:|:---:|
 |MAD4PG on PettingZoo's Multi-Walker environment. | VDN on the SMAC 3m map.| MADQN on Flatland. |
 
+|<img  src="../../docs/images/robocup_animation.gif" width="300px"/> |:---:|
+|MAD4PG on the 2D RoboCup environment using 6 executors.|
+
 # Getting a new environment to work with Mava
 
 Mava uses wrappers to allow different environments to conform to Mava's environment API. For example, the following file shows how our debugging environments are made [debugging_utils](https://github.com/instadeepai/Mava/blob/develop/mava/utils/environments/debugging_utils.py#L53). Here the environment is first initialised as normal. Then a wrapper is applied to that environment that conforms to Deepmind's `dm_env.Environment` standard. Mava also requires three extra methods that can be found in [env_wrappers](https://github.com/instadeepai/Mava/blob/develop/mava/wrappers/env_wrappers.py).
