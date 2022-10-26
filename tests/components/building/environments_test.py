@@ -98,11 +98,7 @@ def test_builder() -> SystemBuilder:
     system_builder.store.executor_environment = "environment"
     system_builder.store.executor = "executor"
     system_builder.store.executor_logger = "executor_logger"
-
-    if system_builder.store.executor_environment == "environment_eval_false":
-        system_builder.store.is_evaluator = False
-    else:
-        system_builder.store.is_evaluator = True
+    system_builder.store.is_evaluator = True
 
     return system_builder
 
