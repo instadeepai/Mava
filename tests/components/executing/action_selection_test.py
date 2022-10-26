@@ -42,7 +42,7 @@ class DummyExecutorSelectActionConfig:
 
 @pytest.fixture
 def dummy_config() -> DummyExecutorSelectActionConfig:
-    """Dummy config attribute for FeedforwardExecutorSelectAction and RecurrentExecutorSelectAction classes
+    """Dummy config attribute for Feedforward and Recurrent ExecutorSelectAction classes
 
     Returns:
         ExecutorSelectActionConfig
@@ -81,6 +81,10 @@ def mock_empty_executor() -> Executor:
         select_actions_fn=select_actions,
         base_key=42,
         policy_states=1234,
+        global_config=SimpleNamespace(
+            normalize_observations=False,
+            normalize_target_values=False,
+        ),
     )
     return Executor(store=store)
 
@@ -181,6 +185,10 @@ class MockFeedForwardExecutor(Executor):
             action_info=action_info,
             policy_info=policy_info,
             select_actions_fn=select_actions,
+            global_config=SimpleNamespace(
+                normalize_observations=False,
+                normalize_target_values=False,
+            ),
         )
         self.store = store
 
@@ -335,6 +343,10 @@ class MockRecurrentExecutor(Executor):  # type: ignore # noqa: E501
             action_info=action_info,
             policy_info=policy_info,
             select_actions_fn=select_actions,
+            global_config=SimpleNamespace(
+                normalize_observations=False,
+                normalize_target_values=False,
+            ),
         )
         self.store = store
 
