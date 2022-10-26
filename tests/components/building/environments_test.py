@@ -99,6 +99,11 @@ def test_builder() -> SystemBuilder:
     system_builder.store.executor = "executor"
     system_builder.store.executor_logger = "executor_logger"
 
+    if system_builder.store.executor_environment == "environment_eval_false":
+        system_builder.store.is_evaluator = False
+    else:
+        system_builder.store.is_evaluator = True
+
     return system_builder
 
 
@@ -179,7 +184,7 @@ class TestExecutorEnvironmentLoop:
     ) -> None:
         """Test by manually calling the hook and checking the store"""
         test_executor_environment_loop.on_building_executor_environment(test_builder)
-        assert test_builder.store.executor_environment == "environment_eval_false"
+        assert test_builder.store.executor_environment == "environment_eval_true"
 
 
 class TestParallelExecutorEnvironmentLoop:
