@@ -56,6 +56,7 @@ def test_parameter_server_single_process(test_system_sp: System) -> None:
         "evaluator_episodes": jnp.zeros(1, dtype=jnp.int32),
         "executor_episodes": jnp.zeros(1, dtype=jnp.int32),
         "executor_steps": jnp.zeros(1, dtype=jnp.int32),
+        "interrupt": False,
     }
 
     # Check that checkpoint not yet saved
