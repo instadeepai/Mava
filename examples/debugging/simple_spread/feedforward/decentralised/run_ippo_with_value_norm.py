@@ -106,7 +106,7 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        clip_value=False,
+        clip_value=True,
         normalize_target_values=True,
         normalize_observations=True,
     )
