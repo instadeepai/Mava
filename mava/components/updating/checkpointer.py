@@ -30,7 +30,8 @@ from mava.wrappers import SaveableWrapper
 
 @dataclass
 class CheckpointerConfig:
-    checkpoint_minute_interval: float = 5
+    checkpoint_minute_interval: float = 1
+    best_checkpoint: bool = False
 
 
 class Checkpointer(Component):
@@ -57,6 +58,17 @@ class Checkpointer(Component):
             add_uid=False,
             time_delta_minutes=0,
         )
+
+        if self.config.best_checkpoint:
+            saveable_parameters = SaveableWrapper(server.store.best_parameters)
+            server.store.system_best_checkpointer = acme_savers.Checkpointer(
+                object_to_save=saveable_parameters,  # must be type saveable
+                directory=server.store.experiment_path,
+                add_uid=False,
+                time_delta_minutes=0,
+                subdirectory="best_checkpoint",
+            )
+
         server.store.last_checkpoint_time = time.time()
         server.store.checkpoint_minute_interval = self.config.checkpoint_minute_interval
 
@@ -76,6 +88,8 @@ class Checkpointer(Component):
             > self.config.checkpoint_minute_interval * 60 + 1
         ):
             server.store.system_checkpointer.save()
+            if self.config.best_checkpoint:
+                server.store.system_best_checkpointer.save()
             server.store.last_checkpoint_time = time.time()
 
     @staticmethod

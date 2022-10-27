@@ -137,6 +137,9 @@ class DefaultParameterServer(ParameterServer):
 
         server.store.experiment_path = self.config.experiment_path
 
+        # Best params
+        server.store.best_parameters = server.store.parameters
+
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
         """Fetch the parameters from the server specified in the store.
