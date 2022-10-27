@@ -72,13 +72,6 @@ You can also install directly from source:
 pip install "id-mava[reverb,jax,envs] @ git+https://github.com/instadeepai/mava.git"
 ```
 
-If you would like to develop features for Mava, the best way to do download all dependencies is:
-
-```bash
-git clone https://github.com/instadeepai/mava.git
-pip install -e "mava[reverb,jax]"
-```
-
 We have tested `mava` on Python 3.7, 3.8 and 3.9. Note that because the installation of JAX differs depending on your hardware accelerator,
 we advise users to explicitly install the correct JAX version (see the [official installation guide](https://github.com/google/jax#installation)). For more in-depth instalations guides including Docker builds and virtual environments, please see our [detailed installation guide](DETAILED_INSTALL.md).
 
