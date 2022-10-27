@@ -141,6 +141,9 @@ class DefaultParameterServer(ParameterServer):
         # Interrupt the system in case evaluator failed
         server.store.parameters["evaluator_failed"] = False
 
+        # Interrupt the system in case all the executors failed
+        server.store.parameters["num_executor_failed"] = 0
+
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
         """Fetch the parameters from the server specified in the store.
@@ -164,6 +167,10 @@ class DefaultParameterServer(ParameterServer):
 
         # Interrupt the system in case the evaluator failed
         if server.store.parameters["evaluator_failed"]:
+            termination_fn(server)
+
+        # Interrupt the system in case all the executors failed
+        if server.store.num_executors == server.store.parameters["num_executor_failed"]:
             termination_fn(server)
 
     # Set
@@ -204,6 +211,13 @@ class DefaultParameterServer(ParameterServer):
         """
         # server.store._add_to_params set by Parameter Server
         params: Dict[str, Any] = server.store._add_to_params
+
+        # Interrupt is a flag that sent info about whether the executor is failing
+        if "interrupt" in params.keys():
+            server.store.parameters["num_executor_failed"] += 1
+            # remove interrupt
+            del params["interrupt"]
+
         names = params.keys()
 
         for var_key in names:

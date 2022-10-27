@@ -280,7 +280,15 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     print(
                         e, ": Experiment terminated due to an error on the evaluator."
                     )
+                    time.sleep(60)
                     self._executor.store.executor_parameter_client.add_and_wait(
                         {"evaluator_failed": True}
+                    )
+                    self._executor.force_update()
+                else:
+                    print(e, ": an executor failed.")
+                    time.sleep(60)
+                    self._executor.store.executor_parameter_client.add_and_wait(
+                        {"interrupt": True}
                     )
                     self._executor.force_update()
