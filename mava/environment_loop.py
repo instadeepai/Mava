@@ -276,8 +276,11 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     self._executor.force_update()
 
             except Exception as e:
-                print(e, ": Experiment terminated due to an error on a node.")
-                self._executor.store.executor_parameter_client.add_and_wait(
-                    {"interrupt": True}
-                )
-                self._executor.force_update()
+                if self._executor._evaluator:
+                    print(
+                        e, ": Experiment terminated due to an error on the evaluator."
+                    )
+                    self._executor.store.executor_parameter_client.add_and_wait(
+                        {"evaluator_failed": True}
+                    )
+                    self._executor.force_update()

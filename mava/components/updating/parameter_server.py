@@ -138,8 +138,8 @@ class DefaultParameterServer(ParameterServer):
 
         server.store.experiment_path = self.config.experiment_path
 
-        # Interrupt the system in case of error
-        server.store.parameters["interrupt"] = False
+        # Interrupt the system in case evaluator failed
+        server.store.parameters["evaluator_failed"] = False
 
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
@@ -162,8 +162,8 @@ class DefaultParameterServer(ParameterServer):
                 get_params[var_key] = server.store.parameters[var_key]
         server.store.get_parameters = get_params
 
-        if server.store.parameters["interrupt"]:
-            # Interrupt the system
+        # Interrupt the system in case the evaluator failed
+        if server.store.parameters["evaluator_failed"]:
             termination_fn(server)
 
     # Set
