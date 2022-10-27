@@ -82,7 +82,7 @@ def normalize(
     """
 
     mean, std = stats["mean"], stats["std"]
-    normalize_batch = (batch - mean) / (std + 1e-8)
+    normalize_batch = (batch - mean) / jnp.fmax(std, 1e-6)
 
     return normalize_batch
 
@@ -100,7 +100,7 @@ def denormalize(
     """
 
     mean, std = stats["mean"], stats["std"]
-    denormalize_batch = batch * std + mean
+    denormalize_batch = batch * jnp.fmax(std, 1e-6) + mean
 
     return denormalize_batch
 
