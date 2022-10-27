@@ -92,6 +92,14 @@ def mock_system_parameter_server() -> SystemParameterServer:
             constants.OPT_STATE_DICT_KEY: EmptyState()
         }
 
+    mock_system_parameter_server.store.norm_params = {}
+    mock_system_parameter_server.store.norm_params[
+        constants.OBS_NORM_STATE_DICT_KEY
+    ] = EmptyState()
+    mock_system_parameter_server.store.norm_params[
+        constants.VALUES_NORM_STATE_DICT_KEY
+    ] = EmptyState()
+
     mock_system_parameter_server.store.parameters = {
         "param1": "param1_value",
         "param2": "param2_value",

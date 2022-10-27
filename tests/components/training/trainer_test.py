@@ -20,6 +20,7 @@ from typing import List
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optax
 import pytest
 
@@ -92,6 +93,18 @@ class MockBuilder(Builder):
         )
         self.store.critic_optimiser = optax.chain(
             optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+        )
+
+        # Added this to handle the observation normalisation parameters
+        obs_spec = SimpleNamespace(
+            observations=SimpleNamespace(observation=np.zeros(1)),
+        )
+        self.store.ma_environment_spec = SimpleNamespace(
+            _agent_environment_specs={
+                "agent_0": obs_spec,
+                "agent_1": obs_spec,
+                "agent_2": obs_spec,
+            }
         )
 
 
