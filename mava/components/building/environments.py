@@ -59,18 +59,15 @@ class EnvironmentSpec(Component):
             None.
         """
         builder.store.manager_pid = os.getpid()
-        builder.store.ma_environment_spec = specs.MAEnvironmentSpec(
-            self.config.environment_factory()
-        )
+        env = self.config.environment_factory()
+        builder.store.ma_environment_spec = specs.MAEnvironmentSpec(env)
 
         builder.store.agents = sort_str_num(
             builder.store.ma_environment_spec.get_agent_ids()
         )
         builder.store.extras_spec = {}
 
-        builder.store.obs_normalisation_start = (
-            self.config.environment_factory().obs_normalisation_start_index
-        )
+        builder.store.obs_normalisation_start = env.obs_normalisation_start_index
 
     @staticmethod
     def name() -> str:
