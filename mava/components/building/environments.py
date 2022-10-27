@@ -119,7 +119,9 @@ class ExecutorEnvironmentLoop(Component):
         """
         # Global config set by EnvironmentSpec component
         builder.store.executor_environment = (
-            builder.store.global_config.environment_factory(evaluation=False)
+            builder.store.global_config.environment_factory(
+                evaluation=builder.store.is_evaluator
+            )
         )  # type: ignore
 
     @abc.abstractmethod
