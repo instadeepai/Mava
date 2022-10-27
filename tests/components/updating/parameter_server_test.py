@@ -108,7 +108,7 @@ def mock_system_parameter_server() -> SystemParameterServer:
         "num_executor_failed": 0,
     }
 
-    mock_system_parameter_server.store.num_executors = 1
+    mock_system_parameter_server.store.num_executors = 2
 
     return mock_system_parameter_server
 
@@ -175,6 +175,10 @@ def test_on_parameter_server_init_start_parameter_creation(
         mock_system_parameter_server.store.parameters["critic_network-agent_net_2"]
         == "net_1_2_params"
     )
+    assert not mock_system_parameter_server.store.parameters[
+        "evaluator_or_trainer_failed"
+    ]
+    assert mock_system_parameter_server.store.parameters["num_executor_failed"] == 0
 
 
 def test_on_parameter_server_get_parameters_single(
@@ -251,3 +255,11 @@ def test_on_parameter_server_add_to_parameters(
     )
     assert mock_system_parameter_server.store.parameters["param2"] == "param2_value"
     assert mock_system_parameter_server.store.parameters["param3"] == 6
+
+    # Test that the number of num_executor_failed got incremneted
+    mock_system_parameter_server.store._add_to_params = {"interrupt": True}
+
+    test_default_parameter_server.on_parameter_server_add_to_parameters(
+        mock_system_parameter_server
+    )
+    assert mock_system_parameter_server.store.parameters["num_executor_failed"] == 1
