@@ -104,8 +104,11 @@ def mock_system_parameter_server() -> SystemParameterServer:
         "param1": "param1_value",
         "param2": "param2_value",
         "param3": "param3_value",
-        "interrupt": False,
+        "evaluator_or_trainer_failed": False,
+        "num_executor_failed": 0,
     }
+
+    mock_system_parameter_server.store.num_executors = 1
 
     return mock_system_parameter_server
 
