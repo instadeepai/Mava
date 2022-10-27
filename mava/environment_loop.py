@@ -242,6 +242,9 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             )
             evaluation_duration = eval_duration_condition[1]
 
+        # Initialize best performance
+        best_performance = None
+
         while True:
             if (not environment_loop_schedule) or (
                 should_run_loop(eval_interval_condition)
@@ -260,6 +263,19 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     if hasattr(self._environment, "get_interval_stats"):
                         results.update(self._environment.get_interval_stats())
                     self._logger.write(results)
+
+                    # Check if the performance has improved
+                    if best_performance is None:
+                        best_performance = results["mean_episode_return"]
+                        self._executor.store.executor_parameter_client.add_and_wait(
+                            {"best_performance": True}
+                        )
+                    elif best_performance < results["mean_episode_return"]:
+                        best_performance = results["mean_episode_return"]
+                        self._executor.store.executor_parameter_client.add_and_wait(
+                            {"best_performance": True}
+                        )
+
                 else:
                     result = self.run_episode()
                     # Log the given results.

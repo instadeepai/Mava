@@ -199,6 +199,10 @@ class DefaultParameterServer(ParameterServer):
         """
         # server.store._add_to_params set by Parameter Server
         params: Dict[str, Any] = server.store._add_to_params
+        if "best_performance" in params.keys():
+            server.store.best_parameters = server.store.parameters
+            del params["best_performance"]
+
         names = params.keys()
 
         for var_key in names:
