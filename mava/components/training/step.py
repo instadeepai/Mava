@@ -308,6 +308,10 @@ class MAPGWithTrustRegionStep(Step):
                     target_values[key] = normalize(
                         target_value_stats[key], target_values[key]
                     )
+                    # This is required if clip_value is set to true in the loss_fn
+                    behavior_values[key] = normalize(
+                        target_value_stats[key], behavior_values[key]
+                    )
 
             # Exclude the last step - it was only used for bootstrapping.
             # The shape is [num_sequences, num_steps, ..]
