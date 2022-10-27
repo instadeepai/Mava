@@ -80,15 +80,6 @@ jobs:
           tags: ${{ steps.vars2.outputs.docker_repo }}:robocup-latest
           target: robocup
 
-      -
-        name: Build and push meltingpot
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:meltingpot-latest
-          target: meltingpot
-
 
 
 
@@ -172,12 +163,3 @@ jobs:
           push: true
           tags: ${{ steps.vars2.outputs.docker_repo }}:robocup-${{ steps.vars.outputs.sha_short }}
           target: robocup
-
-      -
-        name: Build and push meltingpot
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:meltingpot-${{ steps.vars.outputs.sha_short }}
-          target: meltingpot
