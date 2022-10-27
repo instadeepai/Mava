@@ -138,7 +138,7 @@ class DefaultParameterServer(ParameterServer):
 
         server.store.experiment_path = self.config.experiment_path
 
-        # Interrupt the system in case evaluator failed
+        # Interrupt the system in case evaluator or trainer failed
         server.store.parameters["evaluator_or_trainer_failed"] = False
 
         # Interrupt the system in case all the executors failed
