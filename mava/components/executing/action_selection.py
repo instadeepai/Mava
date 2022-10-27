@@ -23,7 +23,6 @@ import jax
 from acme.jax import networks as networks_lib
 from acme.jax import utils
 
-from mava import constants
 from mava.callbacks import Callback
 from mava.components import Component
 from mava.components.building.networks import Networks
@@ -31,7 +30,7 @@ from mava.components.building.system_init import BaseSystemInit
 from mava.components.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemExecutor
 from mava.types import NestedArray
-from mava.utils.jax_training_utils import normalize_observations
+from mava.utils.jax_training_utils import executor_normalize_observation
 
 
 class ExecutorSelectAction(Component):
@@ -96,22 +95,9 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
         """
 
         observations = executor.store.observations
-
         # Normalise the observations before selecting actions.
         if executor.store.global_config.normalize_observations:
-            observations_stats = executor.store.norm_params[
-                constants.OBS_NORM_STATE_DICT_KEY
-            ]
-            agents = list(observations.keys())
-            death_masked_agents = (
-                executor.store.executor_environment.death_masked_agents
-            )
-            agents_alive = list(set(agents) - set(death_masked_agents))
-
-            for key in agents_alive:
-                observations[key] = normalize_observations(
-                    observations_stats[key], observations[key]
-                )
+            observations = executor_normalize_observation(executor, observations)
 
         # Dict with params per network
         current_agent_params = {
@@ -224,23 +210,10 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
         """
 
         observations = executor.store.observations
-
         # Normalise the observations before selecting actions.
         if executor.store.global_config.normalize_observations:
-            observations_stats = executor.store.norm_params[
-                constants.OBS_NORM_STATE_DICT_KEY
-            ]
-            agents = list(observations.keys())
-            death_masked_agents = (
-                executor.store.executor_environment.death_masked_agents
-            )
-            agents_alive = list(set(agents) - set(death_masked_agents))
-
-            for key in agents_alive:
-                observations[key] = normalize_observations(
-                    observations_stats[key], observations[key]
-                )
-
+            observations = executor_normalize_observation(executor, observations)
+        
         # Dict with params per network
         current_agent_params = {
             network: executor.store.networks[network].get_params()

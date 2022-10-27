@@ -9,6 +9,8 @@ from haiku._src.basic import merge_leading_dims
 from jax.config import config as jax_config
 
 from mava.types import OLT
+from mava.core_jax import SystemExecutor
+from mava import constants
 
 
 def action_mask_categorical_policies(
@@ -26,6 +28,8 @@ def action_mask_categorical_policies(
 
 def init_norm_params(stats_shape: Tuple) -> Dict[str, Union[jnp.array, float]]:
     """Initialise normalistion parameters"""
+
+    assert len(stats_shape) == 1, "Normalisation only works for 1D features"
 
     stats = dict(
         mean=jnp.zeros(shape=stats_shape),
@@ -141,7 +145,7 @@ def update_and_normalize_observations(
 
     # the following code makes sure we do not normalise
     # death masked observations. This uses the assumption
-    # that all death masked agens have zeroed observations
+    # that all death masked agents have zeroed observations
     sum_obs = jnp.sum(obs[:, start_axes:], axis=1)
     mask = jnp.array(sum_obs != 0, dtype=obs.dtype)
     norm_obs = norm_obs.at[:, start_axes:].set(norm_obs[:, start_axes:] * mask[:, None])
@@ -158,7 +162,7 @@ def normalize_observations(
     """Normalise a single observation
 
     stats (Dictionary)   -- array with running mean, var, count.
-    batch (OLT namespace) -- current batch of data in for an agent
+    observation (OLT namespace) -- current batch of data in for an agent
 
     Returns:
         denormalize batch (Dictionary)
@@ -175,6 +179,28 @@ def normalize_observations(
 
     return observation._replace(observation=norm_obs)
 
+def executor_normalize_observation(executor: SystemExecutor, observations: OLT) -> OLT:
+    """Execute the observations normalization before action selection
+    
+    executor (SystemExecutor) -- an environment executor
+    observation (OLT namespace) -- current batch of observations
+    """
+    
+    observations_stats = executor.store.norm_params[
+        constants.OBS_NORM_STATE_DICT_KEY
+    ]
+    agents = list(observations.keys())
+    death_masked_agents = (
+        executor.store.executor_environment.death_masked_agents
+    )
+    agents_alive = list(set(agents) - set(death_masked_agents))
+
+    for key in agents_alive:
+        observations[key] = normalize_observations(
+            observations_stats[key], observations[key]
+        )
+    
+    return observations
 
 def set_growing_gpu_memory_jax() -> None:
     """Solve gpu mem issues.
