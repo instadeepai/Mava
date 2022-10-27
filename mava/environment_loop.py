@@ -282,7 +282,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     )
                     time.sleep(60)
                     self._executor.store.executor_parameter_client.add_and_wait(
-                        {"evaluator_failed": True}
+                        {"evaluator_or_trainer_failed": True}
                     )
                     self._executor.force_update()
                 else:
