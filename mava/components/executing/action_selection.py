@@ -95,7 +95,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
         """
 
         observations = executor.store.observations
-        # Normalise the observations before selecting actions.
+        # Normalize the observations before selecting actions.
         if executor.store.global_config.normalize_observations:
             observations = executor_normalize_observation(executor, observations)
 
@@ -210,10 +210,10 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
         """
 
         observations = executor.store.observations
-        # Normalise the observations before selecting actions.
+        # Normalize the observations before selecting actions.
         if executor.store.global_config.normalize_observations:
             observations = executor_normalize_observation(executor, observations)
-        
+
         # Dict with params per network
         current_agent_params = {
             network: executor.store.networks[network].get_params()

@@ -8,9 +8,9 @@ from chex import Array
 from haiku._src.basic import merge_leading_dims
 from jax.config import config as jax_config
 
-from mava.types import OLT
-from mava.core_jax import SystemExecutor
 from mava import constants
+from mava.core_jax import SystemExecutor
+from mava.types import OLT
 
 
 def action_mask_categorical_policies(
@@ -29,7 +29,7 @@ def action_mask_categorical_policies(
 def init_norm_params(stats_shape: Tuple) -> Dict[str, Union[jnp.array, float]]:
     """Initialise normalistion parameters"""
 
-    assert len(stats_shape) == 1, "Normalisation only works for 1D features"
+    assert len(stats_shape) == 1, "Normalization only works for 1D features"
 
     stats = dict(
         mean=jnp.zeros(shape=stats_shape),
@@ -157,7 +157,7 @@ def update_and_normalize_observations(
 
 
 def normalize_observations(
-    stats: Dict[str, Union[jnp.array, float]], observation: OLT
+    stats: Dict[str, Union[jnp.array, float]], observation: Any
 ) -> OLT:
     """Normalise a single observation
 
@@ -179,28 +179,26 @@ def normalize_observations(
 
     return observation._replace(observation=norm_obs)
 
-def executor_normalize_observation(executor: SystemExecutor, observations: OLT) -> OLT:
+
+def executor_normalize_observation(executor: SystemExecutor, observations: Any) -> Any:
     """Execute the observations normalization before action selection
-    
+
     executor (SystemExecutor) -- an environment executor
     observation (OLT namespace) -- current batch of observations
     """
-    
-    observations_stats = executor.store.norm_params[
-        constants.OBS_NORM_STATE_DICT_KEY
-    ]
+
+    observations_stats = executor.store.norm_params[constants.OBS_NORM_STATE_DICT_KEY]
     agents = list(observations.keys())
-    death_masked_agents = (
-        executor.store.executor_environment.death_masked_agents
-    )
+    death_masked_agents = executor.store.executor_environment.death_masked_agents
     agents_alive = list(set(agents) - set(death_masked_agents))
 
     for key in agents_alive:
         observations[key] = normalize_observations(
             observations_stats[key], observations[key]
         )
-    
+
     return observations
+
 
 def set_growing_gpu_memory_jax() -> None:
     """Solve gpu mem issues.
