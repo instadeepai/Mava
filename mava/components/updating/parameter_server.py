@@ -211,13 +211,6 @@ class DefaultParameterServer(ParameterServer):
         """
         # server.store._add_to_params set by Parameter Server
         params: Dict[str, Any] = server.store._add_to_params
-
-        # Interrupt is a flag that sent info about whether the executor is failing
-        if "interrupt" in params.keys():
-            server.store.parameters["num_executor_failed"] += 1
-            # remove interrupt
-            del params["interrupt"]
-
         names = params.keys()
 
         for var_key in names:

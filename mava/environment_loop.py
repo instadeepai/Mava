@@ -290,6 +290,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     print(e, ": an executor failed.")
                     time.sleep(60)
                     self._executor.store.executor_parameter_client.add_and_wait(
-                        {"interrupt": True}
+                        {"num_executor_failed": 1}
                     )
                     self._executor.force_update()
