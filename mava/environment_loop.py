@@ -242,7 +242,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             )
             evaluation_duration = eval_duration_condition[1]
 
-        def step() -> None:
+        def step_executor() -> None:
             if (not environment_loop_schedule) or (
                 should_run_loop(eval_interval_condition)
             ):
@@ -274,7 +274,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
         while True:
             try:
-                step()
+                step_executor()
 
             except Exception as e:
                 if self._executor._evaluator:
@@ -286,6 +286,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         {"evaluator_or_trainer_failed": True}
                     )
                     self._executor.force_update()
+                    break
                 else:
                     print(e, ": an executor failed.")
                     time.sleep(60)

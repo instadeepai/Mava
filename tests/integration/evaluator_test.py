@@ -17,6 +17,7 @@
 """Integration test of the evaluator for Jax-based Mava systems"""
 
 import functools
+from typing import Any, Dict
 
 import pytest
 
@@ -83,3 +84,28 @@ def test_evaluator_single_process(test_system_sp: System) -> None:
 
     # Observe (without adder)
     assert not hasattr(evaluator._executor.store.adder, "add")
+
+
+def observe_with_error(
+    aactions: Dict[str, Any],
+    timestep: Any,
+    extras: Dict[str, Any] = {},
+) -> None:
+    """Raise an error while calling observe method"""
+    raise ValueError
+
+
+def test_evaluator_error_single_process(test_system_sp: System) -> None:
+    """Test if the evaluator stop if an error happen"""
+    (
+        data_server,
+        parameter_server,
+        executor,
+        evaluator,
+        trainer,
+    ) = test_system_sp._builder.store.system_build
+
+    # Update the observe method to raise an error
+    evaluator._executor.observe = observe_with_error
+
+    evaluator.run()
