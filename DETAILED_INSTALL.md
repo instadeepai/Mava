@@ -68,12 +68,6 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
         make build version=robocup
         ```
 
-    * MeltingPot
-
-        ```bash
-        make build version=meltingpot
-        ```
-
     To allow for agent recordings, where agents evaluations are recorded and these recordings are stored in a `/recordings` folder:
 
     ```
@@ -186,22 +180,6 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
         ```bash
         pip install id-mava[sc2]
         ```
-
-    * MeltingPot:
-
-        Install MeltingPot:
-
-        ```bash
-        ./bash_scripts/install_meltingpot.sh
-        ```
-
-        Add MeltingPot to your python path:
-
-        ```bash
-        export PYTHONPATH="${PYTHONPATH}:${PWD}/../packages/meltingpot"
-        ```
-
-        If this fails, follow instructions [here](https://github.com/deepmind/meltingpot#installation).
 
 3. Run an example:
 
