@@ -69,10 +69,6 @@ class MockedExecutor(ActorMock, core.Executor):
             for agent, observation in observations.items()
         }
 
-    def select_action(self, agent: str, observation: NestedArray) -> Union[float, int]:
-        """Select action for single agent."""
-        return _generate_from_spec(self._spec[agent].actions)
-
     def observe_first(
         self,
         timestep: dm_env.TimeStep,
@@ -168,7 +164,7 @@ def get_ma_environment(
 ) -> Any:
     """Gets an environment."""
 
-    class MockedMAEnvironment(base_class):  # type: ignore
+    class MockedEnvironment(base_class):  # type: ignore
         """Mocked Multi-Agent Environment.
 
         This simply creates multiple agents, with a spec per agent
@@ -318,9 +314,7 @@ DiscreteMAEnvironment = get_ma_environment(DiscreteEnvironment)
 ContinuousMAEnvironment = get_ma_environment(ContinuousEnvironment)
 
 
-class MockedMADiscreteEnvironment(
-    DiscreteMAEnvironment, DiscreteEnvironment  # type: ignore
-):  # type: ignore
+class MockedMADiscreteEnvironment(DiscreteMAEnvironment, DiscreteEnvironment):  # type: ignore # noqa: E501
     def __init__(self, *args: Any, **kwargs: Any):
         """Initialise mock discrete environment."""
         DiscreteMAEnvironment.__init__(self, *args, **kwargs)

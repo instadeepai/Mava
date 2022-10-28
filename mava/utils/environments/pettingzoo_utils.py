@@ -130,12 +130,12 @@ def make_environment(
     else:
         raise Exception("Pettingzoo is not installed.")
 
-    if concat_agent_id:
-        env = ConcatAgentIdToObservation(env)
-
     environment_task_name = {
         "environment_name": "pettingzoo_{env_type}_{env_class}",
         "task_name": env_name,
     }
+
+    if concat_agent_id:
+        env = ConcatAgentIdToObservation(env)
 
     return environment, environment_task_name

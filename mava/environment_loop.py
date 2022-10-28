@@ -248,14 +248,13 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 should_run_loop(eval_interval_condition)
             ):
                 if environment_loop_schedule:
+                    # Get first result dictionary
+                    results = self.run_episode()
 
                     # Initialise list for capturing episode returns
                     eval_returns = []
 
-                    # Get first result dictionary
-                    results = self.run_episode()
                     eval_returns.append(results["raw_episode_return"])
-
                     for _ in range(evaluation_duration - 1):
                         # Add consecutive evaluation run data
                         result = self.run_episode()
@@ -284,9 +283,11 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         )
 
                     self._logger.write(results)
+
                     self._executor.store.eval_json_logger.write(
                         results_dict=eval_result
                     )
+
                 else:
                     result = self.run_episode()
                     # Log the given results.

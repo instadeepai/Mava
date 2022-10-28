@@ -41,7 +41,7 @@ if _found_smac:
         random_seed: Optional[int] = None,
         death_masking: bool = False,
     ) -> Tuple[Any, Dict[str, str]]:
-        """Make a SMAC environment wrapper.
+        """Make a SMAC enviroment.
 
         Args:
             map_name: the name of the scenario
