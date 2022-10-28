@@ -61,7 +61,6 @@ nav:
           - SMAC: environments/smac.md
           - Flatland: environments/flatland.md
           - Robocup: environments/robocup.md
-          - Melting Pot: environments/meltingpot.md
           - Open Spiel: environments/open_spiel.md
   - Examples: examples.md
   - Gotchas: gotchas.md
