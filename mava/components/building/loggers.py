@@ -78,8 +78,13 @@ class Logger(Component):
             )
             del temp_env
 
+            if builder.store.global_config.json_path is not None:
+                json_logging_path = builder.store.global_config.json_path
+            else:
+                json_logging_path = builder.store.global_config.experiment_path
+
             builder.store.eval_json_logger = JSONLogger(
-                experiment_path=builder.store.global_config.experiment_path,
+                experiment_path=json_logging_path,
                 random_seed=builder.store.global_config.seed,
                 env_name=env_names["environment_name"],
                 task_name=env_names["task_name"],

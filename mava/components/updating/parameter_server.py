@@ -16,7 +16,7 @@
 """Parameter server Component for Mava systems."""
 import abc
 from dataclasses import dataclass
-from typing import Any, Dict, List, Sequence, Type, Union
+from typing import Any, Dict, List, Optional, Sequence, Type, Union
 
 import numpy as np
 
@@ -30,6 +30,7 @@ from mava.core_jax import SystemParameterServer
 class ParameterServerConfig:
     non_blocking_sleep_seconds: int = 10
     experiment_path: str = "~/mava/"
+    json_path: Optional[str] = None
 
 
 class ParameterServer(Component):
