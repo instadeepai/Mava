@@ -17,14 +17,9 @@ from typing import Any, Optional
 
 import dm_env
 
-from mava.utils.debugging.environments import TwoStepEnv, switch_game
 from mava.utils.debugging.make_env import make_debugging_env
 from mava.utils.jax_training_utils import set_jax_double_precision
-from mava.wrappers.debugging_envs import (
-    DebuggingEnvWrapper,
-    SwitchGameWrapper,
-    TwoStepWrapper,
-)
+from mava.wrappers.debugging_envs import DebuggingEnvWrapper
 from mava.wrappers.env_preprocess_wrappers import ConcatAgentIdToObservation
 
 
@@ -49,15 +44,7 @@ def make_environment(
 
     del evaluation
 
-    if env_name == "two_step":
-        environment = TwoStepEnv()
-        environment = TwoStepWrapper(environment)
-    elif env_name == "switch":
-        """Creates a SwitchGame environment."""
-        env_module_fn = switch_game.MultiAgentSwitchGame(num_agents=num_agents)
-        environment_fn = SwitchGameWrapper(env_module_fn)
-        return environment_fn
-    else:
+    if env_name == "simple_spread":
         """Creates a MPE environment."""
         env_module = make_debugging_env(
             env_name, action_space, num_agents, recurrent_test, random_seed
@@ -65,6 +52,8 @@ def make_environment(
         environment = DebuggingEnvWrapper(
             env_module, return_state_info=return_state_info
         )
+    else:
+        raise ValueError(f"Environment {env_name} not found.")
 
     if concat_agent_id:
         environment = ConcatAgentIdToObservation(environment)
