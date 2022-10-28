@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Wrapper classes for Mava systems."""
-from mava.wrappers.debugging_envs import DebuggingEnvWrapper, TwoStepWrapper
+from mava.wrappers.debugging_envs import DebuggingEnvWrapper
 from mava.wrappers.env_wrappers import ParallelEnvWrapper
 from mava.wrappers.environment_loop_wrappers import (
     DetailedEpisodeStatistics,
