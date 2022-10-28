@@ -257,7 +257,7 @@ def test_on_parameter_server_add_to_parameters(
     assert mock_system_parameter_server.store.parameters["param3"] == 6
 
     # Test that the number of num_executor_failed got incremneted
-    mock_system_parameter_server.store._add_to_params = {"interrupt": True}
+    mock_system_parameter_server.store._add_to_params = {"num_executor_failed": 1}
 
     test_default_parameter_server.on_parameter_server_add_to_parameters(
         mock_system_parameter_server
