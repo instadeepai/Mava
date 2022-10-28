@@ -77,3 +77,4 @@ class Trainer(SystemTrainer, TrainerHookMixin):
                 self.store.trainer_parameter_client.add_and_wait(
                     {"evaluator_or_trainer_failed": True}
                 )
+                break
