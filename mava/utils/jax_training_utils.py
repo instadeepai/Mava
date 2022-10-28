@@ -44,10 +44,10 @@ def construct_norm_axes_list(
     start_axes: int, axes_list: List[Any], obs_shape: Tuple
 ) -> Tuple[slice, ...]:
     """Construt a list of Tuples containing the features on which to apply normalisation
-
-    start_axes (int) --- default axes from which to start
-    axes_list (List[int]) --- user specified
-    obs_shape (Tuple) --- observations shape
+    Args:
+        start_axes (int) --- default axes from which to start
+        axes_list (List[int]) --- user specified
+        obs_shape (Tuple) --- observations shape
 
     Returns:
         axes_list: a tuple to be used with np.r_
@@ -81,9 +81,10 @@ def compute_running_mean_var_count(
 ) -> jnp.ndarray:
     """Updates the running mean, variance and data counts during training.
 
-    stats (Any)   -- dictionary with running mean, var, std, count
-    batch (array) -- current batch of data.
-    axes (tuple of slices) -- which axes to normalise
+    Args:
+        stats (Any)   -- dictionary with running mean, var, std, count
+        batch (array) -- current batch of data.
+        axes (tuple of slices) -- which axes to normalise
 
     Returns:
         stats (array)
@@ -125,8 +126,9 @@ def normalize(
 ) -> jnp.ndarray:
     """Normlaise batch of data using the running mean and variance.
 
-    stats (Any)   -- dictionary with running mean, var, std, count.
-    batch (array) -- current batch of data.
+    Args:
+        stats (Any)   -- dictionary with running mean, var, std, count.
+        batch (array) -- current batch of data.
 
     Returns:
         denormalize batch (array)
@@ -143,8 +145,9 @@ def denormalize(
 ) -> jnp.ndarray:
     """Transform normalized data back into original distribution
 
-    stats (Any)   -- dictionary with running mean, var, count.
-    batch (array) -- current batch of data
+    Args:
+        stats (Any)   -- dictionary with running mean, var, count.
+        batch (array) -- current batch of data
 
     Returns:
         denormalize batch (array)
@@ -163,9 +166,10 @@ def update_and_normalize_observations(
 ) -> Tuple[Any, OLT]:
     """Update running stats and normalise observations
 
-    stats (Dictionary)   -- array with running mean, var, count.
-    batch (OLT namespace)   -- current batch of data for a single agent.
-    axes (tuple of slices) -- which axes to normalise
+    Args:
+        stats (Dictionary)   -- array with running mean, var, count.
+        batch (OLT namespace)   -- current batch of data for a single agent.
+        axes (tuple of slices) -- which axes to normalise
 
     Returns:
         normalize batch (Dictionary)
@@ -198,8 +202,9 @@ def normalize_observations(
 ) -> OLT:
     """Normalise a single observation
 
-    stats (Dictionary)   -- array with running mean, var, count.
-    observation (OLT namespace) -- current batch of data in for an agent
+    Args:
+        stats (Dictionary)   -- array with running mean, var, count.
+        observation (OLT namespace) -- current batch of data in for an agent
 
     Returns:
         denormalize batch (Dictionary)
@@ -220,8 +225,12 @@ def normalize_observations(
 def executor_normalize_observation(executor: SystemExecutor, observations: Any) -> Any:
     """Execute the observations normalization before action selection
 
-    executor (SystemExecutor) -- an environment executor
-    observation (OLT namespace) -- current batch of observations
+    Args:
+        executor (SystemExecutor) -- an environment executor
+        observation (OLT namespace) -- current batch of observations
+
+    Returns:
+        observations (OLT namespace)
     """
 
     observations_stats = executor.store.norm_params[constants.OBS_NORM_STATE_DICT_KEY]
