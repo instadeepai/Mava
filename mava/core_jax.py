@@ -274,6 +274,6 @@ class SystemParameterClient(abc.ABC):
         and waits for the process to complete before continuing."""
 
     @abc.abstractmethod
-    def set_and_wait(self) -> None:
+    def set_and_wait(self, params: Dict[str, Any]) -> None:
         """Updates source with the set variables \
         and waits for the process to complete before continuing."""
