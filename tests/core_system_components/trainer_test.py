@@ -31,13 +31,16 @@ class MockParameterClient(ParameterClient):
         """Initialise the parameter client"""
         self.parameters = {"evaluator_or_trainer_failed": False}
 
-    def add_and_wait(self, params: Dict[str, Any]) -> None:
-        """Mock for add_and_wait method"""
-        names = params.keys()
+    def set_and_wait(self, params: Dict[str, Any] = None) -> None:
+        """Mock for set_and_wait method"""
+        if params is None:
+            pass
+        else:
+            names = params.keys()
 
-        for var_key in names:
-            assert var_key in self.parameters
-            self.parameters[var_key] += params[var_key]
+            for var_key in names:
+                assert var_key in self.parameters
+                self.parameters[var_key] += params[var_key]
 
 
 class TestTrainer(HookOrderTracking, Trainer):

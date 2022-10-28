@@ -282,7 +282,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         e, ": Experiment terminated due to an error on the evaluator."
                     )
                     time.sleep(60)
-                    self._executor.store.executor_parameter_client.add_and_wait(
+                    self._executor.store.executor_parameter_client.set_and_wait(
                         {"evaluator_or_trainer_failed": True}
                     )
                     self._executor.force_update()
