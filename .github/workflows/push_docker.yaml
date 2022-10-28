@@ -80,30 +80,12 @@ jobs:
           tags: ${{ steps.vars2.outputs.docker_repo }}:robocup-latest
           target: robocup
 
-      -
-        name: Build and push openspiel
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:openspiel-latest
-          target: openspiel
-
-      -
-        name: Build and push meltingpot
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:meltingpot-latest
-          target: meltingpot
-
 
 
 
   # Action pushes new docker image if we have a PR to dev and have the label benchmark
   build-push-branches:
-    if:  ${{ github.event.label.name == 'benchmark' }}
+    if:  ${{ github.event.label.name == 'benchmark required' }}
     runs-on: ubuntu-latest
     steps:
       -
@@ -181,21 +163,3 @@ jobs:
           push: true
           tags: ${{ steps.vars2.outputs.docker_repo }}:robocup-${{ steps.vars.outputs.sha_short }}
           target: robocup
-
-      -
-        name: Build and push openspiel
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:openspiel-${{ steps.vars.outputs.sha_short }}
-          target: openspiel
-
-      -
-        name: Build and push meltingpot
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:meltingpot-${{ steps.vars.outputs.sha_short }}
-          target: meltingpot

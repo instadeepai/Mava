@@ -57,11 +57,16 @@ N_CPU=$(grep -c ^processor /proc/cpuinfo)
 
 if [ "$integration" = "true" ]; then \
     # Run all tests
-    pytest -n "${N_CPU}" tests ;
+    pytest --cov=./ --cov-report=xml -n "${N_CPU}" tests ;
 else
     # Run all unit tests (non integration tests).
-    pytest --durations=10 -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
+    pytest --cov=./ --cov-report=xml --durations=10 -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
 fi
+
+# Code coverage
+curl -Os https://uploader.codecov.io/latest/linux/codecov
+chmod +x codecov
+./codecov --rootDir=./ --file=coverage.xml
 
 # Clean-up.
 deactivate

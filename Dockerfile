@@ -82,19 +82,3 @@ FROM jax-core AS robocup
 RUN apt-get install sudo -y
 RUN ./bash_scripts/install_robocup.sh
 ##########################################################
-
-##########################################################
-## OpenSpiel Image
-FROM jax-core AS openspiel
-RUN pip install .[open_spiel]
-##########################################################
-
-##########################################################
-# MeltingPot Image
-FROM jax-core AS meltingpot
-# Install meltingpot
-RUN apt-get install -y git
-RUN ./bash_scripts/install_meltingpot.sh
-# Add meltingpot to python path
-ENV PYTHONPATH "${PYTHONPATH}:${folder}/../packages/meltingpot"
-##########################################################

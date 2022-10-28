@@ -25,7 +25,8 @@ from typing import Dict, Generic, Optional, Sequence, Tuple, TypeVar, Union
 
 import acme
 import dm_env
-from acme import types
+
+from mava import types
 
 T = TypeVar("T")
 
@@ -45,12 +46,6 @@ class Executor(acme.Actor):
       # Update the actor policy/parameters.
       system.update()
     """
-
-    @abc.abstractmethod
-    def select_action(
-        self, agent: str, observation: types.NestedArray
-    ) -> types.NestedArray:
-        """Samples from the policy and returns an action."""
 
     @abc.abstractmethod
     def select_actions(

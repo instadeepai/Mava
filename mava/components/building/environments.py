@@ -15,6 +15,7 @@
 
 """Execution components for system builders"""
 import abc
+import os
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Tuple, Type, Union
 
@@ -57,7 +58,7 @@ class EnvironmentSpec(Component):
         Returns:
             None.
         """
-
+        builder.store.manager_pid = os.getpid()
         env, _ = self.config.environment_factory()
 
         builder.store.ma_environment_spec = specs.MAEnvironmentSpec(env)
@@ -117,7 +118,7 @@ class ExecutorEnvironmentLoop(Component):
             builder.store.executor_environment,
             _,
         ) = builder.store.global_config.environment_factory(
-            evaluation=False
+            evaluation=builder.store.is_evaluator
         )  # type: ignore
 
     @abc.abstractmethod

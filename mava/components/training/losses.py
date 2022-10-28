@@ -16,8 +16,10 @@
 """Trainer components for calculating losses."""
 import abc
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any, Dict, List, Tuple, Type
 
+import haiku as hk
 import jax
 import jax.numpy as jnp
 import rlax
@@ -27,10 +29,94 @@ from mava.components import Component, training
 from mava.core_jax import SystemTrainer
 
 
+class ValueLoss(Component):
+    @abc.abstractmethod
+    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
+        """An abstract class for a component that defines the
+        final value loss function."""
+
+    @staticmethod
+    def name() -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "value_loss"
+
+
+class SquaredErrorValueLoss(ValueLoss):
+    def __init__(
+        self,
+        config: SimpleNamespace = SimpleNamespace(),
+    ):
+        """Component defines a SquaredErrorValueLoss loss function.
+
+        Args:
+            config: SimpleNamespace.
+        """
+        self.config = config
+
+    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
+        """Creates and stores the squared error value loss function.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
+
+        def squared_error_loss_fn(
+            value_error: jax.interpreters.ad.JVPTracer,
+        ) -> jax.interpreters.ad.JVPTracer:
+            """Default loss function"""
+            return value_error**2
+
+        trainer.store.value_loss_fn = squared_error_loss_fn
+
+
+@dataclass
+class HuberValueLossConfig:
+    huber_delta: float = 1.0
+
+
+class HuberValueLoss(ValueLoss):
+    def __init__(
+        self,
+        config: HuberValueLossConfig = HuberValueLossConfig(),
+    ):
+        """Component defines a HuberValueLoss loss function.
+
+        Args:
+            config: HuberValueLossConfig.
+        """
+        self.config = config
+
+    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
+        """Creates and stores the huber value loss function.
+
+        Args:
+            trainer: SystemTrainer.
+
+        Returns:
+            None.
+        """
+
+        def huber_loss_fn(
+            value_error: jax.interpreters.ad.JVPTracer,
+        ) -> jax.interpreters.ad.JVPTracer:
+            """Huber loss function"""
+            return rlax.huber_loss(value_error, self.config.huber_delta)
+
+        trainer.store.value_loss_fn = huber_loss_fn
+
+
 class Loss(Component):
     @abc.abstractmethod
     def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
+        """An abstract class for a component that defines the
+        entire policy and critic loss functions."""
 
     @staticmethod
     def name() -> str:
@@ -58,6 +144,11 @@ class Loss(Component):
 
 @dataclass
 class MAPGTrustRegionClippingLossConfig:
+    """The value_clip_parameter should be relatively small when value_normalization is True.
+
+    The idea is to scale it to try and match the effect of the normalisation on the target values.
+    """
+
     clipping_epsilon: float = 0.2
     value_clip_parameter: float = 0.2
     clip_value: bool = True
@@ -89,6 +180,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
 
         def policy_loss_grad_fn(
             policy_params: Any,
+            policy_states: Any,
             observations: Any,
             actions: Dict[str, jnp.ndarray],
             behaviour_log_probs: Dict[str, jnp.ndarray],
@@ -113,22 +205,61 @@ class MAPGWithTrustRegionClippingLoss(Loss):
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
                 network = trainer.store.networks[agent_net_key]
-
                 # Note (dries): This is placed here to set the networks correctly in
                 # the case of non-shared weights.
+
                 def policy_loss_fn(
                     policy_params: Any,
+                    policy_states: Any,
                     observations: Any,
                     actions: jnp.ndarray,
                     behaviour_log_probs: jnp.ndarray,
                     advantages: jnp.ndarray,
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
                     """Inner policy loss function: see outer function for parameters."""
-                    distribution_params = network.policy_network.apply(
-                        policy_params, observations
-                    )
+
+                    # TODO (dries): Can we implement something more general here? Like a function call?
+                    if policy_states:
+                        # Recurrent actor.
+                        minibatch_size = int(
+                            trainer.store.sample_batch_size
+                            / trainer.store.num_minibatches
+                        )
+                        seq_len = trainer.store.sequence_length - 1
+
+                        batch_seq_observations = observations.reshape(
+                            minibatch_size, seq_len, -1
+                        )
+
+                        batch_seq_policy_states = policy_states[0].reshape(
+                            minibatch_size, seq_len, -1
+                        )
+
+                        # Use the state at the start of the sequence and unroll the policy.
+                        core = lambda x, y: network.policy_network.apply(
+                            policy_params, [x, y]
+                        )
+                        distribution_params, _ = hk.static_unroll(
+                            core,
+                            batch_seq_observations,
+                            batch_seq_policy_states[:, 0],
+                            time_major=False,
+                        )
+
+                        # Flatten the distribution_params
+                        distribution_params = jax.tree_util.tree_map(
+                            lambda x: x.reshape((-1,) + x.shape[2:]),
+                            distribution_params,
+                        )
+                    else:
+                        # Feedforward actor.
+                        distribution_params = network.policy_network.apply(
+                            policy_params, observations
+                        )
+
                     log_probs = network.log_prob(distribution_params, actions)
                     entropy = network.entropy(distribution_params)
+
                     # Compute importance sampling weights:
                     # current policy / behavior policy.
                     rhos = jnp.exp(log_probs - behaviour_log_probs)
@@ -159,6 +290,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                     policy_loss_fn, has_aux=True
                 )(
                     policy_params[agent_net_key],
+                    policy_states[agent_key],
                     observations[agent_key].observation,
                     actions[agent_key],
                     behaviour_log_probs[agent_key],
@@ -205,7 +337,10 @@ class MAPGWithTrustRegionClippingLoss(Loss):
 
                     # Value function loss. Exclude the bootstrap value
                     unclipped_value_error = target_values - values
-                    unclipped_value_loss = unclipped_value_error**2
+
+                    unclipped_value_loss = trainer.store.value_loss_fn(
+                        unclipped_value_error
+                    )
 
                     value_clip_parameter = self.config.value_clip_parameter
                     if self.config.clip_value:
@@ -217,7 +352,9 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                             value_clip_parameter,
                         )
                         clipped_value_error = target_values - clipped_values
-                        clipped_value_loss = clipped_value_error**2
+                        clipped_value_loss = trainer.store.value_loss_fn(
+                            clipped_value_error
+                        )
                         value_loss = jnp.mean(
                             jnp.fmax(unclipped_value_loss, clipped_value_loss)
                         )

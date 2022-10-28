@@ -18,14 +18,13 @@ import copy
 import functools
 from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import dm_env
 import jax
 import numpy as np
 import reverb
 from acme import specs as acme_specs
-from acme import types
 from acme.specs import EnvironmentSpec
 from acme.testing.fakes import Actor as ActorMock
 from acme.testing.fakes import ContinuousEnvironment, DiscreteEnvironment
@@ -43,11 +42,11 @@ from mava.core_jax import SystemBuilder
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.specs import DesignSpec, MAEnvironmentSpec
 from mava.systems.system import System
-from mava.types import OLT, Observation
+from mava.types import OLT, NestedArray, Observation
 from mava.utils.builder_utils import convert_specs
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
-from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
-from tests.enums import EnvType, MockedEnvironments
+from mava.wrappers.env_wrappers import ParallelEnvWrapper
+from tests.enums import MockedEnvironments
 
 """Mock Objects for Tests"""
 
@@ -62,24 +61,18 @@ class MockedExecutor(ActorMock, core.Executor):
         self._evaluator = False
 
     def select_actions(
-        self, observations: Dict[str, types.NestedArray]
-    ) -> Dict[str, types.NestedArray]:
+        self, observations: Dict[str, NestedArray]
+    ) -> Dict[str, NestedArray]:
         """Select actions over all agents."""
         return {
             agent: _generate_from_spec(self._spec[agent].actions)
             for agent, observation in observations.items()
         }
 
-    def select_action(
-        self, agent: str, observation: types.NestedArray
-    ) -> Union[float, int]:
-        """Select action for single agent."""
-        return _generate_from_spec(self._spec[agent].actions)
-
     def observe_first(
         self,
         timestep: dm_env.TimeStep,
-        extras: Dict[str, types.NestedArray] = {},
+        extras: Dict[str, NestedArray] = {},
     ) -> None:
         """Observe first environment state."""
         for agent, observation_spec in self._specs.items():
@@ -96,9 +89,9 @@ class MockedExecutor(ActorMock, core.Executor):
 
     def observe(
         self,
-        action: Dict[str, types.NestedArray],
+        action: Dict[str, NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extras: Dict[str, types.NestedArray] = {},
+        next_extras: Dict[str, NestedArray] = {},
     ) -> None:
         """Observe environment."""
 
@@ -124,7 +117,7 @@ class MockedExecutor(ActorMock, core.Executor):
     def agent_observe(
         self,
         agent: str,
-        action: Union[float, int, types.NestedArray],
+        action: Union[float, int, NestedArray],
         next_timestep: dm_env.TimeStep,
     ) -> None:
         """Observation of agent."""
@@ -171,7 +164,7 @@ def get_ma_environment(
 ) -> Any:
     """Gets an environment."""
 
-    class MockedMAEnvironment(base_class):  # type: ignore
+    class MockedEnvironment(base_class):  # type: ignore
         """Mocked Multi-Agent Environment.
 
         This simply creates multiple agents, with a spec per agent
@@ -229,115 +222,11 @@ def get_ma_environment(
         def env_done(self) -> bool:
             return not self.agents
 
-    return MockedMAEnvironment
-
-
-"""Class that updates functions for sequential environment.
-This class should be inherited with a MockedMAEnvironment. """
-
-
-class SequentialEnvironment(MockedEnvironment, SequentialEnvWrapper):
-    def __init__(self, agents: List, specs: EnvironmentSpec) -> None:
-        """Initialise mock sequential environment."""
-        self._agents = agents
-        self._possible_agents = agents
-        self._specs = specs
-        self.agent_step_counter = 0
-
-    def agent_iter(self, n_agents: int) -> Iterator[str]:
-        """Interator for stepping through agents."""
-        return iter(self.agents)
-
-    @property
-    def current_agent(self) -> Any:
-        """Current agent."""
-        return self.agent_selection
-
-    @property
-    def agent_selection(self) -> str:
-        """Select actions."""
-        return self.possible_agents[self.agent_step_counter]
-
-    def observation_spec(self) -> OLT:
-        """Return observation spec"""
-
-        if hasattr(self, "agent_selection"):
-            active_agent = self.agent_selection
-        else:
-            active_agent = self.agents[0]
-        return OLT(
-            observation=super().observation_spec(),
-            legal_actions=self.action_spec()[active_agent],
-            terminal=acme_specs.Array(
-                (1,),
-                np.float32,
-            ),
-        )
-
-    def _generate_fake_reward(self) -> types.NestedArray:
-        return _generate_from_spec(self._specs[self.agent_selection].rewards)
-
-    def _generate_fake_discount(self) -> types.NestedArray:
-        return _generate_from_spec(self._specs[self.agent_selection].discounts)
-
-    def action_spec(
-        self,
-    ) -> Dict[str, Union[acme_specs.DiscreteArray, acme_specs.BoundedArray]]:
-        """Return environment action spec."""
-        action_specs = {}
-        for agent in self.agents:
-            action_specs[agent] = super().action_spec()
-        return action_specs
-
-    def reset(self) -> dm_env.TimeStep:
-        """Reset environment."""
-        observation = self._generate_fake_observation()
-        discount = convert_np_type("float32", 1)  # Not used in pettingzoo
-        reward = convert_np_type("float32", 0)
-        self._step = 1
-        return parameterized_restart(
-            reward=reward, discount=discount, observation=observation
-        )
-
-    def _generate_fake_observation(self) -> OLT:
-        return _generate_from_spec(self.observation_spec())
-
-    def step(self, action: Union[float, int, types.NestedArray]) -> dm_env.TimeStep:
-        """Step the environment."""
-        # Return a reset timestep if we haven't touched the environment yet.
-        if not self._step:
-            return self.reset()
-
-        _validate_spec(self._spec.actions, action)
-
-        observation = self._generate_fake_observation()
-        reward = self._generate_fake_reward()
-        discount = self._generate_fake_discount()
-
-        self.agent_step_counter += 1
-
-        if self._episode_length and (self._step == self._episode_length):
-            # Only reset step once all all agents have taken their turn.
-            if self.agent_step_counter == len(self.agents):
-                self._step = 0
-                self.agent_step_counter = 0
-
-            # We can't use dm_env.termination directly because then the discount
-            # wouldn't necessarily conform to the spec (if eg. we want float32).
-            return dm_env.TimeStep(dm_env.StepType.LAST, reward, discount, observation)
-        else:
-            # Only update step counter once all agents have taken their turn.
-            if self.agent_step_counter == len(self.agents):
-                self._step += 1
-                self.agent_step_counter = 0
-
-            return dm_env.transition(
-                reward=reward, observation=observation, discount=discount
-            )
+    return MockedEnvironment
 
 
 """Class that updates functions for parallel environment.
-This class should be inherited with a MockedMAEnvironment. """
+This class should be inherited with a MockedEnvironment. """
 
 
 class ParallelEnvironment(MockedEnvironment, ParallelEnvWrapper):
@@ -389,7 +278,7 @@ class ParallelEnvironment(MockedEnvironment, ParallelEnvWrapper):
         return parameterized_restart(rewards, discounts, observations)  # type: ignore
 
     def step(
-        self, actions: Dict[str, Union[float, int, types.NestedArray]]
+        self, actions: Dict[str, Union[float, int, NestedArray]]
     ) -> dm_env.TimeStep:
         """Step the environment."""
 
@@ -425,9 +314,7 @@ DiscreteMAEnvironment = get_ma_environment(DiscreteEnvironment)
 ContinuousMAEnvironment = get_ma_environment(ContinuousEnvironment)
 
 
-class MockedMADiscreteEnvironment(
-    DiscreteMAEnvironment, DiscreteEnvironment  # type: ignore
-):
+class MockedMADiscreteEnvironment(DiscreteMAEnvironment, DiscreteEnvironment):  # type: ignore # noqa: E501
     def __init__(self, *args: Any, **kwargs: Any):
         """Initialise mock discrete environment."""
         DiscreteMAEnvironment.__init__(self, *args, **kwargs)
@@ -456,18 +343,6 @@ class ParallelMADiscreteEnvironment(ParallelEnvironment, MockedMADiscreteEnviron
         ParallelEnvironment.__init__(self, self.agents, self._specs)
 
 
-"""Mocked Multi-Agent Sequential Discrete Environment"""
-
-
-class SequentialMADiscreteEnvironment(
-    SequentialEnvironment, MockedMADiscreteEnvironment
-):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """Initialise mock discrete sequential environment."""
-        MockedMADiscreteEnvironment.__init__(self, *args, **kwargs)
-        SequentialEnvironment.__init__(self, self.agents, self._specs)
-
-
 """Mocked Multi-Agent Parallel Continuous Environment"""
 
 
@@ -483,18 +358,7 @@ class ParallelMAContinuousEnvironment(
 """Mocked Multi-Agent Sequential Continuous Environment"""
 
 
-class SequentialMAContinuousEnvironment(
-    SequentialEnvironment, MockedMAContinuousEnvironment
-):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """Initialise mock continuous sequential environment."""
-        MockedMAContinuousEnvironment.__init__(self, *args, **kwargs)
-        SequentialEnvironment.__init__(self, self.agents, self._specs)
-
-
 # Mock components to feed to the builder
-
-
 @dataclass
 class MockAdderConfig:
     adder_param: float = 2.7
@@ -508,7 +372,7 @@ class MockAdderClass:
         pass
 
     def add_first(
-        self, timestep: dm_env.TimeStep, extras: Dict[str, types.NestedArray] = {}
+        self, timestep: dm_env.TimeStep, extras: Dict[str, NestedArray] = {}
     ) -> None:
         """_summary_
 
@@ -520,9 +384,9 @@ class MockAdderClass:
 
     def add(
         self,
-        actions: Dict[str, types.NestedArray],
+        actions: Dict[str, NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extras: Dict[str, types.NestedArray] = {},
+        next_extras: Dict[str, NestedArray] = {},
     ) -> None:
         """_summary_
 
@@ -575,14 +439,12 @@ def make_fake_env_specs() -> MAEnvironmentSpec:
 
 def make_fake_env(
     env_name: MockedEnvironments = MockedEnvironments.Mocked_Dicrete,
-    env_type: EnvType = EnvType.Parallel,
     evaluation: bool = False,
 ) -> Any:
     """Func that creates a fake env.
 
     Args:
         env_name : env name.
-        env_type : type of env.
         evaluation: whether env is used for eval or not.
             Not sure we should use this in spec.
 
@@ -593,38 +455,13 @@ def make_fake_env(
         mock env.
     """
     del evaluation
-    if env_name is MockedEnvironments.Mocked_Dicrete:
-        if env_type == EnvType.Parallel:
-            env = ParallelMADiscreteEnvironment(
-                num_actions=18,
-                num_observations=2,
-                obs_shape=(84, 84, 4),
-                obs_dtype=np.float32,
-                episode_length=10,
-            )
-        elif env_type == EnvType.Sequential:
-            env = SequentialMADiscreteEnvironment(
-                num_actions=18,
-                num_observations=2,
-                obs_shape=(84, 84, 4),
-                obs_dtype=np.float32,
-                episode_length=10,
-            )
-    elif env_name is MockedEnvironments.Mocked_Continous:
-        if env_type == EnvType.Parallel:
-            env = ParallelMAContinuousEnvironment(
-                action_dim=2,
-                observation_dim=2,
-                bounded=True,
-                episode_length=10,
-            )
-        elif env_type == EnvType.Sequential:
-            env = SequentialMAContinuousEnvironment(
-                action_dim=2,
-                observation_dim=2,
-                bounded=True,
-                episode_length=10,
-            )
+    env = ParallelMADiscreteEnvironment(
+        num_actions=18,
+        num_observations=2,
+        obs_shape=(84, 84, 4),
+        obs_dtype=np.float32,
+        episode_length=10,
+    )
 
     if env is None:
         raise Exception("Env_spec is not valid.")
@@ -634,13 +471,11 @@ def make_fake_env(
 
 def make_fake_environment_factory(
     env_name: MockedEnvironments = MockedEnvironments.Mocked_Dicrete,
-    env_type: EnvType = EnvType.Parallel,
 ) -> Any:
     """Returns a mock env factory.
 
     Args:
         env_name : env name.
-        env_type : env type.
 
     Returns:
         a mocked env factory.
@@ -648,7 +483,6 @@ def make_fake_environment_factory(
     return functools.partial(
         make_fake_env,
         env_name=env_name,
-        env_type=env_type,
     )
 
 
@@ -1089,12 +923,12 @@ class MockNetworks(Component):
         builder.store.base_key = jax.random.PRNGKey(self.config.seed)
 
         # Build network function here
-        network_key, builder.store.base_key = jax.random.split(builder.store.base_key)
+        builder.store.base_key, network_key = jax.random.split(builder.store.base_key)
         builder.store.network_factory = (
             lambda: self.config.network_factory(  # type: ignore
                 environment_spec=builder.store.ma_environment_spec,
                 agent_net_keys=builder.store.agent_net_keys,
-                rng_key=network_key,
+                base_key=network_key,
             )
         )
 
@@ -1246,7 +1080,8 @@ def return_test_system(components: Dict) -> System:
     """
 
     class TestSystem(System):
-        def design(self) -> Tuple[DesignSpec, Dict]:
+        @staticmethod
+        def design() -> Tuple[DesignSpec, Dict]:
             """Mock system design with zero components.
 
             Returns:

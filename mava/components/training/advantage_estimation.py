@@ -57,7 +57,9 @@ class GAE(Utility):
         """
 
         def gae_advantages(
-            rewards: jnp.ndarray, discounts: jnp.ndarray, values: jnp.ndarray
+            rewards: jnp.ndarray,
+            discounts: jnp.ndarray,
+            values: jnp.ndarray,
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
             """Use truncated GAE to compute advantages.
 
@@ -75,7 +77,10 @@ class GAE(Utility):
             rewards = jnp.clip(rewards, -max_abs_reward, max_abs_reward)
 
             advantages = rlax.truncated_generalized_advantage_estimation(
-                rewards[:-1], discounts[:-1], self.config.gae_lambda, values
+                rewards[:-1],
+                discounts[:-1],
+                self.config.gae_lambda,
+                values,
             )
             advantages = jax.lax.stop_gradient(advantages)
 
