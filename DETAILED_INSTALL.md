@@ -68,12 +68,6 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
         make build version=robocup
         ```
 
-    * MeltingPot
-
-        ```bash
-        make build version=meltingpot
-        ```
-
     To allow for agent recordings, where agents evaluations are recorded and these recordings are stored in a `/recordings` folder:
 
     ```
