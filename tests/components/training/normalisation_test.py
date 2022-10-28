@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from mava.types import OLT
 from mava.utils.jax_training_utils import (
@@ -28,6 +29,14 @@ def test_construct_norm_axes_list() -> None:
     return_list = construct_norm_axes_list(start_axes, axes_list, obs_shape)
     expected_list = tuple([slice(0, 20)])
     assert return_list == expected_list
+
+    with pytest.raises(ValueError):
+        start_axes = 0
+        axes_list = [1, 2, [5, 8], (10, 27)]
+        return_list = construct_norm_axes_list(start_axes, axes_list, obs_shape)
+
+        axes_list = [1, 2, [5, 8], (27, 30)]
+        return_list = construct_norm_axes_list(start_axes, axes_list, obs_shape)
 
 
 def test_compute_running_mean_var_count() -> None:

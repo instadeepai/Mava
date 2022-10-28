@@ -51,27 +51,46 @@ def construct_norm_axes_list(
 
     Returns:
         axes_list: a tuple to be used with np.r_
+
+    The start_axes is 0 unless we use a wrapper like concat_agent_id
+    or concat_previous_actions which add one hot encorded vectors
+    at the start of the array.
+    axes_list corresponds to user specified axes we want to normalise
+    We aussume the user does not consider contenation when specifying axes_list.
+    If axes_list is empty then we nornmalise all the axes
+    axes_list can contain single values or lists and tuples which corresponds to
+    start and end values of axes slices. eg. [1, 2, [4,7], (9,15)]
+    If start_axes is different from 0 then we need offset all
+    the enteries in axes_list by the start_axes
+    For the axes_list [1, 2, [4,7], (9,15)] with start_axes = 0
+    output is tuple([slice(1,2), slice(2,3), slice(4,7), slice(9,15)]).
+    if axes_list = [] and start_axes = 0
+    output is tuple([slice(0, 15)]) assuming obs_shape = (15,)
     """
 
     if len(axes_list) == 0:
-        return_list = [slice(start_axes, obs_shape[0])]
+        return tuple([slice(start_axes, obs_shape[0])])
     else:
         return_list = []
-        indices = []
+        starts = []
+        ends = []
         for x in axes_list:
             if type(x) == tuple or type(x) == list:
                 element = slice(x[0] + start_axes, x[1] + start_axes)
-                indices.append(x[1] + start_axes)
+                starts.append(x[0] + start_axes)
+                ends.append(x[1] + start_axes)
             else:
                 element = slice(x + start_axes, x + start_axes + 1)
-                indices.append(x + start_axes + 1)
+                starts.append(x + start_axes)
+                ends.append(x + start_axes + 1)
             return_list.append(element)
 
-        assert (
-            np.max(indices) <= obs_shape[0]
-        ), "Choosen indices will lead to out of bounds index error"
+        if np.max(starts) >= obs_shape[0] or np.max(ends) > obs_shape[0]:
+            raise ValueError(
+                "Choosen normalization axes will lead to out of bounds index error!"
+            )
 
-    return tuple(return_list)
+        return tuple(return_list)
 
 
 def compute_running_mean_var_count(
