@@ -105,6 +105,14 @@ class BaseTrainerInit(Component):
                 agent
             ].observations.observation.shape
 
+            if (
+                builder.store.global_config.normalize_observations
+                and len(obs_shape) > 1
+            ):
+                raise NotImplementedError(
+                    "Observations normalization only works for 1D feature spaces!"
+                )
+
             builder.store.norm_params[obs_norm_key][agent] = init_norm_params(obs_shape)
 
         # Initialise target values normalisation parameters here

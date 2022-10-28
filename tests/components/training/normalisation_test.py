@@ -4,11 +4,30 @@ import numpy as np
 from mava.types import OLT
 from mava.utils.jax_training_utils import (
     compute_running_mean_var_count,
+    construct_norm_axes_list,
     denormalize,
     normalize,
     normalize_observations,
     update_and_normalize_observations,
 )
+
+
+def test_construct_norm_axes_list() -> None:
+    """Test if slices element are construced correctly"""
+
+    start_axes = 5
+    obs_shape = (20,)
+    axes_list = [1, 2, [5, 8], (10, 12)]
+
+    return_list = construct_norm_axes_list(start_axes, axes_list, obs_shape)
+    expected_list = tuple([slice(6, 7), slice(7, 8), slice(10, 13), slice(15, 17)])
+    assert return_list == expected_list
+
+    start_axes = 0
+    axes_list = []
+    return_list = construct_norm_axes_list(start_axes, axes_list, obs_shape)
+    expected_list = tuple([slice(0, 20)])
+    assert return_list == expected_list
 
 
 def test_compute_running_mean_var_count() -> None:
@@ -25,10 +44,10 @@ def test_compute_running_mean_var_count() -> None:
             count=jnp.array([1e-4]),
             std=np.ones(15),
         )
-
-        stats = compute_running_mean_var_count(stats, jnp.array(x1))
-        stats = compute_running_mean_var_count(stats, jnp.array(x2))
-        stats = compute_running_mean_var_count(stats, jnp.array(x3))
+        axes = tuple([slice(0, 15)])
+        stats = compute_running_mean_var_count(stats, jnp.array(x1), axes=axes)
+        stats = compute_running_mean_var_count(stats, jnp.array(x2), axes=axes)
+        stats = compute_running_mean_var_count(stats, jnp.array(x3), axes=axes)
 
         x = jnp.array(np.concatenate([x1, x2, x3], axis=0))
         stats2 = dict(
@@ -57,14 +76,24 @@ def test_compute_running_mean_var_count_axes() -> None:
             std=np.ones(15),
         )
 
-        s_axes = 5
-        stats = compute_running_mean_var_count(stats, jnp.array(x1), start_axes=s_axes)
-        stats = compute_running_mean_var_count(stats, jnp.array(x2), start_axes=s_axes)
-        stats = compute_running_mean_var_count(stats, jnp.array(x3), start_axes=s_axes)
+        normalize_axes = [1, [3, 5], (7, 8)]
+        axes = construct_norm_axes_list(0, normalize_axes, (15,))
 
-        assert jnp.allclose(stats["mean"][:s_axes], jnp.zeros(s_axes), atol=1e-8)
-        assert jnp.allclose(stats["var"][:s_axes], jnp.zeros(s_axes), atol=1e-8)
-        assert jnp.allclose(stats["std"][:s_axes], jnp.ones(s_axes), atol=1e-8)
+        stats = compute_running_mean_var_count(stats, jnp.array(x1), axes=axes)
+        stats = compute_running_mean_var_count(stats, jnp.array(x2), axes=axes)
+        stats = compute_running_mean_var_count(stats, jnp.array(x3), axes=axes)
+
+        indices = np.r_[axes]
+        assert not jnp.allclose(stats["mean"][indices], 0, atol=1e-8)
+        assert not jnp.allclose(stats["var"][indices], 0, atol=1e-8)
+        assert not jnp.allclose(stats["std"][indices], 1, atol=1e-8)
+
+        reverse_axes = [0, 2, 6, (9, 15)]
+        r_axes = construct_norm_axes_list(0, reverse_axes, (15,))
+        r_indices = np.r_[r_axes]
+        assert jnp.allclose(stats["mean"][r_indices], 0, atol=1e-8)
+        assert jnp.allclose(stats["var"][r_indices], 0, atol=1e-8)
+        assert jnp.allclose(stats["std"][r_indices], 1, atol=1e-8)
 
 
 def test_normalization() -> None:
@@ -105,12 +134,13 @@ def test_update_and_normalize_observations() -> None:
             std=np.ones(15),
         )
 
+        axes = tuple([slice(0, 15)])
         obs = OLT(observation=jnp.array(x1), legal_actions=[1], terminal=[0.0])
-        stats, _ = update_and_normalize_observations(stats, obs)
+        stats, _ = update_and_normalize_observations(stats, obs, axes=axes)
         obs = OLT(observation=jnp.array(x2), legal_actions=[1], terminal=[0.0])
-        stats, _ = update_and_normalize_observations(stats, obs)
+        stats, _ = update_and_normalize_observations(stats, obs, axes=axes)
         obs = OLT(observation=jnp.array(x3), legal_actions=[1], terminal=[0.0])
-        stats, _ = update_and_normalize_observations(stats, obs)
+        stats, _ = update_and_normalize_observations(stats, obs, axes=axes)
 
         x = jnp.array(np.concatenate([x1, x2, x3], axis=0))
         x = jnp.reshape(x, (-1, 15))

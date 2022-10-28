@@ -110,6 +110,11 @@ def main(_: Any) -> None:
         clip_value=True,
         normalize_target_values=True,
         normalize_observations=True,
+        normalize_axes=[
+            0,
+            1,
+            (3, 10),
+        ],  # example of how to select which axes to normalize
     )
 
     # Launch the system.

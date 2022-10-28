@@ -115,7 +115,9 @@ def mock_builder_shared_weights_fixed_sampling() -> Builder:
     Has shared weights and fixed agent trainer sampling setup.
     """
 
-    mock_builder = MockBuilder(global_config=SimpleNamespace(), components=[])
+    mock_builder = MockBuilder(
+        global_config=SimpleNamespace(normalize_observations=True), components=[]
+    )
 
     mock_builder.store.unique_net_keys = ["network_agent"]
     mock_builder.store.network_sampling_setup = [
@@ -132,7 +134,9 @@ def mock_builder_no_shared_weights_fixed_sampling() -> Builder:
     Doesn't shared weights and has fixed agent trainer sampling setup.
     """
 
-    mock_builder = MockBuilder(global_config=SimpleNamespace(), components=[])
+    mock_builder = MockBuilder(
+        global_config=SimpleNamespace(normalize_observations=True), components=[]
+    )
 
     mock_builder.store.unique_net_keys = [
         "network_agent_0",
@@ -153,7 +157,9 @@ def mock_builder_no_shared_weights_random_sampling() -> Builder:
     Doesn't have shared weights and has random agent trainer sampling setup
     """
 
-    mock_builder = MockBuilder(global_config=SimpleNamespace(), components=[])
+    mock_builder = MockBuilder(
+        global_config=SimpleNamespace(normalize_observations=True), components=[]
+    )
 
     mock_builder.store.unique_net_keys = ["network_0", "network_1", "network_2"]
     mock_builder.store.network_sampling_setup = [

@@ -16,7 +16,7 @@
 """Trainer components for system updating."""
 
 import abc
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import partial
 from typing import Any, Dict, List, Tuple, Type
 
@@ -36,6 +36,7 @@ from mava.components.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
 from mava.utils.jax_training_utils import (
     compute_running_mean_var_count,
+    construct_norm_axes_list,
     update_and_normalize_observations,
 )
 
@@ -73,6 +74,7 @@ class MAPGMinibatchUpdateConfig:
     normalize_advantage: bool = True
     normalize_target_values: bool = False
     normalize_observations: bool = False
+    normalize_axes: List = field(default_factory=lambda: [])  # [1, 2, (4,7), [10,12]]
 
 
 class MAPGMinibatchUpdate(MinibatchUpdate):
@@ -106,9 +108,20 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
 
         # Initilaise observations running mean/std function here
         if self.config.normalize_observations:
+            observation_stats = trainer.store.norm_params[
+                constants.OBS_NORM_STATE_DICT_KEY
+            ]
+            obs_shape = observation_stats[list(observation_stats.keys())[0]][
+                "mean"
+            ].shape
+            norm_axes = construct_norm_axes_list(
+                trainer.store.obs_normalisation_start,
+                self.config.normalize_axes,
+                obs_shape,
+            )
             trainer.store.norm_obs_running_stats_fn = partial(
                 update_and_normalize_observations,
-                start_axes=trainer.store.obs_normalisation_start,
+                axes=norm_axes,
             )
 
         def model_update_minibatch(

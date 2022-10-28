@@ -1,8 +1,9 @@
 import os
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import tensorflow_probability.substrates.jax.distributions as tfd
 from chex import Array
 from haiku._src.basic import merge_leading_dims
@@ -29,8 +30,6 @@ def action_mask_categorical_policies(
 def init_norm_params(stats_shape: Tuple) -> Dict[str, Union[jnp.array, float]]:
     """Initialise normalistion parameters"""
 
-    assert len(stats_shape) == 1, "Normalization only works for 1D features"
-
     stats = dict(
         mean=jnp.zeros(shape=stats_shape),
         var=jnp.zeros(shape=stats_shape),
@@ -41,16 +40,50 @@ def init_norm_params(stats_shape: Tuple) -> Dict[str, Union[jnp.array, float]]:
     return stats
 
 
+def construct_norm_axes_list(
+    start_axes: int, axes_list: List[Any], obs_shape: Tuple
+) -> Tuple[slice, ...]:
+    """Construt a list of Tuples containing the features on which to apply normalisation
+
+    start_axes (int) --- default axes from which to start
+    axes_list (List[int]) --- user specified
+    obs_shape (Tuple) --- observations shape
+
+    Returns:
+        axes_list: a tuple to be used with np.r_
+    """
+
+    if len(axes_list) == 0:
+        return_list = [slice(start_axes, obs_shape[0])]
+    else:
+        return_list = []
+        indices = []
+        for x in axes_list:
+            if type(x) == tuple or type(x) == list:
+                element = slice(x[0] + start_axes, x[1] + start_axes)
+                indices.append(x[1] + start_axes)
+            else:
+                element = slice(x + start_axes, x + start_axes + 1)
+                indices.append(x + start_axes + 1)
+            return_list.append(element)
+
+        assert (
+            np.max(indices) <= obs_shape[0]
+        ), "Choosen indices will lead to out of bounds index error"
+
+    return tuple(return_list)
+
+
 def compute_running_mean_var_count(
     stats: Dict[str, Union[jnp.array, float]],
     batch: jnp.ndarray,
-    start_axes: int = 0,
+    axes: Any = slice(0, 1),
 ) -> jnp.ndarray:
     """Updates the running mean, variance and data counts during training.
 
     stats (Any)   -- dictionary with running mean, var, std, count
     batch (array) -- current batch of data.
-    start_axes (int or None) -- number of axes we do not want to normalise
+    axes (tuple of slices) -- which axes to normalise
 
     Returns:
         stats (array)
@@ -79,9 +112,10 @@ def compute_running_mean_var_count(
     new_var = jnp.zeros_like(var)
     new_std = jnp.ones_like(std)
 
-    new_mean = new_mean.at[start_axes:].set(mean[start_axes:])
-    new_var = new_var.at[start_axes:].set(var[start_axes:])
-    new_std = new_std.at[start_axes:].set(std[start_axes:])
+    indices = np.r_[axes]
+    new_mean = new_mean.at[indices].set(mean[indices])
+    new_var = new_var.at[indices].set(var[indices])
+    new_std = new_std.at[indices].set(std[indices])
 
     return dict(mean=new_mean, var=new_var, std=new_std, count=new_count)
 
@@ -125,12 +159,13 @@ def denormalize(
 def update_and_normalize_observations(
     stats: Dict[str, Union[jnp.array, float]],
     observation: OLT,
-    start_axes: int = 0,
+    axes: Any = slice(0, 1),
 ) -> Tuple[Any, OLT]:
     """Update running stats and normalise observations
 
     stats (Dictionary)   -- array with running mean, var, count.
     batch (OLT namespace)   -- current batch of data for a single agent.
+    axes (tuple of slices) -- which axes to normalise
 
     Returns:
         normalize batch (Dictionary)
@@ -140,15 +175,17 @@ def update_and_normalize_observations(
     obs = jax.tree_util.tree_map(
         lambda x: merge_leading_dims(x, num_dims=2), observation.observation
     )
-    upd_stats = compute_running_mean_var_count(stats, obs, start_axes)
+
+    indices = np.r_[axes]
+    upd_stats = compute_running_mean_var_count(stats, obs, indices)
     norm_obs = normalize(upd_stats, obs)
 
     # the following code makes sure we do not normalise
     # death masked observations. This uses the assumption
     # that all death masked agents have zeroed observations
-    sum_obs = jnp.sum(obs[:, start_axes:], axis=1)
+    sum_obs = jnp.sum(obs[:, indices], axis=1)
     mask = jnp.array(sum_obs != 0, dtype=obs.dtype)
-    norm_obs = norm_obs.at[:, start_axes:].set(norm_obs[:, start_axes:] * mask[:, None])
+    norm_obs = norm_obs.at[:, indices].set(norm_obs[:, indices] * mask[:, None])
 
     # reshape before returning
     norm_obs = jnp.reshape(norm_obs, obs_shape)
