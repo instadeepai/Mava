@@ -294,3 +294,4 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         {"num_executor_failed": 1}
                     )
                     self._executor.force_update()
+                    break

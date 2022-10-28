@@ -17,6 +17,7 @@
 """Integration test of the executor for Jax-based Mava systems"""
 
 import functools
+from typing import Any, Dict
 
 import pytest
 
@@ -103,3 +104,28 @@ def test_executor_single_process(test_system_sp: System) -> None:
         lambda: key == "log_prob"
         for key in executor._executor.store.policies_info.values()
     )
+
+
+def observe_with_error(
+    actions: Dict[str, Any],
+    next_timestep: Any,
+    next_extras: Dict[str, Any] = {},
+) -> None:
+    """Raise an error while calling observe method"""
+    raise ValueError
+
+
+def test_executor_error_single_process(test_system_sp: System) -> None:
+    """Test if the executor stop if an error happen"""
+    (
+        data_server,
+        parameter_server,
+        executor,
+        evaluator,
+        trainer,
+    ) = test_system_sp._builder.store.system_build
+
+    # Update the observe method to raise an error
+    executor._executor.observe = observe_with_error
+
+    executor.run()

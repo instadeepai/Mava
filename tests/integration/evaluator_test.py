@@ -87,9 +87,9 @@ def test_evaluator_single_process(test_system_sp: System) -> None:
 
 
 def observe_with_error(
-    aactions: Dict[str, Any],
-    timestep: Any,
-    extras: Dict[str, Any] = {},
+    actions: Dict[str, Any],
+    next_timestep: Any,
+    next_extras: Dict[str, Any] = {},
 ) -> None:
     """Raise an error while calling observe method"""
     raise ValueError
