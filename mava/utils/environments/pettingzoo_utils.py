@@ -92,7 +92,7 @@ def make_environment(
     random_seed: Optional[int] = None,
     **kwargs: Any,
 ) -> dm_env.Environment:
-    """Wraps an Pettingzoo environment.
+    """Wraps a Pettingzoo environment.
 
     Args:
         env_class: str, class of the environment, e.g. MPE or Atari.
@@ -131,6 +131,6 @@ def make_environment(
         raise Exception("Pettingzoo is not installed.")
 
     if concat_agent_id:
-        env = ConcatAgentIdToObservation(env)
+        environment = ConcatAgentIdToObservation(environment)  # type: ignore
 
     return environment

@@ -31,7 +31,7 @@ if _has_petting_zoo:
 
     # Prevent circular import issue.
     if TYPE_CHECKING:
-        from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
+        from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper  # noqa: F401
 
 PettingZooEnv = "PettingZooParallelEnvWrapper"
 
@@ -40,12 +40,26 @@ class ConcatAgentIdToObservation:
     """Concat one-hot vector of agent ID to obs.
 
     We assume the environment has an ordered list
-    self.possible_agents.
+    self.possible_agents. We also assume the observations
+    are vector based.
     """
 
     def __init__(self, environment: Any) -> None:
+        """Initialise wrapper."""
         self._environment = environment
         self._num_agents = len(environment.possible_agents)
+
+        # Check that observation of first agent is a vector
+        if (
+            len(
+                list(self._environment.observation_spec().values())[0].observation.shape
+            )
+            > 1
+        ):
+            raise NotImplementedError(
+                "Agent ID concatenation is only implemented for vector\
+                    based observations."
+            )
 
     def reset(self) -> dm_env.TimeStep:
         """Reset environment and concat agent ID."""
@@ -146,6 +160,7 @@ class ConcatPrevActionToObservation:
     """
 
     def __init__(self, environment: Any):
+        """Initialise wrapper."""
         self._environment = environment
 
     def reset(self) -> dm_env.TimeStep:
