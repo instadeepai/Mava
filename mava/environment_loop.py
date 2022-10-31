@@ -16,6 +16,7 @@
 """A simple multi-agent-system-environment training loop."""
 
 import time
+from threading import local
 from typing import Any, Dict, Tuple
 
 import acme
@@ -260,19 +261,30 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     if hasattr(self._environment, "get_interval_stats"):
                         results.update(self._environment.get_interval_stats())
                     self._logger.write(results)
-
-                    # Check if the performance has improved
-                    if best_performance is None:
+                    # Best_performance_update
+                    if (
+                        not "best_performance" in locals()
+                        or best_performance < results["mean_episode_return"]
+                    ):
                         best_performance = results["mean_episode_return"]
-                        self._executor.store.executor_parameter_client.add_and_wait(
-                            {"best_performance": True}
-                        )
-                    elif best_performance < results["mean_episode_return"]:
-                        best_performance = results["mean_episode_return"]
-                        self._executor.store.executor_parameter_client.add_and_wait(
-                            {"best_performance": True}
-                        )
-
+                        for agent_net_key in self._executor.store.networks.keys():
+                            # Ensure obs and target networks are sonnet modules
+                            self._executor.store.executor_parameter_client.set_and_wait(
+                                {
+                                    f"best_policy_network-{agent_net_key}": self._executor.store.networks[
+                                        agent_net_key
+                                    ].policy_params,
+                                    f"best_critic_network-{agent_net_key}": self._executor.store.networks[
+                                        agent_net_key
+                                    ].critic_params,
+                                    f"best_policy_opt_state-{agent_net_key}": self._executor.store.policy_opt_states[
+                                        agent_net_key
+                                    ],
+                                    f"best_critic_opt_state-{agent_net_key}": self._executor.store.critic_opt_states[
+                                        agent_net_key
+                                    ],
+                                }
+                            )
                 else:
                     result = self.run_episode()
                     # Log the given results.
@@ -284,9 +296,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             # We need to get the latest counts if we are using eval intervals.
             if environment_loop_schedule:
                 self._executor.force_update()
-                
-        # Initialize best performance
-        best_performance = None
+
         while True:
             try:
                 step_executor()

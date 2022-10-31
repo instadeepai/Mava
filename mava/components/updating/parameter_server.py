@@ -31,6 +31,7 @@ from mava.utils.lp_utils import termination_fn
 class ParameterServerConfig:
     non_blocking_sleep_seconds: int = 10
     experiment_path: str = "~/mava/"
+    best_checkpointer: bool = False
 
 
 class ParameterServer(Component):
@@ -138,16 +139,30 @@ class DefaultParameterServer(ParameterServer):
 
         server.store.experiment_path = self.config.experiment_path
 
-
-        # Best params
-        server.store.best_parameters = server.store.parameters
-        
         # Interrupt the system in case evaluator or trainer failed
         server.store.parameters["evaluator_or_trainer_failed"] = False
 
         # Interrupt the system in case all the executors failed
         server.store.parameters["num_executor_failed"] = 0
 
+        # Checkpoint network with best performance
+        if self.config.best_checkpointer:
+            # Network parameters
+            for agent_net_key in networks.keys():
+                # Ensure obs and target networks are sonnet modules
+                server.store.parameters[
+                    f"best_policy_network-{agent_net_key}"
+                ] = networks[agent_net_key].policy_params
+                # Ensure obs and target networks are sonnet modules
+                server.store.parameters[
+                    f"best_critic_network-{agent_net_key}"
+                ] = networks[agent_net_key].critic_params
+                server.store.parameters[
+                    f"best_policy_opt_state-{agent_net_key}"
+                ] = server.store.policy_opt_states[agent_net_key]
+                server.store.parameters[
+                    f"best_critic_opt_state-{agent_net_key}"
+                ] = server.store.critic_opt_states[agent_net_key]
 
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
@@ -216,10 +231,6 @@ class DefaultParameterServer(ParameterServer):
         """
         # server.store._add_to_params set by Parameter Server
         params: Dict[str, Any] = server.store._add_to_params
-        if "best_performance" in params.keys():
-            server.store.best_parameters = server.store.parameters
-            del params["best_performance"]
-
         names = params.keys()
 
         for var_key in names:
