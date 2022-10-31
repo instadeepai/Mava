@@ -54,6 +54,7 @@ class ConcatAgentIdToObservation:
             timestep, env_extras = timestep
         else:
             env_extras = {}
+
         old_observations = timestep.observation
 
         new_observations = {}
