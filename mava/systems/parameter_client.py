@@ -72,6 +72,7 @@ class ParameterClient:
         self._adjust = lambda: client.set_parameters(
             {key: self._parameters[key] for key in self._set_keys},
         )
+        self._adjust_param = lambda params: client.set_parameters(params)
 
         self._add = lambda params: client.add_to_parameters(params)
 
@@ -239,7 +240,7 @@ class ParameterClient:
         """
         self._copy(self._request_all())
 
-    def set_and_wait(self) -> None:
+    def set_and_wait(self, params: Dict[str, Any] = None) -> None:
         """Update server with set parameters. Wait for completion.
 
         Updates server with the set parameters
@@ -248,7 +249,10 @@ class ParameterClient:
         Returns:
             None.
         """
-        self._adjust()
+        if params is None:
+            self._adjust()
+        else:
+            self._adjust_param(params)
 
     # TODO(Dries/Arnu): this needs a bit of a cleanup
     def _copy(self, new_parameters: Dict[str, Any]) -> None:

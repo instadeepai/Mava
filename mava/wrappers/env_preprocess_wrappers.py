@@ -63,7 +63,12 @@ class ConcatAgentIdToObservation:
 
     def reset(self) -> dm_env.TimeStep:
         """Reset environment and concat agent ID."""
-        timestep, extras = self._environment.reset()
+        timestep = self._environment.reset()
+        if type(timestep) == tuple:
+            timestep, env_extras = timestep
+        else:
+            env_extras = {}
+
         old_observations = timestep.observation
 
         new_observations = {}
@@ -85,12 +90,16 @@ class ConcatAgentIdToObservation:
             dm_env.TimeStep(
                 timestep.step_type, timestep.reward, timestep.discount, new_observations
             ),
-            extras,
+            env_extras,
         )
 
     def step(self, actions: Dict) -> dm_env.TimeStep:
         """Step the environment and concat agent ID"""
-        timestep, extras = self._environment.step(actions)
+        timestep = self._environment.step(actions)
+        if type(timestep) == tuple:
+            timestep, env_extras = timestep
+        else:
+            env_extras = {}
 
         old_observations = timestep.observation
         new_observations = {}
@@ -111,7 +120,7 @@ class ConcatAgentIdToObservation:
             dm_env.TimeStep(
                 timestep.step_type, timestep.reward, timestep.discount, new_observations
             ),
-            extras,
+            env_extras,
         )
 
     def observation_spec(self) -> Dict[str, OLT]:
@@ -120,7 +129,10 @@ class ConcatAgentIdToObservation:
         Returns:
             types.Observation: spec for environment.
         """
-        timestep, extras = self.reset()
+        timestep = self.reset()
+        if type(timestep) == tuple:
+            timestep, _ = timestep
+
         observations = timestep.observation
         return observations
 
@@ -153,7 +165,12 @@ class ConcatPrevActionToObservation:
 
     def reset(self) -> dm_env.TimeStep:
         """Reset the environment and add zero action."""
-        timestep, extras = self._environment.reset()
+        timestep = self._environment.reset()
+        if type(timestep) == tuple:
+            timestep, env_extras = timestep
+        else:
+            env_extras = {}
+
         old_observations = timestep.observation
         action_spec = self._environment.action_spec()
         new_observations = {}
@@ -175,12 +192,17 @@ class ConcatPrevActionToObservation:
             dm_env.TimeStep(
                 timestep.step_type, timestep.reward, timestep.discount, new_observations
             ),
-            extras,
+            env_extras,
         )
 
     def step(self, actions: Dict) -> dm_env.TimeStep:
         """Step the environment and concat prev actions."""
-        timestep, extras = self._environment.step(actions)
+        timestep = self._environment.step(actions)
+        if type(timestep) == tuple:
+            timestep, env_extras = timestep
+        else:
+            env_extras = {}
+
         old_observations = timestep.observation
         action_spec = self._environment.action_spec()
         new_observations = {}
@@ -202,7 +224,7 @@ class ConcatPrevActionToObservation:
             dm_env.TimeStep(
                 timestep.step_type, timestep.reward, timestep.discount, new_observations
             ),
-            extras,
+            env_extras,
         )
 
     def observation_spec(self) -> Dict[str, OLT]:
@@ -211,7 +233,10 @@ class ConcatPrevActionToObservation:
         Returns:
             types.Observation: spec for environment.
         """
-        timestep, extras = self.reset()
+        timestep = self.reset()
+        if type(timestep) == tuple:
+            timestep, _ = timestep
+
         observations = timestep.observation
         return observations
 
