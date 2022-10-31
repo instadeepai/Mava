@@ -242,7 +242,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             )
             evaluation_duration = eval_duration_condition[1]
 
-        while True:
+        def step_executor() -> None:
             if (not environment_loop_schedule) or (
                 should_run_loop(eval_interval_condition)
             ):
@@ -271,3 +271,25 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             # We need to get the latest counts if we are using eval intervals.
             if environment_loop_schedule:
                 self._executor.force_update()
+
+        while True:
+            try:
+                step_executor()
+
+            except Exception as e:
+                if self._executor._evaluator:
+                    print(
+                        e, ": Experiment terminated due to an error on the evaluator."
+                    )
+                    time.sleep(60)
+                    self._executor.store.executor_parameter_client.set_and_wait(
+                        {"evaluator_or_trainer_failed": True}
+                    )
+                else:
+                    print(e, ": an executor failed.")
+                    time.sleep(60)
+                    self._executor.store.executor_parameter_client.add_and_wait(
+                        {"num_executor_failed": 1}
+                    )
+                self._executor.force_update()
+                break
