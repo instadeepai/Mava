@@ -16,13 +16,13 @@
 """A simple multi-agent-system-environment training loop."""
 
 import time
-import tensorflow as tf
 from typing import Any, Dict, Tuple
 
 import acme
 import dm_env
 import jax
 import numpy as np
+import tensorflow as tf
 from acme.utils import counting, loggers
 
 import mava
