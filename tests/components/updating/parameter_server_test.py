@@ -92,11 +92,23 @@ def mock_system_parameter_server() -> SystemParameterServer:
             constants.OPT_STATE_DICT_KEY: EmptyState()
         }
 
+    mock_system_parameter_server.store.norm_params = {}
+    mock_system_parameter_server.store.norm_params[
+        constants.OBS_NORM_STATE_DICT_KEY
+    ] = EmptyState()
+    mock_system_parameter_server.store.norm_params[
+        constants.VALUES_NORM_STATE_DICT_KEY
+    ] = EmptyState()
+
     mock_system_parameter_server.store.parameters = {
         "param1": "param1_value",
         "param2": "param2_value",
         "param3": "param3_value",
+        "evaluator_or_trainer_failed": False,
+        "num_executor_failed": 0,
     }
+
+    mock_system_parameter_server.store.num_executors = 2
 
     return mock_system_parameter_server
 
@@ -163,6 +175,10 @@ def test_on_parameter_server_init_start_parameter_creation(
         mock_system_parameter_server.store.parameters["critic_network-agent_net_2"]
         == "net_1_2_params"
     )
+    assert not mock_system_parameter_server.store.parameters[
+        "evaluator_or_trainer_failed"
+    ]
+    assert mock_system_parameter_server.store.parameters["num_executor_failed"] == 0
 
 
 def test_on_parameter_server_get_parameters_single(
@@ -239,3 +255,11 @@ def test_on_parameter_server_add_to_parameters(
     )
     assert mock_system_parameter_server.store.parameters["param2"] == "param2_value"
     assert mock_system_parameter_server.store.parameters["param3"] == 6
+
+    # Test that the number of num_executor_failed got incremneted
+    mock_system_parameter_server.store._add_to_params = {"num_executor_failed": 1}
+
+    test_default_parameter_server.on_parameter_server_add_to_parameters(
+        mock_system_parameter_server
+    )
+    assert mock_system_parameter_server.store.parameters["num_executor_failed"] == 1

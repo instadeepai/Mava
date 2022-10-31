@@ -16,13 +16,31 @@
 # Unit tests for core Jax trainer component.
 
 from types import SimpleNamespace
-from typing import List
+from typing import Any, Dict, List
 
 import pytest
 
 from mava.callbacks import Callback
+from mava.systems import ParameterClient
 from mava.systems.trainer import Trainer
 from tests.hook_order_tracking import HookOrderTracking
+
+
+class MockParameterClient(ParameterClient):
+    def __init__(self) -> None:
+        """Initialise the parameter client"""
+        self.parameters = {"evaluator_or_trainer_failed": False}
+
+    def set_and_wait(self, params: Dict[str, Any] = None) -> None:
+        """Mock for set_and_wait method"""
+        if params is None:
+            pass
+        else:
+            names = params.keys()
+
+            for var_key in names:
+                assert var_key in self.parameters
+                self.parameters[var_key] += params[var_key]
 
 
 class TestTrainer(HookOrderTracking, Trainer):
@@ -39,11 +57,38 @@ class TestTrainer(HookOrderTracking, Trainer):
         super().__init__(config, components)
 
 
+class TestTrainerError(HookOrderTracking, Trainer):
+    __test__ = False
+
+    def __init__(
+        self,
+        config: SimpleNamespace,
+        components: List[Callback],
+    ) -> None:
+        """Initialise the trainer."""
+        self.reset_hook_list()
+
+        super().__init__(config, components)
+        self.store.trainer_parameter_client = MockParameterClient()
+
+    def step(self) -> None:
+        """Raise error in the step function"""
+        raise ValueError
+
+
 @pytest.fixture
 def mock_trainer() -> Trainer:
     """Create mock trainer."""
 
     trainer = TestTrainer(config=SimpleNamespace(), components=[])
+    return trainer
+
+
+@pytest.fixture
+def mock_trainer_with_error() -> Trainer:
+    """Create mock trainer."""
+
+    trainer = TestTrainerError(config=SimpleNamespace(), components=[])
     return trainer
 
 
@@ -71,3 +116,11 @@ def test_step_hook_order(mock_trainer: TestTrainer) -> None:
         "on_training_step",
         "on_training_step_end",
     ]
+
+
+def test_error_step(mock_trainer_with_error: TestTrainerError) -> None:
+    """Test if system stop once trainer step fails"""
+    mock_trainer_with_error.run()
+    assert mock_trainer_with_error.store.trainer_parameter_client.parameters == {
+        "evaluator_or_trainer_failed": True
+    }

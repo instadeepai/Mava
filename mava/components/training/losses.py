@@ -144,6 +144,11 @@ class Loss(Component):
 
 @dataclass
 class MAPGTrustRegionClippingLossConfig:
+    """The value_clip_parameter should be relatively small when value_normalization is True.
+
+    The idea is to scale it to try and match the effect of the normalisation on the target values.
+    """
+
     clipping_epsilon: float = 0.2
     value_clip_parameter: float = 0.2
     clip_value: bool = True
