@@ -19,8 +19,9 @@
 from types import SimpleNamespace
 from typing import List
 
-from mava.callbacks import Callback, TrainerHookMixin
 import tensorflow as tf
+
+from mava.callbacks import Callback, TrainerHookMixin
 from mava.core_jax import SystemTrainer
 from mava.utils.jax_training_utils import set_growing_gpu_memory_jax
 from mava.utils.training_utils import set_growing_gpu_memory
