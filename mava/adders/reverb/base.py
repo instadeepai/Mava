@@ -246,6 +246,10 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
                         else:
                             is_in_entry = False
                             break
+                        
+                    # This is not really necessary. It just makes debugging
+                    # easier in the single trainer setup.
+                    item_agents = sort_str_num(item_agents)
 
                     if is_in_entry:
                         # Write the subset of the trajectory experience to
