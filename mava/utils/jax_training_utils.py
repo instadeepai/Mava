@@ -41,40 +41,49 @@ def init_norm_params(stats_shape: Tuple) -> Dict[str, Union[jnp.array, float]]:
 
 
 def construct_norm_axes_list(
-    start_axes: int, axes_list: List[Any], obs_shape: Tuple
+    start_axes: int,
+    elements_to_norm: Union[List[Any], None],
+    obs_shape: Tuple,
 ) -> Tuple[slice, ...]:
     """Construt a list of Tuples containing the features on which to apply normalisation
+
     Args:
-        start_axes (int) --- default axes from which to start
-        axes_list (List[int]) --- user specified
+        start_axes (int): default axes from which to start,
+            this is always 0 unless we used one of the concatenate wrappers.
+        elements_to_norm: List of elements to normalize,
+            can be a list of ints for specifying each value to normalize
+            or can contain a tuple for a range of values to normalize.
         obs_shape (Tuple) --- observations shape
 
     Returns:
-        axes_list: a tuple to be used with np.r_
+        elements_to_norm: a tuple to be used with np.r_
 
     The start_axes is 0 unless we use a wrapper like concat_agent_id
     or concat_previous_actions which add one hot encorded vectors
     at the start of the array.
-    axes_list corresponds to user specified axes we want to normalise
-    We aussume the user does not consider contenation when specifying axes_list.
-    If axes_list is empty then we nornmalise all the axes
-    axes_list can contain single values or lists and tuples which corresponds to
+    elements_to_norm corresponds to user specified axes we want to normalise
+    We aussume the user does not consider contenation when specifying elements_to_norm.
+    If elements_to_norm is None then we nornmalise all the axes
+    elements_to_norm can contain single values or lists and tuples which corresponds to
     start and end values of axes slices. eg. [1, 2, [4,7], (9,15)]
+    If elements_to_norm is empty we do not normalize anything.
     If start_axes is different from 0 then we need offset all
-    the enteries in axes_list by the start_axes
-    For the axes_list [1, 2, [4,7], (9,15)] with start_axes = 0
+    the enteries in elements_to_norm by the start_axes
+    For the elements_to_norm [1, 2, [4,7], (9,15)] with start_axes = 0
     output is tuple([slice(1,2), slice(2,3), slice(4,7), slice(9,15)]).
-    if axes_list = [] and start_axes = 0
+    if elements_to_norm = [] and start_axes = 0
     output is tuple([slice(0, 15)]) assuming obs_shape = (15,)
     """
 
-    if len(axes_list) == 0:
-        return tuple([slice(start_axes, obs_shape[0])])
+    if elements_to_norm is None:
+        return tuple([slice(start_axes, obs_shape[0])])  # selects everything
+    elif len(elements_to_norm) == 0:
+        return tuple([slice(start_axes, start_axes)])  # selects nothing
     else:
         return_list = []
         starts = []
         ends = []
-        for x in axes_list:
+        for x in elements_to_norm:
             if type(x) == tuple or type(x) == list:
                 element = slice(x[0] + start_axes, x[1] + start_axes)
                 starts.append(x[0] + start_axes)

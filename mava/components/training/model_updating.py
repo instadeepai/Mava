@@ -18,7 +18,7 @@
 import abc
 from dataclasses import dataclass, field
 from functools import partial
-from typing import Any, Dict, List, Tuple, Type
+from typing import Any, Dict, List, Tuple, Type, Union
 
 import jax
 import jax.numpy as jnp
@@ -74,7 +74,9 @@ class MAPGMinibatchUpdateConfig:
     normalize_advantage: bool = True
     normalize_target_values: bool = False
     normalize_observations: bool = False
-    normalize_axes: List = field(default_factory=lambda: [])  # [1, 2, (4,7), [10,12]]
+    normalize_axes: Union[List[Any], None] = field(
+        default_factory=lambda: None
+    )  # [1, 2, (4,7), [10,12]]
 
 
 class MAPGMinibatchUpdate(MinibatchUpdate):

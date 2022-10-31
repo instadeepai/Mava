@@ -1,3 +1,5 @@
+from typing import Any, List, Union
+
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -16,27 +18,33 @@ from mava.utils.jax_training_utils import (
 def test_construct_norm_axes_list() -> None:
     """Test if slices element are construced correctly"""
 
+    elements_to_norm: Union[List[Any], None]
     start_axes = 5
     obs_shape = (20,)
-    axes_list = [1, 2, [5, 8], (10, 12)]
+    elements_to_norm = [1, 2, [5, 8], (10, 12)]
 
-    return_list = construct_norm_axes_list(start_axes, axes_list, obs_shape)
+    return_list = construct_norm_axes_list(start_axes, elements_to_norm, obs_shape)
     expected_list = tuple([slice(6, 7), slice(7, 8), slice(10, 13), slice(15, 17)])
     assert return_list == expected_list
 
     start_axes = 0
-    axes_list = []
-    return_list = construct_norm_axes_list(start_axes, axes_list, obs_shape)
+    elements_to_norm = []
+    return_list = construct_norm_axes_list(start_axes, elements_to_norm, obs_shape)
+    expected_list = tuple([slice(0, 0)])
+    assert return_list == expected_list
+
+    elements_to_norm = None
+    return_list = construct_norm_axes_list(start_axes, elements_to_norm, obs_shape)
     expected_list = tuple([slice(0, 20)])
     assert return_list == expected_list
 
     with pytest.raises(ValueError):
         start_axes = 0
-        axes_list = [1, 2, [5, 8], (10, 27)]
-        return_list = construct_norm_axes_list(start_axes, axes_list, obs_shape)
+        elements_to_norm = [1, 2, [5, 8], (10, 27)]
+        return_list = construct_norm_axes_list(start_axes, elements_to_norm, obs_shape)
 
-        axes_list = [1, 2, [5, 8], (27, 30)]
-        return_list = construct_norm_axes_list(start_axes, axes_list, obs_shape)
+        elements_to_norm = [1, 2, [5, 8], (27, 30)]
+        return_list = construct_norm_axes_list(start_axes, elements_to_norm, obs_shape)
 
 
 def test_compute_running_mean_var_count() -> None:
