@@ -276,6 +276,13 @@ class MAPGEpochUpdate(EpochUpdate):
 
             base_key, shuffle_key = jax.random.split(key)
 
+            # Check that our obs have correct batch shape
+            sample_observation = jax.tree_util.tree_leaves(list(batch.observations.values())[0].observation)[0]
+            assert (
+                sample_observation.shape[0]
+                == trainer.store.full_batch_size
+            )
+
             permutation = jax.random.permutation(
                 shuffle_key, trainer.store.full_batch_size
             )
