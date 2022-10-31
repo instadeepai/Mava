@@ -16,13 +16,13 @@
 """A simple multi-agent-system-environment training loop."""
 
 import time
+import tensorflow as tf
 from typing import Any, Dict, Tuple
 
 import acme
 import dm_env
 import jax
 import numpy as np
-import tensorflow as tf
 from acme.utils import counting, loggers
 
 import mava
@@ -282,13 +282,11 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     tf.print(
                         e, ": Experiment terminated due to an error on the evaluator."
                     )
-                    time.sleep(60)
                     self._executor.store.executor_parameter_client.set_and_wait(
                         {"evaluator_or_trainer_failed": True}
                     )
                 else:
                     tf.print(e, ": an executor failed.")
-                    time.sleep(60)
                     self._executor.store.executor_parameter_client.add_and_wait(
                         {"num_executor_failed": 1}
                     )

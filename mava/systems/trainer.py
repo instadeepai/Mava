@@ -20,6 +20,7 @@ from types import SimpleNamespace
 from typing import List
 
 from mava.callbacks import Callback, TrainerHookMixin
+import tensorflow as tf
 from mava.core_jax import SystemTrainer
 from mava.utils.jax_training_utils import set_growing_gpu_memory_jax
 from mava.utils.training_utils import set_growing_gpu_memory
@@ -73,7 +74,7 @@ class Trainer(SystemTrainer, TrainerHookMixin):
             try:
                 self.step()
             except Exception as e:
-                print(e, "the trainer failed")
+                tf.print(e, "the trainer failed")
                 self.store.trainer_parameter_client.set_and_wait(
                     {"evaluator_or_trainer_failed": True}
                 )
