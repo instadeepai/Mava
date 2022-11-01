@@ -267,24 +267,28 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         or best_performance < results["mean_episode_return"]
                     ):
                         best_performance = results["mean_episode_return"]
+                        params = {}
+                        params["mean_episode_return"] = {}
                         for agent_net_key in self._executor.store.networks.keys():
-                            # Ensure obs and target networks are sonnet modules
-                            self._executor.store.executor_parameter_client.set_and_wait(
-                                {
-                                    f"best_policy_network-{agent_net_key}": self._executor.store.networks[
-                                        agent_net_key
-                                    ].policy_params,
-                                    f"best_critic_network-{agent_net_key}": self._executor.store.networks[
-                                        agent_net_key
-                                    ].critic_params,
-                                    f"best_policy_opt_state-{agent_net_key}": self._executor.store.policy_opt_states[
-                                        agent_net_key
-                                    ],
-                                    f"best_critic_opt_state-{agent_net_key}": self._executor.store.critic_opt_states[
-                                        agent_net_key
-                                    ],
-                                }
-                            )
+                            params["mean_episode_return"][
+                                f"policy_network-{agent_net_key}"
+                            ] = self._executor.store.networks[
+                                agent_net_key
+                            ].policy_params
+                            params["mean_episode_return"][
+                                f"critic_network-{agent_net_key}"
+                            ] = self._executor.store.networks[
+                                agent_net_key
+                            ].critic_params
+                            params["mean_episode_return"][
+                                f"policy_opt_state-{agent_net_key}"
+                            ] = self._executor.store.policy_opt_states[agent_net_key]
+                            params["mean_episode_return"][
+                                f"critic_opt_state-{agent_net_key}"
+                            ] = self._executor.store.critic_opt_states[agent_net_key]
+                        self._executor.store.executor_parameter_client.set_and_wait(
+                            {"best_checkpoint": params}
+                        )
                 else:
                     result = self.run_episode()
                     # Log the given results.

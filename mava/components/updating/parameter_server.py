@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Sequence, Type, Union
 
 import numpy as np
+import tensorflow as tf
 
 from mava.callbacks import Callback
 from mava.components.building.networks import Networks
@@ -31,7 +32,6 @@ from mava.utils.lp_utils import termination_fn
 class ParameterServerConfig:
     non_blocking_sleep_seconds: int = 10
     experiment_path: str = "~/mava/"
-    best_checkpointer: bool = False
 
 
 class ParameterServer(Component):
@@ -145,23 +145,23 @@ class DefaultParameterServer(ParameterServer):
         # Interrupt the system in case all the executors failed
         server.store.parameters["num_executor_failed"] = 0
 
-        # Checkpoint network with best performance
-        if self.config.best_checkpointer:
-            # Network parameters
+        server.store.parameters["best_checkpoint"] = {}
+        metrics = ["mean_episode_return"]
+        # Initiate best performance network values
+        for metric in metrics:
+            server.store.parameters["best_checkpoint"][metric] = {}
             for agent_net_key in networks.keys():
-                # Ensure obs and target networks are sonnet modules
-                server.store.parameters[
-                    f"best_policy_network-{agent_net_key}"
+                server.store.parameters["best_checkpoint"][metric][
+                    f"policy_network-{agent_net_key}"
                 ] = networks[agent_net_key].policy_params
-                # Ensure obs and target networks are sonnet modules
-                server.store.parameters[
-                    f"best_critic_network-{agent_net_key}"
+                server.store.parameters["best_checkpoint"][metric][
+                    f"critic_network-{agent_net_key}"
                 ] = networks[agent_net_key].critic_params
-                server.store.parameters[
-                    f"best_policy_opt_state-{agent_net_key}"
+                server.store.parameters["best_checkpoint"][metric][
+                    f"policy_opt_state-{agent_net_key}"
                 ] = server.store.policy_opt_states[agent_net_key]
-                server.store.parameters[
-                    f"best_critic_opt_state-{agent_net_key}"
+                server.store.parameters["best_checkpoint"][metric][
+                    f"critic_opt_state-{agent_net_key}"
                 ] = server.store.critic_opt_states[agent_net_key]
 
     # Get
