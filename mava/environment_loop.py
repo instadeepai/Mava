@@ -243,6 +243,9 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             )
             evaluation_duration = eval_duration_condition[1]
 
+        # best_performance variable to keep track with the best performance
+        best_performance: Dict[str, Any] = {}
+
         def step_executor() -> None:
             if (not environment_loop_schedule) or (
                 should_run_loop(eval_interval_condition)
@@ -267,11 +270,12 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                             metric in results.keys()
                         ), f"The metric chosen to checkpoint it best performance doesn't exist.\
                             This experiment has only the following metrics {results.keys()}"
+
                         if (
-                            "best_performance" not in locals()
-                            or best_performance < results[metric]  # type: ignore
+                            metric not in best_performance.keys()
+                            or best_performance[metric] < results[metric]  # type: ignore
                         ):
-                            best_performance = update_best_checkpoint(
+                            best_performance[metric] = update_best_checkpoint(
                                 self._executor, results, metric
                             )
                 else:
