@@ -108,6 +108,8 @@ def mock_system_parameter_server() -> SystemParameterServer:
         "num_executor_failed": 0,
     }
 
+    mock_system_parameter_server.store.metrics_checkpoint = ["mean_episode_return"]
+
     mock_system_parameter_server.store.num_executors = 2
 
     return mock_system_parameter_server
