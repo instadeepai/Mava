@@ -55,7 +55,9 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             network: executor.store.networks[network].get_params()
             for network in executor.store.agent_net_keys.values()
         }
-        
+        # TODO (sasha): the base executor requires this to be set, 
+        #  so maybe set it once and forget or refactor the base executor?
+        executor.store.policies_info = None  
         (
             executor.store.actions_info,
             executor.store.base_key,
@@ -131,10 +133,13 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
                 network = networks[agent_net_keys[agent]]
                 actions_info[agent], base_key = select_action(
                     observation=observation,
-                    current_params=current_params[agent_net_keys[agent]],
+                    # TODO (sasha): why does the PPO system not need to index 
+                    #  ["policy_network"] into this dict?
+                    current_params=current_params[agent_net_keys[agent]]["policy_network"],
                     network=network,
                     base_key=base_key,
                 )
             return actions_info, base_key
 
-        executor.store.select_actions_fn = jax.jit(select_actions)
+        # executor.store.select_actions_fn = jax.jit(select_actions)
+        executor.store.select_actions_fn = select_actions

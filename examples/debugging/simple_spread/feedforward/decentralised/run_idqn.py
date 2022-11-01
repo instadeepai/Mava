@@ -98,7 +98,7 @@ def main(_: Any) -> None:
         run_evaluator=True,
         sample_batch_size=32,
         num_executors=1,
-        multi_process=True,
+        multi_process=False,
         min_data_server_size=10,
     )
 

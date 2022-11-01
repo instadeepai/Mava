@@ -15,12 +15,12 @@ class IDQNNetwork:
         self.target_policy_params: networks_lib.Params = copy.deepcopy(policy_params)
         self.policy_network: networks_lib.FeedForwardNetwork = network
 
-        def forward_fn(policy_params,observations):
+        def forward_fn(policy_params: Dict[str, jnp.ndarray], observations: networks_lib.Observation):
             return self.policy_network.apply(policy_params, observations)
 
         self.forward = forward_fn
 
-    def get_aciton(self, params, observations, epsilon, base_key, mask: jnp.array):
+    def get_action(self, params, observations, epsilon, base_key, mask: jnp.array):
         q_values = self.forward(params, observations)
         masked_q_values = jnp.where(mask == 1.0, q_values, -99999)  # todo
 
