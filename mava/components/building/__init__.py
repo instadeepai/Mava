@@ -19,8 +19,10 @@ from mava.components.building.adders import (
     ParallelSequenceAdder,
     ParallelSequenceAdderSignature,
     UniformAdderPriority,
+    ParallelTransitionAdder,
+    ParallelTransitionAdderSignature
 )
-from mava.components.building.data_server import OnPolicyDataServer
+from mava.components.building.data_server import OnPolicyDataServer, OffPolicyDataServer
 from mava.components.building.datasets import TrajectoryDataset, TransitionDataset
 from mava.components.building.distributor import Distributor
 from mava.components.building.environments import (
@@ -39,3 +41,5 @@ from mava.components.building.system_init import (
     FixedNetworkSystemInit,
     RandomSamplingSystemInit,
 )
+
+from mava.components.building import reverb_components

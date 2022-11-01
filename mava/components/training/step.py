@@ -80,7 +80,7 @@ class TrainerStep(Component):
         Returns:
             List of required component classes.
         """
-        return [TrajectoryDataset, Step, TrainerParameterClient, Logger]
+        return [TrainerDataset, Step, TrainerParameterClient, Logger]
 
 
 class DefaultTrainerStep(TrainerStep):
