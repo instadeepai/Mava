@@ -16,7 +16,7 @@
 """Utils to checkpoint the network of the best performance of an algorithm"""
 from typing import Any, Dict
 
-from mava.core_jax import SystemExecutor
+from mava.core_jax import SystemExecutor, SystemParameterServer
 
 
 def update_best_checkpoint(
@@ -43,3 +43,32 @@ def update_best_checkpoint(
             {"best_checkpoint": params}
         )
     return best_performance
+
+
+def update_to_best_net(server: SystemParameterServer, metric: str) -> None:
+    """Restore the network to have the values of the network with best performance"""
+    assert (
+        "best_checkpoint" in server.store.parameters.keys()
+    ), "Can't find the restored best network checkpointed"
+    assert (
+        metric in server.store.parameters["best_checkpoint"].keys()
+    ), f"The metric chosen does not exist in the checkpointed networks.\
+        The best checkpointed network only available for the following\
+            metrics {server.store.parameters['best_checkpoint'].keys()}"
+    network = server.store.parameters["best_checkpoint"][metric]
+    # Update network
+    for agent_net_key in server.store.agents_net_keys:
+        # Ensure obs and target networks are sonnet modules
+        server.store.parameters[f"policy_network-{agent_net_key}"] = network[
+            f"policy_network-{agent_net_key}"
+        ]
+        # Ensure obs and target networks are sonnet modules
+        server.store.parameters[f"critic_network-{agent_net_key}"] = network[
+            f"critic_network-{agent_net_key}"
+        ]
+        server.store.parameters[f"policy_opt_state-{agent_net_key}"] = network[
+            f"policy_opt_state-{agent_net_key}"
+        ]
+        server.store.parameters[f"critic_opt_state-{agent_net_key}"] = network[
+            f"critic_opt_state-{agent_net_key}"
+        ]

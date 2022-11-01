@@ -107,6 +107,9 @@ class DefaultParameterServer(ParameterServer):
         """
         networks = server.store.network_factory()
 
+        # Store net_keys
+        server.store.agents_net_keys = list(networks.keys())
+
         # Create parameters
         server.store.parameters = {
             "trainer_steps": np.zeros(1, dtype=np.int32),
