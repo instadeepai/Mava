@@ -16,7 +16,6 @@
 """A simple multi-agent-system-environment training loop."""
 
 import time
-from threading import local
 from typing import Any, Dict, Tuple
 
 import acme
@@ -26,6 +25,7 @@ import numpy as np
 from acme.utils import counting, loggers
 
 import mava
+from mava.utils.checkpointing_utils import update_best_checkpoint
 from mava.utils.training_utils import check_count_condition
 from mava.utils.wrapper_utils import generate_zeros_from_spec
 
@@ -262,33 +262,18 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         results.update(self._environment.get_interval_stats())
                     self._logger.write(results)
                     # Best_performance_update
-                    if (
-                        not "best_performance" in locals()
-                        or best_performance < results["mean_episode_return"]
-                    ):
-                        best_performance = results["mean_episode_return"]
-                        params = {}
-                        params["mean_episode_return"] = {}
-                        for agent_net_key in self._executor.store.networks.keys():
-                            params["mean_episode_return"][
-                                f"policy_network-{agent_net_key}"
-                            ] = self._executor.store.networks[
-                                agent_net_key
-                            ].policy_params
-                            params["mean_episode_return"][
-                                f"critic_network-{agent_net_key}"
-                            ] = self._executor.store.networks[
-                                agent_net_key
-                            ].critic_params
-                            params["mean_episode_return"][
-                                f"policy_opt_state-{agent_net_key}"
-                            ] = self._executor.store.policy_opt_states[agent_net_key]
-                            params["mean_episode_return"][
-                                f"critic_opt_state-{agent_net_key}"
-                            ] = self._executor.store.critic_opt_states[agent_net_key]
-                        self._executor.store.executor_parameter_client.set_and_wait(
-                            {"best_checkpoint": params}
-                        )
+                    for metric in self._executor.store.metrics_checkpoint:
+                        assert (
+                            metric in results.keys()
+                        ), f"The metric chosen to checkpoint it best performance doesn't exist.\
+                            This experiment has only the following metrics {results.keys()}"
+                        if (
+                            "best_performance" not in locals()
+                            or best_performance < results[metric]  # type: ignore
+                        ):
+                            best_performance = update_best_checkpoint(
+                                self._executor, results, metric
+                            )
                 else:
                     result = self.run_episode()
                     # Log the given results.

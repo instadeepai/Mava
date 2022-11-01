@@ -19,7 +19,6 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Sequence, Type, Union
 
 import numpy as np
-import tensorflow as tf
 
 from mava.callbacks import Callback
 from mava.components.building.networks import Networks
@@ -145,10 +144,9 @@ class DefaultParameterServer(ParameterServer):
         # Interrupt the system in case all the executors failed
         server.store.parameters["num_executor_failed"] = 0
 
-        server.store.parameters["best_checkpoint"] = {}
-        metrics = ["mean_episode_return"]
         # Initiate best performance network values
-        for metric in metrics:
+        server.store.parameters["best_checkpoint"] = {}
+        for metric in server.store.metrics_checkpoint:
             server.store.parameters["best_checkpoint"][metric] = {}
             for agent_net_key in networks.keys():
                 server.store.parameters["best_checkpoint"][metric][

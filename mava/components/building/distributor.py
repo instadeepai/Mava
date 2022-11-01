@@ -15,7 +15,7 @@
 
 """Commonly used distributor components for system builders"""
 from dataclasses import dataclass
-from typing import List, Optional, Type, Union
+from typing import List, Optional, Tuple, Type, Union
 
 import jax
 
@@ -37,6 +37,7 @@ class DistributorConfig:
     single_process_max_episodes: Optional[int] = None
     is_test: Optional[bool] = False
     wait: Optional[bool] = False
+    metrics_checkpoint: Tuple = ("mean_episode_return",)
 
 
 class Distributor(Component):
@@ -74,6 +75,9 @@ class Distributor(Component):
 
         # Save number of the executors
         builder.store.num_executors = self.config.num_executors
+
+        # Save list of metrics to checkpoint it best performance
+        builder.store.metrics_checkpoint = list(self.config.metrics_checkpoint)
 
         # Generate keys for the data_server, parameter_server and evaluator.
         (
