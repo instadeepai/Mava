@@ -60,7 +60,7 @@ class IDQNSystem(System):
             executor_select_action=dqn_executing.FeedforwardExecutorSelectAction,
             executor_adder=ParallelTransitionAdder,
             adder_priority=building.UniformAdderPriority,
-            rate_limiter=building.reverb_components.MinSizeRateLimiter,
+            rate_limiter=building.reverb_components.SampleToInsertRateLimiter,
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
             networks=building.DefaultNetworks,
             optimisers=dqn_building.Optimiser,
