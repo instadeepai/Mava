@@ -15,6 +15,7 @@
 
 """Execution components for system builders"""
 
+from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any, Dict, List, Tuple, Type
 
@@ -26,11 +27,16 @@ from mava.components.executing.action_selection import ExecutorSelectAction
 from mava.core_jax import SystemExecutor
 from mava.types import NestedArray
 
+@dataclass
+class FeedforwardExecutorSelectActionConfig:
+    epsilon_min: float = 0.05
+    epsilon_decay_timesteps: float = 10_000
+
 
 class FeedforwardExecutorSelectAction(ExecutorSelectAction):
     def __init__(
         self,
-        config: SimpleNamespace = SimpleNamespace(),
+        config: FeedforwardExecutorSelectActionConfig = FeedforwardExecutorSelectActionConfig(),
     ):
         """Component defines hooks for the executor selecting actions.
 
@@ -38,32 +44,6 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             config: SimpleNamespace.
         """
         self.config = config
-
-    # Select actions
-    def on_execution_select_actions(self, executor: SystemExecutor) -> None:
-        """Select actions for each agent and save info in store.
-
-        Args:
-            executor: SystemExecutor.
-
-        Returns:
-            None.
-        """
-
-        # Dict with params per network
-        current_agent_params = {
-            network: executor.store.networks[network].get_params()
-            for network in executor.store.agent_net_keys.values()
-        }
-        # TODO (sasha): the base executor requires this to be set, 
-        #  so maybe set it once and forget or refactor the base executor?
-        executor.store.policies_info = None  
-        (
-            executor.store.actions_info,
-            executor.store.base_key,
-        ) = executor.store.select_actions_fn(
-            executor.store.observations, current_agent_params, executor.store.base_key
-        )
 
     def on_execution_init_end(self, executor: SystemExecutor) -> None:
         """Create function that is used to select actions.
@@ -74,6 +54,10 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
         Returns:
             None.
         """
+        # Epsilon Scheduling
+        executor.store.num_action_selections = 0.
+
+
         networks = executor.store.networks
         agent_net_keys = executor.store.agent_net_keys
 
@@ -82,6 +66,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             current_params: NestedArray,
             network: Any,
             base_key: networks_lib.PRNGKey,
+            epsilon: float
         ) -> Tuple[NestedArray, NestedArray, networks_lib.PRNGKey]:
             """Action selection across a single agent.
 
@@ -95,7 +80,6 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
                 action info, policy info and new key.
             """
             observation_data = utils.add_batch_dim(observation.observation)
-            epsilon = 0.1  # TODO!
 
             # We use the action_key immediately and keep the new key for future splits.
             base_key, action_key = jax.random.split(base_key)
@@ -106,12 +90,13 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
                 base_key=action_key,
                 mask=utils.add_batch_dim(observation.legal_actions),
             )
-            return action_info, base_key
+            return jax.numpy.squeeze(action_info), base_key
 
         def select_actions(
             observations: Dict[str, NestedArray],
             current_params: Dict[str, NestedArray],
             base_key: networks_lib.PRNGKey,
+            epsilon: float
         ) -> Tuple[
             Dict[str, NestedArray], Dict[str, NestedArray], networks_lib.PRNGKey
         ]:
@@ -138,8 +123,46 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
                     current_params=current_params[agent_net_keys[agent]]["policy_network"],
                     network=network,
                     base_key=base_key,
+                    epsilon=epsilon
                 )
             return actions_info, base_key
 
         # executor.store.select_actions_fn = jax.jit(select_actions)
         executor.store.select_actions_fn = select_actions
+
+
+    # Select actions
+    def on_execution_select_actions(self, executor: SystemExecutor) -> None:
+        """Select actions for each agent and save info in store.
+
+        Args:
+            executor: SystemExecutor.
+
+        Returns:
+            None.
+        """
+
+        # Dict with params per network
+        current_agent_params = {
+            network: executor.store.networks[network].get_params()
+            for network in executor.store.agent_net_keys.values()
+        }
+
+        # Epsilon Scheduling
+        # TODO add epsilon to logs
+        executor.store.num_action_selections += 1.
+        epsilon = max(self.config.epsilon_min, 1. - (1. / self.config.epsilon_decay_timesteps) * executor.store.num_action_selections)
+        if executor._evaluator:
+            epsilon = 0.
+        
+        executor.store.episode_metrics["epsilon"] = epsilon
+
+        # TODO (sasha): the base executor requires this to be set, 
+        #  so maybe set it once and forget or refactor the base executor?
+        executor.store.policies_info = None  
+        (
+            executor.store.actions_info,
+            executor.store.base_key,
+        ) = executor.store.select_actions_fn(
+            executor.store.observations, current_agent_params, executor.store.base_key, epsilon
+        )

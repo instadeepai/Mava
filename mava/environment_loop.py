@@ -77,6 +77,9 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         # We need this to schedule evaluation/test runs
         self._last_evaluator_run_t = -1
 
+        # create logging dict for logging executor related stuff
+        executor.store.episode_metrics = {}
+
     def _get_actions(self, timestep: dm_env.TimeStep) -> Any:
         return self._executor.select_actions(timestep.observation)
 
@@ -113,6 +116,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
         # Reset any counts and start the environment.
         start_time = time.time()
+        self._executor.store.episode_metrics = {}  # clear metrics at the start of each episode
         episode_steps = 0
 
         timestep = self._environment.reset()
@@ -176,7 +180,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             start_time,
         )
         if self._get_running_stats():
-            return self._get_running_stats()
+            return {**self._get_running_stats(), **self._executor.store.episode_metrics}
         else:
             counts = self.record_counts(episode_steps)
 
@@ -186,8 +190,10 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 "episode_length": episode_steps,
                 "mean_episode_return": np.mean(list(episode_returns.values())),
                 "steps_per_second": steps_per_second,
+                **counts,
+                **self._executor.store.episode_metrics
             }
-            result.update(counts)
+            # result.update(counts)
             return result
 
     def run_episode_and_log(self) -> loggers.LoggingData:

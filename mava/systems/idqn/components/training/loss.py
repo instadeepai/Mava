@@ -127,7 +127,7 @@ class IDQNLoss(Loss):
                         True,
                     )
 
-                    loss = rlax.l2_loss(error)
+                    loss = jax.numpy.mean(rlax.l2_loss(error))
 
                     # TODO: (Ruan) Keeping the entropy penalty for now.
                     # can remove or add a flag for including it.
@@ -140,14 +140,14 @@ class IDQNLoss(Loss):
                 policy_grads[agent_key], loss_info_policy[agent_key] = jax.grad(
                     policy_loss_fn, has_aux=True
                 )(
-                    policy_params[agent_key],
+                    policy_params[agent_net_key],
                     target_policy_params[agent_net_key],
                     observations[agent_key].observation,
                     actions[agent_key],
-                    rewards[agent_net_key],
-                    next_observations[agent_key],
-                    discounts[agent_net_key],
-                    observations[agent_net_key].legal_actions,
+                    rewards[agent_key],
+                    next_observations[agent_key].observation,
+                    discounts[agent_key],
+                    next_observations[agent_key].legal_actions,
                 )
             return policy_grads, loss_info_policy
 

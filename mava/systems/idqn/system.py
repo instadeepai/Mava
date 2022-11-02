@@ -22,6 +22,7 @@ from mava.components.building.adders import ParallelTransitionAdder
 from mava.components.building.guardrails import ComponentDependencyGuardrails
 from mava.specs import DesignSpec
 from mava.systems import System
+from mava.systems.idqn.components.building.extras_spec import DQNExtrasSpec
 from mava.systems.idqn.config import IDQNDefaultConfig
 from mava.systems.ippo.components import ExtrasLogProbSpec
 
@@ -81,7 +82,7 @@ class IDQNSystem(System):
             data_server_adder_signature=building.ParallelTransitionAdderSignature,
             data_server_remover=building.reverb_components.FIFORemover,
             data_server_sampler=building.reverb_components.UniformSampler,
-            # extras_spec=ExtrasLogProbSpec,
+            extras_spec=DQNExtrasSpec,
         ).get()
 
         # Parameter Server
