@@ -215,8 +215,8 @@ class DefaultParameterServer(ParameterServer):
                 # # Loop through tuple
                 # for var_i in range(len(server.store.parameters[var_key])):
                 #     server.store.parameters[var_key][var_i].assign(params[var_key][var_i])
-            elif type(server.store.parameters[var_key]) == dict:
-                # In case we have 2 dimensional dict
+            elif var_key == "best_checkpoint":
+                # Set best checkpoint values
                 for name in params[var_key].keys():
                     server.store.parameters[var_key][name] = params[var_key][name]
             else:
