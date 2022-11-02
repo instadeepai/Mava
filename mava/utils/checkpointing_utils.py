@@ -58,11 +58,9 @@ def update_to_best_net(server: SystemParameterServer, metric: str) -> None:
     network = server.store.parameters["best_checkpoint"][metric]
     # Update network
     for agent_net_key in server.store.agents_net_keys:
-        # Ensure obs and target networks are sonnet modules
         server.store.parameters[f"policy_network-{agent_net_key}"] = network[
             f"policy_network-{agent_net_key}"
         ]
-        # Ensure obs and target networks are sonnet modules
         server.store.parameters[f"critic_network-{agent_net_key}"] = network[
             f"critic_network-{agent_net_key}"
         ]
