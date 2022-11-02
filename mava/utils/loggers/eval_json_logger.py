@@ -122,7 +122,13 @@ class JSONLogger:
         }
         """
 
-        self._jsonify_and_process(results_dict=results_dict)
+        eval_dict = {
+            "_".join(str(k).split("_")[1:]): v
+            for k, v in results_dict.items()
+            if str(k).split("_")[0] == "eval"
+        }
+
+        self._jsonify_and_process(results_dict=eval_dict)
 
         # Load current logged data
         with open(self._logs_file_dir, "r") as f:

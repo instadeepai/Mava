@@ -266,27 +266,29 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
                     # Log evaluation interval results for json logging
                     eval_result = {
-                        "step_count": jnp.array([self._last_evaluator_run_t]),
-                        "return": jnp.array(eval_returns),
+                        "eval_step_count": jnp.array(self._last_evaluator_run_t),
+                        "eval_return": jnp.array(eval_returns),
                     }
 
                     # Check for extra logs
                     if hasattr(self._environment, "get_interval_stats"):
                         interval_stats = self._environment.get_interval_stats()
                         results.update(interval_stats)
+                        interval_stats_json = {
+                            "eval_" + str(k): v for k, v in interval_stats.items()
+                        }
 
                         # Add interval stats to dictionary for json logging
                         eval_result.update(
                             jax.tree_util.tree_map(
-                                lambda leaf: jnp.array([leaf]), interval_stats
+                                lambda leaf: jnp.array([leaf]), interval_stats_json
                             )
                         )
 
+                    results.update(eval_result)
                     self._logger.write(results)
 
-                    self._executor.store.eval_json_logger.write(
-                        results_dict=eval_result
-                    )
+                    self._executor.store.eval_json_logger.write(results_dict=results)
 
                 else:
                     result = self.run_episode()
