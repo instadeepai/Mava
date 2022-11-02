@@ -178,7 +178,7 @@ class Launcher:
             worker_manager = lp.launch(
                 self._program,
                 launch_type=launch_type,
-                terminal=self._terminal,
+                # terminal=self._terminal,
                 local_resources=local_resources,
             )
 
