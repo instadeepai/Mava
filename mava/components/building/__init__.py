@@ -20,7 +20,7 @@ from mava.components.building.adders import (
     ParallelSequenceAdderSignature,
     UniformAdderPriority,
     ParallelTransitionAdder,
-    ParallelTransitionAdderSignature
+    ParallelTransitionAdderSignature,
 )
 from mava.components.building.data_server import OnPolicyDataServer, OffPolicyDataServer
 from mava.components.building.datasets import TrajectoryDataset, TransitionDataset
@@ -35,6 +35,8 @@ from mava.components.building.optimisers import DefaultOptimisers
 from mava.components.building.parameter_client import (
     ExecutorParameterClient,
     TrainerParameterClient,
+    ActorCriticExecutorParameterClient,
+    ActorCriticTrainerParameterClient,
 )
 from mava.components.building.system_init import (
     CustomSamplingSystemInit,

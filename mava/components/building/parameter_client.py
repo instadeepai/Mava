@@ -106,18 +106,6 @@ class ExecutorParameterClient(BaseParameterClient):
             ].policy_params
             get_keys.append(policy_param_key)
 
-            # TODO (sasha): make dqn specific one
-            # critic_param_key = f"critic_network-{agent_net_key}"
-            # params[critic_param_key] = builder.store.networks[
-            #     agent_net_key
-            # ].critic_params
-            # get_keys.append(critic_param_key)
-
-        # Create observations' normalisation parameters
-        # TODO (sasha): make dqn specific one
-        # params["norm_params"] = builder.store.norm_params
-        # get_keys.append("norm_params")
-
         count_names, params = self._set_up_count_parameters(params=params)
 
         get_keys.extend(count_names)
@@ -145,6 +133,65 @@ class ExecutorParameterClient(BaseParameterClient):
     def name() -> str:
         """Static method that returns component name."""
         return "executor_parameter_client"
+
+
+# TODO (sasha): there needs to be a better way to do this without all this code duplication?
+class ActorCriticExecutorParameterClient(ExecutorParameterClient):
+    def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
+        """Create and store the executor parameter client.
+
+        Gets network parameters from store and registers them for tracking.
+        Also works for the evaluator.
+
+        Args:
+            builder: SystemBuilder.
+        """
+        # Create policy parameters
+        params: Dict[str, Any] = {}
+        # Executor does not explicitly set variables i.e. it adds to count variables
+        # and hence set_keys is empty
+        set_keys: List[str] = []
+        get_keys: List[str] = []
+
+        for agent_net_key in builder.store.networks.keys():
+            policy_param_key = f"policy_network-{agent_net_key}"
+            params[policy_param_key] = builder.store.networks[
+                agent_net_key
+            ].policy_params
+            get_keys.append(policy_param_key)
+
+            critic_param_key = f"critic_network-{agent_net_key}"
+            params[critic_param_key] = builder.store.networks[
+                agent_net_key
+            ].critic_params
+            get_keys.append(critic_param_key)
+
+        # Create observations' normalisation parameters
+        params["norm_params"] = builder.store.norm_params
+        get_keys.append("norm_params")
+
+        count_names, params = self._set_up_count_parameters(params=params)
+
+        get_keys.extend(count_names)
+
+        builder.store.executor_counts = {name: params[name] for name in count_names}
+
+        parameter_client = None
+        if builder.store.parameter_server_client:
+            # Create parameter client
+            parameter_client = ParameterClient(
+                client=builder.store.parameter_server_client,
+                parameters=params,
+                get_keys=get_keys,
+                set_keys=set_keys,
+                update_period=self.config.executor_parameter_update_period,
+            )
+
+            # Make sure not to use a random policy after checkpoint restoration by
+            # assigning parameters before running the environment loop.
+            parameter_client.get_and_wait()
+
+        builder.store.executor_parameter_client = parameter_client
 
 
 @dataclass
@@ -185,35 +232,16 @@ class TrainerParameterClient(BaseParameterClient):
             params[f"policy_network-{net_key}"] = builder.store.networks[
                 net_key
             ].policy_params
-            # TODO (sasha): make dqn specific one
-            # params[f"critic_network-{net_key}"] = builder.store.networks[
-            #     net_key
-            # ].critic_params
 
             if net_key in set(trainer_networks):
                 set_keys.append(f"policy_network-{net_key}")
-                # TODO (sasha): make dqn specific one
-                # set_keys.append(f"critic_network-{net_key}")
             else:
                 get_keys.append(f"policy_network-{net_key}")
-                # TODO (sasha): make dqn specific one
-                # get_keys.append(f"critic_network-{net_key}")
 
             params[f"policy_opt_state-{net_key}"] = builder.store.policy_opt_states[
                 net_key
             ]
-            # TODO (sasha): make dqn specific one
-            # params[f"critic_opt_state-{net_key}"] = builder.store.critic_opt_states[
-            #     net_key
-            # ]
             set_keys.append(f"policy_opt_state-{net_key}")
-            # TODO (sasha): make dqn specific one
-            # set_keys.append(f"critic_opt_state-{net_key}")
-
-        # Add observations' normalisation parameters
-        # TODO (sasha): make dqn version?
-        # params["norm_params"] = builder.store.norm_params
-        # set_keys.append("norm_params")
 
         count_names, params = self._set_up_count_parameters(params=params)
 
@@ -240,3 +268,70 @@ class TrainerParameterClient(BaseParameterClient):
     def name() -> str:
         """Static method that returns component name."""
         return "trainer_parameter_client"
+
+
+class ActorCriticTrainerParameterClient(TrainerParameterClient):
+    def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
+        """Create and store the trainer parameter client.
+
+        Gets network parameters from store and registers them for tracking.
+
+        Args:
+            builder: SystemBuilder.
+        """
+        # Create parameter client
+        params: Dict[str, Any] = {}
+        set_keys: List[str] = []
+        get_keys: List[str] = []
+        # TODO (dries): Only add the networks this trainer is working with.
+        # Not all of them.
+        trainer_networks = builder.store.trainer_networks[builder.store.trainer_id]
+
+        for net_key in builder.store.networks.keys():
+            params[f"policy_network-{net_key}"] = builder.store.networks[
+                net_key
+            ].policy_params
+            params[f"critic_network-{net_key}"] = builder.store.networks[
+                net_key
+            ].critic_params
+
+            if net_key in set(trainer_networks):
+                set_keys.append(f"policy_network-{net_key}")
+                set_keys.append(f"critic_network-{net_key}")
+            else:
+                get_keys.append(f"policy_network-{net_key}")
+                get_keys.append(f"critic_network-{net_key}")
+
+            params[f"policy_opt_state-{net_key}"] = builder.store.policy_opt_states[
+                net_key
+            ]
+            params[f"critic_opt_state-{net_key}"] = builder.store.critic_opt_states[
+                net_key
+            ]
+            set_keys.append(f"policy_opt_state-{net_key}")
+            set_keys.append(f"critic_opt_state-{net_key}")
+
+        # Add observations' normalisation parameters
+        params["norm_params"] = builder.store.norm_params
+        set_keys.append("norm_params")
+
+        count_names, params = self._set_up_count_parameters(params=params)
+
+        get_keys.extend(count_names)
+        builder.store.trainer_counts = {name: params[name] for name in count_names}
+
+        # Create parameter client
+        parameter_client = None
+        if builder.store.parameter_server_client:
+            parameter_client = ParameterClient(
+                client=builder.store.parameter_server_client,
+                parameters=params,
+                get_keys=get_keys,
+                set_keys=set_keys,
+                update_period=self.config.trainer_parameter_update_period,
+            )
+
+            # Get all the initial parameters
+            parameter_client.get_all_and_wait()
+
+        builder.store.trainer_parameter_client = parameter_client

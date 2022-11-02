@@ -118,26 +118,12 @@ class DefaultParameterServer(ParameterServer):
         }
         # Network parameters
         for agent_net_key in networks.keys():
-            # Ensure obs and target networks are sonnet modules
             server.store.parameters[f"policy_network-{agent_net_key}"] = networks[
                 agent_net_key
             ].policy_params
-            # Ensure obs and target networks are sonnet modules
-            # TODO (sasha): make dqn specific one
-            # server.store.parameters[f"critic_network-{agent_net_key}"] = networks[
-            #     agent_net_key
-            # ].critic_params
             server.store.parameters[
                 f"policy_opt_state-{agent_net_key}"
             ] = server.store.policy_opt_states[agent_net_key]
-            # TODO (sasha): make dqn specific one
-            # server.store.parameters[
-            #     f"critic_opt_state-{agent_net_key}"
-            # ] = server.store.critic_opt_states[agent_net_key]
-
-        # Normalization parameters
-        # TODO (sasha): make dqn specific one
-        # server.store.parameters["norm_params"] = server.store.norm_params
 
         server.store.experiment_path = self.config.experiment_path
 
@@ -219,3 +205,28 @@ class DefaultParameterServer(ParameterServer):
         for var_key in names:
             assert var_key in server.store.parameters
             server.store.parameters[var_key] += params[var_key]
+
+
+class ActorCriticParameterServer(DefaultParameterServer):
+    def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
+        """Register parameters and network params to track.
+
+        Args:
+            server: SystemParameterServer.
+        """
+        super().on_parameter_server_init_start(server)
+        networks = server.store.network_factory()
+
+        # Store critic params (policy params storage done in super class)
+        for agent_net_key in networks.keys():
+            server.store.parameters[f"critic_network-{agent_net_key}"] = networks[
+                agent_net_key
+            ].critic_params
+
+            server.store.parameters[
+                f"critic_opt_state-{agent_net_key}"
+            ] = server.store.critic_opt_states[agent_net_key]
+
+        # TODO: normalisation should have its own component?
+        # Normalization parameters
+        server.store.parameters["norm_params"] = server.store.norm_params

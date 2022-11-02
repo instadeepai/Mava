@@ -80,9 +80,9 @@ class IPPOSystem(System):
 
         # Parameter Server
         parameter_server_process = DesignSpec(
-            parameter_server=updating.DefaultParameterServer,
-            executor_parameter_client=building.ExecutorParameterClient,
-            trainer_parameter_client=building.TrainerParameterClient,
+            parameter_server=updating.ActorCriticParameterServer,
+            executor_parameter_client=building.ActorCriticExecutorParameterClient,
+            trainer_parameter_client=building.ActorCriticTrainerParameterClient,
             termination_condition=updating.CountConditionTerminator,
             checkpointer=updating.Checkpointer,
         ).get()
