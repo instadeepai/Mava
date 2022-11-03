@@ -199,9 +199,6 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
                 trajectory=trajectory, trajectory_net_keys=trajectory_net_keys
             )
 
-            print("agents: ", agents)
-            print("trajectory_nets_agent: ", trajectory_nets_agent)
-
             # Flag to check if all experience was used
             created_item = False
 
