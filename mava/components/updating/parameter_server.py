@@ -24,6 +24,7 @@ from mava.callbacks import Callback
 from mava.components.building.networks import Networks
 from mava.components.component import Component
 from mava.core_jax import SystemParameterServer
+from mava.utils.lp_utils import termination_fn
 
 
 @dataclass
@@ -138,6 +139,12 @@ class DefaultParameterServer(ParameterServer):
 
         server.store.experiment_path = self.config.experiment_path
 
+        # Interrupt the system in case evaluator or trainer failed
+        server.store.parameters["evaluator_or_trainer_failed"] = False
+
+        # Interrupt the system in case all the executors failed
+        server.store.parameters["num_executor_failed"] = 0
+
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
         """Fetch the parameters from the server specified in the store.
@@ -158,6 +165,14 @@ class DefaultParameterServer(ParameterServer):
             for var_key in names:
                 get_params[var_key] = server.store.parameters[var_key]
         server.store.get_parameters = get_params
+
+        # Interrupt the system in case the evaluator or the trainer failed
+        if server.store.parameters["evaluator_or_trainer_failed"]:
+            termination_fn(server)
+
+        # Interrupt the system in case all the executors failed
+        if server.store.num_executors == server.store.parameters["num_executor_failed"]:
+            termination_fn(server)
 
     # Set
     def on_parameter_server_set_parameters(self, server: SystemParameterServer) -> None:

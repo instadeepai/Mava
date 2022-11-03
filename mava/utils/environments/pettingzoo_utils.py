@@ -136,6 +136,6 @@ def make_environment(
     }
 
     if concat_agent_id:
-        env = ConcatAgentIdToObservation(env)
+        environment = ConcatAgentIdToObservation(environment)  # type: ignore
 
     return environment, environment_task_name
