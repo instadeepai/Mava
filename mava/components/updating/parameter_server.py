@@ -15,6 +15,7 @@
 
 """Parameter server Component for Mava systems."""
 import abc
+import copy
 from dataclasses import dataclass
 from typing import Any, Dict, List, Sequence, Type, Union
 
@@ -157,16 +158,16 @@ class DefaultParameterServer(ParameterServer):
             for agent_net_key in networks.keys():
                 server.store.parameters["best_checkpoint"][metric][
                     f"policy_network-{agent_net_key}"
-                ] = networks[agent_net_key].policy_params
+                ] = copy.deepcopy(networks[agent_net_key].policy_params)
                 server.store.parameters["best_checkpoint"][metric][
                     f"critic_network-{agent_net_key}"
-                ] = networks[agent_net_key].critic_params
+                ] = copy.deepcopy(networks[agent_net_key].critic_params)
                 server.store.parameters["best_checkpoint"][metric][
                     f"policy_opt_state-{agent_net_key}"
-                ] = server.store.policy_opt_states[agent_net_key]
+                ] = copy.deepcopy(server.store.policy_opt_states[agent_net_key])
                 server.store.parameters["best_checkpoint"][metric][
                     f"critic_opt_state-{agent_net_key}"
-                ] = server.store.critic_opt_states[agent_net_key]
+                ] = copy.deepcopy(server.store.critic_opt_states[agent_net_key])
 
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:

@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Utils to checkpoint the network of the best performance of an algorithm"""
+import copy
 from typing import Any, Dict
 
 from mava.core_jax import SystemExecutor, SystemParameterServer
@@ -25,20 +26,20 @@ def update_best_checkpoint(
     """Update the best_checkpoint parameter in the server"""
     params: Dict[str, Any] = {}
     params[metric] = {}
-    params[metric]["best_performance"] = results[metric]
+    params[metric]["best_performance"] = copy.deepcopy(results[metric])
     for agent_net_key in executor.store.networks.keys():
-        params[metric][f"policy_network-{agent_net_key}"] = executor.store.networks[
-            agent_net_key
-        ].policy_params
-        params[metric][f"critic_network-{agent_net_key}"] = executor.store.networks[
-            agent_net_key
-        ].critic_params
-        params[metric][
-            f"policy_opt_state-{agent_net_key}"
-        ] = executor.store.policy_opt_states[agent_net_key]
-        params[metric][
-            f"critic_opt_state-{agent_net_key}"
-        ] = executor.store.critic_opt_states[agent_net_key]
+        params[metric][f"policy_network-{agent_net_key}"] = copy.deepcopy(
+            executor.store.networks[agent_net_key].policy_params
+        )
+        params[metric][f"critic_network-{agent_net_key}"] = copy.deepcopy(
+            executor.store.networks[agent_net_key].critic_params
+        )
+        params[metric][f"policy_opt_state-{agent_net_key}"] = copy.deepcopy(
+            executor.store.policy_opt_states[agent_net_key]
+        )
+        params[metric][f"critic_opt_state-{agent_net_key}"] = copy.deepcopy(
+            executor.store.critic_opt_states[agent_net_key]
+        )
         executor.store.executor_parameter_client.set_async({"best_checkpoint": params})
     return params[metric]["best_performance"]
 
@@ -56,15 +57,15 @@ def update_to_best_net(server: SystemParameterServer, metric: str) -> None:
     network = server.store.parameters["best_checkpoint"][metric]
     # Update network
     for agent_net_key in server.store.agents_net_keys:
-        server.store.parameters[f"policy_network-{agent_net_key}"] = network[
-            f"policy_network-{agent_net_key}"
-        ]
-        server.store.parameters[f"critic_network-{agent_net_key}"] = network[
-            f"critic_network-{agent_net_key}"
-        ]
-        server.store.parameters[f"policy_opt_state-{agent_net_key}"] = network[
-            f"policy_opt_state-{agent_net_key}"
-        ]
-        server.store.parameters[f"critic_opt_state-{agent_net_key}"] = network[
-            f"critic_opt_state-{agent_net_key}"
-        ]
+        server.store.parameters[f"policy_network-{agent_net_key}"] = copy.deepcopy(
+            network[f"policy_network-{agent_net_key}"]
+        )
+        server.store.parameters[f"critic_network-{agent_net_key}"] = copy.deepcopy(
+            network[f"critic_network-{agent_net_key}"]
+        )
+        server.store.parameters[f"policy_opt_state-{agent_net_key}"] = copy.deepcopy(
+            network[f"policy_opt_state-{agent_net_key}"]
+        )
+        server.store.parameters[f"critic_opt_state-{agent_net_key}"] = copy.deepcopy(
+            network[f"critic_opt_state-{agent_net_key}"]
+        )
