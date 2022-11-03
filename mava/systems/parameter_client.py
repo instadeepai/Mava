@@ -37,7 +37,6 @@ class ParameterClient:
         get_keys: List[str] = None,
         set_keys: List[str] = None,
         update_period: int = 1,
-        
         devices: Dict[str, Optional[Union[str, jax.xla.Device]]] = {},
     ):
         """Initialise the parameter client.
@@ -101,7 +100,8 @@ class ParameterClient:
         self._add_future: Optional[futures.Future] = None
 
     def _should_update(self, call_count: int):
-        time_reached = self._set_get_call_counter >= self._update_period
+        # TODO: possibly add 1 time limiter per get/set/get_set
+        time_reached = time.time() - self.last_update_time > 1  # TODO: make this a variable
         calls_reached = call_count >= self._update_period
         return time_reached and calls_reached 
 
