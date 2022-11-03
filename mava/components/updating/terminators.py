@@ -18,6 +18,7 @@ import abc
 import time
 from typing import Any, Callable, Dict, List, Optional, Type
 
+import tensorflow as tf
 from chex import dataclass
 
 from mava.callbacks import Callback
@@ -26,8 +27,6 @@ from mava.components.updating.parameter_server import ParameterServer
 from mava.core_jax import SystemParameterServer
 from mava.utils.lp_utils import termination_fn
 from mava.utils.training_utils import check_count_condition
-
-import tensorflow as tf
 
 
 class Terminator(Component):
