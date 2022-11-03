@@ -150,10 +150,10 @@ class DefaultParameterServer(ParameterServer):
         # Initiate best performance network values
         server.store.parameters["best_checkpoint"] = {}
         for metric in server.store.metrics_checkpoint:
+            server.store.parameters["best_checkpoint"][metric] = {}
             server.store.parameters["best_checkpoint"][metric][
                 "best_performance"
             ] = None
-            server.store.parameters["best_checkpoint"][metric] = {}
             for agent_net_key in networks.keys():
                 server.store.parameters["best_checkpoint"][metric][
                     f"policy_network-{agent_net_key}"

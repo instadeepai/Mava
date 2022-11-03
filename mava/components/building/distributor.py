@@ -77,7 +77,7 @@ class Distributor(Component):
         builder.store.num_executors = self.config.num_executors
 
         # Save list of metrics attached with their best performance
-        builder.store.metrics_checkpoint: Dict[str, Any] = {}
+        builder.store.metrics_checkpoint: Dict[str, Any] = {}  # type: ignore
         for metric in list(self.config.metrics_checkpoint):
             builder.store.metrics_checkpoint[metric] = None
 
