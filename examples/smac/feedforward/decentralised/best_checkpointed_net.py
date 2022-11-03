@@ -16,11 +16,11 @@
 
 
 import functools
+import time
 from datetime import datetime
 from typing import Any
 
 import optax
-import tensorflow as tf
 from absl import app, flags
 
 from mava.systems import ippo
@@ -166,10 +166,10 @@ def run_checkpointed_model() -> None:
         multi_process=True,
         evaluation_interval={"executor_steps": 2000},
         evaluation_duration={"evaluator_episodes": 32},
-        executor_parameter_update_period=1,
+        executor_parameter_update_period=5,
         # choose which metric you want to restore its best netrworks
         restore_best_net="win_rate",
-        termination_condition={"executor_steps": 10000},
+        termination_condition={"executor_steps": 40000},
         checkpoint_minute_interval=1,
         wait=True,
     )
@@ -183,7 +183,8 @@ def main(_: Any) -> None:
     # Run system that checkpoint the best performance for win rate
     # and mean return
     run_system()
-    tf.print("Start restored win rate best networks")
+    print("Start restored win rate best networks")
+    time.sleep(10)
     run_checkpointed_model()
 
 
