@@ -153,8 +153,8 @@ class Logger(MavaLogger):
 
             logger += [
                 JSONLogger(
-                    experiment_path=json_path, **extra_logger_kwargs
-                )  # type: ignore
+                    experiment_path=json_path, **extra_logger_kwargs  # type: ignore # noqa: E501
+                )
             ]
 
         if external_logger:
