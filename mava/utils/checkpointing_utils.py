@@ -39,9 +39,7 @@ def update_best_checkpoint(
         params[metric][
             f"critic_opt_state-{agent_net_key}"
         ] = executor.store.critic_opt_states[agent_net_key]
-        executor.store.executor_parameter_client.set_and_wait(
-            {"best_checkpoint": params}
-        )
+        executor.store.executor_parameter_client.set_async({"best_checkpoint": params})
     return best_performance
 
 

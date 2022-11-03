@@ -247,7 +247,7 @@ class SystemParameterClient(abc.ABC):
         """Asynchronously updates the get variables with the latest copy from source."""
 
     @abc.abstractmethod
-    def set_async(self) -> None:
+    def set_async(self, params: Dict[str, Any]) -> None:
         """Asynchronously updates source with the set variables."""
 
     @abc.abstractmethod

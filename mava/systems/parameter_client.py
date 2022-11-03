@@ -82,6 +82,9 @@ class ParameterClient:
         self._async_add_buffer: Dict[str, Any] = {}
         self._async_request = lambda: self._executor.submit(self._request)
         self._async_adjust = lambda: self._executor.submit(self._adjust)
+        self._async_adjust_param = lambda params: self._executor.submit(
+            self._adjust_param(params)  # type: ignore
+        )
         self._async_adjust_and_request = lambda: self._executor.submit(
             self._adjust_and_request
         )
@@ -130,7 +133,7 @@ class ParameterClient:
             self._copy(self._get_future.result())
             self._get_future = None
 
-    def set_async(self) -> None:
+    def set_async(self, params: Dict[str, Any] = None) -> None:
         """Asynchronously updates server with the set parameters.
 
         Returns:
@@ -145,7 +148,10 @@ class ParameterClient:
         if period_reached and self._set_future is None:
             # The update period has been reached and no request has been sent yet, so
             # making an asynchronous request now.
-            self._set_future = self._async_adjust()
+            if params is None:
+                self._set_future = self._async_adjust()
+            else:
+                self._set_future = self._async_adjust_param(params)
             self._set_call_counter = 0
             return
         if self._set_future is not None and self._set_future.done():

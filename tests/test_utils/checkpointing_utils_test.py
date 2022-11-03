@@ -97,7 +97,7 @@ class MockParameterClient:
                     f"critic_opt_state-{agent_net_key}"
                 ] = critic_opt_states[agent_net_key]
 
-    def set_and_wait(self, params: Dict[Any, Any] = {}) -> None:
+    def set_async(self, params: Dict[Any, Any] = {}) -> None:
         """Set and wait function to update the params"""
         names = params.keys()
         for var_key in names:
