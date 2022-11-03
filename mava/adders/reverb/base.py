@@ -249,7 +249,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
                         else:
                             is_in_entry = False
                             break
-                    
+
                     if is_in_entry:
                         # Write the subset of the trajectory experience to
                         # the table. The below code creates a new Step/Transition
