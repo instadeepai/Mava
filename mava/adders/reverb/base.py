@@ -199,6 +199,9 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
                 trajectory=trajectory, trajectory_net_keys=trajectory_net_keys
             )
 
+            print("agents: ", agents)
+            print("trajectory_nets_agent: ", trajectory_nets_agent)
+
             # Flag to check if all experience was used
             created_item = False
 
@@ -242,15 +245,11 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
                             net_key in trajectory_dict_copy
                             and len(trajectory_dict_copy[net_key]) > 0
                         ):
-                            item_agents.append(trajectory_dict_copy[net_key].pop())
+                            item_agents.append(trajectory_dict_copy[net_key].pop(0))
                         else:
                             is_in_entry = False
                             break
-
-                    # This is not really necessary. It just makes debugging
-                    # easier in the single trainer setup.
-                    item_agents = sort_str_num(item_agents)
-
+                    
                     if is_in_entry:
                         # Write the subset of the trajectory experience to
                         # the table. The below code creates a new Step/Transition
