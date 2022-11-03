@@ -73,7 +73,7 @@ class Trainer(SystemTrainer, TrainerHookMixin):
             try:
                 self.step()
             except Exception as e:
-                print(e, "the trainer failed")
+                print(e.with_traceback(), "the trainer failed")
                 self.store.trainer_parameter_client.set_and_wait(
                     {"evaluator_or_trainer_failed": True}
                 )
