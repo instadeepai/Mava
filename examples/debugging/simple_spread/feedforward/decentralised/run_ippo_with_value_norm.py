@@ -115,6 +115,7 @@ def main(_: Any) -> None:
             1,
             (3, 10),
         ],  # example of how to select which axes to normalize
+        termination_condition={"executor_steps": 200000},
     )
 
     # Launch the system.

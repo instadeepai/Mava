@@ -7,6 +7,7 @@ import numpy as np
 import tensorflow_probability.substrates.jax.distributions as tfd
 from chex import Array
 from haiku._src.basic import merge_leading_dims
+from jax import jit
 from jax.config import config as jax_config
 
 from mava import constants
@@ -225,6 +226,7 @@ def update_and_normalize_observations(
     return upd_stats, observation._replace(observation=norm_obs)
 
 
+@jit
 def normalize_observations(
     stats: Dict[str, Union[jnp.array, float]], observation: Any
 ) -> OLT:
