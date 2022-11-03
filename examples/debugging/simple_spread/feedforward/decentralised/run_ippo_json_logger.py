@@ -83,7 +83,7 @@ def main(_: Any) -> None:
                 "env_name": "debugging",
                 "task_name": "simple_spread",
                 "system_name": "IPPO",
-                "json_path": f"{FLAGS.base_dir}/HELLO_JSON",
+                "json_path": f"{FLAGS.base_dir}/JSON_DIR",
             },
         },
     }
