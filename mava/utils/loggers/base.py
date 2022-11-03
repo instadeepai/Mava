@@ -54,7 +54,7 @@ class Logger(MavaLogger):
         time_delta: float = 1.0,
         print_fn: Callable[[str], None] = print,
         time_stamp: Optional[str] = None,
-        extra_logger_kwargs: Optional[Dict[str, Any]] = None,
+        extra_logger_kwargs: Dict = {},
         external_logger: Optional[base.Logger] = None,
         **external_logger_kwargs: Any,
     ):
@@ -98,7 +98,7 @@ class Logger(MavaLogger):
         to_json: bool,
         time_delta: float,
         print_fn: Callable[[str], None],
-        extra_logger_kwargs: Optional[Dict[str, Any]],
+        extra_logger_kwargs: Dict,
         external_logger: Optional[base.Logger],
         **external_logger_kwargs: Any,
     ) -> loggers.Logger:
@@ -151,11 +151,7 @@ class Logger(MavaLogger):
             else:
                 json_path = str(self._directory / self._time_stamp)
 
-            logger += [
-                JSONLogger(
-                    experiment_path=json_path, **extra_logger_kwargs  # type: ignore # noqa: E501
-                )
-            ]
+            logger += [JSONLogger(experiment_path=json_path, **extra_logger_kwargs)]
 
         if external_logger:
             logger += [
