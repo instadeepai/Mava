@@ -83,6 +83,7 @@ class MockParameterClient:
         self.store.parameters["best_checkpoint"] = {}
         for metric in self.store.metrics_checkpoint:
             self.store.parameters["best_checkpoint"][metric] = {}
+            self.store.parameters["best_checkpoint"][metric]["best_performance"] = 20
             for agent_net_key in networks.keys():
                 self.store.parameters["best_checkpoint"][metric][
                     f"policy_network-{agent_net_key}"
@@ -168,10 +169,22 @@ def test_update_best_checkpoint(mock_executor: MockExecutor) -> None:
     best_performance = update_best_checkpoint(
         executor=mock_executor, results=results, metric="win_rate"  # type:ignore
     )
+    mock_parameter_client = mock_executor.store.executor_parameter_client
 
     assert best_performance == 70
+    assert (
+        mock_parameter_client.store.parameters["best_checkpoint"]["win_rate"][
+            "best_performance"
+        ]
+        == 70
+    )
+    assert (
+        mock_parameter_client.store.parameters["best_checkpoint"]["mean_return"][
+            "best_performance"
+        ]
+        != 70
+    )
     # Check that the best checkpoint params are updated for the win_rate
-    mock_parameter_client = mock_executor.store.executor_parameter_client
     for agent_net_key in mock_executor.store.networks.keys():
         assert (
             mock_parameter_client.store.parameters["best_checkpoint"]["win_rate"][

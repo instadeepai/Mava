@@ -23,9 +23,9 @@ def update_best_checkpoint(
     executor: SystemExecutor, results: Dict[str, Any], metric: str
 ) -> float:
     """Update the best_checkpoint parameter in the server"""
-    best_performance = results[metric]
     params: Dict[str, Any] = {}
     params[metric] = {}
+    params[metric]["best_performance"] = results[metric]
     for agent_net_key in executor.store.networks.keys():
         params[metric][f"policy_network-{agent_net_key}"] = executor.store.networks[
             agent_net_key
@@ -40,7 +40,7 @@ def update_best_checkpoint(
             f"critic_opt_state-{agent_net_key}"
         ] = executor.store.critic_opt_states[agent_net_key]
         executor.store.executor_parameter_client.set_async({"best_checkpoint": params})
-    return best_performance
+    return params[metric]["best_performance"]
 
 
 def update_to_best_net(server: SystemParameterServer, metric: str) -> None:

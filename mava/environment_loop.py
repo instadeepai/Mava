@@ -243,9 +243,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             )
             evaluation_duration = eval_duration_condition[1]
 
-        # best_performance variable to keep track with the best performance
-        best_performance: Dict[str, Any] = {}
-
         def step_executor() -> None:
             if (not environment_loop_schedule) or (
                 should_run_loop(eval_interval_condition)
@@ -265,19 +262,22 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         results.update(self._environment.get_interval_stats())
                     self._logger.write(results)
                     # Best_performance_update
-                    for metric in self._executor.store.metrics_checkpoint:
+                    for (
+                        metric,
+                        best_performance,
+                    ) in self._executor.store.metrics_checkpoint.items():
                         assert (
                             metric in results.keys()
                         ), f"The metric chosen to checkpoint it best performance doesn't exist.\
                             This experiment has only the following metrics {results.keys()}"
 
                         if (
-                            metric not in best_performance.keys()
-                            or best_performance[metric] < results[metric]  # type: ignore
+                            best_performance is None
+                            or best_performance < results[metric]  # type: ignore
                         ):
-                            best_performance[metric] = update_best_checkpoint(
-                                self._executor, results, metric
-                            )
+                            self._executor.store.metrics_checkpoint[
+                                metric
+                            ] = update_best_checkpoint(self._executor, results, metric)
                 else:
                     result = self.run_episode()
                     # Log the given results.

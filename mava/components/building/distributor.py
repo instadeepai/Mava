@@ -15,7 +15,7 @@
 
 """Commonly used distributor components for system builders"""
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import jax
 
@@ -76,8 +76,10 @@ class Distributor(Component):
         # Save number of the executors
         builder.store.num_executors = self.config.num_executors
 
-        # Save list of metrics to checkpoint it best performance
-        builder.store.metrics_checkpoint = list(self.config.metrics_checkpoint)
+        # Save list of metrics attached with their best performance
+        builder.store.metrics_checkpoint: Dict[str, Any] = {}
+        for metric in list(self.config.metrics_checkpoint):
+            builder.store.metrics_checkpoint[metric] = None
 
         # Generate keys for the data_server, parameter_server and evaluator.
         (
