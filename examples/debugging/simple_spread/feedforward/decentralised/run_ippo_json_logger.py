@@ -74,6 +74,7 @@ def main(_: Any) -> None:
     log_every = 10
 
     # Pass custom logger config for evaluator to use.
+    # A custom json path can also be passed in.
     logger_config = {
         "evaluator": {
             "to_json": True,
@@ -82,6 +83,7 @@ def main(_: Any) -> None:
                 "env_name": "debugging",
                 "task_name": "simple_spread",
                 "system_name": "IPPO",
+                "json_path": f"{FLAGS.base_dir}/HELLO_JSON",
             },
         },
     }
@@ -122,7 +124,7 @@ def main(_: Any) -> None:
         num_executors=1,
         multi_process=True,
         clip_value=False,
-        evaluation_interval={"executor_steps": 1000},
+        evaluation_interval={"executor_steps": 10000},
         evaluation_duration={"evaluator_episodes": 3},
     )
 

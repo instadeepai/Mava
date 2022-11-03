@@ -23,4 +23,3 @@ class IPPODefaultConfig:
     sequence_length: int = 20
     period: int = 10
     use_next_extras: bool = False
-    system_name: str = "IPPO"
