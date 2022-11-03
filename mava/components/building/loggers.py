@@ -22,14 +22,12 @@ from mava.callbacks import Callback
 from mava.components import Component
 from mava.core_jax import SystemBuilder
 from mava.utils.loggers import MavaLogger
-from mava.utils.loggers.eval_json_logger import JSONLogger
 
 
 @dataclass
 class LoggerConfig:
     logger_factory: Optional[Callable[[str], MavaLogger]] = None
     logger_config: Optional[Any] = None
-    system_name: str = "system"
 
 
 class Logger(Component):
@@ -57,39 +55,15 @@ class Logger(Component):
         # is_evaluator set by builder
         name = "executor" if not builder.store.is_evaluator else "evaluator"
 
-        if self.config.logger_config and name in self.config.logger_config:
+        if (self.config.logger_config is not None) and (
+            name in self.config.logger_config
+        ):
             logger_config = self.config.logger_config[name]
 
         # executor_id set by builder
         builder.store.executor_logger = self.config.logger_factory(  # type: ignore
             builder.store.executor_id, **logger_config
         )
-
-        # Add json logger to evaluator process only when performing evaluation
-        # at fixed intervals and for fixed durations.
-        if (
-            name == "evaluator"
-            and builder.store.global_config.evaluation_interval is not None
-        ):
-            # Instantiate an environment from a factory to get access to the
-            # environment name and task name
-            temp_env, env_names = builder.store.global_config.environment_factory(
-                evaluation=False
-            )
-            del temp_env
-
-            if builder.store.global_config.json_path is not None:
-                json_logging_path = builder.store.global_config.json_path
-            else:
-                json_logging_path = builder.store.global_config.experiment_path
-
-            builder.store.eval_json_logger = JSONLogger(
-                experiment_path=json_logging_path,
-                random_seed=builder.store.global_config.seed,
-                env_name=env_names["environment_name"],
-                task_name=env_names["task_name"],
-                system_name=self.config.system_name,
-            )
 
     def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
         """Create and store the trainer logger.

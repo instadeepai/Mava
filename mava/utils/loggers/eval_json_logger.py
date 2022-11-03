@@ -38,10 +38,21 @@ class JSONLogger:
             env_name: name of environment of experiment. eg. "SMAC"
             task_name: name of current experiment task. eg. "3m"
             system_name: name of system being evaluated. eg. "IPPO"
+
+        Raises:
+            ValueError: if all the required parameters are not passed
+                in to the logger.
         """
 
+        if not random_seed and env_name and task_name and system_name:
+            raise ValueError(
+                "Valid arguments must be passed in for the "
+                + "random_seed, env_name, task_name and system_name in order "
+                + "to use the json logger."
+            )
+
         # Create subfolder for storing json file
-        self._log_dir = experiment_path + f"/json_data/{env_name}/{task_name}/"
+        self._log_dir = str(experiment_path) + f"/json_data/{env_name}/{task_name}/"
         self._log_dir = paths.process_path(self._log_dir, add_uid=False)
 
         self._logs_file_dir = (
@@ -96,24 +107,28 @@ class JSONLogger:
             ][f"step_{str(self._step_count)}"] = dictionary_to_add
         return original_dictionary
 
-    def write(self, results_dict: Dict[str, jax.numpy.ndarray]) -> None:
+    def write(self, results_dict: Dict[str, Any]) -> None:
         """Write current evaluation data to a json file.
 
-        It should be noted that the input data here should be in one of two
+        The json logger will filter all logged Mava results and select only
+        elements in the results dictionary starting with `eval` to form a
+        filter dictionary `eval_dict`.
+
+        It should be noted that the eval data here should be in one of two
         forms depending on whether evaluation metrics for a particular
         evaluation step are being logged or whether absolute metrics are
         being logged.
 
         For evaluation metrics at a particular evaluation step, the
-        `results_dict` should take the following form:
-        results_dict = {
+        filtered `eval_dict` should take the following form:
+        eval_dict = {
             'step_count': <value>,
             'metric_1': <array>,
             'metric_2': <array>
         }
 
         Where for absolute metrics, the `step_count` key should not be
-        included, implying that the `results_dict` dictionary will look
+        included, implying that the `eval_dict` dictionary will look
         as follows:
 
         results_dict = {
@@ -128,16 +143,18 @@ class JSONLogger:
             if str(k).split("_")[0] == "eval"
         }
 
-        self._jsonify_and_process(results_dict=eval_dict)
+        # Only write to json if eval_dict is non-empty
+        if len(eval_dict) > 0:
+            self._jsonify_and_process(results_dict=eval_dict)
 
-        # Load current logged data
-        with open(self._logs_file_dir, "r") as f:
-            read_in_data = json.load(f)
+            # Load current logged data
+            with open(self._logs_file_dir, "r") as f:
+                read_in_data = json.load(f)
 
-        with open(self._logs_file_dir, "w+") as f:
-            updated_data = self._add_data_to_dictionary(
-                read_in_data, self._results_dict
-            )
-            json.dump(updated_data, f, indent=4)
+            with open(self._logs_file_dir, "w+") as f:
+                updated_data = self._add_data_to_dictionary(
+                    read_in_data, self._results_dict
+                )
+                json.dump(updated_data, f, indent=4)
 
-        self._step_count += 1
+            self._step_count += 1

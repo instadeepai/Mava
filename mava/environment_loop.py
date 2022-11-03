@@ -265,6 +265,8 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     results = jax.tree_map(lambda x: x / evaluation_duration, results)
 
                     # Log evaluation interval results for json logging
+                    # all results with the `eval` appended will be logged
+                    # by the json logger.
                     eval_result = {
                         "eval_step_count": jnp.array(self._last_evaluator_run_t),
                         "eval_return": jnp.array(eval_returns),
@@ -287,8 +289,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
                     results.update(eval_result)
                     self._logger.write(results)
-
-                    self._executor.store.eval_json_logger.write(results_dict=results)
 
                 else:
                     result = self.run_episode()

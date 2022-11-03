@@ -18,11 +18,12 @@
 import abc
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 
 from acme.utils import loggers, paths
 from acme.utils.loggers import base
 
+from mava.utils.loggers.eval_json_logger import JSONLogger
 from mava.utils.loggers.tf_logger import TFSummaryLogger
 
 
@@ -49,13 +50,15 @@ class Logger(MavaLogger):
         to_terminal: bool = True,
         to_csv: bool = False,
         to_tensorboard: bool = False,
+        to_json: bool = False,
         time_delta: float = 1.0,
         print_fn: Callable[[str], None] = print,
         time_stamp: Optional[str] = None,
+        extra_logger_kwargs: Optional[Dict[str, Any]] = None,
         external_logger: Optional[base.Logger] = None,
         **external_logger_kwargs: Any,
     ):
-        """Init"""
+        """Initialise logger."""
         self._label = label
 
         if not isinstance(directory, Path):
@@ -67,8 +70,10 @@ class Logger(MavaLogger):
             to_terminal,
             to_csv,
             to_tensorboard,
+            to_json,
             time_delta,
             print_fn,
+            extra_logger_kwargs,
             external_logger=external_logger,
             **external_logger_kwargs,
         )
@@ -82,6 +87,7 @@ class Logger(MavaLogger):
         )
 
     def update_label(self, label: str) -> None:
+        """Extend a logger label."""
         self._label = f"{self._label}_{label}"
 
     def make_logger(
@@ -89,8 +95,10 @@ class Logger(MavaLogger):
         to_terminal: bool,
         to_csv: bool,
         to_tensorboard: bool,
+        to_json: bool,
         time_delta: float,
         print_fn: Callable[[str], None],
+        extra_logger_kwargs: Optional[Dict[str, Any]],
         external_logger: Optional[base.Logger],
         **external_logger_kwargs: Any,
     ) -> loggers.Logger:
@@ -102,10 +110,15 @@ class Logger(MavaLogger):
             to_terminal: to print the logs in the terminal.
             to_csv: to save the logs in a csv file.
             to_tensorboard: to write the logs tf-events.
+            to_json: whether to write certain results to a json file for
+                plotting.
             time_delta: minimum elapsed time (in seconds) between logging events.
             print_fn: function to call which acts like print.
+            extra_logger_kwarg: any extra kwargs not related to an
+                external logger.
             external_logger: optional external logger.
             external_logger_kwargs: optional external logger params.
+
         Returns:
             A logger (pipe) object that responds to logger.write(some_dict).
         """
@@ -124,6 +137,21 @@ class Logger(MavaLogger):
         if to_tensorboard:
             logger += [
                 TFSummaryLogger(logdir=self._path("tensorboard"), label=self._label)
+            ]
+
+        if to_json:
+
+            if (extra_logger_kwargs is not None) and (
+                "json_path" in extra_logger_kwargs
+            ):
+                json_path = extra_logger_kwargs["json_path"]
+            else:
+                json_path = str(self._directory / self._time_stamp)
+
+            logger += [
+                JSONLogger(
+                    experiment_path=json_path, **extra_logger_kwargs
+                )  # type: ignore
             ]
 
         if external_logger:
@@ -153,4 +181,5 @@ class Logger(MavaLogger):
         return paths.process_path(path)
 
     def write(self, data: Any) -> None:
+        """Method used for writing data."""
         self._logger.write(data)
