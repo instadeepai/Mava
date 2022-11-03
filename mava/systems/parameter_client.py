@@ -82,7 +82,7 @@ class ParameterClient:
         self._async_add_buffer: Dict[str, Any] = {}
         self._async_request = lambda: self._executor.submit(self._request)
         self._async_adjust = lambda: self._executor.submit(self._adjust)
-        self._async_adjust_param = lambda params: self._executor.submit(
+        self._async_adjust_param: Any = lambda params: self._executor.submit(
             self._adjust_param(params)  # type: ignore
         )
         self._async_adjust_and_request = lambda: self._executor.submit(
