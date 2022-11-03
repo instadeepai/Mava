@@ -222,7 +222,9 @@ class DefaultParameterServer(ParameterServer):
             elif var_key == "best_checkpoint":
                 # Set best checkpoint values
                 for name in params[var_key].keys():
-                    server.store.parameters[var_key][name] = params[var_key][name]
+                    server.store.parameters[var_key][name] = copy.deepcopy(
+                        params[var_key][name]
+                    )
             else:
                 server.store.parameters[var_key] = params[var_key]
 
