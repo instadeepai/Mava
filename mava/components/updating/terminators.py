@@ -27,6 +27,8 @@ from mava.core_jax import SystemParameterServer
 from mava.utils.lp_utils import termination_fn
 from mava.utils.training_utils import check_count_condition
 
+import tensorflow as tf
+
 
 class Terminator(Component):
     @abc.abstractmethod
@@ -101,7 +103,7 @@ class CountConditionTerminator(Terminator):
             and parameter_server.store.parameters[self.termination_key]
             > self.termination_value
         ):
-            print(
+            tf.print(
                 f"Max {self.termination_key} of {self.termination_value}"
                 " reached, terminating."
             )
@@ -161,7 +163,7 @@ class TimeTerminator(Terminator):
             None.
         """
         if time.time() - self._start_time > self.config.run_seconds:
-            print(
+            tf.print(
                 f"Run time of {self.config.run_seconds} seconds reached, terminating."
             )
             self.config.termination_function(parameter_server)
