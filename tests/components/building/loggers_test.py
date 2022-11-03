@@ -80,6 +80,36 @@ def test_logger(test_logger_factory: Callable) -> Logger:
     return Logger(logger_config)
 
 
+@pytest.fixture
+def test_logger_with_json(test_logger_factory: Callable) -> Logger:
+    """Pytest fixture for TestLogger with json logging.
+
+    Args:
+        test_logger_factory: factory to use in logger config.
+
+    Returns:
+        Default TestLogger.
+    """
+    logger_config = LoggerConfig()
+    logger_config.logger_factory = test_logger_factory
+    logger_config.logger_config = {
+        "trainer": {"time_stamp": "trainer_logger_config"},
+        "executor": {"time_stamp": "executor_logger_config"},
+        "evaluator": {
+            "time_stamp": "evaluator_logger_config",
+            "to_json": True,
+            "extra_logger_kwargs": {
+                "random_seed": 1234,
+                "env_name": "test_environment",
+                "task_name": "test_task",
+                "system_name": "test_system",
+            },
+        },
+    }
+
+    return Logger(logger_config)
+
+
 def test_on_building_executor_logger_executor(
     test_logger: Logger, test_builder: SystemBuilder
 ) -> None:
@@ -124,6 +154,26 @@ def test_on_building_executor_logger_evaluator(
 
     # Correct component name
     assert test_logger.name() == "logger"
+
+    # Correct logger has been created
+    assert test_builder.store.executor_logger is not None
+    assert not hasattr(test_builder.store, "trainer_logger")
+
+    # Correct logger config has been loaded
+    assert test_builder.store.executor_logger._label == "executor_1"
+    assert test_builder.store.executor_logger._time_stamp == "evaluator_logger_config"
+
+
+def test_on_building_executor_logger_evaluator_with_json(
+    test_logger_with_json: Logger, test_builder: SystemBuilder
+) -> None:
+    """Test whether json logger is correctly added to evaluator"""
+
+    test_builder.store.is_evaluator = True
+    test_logger_with_json.on_building_executor_logger(test_builder)
+
+    # Correct component name
+    assert test_logger_with_json.name() == "logger"
 
     # Correct logger has been created
     assert test_builder.store.executor_logger is not None
