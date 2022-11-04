@@ -70,7 +70,7 @@ def main(_: Any) -> None:
     experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
-    log_every = 10
+    log_every = 5
     logger_factory = functools.partial(
         logger_utils.make_logger,
         directory=FLAGS.base_dir,
@@ -96,11 +96,13 @@ def main(_: Any) -> None:
         experiment_path=experiment_path,
         policy_optimiser=policy_optimiser,
         run_evaluator=True,
-        sample_batch_size=32,
+        sample_batch_size=128,
         num_executors=1,
         multi_process=True,
-        samples_per_insert=8,
-        # terminal="gnome-terminal"
+        min_data_server_size=10,
+        terminal="gnome-terminal",
+        trainer_parameter_update_period=1,
+        samples_per_insert=32,
     )
 
     # Launch the system.

@@ -32,7 +32,7 @@ class FeedforwardExecutorSelectActionConfig:
     epsilon_min: float = 0.05
     epsilon_decay_timesteps: float = 10_000
 
-
+# TODO (sasha): rename to IDQN....
 class FeedforwardExecutorSelectAction(ExecutorSelectAction):
     def __init__(
         self,
