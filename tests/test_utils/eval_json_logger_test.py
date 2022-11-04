@@ -85,6 +85,31 @@ def python_type_step_data() -> Dict:
     }
 
 
+@pytest.fixture
+def full_logging_data() -> Dict:
+    """Full logging data as it would be passed by a system."""
+
+    return {
+        "mock_normal_step_data": {
+            "eval_step_count": jnp.array([10000]),
+            "eval_metric_1": jnp.array([1, 1, 1, 1, 1]),
+            "eval_metric_2": jnp.array([2]),
+            "other_metric_1": 1,
+            "other_metric_2": 2,
+        },
+        "mock_absolute_metric_data": {
+            "eval_metric_1": jnp.array([11, 11, 11, 11, 11]),
+            "eval_metric_2": jnp.array([22]),
+            "other_metric_1": 1,
+            "other_metric_2": 2,
+        },
+        "mock_irrelevant_data": {
+            "other_metric_1": 1,
+            "other_metric_2": 2,
+        },
+    }
+
+
 def test_logger_init(test_data: Dict, logger: JSONLogger) -> None:
     """Test that json logger initialises correctly"""
 
@@ -171,6 +196,69 @@ def test_add_data_to_dictionary(
     assert logger._add_data_to_dictionary(
         mock_original_dict, mock_absolute_metric_data
     ) == {
+        "test_env": {
+            "test_task": {
+                "test_system": {
+                    "1111": {
+                        "step_0": {
+                            "step_count": [10000],
+                            "metric_1": [1, 1, 1, 1, 1],
+                            "metric_2": [2],
+                        },
+                        "absolute_metrics": {
+                            "metric_1": [11, 11, 11, 11, 11],
+                            "metric_2": [22],
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+
+def test_write(
+    full_logging_data: Dict,
+    logger: JSONLogger,
+) -> None:
+    """Test write method of logger."""
+
+    mock_normal_step_data = full_logging_data["mock_normal_step_data"]
+    mock_absolute_metric_data = full_logging_data["mock_absolute_metric_data"]
+    mock_irrelevant_data = full_logging_data["mock_irrelevant_data"]
+
+    # Test that irrelevant data is not logged.
+    logger.write(mock_irrelevant_data)
+    assert logger._step_count == 0
+
+    # Test that step data logged correctly.
+    logger.write(mock_normal_step_data)
+
+    with open(logger._logs_file_dir, "r") as f:
+        read_in_data = json.load(f)
+
+    assert read_in_data == {
+        "test_env": {
+            "test_task": {
+                "test_system": {
+                    "1111": {
+                        "step_0": {
+                            "step_count": [10000],
+                            "metric_1": [1, 1, 1, 1, 1],
+                            "metric_2": [2],
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    # Test the absolute metric data logged correctly
+    logger.write(mock_absolute_metric_data)
+
+    with open(logger._logs_file_dir, "r") as f:
+        read_in_data = json.load(f)
+
+    assert read_in_data == {
         "test_env": {
             "test_task": {
                 "test_system": {
