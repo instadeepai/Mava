@@ -110,6 +110,48 @@ def full_logging_data() -> Dict:
     }
 
 
+@pytest.fixture
+def expected_output_data() -> Dict:
+    """Expected logged data."""
+
+    return {
+        "after_one_normal_log": {
+            "test_env": {
+                "test_task": {
+                    "test_system": {
+                        "1111": {
+                            "step_0": {
+                                "step_count": [10000],
+                                "metric_1": [1, 1, 1, 1, 1],
+                                "metric_2": [2],
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "after_normal_and_absolute_log": {
+            "test_env": {
+                "test_task": {
+                    "test_system": {
+                        "1111": {
+                            "step_0": {
+                                "step_count": [10000],
+                                "metric_1": [1, 1, 1, 1, 1],
+                                "metric_2": [2],
+                            },
+                            "absolute_metrics": {
+                                "metric_1": [11, 11, 11, 11, 11],
+                                "metric_2": [22],
+                            },
+                        }
+                    }
+                }
+            }
+        },
+    }
+
+
 def test_logger_init(test_data: Dict, logger: JSONLogger) -> None:
     """Test that json logger initialises correctly"""
 
@@ -158,7 +200,10 @@ def test_jsonify_and_process(
 
 
 def test_add_data_to_dictionary(
-    test_data: Dict, python_type_step_data: Dict, logger: JSONLogger
+    test_data: Dict,
+    python_type_step_data: Dict,
+    expected_output_data: Dict,
+    logger: JSONLogger,
 ) -> None:
     """Test that add_data_to_dictionary method works."""
 
@@ -174,50 +219,21 @@ def test_add_data_to_dictionary(
     mock_absolute_metric_data = python_type_step_data["mock_absolute_metric_data"]
 
     # write one normal step
-    assert logger._add_data_to_dictionary(
-        mock_original_dict, mock_normal_step_data
-    ) == {
-        "test_env": {
-            "test_task": {
-                "test_system": {
-                    "1111": {
-                        "step_0": {
-                            "step_count": [10000],
-                            "metric_1": [1, 1, 1, 1, 1],
-                            "metric_2": [2],
-                        }
-                    }
-                }
-            }
-        }
-    }
+    assert (
+        logger._add_data_to_dictionary(mock_original_dict, mock_normal_step_data)
+        == expected_output_data["after_one_normal_log"]
+    )
 
     # Write one absolute metric step
-    assert logger._add_data_to_dictionary(
-        mock_original_dict, mock_absolute_metric_data
-    ) == {
-        "test_env": {
-            "test_task": {
-                "test_system": {
-                    "1111": {
-                        "step_0": {
-                            "step_count": [10000],
-                            "metric_1": [1, 1, 1, 1, 1],
-                            "metric_2": [2],
-                        },
-                        "absolute_metrics": {
-                            "metric_1": [11, 11, 11, 11, 11],
-                            "metric_2": [22],
-                        },
-                    }
-                }
-            }
-        }
-    }
+    assert (
+        logger._add_data_to_dictionary(mock_original_dict, mock_absolute_metric_data)
+        == expected_output_data["after_normal_and_absolute_log"]
+    )
 
 
 def test_write(
     full_logging_data: Dict,
+    expected_output_data: Dict,
     logger: JSONLogger,
 ) -> None:
     """Test write method of logger."""
@@ -236,21 +252,7 @@ def test_write(
     with open(logger._logs_file_dir, "r") as f:
         read_in_data = json.load(f)
 
-    assert read_in_data == {
-        "test_env": {
-            "test_task": {
-                "test_system": {
-                    "1111": {
-                        "step_0": {
-                            "step_count": [10000],
-                            "metric_1": [1, 1, 1, 1, 1],
-                            "metric_2": [2],
-                        }
-                    }
-                }
-            }
-        }
-    }
+    assert read_in_data == expected_output_data["after_one_normal_log"]
 
     # Test the absolute metric data logged correctly
     logger.write(mock_absolute_metric_data)
@@ -258,22 +260,4 @@ def test_write(
     with open(logger._logs_file_dir, "r") as f:
         read_in_data = json.load(f)
 
-    assert read_in_data == {
-        "test_env": {
-            "test_task": {
-                "test_system": {
-                    "1111": {
-                        "step_0": {
-                            "step_count": [10000],
-                            "metric_1": [1, 1, 1, 1, 1],
-                            "metric_2": [2],
-                        },
-                        "absolute_metrics": {
-                            "metric_1": [11, 11, 11, 11, 11],
-                            "metric_2": [22],
-                        },
-                    }
-                }
-            }
-        }
-    }
+    assert read_in_data == expected_output_data["after_normal_and_absolute_log"]
