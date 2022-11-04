@@ -44,13 +44,6 @@ class JSONLogger:
                 in to the logger.
         """
 
-        if not random_seed and env_name and task_name and system_name:
-            raise ValueError(
-                "Valid arguments must be passed in for the "
-                + "random_seed, env_name, task_name and system_name in order "
-                + "to use the json logger."
-            )
-
         # Create subfolder for storing json file
         self._log_dir = str(experiment_path) + f"/json_data/{env_name}/{task_name}/"
         self._log_dir = paths.process_path(self._log_dir, add_uid=False)
