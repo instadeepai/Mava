@@ -26,7 +26,6 @@ from mava.systems.parameter_server import ParameterServer
 from mava.utils.sort_utils import sort_str_num
 
 
-
 class ParameterClient:
     """A parameter client for updating parameters from a remote server."""
 
@@ -36,7 +35,8 @@ class ParameterClient:
         parameters: Dict[str, Any],
         get_keys: List[str] = None,
         set_keys: List[str] = None,
-        update_period: int = 1,
+        call_update_period: int = 1,
+        time_update_period: int = 0,
         devices: Dict[str, Optional[Union[str, jax.xla.Device]]] = {},
     ):
         """Initialise the parameter client.
@@ -46,7 +46,8 @@ class ParameterClient:
             parameters: parameters that the client tracks.
             get_keys: names of parameters to fetch from the server in requests.
             set_keys: names of parameters to set in the server.
-            update_period: number of calls between syncs with the server.
+            call_update_period: number of calls between syncs with the server.
+            time_update_period: number of seconds between syncs with the server.
             devices: dictionary {parameter name: device} defining devices for params.
         """
         self._all_keys = sort_str_num(list(parameters.keys()))
@@ -57,10 +58,11 @@ class ParameterClient:
         self._get_call_counter = 0
         self._set_call_counter = 0
         self._set_get_call_counter = 0
-        self._update_period = update_period
+        self._call_update_period = call_update_period
+        self._time_update_period = time_update_period
         self._client = client
         self._devices = devices
-        self.last_update_time = time.time()
+        self._last_update_time = time.time()
 
         # note below it is assumed that if one device is specified with a string
         # they all are - need to test this works
@@ -100,10 +102,21 @@ class ParameterClient:
         self._add_future: Optional[futures.Future] = None
 
     def _should_update(self, call_count: int):
+        """
+        Checks whether a sync with the server should be performed given the 
+        number of times it has been called and the time since it was last called
+
+        Args:
+            call_count: the number of times this call has been requested since
+             last synced with the server
+
+        Returns:
+            None.
+        """
         # TODO: possibly add 1 time limiter per get/set/get_set
-        time_reached = time.time() - self.last_update_time > 1  # TODO: make this a variable
+        time_reached = time.time() - self._last_update_time > self._time_update_period
         calls_reached = call_count >= self._update_period
-        return time_reached and calls_reached 
+        return time_reached and calls_reached
 
     def _adjust_and_request(self) -> None:
         """Set the parameters in the server, then update local params from the server.
@@ -132,7 +145,7 @@ class ParameterClient:
             # making an asynchronous request now.
             self._get_future = self._async_request()
             self._get_call_counter = 0
-            self.last_update_time = time.time()
+            self._last_update_time = time.time()
             return
 
         if self._get_future is not None and self._get_future.done():
@@ -155,7 +168,7 @@ class ParameterClient:
             # making an asynchronous request now.
             self._set_future = self._async_adjust()
             self._set_call_counter = 0
-            self.last_update_time = time.time()
+            self._last_update_time = time.time()
             return
 
         if self._set_future is not None and self._set_future.done():
@@ -171,12 +184,15 @@ class ParameterClient:
         if self._set_get_call_counter < self._update_period:
             self._set_get_call_counter += 1
 
-        if self._should_update(self._set_get_call_counter) and self._set_get_future is None:
+        if (
+            self._should_update(self._set_get_call_counter)
+            and self._set_get_future is None
+        ):
             # The update period has been reached and no request has been sent yet, so
             # making an asynchronous request now.
             self._set_get_future = self._async_adjust_and_request()
             self._set_get_call_counter = 0
-            self.last_update_time = time.time()
+            self._last_update_time = time.time()
             return
 
         if self._set_get_future is not None and self._set_get_future.done():
