@@ -16,6 +16,7 @@
 """Logger unit tests"""
 
 import functools
+import tempfile
 from typing import Callable
 
 import pytest
@@ -35,7 +36,7 @@ def test_logger_factory() -> Callable:
     """
     simple_factory = functools.partial(
         logger_utils.make_logger,
-        directory="~/mava",
+        directory=tempfile.mkdtemp(),
         to_terminal=True,
         to_tensorboard=True,
         time_stamp="01/01/1997-00:00:00",
@@ -103,6 +104,7 @@ def test_logger_with_json(test_logger_factory: Callable) -> Logger:
                 "env_name": "test_environment",
                 "task_name": "test_task",
                 "system_name": "test_system",
+                "json_path": tempfile.mkdtemp(),
             },
         },
     }
