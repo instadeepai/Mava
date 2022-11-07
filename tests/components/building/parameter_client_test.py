@@ -197,6 +197,7 @@ def mock_builder_with_parameter_client() -> Builder:
         components=[],
     )
     builder.store.is_evaluator = False
+    builder.store.checkpoint_best_perf = False
     return builder
 
 

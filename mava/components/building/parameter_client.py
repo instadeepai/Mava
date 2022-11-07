@@ -119,7 +119,7 @@ class ExecutorParameterClient(BaseParameterClient):
 
         # Create best performance network params in case of evaluator
         if builder.store.is_evaluator and builder.store.checkpoint_best_perf:
-            builder.store.best_checkpoint: Dict[str, Any] = {}
+            builder.store.best_checkpoint: Dict[str, Any] = {}  # type:ignore
             for metric in builder.store.metrics_checkpoint:
                 builder.store.best_checkpoint[metric] = {}
                 builder.store.best_checkpoint[metric]["best_performance"] = None

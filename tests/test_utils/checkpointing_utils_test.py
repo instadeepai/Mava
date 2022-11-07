@@ -124,7 +124,8 @@ class MockExecutor:
             critic_opt_states=critic_opt_states,
             metrics_checkpoint=["win_rate", "mean_return"],
         )
-        self.store.best_checkpoint = {}
+        (networks, policy_opt_states, critic_opt_states) = fake_networks()
+        self.store.best_checkpoint: Dict[str, Any] = {}  # type: ignore
         for metric in self.store.metrics_checkpoint:
             self.store.best_checkpoint[metric] = {}
             self.store.best_checkpoint[metric]["best_performance"] = 20
