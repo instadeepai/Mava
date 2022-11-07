@@ -103,7 +103,7 @@ class ParameterClient:
 
     def _should_update(self, call_count: int):
         """
-        Checks whether a sync with the server should be performed given the 
+        Checks whether a sync with the server should be performed given the
         number of times it has been called and the time since it was last called
 
         Args:
@@ -115,7 +115,7 @@ class ParameterClient:
         """
         # TODO: possibly add 1 time limiter per get/set/get_set
         time_reached = time.time() - self._last_update_time > self._time_update_period
-        calls_reached = call_count >= self._update_period
+        calls_reached = call_count >= self._call_update_period
         return time_reached and calls_reached
 
     def _adjust_and_request(self) -> None:
@@ -137,7 +137,7 @@ class ParameterClient:
         """
 
         # Track the number of calls (we only update periodically).
-        if self._get_call_counter < self._update_period:
+        if self._get_call_counter < self._call_update_period:
             self._get_call_counter += 1
 
         if self._should_update(self._get_call_counter) and self._get_future is None:
@@ -160,7 +160,7 @@ class ParameterClient:
             None.
         """
         # Track the number of calls (we only update periodically).
-        if self._set_call_counter < self._update_period:
+        if self._set_call_counter < self._call_update_period:
             self._set_call_counter += 1
 
         if self._should_update(self._set_call_counter) and self._set_future is None:
@@ -181,7 +181,7 @@ class ParameterClient:
             None.
         """
         # Track the number of calls (we only update periodically).
-        if self._set_get_call_counter < self._update_period:
+        if self._set_get_call_counter < self._call_update_period:
             self._set_get_call_counter += 1
 
         if (
