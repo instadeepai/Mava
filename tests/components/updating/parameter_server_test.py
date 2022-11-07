@@ -112,6 +112,8 @@ def mock_system_parameter_server() -> SystemParameterServer:
 
     mock_system_parameter_server.store.num_executors = 2
 
+    mock_system_parameter_server.store.checkpoint_best_perf = True
+
     return mock_system_parameter_server
 
 

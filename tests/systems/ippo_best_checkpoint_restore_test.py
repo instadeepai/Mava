@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run feedforward IPPO on SMAC using best checkpointed networks."""
+"""Integration test for the IPPO using best checkpointer"""
 
 
 import functools
@@ -96,14 +96,14 @@ def run_system() -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        evaluation_interval={"executor_steps": 2000},
-        evaluation_duration={"evaluator_episodes": 32},
+        evaluation_interval={"executor_steps": 100},
+        evaluation_duration={"evaluator_episodes": 2},
         executor_parameter_update_period=1,
         # Flag to activate best checkpointing
         checkpoint_best_perf=True,
         # metrics to checkpoint its best performance networks
         metrics_checkpoint=("mean_episode_return", "win_rate"),
-        termination_condition={"executor_steps": 30000},
+        termination_condition={"executor_steps": 5000},
         checkpoint_minute_interval=1,
         wait=True,
     )
@@ -166,12 +166,12 @@ def run_checkpointed_model() -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        evaluation_interval={"executor_steps": 2000},
-        evaluation_duration={"evaluator_episodes": 32},
+        evaluation_interval={"executor_steps": 100},
+        evaluation_duration={"evaluator_episodes": 1},
         executor_parameter_update_period=5,
         # choose which metric you want to restore its best netrworks
         restore_best_net="win_rate",
-        termination_condition={"executor_steps": 40000},
+        termination_condition={"executor_steps": 7000},
         checkpoint_minute_interval=1,
         wait=True,
     )
@@ -180,7 +180,7 @@ def run_checkpointed_model() -> None:
     system.launch()
 
 
-def main(_: Any) -> None:
+def test_main() -> None:
     """Run the model and then restore the best networks"""
     # Run system that checkpoint the best performance for win rate
     # and mean return
@@ -191,4 +191,4 @@ def main(_: Any) -> None:
 
 
 if __name__ == "__main__":
-    app.run(main)
+    app.run(test_main)

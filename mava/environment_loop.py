@@ -261,23 +261,26 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     if hasattr(self._environment, "get_interval_stats"):
                         results.update(self._environment.get_interval_stats())
                     self._logger.write(results)
-                    # Best_performance_update
-                    for (
-                        metric,
-                        best_performance,
-                    ) in self._executor.store.metrics_checkpoint.items():
-                        assert (
-                            metric in results.keys()
-                        ), f"The metric chosen to checkpoint it best performance doesn't exist.\
-                            This experiment has only the following metrics {results.keys()}"
+                    if self._executor.store.checkpoint_best_perf:
+                        # Best_performance_update
+                        for (
+                            metric,
+                            best_performance,
+                        ) in self._executor.store.metrics_checkpoint.items():
+                            assert (
+                                metric in results.keys()
+                            ), f"The metric chosen to checkpoint it best performance doesn't exist.\
+                                This experiment has only the following metrics {results.keys()}"
 
-                        if (
-                            best_performance is None
-                            or best_performance < results[metric]  # type: ignore
-                        ):
-                            self._executor.store.metrics_checkpoint[
-                                metric
-                            ] = update_best_checkpoint(self._executor, results, metric)
+                            if (
+                                best_performance is None
+                                or best_performance < results[metric]  # type: ignore
+                            ):
+                                self._executor.store.metrics_checkpoint[
+                                    metric
+                                ] = update_best_checkpoint(
+                                    self._executor, results, metric
+                                )
                 else:
                     result = self.run_episode()
                     # Log the given results.
