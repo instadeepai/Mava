@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Checkpointer util functions unit test"""
+import copy
 from types import SimpleNamespace
 from typing import Any, Dict, Tuple
 
@@ -121,7 +122,25 @@ class MockExecutor:
             executor_parameter_client=executor_parameter_client,
             policy_opt_states=policy_opt_states,
             critic_opt_states=critic_opt_states,
+            metrics_checkpoint=["win_rate", "mean_return"],
         )
+        self.store.best_checkpoint = {}
+        for metric in self.store.metrics_checkpoint:
+            self.store.best_checkpoint[metric] = {}
+            self.store.best_checkpoint[metric]["best_performance"] = 20
+            for agent_net_key in networks.keys():
+                self.store.best_checkpoint[metric][
+                    f"policy_network-{agent_net_key}"
+                ] = copy.deepcopy(networks[agent_net_key].policy_params)
+                self.store.best_checkpoint[metric][
+                    f"critic_network-{agent_net_key}"
+                ] = copy.deepcopy(networks[agent_net_key].critic_params)
+                self.store.best_checkpoint[metric][
+                    f"policy_opt_state-{agent_net_key}"
+                ] = copy.deepcopy(policy_opt_states[agent_net_key])
+                self.store.best_checkpoint[metric][
+                    f"critic_opt_state-{agent_net_key}"
+                ] = copy.deepcopy(critic_opt_states[agent_net_key])
 
 
 class MockParameterServer(MockParameterClient):
@@ -169,43 +188,32 @@ def test_update_best_checkpoint(mock_executor: MockExecutor) -> None:
     best_performance = update_best_checkpoint(
         executor=mock_executor, results=results, metric="win_rate"  # type:ignore
     )
-    mock_parameter_client = mock_executor.store.executor_parameter_client
 
     assert best_performance == 70
-    assert (
-        mock_parameter_client.store.parameters["best_checkpoint"]["win_rate"][
-            "best_performance"
-        ]
-        == 70
-    )
-    assert (
-        mock_parameter_client.store.parameters["best_checkpoint"]["mean_return"][
-            "best_performance"
-        ]
-        != 70
-    )
+    assert mock_executor.store.best_checkpoint["win_rate"]["best_performance"] == 70
+    assert mock_executor.store.best_checkpoint["mean_return"]["best_performance"] != 70
     # Check that the best checkpoint params are updated for the win_rate
     for agent_net_key in mock_executor.store.networks.keys():
         assert (
-            mock_parameter_client.store.parameters["best_checkpoint"]["win_rate"][
+            mock_executor.store.best_checkpoint["win_rate"][
                 f"policy_network-{agent_net_key}"
             ]
             == mock_executor.store.networks[agent_net_key].policy_params
         )
         assert (
-            mock_parameter_client.store.parameters["best_checkpoint"]["win_rate"][
+            mock_executor.store.best_checkpoint["win_rate"][
                 f"critic_network-{agent_net_key}"
             ]
             == mock_executor.store.networks[agent_net_key].critic_params
         )
         assert (
-            mock_parameter_client.store.parameters["best_checkpoint"]["win_rate"][
+            mock_executor.store.best_checkpoint["win_rate"][
                 f"policy_opt_state-{agent_net_key}"
             ]
             == mock_executor.store.policy_opt_states[agent_net_key]
         )
         assert (
-            mock_parameter_client.store.parameters["best_checkpoint"]["win_rate"][
+            mock_executor.store.best_checkpoint["win_rate"][
                 f"critic_opt_state-{agent_net_key}"
             ]
             == mock_executor.store.critic_opt_states[agent_net_key]
@@ -216,27 +224,27 @@ def test_update_best_checkpoint(mock_executor: MockExecutor) -> None:
     for agent_net_key in mock_executor.store.networks.keys():
         if (
             (
-                mock_parameter_client.store.parameters["best_checkpoint"][
-                    "mean_return"
-                ][f"policy_network-{agent_net_key}"]
+                mock_executor.store.best_checkpoint["mean_return"][
+                    f"policy_network-{agent_net_key}"
+                ]
                 != mock_executor.store.networks[agent_net_key].policy_params
             )
             or (
-                mock_parameter_client.store.parameters["best_checkpoint"][
-                    "mean_return"
-                ][f"critic_network-{agent_net_key}"]
+                mock_executor.store.best_checkpoint["mean_return"][
+                    f"critic_network-{agent_net_key}"
+                ]
                 != mock_executor.store.networks[agent_net_key].critic_params
             )
             or (
-                mock_parameter_client.store.parameters["best_checkpoint"][
-                    "mean_return"
-                ][f"policy_opt_state-{agent_net_key}"]
+                mock_executor.store.best_checkpoint["mean_return"][
+                    f"policy_opt_state-{agent_net_key}"
+                ]
                 != mock_executor.store.policy_opt_states[agent_net_key]
             )
             or (
-                mock_parameter_client.store.parameters["best_checkpoint"][
-                    "mean_return"
-                ][f"critic_opt_state-{agent_net_key}"]
+                mock_executor.store.best_checkpoint["mean_return"][
+                    f"critic_opt_state-{agent_net_key}"
+                ]
                 != mock_executor.store.critic_opt_states[agent_net_key]
             )
         ):

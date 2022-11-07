@@ -24,24 +24,24 @@ def update_best_checkpoint(
     executor: SystemExecutor, results: Dict[str, Any], metric: str
 ) -> float:
     """Update the best_checkpoint parameter in the server"""
-    params: Dict[str, Any] = {}
-    params[metric] = {}
-    params[metric]["best_performance"] = copy.deepcopy(results[metric])
+    executor.store.best_checkpoint[metric]["best_performance"] = copy.deepcopy(
+        results[metric]
+    )
     for agent_net_key in executor.store.networks.keys():
-        params[metric][f"policy_network-{agent_net_key}"] = copy.deepcopy(
-            executor.store.networks[agent_net_key].policy_params
-        )
-        params[metric][f"critic_network-{agent_net_key}"] = copy.deepcopy(
-            executor.store.networks[agent_net_key].critic_params
-        )
-        params[metric][f"policy_opt_state-{agent_net_key}"] = copy.deepcopy(
-            executor.store.policy_opt_states[agent_net_key]
-        )
-        params[metric][f"critic_opt_state-{agent_net_key}"] = copy.deepcopy(
-            executor.store.critic_opt_states[agent_net_key]
-        )
-        executor.store.executor_parameter_client.set_async({"best_checkpoint": params})
-    return params[metric]["best_performance"]
+        executor.store.best_checkpoint[metric][
+            f"policy_network-{agent_net_key}"
+        ] = copy.deepcopy(executor.store.networks[agent_net_key].policy_params)
+        executor.store.best_checkpoint[metric][
+            f"critic_network-{agent_net_key}"
+        ] = copy.deepcopy(executor.store.networks[agent_net_key].critic_params)
+        executor.store.best_checkpoint[metric][
+            f"policy_opt_state-{agent_net_key}"
+        ] = copy.deepcopy(executor.store.policy_opt_states[agent_net_key])
+        executor.store.best_checkpoint[metric][
+            f"critic_opt_state-{agent_net_key}"
+        ] = copy.deepcopy(executor.store.critic_opt_states[agent_net_key])
+
+    return executor.store.best_checkpoint[metric]["best_performance"]
 
 
 def update_to_best_net(server: SystemParameterServer, metric: str) -> None:

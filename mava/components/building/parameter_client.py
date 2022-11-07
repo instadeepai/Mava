@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Parameter client for system builders"""
+import copy
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Type
 
@@ -115,6 +116,32 @@ class ExecutorParameterClient(BaseParameterClient):
         # Create observations' normalisation parameters
         params["norm_params"] = builder.store.norm_params
         get_keys.append("norm_params")
+
+        # Create best performance network params in case of evaluator
+        if builder.store.is_evaluator and builder.store.checkpoint_best_perf:
+            builder.store.best_checkpoint: Dict[str, Any] = {}
+            for metric in builder.store.metrics_checkpoint:
+                builder.store.best_checkpoint[metric] = {}
+                builder.store.best_checkpoint[metric]["best_performance"] = None
+                for agent_net_key in builder.store.networks.keys():
+                    builder.store.best_checkpoint[metric][
+                        f"policy_network-{agent_net_key}"
+                    ] = copy.deepcopy(
+                        builder.store.networks[agent_net_key].policy_params
+                    )
+                    builder.store.best_checkpoint[metric][
+                        f"critic_network-{agent_net_key}"
+                    ] = copy.deepcopy(
+                        builder.store.networks[agent_net_key].critic_params
+                    )
+                    builder.store.best_checkpoint[metric][
+                        f"policy_opt_state-{agent_net_key}"
+                    ] = copy.deepcopy(builder.store.policy_opt_states[agent_net_key])
+                    builder.store.best_checkpoint[metric][
+                        f"critic_opt_state-{agent_net_key}"
+                    ] = copy.deepcopy(builder.store.critic_opt_states[agent_net_key])
+            params["best_checkpoint"] = builder.store.best_checkpoint
+            set_keys.append("best_checkpoint")
 
         count_names, params = self._set_up_count_parameters(params=params)
 

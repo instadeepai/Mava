@@ -196,7 +196,7 @@ def mock_builder_with_parameter_client() -> Builder:
         ),
         components=[],
     )
-
+    builder.store.is_evaluator = False
     return builder
 
 

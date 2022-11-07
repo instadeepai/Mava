@@ -220,12 +220,6 @@ class DefaultParameterServer(ParameterServer):
                 # # Loop through tuple
                 # for var_i in range(len(server.store.parameters[var_key])):
                 #     server.store.parameters[var_key][var_i].assign(params[var_key][var_i])
-            elif var_key == "best_checkpoint":
-                # Set best checkpoint values
-                for name in params[var_key].keys():
-                    server.store.parameters[var_key][name] = copy.deepcopy(
-                        params[var_key][name]
-                    )
             else:
                 server.store.parameters[var_key] = params[var_key]
 

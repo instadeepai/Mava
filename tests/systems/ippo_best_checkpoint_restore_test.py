@@ -16,6 +16,7 @@
 
 
 import functools
+import tempfile
 import time
 from datetime import datetime
 from typing import Any
@@ -42,7 +43,7 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 # Used for checkpoints, tensorboard logging and env monitoring
-experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+experiment_path = tempfile.mkdtemp()
 
 
 def run_system() -> None:
