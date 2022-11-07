@@ -104,7 +104,7 @@ def mock_system_parameter_server() -> SystemParameterServer:
         "param1": "param1_value",
         "param2": "param2_value",
         "param3": "param3_value",
-        "evaluator_or_trainer_failed": False,
+        "terminate": False,
         "num_executor_failed": 0,
     }
 
@@ -179,9 +179,7 @@ def test_on_parameter_server_init_start_parameter_creation(
         mock_system_parameter_server.store.parameters["critic_network-agent_net_2"]
         == "net_1_2_params"
     )
-    assert not mock_system_parameter_server.store.parameters[
-        "evaluator_or_trainer_failed"
-    ]
+    assert not mock_system_parameter_server.store.parameters["terminate"]
     assert mock_system_parameter_server.store.parameters["num_executor_failed"] == 0
 
 

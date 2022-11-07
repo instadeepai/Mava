@@ -27,6 +27,8 @@ from mava.core_jax import SystemExecutor
 class ExecutorInitConfig:
     evaluation_interval: Optional[dict] = None
     evaluation_duration: Optional[dict] = None
+    absolute_metric: bool = False
+    absolute_metric_duration: Optional[int] = 320
 
 
 class ExecutorInit(Component):
@@ -59,6 +61,9 @@ class ExecutorInit(Component):
         if executor.store.is_evaluator:
             executor.store.evaluation_interval = self.config.evaluation_interval  # type: ignore # noqa: E501
             executor.store.evaluation_duration = self.config.evaluation_duration  # type: ignore # noqa: E501
+            executor.store.absolute_metric = self.config.absolute_metric  # type: ignore # noqa: E501
+            executor.store.absolute_metric_duration = self.config.absolute_metric_duration  # type: ignore # noqa: E501
+
         if self.config.evaluation_duration is None:
             executor.store.evaluation_duration = {"evaluator_episodes": 1}
 
