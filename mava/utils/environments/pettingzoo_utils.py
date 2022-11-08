@@ -16,7 +16,7 @@
 """Pettingzoo environment factory."""
 
 import importlib
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import dm_env
 import numpy as np
@@ -91,8 +91,8 @@ def make_environment(
     concat_agent_id: bool = False,
     random_seed: Optional[int] = None,
     **kwargs: Any,
-) -> dm_env.Environment:
-    """Wraps a Pettingzoo environment.
+) -> Tuple[dm_env.Environment, Dict[str, str]]:
+    """Wraps an Pettingzoo environment.
 
     Args:
         env_class: str, class of the environment, e.g. MPE or Atari.
@@ -130,7 +130,12 @@ def make_environment(
     else:
         raise Exception("Pettingzoo is not installed.")
 
+    environment_task_name = {
+        "environment_name": "pettingzoo_{env_type}_{env_class}",
+        "task_name": env_name,
+    }
+
     if concat_agent_id:
         environment = ConcatAgentIdToObservation(environment)  # type: ignore
 
-    return environment
+    return environment, environment_task_name

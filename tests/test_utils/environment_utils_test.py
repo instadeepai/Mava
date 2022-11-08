@@ -58,7 +58,7 @@ class TestEnvUtils:
         """Test with seeds, obs are the same.
 
         Args:
-            env_factory (Any): env factory.
+            env: env factory and params
         """
         if env is None:
             pytest.skip()
@@ -66,14 +66,14 @@ class TestEnvUtils:
         test_seed = 42
         env_factory, env_params = env
 
-        wrapped_env = env_factory(random_seed=test_seed, **env_params)
+        wrapped_env, _ = env_factory(random_seed=test_seed, **env_params)
         reset_result = wrapped_env.reset()
         if type(reset_result) is tuple:
             timestep, _ = reset_result
         else:
             timestep = reset_result
 
-        wrapped_env2 = env_factory(random_seed=test_seed, **env_params)
+        wrapped_env2, _ = env_factory(random_seed=test_seed, **env_params)
         reset_result2 = wrapped_env2.reset()
         if type(reset_result2) is tuple:
             timestep2, _ = reset_result2
@@ -92,7 +92,7 @@ class TestEnvUtils:
         """Test with no seeds, obs are different.
 
         Args:
-            env_factory (Any): env factory.
+            env: env factory and params
         """
         if env is None:
             pytest.skip()
@@ -104,14 +104,14 @@ class TestEnvUtils:
         if _has_flatland and env_factory == flatland_utils.make_environment:
             pytest.skip("Skipping no seed test for flatland and SC2.")
 
-        wrapped_env = env_factory(**env_params)
+        wrapped_env, _ = env_factory(**env_params)
         reset_result = wrapped_env.reset()
         if type(reset_result) is tuple:
             timestep, _ = reset_result
         else:
             timestep = reset_result
 
-        wrapped_env2 = env_factory(**env_params)
+        wrapped_env2, _ = env_factory(**env_params)
         reset_result2 = wrapped_env2.reset()
         if type(reset_result2) is tuple:
             timestep2, _ = reset_result2
@@ -130,7 +130,7 @@ class TestEnvUtils:
         """Test with different seeds, obs are different.
 
         Args:
-            env_factory (Any): env factory.
+            env: env factory and params
         """
         if env is None:
             pytest.skip()
@@ -143,14 +143,14 @@ class TestEnvUtils:
         if _has_flatland and env_factory == flatland_utils.make_environment:
             pytest.skip("Skipping diff seed test for flatland.")
 
-        wrapped_env = env_factory(random_seed=test_seed1, **env_params)
+        wrapped_env, _ = env_factory(random_seed=test_seed1, **env_params)
         reset_result = wrapped_env.reset()
         if type(reset_result) is tuple:
             timestep, _ = reset_result
         else:
             timestep = reset_result
 
-        wrapped_env2 = env_factory(random_seed=test_seed2, **env_params)
+        wrapped_env2, _ = env_factory(random_seed=test_seed2, **env_params)
         reset_result2 = wrapped_env2.reset()
         if type(reset_result2) is tuple:
             timestep2, _ = reset_result2
