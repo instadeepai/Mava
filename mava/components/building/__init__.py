@@ -39,3 +39,5 @@ from mava.components.building.system_init import (
     FixedNetworkSystemInit,
     RandomSamplingSystemInit,
 )
+
+from mava.components.building.extras_spec import ExtrasSpec
