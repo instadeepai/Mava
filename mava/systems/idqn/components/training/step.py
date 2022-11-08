@@ -175,7 +175,8 @@ class IDQNStep(Step):
                 net_key: networks[net_key].policy_params for net_key in networks.keys()
             }
             target_policy_params = {
-                net_key: networks[net_key].policy_params for net_key in networks.keys()
+                net_key: networks[net_key].target_policy_params
+                for net_key in networks.keys()
             }
 
             policy_opt_states = trainer.store.policy_opt_states

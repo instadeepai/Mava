@@ -99,9 +99,9 @@ def main(_: Any) -> None:
         sample_batch_size=128,
         num_executors=1,
         multi_process=True,
-        min_data_server_size=10,
-        terminal="gnome-terminal",
-        trainer_parameter_update_period=1,
+        # min_data_server_size=10,
+        # terminal="gnome-terminal",
+        trainer_parameter_update_period=5,
         samples_per_insert=32,
     )
 

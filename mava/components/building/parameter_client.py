@@ -120,7 +120,7 @@ class ExecutorParameterClient(BaseParameterClient):
                 parameters=params,
                 get_keys=get_keys,
                 set_keys=set_keys,
-                update_period=self.config.executor_parameter_update_period,
+                call_update_period=self.config.executor_parameter_update_period,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
@@ -184,7 +184,7 @@ class ActorCriticExecutorParameterClient(ExecutorParameterClient):
                 parameters=params,
                 get_keys=get_keys,
                 set_keys=set_keys,
-                update_period=self.config.executor_parameter_update_period,
+                call_update_period=self.config.executor_parameter_update_period,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
@@ -256,7 +256,7 @@ class TrainerParameterClient(BaseParameterClient):
                 parameters=params,
                 get_keys=get_keys,
                 set_keys=set_keys,
-                update_period=self.config.trainer_parameter_update_period,
+                call_update_period=self.config.trainer_parameter_update_period,
             )
 
             # Get all the initial parameters
@@ -328,7 +328,7 @@ class ActorCriticTrainerParameterClient(TrainerParameterClient):
                 parameters=params,
                 get_keys=get_keys,
                 set_keys=set_keys,
-                update_period=self.config.trainer_parameter_update_period,
+                call_update_period=self.config.trainer_parameter_update_period,
             )
 
             # Get all the initial parameters
