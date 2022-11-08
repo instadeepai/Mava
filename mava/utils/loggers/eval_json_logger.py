@@ -90,14 +90,16 @@ class JSONLogger:
         self, original_dictionary: Dict[str, Any], dictionary_to_add: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Adds new data to already logged data read in from a json file."""
+
         if "step_count" not in list(dictionary_to_add.keys()):
-            original_dictionary[self._env_name][self._task_name][self._system_name][
-                self._random_seed
-            ]["absolute_metrics"] = dictionary_to_add
+            dict_key = "absolute_metrics"
         else:
-            original_dictionary[self._env_name][self._task_name][self._system_name][
-                self._random_seed
-            ][f"step_{str(self._step_count)}"] = dictionary_to_add
+            dict_key = f"step_{str(self._step_count)}"
+
+        original_dictionary[self._env_name][self._task_name][self._system_name][
+            self._random_seed
+        ][dict_key] = dictionary_to_add
+
         return original_dictionary
 
     def write(self, results_dict: Dict[str, Any]) -> None:
