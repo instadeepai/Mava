@@ -15,6 +15,15 @@ You generally only need to submit a CLA once, so if you've already submitted one
 (even if it was for a different project), you probably don't need to do it
 again.
 
+## Installing MAVA for developement
+
+To develop features for mava, clone the repository and install all the dependencies as follows:
+
+```bash
+git clone https://github.com/instadeepai/mava.git
+pip install -e "mava[reverb,jax]"
+```
+
 ## Installing Pre-Commit Hooks and Testing Dependencies
 
 Install the pre-commit hooks and testing dependencies:
