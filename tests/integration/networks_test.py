@@ -37,7 +37,9 @@ def recurrent_network() -> Callable:
         action_space="discrete",
     )
 
-    ma_environment_spec = specs.MAEnvironmentSpec(environment_factory())
+    env, _ = environment_factory()
+    ma_environment_spec = specs.MAEnvironmentSpec(env)
+
     agent_net_keys = {
         "agent_0": "network_agent",
         "agent_1": "network_agent",
@@ -68,7 +70,9 @@ def feedforward_network() -> Callable:
         action_space="discrete",
     )
 
-    ma_environment_spec = specs.MAEnvironmentSpec(environment_factory())
+    env, _ = environment_factory()
+    ma_environment_spec = specs.MAEnvironmentSpec(env)
+
     agent_net_keys = {
         "agent_0": "network_agent",
         "agent_1": "network_agent",

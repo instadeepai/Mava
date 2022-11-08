@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Utils for SMAC environment."""
-from typing import Any, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from mava.utils.jax_training_utils import set_jax_double_precision
 
@@ -40,8 +40,8 @@ if _found_smac:
         evaluation: bool = False,
         random_seed: Optional[int] = None,
         death_masking: bool = False,
-    ) -> Any:
-        """Create smac environment wrapper.
+    ) -> Tuple[Any, Dict[str, str]]:
+        """Make a SMAC enviroment.
 
         Args:
             map_name: the name of the scenario
@@ -63,4 +63,5 @@ if _found_smac:
         if concat_agent_id:
             env = ConcatAgentIdToObservation(env)
 
-        return env
+        environment_task_name = {"environment_name": "SMAC", "task_name": map_name}
+        return env, environment_task_name
