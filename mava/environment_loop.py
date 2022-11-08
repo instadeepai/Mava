@@ -17,7 +17,6 @@
 
 
 import copy
-
 import logging
 import time
 from typing import Any, Dict, Tuple
@@ -30,7 +29,7 @@ import tensorflow as tf
 from acme.utils import counting, loggers
 
 import mava
-from mava.utils.checkpointing_utils import update_best_checkpoint, update_to_best_net
+from mava.utils.checkpointing_utils import update_best_checkpoint
 from mava.utils.training_utils import check_count_condition
 from mava.utils.wrapper_utils import generate_zeros_from_spec
 
@@ -290,7 +289,8 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 used_results = jax.tree_map(lambda x, y: x + y, used_results, result)
                 # compute the mean over all evaluation runs
                 used_results = jax.tree_map(
-                    lambda x: x / evaluation_duration, used_results
+                    lambda x: x / self._executor.store.absolute_metric_duration,
+                    used_results,
                 )
                 # Check for extra logs
                 if hasattr(self._environment, "get_interval_stats"):
@@ -311,7 +311,8 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 if environment_loop_schedule:
                     results = self.run_episode()
                     if (
-                        results["executor_steps"] >= 20000
+                        results["executor_steps"]
+                        >= self._executor.store.absolute_metric_interval
                         and self._executor.store.absolute_metric
                     ):
                         tf.print(
@@ -333,7 +334,10 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         if hasattr(self._environment, "get_interval_stats"):
                             results.update(self._environment.get_interval_stats())
                         self._logger.write(results)
-                        if self._executor.store.checkpoint_best_perf:
+                        if (
+                            self._executor.store.checkpoint_best_perf
+                            or self._executor.store.absolute_metric
+                        ):
                             # Best_performance_update
                             for (
                                 metric,

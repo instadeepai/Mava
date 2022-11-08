@@ -118,7 +118,7 @@ class ExecutorParameterClient(BaseParameterClient):
         get_keys.append("norm_params")
 
         # Create best performance network params in case of evaluator
-        if builder.store.is_evaluator and builder.store.checkpoint_best_perf:
+        if builder.store.is_evaluator:
             builder.store.best_checkpoint: Dict[str, Any] = {}  # type:ignore
             for metric in builder.store.metrics_checkpoint:
                 builder.store.best_checkpoint[metric] = {}
@@ -140,8 +140,9 @@ class ExecutorParameterClient(BaseParameterClient):
                     builder.store.best_checkpoint[metric][
                         f"critic_opt_state-{agent_net_key}"
                     ] = copy.deepcopy(builder.store.critic_opt_states[agent_net_key])
-            params["best_checkpoint"] = builder.store.best_checkpoint
-            set_keys.append("best_checkpoint")
+            if builder.store.checkpoint_best_perf:
+                params["best_checkpoint"] = builder.store.best_checkpoint
+                set_keys.append("best_checkpoint")
 
         count_names, params = self._set_up_count_parameters(params=params)
 
