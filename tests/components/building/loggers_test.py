@@ -57,6 +57,16 @@ def test_builder() -> SystemBuilder:
     system_builder.store.executor_id = "executor_1"
     system_builder.store.trainer_id = "trainer_2"
     system_builder.store.global_config.evaluation_interval = None
+    system_builder.store.global_config.environment_factory = lambda evaluation: (
+        (),
+        {
+            "environment_name": "test_env",
+            "task_name": "test_task",
+        },
+    )
+    system_builder.store.global_config.seed = 1111
+    system_builder.store.global_config.system_name = "test_system"
+    system_builder.store.global_config.json_path = None
     return system_builder
 
 
@@ -99,42 +109,6 @@ def test_logger_with_json(test_logger_factory: Callable) -> Logger:
         "evaluator": {
             "time_stamp": "evaluator_logger_config",
             "to_json": True,
-            "extra_logger_kwargs": {
-                "random_seed": 1234,
-                "env_name": "test_environment",
-                "task_name": "test_task",
-                "system_name": "test_system",
-                "json_path": tempfile.mkdtemp(),
-            },
-        },
-    }
-
-    return Logger(logger_config)
-
-
-@pytest.fixture
-def test_logger_with_json_incomplete(test_logger_factory: Callable) -> Logger:
-    """Pytest fixture for TestLogger with json logging.
-
-    Args:
-        test_logger_factory: factory to use in logger config.
-
-    Returns:
-        Default TestLogger.
-    """
-    logger_config = LoggerConfig()
-    logger_config.logger_factory = test_logger_factory
-    logger_config.logger_config = {
-        "trainer": {"time_stamp": "trainer_logger_config"},
-        "executor": {"time_stamp": "executor_logger_config"},
-        "evaluator": {
-            "time_stamp": "evaluator_logger_config",
-            "to_json": True,
-            "extra_logger_kwargs": {
-                "random_seed": 1234,
-                "env_name": "test_environment",
-                "task_name": "test_task",
-            },
         },
     }
 
@@ -213,17 +187,6 @@ def test_on_building_executor_logger_evaluator_with_json(
     # Correct logger config has been loaded
     assert test_builder.store.executor_logger._label == "executor_1"
     assert test_builder.store.executor_logger._time_stamp == "evaluator_logger_config"
-
-
-def test_json_logger_fail_with_incomplete_information(
-    test_logger_with_json_incomplete: Logger, test_builder: SystemBuilder
-) -> None:
-    """Test whether json logger fails when not all relevant \
-        information is passed in."""
-
-    test_builder.store.is_evaluator = True
-    with pytest.raises(TypeError):
-        test_logger_with_json_incomplete.on_building_executor_logger(test_builder)
 
 
 def test_on_building_trainer_logger(

@@ -60,7 +60,7 @@ class Logger(Component):
         ):
             logger_config = self.config.logger_config[name]
 
-            if logger_config["to_json"]:
+            if ("to_json" in logger_config) and (logger_config["to_json"]):
 
                 # Instantiate an environment from a factory to get access to the
                 # environment name and task name
