@@ -108,11 +108,11 @@ class IRDQNLoss(Loss):
                     """Inner policy loss function: see outer function for parameters."""
 
                     # Use the state at the start of the sequence and unroll the policy.
-                    policy_net_core = lambda x, y: network.forward(
-                        policy_params, [x, y]
+                    policy_net_core = lambda obs, states: network.forward(
+                        policy_params, obs, states
                     )
-                    target_policy_net_core = lambda x, y: network.forward(
-                        target_policy_params, [x, y]
+                    target_policy_net_core = lambda obs, states: network.forward(
+                        target_policy_params, obs, states
                     )
 
                     online_qs, _ = hk.static_unroll(

@@ -18,15 +18,15 @@ class IDRQNNetwork:
 
         def forward_fn(
             policy_params: Dict[str, jnp.ndarray],
-            policy_state: Dict[str, jnp.ndarray],
             observations: networks_lib.Observation,
+            policy_state: Dict[str, jnp.ndarray],
         ):
             return self.policy_network.apply(policy_params, [observations, policy_state])
 
         self.forward = forward_fn
 
     def get_action(self, params, policy_state, observations, epsilon, base_key, mask: jnp.array):
-        q_values, new_policy_state = self.forward(params, policy_state, observations)
+        q_values, new_policy_state = self.forward(params, observations, policy_state)
         masked_q_values = jnp.where(mask == 1.0, q_values, -99999)  # todo
 
         greedy_actions = masked_q_values == jnp.max(masked_q_values)

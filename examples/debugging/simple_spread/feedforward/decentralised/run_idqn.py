@@ -99,8 +99,9 @@ def main(_: Any) -> None:
         sample_batch_size=32,
         num_executors=1,
         multi_process=True,
-        samples_per_insert=8,
-        # terminal="gnome-terminal"
+        # samples_per_insert=8,
+        min_data_server_size=10,
+        terminal="gnome-terminal"
     )
 
     # Launch the system.

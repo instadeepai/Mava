@@ -61,7 +61,7 @@ def main(_: Any) -> None:
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return idrqn.make_default_networks(  # type: ignore
-            policy_layer_sizes=(64, 64),
+            policy_layer_sizes=(64,),
             *args,
             **kwargs,
         )
@@ -82,7 +82,7 @@ def main(_: Any) -> None:
 
     # Optimisers.
     policy_optimiser = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-3)
     )
 
     # Create the system.
@@ -99,9 +99,9 @@ def main(_: Any) -> None:
         sample_batch_size=64,
         num_executors=1,
         multi_process=True,
-        samples_per_insert=32,
-        # min_data_server_size=10,
-        # terminal="gnome-terminal"
+        # samples_per_insert=32,
+        min_data_server_size=10,
+        terminal="gnome-terminal",
         sequence_length=20,
         period=10,
     )

@@ -191,6 +191,8 @@ class IDQNStep(Step):
                 trainer_iteration=steps,
             )
 
+            time.sleep(0.1)
+
             new_states, metrics = sgd_step(states, sample)
 
             # Set the new variables
