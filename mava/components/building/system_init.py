@@ -64,6 +64,7 @@ class BaseSystemInit(Component):
 @dataclass
 class BaseSystemInitConfig:
     shared_weights: bool = True
+    system_name: str = "system"
 
 
 @dataclass

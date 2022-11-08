@@ -16,6 +16,7 @@
 """Logger unit tests"""
 
 import functools
+import tempfile
 from typing import Callable
 
 import pytest
@@ -35,7 +36,7 @@ def test_logger_factory() -> Callable:
     """
     simple_factory = functools.partial(
         logger_utils.make_logger,
-        directory="~/mava",
+        directory=tempfile.mkdtemp(),
         to_terminal=True,
         to_tensorboard=True,
         time_stamp="01/01/1997-00:00:00",
@@ -55,6 +56,17 @@ def test_builder() -> SystemBuilder:
     system_builder = Builder(components=[])
     system_builder.store.executor_id = "executor_1"
     system_builder.store.trainer_id = "trainer_2"
+    system_builder.store.global_config.evaluation_interval = None
+    system_builder.store.global_config.environment_factory = lambda evaluation: (
+        (),
+        {
+            "environment_name": "test_env",
+            "task_name": "test_task",
+        },
+    )
+    system_builder.store.global_config.seed = 1111
+    system_builder.store.global_config.system_name = "test_system"
+    system_builder.store.global_config.json_path = None
     return system_builder
 
 
@@ -74,6 +86,30 @@ def test_logger(test_logger_factory: Callable) -> Logger:
         "trainer": {"time_stamp": "trainer_logger_config"},
         "executor": {"time_stamp": "executor_logger_config"},
         "evaluator": {"time_stamp": "evaluator_logger_config"},
+    }
+
+    return Logger(logger_config)
+
+
+@pytest.fixture
+def test_logger_with_json(test_logger_factory: Callable) -> Logger:
+    """Pytest fixture for TestLogger with json logging.
+
+    Args:
+        test_logger_factory: factory to use in logger config.
+
+    Returns:
+        Default TestLogger.
+    """
+    logger_config = LoggerConfig()
+    logger_config.logger_factory = test_logger_factory
+    logger_config.logger_config = {
+        "trainer": {"time_stamp": "trainer_logger_config"},
+        "executor": {"time_stamp": "executor_logger_config"},
+        "evaluator": {
+            "time_stamp": "evaluator_logger_config",
+            "to_json": True,
+        },
     }
 
     return Logger(logger_config)
@@ -123,6 +159,26 @@ def test_on_building_executor_logger_evaluator(
 
     # Correct component name
     assert test_logger.name() == "logger"
+
+    # Correct logger has been created
+    assert test_builder.store.executor_logger is not None
+    assert not hasattr(test_builder.store, "trainer_logger")
+
+    # Correct logger config has been loaded
+    assert test_builder.store.executor_logger._label == "executor_1"
+    assert test_builder.store.executor_logger._time_stamp == "evaluator_logger_config"
+
+
+def test_on_building_executor_logger_evaluator_with_json(
+    test_logger_with_json: Logger, test_builder: SystemBuilder
+) -> None:
+    """Test whether json logger is correctly added to evaluator"""
+
+    test_builder.store.is_evaluator = True
+    test_logger_with_json.on_building_executor_logger(test_builder)
+
+    # Correct component name
+    assert test_logger_with_json.name() == "logger"
 
     # Correct logger has been created
     assert test_builder.store.executor_logger is not None

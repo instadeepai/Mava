@@ -91,9 +91,9 @@ def test_executor_single_process(test_system_sp: System) -> None:
     ]
 
     # check that the selected action is within the possible ones
+    env, _ = environment_factory()
     num_possible_actions = [
-        environment_factory().action_spec()[agent].num_values
-        for agent in environment_factory().possible_agents
+        env.action_spec()[agent].num_values for agent in env.possible_agents
     ]
     for i in range(len(num_possible_actions)):
         assert list(executor._executor.store.actions_info.values())[i] in range(
