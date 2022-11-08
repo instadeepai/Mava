@@ -15,6 +15,7 @@
 
 """A simple multi-agent-system-environment training loop."""
 
+import logging
 import time
 from typing import Any, Dict, Tuple
 
@@ -22,7 +23,6 @@ import acme
 import dm_env
 import jax
 import numpy as np
-import logging
 from acme.utils import counting, loggers
 
 import mava
@@ -279,7 +279,8 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
             except Exception as e:
                 if self._executor._evaluator:
-                    logging.exception(f"{e}: Experiment terminated due to an error on the evaluator."
+                    logging.exception(
+                        f"{e}: Experiment terminated due to an error on the evaluator."
                     )
                     self._executor.store.executor_parameter_client.set_and_wait(
                         {"evaluator_or_trainer_failed": True}

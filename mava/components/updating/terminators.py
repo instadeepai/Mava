@@ -15,12 +15,12 @@
 
 """Terminator component for Mava systems."""
 import abc
+import logging
 import time
 from typing import Any, Callable, Dict, List, Optional, Type
 
 from chex import dataclass
 
-import logging
 from mava.callbacks import Callback
 from mava.components.component import Component
 from mava.components.updating.parameter_server import ParameterServer
