@@ -18,9 +18,9 @@ import abc
 import time
 from typing import Any, Callable, Dict, List, Optional, Type
 
-import tensorflow as tf
 from chex import dataclass
 
+import logging
 from mava.callbacks import Callback
 from mava.components.component import Component
 from mava.components.updating.parameter_server import ParameterServer
@@ -102,7 +102,7 @@ class CountConditionTerminator(Terminator):
             and parameter_server.store.parameters[self.termination_key]
             > self.termination_value
         ):
-            tf.print(
+            logging.exception(
                 f"Max {self.termination_key} of {self.termination_value}"
                 " reached, terminating."
             )
@@ -162,7 +162,7 @@ class TimeTerminator(Terminator):
             None.
         """
         if time.time() - self._start_time > self.config.run_seconds:
-            tf.print(
+            logging.exception(
                 f"Run time of {self.config.run_seconds} seconds reached, terminating."
             )
             self.config.termination_function(parameter_server)

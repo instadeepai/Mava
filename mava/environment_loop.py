@@ -22,7 +22,7 @@ import acme
 import dm_env
 import jax
 import numpy as np
-import tensorflow as tf
+import logging
 from acme.utils import counting, loggers
 
 import mava
@@ -279,14 +279,13 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
             except Exception as e:
                 if self._executor._evaluator:
-                    tf.print(
-                        e, ": Experiment terminated due to an error on the evaluator."
+                    logging.exception(f"{e}: Experiment terminated due to an error on the evaluator."
                     )
                     self._executor.store.executor_parameter_client.set_and_wait(
                         {"evaluator_or_trainer_failed": True}
                     )
                 else:
-                    tf.print(e, ": an executor failed.")
+                    logging.exception(f"{e}: an executor failed.")
                     self._executor.store.executor_parameter_client.add_and_wait(
                         {"num_executor_failed": 1}
                     )
