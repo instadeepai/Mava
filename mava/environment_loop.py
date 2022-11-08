@@ -15,7 +15,10 @@
 
 """A simple multi-agent-system-environment training loop."""
 
+
 import copy
+
+import logging
 import time
 from typing import Any, Dict, Tuple
 
@@ -368,16 +371,14 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
             except Exception as e:
                 if self._executor._evaluator:
-                    print(
-                        e, ": Experiment terminated due to an error on the evaluator."
+                    logging.exception(
+                        f"{e}: Experiment terminated due to an error on the evaluator."
                     )
-                    time.sleep(60)
                     self._executor.store.executor_parameter_client.set_and_wait(
                         {"terminate": True}
                     )
                 else:
-                    print(e, ": an executor failed.")
-                    time.sleep(60)
+                    logging.exception(f"{e}: an executor failed.")
                     self._executor.store.executor_parameter_client.add_and_wait(
                         {"num_executor_failed": 1}
                     )
