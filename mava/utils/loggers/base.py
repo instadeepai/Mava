@@ -144,12 +144,14 @@ class Logger(MavaLogger):
             # Log json to a different directory if given for easy json file
             # aggregation after completing a set of experiments.
             if (extra_logger_kwargs is not None) and (
-                "json_path" in extra_logger_kwargs
+                extra_logger_kwargs["json_path"] is not None
             ):
-                json_path = extra_logger_kwargs.pop("json_path")
+                json_path = extra_logger_kwargs["json_path"]
 
             else:
                 json_path = str(self._directory / self._time_stamp)
+
+            del extra_logger_kwargs["json_path"]
 
             logger += [JSONLogger(experiment_path=json_path, **extra_logger_kwargs)]
 

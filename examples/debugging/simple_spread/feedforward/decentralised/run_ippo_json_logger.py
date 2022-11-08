@@ -78,13 +78,6 @@ def main(_: Any) -> None:
     logger_config = {
         "evaluator": {
             "to_json": True,
-            "extra_logger_kwargs": {
-                "random_seed": 1234,
-                "env_name": "debugging",
-                "task_name": "simple_spread",
-                "system_name": "IPPO",
-                "json_path": f"{FLAGS.base_dir}/JSON_DIR",
-            },
         },
     }
 
@@ -126,6 +119,7 @@ def main(_: Any) -> None:
         clip_value=False,
         evaluation_interval={"executor_steps": 10000},
         evaluation_duration={"evaluator_episodes": 3},
+        json_path=f"{FLAGS.base_dir}/JSON_DIR",
     )
 
     # Launch the system.
