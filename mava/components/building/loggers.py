@@ -55,8 +55,27 @@ class Logger(Component):
         # is_evaluator set by builder
         name = "executor" if not builder.store.is_evaluator else "evaluator"
 
-        if self.config.logger_config and name in self.config.logger_config:
+        if (self.config.logger_config is not None) and (
+            name in self.config.logger_config
+        ):
             logger_config = self.config.logger_config[name]
+
+            if ("to_json" in logger_config) and (logger_config["to_json"]):
+
+                # Instantiate an environment from a factory to get access to the
+                # environment name and task name
+                temp_env, env_names = builder.store.global_config.environment_factory(
+                    evaluation=False
+                )
+                del temp_env
+
+                logger_config["extra_logger_kwargs"] = {
+                    "random_seed": builder.store.global_config.seed,
+                    "env_name": env_names["environment_name"],
+                    "task_name": env_names["task_name"],
+                    "system_name": builder.store.global_config.system_name,
+                    "json_path": builder.store.global_config.json_path,
+                }
 
         # executor_id set by builder
         builder.store.executor_logger = self.config.logger_factory(  # type: ignore
