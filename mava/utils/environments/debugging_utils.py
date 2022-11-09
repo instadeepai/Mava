@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Optional
+from typing import Dict, Optional, Tuple
 
 import dm_env
 
@@ -32,8 +32,8 @@ def make_environment(
     return_state_info: bool = False,
     random_seed: Optional[int] = None,
     recurrent_test: bool = False,
-    concat_agent_id: bool = False,
-) -> dm_env.Environment:
+) -> Tuple[dm_env.Environment, Dict[str, str]]:
+    """Make a debugging environment."""
 
     assert action_space == "continuous" or action_space == "discrete"
     environment: Any
@@ -61,4 +61,9 @@ def make_environment(
     if random_seed and hasattr(environment, "seed"):
         environment.seed(random_seed)
 
-    return environment
+    environment_task_name = {
+        "environment_name": "debugging",
+        "task_name": env_name,
+    }
+
+    return environment, environment_task_name

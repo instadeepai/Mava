@@ -59,7 +59,8 @@ class EnvironmentSpec(Component):
             None.
         """
         builder.store.manager_pid = os.getpid()
-        env = self.config.environment_factory()
+        env, _ = self.config.environment_factory()
+
         builder.store.ma_environment_spec = specs.MAEnvironmentSpec(env)
 
         builder.store.agents = sort_str_num(
@@ -115,10 +116,11 @@ class ExecutorEnvironmentLoop(Component):
             None.
         """
         # Global config set by EnvironmentSpec component
-        builder.store.executor_environment = (
-            builder.store.global_config.environment_factory(
-                evaluation=builder.store.is_evaluator
-            )
+        (
+            builder.store.executor_environment,
+            _,
+        ) = builder.store.global_config.environment_factory(
+            evaluation=builder.store.is_evaluator
         )  # type: ignore
 
     @abc.abstractmethod

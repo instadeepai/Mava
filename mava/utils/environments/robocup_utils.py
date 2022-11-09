@@ -15,6 +15,8 @@
 
 """Robocup environment factory."""
 
+from typing import Dict, List, Tuple
+
 import dm_env
 import numpy as np
 
@@ -25,7 +27,7 @@ from mava.wrappers.robocup import RoboCupWrapper
 def make_environment(
     game_name: str = "domain_randomisation",
     evaluation: bool = False,
-) -> dm_env.Environment:
+) -> Tuple[dm_env.Environment, Dict[str, str]]:
     """Wraps the Robocup environment with some basic preprocessing.
 
     Args:
@@ -57,4 +59,28 @@ def make_environment(
         game_length=1000,
         port=rand_port,
     )
-    return RoboCupWrapper(robocup_env)
+
+    def _make_robocup_task_name(game_setting: str, players_per_team: List[int]) -> str:
+        """A simple helper function to create a robocup task name.
+
+        The task name will be a string created as:
+        `<game_setting>_<num_players>_players`. For example in a
+        reward_shaping game with 22 players in total the task name
+        will be `reward_shaping_22_players`.
+        """
+
+        game_setting = str(game_setting)
+        num_players = str(players_per_team[0] + players_per_team[1])
+
+        task_name = f"{game_setting}_{num_players}_players"
+
+        return task_name
+
+    environment_task_name = {
+        "environment_name": "robocup",
+        "task_name": _make_robocup_task_name(
+            game_setting=game_name, players_per_team=players_per_team
+        ),
+    }
+
+    return RoboCupWrapper(robocup_env), environment_task_name
