@@ -27,6 +27,7 @@ from mava.components.building.environments import (
     EnvironmentSpec,
     ParallelExecutorEnvironmentLoop,
 )
+from mava.components.building.extras_spec import ExtrasSpec
 from mava.components.building.loggers import Logger
 from mava.components.building.networks import DefaultNetworks
 from mava.components.building.optimisers import DefaultOptimisers
@@ -39,5 +40,3 @@ from mava.components.building.system_init import (
     FixedNetworkSystemInit,
     RandomSamplingSystemInit,
 )
-
-from mava.components.building.extras_spec import ExtrasSpec

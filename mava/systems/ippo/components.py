@@ -14,15 +14,12 @@
 # limitations under the License.
 
 """Custom components for IPPO system."""
-import abc
 from types import SimpleNamespace
-from typing import Any
 
 import numpy as np
-from dm_env import specs
 
-from mava.core_jax import SystemBuilder
 from mava.components.building import ExtrasSpec
+from mava.core_jax import SystemBuilder
 
 
 class ExtrasLogProbSpec(ExtrasSpec):

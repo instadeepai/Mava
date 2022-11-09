@@ -13,14 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-ExtrasSpec's are used on creation of reverb tables, to set the table's signature for
-data that needs to go into the table, but is not included in the environment spec's 
+"""ExtrasSpecs are used to inform the reverb table about extra data.
+
+They are used on creation of reverb tables, to set the table's signature for
+data that needs to go into the table, but is not included in the environments
 observations, actions or rewards
 """
 
 import abc
-from typing import Any, List
+from typing import Any, Dict, List
 
 from dm_env import specs
 
@@ -46,12 +47,15 @@ class ExtrasSpec(Component):
         """
         return "extras_spec"
 
-    def get_network_keys(self, unique_net_keys: List[str], agent_ids: List[str]):
-        """
-        Generates the network keys from the unique_net_keys and agent_ids, which
-         is used by the reverb adders to place experience in the correct tables
+    def get_network_keys(
+        self, unique_net_keys: List[str], agent_ids: List[str]
+    ) -> Dict[str, Dict[str, int]]:
+        """Generates the network keys used by adders.
 
-        Params:
+        Uses the the unique_net_keys and agent_ids, to generate network keys.
+        The keys inform the reverb adders in which tables to place the experience.
+
+        Args:
             unique_net_keys: keys of all the networks
             agent_ids: the IDs of all agents
 
