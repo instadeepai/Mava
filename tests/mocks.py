@@ -222,6 +222,16 @@ def get_ma_environment(
         def env_done(self) -> bool:
             return not self.agents
 
+        @property
+        def death_masked_agents(self) -> List:
+            """Returns all death masked agents"""
+            return []
+
+        @property
+        def obs_normalisation_start_index(self) -> int:
+            """Returns an interger to indicate which features should not be normalised"""
+            return 0
+
     return MockedEnvironment
 
 
