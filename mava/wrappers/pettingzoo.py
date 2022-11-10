@@ -18,7 +18,6 @@
 from typing import Any, Dict, List, Optional, Union
 
 import dm_env
-import gym
 import jax
 import numpy as np
 from acme import specs
