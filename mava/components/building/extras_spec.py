@@ -21,16 +21,17 @@ observations, actions or rewards
 """
 
 import abc
-from typing import Any, Dict, List
+from types import SimpleNamespace
+from typing import Dict, List
 
 from dm_env import specs
 
 from mava.components import Component
+from mava.core_jax import SystemBuilder
 
 
 class ExtrasSpec(Component):
-    @abc.abstractmethod
-    def __init__(self, config: Any) -> None:
+    def __init__(self, config: SimpleNamespace = SimpleNamespace()) -> None:
         """Initialise extra specs
 
         Args:
@@ -48,7 +49,7 @@ class ExtrasSpec(Component):
         return "extras_spec"
 
     def get_network_keys(
-        self, unique_net_keys: List[str], agent_ids: List[str]
+        self, unique_net_keys: List, agent_ids: List[str]
     ) -> Dict[str, Dict[str, int]]:
         """Generates the network keys used by adders.
 
@@ -64,3 +65,15 @@ class ExtrasSpec(Component):
         """
         int_spec = specs.DiscreteArray(len(unique_net_keys))
         return {"network_keys": {agent_id: int_spec for agent_id in agent_ids}}
+
+    @abc.abstractmethod
+    def on_building_init_end(self, builder: SystemBuilder) -> None:
+        """Create extra specs after builder has been initialised
+
+        Args:
+            builder: SystemBuilder
+
+        Returns:
+            None.
+        """
+        pass
