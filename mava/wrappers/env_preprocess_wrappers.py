@@ -124,6 +124,15 @@ class ConcatAgentIdToObservation:
         observations = timestep.observation
         return observations
 
+    @property
+    def obs_normalisation_start_index(self) -> int:
+        """Returns an interger to indicate which features should not be normalised"""
+
+        old_value = self._environment.obs_normalisation_start_index
+        num_values = self._num_agents
+
+        return old_value + num_values
+
     def __getattr__(self, name: str) -> Any:
         """Expose any other attributes of the underlying environment.
 
@@ -227,6 +236,17 @@ class ConcatPrevActionToObservation:
 
         observations = timestep.observation
         return observations
+
+    @property
+    def obs_normalisation_start_index(self) -> int:
+        """Returns an interger to indicate which features should not be normalised"""
+
+        old_value = self._environment.obs_normalisation_start_index
+        action_spec = self._environment.action_spec()
+        agent = self._environment.possible_agents[0]
+        num_values = action_spec[agent].num_values
+
+        return old_value + num_values
 
     def __getattr__(self, name: str) -> Any:
         """Expose any other attributes of the underlying environment.

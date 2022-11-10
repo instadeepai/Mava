@@ -25,12 +25,13 @@ import jax.numpy as jnp
 import pytest
 from acme.jax import networks as networks_lib
 
+from mava import constants
 from mava.components.executing.action_selection import (
     FeedforwardExecutorSelectAction,
     RecurrentExecutorSelectAction,
 )
 from mava.systems.executor import Executor
-from mava.types import NestedArray
+from mava.types import OLT, NestedArray
 
 
 @dataclass
@@ -42,7 +43,7 @@ class DummyExecutorSelectActionConfig:
 
 @pytest.fixture
 def dummy_config() -> DummyExecutorSelectActionConfig:
-    """Dummy config attribute for FeedforwardExecutorSelectAction and RecurrentExecutorSelectAction classes
+    """Dummy config attribute for Feedforward and Recurrent ExecutorSelectAction classes
 
     Returns:
         ExecutorSelectActionConfig
@@ -81,6 +82,10 @@ def mock_empty_executor() -> Executor:
         select_actions_fn=select_actions,
         base_key=42,
         policy_states=1234,
+        global_config=SimpleNamespace(
+            normalize_observations=False,
+            normalize_target_values=False,
+        ),
     )
     return Executor(store=store)
 
@@ -115,7 +120,7 @@ def get_params() -> Dict[str, jnp.ndarray]:
 def select_actions(
     observations: Dict[str, NestedArray],
     current_params: Dict[str, NestedArray],
-    key: networks_lib.PRNGKey,
+    base_key: networks_lib.PRNGKey,
 ) -> Tuple[Dict[str, NestedArray], Dict[str, NestedArray], networks_lib.PRNGKey]:
     """Dummy select actions.
 
@@ -132,7 +137,7 @@ def select_actions(
     for agent in observations.keys():
         action_info[agent] = "action_info_" + str(agent)
         policy_info[agent] = "policy_info_" + str(agent)
-    return action_info, policy_info, key
+    return action_info, policy_info, base_key
 
 
 class MockFeedForwardExecutor(Executor):
@@ -141,9 +146,15 @@ class MockFeedForwardExecutor(Executor):
     def __init__(self) -> None:
         """Init for mock executor."""
         observations = {
-            "agent_0": [0.1, 0.5, 0.7],
-            "agent_1": [0.8, 0.3, 0.7],
-            "agent_2": [0.9, 0.9, 0.8],
+            "agent_0": OLT(
+                observation=jnp.array([0.1, 0.5, 0.7]), legal_actions=[1], terminal=[0]
+            ),
+            "agent_1": OLT(
+                observation=jnp.array([0.8, 0.3, 0.7]), legal_actions=[1], terminal=[0]
+            ),
+            "agent_2": OLT(
+                observation=jnp.array([0.9, 0.9, 0.8]), legal_actions=[1], terminal=[0]
+            ),
         }
         agent_net_keys = {
             "agent_0": "network_agent_0",
@@ -170,6 +181,18 @@ class MockFeedForwardExecutor(Executor):
         action_info = "action_info_test"
         policy_info = "policy_info_test"
 
+        norm_params: Any = {
+            constants.OBS_NORM_STATE_DICT_KEY: {},
+        }
+        for agent in ["agent_0", "agent_1", "agent_2"]:
+            obs_shape = 3
+            norm_params[constants.OBS_NORM_STATE_DICT_KEY][agent] = dict(
+                mean=jnp.zeros(shape=obs_shape),
+                var=jnp.ones(shape=obs_shape) * 4,
+                std=jnp.ones(shape=obs_shape) * 2,
+                count=jnp.array([10]),
+            )
+
         store = SimpleNamespace(
             is_evaluator=None,
             observations=observations,
@@ -181,6 +204,11 @@ class MockFeedForwardExecutor(Executor):
             action_info=action_info,
             policy_info=policy_info,
             select_actions_fn=select_actions,
+            norm_params=norm_params,
+            global_config=SimpleNamespace(
+                normalize_observations=True,
+                normalize_target_values=False,
+            ),
         )
         self.store = store
 
@@ -295,9 +323,15 @@ class MockRecurrentExecutor(Executor):  # type: ignore # noqa: E501
     def __init__(self) -> None:
         """Init for mock executor."""
         observations = {
-            "agent_0": [0.1, 0.5, 0.7],
-            "agent_1": [0.8, 0.3, 0.7],
-            "agent_2": [0.9, 0.9, 0.8],
+            "agent_0": OLT(
+                observation=jnp.array([0.1, 0.5, 0.7]), legal_actions=[1], terminal=[0]
+            ),
+            "agent_1": OLT(
+                observation=jnp.array([0.8, 0.3, 0.7]), legal_actions=[1], terminal=[0]
+            ),
+            "agent_2": OLT(
+                observation=jnp.array([0.9, 0.9, 0.8]), legal_actions=[1], terminal=[0]
+            ),
         }
         agent_net_keys = {
             "agent_0": "network_agent_0",
@@ -324,6 +358,18 @@ class MockRecurrentExecutor(Executor):  # type: ignore # noqa: E501
         action_info = "action_info_test"
         policy_info = "policy_info_test"
 
+        norm_params: Any = {
+            constants.OBS_NORM_STATE_DICT_KEY: {},
+        }
+        for agent in ["agent_0", "agent_1", "agent_2"]:
+            obs_shape = 3
+            norm_params[constants.OBS_NORM_STATE_DICT_KEY][agent] = dict(
+                mean=jnp.zeros(shape=obs_shape),
+                var=jnp.ones(shape=obs_shape) * 4,
+                std=jnp.ones(shape=obs_shape) * 2,
+                count=jnp.array([10]),
+            )
+
         store = SimpleNamespace(
             is_evaluator=None,
             observations=observations,
@@ -334,7 +380,12 @@ class MockRecurrentExecutor(Executor):  # type: ignore # noqa: E501
             base_key=base_key,
             action_info=action_info,
             policy_info=policy_info,
+            norm_params=norm_params,
+            executor_environment=SimpleNamespace(death_masked_agents=[]),
             select_actions_fn=select_actions,
+            global_config=SimpleNamespace(
+                normalize_observations=True,
+            ),
         )
         self.store = store
 
