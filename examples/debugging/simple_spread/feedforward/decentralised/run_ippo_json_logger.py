@@ -56,7 +56,6 @@ def main(_: Any) -> None:
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
-        concat_agent_id=True,
     )
 
     # Networks.
@@ -73,6 +72,15 @@ def main(_: Any) -> None:
 
     # Log every [log_every] seconds.
     log_every = 10
+
+    # Pass custom logger config for evaluator to use.
+    # A custom json path can also be passed in.
+    logger_config = {
+        "evaluator": {
+            "to_json": True,
+        },
+    }
+
     logger_factory = functools.partial(
         logger_utils.make_logger,
         directory=FLAGS.base_dir,
@@ -99,6 +107,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
+        logger_config=logger_config,
         experiment_path=experiment_path,
         policy_optimiser=policy_optimiser,
         critic_optimiser=critic_optimiser,
@@ -107,15 +116,10 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        clip_value=True,
-        normalize_target_values=True,
-        normalize_observations=True,
-        normalize_axes=[
-            0,
-            1,
-            (3, 10),
-        ],  # example of how to select which axes to normalize
-        termination_condition={"executor_steps": 200000},
+        clip_value=False,
+        evaluation_interval={"executor_steps": 10000},
+        evaluation_duration={"evaluator_episodes": 3},
+        json_path=f"{FLAGS.base_dir}/JSON_DIR",
     )
 
     # Launch the system.

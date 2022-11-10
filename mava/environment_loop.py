@@ -15,12 +15,14 @@
 
 """A simple multi-agent-system-environment training loop."""
 
+import logging
 import time
 from typing import Any, Dict, Tuple
 
 import acme
 import dm_env
 import jax
+import jax.numpy as jnp
 import numpy as np
 from acme.utils import counting, loggers
 
@@ -247,19 +249,48 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 should_run_loop(eval_interval_condition)
             ):
                 if environment_loop_schedule:
-                    results = self.run_episode()
                     # Get first result dictionary
+                    results = self.run_episode()
+
+                    # Initialise list for capturing episode returns
+                    eval_returns = []
+
+                    eval_returns.append(results["raw_episode_return"])
                     for _ in range(evaluation_duration - 1):
                         # Add consecutive evaluation run data
                         result = self.run_episode()
+                        eval_returns.append(result["raw_episode_return"])
                         # Sum results for computing mean after all evaluation runs.
                         results = jax.tree_map(lambda x, y: x + y, results, result)
                     # compute the mean over all evaluation runs
                     results = jax.tree_map(lambda x: x / evaluation_duration, results)
+
+                    # Log evaluation interval results for json logging
+                    # all results with the `eval` appended will be logged
+                    # by the json logger.
+                    eval_result = {
+                        "eval_step_count": jnp.array(self._last_evaluator_run_t),
+                        "eval_return": jnp.array(eval_returns),
+                    }
+
                     # Check for extra logs
                     if hasattr(self._environment, "get_interval_stats"):
-                        results.update(self._environment.get_interval_stats())
+                        interval_stats = self._environment.get_interval_stats()
+                        results.update(interval_stats)
+                        interval_stats_json = {
+                            "eval_" + str(k): v for k, v in interval_stats.items()
+                        }
+
+                        # Add interval stats to dictionary for json logging
+                        eval_result.update(
+                            jax.tree_util.tree_map(
+                                lambda leaf: jnp.array([leaf]), interval_stats_json
+                            )
+                        )
+
+                    results.update(eval_result)
                     self._logger.write(results)
+
                 else:
                     result = self.run_episode()
                     # Log the given results.
@@ -278,16 +309,14 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
             except Exception as e:
                 if self._executor._evaluator:
-                    print(
-                        e, ": Experiment terminated due to an error on the evaluator."
+                    logging.exception(
+                        f"{e}: Experiment terminated due to an error on the evaluator."
                     )
-                    time.sleep(60)
                     self._executor.store.executor_parameter_client.set_and_wait(
                         {"evaluator_or_trainer_failed": True}
                     )
                 else:
-                    print(e, ": an executor failed.")
-                    time.sleep(60)
+                    logging.exception(f"{e}: an executor failed.")
                     self._executor.store.executor_parameter_client.add_and_wait(
                         {"num_executor_failed": 1}
                     )

@@ -12,8 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Run feedforward MADQN on SMAC."""
 
-"""Example running IPPO on debug MPE environments."""
+
 import functools
 from datetime import datetime
 from typing import Any
@@ -22,19 +23,14 @@ import optax
 from absl import app, flags
 
 from mava.systems import ippo
-from mava.utils.environments import debugging_utils
+from mava.utils.environments.smac_utils import make_environment
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
-)
-flags.DEFINE_string(
-    "action_space",
-    "discrete",
-    "Environment action space type (str).",
+    "map_name",
+    "3m",
+    "Starcraft 2 micromanagement map name (str).",
 )
 
 flags.DEFINE_string(
@@ -46,18 +42,10 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Run main script
+    """Example running feedforward MADQN on SMAC environment."""
 
-    Args:
-        _ : _
-    """
-    # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
-        concat_agent_id=True,
-    )
+    # Environment
+    environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
 
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
@@ -70,6 +58,19 @@ def main(_: Any) -> None:
 
     # Used for checkpoints, tensorboard logging and env monitoring
     experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+
+    # Pass custom logger config for evaluator to use.
+    logger_config = {
+        "evaluator": {
+            "to_json": True,
+            "extra_logger_kwargs": {
+                "random_seed": 1234,
+                "env_name": "SMAC",
+                "task_name": "3m",
+                "system_name": "IPPO",
+            },
+        },
+    }
 
     # Log every [log_every] seconds.
     log_every = 10
@@ -99,6 +100,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
+        logger_config=logger_config,
         experiment_path=experiment_path,
         policy_optimiser=policy_optimiser,
         critic_optimiser=critic_optimiser,
@@ -107,15 +109,8 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        clip_value=True,
-        normalize_target_values=True,
-        normalize_observations=True,
-        normalize_axes=[
-            0,
-            1,
-            (3, 10),
-        ],  # example of how to select which axes to normalize
-        termination_condition={"executor_steps": 200000},
+        evaluation_interval={"executor_steps": 1000},
+        evaluation_duration={"evaluator_episodes": 3},
     )
 
     # Launch the system.
