@@ -70,7 +70,6 @@ class SMACWrapper(ParallelEnvWrapper):
             self._is_resetted = True
         self._done = False
 
-        # self._reset_next_step = False
         self._step_type = dm_env.StepType.FIRST
 
         # Get observation from env
@@ -138,7 +137,6 @@ class SMACWrapper(ParallelEnvWrapper):
 
         if self._done:
             self._step_type = dm_env.StepType.LAST
-            # self._reset_next_step = True
 
             # Discount on last timestep set to zero
             self._discounts = {
