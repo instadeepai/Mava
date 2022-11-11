@@ -25,7 +25,6 @@ from mava import types
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.env_wrappers import ParallelEnvWrapper
 
-
 class SMACWrapper(ParallelEnvWrapper):
     """Environment wrapper for PettingZoo MARL environments."""
 
@@ -46,10 +45,13 @@ class SMACWrapper(ParallelEnvWrapper):
             return_state_info: return extra state info
         """
         self._environment = environment
+
+
+
         self._return_state_info = return_state_info
         self._agents = [f"agent_{n}" for n in range(self._environment.n_agents)]
 
-        self._reset_next_step = True
+        self._is_resetted = False
         self._done = False
 
         self._battles_won = 0
@@ -64,10 +66,12 @@ class SMACWrapper(ParallelEnvWrapper):
             dm_env.TimeStep: dm timestep.
         """
         # Reset the environment
-        self._environment.reset()
+        if not self._is_resetted:
+            self._environment.reset()
+            self._is_resetted = True
         self._done = False
 
-        self._reset_next_step = False
+        # self._reset_next_step = False
         self._step_type = dm_env.StepType.FIRST
 
         # Get observation from env
@@ -109,15 +113,12 @@ class SMACWrapper(ParallelEnvWrapper):
         Returns:
             dm_env.TimeStep: dm timestep
         """
-        # Possibly reset the environment
-        if self._reset_next_step:
-            return self.reset()
-
         # Convert dict of actions to list for SMAC
         smac_actions = [actions[agent] for agent in self._agents]
 
         # Step the SMAC environment
         reward, self._done, self._info = self._environment.step(smac_actions)
+        self._is_resetted = False
 
         # Get the next observations
         next_observations = self._environment.get_obs()
@@ -138,7 +139,7 @@ class SMACWrapper(ParallelEnvWrapper):
 
         if self._done:
             self._step_type = dm_env.StepType.LAST
-            self._reset_next_step = True
+            # self._reset_next_step = True
 
             # Discount on last timestep set to zero
             self._discounts = {
@@ -243,7 +244,9 @@ class SMACWrapper(ParallelEnvWrapper):
         Returns:
             types.Observation: spec for environment.
         """
-        self._environment.reset()
+        if not self._is_resetted:
+            self._environment.reset()
+            self._is_resetted = True
 
         observations = self._environment.get_obs()
         legal_actions = self._get_legal_actions()

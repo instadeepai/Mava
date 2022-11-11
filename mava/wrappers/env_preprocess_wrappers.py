@@ -48,6 +48,18 @@ class ConcatAgentIdToObservation:
         """Initialise wrapper."""
         self._environment = environment
         self._num_agents = len(environment.possible_agents)
+        
+        # Check that observation of first agent is a vector
+        if (
+            len(
+                list(self._environment.observation_spec().values())[0].observation.shape
+            )
+            > 1
+        ):
+            raise NotImplementedError(
+                "Agent ID concatenation is only implemented for vector\
+                    based observations."
+            )
 
     def reset(self) -> dm_env.TimeStep:
         """Reset environment and concat agent ID."""
