@@ -25,6 +25,7 @@ from mava import types
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.env_wrappers import ParallelEnvWrapper
 
+
 class SMACWrapper(ParallelEnvWrapper):
     """Environment wrapper for PettingZoo MARL environments."""
 
@@ -45,8 +46,6 @@ class SMACWrapper(ParallelEnvWrapper):
             return_state_info: return extra state info
         """
         self._environment = environment
-
-
 
         self._return_state_info = return_state_info
         self._agents = [f"agent_{n}" for n in range(self._environment.n_agents)]

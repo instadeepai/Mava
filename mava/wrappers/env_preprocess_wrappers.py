@@ -48,7 +48,7 @@ class ConcatAgentIdToObservation:
         """Initialise wrapper."""
         self._environment = environment
         self._num_agents = len(environment.possible_agents)
-        
+
         # Check that observation of first agent is a vector
         if (
             len(
