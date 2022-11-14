@@ -15,7 +15,8 @@
 
 """
 Example running IPPO on debug MPE environment, recording evaluations.
-For installation instructions, please follow step 4 in https://github.com/instadeepai/Mava/blob/develop/DETAILED_INSTALL.md#optional-installs."""
+For installation instructions, please follow step 4 in https://github.com/instadeepai/Mava/blob/develop/DETAILED_INSTALL.md#optional-installs. # noqa: E501
+"""
 import functools
 from datetime import datetime
 from typing import Any

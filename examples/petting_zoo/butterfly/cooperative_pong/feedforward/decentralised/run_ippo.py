@@ -14,8 +14,8 @@
 # limitations under the License.
 
 """
-Example running IPPO on coop pong. 
-For installation instructions, please follow step 1 and 2 from https://github.com/instadeepai/Mava/blob/develop/DETAILED_INSTALL.md#optional-installs.
+Example running IPPO on coop pong.
+For installation instructions, please follow step 1 and 2 from https://github.com/instadeepai/Mava/blob/develop/DETAILED_INSTALL.md#optional-installs. # noqa: E501
 """
 import functools
 from datetime import datetime

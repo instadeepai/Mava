@@ -15,7 +15,7 @@
 
 """
 Example running IPPO on coop pong, recording evaluations.
-For installation instructions, please follow step 1, 2 and 4 from https://github.com/instadeepai/Mava/blob/develop/DETAILED_INSTALL.md#optional-installs.
+For installation instructions, please follow step 1, 2 and 4 from https://github.com/instadeepai/Mava/blob/develop/DETAILED_INSTALL.md#optional-installs. # noqa: E501
 """
 import functools
 from datetime import datetime
@@ -26,8 +26,8 @@ import optax
 from absl import app, flags
 from acme.jax.networks.atari import DeepAtariTorso
 from supersuit import dtype_v0
-from mava.components.building.environments import MonitorExecutorEnvironmentLoop
 
+from mava.components.building.environments import MonitorExecutorEnvironmentLoop
 from mava.systems import ippo
 from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
