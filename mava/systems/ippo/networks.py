@@ -267,12 +267,15 @@ def make_discrete_networks(
                 policy_network.append(recurrent_architecture_fn(size))
 
             # Add optional feedforward layers after the recurrent layers
-            hk.nets.MLP(
-                policy_layers_after_recurrent,
-                activation=activation_function,
-                w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
-                activate_final=True,
-            ),
+            if len(policy_layers_after_recurrent) > 0:
+                policy_network.append(
+                    hk.nets.MLP(
+                        policy_layers_after_recurrent,
+                        activation=activation_function,
+                        w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
+                        activate_final=True,
+                    ),
+                )
 
         # Add a categorical value head.
         policy_network.append(
