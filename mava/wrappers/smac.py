@@ -347,6 +347,17 @@ class SMACWrapper(ParallelEnvWrapper):
         return self._agents
 
     @property
+    def death_masked_agents(self) -> List:
+        """Check and returns all death masked agents"""
+
+        masked_agents = []
+        for i, agent in enumerate(self._agents):
+            if self._death_masking and self.is_dead(i):
+                masked_agents.append(agent)
+
+        return masked_agents
+
+    @property
     def environment(self) -> StarCraft2Env:
         """Returns the wrapped environment.
 

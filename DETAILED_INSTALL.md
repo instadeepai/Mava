@@ -181,7 +181,18 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
         pip install id-mava[sc2]
         ```
 
-3. Run an example:
+3. Developing features for mava
+
+    When developing features for MAVA one can replace the `id-mava` part of the `pip install` with a `.` (or mava's directory) in order to install all dependencies.
+
+    ```bash
+    git clone https://github.com/instadeepai/mava.git
+    pip install -e "mava[reverb,jax]"
+    ```
+
+    This installs the mava dependencies into your current environment, but uses your local copy of mava, instead of the one stored inside of your environments package directory.
+
+4. Run an example:
 
     ```
     python dir/to/example/example.py

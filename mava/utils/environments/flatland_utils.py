@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Utils for making Flatland environment."""
-from typing import Optional
+from typing import Dict, Optional, Tuple
 
 from mava.utils.jax_training_utils import set_jax_double_precision
 from mava.wrappers.env_preprocess_wrappers import (
@@ -119,6 +119,22 @@ if _found_flatland:
 
         return rail_env
 
+    def make_flatland_task_name(x_dim: int, y_dim: int, num_agents: int) -> str:
+        """A simple helper function to create a flatland task name.
+
+        The task name will be a string created as:
+        `<map_width>x<map_height>_<num_agents>_trains`. For example on a
+        5x5 maps with 3 agents the task name will be `5x5_3_trains`.
+        """
+
+        env_width = str(x_dim)
+        env_height = str(y_dim)
+        num_trains = str(num_agents)
+
+        task_name = f"{env_width}x{env_height}_{num_trains}_trains"
+
+        return task_name
+
     def make_environment(
         n_agents: int = 10,
         x_dim: int = 30,
@@ -136,7 +152,7 @@ if _found_flatland:
         concat_agent_id: bool = False,
         evaluation: bool = False,
         random_seed: Optional[int] = None,
-    ) -> FlatlandEnvWrapper:
+    ) -> Tuple[FlatlandEnvWrapper, Dict[str, str]]:
         """Loads a flatand environment and wraps it using the flatland wrapper"""
 
         del evaluation  # since it has same behaviour for both train and eval
@@ -167,4 +183,11 @@ if _found_flatland:
         if concat_agent_id:
             env = ConcatAgentIdToObservation(env)
 
-        return env
+        environment_task_name = {
+            "environment_name": "flatland",
+            "task_name": make_flatland_task_name(
+                x_dim=x_dim, y_dim=y_dim, num_agents=n_agents
+            ),
+        }
+
+        return env, environment_task_name

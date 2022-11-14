@@ -15,6 +15,7 @@
 
 """Terminator component for Mava systems."""
 import abc
+import logging
 import time
 from typing import Any, Callable, Dict, List, Optional, Type
 
@@ -101,7 +102,7 @@ class CountConditionTerminator(Terminator):
             and parameter_server.store.parameters[self.termination_key]
             > self.termination_value
         ):
-            print(
+            logging.exception(
                 f"Max {self.termination_key} of {self.termination_value}"
                 " reached, terminating."
             )
@@ -161,7 +162,7 @@ class TimeTerminator(Terminator):
             None.
         """
         if time.time() - self._start_time > self.config.run_seconds:
-            print(
+            logging.exception(
                 f"Run time of {self.config.run_seconds} seconds reached, terminating."
             )
             self.config.termination_function(parameter_server)

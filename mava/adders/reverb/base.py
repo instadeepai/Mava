@@ -242,7 +242,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
                             net_key in trajectory_dict_copy
                             and len(trajectory_dict_copy[net_key]) > 0
                         ):
-                            item_agents.append(trajectory_dict_copy[net_key].pop())
+                            item_agents.append(trajectory_dict_copy[net_key].pop(0))
                         else:
                             is_in_entry = False
                             break
