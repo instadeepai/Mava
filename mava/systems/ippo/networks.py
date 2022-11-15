@@ -29,6 +29,7 @@ from dm_env import specs as dm_specs
 from mava import specs as mava_specs
 from mava.types import NestedArray
 from mava.utils.jax_training_utils import action_mask_categorical_policies
+from mava.utils.networks_utils import MLP_NORM
 
 Array = dm_specs.Array
 BoundedArray = dm_specs.BoundedArray
@@ -204,6 +205,7 @@ def make_discrete_networks(
     orthogonal_initialisation: bool = False,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     policy_network_head_weight_gain: float = 0.01,
+    layer_norm: bool = False,
     # default behaviour is to flatten observations
 ) -> PPONetworks:
     """Create PPO network for environments with discrete action spaces.
@@ -225,6 +227,8 @@ def make_discrete_networks(
             network hidden layers.
         policy_network_head_weight_gain: value for scaling the policy
             network final layer weights by.
+        layer_norm: apply layer normalisation to hidden MLP layers.
+
 
     Returns:
         PPONetworks class
@@ -253,11 +257,12 @@ def make_discrete_networks(
         """
         # Add the observation network and an MLP network.
         policy_network = [
-            hk.nets.MLP(
+            MLP_NORM(
                 policy_layer_sizes,
                 activation=activation_function,
                 w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
                 activate_final=True,
+                layer_norm=layer_norm,
             ),
         ]
 
@@ -269,11 +274,12 @@ def make_discrete_networks(
             # Add optional feedforward layers after the recurrent layers
             if len(policy_layers_after_recurrent) > 0:
                 policy_network.append(
-                    hk.nets.MLP(
+                    MLP_NORM(
                         policy_layers_after_recurrent,
                         activation=activation_function,
                         w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
                         activate_final=True,
+                        layer_norm=layer_norm,
                     ),
                 )
 
@@ -322,11 +328,12 @@ def make_discrete_networks(
         """
         critic_network = hk.Sequential(
             [
-                hk.nets.MLP(
+                MLP_NORM(
                     critic_layer_sizes,
                     activation=activation_function,
                     w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
                     activate_final=True,
+                    layer_norm=layer_norm,
                 ),
                 ValueHead(w_init=w_init_fn(orthogonal_initialisation, 1.0)),
             ]
@@ -373,6 +380,7 @@ def make_networks(
     orthogonal_initialisation: bool = False,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     policy_network_head_weight_gain: float = 0.01,
+    layer_norm: bool = False,
 ) -> PPONetworks:
     """Function for creating PPO networks to be used.
 
@@ -396,6 +404,7 @@ def make_networks(
             network hidden layers.
         policy_network_head_weight_gain: value for scaling the policy
             network final layer weights by.
+        layer_norm: apply layer normalisation to hidden MLP layers.
 
     Returns:
         make_discrete_networks: function to create a discrete network
@@ -415,6 +424,7 @@ def make_networks(
             recurrent_architecture_fn=recurrent_architecture_fn,
             orthogonal_initialisation=orthogonal_initialisation,
             activation_function=activation_function,
+            layer_norm=layer_norm,
             policy_network_head_weight_gain=policy_network_head_weight_gain,
         )
 
@@ -443,6 +453,7 @@ def make_default_networks(
     orthogonal_initialisation: bool = False,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     policy_network_head_weight_gain: float = 0.01,
+    layer_norm: bool = False,
 ) -> Dict[str, Any]:
     """Create default PPO networks
 
@@ -472,6 +483,7 @@ def make_default_networks(
             network hidden layers.
         policy_network_head_weight_gain: value for scaling the policy
             network final layer weights by.
+        layer_norm: bool = False,
 
     Returns:
         networks: networks created to given spec
@@ -498,6 +510,7 @@ def make_default_networks(
             policy_layers_after_recurrent=policy_layers_after_recurrent,
             orthogonal_initialisation=orthogonal_initialisation,
             activation_function=activation_function,
+            layer_norm=layer_norm,
             policy_network_head_weight_gain=policy_network_head_weight_gain,
         )
 
