@@ -152,7 +152,7 @@ class DefaultParameterServer(ParameterServer):
         # Initiate best performance network values
         if server.store.checkpoint_best_perf:
             server.store.parameters["best_checkpoint"] = {}
-            for metric in server.store.metrics_checkpoint:
+            for metric in server.store.checkpointing_metric:
                 server.store.parameters["best_checkpoint"][metric] = {}
                 server.store.parameters["best_checkpoint"][metric][
                     "best_performance"

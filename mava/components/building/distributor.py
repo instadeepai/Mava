@@ -37,7 +37,8 @@ class DistributorConfig:
     single_process_max_episodes: Optional[int] = None
     is_test: Optional[bool] = False
     wait: Optional[bool] = False
-    metrics_checkpoint: Tuple = ("mean_episode_return",)
+    # Saves networks based on this list of metrics
+    checkpointing_metric: Tuple = ("mean_episode_return",)
     checkpoint_best_perf: bool = False
 
 
@@ -78,9 +79,9 @@ class Distributor(Component):
         builder.store.num_executors = self.config.num_executors
 
         # Save list of metrics attached with their best performance
-        builder.store.metrics_checkpoint: Dict[str, Any] = {}  # type: ignore
-        for metric in list(self.config.metrics_checkpoint):
-            builder.store.metrics_checkpoint[metric] = None
+        builder.store.checkpointing_metric: Dict[str, Any] = {}  # type: ignore
+        for metric in list(self.config.checkpointing_metric):
+            builder.store.checkpointing_metric[metric] = None
 
         # Save the flag of best checkpointing or not
         builder.store.checkpoint_best_perf = self.config.checkpoint_best_perf

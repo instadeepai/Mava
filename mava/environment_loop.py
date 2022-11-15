@@ -200,7 +200,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         self._logger.write(results)
         return results
 
-    def run(self) -> None:
+    def run(self) -> None:  # noqa: C901
         """Run the environment loop."""
 
         def should_run_loop(eval_interval_condition: Tuple) -> bool:
@@ -297,17 +297,18 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         for (
                             metric,
                             best_performance,
-                        ) in self._executor.store.metrics_checkpoint.items():
+                        ) in self._executor.store.checkpointing_metric.items():
                             assert (
                                 metric in results.keys()
-                            ), f"The metric chosen to checkpoint it best performance doesn't exist.\
-                                This experiment has only the following metrics {results.keys()}"
+                            ), f"The metric, {metric}, chosen for checkpointing doesn't exist.\
+                                 This experiment has only the following metrics:\
+                                 {results.keys()}"
 
                             if (
                                 best_performance is None
                                 or best_performance < results[metric]  # type: ignore
                             ):
-                                self._executor.store.metrics_checkpoint[
+                                self._executor.store.checkpointing_metric[
                                     metric
                                 ] = update_best_checkpoint(
                                     self._executor, results, metric

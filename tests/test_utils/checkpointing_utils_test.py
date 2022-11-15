@@ -77,12 +77,12 @@ class MockParameterClient:
         """Initialization"""
         self.store = SimpleNamespace(
             parameters={},
-            metrics_checkpoint=["win_rate", "mean_return"],
+            checkpointing_metric=["win_rate", "mean_return"],
             agents_net_keys=["agent_0", "agent_1", "agent_2"],
         )
         (networks, policy_opt_states, critic_opt_states) = fake_networks()
         self.store.parameters["best_checkpoint"] = {}
-        for metric in self.store.metrics_checkpoint:
+        for metric in self.store.checkpointing_metric:
             self.store.parameters["best_checkpoint"][metric] = {}
             self.store.parameters["best_checkpoint"][metric]["best_performance"] = 20
             for agent_net_key in networks.keys():
@@ -122,11 +122,11 @@ class MockExecutor:
             executor_parameter_client=executor_parameter_client,
             policy_opt_states=policy_opt_states,
             critic_opt_states=critic_opt_states,
-            metrics_checkpoint=["win_rate", "mean_return"],
+            checkpointing_metric=["win_rate", "mean_return"],
         )
         (networks, policy_opt_states, critic_opt_states) = fake_networks()
         self.store.best_checkpoint: Dict[str, Any] = {}  # type: ignore
-        for metric in self.store.metrics_checkpoint:
+        for metric in self.store.checkpointing_metric:
             self.store.best_checkpoint[metric] = {}
             self.store.best_checkpoint[metric]["best_performance"] = 20
             for agent_net_key in networks.keys():

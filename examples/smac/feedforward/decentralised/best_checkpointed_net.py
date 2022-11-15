@@ -102,7 +102,7 @@ def run_system() -> None:
         # Flag to activate best checkpointing
         checkpoint_best_perf=True,
         # metrics to checkpoint its best performance networks
-        metrics_checkpoint=("mean_episode_return", "win_rate"),
+        checkpointing_metric=("mean_episode_return", "win_rate"),
         termination_condition={"executor_steps": 30000},
         checkpoint_minute_interval=1,
         wait=True,
