@@ -61,8 +61,8 @@ class Checkpointer(Component):
             time_delta_minutes=0,
         )
 
-        # Check if the checkpointer restore the network
-        # and if the user want network with best performance.
+        # Check if the checkpointer restored the network parameters
+        # and if the user wants the network with the best performance.
         if (old_trainer_steps != server.store.parameters["trainer_steps"]) and (
             self.config.restore_best_net is not None
         ):
