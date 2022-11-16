@@ -1,4 +1,19 @@
-"""Implementation an mlp module with layer normalisation"""
+# python3
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Implementation of an mlp module with layer normalisation."""
 # Adapted from https://github.com/deepmind/dm-haiku/blob/main/haiku/_src/nets/mlp.py
 
 from typing import Any, Callable, Iterable, Optional
@@ -9,7 +24,7 @@ import jax.numpy as jnp
 
 
 class MLP_NORM(hk.Module):
-    """A multi-layer perceptron module."""
+    """A multi-layer perceptron module with an option for layer normalisation."""
 
     def __init__(
         self,
@@ -22,7 +37,7 @@ class MLP_NORM(hk.Module):
         layer_norm: bool = False,
         name: Optional[str] = None,
     ):
-        """Constructs an MLP.
+        """Constructs an MLP with layer normalisation (MLP_NORM).
         Args:
             output_sizes: Sequence of layer sizes.
             w_init: Initializer for :class:`~haiku.Linear` weights.
@@ -32,7 +47,7 @@ class MLP_NORM(hk.Module):
             activation: Activation function to apply between :class:`~haiku.Linear`
             layers. Defaults to ReLU.
             activate_final: Whether or not to activate the final layer of the MLP.
-            layer_norm: apply layer normalisation hidden MLP layers.
+            layer_norm: apply layer normalisation to the hidden MLP layers.
             name: Optional name for this module.
         Raises:
             ValueError: If ``with_bias`` is ``False`` and ``b_init`` is not ``None``.
@@ -109,47 +124,3 @@ class MLP_NORM(hk.Module):
                 out = self.norms[i](out)
 
         return out
-
-    def reverse(
-        self,
-        activate_final: Optional[bool] = None,
-        name: Optional[str] = None,
-    ) -> "MLP_NORM":
-        """Returns a new MLP which is the layer-wise reverse of this MLP.
-        NOTE: Since computing the reverse of an MLP requires knowing the input size
-        of each linear layer this method will fail if the module has not been called
-        at least once.
-        The contract of reverse is that the reversed module will accept the output
-        of the parent module as input and produce an output which is the input size
-        of the parent.
-        >>> mlp = hk.nets.MLP([1, 2, 3])
-        >>> mlp_in = jnp.ones([1, 2])
-        >>> y = mlp(mlp_in)
-        >>> rev = mlp.reverse()
-        >>> rev_mlp_out = rev(y)
-        >>> mlp_in.shape == rev_mlp_out.shape
-        True
-        Args:
-            activate_final: Whether the final layer of the MLP should be activated.
-            name: Optional name for the new module. The default name will be the name
-            of the current module prefixed with ``"reversed_"``.
-        Returns:
-            An MLP instance which is the reverse of the current instance. Note these
-            instances do not share weights and, apart from being symmetric to each
-            other, are not coupled in any way.
-        """
-
-        if activate_final is None:
-            activate_final = self.activate_final
-        if name is None:
-            name = self.name + "_reversed"
-
-        return MLP_NORM(
-            output_sizes=(layer.input_size for layer in reversed(self.layers)),
-            w_init=self.w_init,
-            b_init=self.b_init,
-            with_bias=self.with_bias,
-            activation=self.activation,
-            activate_final=activate_final,
-            name=name,
-        )

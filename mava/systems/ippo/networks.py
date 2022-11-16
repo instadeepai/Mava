@@ -227,7 +227,7 @@ def make_discrete_networks(
             network hidden layers.
         policy_network_head_weight_gain: value for scaling the policy
             network final layer weights by.
-        layer_norm: apply layer normalisation to hidden MLP layers.
+        layer_norm: apply layer normalisation to the hidden MLP layers.
 
 
     Returns:
@@ -404,7 +404,7 @@ def make_networks(
             network hidden layers.
         policy_network_head_weight_gain: value for scaling the policy
             network final layer weights by.
-        layer_norm: apply layer normalisation to hidden MLP layers.
+        layer_norm: apply layer normalisation to the hidden MLP layers.
 
     Returns:
         make_discrete_networks: function to create a discrete network
@@ -483,7 +483,7 @@ def make_default_networks(
             network hidden layers.
         policy_network_head_weight_gain: value for scaling the policy
             network final layer weights by.
-        layer_norm: bool = False,
+        layer_norm: apply layer normalisation to the hidden MLP layers.
 
     Returns:
         networks: networks created to given spec
