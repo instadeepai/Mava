@@ -14,35 +14,12 @@
 # limitations under the License.
 
 """Custom components for IPPO system."""
-import abc
 from types import SimpleNamespace
-from typing import Any
 
 import numpy as np
-from dm_env import specs
 
-from mava.components import Component
+from mava.components.building import ExtrasSpec
 from mava.core_jax import SystemBuilder
-
-
-class ExtrasSpec(Component):
-    @abc.abstractmethod
-    def __init__(self, config: Any) -> None:
-        """Initialise extra specs
-
-        Args:
-            config : ExtrasSpecConfig
-        """
-        self.config = config
-
-    @staticmethod
-    def name() -> str:
-        """Returns name of ExtrasSpec class
-
-        Returns:
-            "extras_spec": name of ExtrasSpec class
-        """
-        return "extras_spec"
 
 
 class ExtrasLogProbSpec(ExtrasSpec):
@@ -70,23 +47,23 @@ class ExtrasLogProbSpec(ExtrasSpec):
         agent_specs = builder.store.ma_environment_spec.get_agent_environment_specs()
         builder.store.extras_spec = {"policy_info": {}}
 
-        for agent, spec in agent_specs.items():
+        for agent, _ in agent_specs.items():
             # Make dummy log_probs
             builder.store.extras_spec["policy_info"][agent] = np.ones(
                 shape=(), dtype=np.float32
             )
 
         # Add the networks keys to extras.
-        int_spec = specs.DiscreteArray(len(builder.store.unique_net_keys))
-        agents = builder.store.ma_environment_spec.get_agent_ids()
-        net_spec = {"network_keys": {agent: int_spec for agent in agents}}
+        net_spec = self.get_network_keys(
+            builder.store.unique_net_keys,
+            builder.store.ma_environment_spec.get_agent_ids(),
+        )
         builder.store.extras_spec.update(net_spec)
 
         # Get the policy state specs
         networks = builder.store.network_factory()
         net_states = {}
         for agent_key, network_key in builder.store.agent_net_keys.items():
-
             init_state = networks[network_key].get_init_state()
             if init_state is not None:
                 net_states[agent_key] = init_state

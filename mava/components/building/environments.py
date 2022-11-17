@@ -68,6 +68,8 @@ class EnvironmentSpec(Component):
         )
         builder.store.extras_spec = {}
 
+        builder.store.obs_normalisation_start = env.obs_normalisation_start_index
+
     @staticmethod
     def name() -> str:
         """Static method that returns component name."""
