@@ -27,6 +27,7 @@ import numpy as np
 from acme.utils import counting, loggers
 
 import mava
+from mava.utils.checkpointing_utils import update_best_checkpoint
 from mava.utils.training_utils import check_count_condition
 from mava.utils.wrapper_utils import generate_zeros_from_spec
 
@@ -199,7 +200,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         self._logger.write(results)
         return results
 
-    def run(self) -> None:
+    def run(self) -> None:  # noqa: C901
         """Run the environment loop."""
 
         def should_run_loop(eval_interval_condition: Tuple) -> bool:
@@ -291,6 +292,27 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     results.update(eval_result)
                     self._logger.write(results)
 
+                    if self._executor.store.checkpoint_best_perf:
+                        # Best_performance_update
+                        for (
+                            metric,
+                            best_performance,
+                        ) in self._executor.store.checkpointing_metric.items():
+                            assert (
+                                metric in results.keys()
+                            ), f"The metric, {metric}, chosen for checkpointing doesn't exist.\
+                                 This experiment has only the following metrics:\
+                                 {results.keys()}"
+
+                            if (
+                                best_performance is None
+                                or best_performance < results[metric]  # type: ignore
+                            ):
+                                self._executor.store.checkpointing_metric[
+                                    metric
+                                ] = update_best_checkpoint(
+                                    self._executor, results, metric
+                                )
                 else:
                     result = self.run_episode()
                     # Log the given results.

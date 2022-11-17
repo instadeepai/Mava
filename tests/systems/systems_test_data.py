@@ -311,7 +311,8 @@ def ippo_system_multi_thread_eval() -> System:
         is_test=True,
         checkpoint_minute_interval=3 / 60,
         trainer_parameter_update_period=1,
-        evaluation_interval={"executor_steps": 10000},
-        evaluation_duration={"evaluator_episodes": 32},
+        evaluation_interval={"executor_steps": 10},
+        evaluation_duration={"evaluator_episodes": 2},
+        checkpoint_best_perf=True,
     )
     return test_system

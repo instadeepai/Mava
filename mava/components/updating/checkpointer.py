@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import time
-from typing import List, Type
+from typing import List, Type, Union
 
 from acme.jax import savers as acme_savers
 from chex import dataclass
@@ -23,6 +23,7 @@ from mava.callbacks import Callback
 from mava.components import Component
 from mava.components.updating.parameter_server import ParameterServer
 from mava.core_jax import SystemParameterServer
+from mava.utils.checkpointing_utils import update_to_best_net
 from mava.wrappers import SaveableWrapper
 
 """Checkpointer component for Mava systems."""
@@ -31,6 +32,7 @@ from mava.wrappers import SaveableWrapper
 @dataclass
 class CheckpointerConfig:
     checkpoint_minute_interval: float = 5
+    restore_best_net: Union[str, None] = None
 
 
 class Checkpointer(Component):
@@ -51,12 +53,21 @@ class Checkpointer(Component):
             None.
         """
         saveable_parameters = SaveableWrapper(server.store.parameters)
+        old_trainer_steps = server.store.parameters["trainer_steps"].copy()
         server.store.system_checkpointer = acme_savers.Checkpointer(
             object_to_save=saveable_parameters,  # must be type saveable
             directory=server.store.experiment_path,
             add_uid=False,
             time_delta_minutes=0,
         )
+
+        # Check if the checkpointer restored the network parameters
+        # and if the user wants the network with the best performance.
+        if (old_trainer_steps != server.store.parameters["trainer_steps"]) and (
+            self.config.restore_best_net is not None
+        ):
+            update_to_best_net(server, self.config.restore_best_net)
+
         server.store.last_checkpoint_time = time.time()
         server.store.checkpoint_minute_interval = self.config.checkpoint_minute_interval
 
