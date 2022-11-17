@@ -13,13 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import dm_env
 
 from mava.utils.debugging.make_env import make_debugging_env
 from mava.utils.jax_training_utils import set_jax_double_precision
 from mava.wrappers.debugging_envs import DebuggingEnvWrapper
+from mava.wrappers.env_preprocess_wrappers import ConcatAgentIdToObservation
 
 
 def make_environment(
@@ -31,10 +32,12 @@ def make_environment(
     return_state_info: bool = False,
     random_seed: Optional[int] = None,
     recurrent_test: bool = False,
+    concat_agent_id: bool = False,
 ) -> Tuple[dm_env.Environment, Dict[str, str]]:
     """Make a debugging environment."""
 
     assert action_space == "continuous" or action_space == "discrete"
+    environment: Any
 
     if action_space == "discrete":
         # Env uses int64 action space due to the use of spac.Discrete.
@@ -52,6 +55,9 @@ def make_environment(
         )
     else:
         raise ValueError(f"Environment {env_name} not found.")
+
+    if concat_agent_id:
+        environment = ConcatAgentIdToObservation(environment)
 
     if random_seed and hasattr(environment, "seed"):
         environment.seed(random_seed)
