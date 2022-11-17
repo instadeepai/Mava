@@ -17,14 +17,14 @@
 import abc
 import copy
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Type, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
 
 import numpy as np
 
 from mava.callbacks import Callback
 from mava.components.building.networks import Networks
 from mava.components.component import Component
-from mava.core_jax import SystemParameterServer
+from mava.core_jax import SystemBuilder, SystemParameterServer
 from mava.utils.lp_utils import termination_fn
 
 
@@ -33,6 +33,9 @@ class ParameterServerConfig:
     non_blocking_sleep_seconds: int = 10
     experiment_path: str = "~/mava/"
     json_path: Optional[str] = None
+    # Saves networks based on this list of metrics
+    checkpointing_metric: Tuple = ("mean_episode_return",)
+    checkpoint_best_perf: bool = False
 
 
 class ParameterServer(Component):
@@ -100,6 +103,16 @@ class DefaultParameterServer(ParameterServer):
             config: ParameterServerConfig.
         """
         self.config = config
+
+    def on_building_init(self, builder: SystemBuilder) -> None:
+        """Store checkpointing params in the store"""
+        # Save list of metrics attached with their best performance
+        builder.store.checkpointing_metric: Dict[str, Any] = {}  # type: ignore
+        for metric in list(self.config.checkpointing_metric):
+            builder.store.checkpointing_metric[metric] = None
+
+        # Save the flag of best checkpointing or not
+        builder.store.checkpoint_best_perf = self.config.checkpoint_best_perf
 
     def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
         """Register parameters and network params to track.
