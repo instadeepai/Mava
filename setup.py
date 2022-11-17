@@ -40,7 +40,7 @@ jax_requirements = [
     "chex",
     "jax~=0.3.20",
     "jaxlib~=0.3.20",
-    "dm-haiku",
+    "dm-haiku==0.0.8",
     "flax",
     "optax",
     "rlax",
