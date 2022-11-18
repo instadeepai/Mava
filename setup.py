@@ -38,9 +38,9 @@ tf_requirements = [
 
 jax_requirements = [
     "chex",
-    "jax~=0.3.20",
-    "jaxlib~=0.3.20",
-    "dm-haiku",
+    "jax==0.3.24",
+    "jaxlib==0.3.24",
+    "dm-haiku==0.0.8",
     "flax",
     "optax",
     "rlax",
