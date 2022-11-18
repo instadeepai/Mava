@@ -32,8 +32,8 @@ class ParameterClient:
         self,
         client: ParameterServer,
         parameters: Dict[str, Any],
-        get_keys: List[str] = None,
-        set_keys: List[str] = None,
+        get_keys: Optional[List[str]] = None,
+        set_keys: Optional[List[str]] = None,
         update_period: int = 1,
         devices: Dict[str, Optional[Union[str, jax.xla.Device]]] = {},
     ):
@@ -76,21 +76,12 @@ class ParameterClient:
 
         self._add = lambda params: client.add_to_parameters(params)
 
-        # Create a single background thread to fetch parameters without necessarily
-        # blocking the actor.
-        self._executor = futures.ThreadPoolExecutor(max_workers=1)
         self._async_add_buffer: Dict[str, Any] = {}
-        self._async_request = lambda: self._executor.submit(self._request)
-        self._async_adjust = lambda: self._executor.submit(self._adjust)
-        self._async_adjust_param: Any = lambda params: self._executor.submit(
-            self._adjust_param(params)  # type: ignore
+        self._async_request = lambda: client.futures.get_parameters(self._get_keys)
+        self._async_adjust = lambda: client.futures.set_parameters(
+            {key: self._parameters[key] for key in self._set_keys},
         )
-        self._async_adjust_and_request = lambda: self._executor.submit(
-            self._adjust_and_request
-        )
-        self._async_add: Any = lambda params: self._executor.submit(
-            self._add(params)  # type: ignore
-        )
+        self._async_add = lambda params: client.futures.add_to_parameters(params)
 
         # Initialize this client's future to None to indicate to the `update()`
         # method that there is no pending/running request.
@@ -109,6 +100,22 @@ class ParameterClient:
             {key: self._parameters[key] for key in self._set_keys},
         )
         self._copy(self._client.get_parameters(self._get_keys))
+
+    def _async_adjust_and_request(self) -> None:
+        """Set the parameters in the server, then update local params from the server.
+
+        Returns:
+            None.
+        """
+        self._client.futures.set_parameters(
+            {key: self._parameters[key] for key in self._set_keys},
+        )
+        # not sure how these futures will interact
+        # will it fetch the parameters set above?
+        get_future = self._client.futures.get_parameters(self._get_keys)
+        get_future.add_done_callback(lambda ctx: self._copy(ctx.result()))
+
+        return get_future
 
     def get_async(self) -> None:
         """Asynchronously updates the parameters with the latest copy from server.
@@ -133,7 +140,7 @@ class ParameterClient:
             self._copy(self._get_future.result())
             self._get_future = None
 
-    def set_async(self, params: Dict[str, Any] = None) -> None:
+    def set_async(self) -> None:
         """Asynchronously updates server with the set parameters.
 
         Returns:
@@ -148,10 +155,7 @@ class ParameterClient:
         if period_reached and self._set_future is None:
             # The update period has been reached and no request has been sent yet, so
             # making an asynchronous request now.
-            if params is None:
-                self._set_future = self._async_adjust()
-            else:
-                self._set_future = self._async_adjust_param(params)
+            self._set_future = self._async_adjust()
             self._set_call_counter = 0
             return
         if self._set_future is not None and self._set_future.done():
