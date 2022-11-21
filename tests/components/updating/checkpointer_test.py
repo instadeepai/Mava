@@ -21,6 +21,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
+import numpy as np
 import pytest
 from acme.jax import savers as acme_savers
 
@@ -50,7 +51,9 @@ def mock_parameter_server() -> MockParameterServer:
 
     mock_server = MockParameterServer(
         store=MockParameterStore(
-            parameters={"trainer_steps": 50},
+            parameters={
+                "trainer_steps": np.zeros(1, dtype=np.int32),
+            },
             experiment_path=tempfile.mkdtemp(),
         ),
     )
@@ -92,6 +95,7 @@ def test_save_restore(
 
     # Emulate the parameters changing e.g. trainer_steps increase and then ensure that
     # the saveable has updated
+    mock_parameter_server.store.parameters["trainer_steps"] = 50
     mock_parameter_server.store.parameters["trainer_steps"] += 50
 
     assert (

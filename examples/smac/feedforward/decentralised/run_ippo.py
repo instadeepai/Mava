@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run feedforward MADQN on SMAC."""
+"""Run feedforward IPPO on SMAC."""
 
 
 import functools
@@ -42,7 +42,7 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Example running feedforward MADQN on SMAC environment."""
+    """Example running feedforward IPPO on SMAC environment."""
 
     # Environment
     environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
