@@ -14,7 +14,6 @@
 # limitations under the License.
 
 """Jax IDQN system."""
-import imp
 from typing import Any, Tuple
 
 from mava.components import building, executing, training, updating
@@ -22,13 +21,11 @@ from mava.components.building.adders import ParallelTransitionAdder
 from mava.components.building.guardrails import ComponentDependencyGuardrails
 from mava.specs import DesignSpec
 from mava.systems import System
+from mava.systems.idqn.components import building as dqn_building
+from mava.systems.idqn.components import executing as dqn_executing
+from mava.systems.idqn.components import training as dqn_training
 from mava.systems.idqn.components.building.extras_spec import DQNExtrasSpec
 from mava.systems.idqn.config import IDQNDefaultConfig
-from mava.systems.ippo.components import ExtrasLogProbSpec
-
-from mava.systems.idqn.components import executing as dqn_executing
-from mava.systems.idqn.components import building as dqn_building
-from mava.systems.idqn.components import training as dqn_training
 
 
 class IDQNSystem(System):

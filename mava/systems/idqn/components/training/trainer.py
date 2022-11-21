@@ -1,13 +1,9 @@
-import abc
-from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import Any, Dict, List, Type
 
 from mava import constants
-from mava.core_jax import SystemBuilder
-from mava.utils.jax_training_utils import init_norm_params
-from mava.utils.sort_utils import sort_str_num
 from mava.components.training.trainer import BaseTrainerInit
+from mava.core_jax import SystemBuilder
+from mava.utils.sort_utils import sort_str_num
 
 
 class TrainerInit(BaseTrainerInit):
@@ -55,6 +51,7 @@ class TrainerInit(BaseTrainerInit):
                     builder.store.networks[net_key].policy_params
                 )
             }  # pytype: disable=attribute-error
+
 
 class SingleTrainerInit(TrainerInit):
     def __init__(self, config: SimpleNamespace = SimpleNamespace()):

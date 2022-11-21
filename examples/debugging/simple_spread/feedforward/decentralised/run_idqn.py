@@ -100,8 +100,8 @@ def main(_: Any) -> None:
         num_executors=1,
         multi_process=True,
         # min_data_server_size=10,
-        # terminal="gnome-terminal",
-        trainer_parameter_update_period=5,
+        terminal="gnome-terminal",
+        trainer_parameter_update_period=55,
         samples_per_insert=32,
     )
 

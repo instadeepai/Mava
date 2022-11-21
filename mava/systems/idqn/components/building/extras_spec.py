@@ -14,35 +14,11 @@
 # limitations under the License.
 
 """Custom components for IPPO system."""
-import abc
 from types import SimpleNamespace
-from typing import Any
 
-import numpy as np
-from dm_env import specs
-
-from mava.components import Component
+from mava.components.building.extras_spec import ExtrasSpec
 from mava.core_jax import SystemBuilder
 
-
-class ExtrasSpec(Component):
-    @abc.abstractmethod
-    def __init__(self, config: Any) -> None:
-        """Initialise extra specs
-
-        Args:
-            config : ExtrasSpecConfig
-        """
-        self.config = config
-
-    @staticmethod
-    def name() -> str:
-        """Returns name of ExtrasSpec class
-
-        Returns:
-            "extras_spec": name of ExtrasSpec class
-        """
-        return "extras_spec"
 
 class DQNExtrasSpec(ExtrasSpec):
     def __init__(
@@ -64,15 +40,17 @@ class DQNExtrasSpec(ExtrasSpec):
 
         Returns:
             None.
-
         """
-        agent_specs = builder.store.ma_environment_spec.get_agent_environment_specs()
-        builder.store.extras_spec = {}
+        # builder.store.extras_spec = {}
+        #
+        # # Add the networks keys to extras.
+        # int_spec = specs.DiscreteArray(len(builder.store.unique_net_keys))
+        # agents = builder.store.ma_environment_spec.get_agent_ids()
+        # net_spec = {"network_keys": {agent: int_spec for agent in agents}}
 
-        # Add the networks keys to extras.
-        int_spec = specs.DiscreteArray(len(builder.store.unique_net_keys))
-        agents = builder.store.ma_environment_spec.get_agent_ids()
-        net_spec = {"network_keys": {agent: int_spec for agent in agents}}
-        builder.store.extras_spec.update(net_spec)
+        # builder.store.extras_spec.update(net_spec)
 
-        builder.store.extras_spec.update(net_spec)
+        builder.store.extras_spec = self.get_network_keys(
+            builder.store.unique_net_keys,
+            builder.store.ma_environment_spec.get_agent_ids(),
+        )

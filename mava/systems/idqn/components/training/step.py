@@ -14,30 +14,24 @@
 # limitations under the License.
 
 """Trainer components for gradient step calculations."""
-import abc
-from distutils.command.config import config
-import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple, Type
+from typing import Dict, List, Tuple, Type
 
 import jax
 import jax.numpy as jnp
 import optax
 import reverb
-import tree
-from acme.jax import utils
+import rlax
 from jax import jit
 
 import mava.components.building.adders  # To avoid circular imports
 import mava.components.training.model_updating  # To avoid circular imports
 from mava import constants
 from mava.callbacks import Callback
-from mava.components.training.advantage_estimation import GAE
-from mava.components.training.base import Batch, DQNTrainingState, TrainingState
+from mava.components.training.base import DQNTrainingState
 from mava.components.training.step import Step
 from mava.core_jax import SystemTrainer
-from mava.utils.jax_training_utils import denormalize, normalize
-import rlax
+from mava.systems.idqn.components.training.loss import IDQNLoss
 
 
 @dataclass
@@ -71,7 +65,7 @@ class IDQNStep(Step):
         @jit
         def sgd_step(
             states: DQNTrainingState, sample: reverb.ReplaySample
-        ) -> Tuple[TrainingState, Dict[str, jnp.ndarray]]:
+        ) -> Tuple[DQNTrainingState, Dict[str, jnp.ndarray]]:
             """Performs a minibatch SGD step.
 
             Args:
@@ -86,23 +80,19 @@ class IDQNStep(Step):
             data = sample.data
 
             observations, actions, rewards, next_observations, discounts, _ = (
-                data.observations,
-                data.actions,
-                data.rewards,
-                data.next_observations,
-                data.discounts,
-                data.extras,
+                data.observations,  # type: ignore
+                data.actions,  # type: ignore
+                data.rewards,  # type: ignore
+                data.next_observations,  # type: ignore
+                data.discounts,  # type: ignore
+                data.extras,  # type: ignore
             )
 
-            # policy_opt_states = trainer.store.policy_opt_states
             target_policy_params = states.target_policy_params
             policy_params = states.policy_params
             policy_opt_states = states.policy_opt_states
 
-            # # TODO (Ruan): Double check this
-            # agent_nets = trainer.store.trainer_agent_net_keys
-
-            policy_gradients, policy_agent_metrics = trainer.store.policy_grad_fn(
+            policy_gradients, grad_metrics = trainer.store.policy_grad_fn(
                 policy_params,
                 target_policy_params,
                 observations,
@@ -112,24 +102,24 @@ class IDQNStep(Step):
                 discounts,
             )
 
-            metrics = {}
+            metrics: Dict[str, jnp.ndarray] = {}
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
-                # Update the policy networks and optimisers.
-                # Apply updates
+                # Update the networks and optimisers.
                 # TODO (dries): Use one optimiser per network type here and not
                 # just one.
                 (
                     policy_updates,
-                    policy_opt_states[agent_net_key][constants.OPT_STATE_DICT_KEY],
+                    policy_opt_states[agent_net_key][constants.OPT_STATE_DICT_KEY],  # type: ignore
                 ) = trainer.store.policy_optimiser.update(
                     policy_gradients[agent_key],
-                    policy_opt_states[agent_net_key][constants.OPT_STATE_DICT_KEY],
+                    policy_opt_states[agent_net_key][constants.OPT_STATE_DICT_KEY],  # type: ignore
                 )
                 policy_params[agent_net_key] = optax.apply_updates(
                     policy_params[agent_net_key], policy_updates
                 )
 
+                # TODO (sasha): does this need to be included
                 # policy_agent_metrics[agent_key]["norm_policy_grad"] = optax.global_norm(
                 #     policy_gradients[agent_key]
                 # )
@@ -142,12 +132,12 @@ class IDQNStep(Step):
             target_policy_params = rlax.periodic_update(
                 policy_params,
                 target_policy_params,
-                states.trainer_iteration,
+                states.trainer_iteration,  # type: ignore
                 self.config.target_update_period,
             )
 
             # Set the metrics
-            metrics = jax.tree_util.tree_map(jnp.mean, metrics)
+            metrics = jax.tree_util.tree_map(jnp.mean, {**metrics, **grad_metrics})
 
             new_states = DQNTrainingState(
                 policy_params=policy_params,
@@ -201,9 +191,8 @@ class IDQNStep(Step):
             # server.
             trainer.store.base_key = new_states.random_key
 
+            # UPDATING THE PARAMETERS IN THE NETWORK IN THE STORE
             for net_key in policy_params.keys():
-                # UPDATING THE PARAMETERS IN THE NETWORK IN THE STORE
-
                 # The for loop below is needed to not lose the param reference.
                 net_params = trainer.store.networks[net_key].policy_params
                 for param_key in net_params.keys():
@@ -230,13 +219,10 @@ class IDQNStep(Step):
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
-        GAE required to set up trainer.store.gae_fn.
-        MAPGEpochUpdate required for config num_epochs, num_minibatches,
-        and trainer.store.epoch_update_fn.
-        MinibatchUpdate required to set up trainer.store.opt_states.
-        ParallelSequenceAdder required for config sequence_length.
-
         Returns:
             List of required component classes.
         """
-        return Step.required_components()  # TODO
+        return Step.required_components() + [
+            IDQNLoss,
+            mava.components.building.adders.ParallelTransitionAdder,
+        ]

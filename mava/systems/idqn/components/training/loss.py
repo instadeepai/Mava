@@ -14,30 +14,19 @@
 # limitations under the License.
 
 """Trainer components for calculating losses."""
-import abc
 from dataclasses import dataclass
-from types import SimpleNamespace
-from typing import Any, Dict, List, Tuple, Type
+from typing import Any, Dict, Tuple
 
-import haiku as hk
 import jax
 import jax.numpy as jnp
 import rlax
 
-from mava.callbacks import Callback
-from mava.components import Component, training
 from mava.components.training.losses import Loss
 from mava.core_jax import SystemTrainer
-from mava.systems.idqn.idqn_network import IDQNNetwork
 
 
 @dataclass
 class IDQNLossConfig:
-    """The value_clip_parameter should be relatively small when value_normalization is True.
-
-    The idea is to scale it to try and match the effect of the normalisation on the target values.
-    """
-
     gamma: float = 0.99
 
 
@@ -54,7 +43,7 @@ class IDQNLoss(Loss):
         self.config = config
 
     def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
-        """Create and store MAPGWithTrustRegionClippingLoss loss function.
+        """Create and store IDQN loss function.
 
         Args:
             trainer: SystemTrainer.
@@ -76,11 +65,12 @@ class IDQNLoss(Loss):
 
             Args:
                 policy_params: policy network parameters.
-                observations: agent observations.
+                target_policy_params: target network parameters
+                observations: agent observations at timestep t.
                 actions: actions the agents took.
-                behaviour_log_probs: Log probabilities of actions taken by
-                    current policy in the environment.
-                advantages: advantage estimation values per agent.
+                rewards: rewards given to the agent
+                next_observations: agent observations at timestep t+1
+                discounts: terminal agent mask (dm_env discounts)
 
             Returns:
                 Tuple[policy gradients, policy loss information]
@@ -91,8 +81,6 @@ class IDQNLoss(Loss):
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
                 network = trainer.store.networks[agent_net_key]
-                # Note (dries): This is placed here to set the networks correctly in
-                # the case of non-shared weights.
 
                 def policy_loss_fn(
                     policy_params: Any,
@@ -129,10 +117,8 @@ class IDQNLoss(Loss):
 
                     loss = jax.numpy.mean(rlax.l2_loss(error))
 
-                    # TODO: (Ruan) Keeping the entropy penalty for now.
-                    # can remove or add a flag for including it.
                     loss_info_policy = {
-                        "policy_loss_total": loss,
+                        "policy_loss_total": loss.item(),
                     }
 
                     return loss, loss_info_policy

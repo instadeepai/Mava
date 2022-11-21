@@ -3,9 +3,10 @@ from typing import Optional
 
 import optax
 from optax._src import base as optax_base
-from mava.components.building.optimisers import Optimisers
 
+from mava.components.building.optimisers import Optimisers
 from mava.core_jax import SystemBuilder
+
 
 @dataclass
 class OptimisersConfig:

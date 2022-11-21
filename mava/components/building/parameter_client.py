@@ -120,7 +120,7 @@ class ExecutorParameterClient(BaseParameterClient):
                 parameters=params,
                 get_keys=get_keys,
                 set_keys=set_keys,
-                call_update_period=self.config.executor_parameter_update_period,
+                update_period=self.config.executor_parameter_update_period,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
@@ -135,7 +135,8 @@ class ExecutorParameterClient(BaseParameterClient):
         return "executor_parameter_client"
 
 
-# TODO (sasha): there needs to be a better way to do this without all this code duplication?
+# TODO (sasha): there needs to be a better way to do this without
+# all this code duplication?
 class ActorCriticExecutorParameterClient(ExecutorParameterClient):
     def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
         """Create and store the executor parameter client.
@@ -184,7 +185,7 @@ class ActorCriticExecutorParameterClient(ExecutorParameterClient):
                 parameters=params,
                 get_keys=get_keys,
                 set_keys=set_keys,
-                call_update_period=self.config.executor_parameter_update_period,
+                update_period=self.config.executor_parameter_update_period,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
@@ -256,7 +257,7 @@ class TrainerParameterClient(BaseParameterClient):
                 parameters=params,
                 get_keys=get_keys,
                 set_keys=set_keys,
-                call_update_period=self.config.trainer_parameter_update_period,
+                update_period=self.config.trainer_parameter_update_period,
             )
 
             # Get all the initial parameters
@@ -328,7 +329,7 @@ class ActorCriticTrainerParameterClient(TrainerParameterClient):
                 parameters=params,
                 get_keys=get_keys,
                 set_keys=set_keys,
-                call_update_period=self.config.trainer_parameter_update_period,
+                update_period=self.config.trainer_parameter_update_period,
             )
 
             # Get all the initial parameters
