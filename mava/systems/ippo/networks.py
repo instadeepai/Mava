@@ -205,6 +205,7 @@ def make_discrete_networks(
     orthogonal_initialisation: bool = False,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     policy_network_head_weight_gain: float = 0.01,
+    normalise_features: bool = False,
     layer_norm: bool = False,
     # default behaviour is to flatten observations
 ) -> PPONetworks:
@@ -227,6 +228,7 @@ def make_discrete_networks(
             network hidden layers.
         policy_network_head_weight_gain: value for scaling the policy
             network final layer weights by.
+        normalise_features: apply layer normalisation to the raw observations.
         layer_norm: apply layer normalisation to the hidden MLP layers.
 
 
@@ -262,6 +264,7 @@ def make_discrete_networks(
                 activation=activation_function,
                 w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
                 activate_final=True,
+                normalise_features=normalise_features,
                 layer_norm=layer_norm,
             ),
         ]
@@ -333,6 +336,7 @@ def make_discrete_networks(
                     activation=activation_function,
                     w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
                     activate_final=True,
+                    normalise_features=normalise_features,
                     layer_norm=layer_norm,
                 ),
                 ValueHead(w_init=w_init_fn(orthogonal_initialisation, 1.0)),
@@ -380,6 +384,7 @@ def make_networks(
     orthogonal_initialisation: bool = False,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     policy_network_head_weight_gain: float = 0.01,
+    normalise_features: bool = False,
     layer_norm: bool = False,
 ) -> PPONetworks:
     """Function for creating PPO networks to be used.
@@ -404,6 +409,7 @@ def make_networks(
             network hidden layers.
         policy_network_head_weight_gain: value for scaling the policy
             network final layer weights by.
+        normalise_features: apply layer normalisation to the raw observations.
         layer_norm: apply layer normalisation to the hidden MLP layers.
 
     Returns:
@@ -424,6 +430,7 @@ def make_networks(
             recurrent_architecture_fn=recurrent_architecture_fn,
             orthogonal_initialisation=orthogonal_initialisation,
             activation_function=activation_function,
+            normalise_features=normalise_features,
             layer_norm=layer_norm,
             policy_network_head_weight_gain=policy_network_head_weight_gain,
         )
@@ -453,6 +460,7 @@ def make_default_networks(
     orthogonal_initialisation: bool = False,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     policy_network_head_weight_gain: float = 0.01,
+    normalise_features: bool = False,
     layer_norm: bool = False,
 ) -> Dict[str, Any]:
     """Create default PPO networks
@@ -483,6 +491,7 @@ def make_default_networks(
             network hidden layers.
         policy_network_head_weight_gain: value for scaling the policy
             network final layer weights by.
+        normalise_features: apply layer normalisation to the raw observations.
         layer_norm: apply layer normalisation to the hidden MLP layers.
 
     Returns:
@@ -510,6 +519,7 @@ def make_default_networks(
             policy_layers_after_recurrent=policy_layers_after_recurrent,
             orthogonal_initialisation=orthogonal_initialisation,
             activation_function=activation_function,
+            normalise_features=normalise_features,
             layer_norm=layer_norm,
             policy_network_head_weight_gain=policy_network_head_weight_gain,
         )

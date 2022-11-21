@@ -339,7 +339,7 @@ def mlp(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
 def mlp_norm(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
 
     output_sizes = [64, 64, 64]
-    mlp_network_norm = MLP_NORM(output_sizes, layer_norm=True)
+    mlp_network_norm = MLP_NORM(output_sizes, layer_norm=True, normalise_features=True)
 
     return mlp_network_norm(inputs)
 
@@ -366,4 +366,4 @@ def test_MLP_with_feature_norm() -> None:
     params_norm_false = mlp_norm_false.init(network_key, dummy_obs)
 
     assert len(params.keys()) == len(params_norm_false.keys())
-    assert len(params.keys()) * 2 == len(params_norm.keys())
+    assert len(params.keys()) * 2 + 1 == len(params_norm.keys())

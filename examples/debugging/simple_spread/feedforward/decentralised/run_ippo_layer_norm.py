@@ -63,6 +63,7 @@ def main(_: Any) -> None:
         return ippo.make_default_networks(  # type: ignore
             policy_layer_sizes=(64, 64),
             critic_layer_sizes=(64, 64, 64),
+            normalise_features=True,
             layer_norm=True,
             *args,
             **kwargs,
@@ -109,7 +110,7 @@ def main(_: Any) -> None:
         multi_process=True,
         clip_value=True,
         normalize_target_values=True,
-        normalize_observations=True,
+        normalize_observations=False,
         termination_condition={"executor_steps": 200000},
     )
 

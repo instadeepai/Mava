@@ -34,6 +34,7 @@ class MLP_NORM(hk.Module):
         with_bias: bool = True,
         activation: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
         activate_final: bool = False,
+        normalise_features: bool = False,
         layer_norm: bool = False,
         name: Optional[str] = None,
     ):
@@ -47,7 +48,8 @@ class MLP_NORM(hk.Module):
             activation: Activation function to apply between :class:`~haiku.Linear`
             layers. Defaults to ReLU.
             activate_final: Whether or not to activate the final layer of the MLP.
-            layer_norm: apply layer normalisation to the hidden MLP layers.
+            normalise_features: Apply layer normalisation to the inputs.
+            layer_norm: Apply layer normalisation to the hidden MLP layers.
             name: Optional name for this module.
         Raises:
             ValueError: If ``with_bias`` is ``False`` and ``b_init`` is not ``None``.
@@ -61,6 +63,7 @@ class MLP_NORM(hk.Module):
         self.b_init = b_init
         self.activation = activation
         self.activate_final = activate_final
+        self.normalise_features = normalise_features
         self.layer_norm = layer_norm
         layers = []
         norms = []
@@ -82,13 +85,21 @@ class MLP_NORM(hk.Module):
                     create_offset=True,
                     param_axis=-1,
                     use_fast_variance=False,
-                    name="norm_%d" % index,
+                    name="layer_norm_%d" % index,
                 )
             )
 
         self.layers = tuple(layers)
         self.norms = tuple(norms)
         self.output_size = output_sizes[-1] if output_sizes else None
+        self.feature_norm = hk.LayerNorm(
+            axis=-1,
+            create_scale=True,
+            create_offset=True,
+            param_axis=-1,
+            use_fast_variance=False,
+            name="feature_norm",
+        )
 
     def __call__(
         self,
@@ -113,6 +124,8 @@ class MLP_NORM(hk.Module):
         num_layers = len(self.layers)
 
         out = inputs
+        if self.normalise_features:
+            out = self.feature_norm(out)
         for i, layer in enumerate(self.layers):
             out = layer(out)
             if i < (num_layers - 1) or self.activate_final:
