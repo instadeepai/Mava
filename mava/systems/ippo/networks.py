@@ -45,6 +45,7 @@ class PPONetworks:
         policy_network: networks_lib.FeedForwardNetwork,
         policy_params: networks_lib.Params,
         policy_init_state: Any,
+        critic_init_state: Any,
         critic_network: networks_lib.FeedForwardNetwork,
         critic_params: networks_lib.Params,
         log_prob: Optional[networks_lib.LogProbFn] = None,
@@ -72,6 +73,7 @@ class PPONetworks:
         self.policy_network = policy_network
         self.policy_params = policy_params
         self.policy_init_state = policy_init_state
+        self.critic_init_state = critic_init_state
         self.critic_network = critic_network
         self.critic_params = critic_params
         self.log_prob = log_prob
@@ -137,7 +139,7 @@ class PPONetworks:
             mask=mask,
             policy_state=policy_state,
         )
-
+                        
         if self.policy_init_state:
             return actions, {"log_prob": log_prob}, policy_state  # type: ignore
         else:
@@ -151,6 +153,10 @@ class PPONetworks:
     def get_init_state(self) -> jnp.ndarray:
         """Get initial policy hidden state."""
         return self.policy_init_state
+    
+    def get_critic_init_state(self) -> jnp.ndarray:
+        """Get initial critic hidden state."""
+        return self.critic_init_state
 
     def get_params(
         self,
@@ -311,6 +317,19 @@ def make_discrete_networks(
 
     @hk.without_apply_rng
     @hk.transform
+    def critic_initial_state_fn() -> List[jnp.ndarray]:
+        """Returns an intial state for the recurrent layers.
+
+        Args:
+            None.
+
+        Returns:
+            Initial state for the recurrent layers.
+        """
+        return hk.GRU(64).initial_state(1), hk.GRU(64).initial_state(5)
+
+    @hk.without_apply_rng
+    @hk.transform
     def critic_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
         """Create a critic network function and transform it using Haiku.
 
@@ -320,7 +339,7 @@ def make_discrete_networks(
         Returns:
             FeedForwardNetwork class
         """
-        critic_network = hk.Sequential(
+        critic_network = hk.DeepRNN(
             [
                 hk.nets.MLP(
                     critic_layer_sizes,
@@ -328,10 +347,12 @@ def make_discrete_networks(
                     w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
                     activate_final=True,
                 ),
+                hk.GRU(64),
                 ValueHead(w_init=w_init_fn(orthogonal_initialisation, 1.0)),
             ]
+
         )
-        return critic_network(inputs)
+        return critic_network(inputs[0], inputs[1])
 
     dummy_obs = utils.zeros_like(environment_spec.observations.observation)
     dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
@@ -347,13 +368,16 @@ def make_discrete_networks(
         policy_params = policy_fn.init(network_key, dummy_obs)  # type: ignore
 
     base_key, network_key = jax.random.split(base_key)
-    critic_params = critic_fn.init(network_key, dummy_obs)  # type: ignore
+    critic_state, batch_critic_state = critic_initial_state_fn.apply(None)
+    
+    critic_params = critic_fn.init(network_key, [dummy_obs, critic_state])  # type: ignore
 
     # Create PPONetworks to add functionality required by the agent.
     return PPONetworks(
         policy_network=policy_fn,
         policy_params=policy_params,
         policy_init_state=policy_state,
+        critic_init_state=batch_critic_state,  
         critic_network=critic_fn,
         critic_params=critic_params,
         log_prob=lambda distribution, action: distribution.log_prob(action),

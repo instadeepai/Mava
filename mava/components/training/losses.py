@@ -333,7 +333,37 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
                     """Inner critic loss function: see outer function for parameters."""
 
-                    values = network.critic_network.apply(critic_params, observations)
+                    if True: 
+                        # TODO check if recurrent 
+                        # Recurrent critic.
+                        minibatch_size = int(
+                            trainer.store.sample_batch_size
+                            / trainer.store.num_minibatches
+                        )
+                        seq_len = trainer.store.sequence_length - 1
+
+                        batch_seq_observations = observations.reshape(
+                            minibatch_size, seq_len, -1
+                        )
+
+                        core = lambda x, y: network.critic_network.apply(
+                            critic_params, [x, y]
+                        )
+                        
+                        values, _ = hk.static_unroll(
+                            core,
+                            batch_seq_observations,
+                            network.get_critic_init_state(),
+                            time_major=False,
+                        )
+
+                        values = jax.tree_util.tree_map(
+                            lambda x: x.reshape((-1,) + x.shape[2:]),
+                            values,
+                        )
+
+                    else: 
+                        values = network.critic_network.apply(critic_params, observations)
 
                     # Value function loss. Exclude the bootstrap value
                     unclipped_value_error = target_values - values

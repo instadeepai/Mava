@@ -19,6 +19,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Type
 
+import haiku as hk
 import jax
 import jax.numpy as jnp
 import optax
@@ -264,14 +265,30 @@ class MAPGWithTrustRegionStep(Step):
                 net_key: Any, reward: Any, observation: Any
             ) -> jnp.ndarray:
                 """Gets behaviour values from the agent networks and observations."""
-                o = jax.tree_util.tree_map(
-                    lambda x: jnp.reshape(x, [-1] + list(x.shape[2:])), observation
-                )
-                behavior_values = networks[net_key].critic_network.apply(
-                    states.critic_params[net_key], o
-                )
-                behavior_values = jnp.reshape(behavior_values, reward.shape[0:2])
+                if True: 
+                    # Use the state at the start of the sequence and unroll the policy.
+                    core = lambda x, y: networks[net_key].critic_network.apply(
+                        states.critic_params[net_key], [x, y]
+                    )
+                    
+                    behavior_values, _ = hk.static_unroll(
+                        core,
+                        observation,
+                        networks[net_key].get_critic_init_state(),
+                        time_major=False,
+                    )
+
+                else: 
+                    o = jax.tree_util.tree_map(
+                        lambda x: jnp.reshape(x, [-1] + list(x.shape[2:])), observation
+                    )
+                    behavior_values = networks[net_key].critic_network.apply(
+                        states.critic_params[net_key], o
+                    )
+                    behavior_values = jnp.reshape(behavior_values, reward.shape[0:2])
+                
                 return behavior_values
+            
 
             # TODO (Ruan): Double check this
             agent_nets = trainer.store.trainer_agent_net_keys
