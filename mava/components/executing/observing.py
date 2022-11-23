@@ -175,7 +175,7 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
         Args:
             config: SimpleNamespace.
         """
-        
+
         self.config = config
 
     def on_execution_observe_first(self, executor: SystemExecutor) -> None:
@@ -193,11 +193,9 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
         # Initialise the recurrent states of the agents
 
         # Check if temp_counts is in executor.store
-        if  not hasattr(executor.store, "temp_counts"):
+        if not hasattr(executor.store, "temp_counts"):
             executor.store.temp_counts = 0
-    
 
-        
         executor.store.policy_states = {}
         for agent in executor.store.agent_net_keys.keys():
             network = executor.store.agent_net_keys[agent]
@@ -230,7 +228,6 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
         #     agent = "agent_" + str(i)
         #     obs = executor.store.timestep.observation[agent]
         #     executor.store.timestep.observation[agent] = obs._replace(observation=obs.observation*0 + executor.store.temp_counts + i)
-           
 
         # executor.store.timestep set by Executor
         executor.store.adder.add_first(executor.store.timestep, executor.store.extras)
@@ -281,7 +278,6 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
         # tf.print("actions_info", adder_actions)
         # tf.print("policy_info", executor.store.next_extras["policy_info"])
         # exit()
-
 
         executor.store.adder.add(
             adder_actions, executor.store.next_timestep, executor.store.next_extras

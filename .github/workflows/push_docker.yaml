@@ -146,4 +146,3 @@ jobs:
           push: true
           tags: ${{ steps.vars2.outputs.docker_repo }}:flatland-${{ steps.vars.outputs.sha_short }}
           target: flatland
-

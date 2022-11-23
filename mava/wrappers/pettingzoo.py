@@ -141,24 +141,22 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         observations = self._convert_observations(observations, dones)
 
         state = self.get_state()
-        
+
         discounts = {}
         for agent in self.possible_agents:
             # If the agent was not done at the start of the episode,
             # it is a valid step (death masking).
             value = 1 if not self._pre_dones[agent] else 0
 
-            discounts[agent] = convert_np_type(
-                self.discount_spec()[agent].dtype, value
-            )
-    
+            discounts[agent] = convert_np_type(self.discount_spec()[agent].dtype, value)
+
         self._pre_dones = dones
 
         if self.env_done():
             self._step_type = dm_env.StepType.LAST
             self._reset_next_step = True
             # Final discount should be 0.0
-            
+
         else:
             self._step_type = dm_env.StepType.MID
 

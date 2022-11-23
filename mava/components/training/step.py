@@ -331,7 +331,13 @@ class MAPGWithTrustRegionStep(Step):
                 behavior_values,
             ) = jax.tree_util.tree_map(
                 lambda x: x[:, :-1],
-                (observations, loss_masks, actions, behavior_log_probs, behavior_values),
+                (
+                    observations,
+                    loss_masks,
+                    actions,
+                    behavior_log_probs,
+                    behavior_values,
+                ),
             )
 
             if "policy_states" in extras:

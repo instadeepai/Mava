@@ -147,15 +147,12 @@ class SMACWrapper(ParallelEnvWrapper):
             # it is a valid step (death masking).
             value = 1 if not self._pre_agents_alive[agent] else 0
 
-            discounts[agent] = convert_np_type(
-                self.discount_spec()[agent].dtype, value
-            )
+            discounts[agent] = convert_np_type(self.discount_spec()[agent].dtype, value)
 
         self._pre_agents_alive = {}
         for i, agent in enumerate(self._agents):
             # Check if agent is dead.
             self._pre_agents_alive[agent] = self.is_dead(i)
-    
 
         if self._done:
             self._step_type = dm_env.StepType.LAST

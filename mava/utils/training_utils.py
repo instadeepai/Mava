@@ -3,12 +3,14 @@ import time
 import warnings
 from typing import Dict, Optional, Tuple
 
-import tensorflow as tf
-import jax.numpy as jnp
-import jax
 import chex
+import jax
+import jax.numpy as jnp
+import tensorflow as tf
+
 Array = chex.Array
 Scalar = chex.Scalar
+
 
 def non_blocking_sleep(time_in_seconds: int) -> None:
     """Function to sleep for time_in_seconds, without hanging lp program.
@@ -21,12 +23,14 @@ def non_blocking_sleep(time_in_seconds: int) -> None:
         # termination hangs (time.sleep is not interruptible).
         time.sleep(1)
 
+
 def clipped_surrogate_pg_loss(
     prob_ratios_t: Array,
     adv_t: Array,
     epsilon: Scalar,
     loss_masks: Array,
-    use_stop_gradient=True) -> Array:
+    use_stop_gradient=True,
+) -> Array:
     """
     Modified from: https://github.com/deepmind/rlax/blob/master/rlax/_src/policy_gradients.py
     Computes the clipped surrogate policy gradient loss.
@@ -49,9 +53,10 @@ def clipped_surrogate_pg_loss(
     chex.assert_type([prob_ratios_t, adv_t], [float, float])
 
     adv_t = jax.lax.select(use_stop_gradient, jax.lax.stop_gradient(adv_t), adv_t)
-    clipped_ratios_t = jnp.clip(prob_ratios_t, 1. - epsilon, 1. + epsilon)
+    clipped_ratios_t = jnp.clip(prob_ratios_t, 1.0 - epsilon, 1.0 + epsilon)
     clipped_objective = jnp.fmin(prob_ratios_t * adv_t, clipped_ratios_t * adv_t)
-    return -(jnp.sum(clipped_objective*loss_masks)/jnp.sum(loss_masks))
+    return -(jnp.sum(clipped_objective * loss_masks) / jnp.sum(loss_masks))
+
 
 def check_count_condition(condition: Optional[dict]) -> Tuple:
     """Checks if condition is valid.

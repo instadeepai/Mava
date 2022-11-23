@@ -26,6 +26,7 @@ NestedArray = Any
 
 class OLT(NamedTuple):
     """Container for (observation, legal_actions) tuples."""
+
     observation: types.Nest
     legal_actions: types.Nest
 

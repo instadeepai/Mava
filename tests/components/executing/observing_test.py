@@ -136,7 +136,8 @@ class MockExecutor(Executor):
             reward=0.0,
             discount=1.0,
             observation=OLT(
-                observation=[0.1, 0.3, 0.7], legal_actions=[1],
+                observation=[0.1, 0.3, 0.7],
+                legal_actions=[1],
             ),
         )
         # extras
