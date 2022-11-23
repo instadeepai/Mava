@@ -8,3 +8,4 @@ omit =
     mava/utils/wrapper_utils.py
     */wrappers/*
     mava/utils/loggers/tf_logger.py
+    */tests/*
