@@ -65,7 +65,7 @@ class GAE(Utility):
 
             Args:
                 rewards: Agent rewards.
-                discounts: Agent took a valid step.
+                discounts: Agent discount factors.
                 values: Agent value estimations.
 
             Returns:

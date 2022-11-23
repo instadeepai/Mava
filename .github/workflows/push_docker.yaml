@@ -71,12 +71,6 @@ jobs:
           tags: ${{ steps.vars2.outputs.docker_repo }}:flatland-latest
           target: flatland
 
-<<<<<<< HEAD
-
-
-
-=======
->>>>>>> origin/develop
 
   # Action pushes new docker image if we have a PR to dev and have the label benchmark
   build-push-branches:

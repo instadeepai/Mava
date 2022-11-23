@@ -175,7 +175,6 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
         Args:
             config: SimpleNamespace.
         """
-
         self.config = config
 
     def on_execution_observe_first(self, executor: SystemExecutor) -> None:
@@ -236,6 +235,7 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
 
         actions_info = executor.store.actions_info
         policies_info = executor.store.policies_info
+        
         adder_actions: Dict[str, Any] = {}
         # executor.store.next_extras set by Executor
         executor.store.next_extras["policy_info"] = {}

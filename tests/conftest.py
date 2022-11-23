@@ -318,7 +318,7 @@ class Helpers:
         Helpers.compare_dicts(
             dm_env_timestep.discount,
             expected_discounts,
-        ), "Failed to reset valid step."
+        ), "Failed to reset discount."
 
     @staticmethod
     def mock_done() -> bool:

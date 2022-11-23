@@ -263,7 +263,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             next_observations=obs_specs,
             actions=act_specs,
             rewards=reward_specs,
-            discounts=step_discounts_spec,
+            discounts=step_discount_specs,
             extras=extras_specs,
             next_extras=extras_specs,
         )

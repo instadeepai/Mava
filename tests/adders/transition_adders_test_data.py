@@ -429,7 +429,7 @@ TEST_CASES = [
         agents=agents,
     ),
     dict(
-        testcase_name="TwoStepDiffValidSteps",
+        testcase_name="TwoStepDiffDiscounts",
         n_step=2,
         discount=default_discount,
         first=env_restart,
@@ -475,7 +475,7 @@ TEST_CASES = [
                 calc_nstep_return(
                     r_t=reward_step1,
                     discounts=[
-                        {agent: 1.0 for agent in agents},
+                        {agent: 0.5 for agent in agents},
                     ],
                     rewards=[reward_step2],
                 ),
@@ -487,7 +487,7 @@ TEST_CASES = [
                 default_action,
                 calc_nstep_return(
                     r_t=reward_step2,
-                    discounts=[{agent: 0.0 for agent in agents}],
+                    discounts=[{agent: 0.25 for agent in agents}],
                     rewards=[reward_step3],
                 ),
                 final_step_discount,
@@ -588,7 +588,7 @@ TEST_CASES = [
         agents=agents,
     ),
     dict(
-        testcase_name="ThreeStepDiffValidSteps",
+        testcase_name="ThreeStepDiffDiscounts",
         n_step=3,
         discount=default_discount,
         first=env_restart,
@@ -598,7 +598,7 @@ TEST_CASES = [
                 dm_env.transition(
                     reward=reward_step1,
                     observation=obs_step1,
-                    discount={agent: 1.0 for agent in agents},
+                    discount={agent: 0.5 for agent in agents},
                 ),
             ),
             (
@@ -606,7 +606,7 @@ TEST_CASES = [
                 dm_env.transition(
                     reward=reward_step2,
                     observation=obs_step2,
-                    discount={agent: 0.0 for agent in agents},
+                    discount={agent: 0.25 for agent in agents},
                 ),
             ),
             (
@@ -634,7 +634,7 @@ TEST_CASES = [
                 calc_nstep_return(
                     r_t=reward_step1,
                     discounts=[
-                        {agent: 1.0 for agent in agents},
+                        {agent: 0.5 for agent in agents},
                     ],
                     rewards=[reward_step2],
                 ),
@@ -647,8 +647,8 @@ TEST_CASES = [
                 calc_nstep_return(
                     r_t=reward_step1,
                     discounts=[
-                        {agent: 1.0 for agent in agents},
-                        {agent: 1.0 for agent in agents},
+                        {agent: 0.5 for agent in agents},
+                        {agent: 0.125 for agent in agents},
                     ],
                     rewards=[reward_step2, reward_step3],
                 ),
@@ -660,7 +660,7 @@ TEST_CASES = [
                 default_action,
                 calc_nstep_return(
                     r_t=reward_step2,
-                    discounts=[{agent: 0.0 for agent in agents}],
+                    discounts=[{agent: 0.25 for agent in agents}],
                     rewards=[reward_step3],
                 ),
                 final_step_discount,

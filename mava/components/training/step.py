@@ -111,13 +111,6 @@ class DefaultTrainerStep(TrainerStep):
         # Do a batch of SGD.
         sample = next(trainer.store.dataset_iterator)
 
-        # import tensorflow as tf
-        # tf.print("Actions: ", sample.data.actions)
-        # tf.print("policy_info: ", sample.data.extras["policy_info"])
-        # tf.print("discounts: ", sample.data.discounts)
-        # tf.print("observation: ", sample.data.observations)
-        # exit()
-
         results = trainer.store.step_fn(sample)
 
         # Update our counts and record it.
@@ -258,7 +251,7 @@ class MAPGWithTrustRegionStep(Step):
                     ) = trainer.store.norm_obs_running_stats_fn(
                         observation_stats[key], observations[key]
                     )
-            # Mask that is zero if an episode is done or an agent is done.
+            # Mask which is zero if an episode is done or an agent is done.
             # The final timestep is not masked.
             loss_masks = discounts
             discounts = tree.map_structure(
