@@ -62,7 +62,7 @@ class MockExecutorParameterClient:
         """Initiator of an executor's parameter client"""
         self.parm = False
 
-    def get_async(self) -> None:
+    def set_and_get_async(self) -> None:
         """Asynchronously updates the get variables with the latest copy from source."""
         self.parm = True
 
