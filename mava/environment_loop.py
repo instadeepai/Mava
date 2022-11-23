@@ -119,9 +119,8 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
         # Reset any counts and start the environment.
         start_time = time.time()
-        self._executor.store.episode_metrics = (
-            {}
-        )  # clear metrics at the start of each episode
+        # clear metrics at the start of each episode
+        self._executor.store.episode_metrics = {}
         episode_steps = 0
 
         timestep = self._environment.reset()

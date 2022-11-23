@@ -15,7 +15,7 @@
 
 """Execution components for system builders"""
 
-from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Dict, Tuple
 
 import jax
@@ -28,17 +28,8 @@ from mava.core_jax import SystemExecutor
 from mava.systems.idqn.idqn_network import IDQNNetwork
 
 
-@dataclass
-class FeedforwardExecutorSelectActionConfig:
-    epsilon_min: float = 0.05
-    epsilon_decay_timesteps: float = 10_000
-
-
 class FeedforwardExecutorSelectAction(ExecutorSelectAction):
-    def __init__(
-        self,
-        config: FeedforwardExecutorSelectActionConfig = FeedforwardExecutorSelectActionConfig(),  # noqa: E501
-    ):
+    def __init__(self, config: SimpleNamespace = SimpleNamespace()):
         """Component defines hooks for the executor selecting actions.
 
         Args:
