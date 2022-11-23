@@ -65,7 +65,7 @@ def test_executor_single_process(test_system_sp: System) -> None:
         "start_of_episode",
         "actions",
         "rewards",
-        "discounts",
+        "valid_steps",
         "extras",
     ]
     assert list(

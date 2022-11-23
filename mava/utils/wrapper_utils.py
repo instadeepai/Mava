@@ -84,15 +84,10 @@ def convert_dm_compatible_observations(
                 observation_spec[agent].legal_actions.shape,
                 dtype=observation_spec[agent].legal_actions.dtype,
             )
-        if agent in dones:
-            terminal = dones[agent]
-        else:
-            terminal = env_done
 
         observations[agent] = types.OLT(
             observation=observation,
             legal_actions=legals,
-            terminal=np.asarray([terminal], dtype=np.float32),
         )
     return observations
 

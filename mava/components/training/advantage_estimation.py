@@ -58,14 +58,14 @@ class GAE(Utility):
 
         def gae_advantages(
             rewards: jnp.ndarray,
-            discounts: jnp.ndarray,
+            valid_steps: jnp.ndarray,
             values: jnp.ndarray,
         ) -> Tuple[jnp.ndarray, jnp.ndarray]:
             """Use truncated GAE to compute advantages.
 
             Args:
                 rewards: Agent rewards.
-                discounts: Agent discount factors.
+                valid_steps: Agent took a valid step.
                 values: Agent value estimations.
 
             Returns:
@@ -78,7 +78,7 @@ class GAE(Utility):
 
             advantages = rlax.truncated_generalized_advantage_estimation(
                 rewards[:-1],
-                discounts[:-1],
+                valid_steps[:-1],
                 self.config.gae_lambda,
                 values,
             )

@@ -33,7 +33,7 @@ class MockStep:
         observations: Any,
         actions: Any,
         rewards: Any,
-        discounts: Any,
+        valid_steps: Any,
         start_of_episode: Any,
         extras: Any,
     ) -> None:
@@ -41,7 +41,7 @@ class MockStep:
         self.observations = observations
         self.actions = actions
         self.rewards = rewards
-        self.discounts = discounts
+        self.valid_steps = discounts
         self.start_of_episode = start_of_episode
         self.extras = extras
 
@@ -191,10 +191,6 @@ dummy_sample = reverb.ReplaySample(
                         [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
                     ]
                 ),
-                terminal=jnp.array(
-                    [[[0.0], [0.0], [0.0]], [[0.0], [0.0], [0.0]]],
-                    dtype=jnp.float32,
-                ),
             ),
             "agent_1": OLT(
                 observation=jnp.array(
@@ -314,10 +310,6 @@ dummy_sample = reverb.ReplaySample(
                         [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
                     ]
                 ),
-                terminal=jnp.array(
-                    [[[0.0], [0.0], [0.0]], [[0.0], [0.0], [0.0]]],
-                    dtype=jnp.float32,
-                ),
             ),
             "agent_2": OLT(
                 observation=jnp.array(
@@ -436,10 +428,6 @@ dummy_sample = reverb.ReplaySample(
                         [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
                         [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
                     ]
-                ),
-                terminal=jnp.array(
-                    [[[0.0], [0.0], [0.0]], [[0.0], [0.0], [0.0]]],
-                    dtype=jnp.float32,
                 ),
             ),
         },

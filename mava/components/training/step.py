@@ -111,6 +111,13 @@ class DefaultTrainerStep(TrainerStep):
         # Do a batch of SGD.
         sample = next(trainer.store.dataset_iterator)
 
+        import tensorflow as tf
+        tf.print("Actions: ", sample.data.actions)
+        tf.print("policy_info: ", sample.data.extras["policy_info"])
+        tf.print("valid_steps: ", sample.data.valid_steps)
+        tf.print("observation: ", sample.data.observation)
+        exit()
+
         results = trainer.store.step_fn(sample)
 
         # Update our counts and record it.
@@ -233,11 +240,11 @@ class MAPGWithTrustRegionStep(Step):
             # Extract the data.
             data = sample.data
 
-            observations, actions, rewards, termination, extras = (
+            observations, actions, rewards, valid_steps, extras = (
                 data.observations,
                 data.actions,
                 data.rewards,
-                data.discounts,
+                data.valid_steps,
                 data.extras,
             )
 
@@ -253,7 +260,7 @@ class MAPGWithTrustRegionStep(Step):
                     )
 
             discounts = tree.map_structure(
-                lambda x: x * self.config.discount, termination
+                lambda x: x * self.config.discount, valid_steps
             )
 
             behavior_log_probs = extras["policy_info"]

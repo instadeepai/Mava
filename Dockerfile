@@ -75,10 +75,3 @@ RUN pip install -e .[flatland]
 # To fix module 'jaxlib.xla_extension' has no attribute '__path__'
 RUN pip install cloudpickle -U
 ##########################################################
-
-#########################################################
-## Robocup Image
-FROM jax-core AS robocup
-RUN apt-get install sudo -y
-RUN ./bash_scripts/install_robocup.sh
-##########################################################

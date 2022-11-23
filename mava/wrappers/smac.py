@@ -60,6 +60,7 @@ class SMACWrapper(ParallelEnvWrapper):
         self._battles_game = 0
 
         self._death_masking = death_masking
+        self._pre_agents_alive = {}
 
     def reset(self) -> dm_env.TimeStep:
         """Resets the env, if it was not reset on the previous step.
@@ -84,7 +85,7 @@ class SMACWrapper(ParallelEnvWrapper):
 
         # Set env discount to 1 for all agents
         discount_spec = self.discount_spec()
-        self._discounts = {
+        self._valid_steps = {
             agent: convert_np_type(discount_spec[agent].dtype, 1)
             for agent in self._agents
         }
@@ -96,6 +97,8 @@ class SMACWrapper(ParallelEnvWrapper):
             for agent in self._agents
         }
 
+        self._pre_agents_alive = {agent: True for agent in self._agents}
+
         # Possibly add state information to extras
         if self._return_state_info:
             state = self.get_state()
@@ -103,7 +106,7 @@ class SMACWrapper(ParallelEnvWrapper):
         else:
             extras = {}
 
-        return parameterized_restart(rewards, self._discounts, observations), extras
+        return parameterized_restart(rewards, self._valid_steps, observations), extras
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps in env.
@@ -138,14 +141,24 @@ class SMACWrapper(ParallelEnvWrapper):
         else:
             extras = {}
 
+        valid_steps = {}
+        for agent in self.possible_agents:
+            # If the agent was not done at the start of the episode,
+            # it is a valid step (death masking).
+            value = 1 if not self._pre_agents_alive[agent] else 0
+
+            valid_steps[agent] = convert_np_type(
+                self.valid_step_spec()[agent].dtype, value
+            )
+
+        self._pre_agents_alive = {}
+        for i, agent in enumerate(self._agents):
+            # Check if agent is dead.
+            self._pre_agents_alive[agent] = self.is_dead(i)
+    
+
         if self._done:
             self._step_type = dm_env.StepType.LAST
-
-            # Discount on last timestep set to zero
-            self._discounts = {
-                agent: convert_np_type(self.discount_spec()[agent].dtype, 0.0)
-                for agent in self._agents
-            }
         else:
             self._step_type = dm_env.StepType.MID
 
@@ -153,7 +166,7 @@ class SMACWrapper(ParallelEnvWrapper):
         timestep = dm_env.TimeStep(
             observation=next_observations,
             reward=rewards,
-            discount=self._discounts,
+            valid_step=self._valid_step,
             step_type=self._step_type,
         )
 
@@ -288,18 +301,18 @@ class SMACWrapper(ParallelEnvWrapper):
             reward_specs[agent] = specs.Array((), np.float32)
         return reward_specs
 
-    def discount_spec(self) -> Dict[str, specs.BoundedArray]:
-        """Discount spec.
+    def valid_step_spec(self) -> Dict[str, specs.BoundedArray]:
+        """Valid step spec.
 
         Returns:
-            Dict[str, specs.BoundedArray]: spec for discounts.
+            Dict[str, specs.BoundedArray]: spec for valid_steps.
         """
-        discount_specs = {}
+        valid_step_specs = {}
         for agent in self._agents:
-            discount_specs[agent] = specs.BoundedArray(
+            valid_step_specs[agent] = specs.BoundedArray(
                 (), np.float32, minimum=0, maximum=1.0
             )
-        return discount_specs
+        return valid_step_specs
 
     def get_stats(self) -> Optional[Dict]:
         """Return extra stats to be logged.

@@ -39,7 +39,7 @@ from mava.utils.wrapper_utils import parameterized_restart, parameterized_termin
 
 
 def calc_nstep_return(
-    r_t: Dict[str, float], discounts: list, rewards: list
+    r_t: Dict[str, float], valid_steps: list, rewards: list
 ) -> Dict[str, float]:
     """Function that calculates n_step_return as follows:
 
@@ -47,7 +47,7 @@ def calc_nstep_return(
 
     Args:
         r_t (Dict[str,float]): reward achieved from action a_t.
-        discounts (list): list of discounts.
+        valid_steps (list): list of valid_steps.
         rewards (list): list of rewards.
 
     Returns:
@@ -55,7 +55,7 @@ def calc_nstep_return(
     """
     reward = Counter(r_t)
     for index, r_tn in enumerate(rewards):
-        d_t = discounts[index]
+        d_t = valid_steps[index]
         return_t = {key: d_t[key] * r_tn.get(key, 0) for key in r_tn.keys()}
         reward.update(Counter(return_t))
     return dict(reward)
@@ -111,7 +111,7 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
                 ),
                 actions=test_utils._numeric_to_spec(steps[0][0][agent]),
                 rewards=test_utils._numeric_to_spec(steps[0][1].reward[agent]),
-                discounts=test_utils._numeric_to_spec(steps[0][1].discount[agent]),
+                valid_steps=test_utils._numeric_to_spec(steps[0][1].valid_step[agent]),
             )
 
         has_extras = len(steps[0]) >= 3

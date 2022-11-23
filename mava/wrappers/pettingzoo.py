@@ -62,6 +62,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         self._environment = environment
         self._reset_next_step = True
         self._return_state_info = return_state_info
+        self._pre_dones = {}
 
         if env_preprocess_wrappers:
             self._environment = apply_env_wrapper_preprocessors(
@@ -77,11 +78,11 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
 
         self._reset_next_step = False
         self._step_type = dm_env.StepType.FIRST
-        discount_spec = self.discount_spec()
+        valid_step_spec = self.valid_step_spec()
         observe = self._environment.reset()
 
-        self._discounts = {
-            agent: convert_np_type(discount_spec[agent].dtype, 1)
+        self._valid_steps = {
+            agent: convert_np_type(valid_step_spec[agent].dtype, 1)
             for agent in self.possible_agents
         }
 
@@ -104,12 +105,15 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         if not state:
             state = self.get_state()
 
+        # Assuming no agents are done at the start of the episode.
+        self._pre_dones = {agent: False for agent in self.agents}
+
         if state is not None:
-            return parameterized_restart(rewards, self._discounts, observations), {
+            return parameterized_restart(rewards, self._valid_steps, observations), {
                 "s_t": state
             }
         else:
-            return parameterized_restart(rewards, self._discounts, observations)
+            return parameterized_restart(rewards, self._valid_steps, observations)
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps in env.
@@ -137,23 +141,31 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         observations = self._convert_observations(observations, dones)
 
         state = self.get_state()
+        
+        valid_steps = {}
+        for agent in self.possible_agents:
+            # If the agent was not done at the start of the episode,
+            # it is a valid step (death masking).
+            value = 1 if not self._pre_dones[agent] else 0
+
+            valid_steps[agent] = convert_np_type(
+                self.valid_step_spec()[agent].dtype, value
+            )
+    
+        self._pre_dones = dones
 
         if self.env_done():
             self._step_type = dm_env.StepType.LAST
             self._reset_next_step = True
-            # Terminal discount should be 0.0 as per dm_env
-            discount = {
-                agent: convert_np_type(self.discount_spec()[agent].dtype, 0.0)
-                for agent in self.possible_agents
-            }
+            # Final valid_step should be 0.0
+            
         else:
             self._step_type = dm_env.StepType.MID
-            discount = self._discounts
 
         timestep = dm_env.TimeStep(
             observation=observations,
             reward=rewards,
-            discount=discount,
+            valid_step=valid_steps,
             step_type=self._step_type,
         )
 
@@ -302,18 +314,18 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
 
         return reward_specs
 
-    def discount_spec(self) -> Dict[str, specs.BoundedArray]:
+    def valid_step_spec(self) -> Dict[str, specs.BoundedArray]:
         """Discount spec.
 
         Returns:
-            Dict[str, specs.BoundedArray]: spec for discounts.
+            Dict[str, specs.BoundedArray]: spec for valid_steps.
         """
-        discount_specs = {}
+        valid_step_specs = {}
         for agent in self.possible_agents:
-            discount_specs[agent] = specs.BoundedArray(
+            valid_step_specs[agent] = specs.BoundedArray(
                 (), np.float32, minimum=0, maximum=1.0
             )
-        return discount_specs
+        return valid_step_specs
 
     def get_state(self) -> Optional[Dict]:
         """Retrieve state from environment.

@@ -305,8 +305,8 @@ class Helpers:
             for agent in wrapped_env.agents
         }
 
-        discount_spec = wrapped_env.discount_spec()
-        expected_discounts = {
+        valid_step_spec = wrapped_env.valid_step_spec()
+        expected_valid_steps = {
             agent: convert_np_type(rewards_spec[agent].dtype, 1)
             for agent in wrapped_env.agents
         }
@@ -316,9 +316,9 @@ class Helpers:
             expected_rewards,
         ), "Failed to reset reward."
         Helpers.compare_dicts(
-            dm_env_timestep.discount,
-            expected_discounts,
-        ), "Failed to reset discount."
+            dm_env_timestep.valid_step,
+            expected_valid_steps,
+        ), "Failed to reset valid step."
 
     @staticmethod
     def mock_done() -> bool:

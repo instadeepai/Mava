@@ -154,8 +154,8 @@ class TestEnvironmentSpec:
                 == expected_spec._agent_environment_specs[key].rewards
             )
             assert (
-                environment_spec._agent_environment_specs[key].discounts
-                == expected_spec._agent_environment_specs[key].discounts
+                environment_spec._agent_environment_specs[key].valid_steps
+                == expected_spec._agent_environment_specs[key].valid_steps
             )
 
         # Agent list

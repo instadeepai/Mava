@@ -169,10 +169,6 @@ class TestEnvWrapper:
                     dm_env_timestep[agent].observation,
                 )
 
-                assert (
-                    bool(dm_env_timestep[agent].terminal) is False
-                ), "Failed to set terminal."
-
     # Test that observations from petting zoo get converted to
     #   dm observations correctly when empty obs are returned.
     def test_convert_env_to_dm_env_0_empty_obs(
@@ -282,9 +278,6 @@ class TestEnvWrapper:
                     test_agents_observations[agent].get("action_mask"),  # type: ignore # noqa: E501
                     dm_env_timestep[agent].legal_actions,
                 )
-                assert (
-                    bool(dm_env_timestep[agent].terminal) is False
-                ), "Failed to set terminal."
 
     # Test we can take a action and it updates observations
     def test_step_0_valid_when_env_not_done(

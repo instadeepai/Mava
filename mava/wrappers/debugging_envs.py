@@ -45,7 +45,7 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
         self._reset_next_step = False
         self._step_type = dm_env.StepType.FIRST
         discount_spec = self.discount_spec()
-        self._discounts = {
+        self._valid_steps = {
             agent: convert_np_type(discount_spec[agent].dtype, 1)
             for agent in self._environment.possible_agents
         }
@@ -62,7 +62,7 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
         if not self.return_state_info:
             env_extras = {}
 
-        return parameterized_restart(rewards, self._discounts, observations), env_extras
+        return parameterized_restart(rewards, self._valid_steps, observations), env_extras
 
     def step(
         self, actions: Dict[str, np.ndarray]
@@ -99,7 +99,7 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
         timestep = dm_env.TimeStep(
             observation=observations,
             reward=rewards,
-            discount=self._discounts,
+            valid_step=self._valid_steps,
             step_type=self._step_type,
         )
         if self.return_state_info:

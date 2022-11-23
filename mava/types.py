@@ -25,11 +25,9 @@ NestedArray = Any
 
 
 class OLT(NamedTuple):
-    """Container for (observation, legal_actions, terminal) tuples."""
-
+    """Container for (observation, legal_actions) tuples."""
     observation: types.Nest
     legal_actions: types.Nest
-    terminal: types.Nest
 
 
 NestedLogger = Union[loggers.Logger, Dict[str, loggers.Logger]]
@@ -50,7 +48,7 @@ class Transition(NamedTuple):
     observations: NestedArray
     actions: NestedArray
     rewards: NestedArray
-    discounts: NestedArray
+    valid_steps: NestedArray
     next_observations: NestedArray
     extras: NestedArray = ()
     next_extras: NestedArray = ()

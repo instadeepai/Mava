@@ -96,6 +96,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         self._reset_next_step = True
         self._step_type = dm_env.StepType.FIRST
         self.num_actions = 5
+        self._pre_dones = {}
 
         self.action_spaces = {
             agent: Discrete(self.num_actions) for agent in self.possible_agents
@@ -188,7 +189,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
 
         self._reset_next_step = False
         self._agents = self.possible_agents[:]
-        self._discounts = {
+        self._valid_steps = {
             agent: np.dtype("float32").type(1.0) for agent in self.agents
         }
         observe, info = self._environment.reset()
@@ -199,12 +200,16 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
             for agent in self.possible_agents
         }
 
-        discount_spec = self.discount_spec()
-        discounts = {
-            agent: convert_np_type(discount_spec[agent].dtype, 1)
+        valid_step_spec = self.valid_step_spec()
+        valid_steps = {
+            agent: convert_np_type(valid_step_spec[agent].dtype, 1)
             for agent in self.possible_agents
         }
-        return parameterized_restart(rewards, discounts, observations), {}
+
+        # Assuming no agents are done at the start of the episode.
+        self._pre_dones = {agent: False for agent in self.agents}
+
+        return parameterized_restart(rewards, valid_steps, observations), {}
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps the environment."""
@@ -239,31 +244,32 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         if observations:
             observations = self._create_observations(observations, infos, dones)
 
+        valid_steps = {}
+        for agent in self.possible_agents:
+            # If the agent was not done at the start of the episode,
+            # it is a valid step (death masking).
+            value = 1 if not self._pre_dones[agent] else 0
+
+            valid_steps[agent] = convert_np_type(
+                self.valid_step_spec()[agent].dtype, value
+            )
+    
+        self._pre_dones = dones
+
         if self.env_done():
             self._step_type = dm_env.StepType.LAST
             self._reset_next_step = True
-            discounts = {
-                agent: convert_np_type(
-                    self.discount_spec()[agent].dtype, 0
-                )  # Zero discount on final step
-                for agent in self.possible_agents
-            }
+            
             self._update_stats(infos, rewards)
-            # TODO (Claude) zero discount!
+            # TODO (Claude) zero valid_step!
         else:
             self._step_type = dm_env.StepType.MID
-            discounts = {
-                agent: convert_np_type(
-                    self.discount_spec()[agent].dtype, 1
-                )  # discount = 1
-                for agent in self.possible_agents
-            }
 
         return (
             dm_env.TimeStep(
                 observation=observations,
                 reward=rewards,
-                discount=discounts,
+                valid_step=valid_steps,
                 step_type=self._step_type,
             ),
             {},

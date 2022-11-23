@@ -217,17 +217,14 @@ def fake_batch() -> Batch:
             "agent_0": OLT(
                 observation=jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
                 legal_actions=jnp.array([[1], [1], [1], [1]]),
-                terminal=jnp.array([[1], [1]]),
             ),
             "agent_1": OLT(
                 observation=jnp.array([[0.8, 0.3, 0.7], [1.8, 1.3, 1.7]]),
                 legal_actions=jnp.array([[1], [1], [1], [1]]),
-                terminal=jnp.array([[1], [1]]),
             ),
             "agent_2": OLT(
                 observation=jnp.array([[0.9, 0.9, 0.8], [1.9, 1.9, 1.8]]),
                 legal_actions=jnp.array([[1], [1], [1], [1]]),
-                terminal=jnp.array([[1], [1]]),
             ),
         },
         actions={

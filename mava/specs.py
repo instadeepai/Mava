@@ -64,14 +64,14 @@ class MAEnvironmentSpec:
         observation_specs = environment.observation_spec()
         action_specs = environment.action_spec()
         reward_specs = environment.reward_spec()
-        discount_specs = environment.discount_spec()
+        valid_step_specs = environment.valid_step_spec()
         self._extras_specs = environment.extras_spec()
         for agent in environment.possible_agents:
             agent_environment_specs[agent] = EnvironmentSpec(
                 observations=observation_specs[agent],
                 actions=action_specs[agent],
                 rewards=reward_specs[agent],
-                discounts=discount_specs[agent],
+                valid_steps=valid_step_specs[agent],
             )
         return agent_environment_specs
 
