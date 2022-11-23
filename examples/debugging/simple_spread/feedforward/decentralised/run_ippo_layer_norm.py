@@ -12,9 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run feedforward IPPO on SMAC."""
 
-
+"""Example running IPPO on debug MPE environments with layer normalisation."""
 import functools
 from datetime import datetime
 from typing import Any
@@ -23,14 +22,19 @@ import optax
 from absl import app, flags
 
 from mava.systems import ippo
-from mava.utils.environments.smac_utils import make_environment
+from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "map_name",
-    "3m",
-    "Starcraft 2 micromanagement map name (str).",
+    "env_name",
+    "simple_spread",
+    "Debugging environment name (str).",
+)
+flags.DEFINE_string(
+    "action_space",
+    "discrete",
+    "Environment action space type (str).",
 )
 
 flags.DEFINE_string(
@@ -42,16 +46,24 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Example running feedforward IPPO on SMAC environment."""
+    """Run main script
 
-    # Environment
-    environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
+    Args:
+        _ : _
+    """
+    # Environment.
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name=FLAGS.env_name,
+        action_space=FLAGS.action_space,
+    )
 
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return ippo.make_default_networks(  # type: ignore
             policy_layer_sizes=(64, 64),
             critic_layer_sizes=(64, 64, 64),
+            layer_norm=True,
             *args,
             **kwargs,
         )
@@ -95,8 +107,10 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        evaluation_interval={"executor_steps": 10000},
-        evaluation_duration={"evaluator_episodes": 32},
+        clip_value=True,
+        normalize_target_values=True,
+        normalize_observations=True,
+        termination_condition={"executor_steps": 200000},
     )
 
     # Launch the system.

@@ -62,12 +62,6 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
         make build version=flatland
         ```
 
-    * 2D RoboCup environment
-
-        ```
-        make build version=robocup
-        ```
-
     To allow for agent recordings, where agents evaluations are recorded and these recordings are stored in a `/recordings` folder:
 
     ```
@@ -149,16 +143,6 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
 
         ```
         pip install id-mava[flatland]
-        ```
-
-    * 2D RoboCup environment:
-
-        A local install has only been tested using the Ubuntu 18.04 operating system.
-        The installation can be performed by running the RoboCup bash script while inside the Mava
-        python virtual environment.
-
-        ```bash
-        ./bash_scripts/install_robocup.sh
         ```
 
     * StarCraft II:
