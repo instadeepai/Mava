@@ -191,11 +191,6 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
         """
 
         # Initialise the recurrent states of the agents
-
-        # Check if temp_counts is in executor.store
-        if not hasattr(executor.store, "temp_counts"):
-            executor.store.temp_counts = 0
-
         executor.store.policy_states = {}
         for agent in executor.store.agent_net_keys.keys():
             network = executor.store.agent_net_keys[agent]
@@ -223,11 +218,6 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
         ] = executor.store.network_int_keys_extras
 
         executor.store.extras["policy_states"] = executor.store.policy_states
-
-        # for i in range(len(executor.store.timestep.observation.keys())):
-        #     agent = "agent_" + str(i)
-        #     obs = executor.store.timestep.observation[agent]
-        #     executor.store.timestep.observation[agent] = obs._replace(observation=obs.observation*0 + executor.store.temp_counts + i)
 
         # executor.store.timestep set by Executor
         executor.store.adder.add_first(executor.store.timestep, executor.store.extras)
@@ -261,23 +251,6 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
 
         # executor.store.extras set by Executor
         executor.store.next_extras["policy_states"] = executor.store.policy_states
-
-        executor.store.temp_counts += 1
-
-        # import tensorflow as tf
-
-        # for i in range(len(executor.store.timestep.observation.keys())):
-        #     agent = "agent_" + str(i)
-        #     obs = executor.store.next_timestep.observation[agent]
-        #     executor.store.next_timestep.observation[agent] = obs._replace(observation=obs.observation*0 + executor.store.temp_counts + i)
-        #     adder_actions[agent]["actions_info"] = adder_actions[agent]["actions_info"]*0 + executor.store.temp_counts + i
-        #     executor.store.next_extras["policy_info"][agent]["log_prob"] = executor.store.next_extras["policy_info"][agent]["log_prob"]*0 + executor.store.temp_counts + i
-
-        # tf.print("Obs: ", executor.store.next_timestep.observation)
-        # tf.print("Discount: ", executor.store.next_timestep.discount)
-        # tf.print("actions_info", adder_actions)
-        # tf.print("policy_info", executor.store.next_extras["policy_info"])
-        # exit()
 
         executor.store.adder.add(
             adder_actions, executor.store.next_timestep, executor.store.next_extras
