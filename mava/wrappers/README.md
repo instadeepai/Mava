@@ -16,7 +16,7 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 |MAD4PG on PettingZoo's Multi-Walker environment. | VDN on the SMAC 3m map.|
 
 | <img src="../../docs/images/flatland.gif" width="300px" />  |
-|:---:|:---:|
+|:---:|
 |MADQN on Flatland. |
 
 # Getting a new environment to work with Mava
