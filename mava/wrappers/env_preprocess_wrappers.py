@@ -83,7 +83,6 @@ class ConcatAgentIdToObservation:
             new_observations[agent] = OLT(
                 observation=np.concatenate([agent_one_hot, agent_observation]),
                 legal_actions=agent_olt.legal_actions,
-                terminal=agent_olt.terminal,
             )
 
         return (
@@ -113,7 +112,6 @@ class ConcatAgentIdToObservation:
             new_observations[agent] = OLT(
                 observation=np.concatenate([agent_one_hot, agent_observation]),
                 legal_actions=agent_olt.legal_actions,
-                terminal=agent_olt.terminal,
             )
 
         return (
@@ -194,7 +192,6 @@ class ConcatPrevActionToObservation:
             new_observations[agent] = OLT(
                 observation=np.concatenate([agent_one_hot_action, agent_observation]),
                 legal_actions=agent_olt.legal_actions,
-                terminal=agent_olt.terminal,
             )
 
         return (
@@ -226,7 +223,6 @@ class ConcatPrevActionToObservation:
             new_observations[agent] = OLT(
                 observation=np.concatenate([agent_one_hot_action, agent_observation]),
                 legal_actions=agent_olt.legal_actions,
-                terminal=agent_olt.terminal,
             )
 
         return (

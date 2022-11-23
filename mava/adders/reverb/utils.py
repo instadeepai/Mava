@@ -29,15 +29,15 @@ def final_step_like(
 ) -> base.Step:
     """Return a list of steps with the final step zero-filled."""
     # Make zero-filled components so we can fill out the last step.
-    zero_action, zero_reward, zero_valid_step = tree.map_structure(
-        acme_utils.zeros_like, (step.actions, step.rewards, step.valid_steps)
+    zero_action, zero_reward, zero_discount = tree.map_structure(
+        acme_utils.zeros_like, (step.actions, step.rewards, step.discounts)
     )
 
     return base.Step(
         observations=next_observations,
         actions=zero_action,
         rewards=zero_reward,
-        valid_steps=zero_valid_step,
+        discounts=zero_discount,
         start_of_episode=False,
         extras=next_extras
         if next_extras
@@ -85,23 +85,23 @@ def trajectory_signature(
     obs_specs = {}
     act_specs = {}
     reward_specs = {}
-    step_valid_step_specs = {}
+    step_discount_specs = {}
     for agent in agents:
-        rewards_spec, step_valid_steps_spec = tree_utils.broadcast_structures(
+        rewards_spec, step_discounts_spec = tree_utils.broadcast_structures(
             agent_environment_specs[agent].rewards,
-            agent_environment_specs[agent].valid_steps,
+            agent_environment_specs[agent].discounts,
         )
         obs_specs[agent] = agent_environment_specs[agent].observations
         act_specs[agent] = agent_environment_specs[agent].actions
         reward_specs[agent] = rewards_spec
-        step_valid_step_specs[agent] = step_valid_steps_spec
+        step_discount_specs[agent] = step_discounts_spec
 
     # Add a time dimension to the specs
     (
         obs_specs,
         act_specs,
         reward_specs,
-        step_valid_step_specs,
+        step_discount_specs,
         soe_spec,
         extras_specs,
     ) = tree.map_structure_with_path(
@@ -110,7 +110,7 @@ def trajectory_signature(
             obs_specs,
             act_specs,
             reward_specs,
-            step_valid_step_specs,
+            step_discount_specs,
             specs.Array(shape=(), dtype=bool),
             extras_specs,
         ),
@@ -120,7 +120,7 @@ def trajectory_signature(
         observations=obs_specs,
         actions=act_specs,
         rewards=reward_specs,
-        valid_steps=step_valid_step_specs,
+        discounts=step_discount_specs,
         start_of_episode=soe_spec,
         extras=extras_specs,
     )

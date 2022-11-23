@@ -54,7 +54,7 @@ def critic_apply(params: Any, observations: Any) -> Tuple:
 
 def gae_advantages(
     rewards: jnp.ndarray,
-    valid_steps: jnp.ndarray,
+    discounts: jnp.ndarray,
     values: jnp.ndarray,
     stats: jnp.ndarray = jnp.array([0, 1, 1e-4]),
 ) -> Tuple:
@@ -64,7 +64,7 @@ def gae_advantages(
     rewards = jnp.clip(rewards, -max_abs_reward, max_abs_reward)
 
     advantages = rlax.truncated_generalized_advantage_estimation(
-        rewards[:-1], valid_steps[:-1], 0.95, values
+        rewards[:-1], discounts[:-1], 0.95, values
     )
     advantages = jax.lax.stop_gradient(advantages)
 

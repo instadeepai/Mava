@@ -189,7 +189,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
 
         self._reset_next_step = False
         self._agents = self.possible_agents[:]
-        self._valid_steps = {
+        self._discounts = {
             agent: np.dtype("float32").type(1.0) for agent in self.agents
         }
         observe, info = self._environment.reset()
@@ -200,16 +200,16 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
             for agent in self.possible_agents
         }
 
-        valid_step_spec = self.valid_step_spec()
-        valid_steps = {
-            agent: convert_np_type(valid_step_spec[agent].dtype, 1)
+        discount_spec = self.discount_spec()
+        discounts = {
+            agent: convert_np_type(discount_spec[agent].dtype, 1)
             for agent in self.possible_agents
         }
 
         # Assuming no agents are done at the start of the episode.
         self._pre_dones = {agent: False for agent in self.agents}
 
-        return parameterized_restart(rewards, valid_steps, observations), {}
+        return parameterized_restart(rewards, discounts, observations), {}
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps the environment."""
@@ -244,14 +244,14 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         if observations:
             observations = self._create_observations(observations, infos, dones)
 
-        valid_steps = {}
+        discounts = {}
         for agent in self.possible_agents:
             # If the agent was not done at the start of the episode,
             # it is a valid step (death masking).
             value = 1 if not self._pre_dones[agent] else 0
 
-            valid_steps[agent] = convert_np_type(
-                self.valid_step_spec()[agent].dtype, value
+            discounts[agent] = convert_np_type(
+                self.discount_spec()[agent].dtype, value
             )
     
         self._pre_dones = dones
@@ -261,7 +261,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
             self._reset_next_step = True
             
             self._update_stats(infos, rewards)
-            # TODO (Claude) zero valid_step!
+            # TODO (Claude) zero discount!
         else:
             self._step_type = dm_env.StepType.MID
 
@@ -269,7 +269,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
             dm_env.TimeStep(
                 observation=observations,
                 reward=rewards,
-                valid_step=valid_steps,
+                discount=discounts,
                 step_type=self._step_type,
             ),
             {},
@@ -383,7 +383,6 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
                 if self._include_agent_info
                 else _convert_to_spec(self.observation_spaces[agent]),
                 legal_actions=legals,
-                terminal=specs.Array((1,), np.float32),
             )
         return observation_specs
 

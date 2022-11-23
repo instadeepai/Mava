@@ -63,8 +63,8 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
       R_{t:t+n} = N-step discounted return, i.e. accumulated over N rewards:
             R_{t:t+n} := r_t + g * d_t * r_{t+1} + ...
                              + g^{n-1} * d_t * ... * d_{t+n-2} * r_{t+n-1}.
-      D_{t:t+n}: N-step product of agent valid_steps g_i and environment
-        "valid_steps" d_i.
+      D_{t:t+n}: N-step product of agent discounts g_i and environment
+        "discounts" d_i.
             D_{t:t+n} := g^{n-1} * d_{t} * ... * d_{t+n-1},
         For most environments d_i is 1 for all steps except the last,
         i.e. it is the episode termination signal.
@@ -112,7 +112,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
           ValueError: If n_step is less than 1.
         """
         # Makes the additional discount a float32, which means that it will be
-        # upcast if rewards/valid_steps are float64 and left alone otherwise.
+        # upcast if rewards/discounts are float64 and left alone otherwise.
         self.n_step = n_step
         self._net_ids_to_keys = net_ids_to_keys
         self._discount = tree.map_structure(np.float32, discount)
@@ -163,19 +163,19 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         # N-1, ...). See the Note in the docstring.
         # Get numpy view of the steps to be fed into the priority functions.
 
-        rewards, valid_steps = tree.map_structure(
-            get_all_np, (history["rewards"], history["valid_steps"])
+        rewards, discounts = tree.map_structure(
+            get_all_np, (history["rewards"], history["discounts"])
         )
         # Compute discounted return and geometric discount over n steps.
-        n_step_return, total_valid_step = self._compute_cumulative_quantities(
-            rewards, valid_steps
+        n_step_return, total_discount = self._compute_cumulative_quantities(
+            rewards, discounts
         )
 
         # Append the computed n-step return and total discount.
         # Note: if this call to _write() is within a call to _write_last(), then
         # this is the only data being appended and so it is not a partial append.
         self._writer.append(
-            dict(n_step_return=n_step_return, total_valid_step=total_valid_step),
+            dict(n_step_return=n_step_return, total_discount=total_discount),
             partial_step=self._writer.episode_steps <= self._last_idx,
         )
         # This should be done immediately after self._writer.append so the history
@@ -185,15 +185,15 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         # Form the n-step transition by using the following:
         # the first observation and action in the buffer, along with the cumulative
         # reward and discount computed above.
-        n_step_return, total_valid_step = tree.map_structure(
-            lambda x: x[-1], (history["n_step_return"], history["total_valid_step"])
+        n_step_return, total_discount = tree.map_structure(
+            lambda x: x[-1], (history["n_step_return"], history["total_discount"])
         )
         transition = mava_types.Transition(
             observations=s,
             extras=e,
             actions=a,
             rewards=n_step_return,
-            valid_steps=total_valid_step,
+            discounts=total_discount,
             next_observations=s_,
             next_extras=e_,
         )
@@ -243,27 +243,27 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         step_discount_specs = {}
         for agent in agents:
 
-            rewards_spec, step_valid_steps_spec = tree_utils.broadcast_structures(
+            rewards_spec, step_discounts_spec = tree_utils.broadcast_structures(
                 agent_environment_specs[agent].rewards,
-                agent_environment_specs[agent].valid_steps,
+                agent_environment_specs[agent].discounts,
             )
 
             rewards_spec = tree.map_structure(
-                _broadcast_specs, rewards_spec, step_valid_steps_spec
+                _broadcast_specs, rewards_spec, step_discounts_spec
             )
-            step_valid_steps_spec = tree.map_structure(copy.deepcopy, step_valid_steps_spec)
+            step_discounts_spec = tree.map_structure(copy.deepcopy, step_discounts_spec)
 
             obs_specs[agent] = agent_environment_specs[agent].observations
             act_specs[agent] = agent_environment_specs[agent].actions
             reward_specs[agent] = rewards_spec
-            step_discount_specs[agent] = step_valid_steps_spec
+            step_discount_specs[agent] = step_discounts_spec
 
         transition_spec = types.Transition(
             observations=obs_specs,
             next_observations=obs_specs,
             actions=act_specs,
             rewards=reward_specs,
-            valid_steps=step_valid_steps_spec,
+            discounts=step_discounts_spec,
             extras=extras_specs,
             next_extras=extras_specs,
         )

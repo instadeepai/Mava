@@ -111,12 +111,12 @@ class DefaultTrainerStep(TrainerStep):
         # Do a batch of SGD.
         sample = next(trainer.store.dataset_iterator)
 
-        import tensorflow as tf
-        tf.print("Actions: ", sample.data.actions)
-        tf.print("policy_info: ", sample.data.extras["policy_info"])
-        tf.print("valid_steps: ", sample.data.valid_steps)
-        tf.print("observation: ", sample.data.observation)
-        exit()
+        # import tensorflow as tf
+        # tf.print("Actions: ", sample.data.actions)
+        # tf.print("policy_info: ", sample.data.extras["policy_info"])
+        # tf.print("discounts: ", sample.data.discounts)
+        # tf.print("observation: ", sample.data.observations)
+        # exit()
 
         results = trainer.store.step_fn(sample)
 
@@ -240,11 +240,11 @@ class MAPGWithTrustRegionStep(Step):
             # Extract the data.
             data = sample.data
 
-            observations, actions, rewards, valid_steps, extras = (
+            observations, actions, rewards, discounts, extras = (
                 data.observations,
                 data.actions,
                 data.rewards,
-                data.valid_steps,
+                data.discounts,
                 data.extras,
             )
 
@@ -258,9 +258,11 @@ class MAPGWithTrustRegionStep(Step):
                     ) = trainer.store.norm_obs_running_stats_fn(
                         observation_stats[key], observations[key]
                     )
-
+            # Mask that is zero if an episode is done or an agent is done.
+            # The final timestep is not masked.
+            loss_masks = discounts
             discounts = tree.map_structure(
-                lambda x: x * self.config.discount, valid_steps
+                lambda x: x * self.config.discount, discounts
             )
 
             behavior_log_probs = extras["policy_info"]
@@ -323,12 +325,13 @@ class MAPGWithTrustRegionStep(Step):
             # The shape is [num_sequences, num_steps, ..]
             (
                 observations,
+                loss_masks,
                 actions,
                 behavior_log_probs,
                 behavior_values,
             ) = jax.tree_util.tree_map(
                 lambda x: x[:, :-1],
-                (observations, actions, behavior_log_probs, behavior_values),
+                (observations, loss_masks, actions, behavior_log_probs, behavior_values),
             )
 
             if "policy_states" in extras:
@@ -344,6 +347,7 @@ class MAPGWithTrustRegionStep(Step):
                 policy_states=policy_states,
                 actions=actions,
                 advantages=advantages,
+                loss_masks=loss_masks,
                 behavior_log_probs=behavior_log_probs,
                 target_values=target_values,
                 behavior_values=behavior_values,

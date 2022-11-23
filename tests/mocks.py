@@ -104,7 +104,7 @@ class MockedExecutor(ActorMock, core.Executor):
 
             if agent in next_timestep.discount.keys():
                 _validate_spec(
-                    observation_spec.valid_steps, next_timestep.discount[agent]
+                    observation_spec.discounts, next_timestep.discount[agent]
                 )
 
             if next_timestep.observation and agent in next_timestep.observation.keys():
@@ -124,7 +124,7 @@ class MockedExecutor(ActorMock, core.Executor):
         observation_spec = self._spec[agent]
         _validate_spec(observation_spec.actions, action)
         _validate_spec(observation_spec.rewards, next_timestep.reward)
-        _validate_spec(observation_spec.valid_steps, next_timestep.discount)
+        _validate_spec(observation_spec.discounts, next_timestep.discount)
 
 
 class MockedSystem(MockedExecutor):
@@ -182,7 +182,7 @@ def get_ma_environment(
                 spec = self._spec
                 actions = spec.actions
                 rewards = spec.rewards
-                valid_steps = spec.valid_steps
+                discounts = spec.discounts
 
                 # Observation spec needs to be an OLT
                 ma_observation_spec = self.observation_spec()
@@ -190,7 +190,7 @@ def get_ma_environment(
                     observations=ma_observation_spec,
                     actions=actions,
                     rewards=rewards,
-                    valid_steps=valid_steps,
+                    discounts=discounts,
                 )
 
             self._specs = multi_agent_specs
@@ -282,10 +282,10 @@ class ParallelEnvironment(MockedEnvironment, ParallelEnvWrapper):
             observations[agent] = observation
 
         rewards = {agent: convert_np_type("float32", 0) for agent in self.agents}
-        valid_steps = {agent: convert_np_type("float32", 1) for agent in self.agents}
+        discounts = {agent: convert_np_type("float32", 1) for agent in self.agents}
 
         self._step = 1
-        return parameterized_restart(rewards, valid_steps, observations)  # type: ignore
+        return parameterized_restart(rewards, discounts, observations)  # type: ignore
 
     def step(
         self, actions: Dict[str, Union[float, int, NestedArray]]
@@ -436,7 +436,7 @@ def make_fake_env_specs() -> MAEnvironmentSpec:
             observations=acme_specs.Array(shape=(10, 5), dtype=np.float32),
             actions=acme_specs.DiscreteArray(num_values=3),
             rewards=acme_specs.Array(shape=(), dtype=np.float32),
-            valid_steps=acme_specs.BoundedArray(
+            discounts=acme_specs.BoundedArray(
                 shape=(), dtype=np.float32, minimum=0.0, maximum=1.0
             ),
         )

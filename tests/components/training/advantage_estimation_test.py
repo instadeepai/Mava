@@ -146,12 +146,12 @@ def test_gae_creation(mock_trainer: Trainer, gae_without_reward_clipping: GAE) -
 
 
 @pytest.mark.parametrize(
-    "rewards_low,rewards_high,valid_steps,values", different_reward_values()
+    "rewards_low,rewards_high,discounts,values", different_reward_values()
 )
 def test_gae_function_reward_clipping_different_rewards(
     rewards_low: jnp.ndarray,
     rewards_high: jnp.ndarray,
-    valid_steps: jnp.ndarray,
+    discounts: jnp.ndarray,
     values: jnp.ndarray,
     gae_with_reward_clipping: GAE,
     mock_trainer: Trainer,
@@ -166,11 +166,11 @@ def test_gae_function_reward_clipping_different_rewards(
     gae_fn = mock_trainer.store.gae_fn
 
     advantages_high, target_values_high = gae_fn(
-        rewards=rewards_high, valid_steps=valid_steps, values=values
+        rewards=rewards_high, discounts=discounts, values=values
     )
 
     advantages_low, target_values_low = gae_fn(
-        rewards=rewards_low, valid_steps=valid_steps, values=values
+        rewards=rewards_low, discounts=discounts, values=values
     )
 
     assert jnp.array_equal(advantages_high, advantages_low)
@@ -178,12 +178,12 @@ def test_gae_function_reward_clipping_different_rewards(
 
 
 @pytest.mark.parametrize(
-    "rewards_low,rewards_high,valid_steps,values", different_reward_values()
+    "rewards_low,rewards_high,discounts,values", different_reward_values()
 )
 def test_gae_function_reward_not_clipping_different_rewards(
     rewards_low: jnp.ndarray,
     rewards_high: jnp.ndarray,
-    valid_steps: jnp.ndarray,
+    discounts: jnp.ndarray,
     values: jnp.ndarray,
     gae_without_reward_clipping: GAE,
     mock_trainer: Trainer,
@@ -198,11 +198,11 @@ def test_gae_function_reward_not_clipping_different_rewards(
     gae_fn = mock_trainer.store.gae_fn
 
     advantages_high, target_values_high = gae_fn(
-        rewards=rewards_high, valid_steps=valid_steps, values=values
+        rewards=rewards_high, discounts=discounts, values=values
     )
 
     advantages_low, target_values_low = gae_fn(
-        rewards=rewards_low, valid_steps=valid_steps, values=values
+        rewards=rewards_low, discounts=discounts, values=values
     )
 
     assert not jnp.array_equal(advantages_high, advantages_low)
@@ -210,12 +210,12 @@ def test_gae_function_reward_not_clipping_different_rewards(
 
 
 @pytest.mark.parametrize(
-    "rewards_1,rewards_2,valid_steps,values", similar_reward_values()
+    "rewards_1,rewards_2,discounts,values", similar_reward_values()
 )
 def test_gae_function_reward_clipping_similar_rewards(
     rewards_1: jnp.ndarray,
     rewards_2: jnp.ndarray,
-    valid_steps: jnp.ndarray,
+    discounts: jnp.ndarray,
     values: jnp.ndarray,
     gae_with_reward_clipping: GAE,
     mock_trainer: Trainer,
@@ -231,11 +231,11 @@ def test_gae_function_reward_clipping_similar_rewards(
     gae_fn = mock_trainer.store.gae_fn
 
     advantages_1, target_values_1 = gae_fn(
-        rewards=rewards_1, valid_steps=valid_steps, values=values
+        rewards=rewards_1, discounts=discounts, values=values
     )
 
     advantages_2, target_values_2 = gae_fn(
-        rewards=rewards_2, valid_steps=valid_steps, values=values
+        rewards=rewards_2, discounts=discounts, values=values
     )
 
     assert jnp.array_equal(advantages_1, advantages_2)
@@ -243,12 +243,12 @@ def test_gae_function_reward_clipping_similar_rewards(
 
 
 @pytest.mark.parametrize(
-    "rewards_1,rewards_2,valid_steps,values", different_reward_values()
+    "rewards_1,rewards_2,discounts,values", different_reward_values()
 )
 def test_gae_function_stop_gradient(
     rewards_1: jnp.ndarray,
     rewards_2: jnp.ndarray,
-    valid_steps: jnp.ndarray,
+    discounts: jnp.ndarray,
     values: jnp.ndarray,
     gae_without_reward_clipping: GAE,
     mock_trainer: Trainer,
@@ -265,19 +265,19 @@ def test_gae_function_stop_gradient(
 
     def scalar_advantage_gae_fn(
         inner_rewards: jnp.ndarray,
-        inner_valid_steps: jnp.ndarray,
+        inner_discounts: jnp.ndarray,
         inner_values: jnp.ndarray,
     ) -> jnp.ndarray:
         """Scalar advantage function"""
         return jnp.sum(
             gae_fn(
-                rewards=inner_rewards, valid_steps=inner_valid_steps, values=inner_values
+                rewards=inner_rewards, discounts=inner_discounts, values=inner_values
             )[0]
         )
 
     grad_gae_fn = jax.grad(scalar_advantage_gae_fn)
-    gradients_1 = grad_gae_fn(rewards_1, valid_steps, values)
-    gradients_2 = grad_gae_fn(rewards_2, valid_steps, values)
+    gradients_1 = grad_gae_fn(rewards_1, discounts, values)
+    gradients_2 = grad_gae_fn(rewards_2, discounts, values)
 
     # Gradient of zero means gradient was stopped
     assert jnp.array_equal(gradients_1, jnp.array([0, 0, 0, 0]))

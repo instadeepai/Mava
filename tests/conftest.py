@@ -305,8 +305,8 @@ class Helpers:
             for agent in wrapped_env.agents
         }
 
-        valid_step_spec = wrapped_env.valid_step_spec()
-        expected_valid_steps = {
+        discount_spec = wrapped_env.discount_spec()
+        expected_discounts = {
             agent: convert_np_type(rewards_spec[agent].dtype, 1)
             for agent in wrapped_env.agents
         }
@@ -316,8 +316,8 @@ class Helpers:
             expected_rewards,
         ), "Failed to reset reward."
         Helpers.compare_dicts(
-            dm_env_timestep.valid_step,
-            expected_valid_steps,
+            dm_env_timestep.discount,
+            expected_discounts,
         ), "Failed to reset valid step."
 
     @staticmethod

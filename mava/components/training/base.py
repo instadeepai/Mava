@@ -31,6 +31,7 @@ class Batch(NamedTuple):
     policy_states: Any
     actions: Any
     advantages: Any
+    loss_masks: Any
 
     # Target value estimate used to bootstrap the value function.
     target_values: Any

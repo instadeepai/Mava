@@ -33,7 +33,7 @@ class MockStep:
         observations: Any,
         actions: Any,
         rewards: Any,
-        valid_steps: Any,
+        discounts: Any,
         start_of_episode: Any,
         extras: Any,
     ) -> None:
@@ -41,7 +41,7 @@ class MockStep:
         self.observations = observations
         self.actions = actions
         self.rewards = rewards
-        self.valid_steps = discounts
+        self.discounts = discounts
         self.start_of_episode = start_of_episode
         self.extras = extras
 

@@ -226,10 +226,10 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
 
         executor.store.extras["policy_states"] = executor.store.policy_states
 
-        for i in range(len(executor.store.timestep.observation.keys())):
-            agent = "agent_" + str(i)
-            obs = executor.store.timestep.observation[agent]
-            executor.store.timestep.observation[agent] = obs._replace(observation=obs.observation*0 + executor.store.temp_counts + i)
+        # for i in range(len(executor.store.timestep.observation.keys())):
+        #     agent = "agent_" + str(i)
+        #     obs = executor.store.timestep.observation[agent]
+        #     executor.store.timestep.observation[agent] = obs._replace(observation=obs.observation*0 + executor.store.temp_counts + i)
            
 
         # executor.store.timestep set by Executor
@@ -267,20 +267,20 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
 
         executor.store.temp_counts += 1
 
-        import tensorflow as tf
+        # import tensorflow as tf
 
-        for i in range(len(executor.store.timestep.observation.keys())):
-            agent = "agent_" + str(i)
-            obs = executor.store.next_timestep.observation[agent]
-            executor.store.next_timestep.observation[agent] = obs._replace(observation=obs.observation*0 + executor.store.temp_counts + i)
-            adder_actions[agent]["actions_info"] = adder_actions[agent]["actions_info"]*0 + executor.store.temp_counts + i
-            executor.store.next_extras["policy_info"][agent]["log_prob"] = executor.store.next_extras["policy_info"][agent]["log_prob"]*0 + executor.store.temp_counts + i
+        # for i in range(len(executor.store.timestep.observation.keys())):
+        #     agent = "agent_" + str(i)
+        #     obs = executor.store.next_timestep.observation[agent]
+        #     executor.store.next_timestep.observation[agent] = obs._replace(observation=obs.observation*0 + executor.store.temp_counts + i)
+        #     adder_actions[agent]["actions_info"] = adder_actions[agent]["actions_info"]*0 + executor.store.temp_counts + i
+        #     executor.store.next_extras["policy_info"][agent]["log_prob"] = executor.store.next_extras["policy_info"][agent]["log_prob"]*0 + executor.store.temp_counts + i
 
         # tf.print("Obs: ", executor.store.next_timestep.observation)
-        tf.print("Discount: ", executor.store.next_timestep.discount)
-        tf.print("actions_info", adder_actions)
-        tf.print("policy_info", executor.store.next_extras["policy_info"])
-        exit()
+        # tf.print("Discount: ", executor.store.next_timestep.discount)
+        # tf.print("actions_info", adder_actions)
+        # tf.print("policy_info", executor.store.next_extras["policy_info"])
+        # exit()
 
 
         executor.store.adder.add(

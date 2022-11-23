@@ -149,6 +149,7 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
                 policy_params,
                 minibatch.policy_states,
                 minibatch.observations,
+                minibatch.loss_masks,
                 minibatch.actions,
                 minibatch.behavior_log_probs,
                 advantages,
@@ -158,6 +159,7 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
             critic_gradients, critic_agent_metrics = trainer.store.critic_grad_fn(
                 critic_params,
                 minibatch.observations,
+                minibatch.loss_masks,
                 minibatch.target_values,
                 minibatch.behavior_values,
             )

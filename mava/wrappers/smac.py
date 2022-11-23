@@ -85,7 +85,7 @@ class SMACWrapper(ParallelEnvWrapper):
 
         # Set env discount to 1 for all agents
         discount_spec = self.discount_spec()
-        self._valid_steps = {
+        self._discounts = {
             agent: convert_np_type(discount_spec[agent].dtype, 1)
             for agent in self._agents
         }
@@ -106,7 +106,7 @@ class SMACWrapper(ParallelEnvWrapper):
         else:
             extras = {}
 
-        return parameterized_restart(rewards, self._valid_steps, observations), extras
+        return parameterized_restart(rewards, self._discounts, observations), extras
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps in env.
@@ -141,14 +141,14 @@ class SMACWrapper(ParallelEnvWrapper):
         else:
             extras = {}
 
-        valid_steps = {}
+        discounts = {}
         for agent in self.possible_agents:
             # If the agent was not done at the start of the episode,
             # it is a valid step (death masking).
             value = 1 if not self._pre_agents_alive[agent] else 0
 
-            valid_steps[agent] = convert_np_type(
-                self.valid_step_spec()[agent].dtype, value
+            discounts[agent] = convert_np_type(
+                self.discount_spec()[agent].dtype, value
             )
 
         self._pre_agents_alive = {}
@@ -166,7 +166,7 @@ class SMACWrapper(ParallelEnvWrapper):
         timestep = dm_env.TimeStep(
             observation=next_observations,
             reward=rewards,
-            valid_step=self._valid_step,
+            discount=self._discount,
             step_type=self._step_type,
         )
 
@@ -235,7 +235,6 @@ class SMACWrapper(ParallelEnvWrapper):
             olt_observations[agent] = types.OLT(
                 observation=observation,
                 legal_actions=legal_actions[i],
-                terminal=np.asarray([done], dtype=np.float32),
             )
 
         return olt_observations
@@ -270,7 +269,6 @@ class SMACWrapper(ParallelEnvWrapper):
             observation_specs[agent] = types.OLT(
                 observation=observations[i],
                 legal_actions=legal_actions[i],
-                terminal=np.asarray([True], dtype=np.float32),
             )
 
         return observation_specs
@@ -301,18 +299,18 @@ class SMACWrapper(ParallelEnvWrapper):
             reward_specs[agent] = specs.Array((), np.float32)
         return reward_specs
 
-    def valid_step_spec(self) -> Dict[str, specs.BoundedArray]:
+    def discount_spec(self) -> Dict[str, specs.BoundedArray]:
         """Valid step spec.
 
         Returns:
-            Dict[str, specs.BoundedArray]: spec for valid_steps.
+            Dict[str, specs.BoundedArray]: spec for discounts.
         """
-        valid_step_specs = {}
+        discount_specs = {}
         for agent in self._agents:
-            valid_step_specs[agent] = specs.BoundedArray(
+            discount_specs[agent] = specs.BoundedArray(
                 (), np.float32, minimum=0, maximum=1.0
             )
-        return valid_step_specs
+        return discount_specs
 
     def get_stats(self) -> Optional[Dict]:
         """Return extra stats to be logged.

@@ -48,7 +48,7 @@ class Transition(NamedTuple):
     observations: NestedArray
     actions: NestedArray
     rewards: NestedArray
-    valid_steps: NestedArray
+    discounts: NestedArray
     next_observations: NestedArray
     extras: NestedArray = ()
     next_extras: NestedArray = ()

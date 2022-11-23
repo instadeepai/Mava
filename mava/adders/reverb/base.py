@@ -51,7 +51,7 @@ class Step(NamedTuple):
     observations: Dict[str, mava_types.NestedArray]
     actions: Dict[str, mava_types.NestedArray]
     rewards: Dict[str, mava_types.NestedArray]
-    valid_steps: Dict[str, mava_types.NestedArray]
+    discounts: Dict[str, mava_types.NestedArray]
     start_of_episode: Union[bool, acme_specs.Array, tf.Tensor, Tuple[()]]
     extras: Dict[str, mava_types.NestedArray]
 
@@ -65,7 +65,7 @@ class PriorityFnInput(NamedTuple):
     observations: Dict[str, types.NestedArray]
     actions: Dict[str, types.NestedArray]
     rewards: Dict[str, types.NestedArray]
-    valid_steps: Dict[str, types.NestedArray]
+    discounts: Dict[str, types.NestedArray]
     start_of_episode: types.NestedArray
     extras: Dict[str, types.NestedArray]
 
@@ -296,7 +296,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
                             new_trajectory.rewards[want_agent] = trajectory.rewards[
                                 cur_agent
                             ]
-                            new_trajectory.valid_steps[want_agent] = trajectory.valid_steps[
+                            new_trajectory.discounts[want_agent] = trajectory.discounts[
                                 cur_agent
                             ]
 
@@ -404,7 +404,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             # Observations was passed at the previous add call.
             actions=actions,
             rewards=next_timestep.reward,
-            valid_steps=next_timestep.valid_step,
+            discounts=next_timestep.discount,
             # Start of episode indicator was passed at the previous add call.
         )
 
