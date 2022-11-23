@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import pytest
 
 from mava.systems.system import System
@@ -33,14 +32,42 @@ def test_ippo(
     test_ippo_system_mt: System,
 ) -> None:
     """Full integration test of ippo system."""
+    # Disable the nodes
     (trainer_node,) = test_ippo_system_mt._builder.store.program._program._groups[
         "trainer"
     ]
+    (executor_node,) = test_ippo_system_mt._builder.store.program._program._groups[
+        "executor"
+    ]
+    (evaluator_node,) = test_ippo_system_mt._builder.store.program._program._groups[
+        "evaluator"
+    ]
+    (
+        parameter_server_node,
+    ) = test_ippo_system_mt._builder.store.program._program._groups["parameter_server"]
+    (data_server_node,) = test_ippo_system_mt._builder.store.program._program._groups[
+        "data_server"
+    ]
 
     trainer_node.disable_run()
+    executor_node.disable_run()
+    evaluator_node.disable_run()
+    parameter_server_node.disable_run()
+    # Data server runs in background
 
+    # launch the system
     test_ippo_system_mt.launch()
-    trainer_run = trainer_node.create_handle().dereference()
 
+    # Extract the instances of each node
+    trainer_run = trainer_node.create_handle().dereference()
+    executor_run = executor_node.create_handle().dereference()
+    evaluator_run = evaluator_node.create_handle().dereference()
+    parameter_server_run = parameter_server_node.create_handle().dereference()
+
+    # Generate data with executor, run train step,
+    # update parameters and finally, run an evaluation episode
     for _ in range(5):
+        executor_run.run_environment_episode()
         trainer_run.step()
+        parameter_server_run.step()
+        evaluator_run.run_environment_episode()
