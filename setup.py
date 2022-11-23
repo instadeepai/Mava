@@ -26,7 +26,7 @@ _metadata = import_util.module_from_spec(spec)  # type: ignore
 spec.loader.exec_module(_metadata)  # type: ignore
 
 reverb_requirements = [
-    "dm-reverb==0.7.2",
+    "dm-reverb~=0.7.2",
 ]
 
 tf_requirements = [
@@ -100,9 +100,7 @@ setup(
     keywords="multi-agent reinforcement-learning python machine learning",
     packages=find_packages(),
     install_requires=[
-        # TODO Pin acme to commit.
-        "dm-acme @ git+https://github.com/deepmind/acme.git#egg=dm-acme",
-        'dm-launchpad==0.5.2',
+        "dm-acme~=0.4.0",
         "absl-py",
         "dm_env",
         "dm-tree",
