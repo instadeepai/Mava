@@ -249,6 +249,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         def run_evaluation(results: Any) -> None:
             """Calculate the absolute metric"""
             logging.exception("Calculating the absolute metric")
+            eval_returns = []  # create a dict with checkpointing_metric
             for metric in self._executor.store.checkpointing_metric.keys():
                 used_results = copy.deepcopy(results)
                 # update the evaluator network
@@ -281,23 +282,45 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                             f"critic_opt_state-{agent_net_key}"
                         ]
                     )
+
                 for _ in range(self._executor.store.absolute_metric_duration):
                     # Add consecutive evaluation run data
                     result = self.run_episode()
+                    if "return" in metric:
+                        eval_returns.append(result["raw_episode_return"])
                     # Sum results for computing mean after all evaluation runs.
-                used_results = jax.tree_map(lambda x, y: x + y, used_results, result)
+                    used_results = jax.tree_map(
+                        lambda x, y: x + y, used_results, result
+                    )
                 # compute the mean over all evaluation runs
                 used_results = jax.tree_map(
                     lambda x: x / self._executor.store.absolute_metric_duration,
                     used_results,
                 )
+                eval_result = {
+                    "eval_return": jnp.array(eval_returns),
+                }
                 # Check for extra logs
                 if hasattr(self._environment, "get_interval_stats"):
-                    used_results.update(self._environment.get_interval_stats())
+                    interval_stats = self._environment.get_interval_stats()
+                    used_results.update(interval_stats)
+                    if metric in interval_stats.keys():
+                        interval_stats_json = {
+                            "eval_extra" + str(k): v for k, v in interval_stats.items()
+                        }
+
+                        # Add interval stats to dictionary for json logging
+                        eval_result.update(
+                            jax.tree_util.tree_map(
+                                lambda leaf: jnp.array([leaf]), interval_stats_json
+                            )
+                        )
                 logging.exception(
-                    f"Absolute metric results for {metric} is equal to {used_results[metric]}"
+                    f"Absolute metric for {metric} is equal {used_results[metric]}"
                 )
                 logging.exception(f"Additional results {used_results}")
+            used_results.update(eval_result)
+            self._logger.write(used_results)
             logging.exception("Terminate the system")
             self._executor.store.executor_parameter_client.set_and_wait(
                 {"terminate": True}
@@ -363,7 +386,10 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         results.update(eval_result)
                         self._logger.write(results)
 
-                        if self._executor.store.checkpoint_best_perf:
+                        if (
+                            self._executor.store.checkpoint_best_perf
+                            or self._executor.store.absolute_metric
+                        ):
                             # Best_performance_update
                             for (
                                 metric,
@@ -377,7 +403,8 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
                                 if (
                                     best_performance is None
-                                    or best_performance < results[metric]  # type: ignore
+                                    or best_performance
+                                    < results[metric]  # type: ignore
                                 ):
                                     self._executor.store.checkpointing_metric[
                                         metric

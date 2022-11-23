@@ -85,7 +85,7 @@ class Checkpointer(Component):
         if (
             time.time() - server.store.last_checkpoint_time
             > self.config.checkpoint_minute_interval * 60 + 1
-        ):
+        ) or server.store.force_checkpointing:
             server.store.system_checkpointer.save()
             server.store.last_checkpoint_time = time.time()
 

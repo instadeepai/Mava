@@ -16,6 +16,7 @@
 """Parameter server Component for Mava systems."""
 import abc
 import copy
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
 
@@ -184,6 +185,10 @@ class DefaultParameterServer(ParameterServer):
                         f"critic_opt_state-{agent_net_key}"
                     ] = copy.deepcopy(server.store.critic_opt_states[agent_net_key])
 
+        # Force_heckpointing flag that will help in checkpoint the latest params
+        # Without waiting for the checkpoint_minute_interval
+        server.store.force_checkpointing = False
+
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
         """Fetch the parameters from the server specified in the store.
@@ -207,6 +212,8 @@ class DefaultParameterServer(ParameterServer):
 
         # Interrupt the system flag
         if server.store.parameters["terminate"]:
+            time.sleep(15)
+            server.store.force_checkpointing = True
             termination_fn(server)
 
         # Interrupt the system in case all the executors failed

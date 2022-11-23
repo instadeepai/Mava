@@ -61,6 +61,15 @@ def main(_: Any) -> None:
 
     # Log every [log_every] seconds.
     log_every = 10
+
+    # Pass custom logger config for evaluator to use.
+    # A custom json path can also be passed in.
+    logger_config = {
+        "evaluator": {
+            "to_json": True,
+        },
+    }
+
     logger_factory = functools.partial(
         logger_utils.make_logger,
         directory=FLAGS.base_dir,
@@ -86,7 +95,6 @@ def main(_: Any) -> None:
     system.build(
         environment_factory=environment_factory,
         network_factory=network_factory,
-        logger_factory=logger_factory,
         experiment_path=experiment_path,
         policy_optimiser=policy_optimiser,
         critic_optimiser=critic_optimiser,
@@ -97,6 +105,8 @@ def main(_: Any) -> None:
         multi_process=True,
         evaluation_interval={"executor_steps": 5000},
         evaluation_duration={"evaluator_episodes": 32},
+        logger_factory=logger_factory,
+        logger_config=logger_config,
         # Flag to activate the calculation of the absolute metric
         absolute_metric=True,
         # How many episodes the evaluator will run for
