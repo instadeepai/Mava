@@ -202,7 +202,7 @@ def make_discrete_networks(
     policy_recurrent_layer_sizes: Sequence[int],
     recurrent_architecture_fn: Any,
     policy_layers_after_recurrent: Sequence[int],
-    observation_network: Callable = None,
+    observation_network: Optional[Callable] = None,
     orthogonal_initialisation: bool = False,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     policy_network_head_weight_gain: float = 0.01,
@@ -384,7 +384,7 @@ def make_networks(
     policy_recurrent_layer_sizes: Sequence[int],
     recurrent_architecture_fn: Any,
     policy_layers_after_recurrent: Sequence[int],
-    observation_network: Callable = None,
+    observation_network: Optional[Callable] = None,
     orthogonal_initialisation: bool = False,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     policy_network_head_weight_gain: float = 0.01,
@@ -464,7 +464,7 @@ def make_default_networks(
     orthogonal_initialisation: bool = False,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     policy_network_head_weight_gain: float = 0.01,
-    observation_network: Callable = None,
+    observation_network: Optional[Callable] = None,
     layer_norm: bool = False,
 ) -> Dict[str, Any]:
     """Create default PPO networks
