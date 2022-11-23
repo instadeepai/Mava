@@ -17,14 +17,19 @@
 
 from typing import Any, Callable, Dict, List, Sequence
 
+import haiku as hk
 import jax
+import jax.numpy as jnp
 import pytest
+from acme.jax import networks as networks_lib
+from acme.jax import utils
 
 from mava.components.building import DefaultNetworks
 from mava.components.building.networks import Networks, NetworksConfig
 from mava.core_jax import SystemBuilder
 from mava.specs import MAEnvironmentSpec
 from mava.systems import Builder
+from mava.utils.networks_utils import MLP_NORM
 from tests.mocks import make_fake_env_specs
 
 
@@ -317,3 +322,48 @@ def test_no_network_factory_before_build(test_builder: SystemBuilder) -> None:
         None.
     """
     assert not hasattr(test_builder.store, "network_factory")
+
+
+@hk.without_apply_rng
+@hk.transform
+def mlp(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+
+    output_sizes = [64, 64, 64]
+    mlp_network = hk.nets.MLP(output_sizes)
+
+    return mlp_network(inputs)
+
+
+@hk.without_apply_rng
+@hk.transform
+def mlp_norm(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+
+    output_sizes = [64, 64, 64]
+    mlp_network_norm = MLP_NORM(output_sizes, layer_norm=True)
+
+    return mlp_network_norm(inputs)
+
+
+@hk.without_apply_rng
+@hk.transform
+def mlp_norm_false(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+
+    output_sizes = [64, 64, 64]
+    mlp_network_norm = MLP_NORM(output_sizes, layer_norm=False)
+
+    return mlp_network_norm(inputs)
+
+
+def test_MLP_with_feature_norm() -> None:
+    """Test if layer normalisation is added correctly to the hidden layers"""
+
+    base_key = jax.random.PRNGKey(32)
+    dummy_obs = jnp.ones(16)
+    dummy_obs = utils.add_batch_dim(dummy_obs)
+    _, network_key = jax.random.split(base_key)
+    params = mlp.init(network_key, dummy_obs)  # type: ignore
+    params_norm = mlp_norm.init(network_key, dummy_obs)
+    params_norm_false = mlp_norm_false.init(network_key, dummy_obs)
+
+    assert len(params.keys()) == len(params_norm_false.keys())
+    assert len(params.keys()) * 2 == len(params_norm.keys())
