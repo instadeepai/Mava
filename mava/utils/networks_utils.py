@@ -65,17 +65,17 @@ class MLP_NORM(hk.Module):
         layers = []
         norms = []
         output_sizes = tuple(output_sizes)
-        for index, output_size in enumerate(output_sizes):
-            layers.append(
-                hk.Linear(
-                    output_size=output_size,
-                    w_init=w_init,
-                    b_init=b_init,
-                    with_bias=with_bias,
-                    name="linear_%d" % index,
+        if self.layer_norm:
+            for index, output_size in enumerate(output_sizes):
+                layers.append(
+                    hk.Linear(
+                        output_size=output_size,
+                        w_init=w_init,
+                        b_init=b_init,
+                        with_bias=with_bias,
+                        name="linear_%d" % index,
+                    )
                 )
-            )
-            if self.layer_norm:
                 norms.append(
                     hk.LayerNorm(
                         axis=-1,
@@ -86,9 +86,20 @@ class MLP_NORM(hk.Module):
                         name="norm_%d" % index,
                     )
                 )
+            self.norms = tuple(norms)
+        else:
+            for index, output_size in enumerate(output_sizes):
+                layers.append(
+                    hk.Linear(
+                        output_size=output_size,
+                        w_init=w_init,
+                        b_init=b_init,
+                        with_bias=with_bias,
+                        name="linear_%d" % index,
+                    )
+                )
 
         self.layers = tuple(layers)
-        self.norms = tuple(norms)
         self.output_size = output_sizes[-1] if output_sizes else None
 
     def __call__(
