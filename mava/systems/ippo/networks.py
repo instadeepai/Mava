@@ -258,15 +258,17 @@ def make_discrete_networks(
         # Add the observation network and an MLP network.
         policy_layers = []
         if observation_network:
-            policy_layers.append(observation_network)
-        policy_layers.append(
-            MLP_NORM(
-                policy_layer_sizes,
-                activation=activation_function,
-                w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
-                activate_final=True,
-                layer_norm=layer_norm,
-            )
+            policy_layers.extend([observation_network])
+        policy_layers.extend(
+            [
+                MLP_NORM(
+                    policy_layer_sizes,
+                    activation=activation_function,
+                    w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
+                    activate_final=True,
+                    layer_norm=layer_norm,
+                )
+            ]
         )
 
         # Add optional recurrent layers
@@ -331,7 +333,7 @@ def make_discrete_networks(
         """
         critic_layers = []
         if observation_network:
-            critic_layers.append(observation_network)
+            critic_layers.extend([observation_network])
         critic_layers.extend(
             [
                 MLP_NORM(
