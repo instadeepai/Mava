@@ -17,7 +17,7 @@
 
 import logging
 import time
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import acme
 import dm_env
@@ -53,8 +53,8 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         self,
         environment: dm_env.Environment,
         executor: mava.core.Executor,
-        counter: counting.Counter = None,
-        logger: loggers.Logger = None,
+        counter: Optional[counting.Counter] = None,
+        logger: Optional[loggers.Logger] = None,
         should_update: bool = True,
         label: str = "parallel_environment_loop",
     ):
@@ -100,11 +100,9 @@ class ParallelEnvironmentLoop(acme.core.Worker):
     ) -> None:
         pass
 
-    def record_counts(self, episode_steps: int) -> counting.Counter:
+    def record_counts(self, episode_steps: int) -> Dict[str, counting.Number]:
         """Record latest counts"""
-        # Record counts.
-        counts = self._counter.increment(episodes=1, steps=episode_steps)
-        return counts
+        return self._counter.increment(episodes=1, steps=episode_steps)
 
     def run_episode(self) -> loggers.LoggingData:
         """Run one episode.
@@ -197,7 +195,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 **counts,
                 **self._executor.store.episode_metrics,
             }
-            # result.update(counts)
+
             return result
 
     def run_episode_and_log(self) -> loggers.LoggingData:
