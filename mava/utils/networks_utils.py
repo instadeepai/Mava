@@ -75,16 +75,17 @@ class MLP_NORM(hk.Module):
                     name="linear_%d" % index,
                 )
             )
-            norms.append(
-                hk.LayerNorm(
-                    axis=-1,
-                    create_scale=True,
-                    create_offset=True,
-                    param_axis=-1,
-                    use_fast_variance=False,
-                    name="norm_%d" % index,
+            if self.layer_norm:
+                norms.append(
+                    hk.LayerNorm(
+                        axis=-1,
+                        create_scale=True,
+                        create_offset=True,
+                        param_axis=-1,
+                        use_fast_variance=False,
+                        name="norm_%d" % index,
+                    )
                 )
-            )
 
         self.layers = tuple(layers)
         self.norms = tuple(norms)
