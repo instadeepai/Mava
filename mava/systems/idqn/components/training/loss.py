@@ -117,9 +117,7 @@ class IDQNLoss(Loss):
 
                     loss = jax.numpy.mean(rlax.l2_loss(error))
 
-                    loss_info_policy = {
-                        "policy_loss_total": loss.item(),
-                    }
+                    loss_info_policy = {"policy_loss_total": loss}
 
                     return loss, loss_info_policy
 

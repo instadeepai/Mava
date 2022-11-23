@@ -87,8 +87,8 @@ def main(_: Any) -> None:
         run_evaluator=True,
         sample_batch_size=32,
         num_executors=1,
-        min_data_server_size=10,
-        multi_process=False,
+        # min_data_server_size=10,
+        multi_process=True,
     )
 
     # Launch the system.

@@ -60,11 +60,12 @@ class IDQNSystem(System):
             rate_limiter=building.reverb_components.SampleToInsertRateLimiter,
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
             networks=building.DefaultNetworks,
-            optimisers=dqn_building.Optimiser,
+            epsilon_scheduler=dqn_executing.EpsilonScheduler,
         ).get()
 
         # Trainer
         trainer_process = DesignSpec(
+            optimisers=dqn_building.Optimiser,
             trainer_init=dqn_training.SingleTrainerInit,
             loss=dqn_training.IDQNLoss,
             # epoch_update=training.MAPGEpochUpdate,

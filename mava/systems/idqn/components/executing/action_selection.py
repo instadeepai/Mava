@@ -56,10 +56,14 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             None.
         """
         # Epsilon Scheduling
-        executor.store.num_action_selections = 0.0
+        executor.store.action_selection_step = 0.0
 
         networks = executor.store.networks
         agent_net_keys = executor.store.agent_net_keys
+
+        # The base executor requires this to be set, so we set it and forget it,
+        # as Q networks don't need to return log probs
+        executor.store.policies_info = None
 
         def select_action(
             observation: networks_lib.Observation,
@@ -139,6 +143,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
         Returns:
             None.
         """
+        executor.store.action_selection_step += 1.0
 
         # Dict with params per network
         current_agent_params = {
@@ -147,22 +152,12 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
         }
 
         # Epsilon Scheduling
-        # TODO add epsilon to logs
-        executor.store.num_action_selections += 1.0
-        epsilon = max(
-            self.config.epsilon_min,
-            1.0
-            - (1.0 / self.config.epsilon_decay_timesteps)
-            * executor.store.num_action_selections,
-        )
+        epsilon = executor.store.epsilon_scheduler(executor.store.action_selection_step)
         if executor._evaluator:  # type:ignore
             epsilon = 0.0
 
         executor.store.episode_metrics["epsilon"] = epsilon
 
-        # TODO (sasha): the base executor requires this to be set,
-        #  so maybe set it once and forget or refactor the base executor?
-        executor.store.policies_info = None
         (
             executor.store.actions_info,
             executor.store.base_key,

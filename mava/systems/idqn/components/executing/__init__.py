@@ -1,2 +1,3 @@
-from .observing import FeedforwardExecutorObserve
 from .action_selection import FeedforwardExecutorSelectAction
+from .epsilon_scheduler import EpsilonScheduler
+from .observing import FeedforwardExecutorObserve
