@@ -296,7 +296,7 @@ class MAPGEpochUpdate(EpochUpdate):
             base_key, shuffle_key = jax.random.split(key)
 
             permutation = jax.random.permutation(
-                shuffle_key, trainer.store.sample_batch_size
+                shuffle_key, trainer.store.epoch_batch_size
             )
 
             shuffled_batch = jax.tree_util.tree_map(

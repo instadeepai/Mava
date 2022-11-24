@@ -158,7 +158,7 @@ class Step(Component):
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
-        TrainerDataset required for config sample_batch_size.
+        TrainerDataset required for config epoch_batch_size.
         BaseTrainerInit required to set up trainer.store.networks and
         trainer.store.trainer_agent_net_keys
         Networks required to set up trainer.store.base_key.

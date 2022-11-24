@@ -20,10 +20,10 @@ from types import SimpleNamespace
 from typing import Any, Dict, List, Tuple, Type
 
 import haiku as hk
+from haiku._src.basic import merge_leading_dims
 import jax
 import jax.numpy as jnp
 import rlax
-from haiku._src.basic import merge_leading_dims
 
 from mava.callbacks import Callback
 from mava.components import Component, training
@@ -223,7 +223,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                     if policy_states:
                         # Recurrent actor.
                         minibatch_size = int(
-                            trainer.store.sample_batch_size
+                            trainer.store.epoch_batch_size
                             / trainer.store.num_minibatches
                         )
                         seq_len = trainer.store.sequence_length - 1
@@ -249,6 +249,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
 
                         # Flatten the distribution_params
 
+                        
                         distribution_params = jax.tree_util.tree_map(
                             lambda x: merge_leading_dims(x, 2),
                             distribution_params,

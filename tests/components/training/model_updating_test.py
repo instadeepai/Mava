@@ -199,6 +199,7 @@ class MockTrainer(Trainer):
             critic_optimiser=critic_optimiser,
             policy_opt_states=policy_opt_states,
             critic_opt_states=critic_opt_states,
+            epoch_batch_size=3,
         )
 
 
