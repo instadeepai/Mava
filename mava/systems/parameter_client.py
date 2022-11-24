@@ -77,11 +77,12 @@ class ParameterClient:
         self._add = lambda params: client.add_to_parameters(params)
 
         self._async_add_buffer: Dict[str, Any] = {}
-        self._async_request = lambda: client.futures.get_parameters(self._get_keys)
-        self._async_adjust = lambda: client.futures.set_parameters(
+        self._async_request = lambda: client.futures.get_parameters(self._get_keys)  # type: ignore # noqa
+        self._async_adjust = lambda: client.futures.set_parameters(  # type: ignore
             {key: self._parameters[key] for key in self._set_keys},
         )
-        self._async_add = lambda params: client.futures.add_to_parameters(params)
+        self._async_adjust_param = lambda params: client.futures.set_parameters(params)  # type: ignore # noqa
+        self._async_add = lambda params: client.futures.add_to_parameters(params)  # type: ignore # noqa
 
         # Initialize this client's future to None to indicate to the `update()`
         # method that there is no pending/running request.
@@ -101,18 +102,18 @@ class ParameterClient:
         )
         self._copy(self._client.get_parameters(self._get_keys))
 
-    def _async_adjust_and_request(self) -> None:
+    def _async_adjust_and_request(self) -> futures.Future:
         """Set the parameters in the server, then update local params from the server.
 
         Returns:
-            None.
+            A future for the parameter get
         """
-        self._client.futures.set_parameters(
+        self._client.futures.set_parameters(  # type: ignore
             {key: self._parameters[key] for key in self._set_keys},
         )
         # not sure how these futures will interact
         # will it fetch the parameters set above?
-        get_future = self._client.futures.get_parameters(self._get_keys)
+        get_future = self._client.futures.get_parameters(self._get_keys)  # type: ignore
         get_future.add_done_callback(lambda ctx: self._copy(ctx.result()))
 
         return get_future
@@ -140,7 +141,7 @@ class ParameterClient:
             self._copy(self._get_future.result())
             self._get_future = None
 
-    def set_async(self) -> None:
+    def set_async(self, params: Optional[Dict[str, Any]] = None) -> None:
         """Asynchronously updates server with the set parameters.
 
         Returns:
@@ -155,7 +156,10 @@ class ParameterClient:
         if period_reached and self._set_future is None:
             # The update period has been reached and no request has been sent yet, so
             # making an asynchronous request now.
-            self._set_future = self._async_adjust()
+            if params is None:
+                self._set_future = self._async_adjust()
+            else:
+                self._set_future = self._async_adjust_param(params)
             self._set_call_counter = 0
             return
         if self._set_future is not None and self._set_future.done():
