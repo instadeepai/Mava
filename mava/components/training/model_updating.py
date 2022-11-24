@@ -306,13 +306,29 @@ class MAPGEpochUpdate(EpochUpdate):
                 == trainer.store.full_batch_size
             )
 
+            # Note (dries): This computation is only performed once at compilation tome
+            # and not at every epoch step.
+            batch_shape = jax.tree_util.tree_leaves(
+            list(batch.observations.values())[0].observation
+            )[0].shape[0]
+
+            assert batch_shape == 5
+
             permutation = jax.random.permutation(
-                shuffle_key, trainer.store.full_batch_size
+            shuffle_key, batch_shape
             )
 
             shuffled_batch = jax.tree_util.tree_map(
                 lambda x: jnp.take(x, permutation, axis=0), batch
             )
+
+            # Flatten the batch.
+            shuffled_batch = jax.tree_util.tree_map(
+                    lambda x: x.reshape((-1,) + x.shape[2:]), shuffled_batch
+                )
+            
+            assert shuffled_batch.shape[0] == 95
+
             minibatches = jax.tree_util.tree_map(
                 lambda x: jnp.reshape(
                     x, [self.config.num_minibatches, -1] + list(x.shape[1:])

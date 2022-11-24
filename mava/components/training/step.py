@@ -342,20 +342,20 @@ class MAPGWithTrustRegionStep(Step):
                 behavior_values=behavior_values,
             )
 
-            # Concatenate all trajectories. Reshape from [num_sequences, num_steps,..]
-            # to [num_sequences * num_steps,..]
             agent_0_t_vals = list(target_values.values())[0]
             assert len(agent_0_t_vals) > 1
             num_sequences = agent_0_t_vals.shape[0]
-            num_steps = agent_0_t_vals.shape[1]
-            batch_size = num_sequences * num_steps
+
+        
+            batch_size = num_sequences
+
             assert batch_size % trainer.store.global_config.num_minibatches == 0, (
-                "Num minibatches must divide batch size. Got batch_size={}"
-                " num_minibatches={}."
+            "Num minibatches must divide batch size. Got batch_size={}"
+            " num_minibatches={}."
             ).format(batch_size, trainer.store.global_config.num_minibatches)
-            batch = jax.tree_util.tree_map(
-                lambda x: x.reshape((batch_size,) + x.shape[2:]), trajectories
-            )
+
+            # This is done only for the feedforward case
+            batch = trajectories
 
             (
                 new_key,
