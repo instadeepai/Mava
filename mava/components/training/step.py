@@ -336,9 +336,6 @@ class MAPGWithTrustRegionStep(Step):
                 " num_minibatches={}."
             ).format(batch_size, trainer.store.global_config.num_minibatches)
 
-            # This is done only for the feedforward case
-            batch = trajectories
-
             (
                 new_key,
                 new_policy_params,
@@ -354,7 +351,7 @@ class MAPGWithTrustRegionStep(Step):
                     states.critic_params,
                     states.policy_opt_states,
                     states.critic_opt_states,
-                    batch,
+                    trajectories,
                 ),
                 (),
                 length=trainer.store.global_config.num_epochs,
