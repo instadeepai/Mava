@@ -106,7 +106,7 @@ def main(_: Any) -> None:
         critic_optimiser=critic_optimiser,
         run_evaluator=True,
         sample_batch_size=5,
-        num_epochs=1,
+        num_epochs=15,
         num_executors=1,
         num_minibatches=1,
         multi_process=True,

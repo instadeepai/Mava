@@ -251,7 +251,7 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
 
         # executor.store.extras set by Executor
         executor.store.next_extras["policy_states"] = executor.store.policy_states
-            
+         
         executor.store.adder.add(
             adder_actions, executor.store.next_timestep, executor.store.next_extras
         )

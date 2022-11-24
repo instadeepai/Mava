@@ -135,15 +135,13 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
             """Performs model update for a single minibatch."""
             policy_params, critic_params, policy_opt_states, critic_opt_states = carry
 
-            # Flatten if it is recurrent
+            # Flatten the data if it using a recurrent policy.
+            # TODO (dries): Do we need to flatten it? Can't we 
+            # just work with unflattened data and only flatten
+            # where necessary?
             if list(minibatch.policy_states.values())[0]:
-                agent_0_t_vals = list(minibatch.target_values.values())[0]
-                num_sequences = agent_0_t_vals.shape[0]
-                num_steps = agent_0_t_vals.shape[1]
-                batch_size = num_sequences * num_steps
-
                 minibatch = jax.tree_util.tree_map(
-                    lambda x: x.reshape((batch_size,) + x.shape[2:]), minibatch
+                    lambda x: x.reshape((-1,) + x.shape[2:]), minibatch
                 )
             else:
                 raise ValueError("Not testing feedforward at the moment!")
