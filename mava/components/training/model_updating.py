@@ -144,7 +144,9 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
                     lambda x: x.reshape((-1,) + x.shape[2:]), minibatch
                 )
             else:
-                raise ValueError("Not testing feedforward at the moment!")
+                raise ValueError("The above code should be done in both cases! "
+                    ". We need sequences to remain as is for the discounted value function "
+                    " to work")
 
             # Normalize advantages at the minibatch level before using them.
             if self.config.normalize_advantage:

@@ -163,7 +163,7 @@ class SMACWrapper(ParallelEnvWrapper):
         timestep = dm_env.TimeStep(
             observation=next_observations,
             reward=rewards,
-            discount=self._discount,
+            discount=discounts,
             step_type=self._step_type,
         )
 

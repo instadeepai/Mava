@@ -345,7 +345,9 @@ class MAPGWithTrustRegionStep(Step):
             num_sequences = agent_0_t_vals.shape[0]
 
             if "policy_states" not in extras:
-                raise ValueError("Not used at the moment!")
+                raise ValueError("The else code should be done in both cases! "
+                    ". We need sequences to remain as is for the discounted value function "
+                    " to work")
                 num_steps = agent_0_t_vals.shape[1]
                 batch_size = num_sequences * num_steps
             else:
@@ -358,7 +360,9 @@ class MAPGWithTrustRegionStep(Step):
 
             # This is done only for the feedforward case
             if "policy_states" not in extras:
-                raise ValueError("Not used at the moment!")
+                raise ValueError("The else code should be done in both cases! "
+                    ". We need sequences to remain as is for the discounted value function "
+                    " to work")
                 batch = jax.tree_util.tree_map(
                     lambda x: x.reshape((batch_size,) + x.shape[2:]), trajectories
                 )
