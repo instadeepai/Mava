@@ -24,6 +24,7 @@ import jax
 import jax.numpy as jnp
 import optax
 from acme.jax import networks as networks_lib
+from haiku._src.basic import merge_leading_dims
 from jax.random import KeyArray
 
 from mava import constants
@@ -296,26 +297,17 @@ class MAPGEpochUpdate(EpochUpdate):
 
             base_key, shuffle_key = jax.random.split(key)
 
-            # Note (dries): This computation is only performed once at compilation tome
-            # and not at every epoch step.
-            batch_shape = jax.tree_util.tree_leaves(
-                list(batch.observations.values())[0].observation
-            )[0].shape[0]
-
             permutation = jax.random.permutation(
-                shuffle_key, batch_shape
+                shuffle_key, trainer.store.epoch_batch_size
             )
 
             shuffled_batch = jax.tree_util.tree_map(
                 lambda x: jnp.take(x, permutation, axis=0), batch
             )
 
-            # Flatten the data.
-            # TODO (dries): Do we need to flatten it? Can't we 
-            # just work with unflattened data and only flatten
-            # where necessary?
+            # Flatten the batch.
             shuffled_batch = jax.tree_util.tree_map(
-                lambda x: x.reshape((-1,) + x.shape[2:]), shuffled_batch
+                lambda x: merge_leading_dims(x, 2), shuffled_batch
             )
 
             minibatches = jax.tree_util.tree_map(
