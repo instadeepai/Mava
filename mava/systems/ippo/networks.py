@@ -215,6 +215,7 @@ def make_discrete_networks(  # noqa: C901
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     policy_network_head_weight_gain: float = 0.01,
     layer_norm: bool = False,
+    critic_batch_size: Optional[int] = None,
     # default behaviour is to flatten observations
 ) -> PPONetworks:
     """Create PPO network for environments with discrete action spaces.
@@ -241,6 +242,8 @@ def make_discrete_networks(  # noqa: C901
         policy_network_head_weight_gain: value for scaling the policy
             network final layer weights by.
         layer_norm: apply layer normalisation to the hidden MLP layers.
+        critic_batch_size: epoch batch size used for training networks.
+            only relevant for recurrent critic.
 
 
     Returns:
@@ -340,7 +343,9 @@ def make_discrete_networks(  # noqa: C901
             Initial state for the recurrent layers.
         """
         # TODO: Return and handle the same as the above
-        return hk.GRU(64).initial_state(1), hk.GRU(64).initial_state(5)
+        # Passing in the `critic_batch_size` needs to be removed
+        # and inferred from the system hyperparameters in some way.
+        return hk.GRU(64).initial_state(1), hk.GRU(64).initial_state(critic_batch_size)
 
     @hk.without_apply_rng
     @hk.transform
@@ -364,7 +369,6 @@ def make_discrete_networks(  # noqa: C901
                     activate_final=True,
                     layer_norm=layer_norm,
                 ),
-                ValueHead(w_init=w_init_fn(orthogonal_initialisation, 1.0)),
             ]
         )
 
@@ -376,11 +380,12 @@ def make_discrete_networks(  # noqa: C901
             # Add optional feedforward layers after the recurrent layers
             if len(critic_layers_after_recurrent) > 0:
                 critic_layers.append(
-                    hk.nets.MLP(
+                    MLP_NORM(
                         critic_layers_after_recurrent,
                         activation=activation_function,
                         w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
                         activate_final=True,
+                        layer_norm=layer_norm,
                     ),
                 )
 
@@ -444,6 +449,7 @@ def make_networks(
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     policy_network_head_weight_gain: float = 0.01,
     layer_norm: bool = False,
+    critic_batch_size: Optional[int] = None,
 ) -> PPONetworks:
     """Function for creating PPO networks to be used.
 
@@ -472,6 +478,8 @@ def make_networks(
         policy_network_head_weight_gain: value for scaling the policy
             network final layer weights by.
         layer_norm: apply layer normalisation to the hidden MLP layers.
+        critic_batch_size: epoch batch size used for training networks.
+            only relevant for recurrent critic.
 
     Returns:
         make_discrete_networks: function to create a discrete network
@@ -495,6 +503,7 @@ def make_networks(
             activation_function=activation_function,
             layer_norm=layer_norm,
             policy_network_head_weight_gain=policy_network_head_weight_gain,
+            critic_batch_size=critic_batch_size,
         )
 
     else:
@@ -525,6 +534,7 @@ def make_default_networks(
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     policy_network_head_weight_gain: float = 0.01,
     layer_norm: bool = False,
+    critic_batch_size: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Create default PPO networks
 
@@ -559,6 +569,8 @@ def make_default_networks(
         policy_network_head_weight_gain: value for scaling the policy
             network final layer weights by.
         layer_norm: apply layer normalisation to the hidden MLP layers.
+        critic_batch_size: epoch batch size used for training networks.
+            only relevant for recurrent critic.
 
     Returns:
         networks: networks created to given spec
@@ -589,6 +601,7 @@ def make_default_networks(
             activation_function=activation_function,
             layer_norm=layer_norm,
             policy_network_head_weight_gain=policy_network_head_weight_gain,
+            critic_batch_size=critic_batch_size,
         )
 
     # No longer returning a dictionary since this is handled in PPONetworks above

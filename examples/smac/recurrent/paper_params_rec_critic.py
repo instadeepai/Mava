@@ -31,7 +31,7 @@ from mava.utils.loggers import logger_utils
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "map_name",
-    "2m_vs_1z",
+    "3m",
     "Starcraft 2 micromanagement map name (str).",
 )
 
@@ -41,6 +41,8 @@ flags.DEFINE_string(
     "Experiment identifier that can be used to continue experiments.",
 )
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
+
+batch_size = 30
 
 
 def main(_: Any) -> None:
@@ -65,6 +67,8 @@ def main(_: Any) -> None:
             critic_layers_after_recurrent=[64],
             orthogonal_initialisation=True,
             policy_network_head_weight_gain=0.01,
+            critic_batch_size=batch_size,
+            layer_norm=True,
             *args,
             **kwargs,
         )
@@ -111,8 +115,8 @@ def main(_: Any) -> None:
         critic_optimiser=critic_optimiser,
         run_evaluator=True,
         # sample_batch_size=320,
-        sample_batch_size=5,
-        max_queue_size=40,
+        epoch_batch_size=batch_size,
+        max_queue_size=batch_size * 2,
         # max_queue_size=640,
         num_epochs=15,
         num_executors=1,
@@ -126,14 +130,14 @@ def main(_: Any) -> None:
         entropy_cost=0.0,
         executor_parameter_update_period=20,
         normalize_advantage=True,
-        normalize_target_values=False,
+        normalize_target_values=True,
         num_minibatches=1,
         sequence_length=10,
         period=9,
         trainer_parameter_update_period=5,
         value_clip_parameter=0.2,
         value_cost=1,
-        normalize_observations=False,
+        normalize_observations=True,
     )
 
     # Launch the system.

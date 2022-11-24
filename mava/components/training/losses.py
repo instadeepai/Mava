@@ -342,7 +342,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
 
                     if network.get_critic_init_state() is not None:
                         minibatch_size = int(
-                            trainer.store.sample_batch_size
+                            trainer.store.epoch_batch_size
                             / trainer.store.num_minibatches
                         )
                         seq_len = trainer.store.sequence_length - 1

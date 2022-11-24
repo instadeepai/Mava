@@ -42,6 +42,8 @@ flags.DEFINE_string(
 )
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
+batch_size = 30
+
 
 def main(_: Any) -> None:
     """Example running feedforward MADQN on SMAC environment."""
@@ -61,10 +63,10 @@ def main(_: Any) -> None:
             critic_layer_sizes=[64, 64],
             policy_recurrent_layer_sizes=[64],
             policy_layers_after_recurrent=[64],
-            # critic_recurrent_layer_sizes=[64],
-            # critic_layers_after_recurrent=[64],
             orthogonal_initialisation=True,
             policy_network_head_weight_gain=0.01,
+            critic_batch_size=batch_size,
+            layer_norm=True,
             *args,
             **kwargs,
         )
@@ -111,8 +113,8 @@ def main(_: Any) -> None:
         critic_optimiser=critic_optimiser,
         run_evaluator=True,
         # sample_batch_size=320,
-        sample_batch_size=5,
-        max_queue_size=40,
+        epoch_batch_size=batch_size,
+        max_queue_size=batch_size * 2,
         # max_queue_size=640,
         num_epochs=15,
         num_executors=1,
