@@ -195,7 +195,6 @@ class MockTrainer(Trainer):
             critic_grad_fn=fake_ppo_critic_grad_fn,
             trainer_agents=trainer_agents,
             trainer_agent_net_keys=trainer_agent_net_keys,
-            full_batch_size=2,
             policy_optimiser=policy_optimiser,
             critic_optimiser=critic_optimiser,
             policy_opt_states=policy_opt_states,

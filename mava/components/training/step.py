@@ -190,21 +190,6 @@ class MAPGWithTrustRegionStep(Step):
         """
         self.config = config
 
-    def on_training_init_start(self, trainer: SystemTrainer) -> None:
-        """Compute and store full batch size.
-
-        Args:
-            trainer: SystemTrainer.
-
-        Returns:
-            None.
-        """
-        # Note (dries): Assuming the batch and sequence dimensions are flattened.
-        trainer.store.full_batch_size = (
-            trainer.store.global_config.sample_batch_size
-            * (trainer.store.global_config.sequence_length - 1)
-        )
-
     # flake8: noqa: C901
     def on_training_step_fn(self, trainer: SystemTrainer) -> None:
         """Define and store the SGD step function for MAPGWithTrustRegion.
@@ -346,12 +331,11 @@ class MAPGWithTrustRegionStep(Step):
             assert len(agent_0_t_vals) > 1
             num_sequences = agent_0_t_vals.shape[0]
 
-        
             batch_size = num_sequences
 
             assert batch_size % trainer.store.global_config.num_minibatches == 0, (
-            "Num minibatches must divide batch size. Got batch_size={}"
-            " num_minibatches={}."
+                "Num minibatches must divide batch size. Got batch_size={}"
+                " num_minibatches={}."
             ).format(batch_size, trainer.store.global_config.num_minibatches)
 
             # This is done only for the feedforward case

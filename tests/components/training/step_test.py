@@ -278,7 +278,7 @@ def test_on_training_init_start(
 
     mapg_with_trust_region_step.on_training_init_start(trainer=mock_trainer)
 
-    assert mock_trainer.store.full_batch_size == 4
+    assert mock_trainer.store.sample_batch_size == 2
 
 
 def test_on_training_step_fn(
