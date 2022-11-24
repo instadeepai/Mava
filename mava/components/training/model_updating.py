@@ -133,20 +133,7 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
             minibatch: Batch,
         ) -> Tuple[Tuple[Any, Any, optax.OptState, optax.OptState], Dict[str, Any]]:
             """Performs model update for a single minibatch."""
-            policy_params, critic_params, policy_opt_states, critic_opt_states = carry
-
-            # Flatten the data if it using a recurrent policy.
-            # TODO (dries): Do we need to flatten it? Can't we 
-            # just work with unflattened data and only flatten
-            # where necessary?
-            if list(minibatch.policy_states.values())[0]:
-                minibatch = jax.tree_util.tree_map(
-                    lambda x: x.reshape((-1,) + x.shape[2:]), minibatch
-                )
-            else:
-                raise ValueError("The above code should be done in both cases! "
-                    ". We need sequences to remain as is for the discounted value function "
-                    " to work")
+            policy_params, critic_params, policy_opt_states, critic_opt_states = carry           
 
             # Normalize advantages at the minibatch level before using them.
             if self.config.normalize_advantage:
@@ -156,9 +143,6 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
                 )
             else:
                 advantages = minibatch.advantages
-
-            # jax.debug.print("🤯 Actions mask: {x} 🤯", x=minibatch.actions["agent_0"].reshape((5, 19)))
-            # jax.debug.print("🤯 Loss mask: {x} 🤯", x=minibatch.loss_masks["agent_0"].reshape((5, 19)))
 
             # Calculate the gradients and agent metrics.
             policy_gradients, policy_agent_metrics = trainer.store.policy_grad_fn(
@@ -324,6 +308,14 @@ class MAPGEpochUpdate(EpochUpdate):
 
             shuffled_batch = jax.tree_util.tree_map(
                 lambda x: jnp.take(x, permutation, axis=0), batch
+            )
+
+            # Flatten the data.
+            # TODO (dries): Do we need to flatten it? Can't we 
+            # just work with unflattened data and only flatten
+            # where necessary?
+            shuffled_batch = jax.tree_util.tree_map(
+                lambda x: x.reshape((-1,) + x.shape[2:]), shuffled_batch
             )
 
             minibatches = jax.tree_util.tree_map(
