@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running IPPO on debug MPE environments."""
+"""Example running IPPO on debug MPE environments with layer normalisation."""
 import functools
 from datetime import datetime
 from typing import Any
@@ -63,6 +63,7 @@ def main(_: Any) -> None:
         return ippo.make_default_networks(  # type: ignore
             policy_layer_sizes=(64, 64),
             critic_layer_sizes=(64, 64, 64),
+            layer_norm=True,
             *args,
             **kwargs,
         )
@@ -106,7 +107,10 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        clip_value=False,
+        clip_value=True,
+        normalize_target_values=True,
+        normalize_observations=True,
+        termination_condition={"executor_steps": 200000},
     )
 
     # Launch the system.

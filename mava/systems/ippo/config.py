@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 @dataclass
 class IPPODefaultConfig:
-    sample_batch_size: int = 512
+    epoch_batch_size: int = 512
     sequence_length: int = 20
     period: int = 10
     use_next_extras: bool = False
