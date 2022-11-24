@@ -265,12 +265,13 @@ class MAPGWithTrustRegionStep(Step):
                 net_key: Any, reward: Any, observation: Any
             ) -> jnp.ndarray:
                 """Gets behaviour values from the agent networks and observations."""
-                if True: 
+
+                if networks[net_key].get_critic_init_state() is not None:
                     # Use the state at the start of the sequence and unroll the policy.
                     core = lambda x, y: networks[net_key].critic_network.apply(
                         states.critic_params[net_key], [x, y]
                     )
-                    
+
                     behavior_values, _ = hk.static_unroll(
                         core,
                         observation,
@@ -278,17 +279,18 @@ class MAPGWithTrustRegionStep(Step):
                         time_major=False,
                     )
 
-                else: 
+                else:
+
                     o = jax.tree_util.tree_map(
                         lambda x: jnp.reshape(x, [-1] + list(x.shape[2:])), observation
                     )
+
                     behavior_values = networks[net_key].critic_network.apply(
                         states.critic_params[net_key], o
                     )
                     behavior_values = jnp.reshape(behavior_values, reward.shape[0:2])
-                
+
                 return behavior_values
-            
 
             # TODO (Ruan): Double check this
             agent_nets = trainer.store.trainer_agent_net_keys
@@ -370,6 +372,7 @@ class MAPGWithTrustRegionStep(Step):
                 "Num minibatches must divide batch size. Got batch_size={}"
                 " num_minibatches={}."
             ).format(batch_size, trainer.store.global_config.num_minibatches)
+
             batch = jax.tree_util.tree_map(
                 lambda x: x.reshape((batch_size,) + x.shape[2:]), trajectories
             )

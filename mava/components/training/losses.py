@@ -32,7 +32,7 @@ from mava.core_jax import SystemTrainer
 class ValueLoss(Component):
     @abc.abstractmethod
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """An abstract class for a component that defines the
+        """An abstract class for a component that defines the \
         final value loss function."""
 
     @staticmethod
@@ -115,7 +115,7 @@ class HuberValueLoss(ValueLoss):
 class Loss(Component):
     @abc.abstractmethod
     def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
-        """An abstract class for a component that defines the
+        """An abstract class for a component that defines the \
         entire policy and critic loss functions."""
 
     @staticmethod
@@ -144,9 +144,11 @@ class Loss(Component):
 
 @dataclass
 class MAPGTrustRegionClippingLossConfig:
-    """The value_clip_parameter should be relatively small when value_normalization is True.
+    """The value_clip_parameter should be relatively small when \
+        value_normalization is True.
 
-    The idea is to scale it to try and match the effect of the normalisation on the target values.
+    The idea is to scale it to try and match the effect of the
+    normalisation on the target values.
     """
 
     clipping_epsilon: float = 0.2
@@ -216,9 +218,11 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                     behaviour_log_probs: jnp.ndarray,
                     advantages: jnp.ndarray,
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
-                    """Inner policy loss function: see outer function for parameters."""
+                    """Inner policy loss function: see outer function for \
+                        parameters."""
 
-                    # TODO (dries): Can we implement something more general here? Like a function call?
+                    # TODO (dries): Can we implement something more general here?
+                    # Like a function call?
                     if policy_states:
                         # Recurrent actor.
                         minibatch_size = int(
@@ -235,8 +239,9 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                             minibatch_size, seq_len, -1
                         )
 
-                        # Use the state at the start of the sequence and unroll the policy.
-                        core = lambda x, y: network.policy_network.apply(
+                        # Use the state at the start of the sequence and
+                        # unroll the policy.
+                        core = lambda x, y: network.policy_network.apply(  # noqa: E731
                             policy_params, [x, y]
                         )
                         distribution_params, _ = hk.static_unroll(
@@ -333,9 +338,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
                     """Inner critic loss function: see outer function for parameters."""
 
-                    if True: 
-                        # TODO check if recurrent 
-                        # Recurrent critic.
+                    if network.get_critic_init_state() is not None:
                         minibatch_size = int(
                             trainer.store.sample_batch_size
                             / trainer.store.num_minibatches
@@ -346,10 +349,10 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                             minibatch_size, seq_len, -1
                         )
 
-                        core = lambda x, y: network.critic_network.apply(
+                        core = lambda x, y: network.critic_network.apply(  # noqa: E731
                             critic_params, [x, y]
                         )
-                        
+
                         values, _ = hk.static_unroll(
                             core,
                             batch_seq_observations,
@@ -362,8 +365,10 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                             values,
                         )
 
-                    else: 
-                        values = network.critic_network.apply(critic_params, observations)
+                    else:
+                        values = network.critic_network.apply(
+                            critic_params, observations
+                        )
 
                     # Value function loss. Exclude the bootstrap value
                     unclipped_value_error = target_values - values

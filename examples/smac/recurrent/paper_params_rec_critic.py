@@ -22,12 +22,11 @@ from typing import Any
 import optax
 from absl import app, flags
 
+from mava.components.component_groups import recurrent_policy_components
+from mava.components.training import HuberValueLoss
 from mava.systems import ippo
 from mava.utils.environments.smac_utils import make_environment
 from mava.utils.loggers import logger_utils
-
-from mava.components.component_groups import recurrent_policy_components
-from mava.components.training import HuberValueLoss
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -49,18 +48,21 @@ def main(_: Any) -> None:
 
     # Environment
     environment_factory = functools.partial(
-        make_environment, 
+        make_environment,
         map_name=FLAGS.map_name,
-        concat_agent_id=True, 
-        death_masking=True,)
+        concat_agent_id=True,
+        death_masking=True,
+    )
 
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return ippo.make_default_networks(  # type: ignore
             policy_layer_sizes=[64, 64],
             critic_layer_sizes=[64, 64],
-            policy_recurrent_layer_sizes=[64], 
-            policy_layers_after_recurrent=[64], 
+            policy_recurrent_layer_sizes=[64],
+            policy_layers_after_recurrent=[64],
+            critic_recurrent_layer_sizes=[64],
+            critic_layers_after_recurrent=[64],
             orthogonal_initialisation=True,
             policy_network_head_weight_gain=0.01,
             *args,
@@ -83,11 +85,15 @@ def main(_: Any) -> None:
 
     # Optimisers.
     policy_optimiser = optax.chain(
-        optax.clip_by_global_norm(10.0), optax.scale_by_adam(eps=1e-5), optax.scale(-5e-4)
+        optax.clip_by_global_norm(10.0),
+        optax.scale_by_adam(eps=1e-5),
+        optax.scale(-5e-4),
     )
 
     critic_optimiser = optax.chain(
-        optax.clip_by_global_norm(10.0), optax.scale_by_adam(eps=1e-5), optax.scale(-5e-4)
+        optax.clip_by_global_norm(10.0),
+        optax.scale_by_adam(eps=1e-5),
+        optax.scale(-5e-4),
     )
 
     # Create the system.
@@ -104,30 +110,30 @@ def main(_: Any) -> None:
         policy_optimiser=policy_optimiser,
         critic_optimiser=critic_optimiser,
         run_evaluator=True,
-        # sample_batch_size=320, 
+        # sample_batch_size=320,
         sample_batch_size=5,
-        max_queue_size=10, 
-        # max_queue_size=640, 
+        max_queue_size=40,
+        # max_queue_size=640,
         num_epochs=15,
         num_executors=1,
         multi_process=True,
         evaluation_interval={"executor_steps": 10000},
         evaluation_duration={"evaluator_episodes": 10},
         # evaluation_duration={"evaluator_episodes": 32},
-        huber_delta=10.0, 
-        clip_value=True, 
-        clipping_epsilon=0.2, 
-        entropy_cost = 0.0, 
+        huber_delta=10.0,
+        clip_value=True,
+        clipping_epsilon=0.2,
+        entropy_cost=0.0,
         executor_parameter_update_period=20,
-        normalize_advantage=True, 
-        normalize_target_values=True, 
-        num_minibatches=1,  
+        normalize_advantage=True,
+        normalize_target_values=False,
+        num_minibatches=1,
         sequence_length=10,
-        period=9, 
-        trainer_parameter_update_period=5, 
-        value_clip_parameter=0.2, 
-        value_cost=1, 
-        normalize_observations=True,
+        period=9,
+        trainer_parameter_update_period=5,
+        value_clip_parameter=0.2,
+        value_cost=1,
+        normalize_observations=False,
     )
 
     # Launch the system.
