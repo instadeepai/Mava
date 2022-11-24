@@ -329,9 +329,7 @@ class MAPGWithTrustRegionStep(Step):
 
             agent_0_t_vals = list(target_values.values())[0]
             assert len(agent_0_t_vals) > 1
-            num_sequences = agent_0_t_vals.shape[0]
-
-            batch_size = num_sequences
+            batch_size = agent_0_t_vals.shape[0]
 
             assert batch_size % trainer.store.global_config.num_minibatches == 0, (
                 "Num minibatches must divide batch size. Got batch_size={}"
