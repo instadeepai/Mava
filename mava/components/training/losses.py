@@ -271,6 +271,11 @@ class MAPGWithTrustRegionClippingLoss(Loss):
 
                     # Calculate the policy loss using the clipped surrogate objective
                     # with a loss mask.
+                    # policy_loss = rlax.clipped_surrogate_pg_loss(
+                    #         prob_ratios_t=rhos,
+                    #         adv_t=advantages,
+                    #         epsilon=clipping_epsilon,)
+
                     policy_loss = clipped_surrogate_pg_loss(
                         prob_ratios_t=rhos,
                         adv_t=advantages,
@@ -278,7 +283,11 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                         loss_masks=loss_masks,
                     )
 
+                    # jax.debug.print("🤯 prob_ratios_t: {x} 🤯", x=advantages.shape)
+                    # jax.debug.print("🤯 Loss mask: {x} 🤯", x=loss_masks.shape)
+
                     # Entropy regulariser with loss masking.
+                    # entropy_loss = -jnp.mean(entropy)
                     entropy_loss = -jnp.sum(entropy * loss_masks) / jnp.sum(loss_masks)
 
                     total_policy_loss = (
@@ -373,6 +382,12 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                         value_loss = unclipped_value_loss
 
                     # Average value function loss with loss masking.
+                    
+                    # jax.debug.print("🤯 Value loss: {x} 🤯", x=value_loss)
+                    # jax.debug.print("🤯 Loss mask: {x} 🤯", x=loss_masks.reshape((5, 19)))
+                    # exit()
+
+                    # value_loss = jnp.mean(value_loss)
                     value_loss = jnp.sum(value_loss * loss_masks) / jnp.sum(loss_masks)
 
                     # TODO (Ruan): Including value loss parameter in the

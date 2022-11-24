@@ -111,6 +111,15 @@ class DefaultTrainerStep(TrainerStep):
         # Do a batch of SGD.
         sample = next(trainer.store.dataset_iterator)
 
+        # Remove me 101
+        # import tensorflow as tf
+        # tf.print("Actions: ", sample.data.actions)
+        # tf.print("policy_info: ", sample.data.extras["policy_info"])
+        # tf.print("discounts: ", sample.data.discounts)
+        # tf.print("observation: ", sample.data.observations)
+        # exit()
+        # Remove me 101
+
         results = trainer.store.step_fn(sample)
 
         # Update our counts and record it.
@@ -189,21 +198,6 @@ class MAPGWithTrustRegionStep(Step):
             config: MAPGWithTrustRegionStepConfig.
         """
         self.config = config
-
-    def on_training_init_start(self, trainer: SystemTrainer) -> None:
-        """Compute and store full batch size.
-
-        Args:
-            trainer: SystemTrainer.
-
-        Returns:
-            None.
-        """
-        # Note (dries): Assuming the batch and sequence dimensions are flattened.
-        trainer.store.full_batch_size = (
-            trainer.store.global_config.sample_batch_size
-            * (trainer.store.global_config.sequence_length - 1)
-        )
 
     # flake8: noqa: C901
     def on_training_step_fn(self, trainer: SystemTrainer) -> None:
@@ -357,15 +351,27 @@ class MAPGWithTrustRegionStep(Step):
             agent_0_t_vals = list(target_values.values())[0]
             assert len(agent_0_t_vals) > 1
             num_sequences = agent_0_t_vals.shape[0]
-            num_steps = agent_0_t_vals.shape[1]
-            batch_size = num_sequences * num_steps
+
+            if "policy_states" not in extras:
+                raise ValueError("Not used at the moment!")
+                num_steps = agent_0_t_vals.shape[1]
+                batch_size = num_sequences * num_steps
+            else:
+                batch_size = num_sequences
+
             assert batch_size % trainer.store.global_config.num_minibatches == 0, (
                 "Num minibatches must divide batch size. Got batch_size={}"
                 " num_minibatches={}."
             ).format(batch_size, trainer.store.global_config.num_minibatches)
-            batch = jax.tree_util.tree_map(
-                lambda x: x.reshape((batch_size,) + x.shape[2:]), trajectories
-            )
+
+            # This is done only for the feedforward case
+            if "policy_states" not in extras:
+                raise ValueError("Not used at the moment!")
+                batch = jax.tree_util.tree_map(
+                    lambda x: x.reshape((batch_size,) + x.shape[2:]), trajectories
+                )
+            else:
+                batch = trajectories
 
             (
                 new_key,
@@ -469,6 +475,9 @@ class MAPGWithTrustRegionStep(Step):
             )
 
             new_states, metrics = sgd_step(states, sample)
+
+            # TODO (dries): Remove the time.sleep call when Sasha's solution is implemented.
+            time.sleep(0.01)
 
             # Set the new variables
             # TODO (dries): key is probably not being store correctly.
