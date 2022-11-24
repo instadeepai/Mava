@@ -60,7 +60,7 @@ class SMACWrapper(ParallelEnvWrapper):
         self._battles_game = 0
 
         self._death_masking = death_masking
-        self._pre_agents_alive = {}
+        self._pre_agents_alive: Dict[str, Any] = {}
 
     def reset(self) -> dm_env.TimeStep:
         """Resets the env, if it was not reset on the previous step.
@@ -149,7 +149,6 @@ class SMACWrapper(ParallelEnvWrapper):
 
             discounts[agent] = convert_np_type(self.discount_spec()[agent].dtype, value)
 
-        self._pre_agents_alive = {}
         for i, agent in enumerate(self._agents):
             # Check if agent is dead.
             self._pre_agents_alive[agent] = self.is_dead(i)

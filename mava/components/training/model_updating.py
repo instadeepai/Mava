@@ -134,7 +134,7 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
             minibatch: Batch,
         ) -> Tuple[Tuple[Any, Any, optax.OptState, optax.OptState], Dict[str, Any]]:
             """Performs model update for a single minibatch."""
-            policy_params, critic_params, policy_opt_states, critic_opt_states = carry           
+            policy_params, critic_params, policy_opt_states, critic_opt_states = carry
 
             # Normalize advantages at the minibatch level before using them.
             if self.config.normalize_advantage:

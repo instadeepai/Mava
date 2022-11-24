@@ -62,7 +62,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         self._environment = environment
         self._reset_next_step = True
         self._return_state_info = return_state_info
-        self._pre_dones = {}
+        self._pre_dones: Dict[str, Any] = {}
 
         if env_preprocess_wrappers:
             self._environment = apply_env_wrapper_preprocessors(

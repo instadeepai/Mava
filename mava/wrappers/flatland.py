@@ -96,7 +96,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         self._reset_next_step = True
         self._step_type = dm_env.StepType.FIRST
         self.num_actions = 5
-        self._pre_dones = {}
+        self._pre_dones: Dict[str, Any] = {}
 
         self.action_spaces = {
             agent: Discrete(self.num_actions) for agent in self.possible_agents

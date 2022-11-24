@@ -111,7 +111,6 @@ class DefaultTrainerStep(TrainerStep):
         # Do a batch of SGD.
         sample = next(trainer.store.dataset_iterator)
 
-
         results = trainer.store.step_fn(sample)
 
         # Update our counts and record it.

@@ -228,6 +228,11 @@ def test_mapg_loss(
         for agent in {"agent_0", "agent_1", "agent_2"}
     }
 
+    loss_masks = {
+        agent: jnp.array([1.0, 1.0, 1.0, 1.0])
+        for agent in {"agent_0", "agent_1", "agent_2"}
+    }
+
     # Test the recurrent loss code on higher advantage values
     states = [jnp.array([1, 2, 3, 4])]
     policy_states = {"agent_0": states, "agent_1": states, "agent_2": states}
@@ -238,6 +243,7 @@ def test_mapg_loss(
         behaviour_log_probs=behaviour_log_probs,
         advantages=advantages,
         policy_states=policy_states,
+        loss_masks=loss_masks,
     )
 
     agent_0_policy_loss = recurrent_policy_loss_info["agent_0"]
@@ -256,6 +262,7 @@ def test_mapg_loss(
         behaviour_log_probs=behaviour_log_probs,
         advantages=low_advantages,
         policy_states=policy_states,
+        loss_masks=loss_masks,
     )
 
     agent_0_policy_loss = recurrent_policy_loss_info["agent_0"]
@@ -274,6 +281,7 @@ def test_mapg_loss(
         observations=mock_trainer.store.observations,
         target_values=target_values,
         behavior_values=behavior_values,
+        loss_masks=loss_masks,
     )
 
     _, low_critic_loss_info = critic_grad_fn(
@@ -281,6 +289,7 @@ def test_mapg_loss(
         observations=mock_trainer.store.observations,
         target_values=low_target_values,
         behavior_values=behavior_values,
+        loss_masks=loss_masks,
     )
 
     agent_0_critic_loss = critic_loss_info["agent_0"]
@@ -333,6 +342,11 @@ def test_mapg_huber_loss(
         for agent in {"agent_0", "agent_1", "agent_2"}
     }
 
+    loss_masks = {
+        agent: jnp.array([1.0, 1.0, 1.0, 1.0])
+        for agent in {"agent_0", "agent_1", "agent_2"}
+    }
+
     policy_states = {"agent_0": None, "agent_1": None, "agent_2": None}  # type: ignore
     _, policy_loss_info = policy_grad_fn(
         policy_params=mock_trainer.store.parameters,
@@ -341,6 +355,7 @@ def test_mapg_huber_loss(
         behaviour_log_probs=behaviour_log_probs,
         advantages=advantages,
         policy_states=policy_states,
+        loss_masks=loss_masks,
     )
 
     _, low_policy_loss_info = policy_grad_fn(
@@ -350,6 +365,7 @@ def test_mapg_huber_loss(
         behaviour_log_probs=behaviour_log_probs,
         advantages=low_advantages,
         policy_states=policy_states,
+        loss_masks=loss_masks,
     )
 
     _, critic_loss_info = critic_grad_fn(
@@ -357,6 +373,7 @@ def test_mapg_huber_loss(
         observations=mock_trainer.store.observations,
         target_values=target_values,
         behavior_values=behavior_values,
+        loss_masks=loss_masks,
     )
 
     _, low_critic_loss_info = critic_grad_fn(
@@ -364,6 +381,7 @@ def test_mapg_huber_loss(
         observations=mock_trainer.store.observations,
         target_values=low_target_values,
         behavior_values=behavior_values,
+        loss_masks=loss_masks,
     )
 
     agent_0_policy_loss = policy_loss_info["agent_0"]

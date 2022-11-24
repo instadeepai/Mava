@@ -71,6 +71,7 @@ def fake_ppo_policy_grad_fn(
     behaviour_log_probs: Dict[str, jnp.ndarray],
     advantages: Dict[str, jnp.ndarray],
     policy_states: Any,
+    loss_mask: Any,
 ) -> Tuple[Dict, Dict]:
     """Fake policy grad function to be used in MockTrainer
 
@@ -102,6 +103,7 @@ def fake_ppo_critic_grad_fn(
     observations: Any,
     target_values: Dict[str, jnp.ndarray],
     behavior_values: Dict[str, jnp.ndarray],
+    loss_mask: Any,
 ) -> Tuple[Dict, Dict]:
     """Fake critic grad function to be used in MockTrainer
 
@@ -231,6 +233,11 @@ def fake_batch() -> Batch:
             "agent_0": jnp.array([[0.2, 0.6, 0.8], [1.2, 1.6, 1.8]]),
             "agent_1": jnp.array([[0.9, 0.4, 0.8], [1.9, 1.4, 1.8]]),
             "agent_2": jnp.array([[0.8, 0.8, 0.8], [1.8, 1.8, 1.8]]),
+        },
+        loss_masks={
+            "agent_0": jnp.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]),
+            "agent_1": jnp.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]),
+            "agent_2": jnp.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]),
         },
         advantages=jnp.array([2.1, 2.5, 2.7]),
         target_values=jnp.array([3.1, 3.5, 3.7]),

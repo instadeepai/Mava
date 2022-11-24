@@ -142,10 +142,6 @@ class TestEnvironmentSpec:
                 expected_spec._agent_environment_specs[key].observations.legal_actions,
             )
             assert (
-                environment_spec._agent_environment_specs[key].observations.terminal
-                == expected_spec._agent_environment_specs[key].observations.terminal
-            )
-            assert (
                 environment_spec._agent_environment_specs[key].actions
                 == expected_spec._agent_environment_specs[key].actions
             )

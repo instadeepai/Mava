@@ -259,15 +259,9 @@ class ParallelEnvironment(MockedEnvironment, ParallelEnvWrapper):
         observation_specs = {}
         for agent in self.agents:
             legals = self.action_spec()[agent]
-            terminal = acme_specs.Array(
-                (1,),
-                np.float32,
-            )
-
             observation_specs[agent] = OLT(
                 observation=super().observation_spec(),
                 legal_actions=legals,
-                terminal=terminal,
             )
         return observation_specs
 

@@ -8,9 +8,6 @@ import jax
 import jax.numpy as jnp
 import tensorflow as tf
 
-Array = chex.Array
-Scalar = chex.Scalar
-
 
 def non_blocking_sleep(time_in_seconds: int) -> None:
     """Function to sleep for time_in_seconds, without hanging lp program.
@@ -25,12 +22,12 @@ def non_blocking_sleep(time_in_seconds: int) -> None:
 
 
 def clipped_surrogate_pg_loss(
-    prob_ratios_t: Array,
-    adv_t: Array,
-    epsilon: Scalar,
-    loss_masks: Array,
-    use_stop_gradient=True,
-) -> Array:
+    prob_ratios_t: jnp.array,
+    adv_t: jnp.array,
+    epsilon: float,
+    loss_masks: jnp.array,
+    use_stop_gradient: bool = True,
+) -> jnp.array:
     """
     Modified from: https://github.com/deepmind/rlax/blob/master/rlax/_src/policy_gradients.py
     Computes the clipped surrogate policy gradient loss.
