@@ -199,10 +199,7 @@ class SMACWrapper(ParallelEnvWrapper):
         Returns:
             is_dead: boolean indicating whether the agent is alive or dead.
         """
-        is_dead = False
-        if self._environment.agents[int(agent.rsplit("_", -1)[-1])].health == 0.0:
-            is_dead = True
-        return is_dead
+        return self._environment.agents[int(agent.rsplit("_", -1)[-1])].health == 0.0
 
     def _convert_observations(
         self, observations: List, legal_actions: List, done: bool
