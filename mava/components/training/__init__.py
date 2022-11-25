@@ -22,6 +22,7 @@ from mava.components.training.losses import (
     SquaredErrorValueLoss,
 )
 from mava.components.training.model_updating import MAPGEpochUpdate, MAPGMinibatchUpdate
+from mava.components.training.observation_normalisation import ObservationNormalisation
 from mava.components.training.step import DefaultTrainerStep, MAPGWithTrustRegionStep
 from mava.components.training.trainer import (
     BaseTrainerInit,
@@ -29,3 +30,4 @@ from mava.components.training.trainer import (
     OneTrainerPerNetworkInit,
     SingleTrainerInit,
 )
+from mava.components.training.value_normalisation import ValueNormalisation

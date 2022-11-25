@@ -243,7 +243,7 @@ class MAPGWithTrustRegionStep(Step):
 
             # Perform observation normalization if neccesary before proceeding
             observation_stats = states.observation_stats
-            if trainer.store.global_config.normalize_observations:
+            if trainer.store.global_config.normalise_observations:
                 for key in observations.keys():
                     (
                         observation_stats[key],
@@ -284,7 +284,7 @@ class MAPGWithTrustRegionStep(Step):
 
             # Denormalise the values here to keep the GAE function clean
             target_value_stats = states.target_value_stats
-            if trainer.store.global_config.normalize_target_values:
+            if trainer.store.global_config.normalise_target_values:
                 for key in agent_nets:
                     behavior_values[key] = denormalize(
                         target_value_stats[key], behavior_values[key]
@@ -299,7 +299,7 @@ class MAPGWithTrustRegionStep(Step):
                 advantages[key], target_values[key] = batch_gae_advantages(
                     rewards[key], discounts[key], behavior_values[key]
                 )
-                if trainer.store.global_config.normalize_target_values:
+                if trainer.store.global_config.normalise_target_values:
                     target_value_stats[key] = trainer.store.target_running_stats_fn(
                         target_value_stats[key],
                         jnp.reshape(target_values[key], (-1, 1)),
