@@ -281,7 +281,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                             f"critic_opt_state-{agent_net_key}"
                         ]
                     )
-                eval_returns=[]
+                eval_returns = []
                 for _ in range(self._executor.store.absolute_metric_duration):
                     # Add consecutive evaluation run data
                     result = self.run_episode()
@@ -297,7 +297,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     used_results,
                 )
                 if "return" in metric:
-                    eval_result.update({"eval_return":jnp.array(eval_returns)})
+                    eval_result.update({"eval_return": jnp.array(eval_returns)})
                 # Check for extra logs
                 if hasattr(self._environment, "get_interval_stats"):
                     interval_stats = self._environment.get_interval_stats()

@@ -185,7 +185,6 @@ class DefaultParameterServer(ParameterServer):
                         f"critic_opt_state-{agent_net_key}"
                     ] = copy.deepcopy(server.store.critic_opt_states[agent_net_key])
 
-
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
         """Fetch the parameters from the server specified in the store.
