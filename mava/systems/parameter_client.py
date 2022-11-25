@@ -77,12 +77,21 @@ class ParameterClient:
         self._add = lambda params: client.add_to_parameters(params)
 
         self._async_add_buffer: Dict[str, Any] = {}
-        self._async_request = lambda: client.futures.get_parameters(self._get_keys)  # type: ignore # noqa
-        self._async_adjust = lambda: client.futures.set_parameters(  # type: ignore
-            {key: self._parameters[key] for key in self._set_keys},
-        )
-        self._async_adjust_param = lambda params: client.futures.set_parameters(params)  # type: ignore # noqa
-        self._async_add = lambda params: client.futures.add_to_parameters(params)  # type: ignore # noqa
+
+        # parameter server only has `futures` attribute if it is a launchpad node
+        # and it is only a launchpad node if we are running in multiprocess
+        if client.store.global_config.multi_process:
+            self._async_request = lambda: client.futures.get_parameters(self._get_keys)  # type: ignore # noqa
+            self._async_adjust = lambda: client.futures.set_parameters(  # type: ignore
+                {key: self._parameters[key] for key in self._set_keys},
+            )
+            self._async_adjust_param = lambda params: client.futures.set_parameters(params)  # type: ignore # noqa
+            self._async_add = lambda params: client.futures.add_to_parameters(params)  # type: ignore # noqa
+        else:
+            self._async_request = self._request
+            self._async_adjust = self._adjust
+            self._async_adjust_param = self._adjust_param
+            self._async_add = self._add
 
         # Initialize this client's future to None to indicate to the `update()`
         # method that there is no pending/running request.
@@ -102,21 +111,27 @@ class ParameterClient:
         )
         self._copy(self._client.get_parameters(self._get_keys))
 
-    def _async_adjust_and_request(self) -> futures.Future:
+    def _async_adjust_and_request(self) -> Optional[futures.Future]:
         """Set the parameters in the server, then update local params from the server.
 
         Returns:
             A future for the parameter get
         """
-        self._client.futures.set_parameters(  # type: ignore
-            {key: self._parameters[key] for key in self._set_keys},
-        )
-        # not sure how these futures will interact
-        # will it fetch the parameters set above?
-        get_future = self._client.futures.get_parameters(self._get_keys)  # type: ignore
-        get_future.add_done_callback(lambda ctx: self._copy(ctx.result()))
+        # parameter server only has `futures` attribute if it is a launchpad node
+        # and it is only a launchpad node if we are running in multiprocess
+        if self._client.store.global_config.multi_process:
+            self._client.futures.set_parameters(  # type: ignore
+                {key: self._parameters[key] for key in self._set_keys},
+            )
+            # not sure how these futures will interact
+            # will it fetch the parameters set above?
+            get_future = self._client.futures.get_parameters(self._get_keys)  # type: ignore # noqa
+            get_future.add_done_callback(lambda ctx: self._copy(ctx.result()))
 
-        return get_future
+            return get_future
+        else:
+            self._adjust_and_request()
+            return None
 
     def get_async(self) -> None:
         """Asynchronously updates the parameters with the latest copy from server.
@@ -124,6 +139,9 @@ class ParameterClient:
         Returns:
             None.
         """
+        # Do not do parallel calls if not multiprocess
+        if not self._client.store.global_config.multi_process:
+            return self.get_and_wait()
 
         # Track the number of calls (we only update periodically).
         if self._get_call_counter < self._update_period:
@@ -147,6 +165,8 @@ class ParameterClient:
         Returns:
             None.
         """
+        if not self._client.store.global_config.multi_process:
+            return self.set_and_wait(params)
         # Track the number of calls (we only update periodically).
         if self._set_call_counter < self._update_period:
             self._set_call_counter += 1
@@ -171,6 +191,11 @@ class ParameterClient:
         Returns:
             None.
         """
+        if not self._client.store.global_config.multi_process:
+            self.set_and_wait()
+            self.get_and_wait()
+            return
+
         # Track the number of calls (we only update periodically).
         if self._set_get_call_counter < self._update_period:
             self._set_get_call_counter += 1
@@ -191,6 +216,9 @@ class ParameterClient:
         Returns:
             None.
         """
+        if not self._client.store.global_config.multi_process:
+            return self.add_and_wait(params)
+
         if self._add_future is not None and self._add_future.done():
             self._add_future = None
 
@@ -254,7 +282,7 @@ class ParameterClient:
         """
         self._copy(self._request_all())
 
-    def set_and_wait(self, params: Dict[str, Any] = None) -> None:
+    def set_and_wait(self, params: Optional[Dict[str, Any]] = None) -> None:
         """Update server with set parameters. Wait for completion.
 
         Updates server with the set parameters
