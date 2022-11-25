@@ -85,7 +85,7 @@ class SMACWrapper(ParallelEnvWrapper):
 
         # Set env discount to 1 for all agents
         discount_spec = self.discount_spec()
-        self._discounts = {
+        discounts = {
             agent: convert_np_type(discount_spec[agent].dtype, 1)
             for agent in self._agents
         }
@@ -106,7 +106,7 @@ class SMACWrapper(ParallelEnvWrapper):
         else:
             extras = {}
 
-        return parameterized_restart(rewards, self._discounts, observations), extras
+        return parameterized_restart(rewards, discounts, observations), extras
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps in env.
