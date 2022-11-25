@@ -54,6 +54,7 @@ class Step(NamedTuple):
     discounts: Dict[str, mava_types.NestedArray]
     start_of_episode: Union[bool, acme_specs.Array, tf.Tensor, Tuple[()]]
     extras: Dict[str, mava_types.NestedArray]
+    next_extras: Dict[str, mava_types.NestedArray]
 
 
 Trajectory = Step
@@ -68,6 +69,7 @@ class PriorityFnInput(NamedTuple):
     discounts: Dict[str, types.NestedArray]
     start_of_episode: types.NestedArray
     extras: Dict[str, types.NestedArray]
+    next_extras: Dict[str, types.NestedArray]
 
 
 # Define the type of a priority function and the mapping from table to function.
@@ -125,7 +127,6 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
         delta_encoded: bool = False,
         priority_fns: Optional[PriorityFnMapping] = None,
         get_signature_timeout_ms: int = 300_000,
-        use_next_extras: bool = True,
     ):
         """Reverb Base Adder.
 
@@ -142,8 +143,6 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
                 table names to priority functions. Defaults to None.
             get_signature_timeout_ms (int, optional): Timeout while fetching
                 signature. Defaults to 300_000.
-            use_next_extras (bool, optional): Whether to use extras or not. Defaults to
-                True.
         """
         super().__init__(
             client=client,
@@ -153,7 +152,6 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             priority_fns=priority_fns,
             get_signature_timeout_ms=get_signature_timeout_ms,
         )
-        self._use_next_extras = use_next_extras
 
     def write_experience_to_tables(  # noqa
         self,
@@ -181,7 +179,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
 
             # Get the networks use by each agent by
             # converting the network_int_keys to strings.
-            traj_extras = trajectory.extras["network_int_keys"]
+            traj_extras = trajectory.next_extras["network_int_keys"]
             trajectory_net_keys = {}
             agents = sort_str_num(trajectory.actions.keys())
             for agent in agents:
@@ -266,19 +264,36 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
                                 {},
                                 start_of_episode=soe,
                                 extras={},
+                                next_extras={},
                             )
                         else:
                             # Create a new transition trajectory
                             new_trajectory = mava_types.Transition(  # type: ignore
-                                {}, {}, {}, {}, {}, {}, {}
+                                {},
+                                {},
+                                {},
+                                {},
+                                {},
+                                {},
+                                {},
+                                {},
                             )
 
                         # Initialise empty extras
                         for key in trajectory.extras.keys():
                             new_trajectory.extras[key] = {}
-
                             if type(trajectory) == mava_types.Transition:
-                                new_trajectory.next_extras[key] = {}  # type: ignore
+                                raise NotImplementedError(
+                                    "This has not been implemented yet."
+                                )
+
+                        # Initialise empty next_extras
+                        for key in trajectory.next_extras.keys():
+                            new_trajectory.next_extras[key] = {}
+                            if type(trajectory) == mava_types.Transition:
+                                raise NotImplementedError(
+                                    "This has not been implemented yet."
+                                )
 
                         # Go through each of the agents in item_agents and add them
                         # to the new trajectory in the correct spot based on their
@@ -321,27 +336,29 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
                                     # and not per agent. Maybe fix this in the future.
                                     new_trajectory.extras[key] = trajectory.extras[key]
                                 if type(trajectory) == mava_types.Transition:
-                                    ext = trajectory.next_extras[key]  # type: ignore
-                                    if (
-                                        type(ext) is dict  # type: ignore
-                                        and cur_agent in ext  # type: ignore
-                                    ):
-                                        new_trajectory.next_extras[key][  # type: ignore
-                                            want_agent
-                                        ] = trajectory.next_extras[  # type: ignore
-                                            key
-                                        ][  # type: ignore
-                                            cur_agent
-                                        ]  # type: ignore
-                                    else:
-                                        # TODO: (dries) Only actually need to
-                                        # do this once and not per agent. Maybe
-                                        # fix this in the future.
-                                        new_trajectory.next_extras[  # type: ignore
-                                            key
-                                        ] = trajectory.next_extras[  # type: ignore
-                                            key
-                                        ]  # type: ignore
+                                    raise NotImplementedError(
+                                        "This has not been implemented yet."
+                                    )
+
+                            # Write this agent to the next_extras of the new trajectory.
+                            for key in trajectory.next_extras.keys():
+                                if (
+                                    type(trajectory.next_extras[key]) is dict
+                                    and cur_agent in trajectory.next_extras[key]
+                                ):
+                                    new_trajectory.next_extras[key][
+                                        want_agent
+                                    ] = trajectory.next_extras[key][cur_agent]
+                                else:
+                                    # TODO: (dries) Only actually need to do this once
+                                    # and not per agent. Maybe fix this in the future.
+                                    new_trajectory.next_extras[
+                                        key
+                                    ] = trajectory.next_extras[key]
+                                if type(trajectory) == mava_types.Transition:
+                                    raise NotImplementedError(
+                                        "This has not been implemented yet."
+                                    )
 
                         # Write the new_trajectory to the table.
                         self._writer.create_item(
@@ -379,9 +396,9 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             observations=timestep.observation,
             start_of_episode=timestep.first(),
         )
+        if extras:
+            add_dict["next_extras"] = extras
 
-        if self._use_next_extras:
-            add_dict["extras"] = extras
         self._writer.append(
             add_dict,
             partial_step=True,
@@ -393,6 +410,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
         self,
         actions: Dict[str, mava_types.NestedArray],
         next_timestep: dm_env.TimeStep,
+        extras: Dict[str, mava_types.NestedArray] = {},
         next_extras: Dict[str, mava_types.NestedArray] = {},
     ) -> None:
         """Record an action and the following timestep."""
@@ -408,8 +426,8 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             # Start of episode indicator was passed at the previous add call.
         )
 
-        if not self._use_next_extras:
-            current_step["extras"] = next_extras
+        if extras:
+            current_step["extras"] = extras
 
         self._writer.append(current_step)
 
@@ -419,8 +437,9 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             start_of_episode=next_timestep.first(),
         )
 
-        if self._use_next_extras:
-            next_step["extras"] = next_extras
+        if next_extras:
+            next_step["next_extras"] = next_extras
+
         self._writer.append(
             next_step,
             partial_step=True,

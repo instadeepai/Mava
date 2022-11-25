@@ -45,20 +45,21 @@ class ExtrasLogProbSpec(ExtrasSpec):
 
         """
         agent_specs = builder.store.ma_environment_spec.get_agent_environment_specs()
-        builder.store.extras_spec = {"policy_info": {}}
 
+        builder.store.extras_spec = {"policy_info": {}}
         for agent, _ in agent_specs.items():
             # Make dummy log_probs
             builder.store.extras_spec["policy_info"][agent] = np.ones(
                 shape=(), dtype=np.float32
             )
 
+        builder.store.next_extras_spec = {}
         # Add the networks keys to extras.
         net_spec = self.get_network_keys(
             builder.store.unique_net_keys,
             builder.store.ma_environment_spec.get_agent_ids(),
         )
-        builder.store.extras_spec.update(net_spec)
+        builder.store.next_extras_spec.update(net_spec)
 
         # Get the policy state specs
         networks = builder.store.network_factory()
@@ -71,4 +72,4 @@ class ExtrasLogProbSpec(ExtrasSpec):
         if net_states:
             net_spec = {"policy_states": net_states}
 
-        builder.store.extras_spec.update(net_spec)
+        builder.store.next_extras_spec.update(net_spec)
