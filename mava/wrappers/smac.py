@@ -145,13 +145,9 @@ class SMACWrapper(ParallelEnvWrapper):
         for agent in self.possible_agents:
             # If the agent was not done at the start of the episode,
             # it is a valid step (death masking).
-            value = 1 if not self._pre_agents_alive[agent] else 0
-
+            value = not self._pre_agents_alive[agent]
+            self._pre_agents_alive[agent] = self.is_dead(agent)
             discounts[agent] = convert_np_type(self.discount_spec()[agent].dtype, value)
-
-        for i, agent in enumerate(self._agents):
-            # Check if agent is dead.
-            self._pre_agents_alive[agent] = self.is_dead(i)
 
         if self._done:
             self._step_type = dm_env.StepType.LAST
@@ -204,7 +200,7 @@ class SMACWrapper(ParallelEnvWrapper):
             is_dead: boolean indicating whether the agent is alive or dead.
         """
         is_dead = False
-        if self._environment.agents[agent].health == 0.0:
+        if self._environment.agents[int(agent.rsplit("_", -1)[-1])].health == 0.0:
             is_dead = True
         return is_dead
 
@@ -296,7 +292,7 @@ class SMACWrapper(ParallelEnvWrapper):
         return reward_specs
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:
-        """Valid step spec.
+        """Discount spec.
 
         Returns:
             Dict[str, specs.BoundedArray]: spec for discounts.
@@ -361,8 +357,8 @@ class SMACWrapper(ParallelEnvWrapper):
         """Check and returns all death masked agents"""
 
         masked_agents = []
-        for i, agent in enumerate(self._agents):
-            if self._death_masking and self.is_dead(i):
+        for agent in self._agents:
+            if self._death_masking and self.is_dead(agent):
                 masked_agents.append(agent)
 
         return masked_agents

@@ -239,10 +239,8 @@ class MAPGWithTrustRegionStep(Step):
             # Mask which is zero if an episode is done or an agent is done.
             # The final timestep is not masked.
             loss_masks = discounts
-
-             # We use  discounts[1:] because our discount is 1.0 for the last step, where dm_env expects a 0.0.
             discounts = tree.map_structure(
-                lambda x: x * self.config.discount, discounts[1:]
+                lambda x: x * self.config.discount, discounts
             )
 
             behavior_log_probs = extras["policy_info"]
@@ -449,9 +447,6 @@ class MAPGWithTrustRegionStep(Step):
             )
 
             new_states, metrics = sgd_step(states, sample)
-
-            # TODO (dries): Remove the time.sleep call when Sasha's solution is implemented.
-            time.sleep(0.01)
 
             # Set the new variables
             # TODO (dries): key is probably not being store correctly.
