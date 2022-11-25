@@ -76,10 +76,9 @@ class GAE(Utility):
             max_abs_reward = self.config.max_abs_reward
             rewards = jnp.clip(rewards, -max_abs_reward, max_abs_reward)
 
-            # We use  discounts[1:] because our discount is 1.0 for the last step, where dm_env expects a 0.0.
             advantages = rlax.truncated_generalized_advantage_estimation(
                 rewards[:-1],
-                discounts[1:],
+                discounts,
                 self.config.gae_lambda,
                 values,
                 stop_target_gradients=True,
