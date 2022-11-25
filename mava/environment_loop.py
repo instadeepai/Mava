@@ -14,7 +14,6 @@
 # limitations under the License.
 
 """A simple multi-agent-system-environment training loop."""
-
 import copy
 import logging
 import time
@@ -249,7 +248,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         def run_evaluation(results: Any) -> None:
             """Calculate the absolute metric"""
             logging.exception("Calculating the absolute metric")
-            eval_returns = []  # create a dict with checkpointing_metric
+            eval_result: Dict[str, Any] = {}  # create a dict with checkpointing_metric
             for metric in self._executor.store.checkpointing_metric.keys():
                 used_results = copy.deepcopy(results)
                 # update the evaluator network
@@ -282,7 +281,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                             f"critic_opt_state-{agent_net_key}"
                         ]
                     )
-
+                eval_returns=[]
                 for _ in range(self._executor.store.absolute_metric_duration):
                     # Add consecutive evaluation run data
                     result = self.run_episode()
@@ -297,16 +296,15 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     lambda x: x / self._executor.store.absolute_metric_duration,
                     used_results,
                 )
-                eval_result = {
-                    "eval_return": jnp.array(eval_returns),
-                }
+                if "return" in metric:
+                    eval_result.update({"eval_return":jnp.array(eval_returns)})
                 # Check for extra logs
                 if hasattr(self._environment, "get_interval_stats"):
                     interval_stats = self._environment.get_interval_stats()
                     used_results.update(interval_stats)
                     if metric in interval_stats.keys():
                         interval_stats_json = {
-                            "eval_extra" + str(k): v for k, v in interval_stats.items()
+                            "eval_" + str(k): v for k, v in interval_stats.items()
                         }
 
                         # Add interval stats to dictionary for json logging
