@@ -21,8 +21,16 @@ set -x
 
 integration=$1
 
+if grep -sq 'docker\|lxc' /proc/1/cgroup; then
+   echo "Running inside of docker."
+   apt_cmd="apt-get"
+else
+    echo "Running locally."
+    apt_cmd="sudo apt-get"
+fi
+
 # Update
-apt-get update
+$apt_cmd update
 
 # Python must be 3.6 or higher.
 python --version
@@ -40,16 +48,16 @@ source mava_testing/bin/activate
 pip uninstall -y enum34
 
 # For smac
-apt-get -y install git
+$apt_cmd -y install git
 
 # For box2d
-apt-get install swig -y
+$apt_cmd install swig -y
 
 # Install depedencies
 pip install .[jax,envs,reverb,testing_formatting,record_episode]
 
 # For atari envs
-apt-get -y install unrar-free
+$apt_cmd -y install unrar-free
 pip install autorom
 AutoROM -v
 
