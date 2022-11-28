@@ -133,8 +133,9 @@ class ExecutorParameterClient(BaseParameterClient):
         if builder.store.parameter_server_client:
             # Create parameter client
             parameter_client = ParameterClient(
-                client=builder.store.parameter_server_client,
+                server=builder.store.parameter_server_client,
                 parameters=params,
+                multi_process=builder.store.global_config.multi_process,
                 get_keys=get_keys,
                 set_keys=set_keys,
                 update_period=self.config.executor_parameter_update_period,
@@ -223,8 +224,9 @@ class TrainerParameterClient(BaseParameterClient):
         parameter_client = None
         if builder.store.parameter_server_client:
             parameter_client = ParameterClient(
-                client=builder.store.parameter_server_client,
+                server=builder.store.parameter_server_client,
                 parameters=params,
+                multi_process=builder.store.global_config.multi_process,
                 get_keys=get_keys,
                 set_keys=set_keys,
                 update_period=self.config.trainer_parameter_update_period,
