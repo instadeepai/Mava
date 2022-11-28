@@ -13,9 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Local tests running inside a docker container. 
-# We already have a venv in the container so no need to 
-# re-install jax,tf and reverb depedencies. 
+# Local tests running outside of docker. 
 export DEBIAN_FRONTEND=noninteractive
 
 # Bash settings: fail on any error and display all commands being run.
@@ -24,16 +22,16 @@ set -x
 
 integration=$1
 
+# Set up a virtual environment.
+pip install virtualenv
+virtualenv mava_testing
+source mava_testing/bin/activate
+
 # Python must be 3.6 or higher.
 python --version
 
-# For smac
-apt-get -y install git
-
-# Install mava, envs and testing tools.
-pip install .[envs,testing_formatting]
-
-
+# Install depedencies
+pip install .[jax,envs,reverb,testing_formatting,record_episode]
 
 N_CPU=$(grep -c ^processor /proc/cpuinfo)
 # Use only 75% of local CPU cores
