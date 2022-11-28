@@ -28,6 +28,9 @@ python --version
 virtualenv mava_testing
 source mava_testing/bin/activate
 
+# For smac
+apt-get -y install git
+
 # Install depedencies
 pip install .[jax,envs,reverb,testing_formatting,record_episode]
 
