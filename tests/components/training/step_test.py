@@ -191,8 +191,8 @@ class MockTrainer(Trainer):
                 num_epochs=2,
                 sample_batch_size=2,
                 sequence_length=3,
-                normalize_observations=False,
-                normalize_target_values=False,
+                normalise_observations=False,
+                normalise_target_values=False,
             ),
         )
         self.store = store
