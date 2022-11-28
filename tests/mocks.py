@@ -625,6 +625,7 @@ class MockOnPolicyDataServer(MockDataServer):
         table_key: str,
         environment_spec: specs.MAEnvironmentSpec,
         extras_spec: Dict[str, Any],
+        next_extras_spec: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
         """Func returns mock table used in testing.
@@ -633,6 +634,7 @@ class MockOnPolicyDataServer(MockDataServer):
             table_key: key for specific table.
             environment_spec: env spec.
             extras_spec: extras spec.
+            next_extras_spec: next extras spec.
             builder: builder used for building this component.
 
         Returns:
@@ -640,10 +642,15 @@ class MockOnPolicyDataServer(MockDataServer):
         """
         if builder.store.__dict__.get("sequence_length"):
             signature = builder.store.adder_signature_fn(
-                environment_spec, builder.store.sequence_length, extras_spec
+                environment_spec,
+                builder.store.sequence_length,
+                extras_spec,
+                next_extras_spec,
             )
         else:
-            signature = builder.store.adder_signature_fn(environment_spec, extras_spec)
+            signature = builder.store.adder_signature_fn(
+                environment_spec, extras_spec, next_extras_spec
+            )
         return mock_queue(
             name=table_key,
             max_queue_size=self.config.max_queue_size,

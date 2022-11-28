@@ -126,7 +126,6 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             max_sequence_length=n_step + 1,
             priority_fns=priority_fns,
             max_in_flight_items=max_in_flight_items,
-            use_next_extras=True,
         )
 
     def _write(self) -> None:
