@@ -85,7 +85,6 @@ def ippo_system_single_process() -> System:
         multi_process=False,  # Single process case
         run_evaluator=True,
         num_executors=1,
-        use_next_extras=False,
         max_queue_size=5000,
         epoch_batch_size=2,
         max_in_flight_samples_per_worker=4,
@@ -159,7 +158,6 @@ def ippo_system_single_process_norm() -> System:
         multi_process=False,  # Single process case
         run_evaluator=True,
         num_executors=1,
-        use_next_extras=False,
         max_queue_size=5000,
         epoch_batch_size=2,
         max_in_flight_samples_per_worker=4,
@@ -236,7 +234,6 @@ def ippo_system_multi_thread() -> System:
         run_evaluator=True,
         num_executors=1,
         max_queue_size=500,
-        use_next_extras=False,
         epoch_batch_size=5,
         nodes_on_gpu=[],
         is_test=True,
@@ -305,7 +302,6 @@ def ippo_system_multi_thread_eval() -> System:
         run_evaluator=True,
         num_executors=1,
         max_queue_size=500,
-        use_next_extras=False,
         epoch_batch_size=5,
         nodes_on_gpu=[],
         is_test=True,

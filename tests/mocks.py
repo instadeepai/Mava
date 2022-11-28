@@ -562,6 +562,7 @@ class MockDataServer(Component):
         builder.store.table_network_config = {"table_0": "network_0"}
         data_tables = []
         extras_spec: dict = {}
+        next_extras_spec: dict = {}
         for table_key in builder.store.table_network_config.keys():
             num_networks = len(builder.store.table_network_config[table_key])
             env_spec = copy.deepcopy(builder.store.ma_environment_spec)
@@ -572,7 +573,9 @@ class MockDataServer(Component):
                     num_networks,
                 )
             )
-            table = self.table(table_key, env_spec, extras_spec, builder)
+            table = self.table(
+                table_key, env_spec, extras_spec, next_extras_spec, builder
+            )
             data_tables.append(table)
         return data_tables
 
@@ -582,6 +585,7 @@ class MockDataServer(Component):
         table_key: str,
         environment_spec: specs.MAEnvironmentSpec,
         extras_spec: Dict[str, Any],
+        next_extras_spec: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
         """_summary_"""
@@ -612,6 +616,7 @@ class MockOnPolicyDataServer(MockDataServer):
         builder.store.table_network_config = {"table_0": "network_0"}
         data_tables = []
         extras_spec: dict = {}
+        next_extras_spec: Dict[Any, Any] = {}
         for table_key in builder.store.table_network_config.keys():
             num_networks = len(builder.store.table_network_config[table_key])
             env_spec = copy.deepcopy(builder.store.ma_environment_spec)
@@ -622,7 +627,9 @@ class MockOnPolicyDataServer(MockDataServer):
                     num_networks,
                 )
             )
-            table = self.table(table_key, env_spec, extras_spec, builder)
+            table = self.table(
+                table_key, env_spec, extras_spec, next_extras_spec, builder
+            )
             data_tables.append(table)
         return data_tables
 
@@ -631,6 +638,7 @@ class MockOnPolicyDataServer(MockDataServer):
         table_key: str,
         environment_spec: specs.MAEnvironmentSpec,
         extras_spec: Dict[str, Any],
+        next_extras_spec: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
         """Func returns mock table used in testing.
@@ -639,6 +647,7 @@ class MockOnPolicyDataServer(MockDataServer):
             table_key: key for specific table.
             environment_spec: env spec.
             extras_spec: extras spec.
+            next_extras_spec: next extras spec.
             builder: builder used for building this component.
 
         Returns:
@@ -646,10 +655,15 @@ class MockOnPolicyDataServer(MockDataServer):
         """
         if builder.store.__dict__.get("sequence_length"):
             signature = builder.store.adder_signature_fn(
-                environment_spec, builder.store.sequence_length, extras_spec
+                environment_spec,
+                builder.store.sequence_length,
+                extras_spec,
+                next_extras_spec,
             )
         else:
-            signature = builder.store.adder_signature_fn(environment_spec, extras_spec)
+            signature = builder.store.adder_signature_fn(
+                environment_spec, extras_spec, next_extras_spec
+            )
         return mock_queue(
             name=table_key,
             max_queue_size=self.config.max_queue_size,
@@ -673,6 +687,7 @@ class MockOffPolicyDataServer(MockDataServer):
         builder.store.table_network_config = {"table_0": "network_0"}
         data_tables = []
         extras_spec: dict = {}
+        next_extras_spec: Dict[Any, Any] = {}
         for table_key in builder.store.table_network_config.keys():
             num_networks = len(builder.store.table_network_config[table_key])
             env_spec = copy.deepcopy(builder.store.ma_environment_spec)
@@ -683,7 +698,9 @@ class MockOffPolicyDataServer(MockDataServer):
                     num_networks,
                 )
             )
-            table = self.table(table_key, env_spec, extras_spec, builder)
+            table = self.table(
+                table_key, env_spec, extras_spec, next_extras_spec, builder
+            )
             data_tables.append(table)
         return data_tables
 
@@ -692,6 +709,7 @@ class MockOffPolicyDataServer(MockDataServer):
         table_key: str,
         environment_spec: specs.MAEnvironmentSpec,
         extras_spec: Dict[str, Any],
+        next_extras_spec: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
         """Func returns mock table used in testing.
@@ -712,7 +730,9 @@ class MockOffPolicyDataServer(MockDataServer):
             max_size=self.config.max_size,
             max_times_sampled=self.config.max_times_sampled,
             rate_limiter=builder.store.rate_limiter_fn(),
-            signature=builder.store.adder_signature_fn(environment_spec, extras_spec),
+            signature=builder.store.adder_signature_fn(
+                environment_spec, extras_spec, next_extras_spec
+            ),
         )
 
 

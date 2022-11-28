@@ -126,7 +126,6 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             max_sequence_length=n_step + 1,
             priority_fns=priority_fns,
             max_in_flight_items=max_in_flight_items,
-            use_next_extras=True,
         )
 
     def _write(self) -> None:
@@ -211,6 +210,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         cls,
         ma_environment_spec: mava_specs.MAEnvironmentSpec,
         extras_specs: Dict[str, Any] = {},
+        next_extras_specs: Dict[str, Any] = {},
     ) -> tf.TypeSpec:
         """Signature for adder.
 
@@ -235,7 +235,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         agent_environment_specs = ma_environment_spec.get_agent_environment_specs()
         agents = ma_environment_spec.get_agent_ids()
         env_extras_specs = ma_environment_spec.get_extras_specs()
-        extras_specs.update(env_extras_specs)
+        next_extras_specs.update(env_extras_specs)
 
         obs_specs = {}
         act_specs = {}
@@ -265,7 +265,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             rewards=reward_specs,
             discounts=step_discount_specs,
             extras=extras_specs,
-            next_extras=extras_specs,
+            next_extras=next_extras_specs,
         )
 
         return tree.map_structure_with_path(
