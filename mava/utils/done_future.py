@@ -34,4 +34,8 @@ class DoneFuture(futures.Future, Generic[T]):
 
     def cancel(self) -> bool:
         """Returns false as the future is complete and cannot be cancelled"""
-        return True
+        return False
+
+    def __repr__(self) -> str:
+        """Returns representation of DoneFuture as string"""
+        return f"DoneFuture with value: {self._result}"
