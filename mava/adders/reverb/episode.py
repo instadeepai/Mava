@@ -85,6 +85,7 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
         self,
         action: types.NestedArray,
         next_timestep: dm_env.TimeStep,
+        extras: types.NestedArray = (),
         next_extras: types.NestedArray = (),
     ) -> None:
         if self._writer.episode_steps >= self._max_sequence_length - 1:
@@ -93,7 +94,7 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
                 "max_sequence_length with the addition of this transition."
             )
 
-        super().add(action, next_timestep, next_extras)
+        super().add(action, next_timestep, extras, next_extras)
 
     def _write_last(self) -> None:
         if (
@@ -106,6 +107,7 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
                 action=history["action"],
                 reward=history["reward"],
                 discount=history["discount"],
+                next_extras=history.get("next_extras", ()),
                 extras=history.get("extras", ()),
             )
             # Get shapes and dtypes from the last element.

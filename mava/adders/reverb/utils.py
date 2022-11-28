@@ -39,9 +39,12 @@ def final_step_like(
         rewards=zero_reward,
         discounts=zero_discount,
         start_of_episode=False,
-        extras=next_extras
+        extras=tree.map_structure(
+            acme_utils.zeros_like, step.extras
+        ),  # Actions are zero-filled.
+        next_extras=next_extras
         if next_extras
-        else tree.map_structure(acme_utils.zeros_like, step.extras),
+        else tree.map_structure(acme_utils.zeros_like, step.next_extras),
     )
 
 
