@@ -33,8 +33,6 @@ apt-get -y install git
 # Install mava, envs and testing tools.
 pip install .[envs,testing_formatting]
 
-
-
 N_CPU=$(grep -c ^processor /proc/cpuinfo)
 # Use only 75% of local CPU cores
 N_CPU_INTEGRATION=`expr $N_CPU \* 3 / 4`
@@ -47,6 +45,3 @@ else
     pytest --cov --cov-report=xml --durations=10 -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
 fi
 
-# Clean-up.
-deactivate
-rm -rf mava_testing/
