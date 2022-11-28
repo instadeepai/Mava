@@ -18,26 +18,13 @@ export DEBIAN_FRONTEND=noninteractive
 set -e
 set -x
 
-# Update
-apt-get update
-
 # Python must be 3.7 or higher.
 python --version
-
-# Install dependencies.
-pip install --upgrade pip setuptools
-pip --version
 
 # Set up a virtual environment.
 pip install virtualenv
 virtualenv mava_testing
 source mava_testing/bin/activate
-
-# Fix module 'enum' has no attribute 'IntFlag' for py3.6
-pip uninstall -y enum34
-
-# For box2d
-apt-get install swig -y
 
 pip install .[testing_formatting]
 # Check code follows black formatting.

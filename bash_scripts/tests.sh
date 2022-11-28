@@ -24,24 +24,12 @@ integration=$1
 # Python must be 3.6 or higher.
 python --version
 
-# Install dependencies.
-pip install --upgrade pip setuptools
-pip --version
-
 # Set up a virtual environment.
-pip install virtualenv
 virtualenv mava_testing
 source mava_testing/bin/activate
 
-# Fix module 'enum' has no attribute 'IntFlag' for py3.6
-pip uninstall -y enum34
-
 # Install depedencies
 pip install .[jax,envs,reverb,testing_formatting,record_episode]
-
-# For atari envs
-pip install autorom
-AutoROM -v
 
 N_CPU=$(grep -c ^processor /proc/cpuinfo)
 
