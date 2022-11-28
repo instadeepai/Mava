@@ -20,10 +20,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Check format and types
         run: |
-          docker run --mount "type=bind,src=$(pwd),dst=/tmp/mava" \
-              -w "/tmp/mava" --rm ${{ matrix.docker-image }} /bin/bash bash_scripts/check_format.sh
+          ./bin/bash bash_scripts/check_format.sh
       - name: Run tests in docker
         run: |
-          ci_env=`bash <(curl -s https://codecov.io/env)`
-          docker run $ci_env -e CI=true --mount "type=bind,src=$(pwd),dst=/tmp/mava" \
-              -w "/tmp/mava" --rm ${{ matrix.docker-image }} /bin/bash bash_scripts/tests.sh
+          ./bin/bash bash_scripts/tests.sh
