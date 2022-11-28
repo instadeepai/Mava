@@ -16,7 +16,7 @@
 """Parameter client for Jax system. Adapted from Deepmind's Acme library"""
 
 from concurrent import futures
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import jax
 import numpy as np
@@ -103,7 +103,7 @@ class ParameterClient:
         # method that there is no pending/running request.
         self._get_future: Optional[futures.Future] = None
         self._set_future: Optional[futures.Future] = None
-        self._set_get_future: Optional[futures.Future] = None
+        self._set_get_future: Optional[Tuple[futures.Future, futures.Future]] = None
         self._add_future: Optional[futures.Future] = None
 
     def _adjust_and_request(self) -> None:
@@ -117,7 +117,9 @@ class ParameterClient:
         )
         self._copy(self._server.get_parameters(self._get_keys))
 
-    def _async_adjust_and_request(self) -> Optional[futures.Future]:
+    def _async_adjust_and_request(
+        self,
+    ) -> Optional[Tuple[futures.Future, futures.Future]]:
         """Set the parameters in the server, then update local params from the server.
 
         Returns:
@@ -130,7 +132,7 @@ class ParameterClient:
 
         # parameter server only has `futures` attribute if it is a launchpad node
         # and it is only a launchpad node if we are running in multiprocess
-        self._server.futures.set_parameters(  # type: ignore
+        set_future = self._server.futures.set_parameters(  # type: ignore
             {key: self._parameters[key] for key in self._set_keys},
         )
         # Get all parameters in _get_keys that we didn't set above with _set_keys
@@ -138,7 +140,7 @@ class ParameterClient:
         get_future = self._server.futures.get_parameters(get_keys)  # type: ignore
         get_future.add_done_callback(lambda ctx: self._copy(ctx.result()))
 
-        return get_future
+        return set_future, get_future
 
     def get_async(self) -> None:
         """Asynchronously updates the parameters with the latest copy from server.
@@ -203,7 +205,10 @@ class ParameterClient:
             self._set_get_future = self._async_adjust_and_request()
             self._set_get_call_counter = 0
             return
-        if self._set_get_future is not None and self._set_get_future.done():
+
+        if self._set_get_future is not None and all(
+            [f.done() for f in self._set_get_future]
+        ):
             self._set_get_future = None
 
     def add_async(self, params: Dict[str, Any]) -> None:
