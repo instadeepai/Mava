@@ -63,6 +63,11 @@ else
     pytest --cov=./ --cov-report=xml --durations=10 -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
 fi
 
+# Code coverage
+curl -Os https://uploader.codecov.io/latest/linux/codecov
+chmod +x codecov
+./codecov --rootDir=./ --file=coverage.xml
+
 # Clean-up.
 deactivate
 rm -rf mava_testing/
