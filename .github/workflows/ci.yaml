@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Check format and types
         run: |
-          ./bin/bash bash_scripts/check_format.sh
+          ./bash_scripts/check_format.sh
       - name: Run tests in docker
         run: |
-          ./bin/bash bash_scripts/tests.sh
+          ./bash_scripts/tests.sh
