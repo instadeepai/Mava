@@ -2,7 +2,7 @@
 ## How to run
 - Build, download packages and test on local environment
     ```bash
-    ./bash_scripts/tf_tests.sh
+    ./bash_scripts/local_tests_venv.sh
     ```
 - Use Docker
     ```

@@ -1,0 +1,20 @@
+coverage:
+  status:
+    project:
+      default:
+        # basic
+        target: auto
+        # Only fail PR, if codecov drops by 1%.
+        threshold: 1%
+        base: auto
+        branch:
+          - develop
+    patch:
+      default:
+        # basic
+        target: auto
+        # Only fail PR, if codecov drops by 1%.
+        threshold: 1%
+        base: auto
+        branch:
+          - develop
