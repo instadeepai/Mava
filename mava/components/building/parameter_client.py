@@ -21,6 +21,7 @@ import numpy as np
 
 from mava.callbacks import Callback
 from mava.components import Component
+from mava.components.building.best_checkpointer import BestCheckpointer
 from mava.components.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemBuilder
 from mava.systems import ParameterClient
@@ -118,6 +119,7 @@ class ExecutorParameterClient(BaseParameterClient):
 
         if (
             builder.store.is_evaluator
+            and builder.has(BestCheckpointer)
             and builder.store.global_config.checkpoint_best_perf
         ):
             params["best_checkpoint"] = builder.store.best_checkpoint

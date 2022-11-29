@@ -50,7 +50,7 @@ class BestCheckpointer(Component):
         networks = system.store.networks
 
         # Create a dictionary of all parameters to save
-        for metric in system.store.checkpointing_metrics:
+        for metric in self.config.checkpointing_metric:
             params[metric] = {}
             params[metric]["best_performance"] = None
             for agent_net_key in system.store.networks.keys():
