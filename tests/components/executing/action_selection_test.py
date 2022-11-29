@@ -30,6 +30,8 @@ from mava.components.executing.action_selection import (
     FeedforwardExecutorSelectAction,
     RecurrentExecutorSelectAction,
 )
+from mava.components.training.observation_normalisation import ObservationNormalisation
+from mava.components.training.value_normalisation import ValueNormalisation
 from mava.systems.executor import Executor
 from mava.types import OLT, NestedArray
 
@@ -230,6 +232,7 @@ class MockFeedForwardExecutor(Executor):
             ),
         )
         self.store = store
+        self.callbacks = [ObservationNormalisation, ValueNormalisation]
 
     def set_agent(self, agent: str) -> None:
         """Update agent, observation
@@ -409,6 +412,7 @@ class MockRecurrentExecutor(Executor):  # type: ignore # noqa: E501
             ),
         )
         self.store = store
+        self.callbacks = [ObservationNormalisation, ValueNormalisation]
 
     def set_agent(self, agent: str) -> None:
         """Update agent, observation
