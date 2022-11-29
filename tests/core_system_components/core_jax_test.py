@@ -20,7 +20,26 @@ from typing import Any, List
 
 import pytest
 
+from mava.components.building.parameter_client import (
+    BaseParameterClient,
+    ExecutorParameterClient,
+    TrainerParameterClient,
+)
+from mava.components.executing.action_selection import FeedforwardExecutorSelectAction
 from mava.core_jax import BaseSystem, SystemBuilder
+from mava.systems.builder import Builder
+
+
+class MockBuilder(Builder):
+    def __init__(self) -> None:
+        """Init for mock builder"""
+        self.callbacks = [ExecutorParameterClient(), FeedforwardExecutorSelectAction()]
+
+
+@pytest.fixture
+def builder() -> MockBuilder:
+    """Fixture for mock builder"""
+    return MockBuilder()
 
 
 def test_exception_for_incomplete_child_system_class() -> None:
@@ -60,3 +79,15 @@ def test_exception_for_incomplete_child_builder_class() -> None:
                 pass
 
         TestIncompleteDummySystemBuilder()  # type: ignore
+
+
+def test_has_component(builder: Builder) -> None:
+    """Tests if the core_component.has method works"""
+    assert builder.has(ExecutorParameterClient)
+    assert builder.has(FeedforwardExecutorSelectAction)
+    assert not builder.has(TrainerParameterClient)
+    # make sure that has does not check for subclasses by default
+    assert not builder.has(BaseParameterClient)
+    # make sure that subtypes work as expected
+    assert builder.has(BaseParameterClient, subtypes=True)
+    assert not builder.has(TrainerParameterClient, subtypes=True)
