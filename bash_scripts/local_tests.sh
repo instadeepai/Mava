@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Local tests running inside a docker container. 
+# We already have a venv in the container so no need to 
+# re-install jax,tf and reverb depedencies. 
 export DEBIAN_FRONTEND=noninteractive
 
 # Bash settings: fail on any error and display all commands being run.
@@ -21,37 +24,14 @@ set -x
 
 integration=$1
 
-# Update
-apt-get update
-
 # Python must be 3.6 or higher.
 python --version
-
-# Install dependencies.
-pip install --upgrade pip setuptools
-pip --version
-
-# Set up a virtual environment.
-pip install virtualenv
-virtualenv mava_testing
-source mava_testing/bin/activate
-
-# Fix module 'enum' has no attribute 'IntFlag' for py3.6
-pip uninstall -y enum34
 
 # For smac
 apt-get -y install git
 
-# For box2d
-apt-get install swig -y
-
-# Install depedencies
-pip install .[jax,envs,reverb,testing_formatting,record_episode]
-
-# For atari envs
-apt-get -y install unrar-free
-pip install autorom
-AutoROM -v
+# Install mava, envs and testing tools.
+pip install .[envs,testing_formatting]
 
 N_CPU=$(grep -c ^processor /proc/cpuinfo)
 # Use only 75% of local CPU cores
@@ -65,6 +45,3 @@ else
     pytest --cov --cov-report=xml --durations=10 -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
 fi
 
-# Clean-up.
-deactivate
-rm -rf mava_testing/
