@@ -65,7 +65,7 @@ class BaseSystemComponent(abc.ABC):
 
     def __init__(self) -> None:
         """Core component init"""
-        self.store: SimpleNamespace
+        self.store: SimpleNamespace = SimpleNamespace()
         self.callbacks: List
 
     def has(self, component: Type, subtypes: bool = False) -> bool:
