@@ -16,7 +16,9 @@
 
 """Tests for core Mava interfaces for Jax systems."""
 
+from types import SimpleNamespace
 from typing import Any, List
+from unittest.mock import patch
 
 import pytest
 
@@ -26,7 +28,13 @@ from mava.components.building.parameter_client import (
     TrainerParameterClient,
 )
 from mava.components.executing.action_selection import FeedforwardExecutorSelectAction
-from mava.core_jax import BaseSystem, SystemBuilder
+from mava.core_jax import (
+    BaseSystem,
+    SystemBuilder,
+    SystemExecutor,
+    SystemParameterClient,
+    SystemTrainer,
+)
 from mava.systems.builder import Builder
 
 
@@ -91,3 +99,35 @@ def test_has_component(builder: Builder) -> None:
     # make sure that subtypes work as expected
     assert builder.has(BaseParameterClient, subtypes=True)
     assert not builder.has(TrainerParameterClient, subtypes=True)
+
+
+# Allows testing of abstract class
+@patch.multiple(SystemTrainer, __abstractmethods__=set())
+def test_system_trainer__init__() -> None:
+    """Test system trainer init"""
+    trainer = SystemTrainer()  # type: ignore
+    assert trainer.store == SimpleNamespace()
+
+
+# Allows testing of abstract class
+@patch.multiple(SystemBuilder, __abstractmethods__=set())
+def test_system_builder__init__() -> None:
+    """Test system builder init"""
+    builder = SystemBuilder()  # type: ignore
+    assert builder.store == SimpleNamespace()
+
+
+# Allows testing of abstract class
+@patch.multiple(SystemExecutor, __abstractmethods__=set())
+def test_system_executor__init__() -> None:
+    """Test system executor init"""
+    executor = SystemExecutor()  # type: ignore
+    assert executor.store == SimpleNamespace()
+
+
+# Allows testing of abstract class
+@patch.multiple(SystemParameterClient, __abstractmethods__=set())
+def test_system_param_client__init__() -> None:
+    """Test system parameter client init"""
+    param_client = SystemParameterClient()  # type: ignore
+    assert param_client.store == SimpleNamespace()
