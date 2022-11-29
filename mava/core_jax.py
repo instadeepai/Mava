@@ -20,8 +20,6 @@ import abc
 from types import SimpleNamespace
 from typing import Any, Dict, List, Sequence, Tuple, Type, Union
 
-# from mava.callbacks.base import Callback
-# import mava.callbacks.base as callbacks
 from mava.specs import DesignSpec
 
 
