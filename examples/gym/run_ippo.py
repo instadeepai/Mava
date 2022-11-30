@@ -12,27 +12,26 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run feedforward MADQN on SMAC."""
 
-
+"""Example running IPPO on debug MPE environments."""
 import functools
 from datetime import datetime
 from typing import Any
-
+import gym
 import optax
 from absl import app, flags
 
 from mava.components.component_groups import recurrent_policy_components
-from mava.components.training import HuberValueLoss
 from mava.systems import ippo
-from mava.utils.environments.smac_utils import make_environment
+from mava.wrappers.double_independent_gym import DoubleIndependentGym
 from mava.utils.loggers import logger_utils
+from mava.components.training import HuberValueLoss
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "map_name",
-    "8m",
-    "Starcraft 2 micromanagement map name (str).",
+    "env_name",
+    "CartPole-v1",
+    "Debugging environment name (str).",
 )
 
 flags.DEFINE_string(
@@ -40,23 +39,23 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "logs", "Base dir to store experiments.")
 
-BATCH_SIZE = 256
-
+def make_environment(env_name, evaluation=False):
+    env = gym.make(env_name)
+    env = DoubleIndependentGym(env)
+    return env, f"Double {env_name}"
 
 def main(_: Any) -> None:
-    """Example running feedforward MADQN on SMAC environment."""
+    """Example running recurrent IPPO on debugging environment."""
+    BATCH_SIZE = 256
 
-    # Environment
+    # Environment.
     environment_factory = functools.partial(
         make_environment,
-        map_name=FLAGS.map_name,
-        concat_agent_id=True,
-        death_masking=True,
+        env_name=FLAGS.env_name,
     )
 
-    # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return ippo.make_default_networks(  # type: ignore
             policy_layer_sizes=[64, 64],
@@ -120,7 +119,7 @@ def main(_: Any) -> None:
         evaluation_duration={"evaluator_episodes": 10},
         # evaluation_duration={"evaluator_episodes": 32},
         huber_delta=10.0,
-        clip_value=False,
+        clip_value=True,
         clipping_epsilon=0.2,
         entropy_cost=3e-4,
         executor_parameter_update_period=20,
