@@ -98,6 +98,7 @@ def main(_: Any) -> None:
         experiment_path=experiment_path,
         policy_optimiser=policy_optimiser,
         epsilon_scheduler=epsilon_scheduler,
+        reverb_table_max_size=10_000,
         run_evaluator=True,
         sample_batch_size=128,
         num_executors=1,
