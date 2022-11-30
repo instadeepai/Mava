@@ -28,6 +28,7 @@ from mava.components.building.parameter_client import (
     TrainerParameterClient,
 )
 from mava.components.executing.action_selection import FeedforwardExecutorSelectAction
+from mava.components.executing.observing import ExecutorObserve
 from mava.core_jax import (
     BaseSystem,
     SystemBuilder,
@@ -91,14 +92,14 @@ def test_exception_for_incomplete_child_builder_class() -> None:
 
 def test_has_component(builder: Builder) -> None:
     """Tests if the core_component.has method works"""
-    assert builder.has(ExecutorParameterClient)
-    assert builder.has(FeedforwardExecutorSelectAction)
-    assert not builder.has(TrainerParameterClient)
-    # make sure that has does not check for subclasses by default
-    assert not builder.has(BaseParameterClient)
+    # make sure builder checks for sub types by default
+    assert builder.has(BaseParameterClient)
     # make sure that subtypes work as expected
-    assert builder.has(BaseParameterClient, subtypes=True)
-    assert not builder.has(TrainerParameterClient, subtypes=True)
+    assert builder.has(ExecutorParameterClient)
+    assert not builder.has(TrainerParameterClient)
+
+    assert builder.has(FeedforwardExecutorSelectAction)
+    assert not builder.has(ExecutorObserve)
 
 
 # Allows testing of abstract class
