@@ -25,9 +25,13 @@ import pytest
 import rlax
 
 from mava import constants
-from mava.components.training.observation_normalisation import ObservationNormalisation
+from mava.components.training.normalisation.observation_normalisation import (
+    ObservationNormalisation,
+)
+from mava.components.training.normalisation.value_normalisation import (
+    ValueNormalisation,
+)
 from mava.components.training.step import DefaultTrainerStep, MAPGWithTrustRegionStep
-from mava.components.training.value_normalisation import ValueNormalisation
 from mava.systems.trainer import Trainer
 from tests.components.training.step_test_data import dummy_sample
 

@@ -3,7 +3,7 @@ from functools import partial
 from typing import List, Optional
 
 from mava import constants
-from mava.components.component import Component
+from mava.components.training.normalisation.base_normalisation import BaseNormalisation
 from mava.core_jax import SystemBuilder, SystemParameterServer, SystemTrainer
 from mava.utils.jax_training_utils import (
     construct_norm_axes_list,
@@ -18,7 +18,7 @@ class ObservationNormalisationConfig:
     normalize_axes: Optional[List[float]] = field(default_factory=lambda: None)
 
 
-class ObservationNormalisation(Component):
+class ObservationNormalisation(BaseNormalisation):
     def __init__(
         self, config: ObservationNormalisationConfig = ObservationNormalisationConfig()
     ) -> None:

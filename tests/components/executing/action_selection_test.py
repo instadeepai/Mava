@@ -30,8 +30,12 @@ from mava.components.executing.action_selection import (
     FeedforwardExecutorSelectAction,
     RecurrentExecutorSelectAction,
 )
-from mava.components.training.observation_normalisation import ObservationNormalisation
-from mava.components.training.value_normalisation import ValueNormalisation
+from mava.components.training.normalisation.observation_normalisation import (
+    ObservationNormalisation,
+)
+from mava.components.training.normalisation.value_normalisation import (
+    ValueNormalisation,
+)
 from mava.systems.executor import Executor
 from mava.types import OLT, NestedArray
 

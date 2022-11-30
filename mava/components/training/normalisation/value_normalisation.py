@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from mava import constants
-from mava.components.component import Component
+from mava.components.training.normalisation.base_normalisation import BaseNormalisation
 from mava.core_jax import SystemBuilder, SystemParameterServer, SystemTrainer
 from mava.utils.jax_training_utils import (
     compute_running_mean_var_count,
@@ -14,7 +14,7 @@ class ValueNormalisationConfig:
     normalise_target_values: bool = True
 
 
-class ValueNormalisation(Component):
+class ValueNormalisation(BaseNormalisation):
     def __init__(
         self, config: ValueNormalisationConfig = ValueNormalisationConfig()
     ) -> None:
