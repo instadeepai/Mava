@@ -1,6 +1,5 @@
 from types import SimpleNamespace
 
-import numpy as np
 import pytest
 from acme.specs import DiscreteArray
 
@@ -11,22 +10,24 @@ from tests.mocks import make_fake_env_specs
 
 
 class MockBuilder(Builder):
-    def __init__(self, store) -> None:
+    def __init__(self, store: SimpleNamespace) -> None:
+        """Initialises a mock builder"""
         self.store = store
 
 
 @pytest.fixture
-def builder():
+def builder() -> Builder:
+    """Creates a mock builder"""
     return MockBuilder(
         SimpleNamespace(
-            unique_net_keys=["network_0", "network_1"],
+            unique_net_keys=[1, 2],
             ma_environment_spec=make_fake_env_specs(),
         )
     )
 
 
-def test_on_building_init_end(builder: SystemBuilder):
-    """Tests that extras spec is created"""
+def test_on_building_init_end(builder: SystemBuilder) -> None:
+    """Tests that extras spec is created in the store and only network keys are added"""
     extras_spec_component = DQNExtrasSpec()
     extras_spec_component.on_building_init_end(builder)
     assert builder.store.extras_spec == {
