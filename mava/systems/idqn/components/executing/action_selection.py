@@ -28,7 +28,7 @@ from mava.core_jax import SystemExecutor
 from mava.systems.idqn.idqn_network import IDQNNetwork
 
 
-class FeedforwardExecutorSelectAction(ExecutorSelectAction):
+class DQNFeedforwardExecutorSelectAction(ExecutorSelectAction):
     def __init__(self, config: SimpleNamespace = SimpleNamespace()):
         """Component defines hooks for the executor selecting actions.
 
@@ -47,7 +47,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             None.
         """
         # Epsilon Scheduling
-        executor.store.action_selection_step = 0.0
+        executor.store.action_selection_step = 0
 
         networks = executor.store.networks
         agent_net_keys = executor.store.agent_net_keys
@@ -134,7 +134,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
         Returns:
             None.
         """
-        executor.store.action_selection_step += 1.0
+        executor.store.action_selection_step += 1
 
         # Dict with params per network
         current_agent_params = {
@@ -144,7 +144,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
 
         # Epsilon Scheduling
         epsilon = executor.store.epsilon_scheduler(executor.store.action_selection_step)
-        if executor._evaluator:  # type:ignore
+        if executor.store.is_evaluator:
             epsilon = 0.0
 
         executor.store.episode_metrics["epsilon"] = epsilon

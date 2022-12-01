@@ -1,3 +1,5 @@
-from .action_selection import FeedforwardExecutorSelectAction
+"""DQN executor components"""
+
+from .action_selection import DQNFeedforwardExecutorSelectAction
 from .epsilon_scheduler import EpsilonScheduler
-from .observing import FeedforwardExecutorObserve
+from .observing import DQNFeedforwardExecutorObserve

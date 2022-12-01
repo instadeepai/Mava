@@ -53,8 +53,8 @@ class IDQNSystem(System):
         # Executor
         executor_process = DesignSpec(
             executor_init=executing.ExecutorInit,
-            executor_observe=dqn_executing.FeedforwardExecutorObserve,
-            executor_select_action=dqn_executing.FeedforwardExecutorSelectAction,
+            executor_observe=dqn_executing.DQNFeedforwardExecutorObserve,
+            executor_select_action=dqn_executing.DQNFeedforwardExecutorSelectAction,
             executor_adder=ParallelTransitionAdder,
             adder_priority=building.UniformAdderPriority,
             rate_limiter=building.reverb_components.SampleToInsertRateLimiter,
