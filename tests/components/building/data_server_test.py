@@ -76,6 +76,7 @@ def mock_builder() -> Builder:
         "agent_2": "network_agent",
     }
     builder.store.extras_spec = {}
+    builder.store.next_extras_spec = {}
 
     return builder
 
@@ -112,7 +113,8 @@ def test_off_policy_data_server(
 
     mock_builder.store.rate_limiter_fn = lambda: reverb.rate_limiters.MinSize(1000)
     mock_builder.store.adder_signature_fn = (
-        lambda x, y: reverb_adders.ParallelNStepTransitionAdder.signature(x, y)
+        lambda ma_environment_spec, extras_specs, next_extras_specs: reverb_adders.ParallelNStepTransitionAdder.signature(ma_environment_spec,
+        extras_specs, next_extras_specs)
     )
     mock_builder.store.sampler_fn = lambda: sampler
     mock_builder.store.remover_fn = lambda: remover
@@ -138,8 +140,8 @@ def test_on_policy_data_server_no_sequence_length(
 ) -> None:
     """Tests on policy data server when no sequence length is given"""
 
-    mock_builder.store.adder_signature_fn = lambda env_specs, extras_specs: reverb_adders.ParallelNStepTransitionAdder.signature(  # noqa: E501
-        env_specs, extras_specs
+    mock_builder.store.adder_signature_fn = lambda env_specs, extras_specs, next_extras_specs: reverb_adders.ParallelNStepTransitionAdder.signature(  # noqa: E501
+        env_specs, extras_specs, next_extras_specs
     )
 
     data_server = OnPolicyDataServer()
@@ -158,8 +160,8 @@ def test_on_policy_data_server_with_sequence_length(
     """Tests on policy data server when sequence length and \
         sequence adder is given"""
 
-    mock_builder.store.adder_signature_fn = lambda env_specs, seq_length, extras_specs: reverb_adders.ParallelSequenceAdder.signature(  # noqa: E501
-        env_specs, seq_length, extras_specs
+    mock_builder.store.adder_signature_fn = lambda env_specs, seq_length, extras_specs, next_extras_specs: reverb_adders.ParallelSequenceAdder.signature(  # noqa: E501
+        env_specs, seq_length, extras_specs, next_extras_specs
     )
 
     mock_builder.store.global_config = SimpleNamespace(sequence_length=20)

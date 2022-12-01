@@ -36,6 +36,7 @@ class MockStep:
         discounts: Any,
         start_of_episode: Any,
         extras: Any,
+        next_extras: Any,
     ) -> None:
         """Init"""
         self.observations = observations
@@ -44,6 +45,7 @@ class MockStep:
         self.discounts = discounts
         self.start_of_episode = start_of_episode
         self.extras = extras
+        self.next_extras = next_extras
 
     def tree_flatten(self) -> Tuple:
         """Needed for the pytree"""
@@ -54,6 +56,7 @@ class MockStep:
             self.discounts,
             self.start_of_episode,
             self.extras,
+            self.next_extras,
         )
         aux_data = None
         return (children, aux_data)
@@ -498,5 +501,6 @@ dummy_sample = reverb.ReplaySample(
                 ),
             },
         },
+        next_extras={},
     ),
 )
