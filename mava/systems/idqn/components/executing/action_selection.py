@@ -121,8 +121,7 @@ class DQNFeedforwardExecutorSelectAction(ExecutorSelectAction):
                 )
             return actions_info, base_key
 
-        # executor.store.select_actions_fn = jax.jit(select_actions)
-        executor.store.select_actions_fn = select_actions
+        executor.store.select_actions_fn = jax.jit(select_actions)
 
     # Select actions
     def on_execution_select_actions(self, executor: SystemExecutor) -> None:
