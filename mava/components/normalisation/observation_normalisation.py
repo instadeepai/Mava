@@ -3,13 +3,14 @@ from functools import partial
 from typing import List, Optional
 
 from mava import constants
-from mava.components.training.normalisation.base_normalisation import BaseNormalisation
 from mava.core_jax import SystemBuilder, SystemParameterServer, SystemTrainer
 from mava.utils.jax_training_utils import (
     construct_norm_axes_list,
     init_norm_params,
     update_and_normalize_observations,
 )
+
+from .base_normalisation import BaseNormalisation
 
 
 @dataclass

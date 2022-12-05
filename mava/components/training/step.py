@@ -36,14 +36,9 @@ from mava.components.building.datasets import TrainerDataset, TrajectoryDataset
 from mava.components.building.loggers import Logger
 from mava.components.building.networks import Networks
 from mava.components.building.parameter_client import TrainerParameterClient
+from mava.components.normalisation import ObservationNormalisation, ValueNormalisation
 from mava.components.training.advantage_estimation import GAE
 from mava.components.training.base import Batch, TrainingState
-from mava.components.training.normalisation.observation_normalisation import (
-    ObservationNormalisation,
-)
-from mava.components.training.normalisation.value_normalisation import (
-    ValueNormalisation,
-)
 from mava.components.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
 from mava.utils.jax_training_utils import denormalize, normalize

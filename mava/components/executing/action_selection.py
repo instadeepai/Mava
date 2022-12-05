@@ -27,9 +27,7 @@ from mava.callbacks import Callback
 from mava.components import Component
 from mava.components.building.networks import Networks
 from mava.components.building.system_init import BaseSystemInit
-from mava.components.training.normalisation.observation_normalisation import (
-    ObservationNormalisation,
-)
+from mava.components.normalisation import ObservationNormalisation
 from mava.components.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemExecutor
 from mava.types import NestedArray

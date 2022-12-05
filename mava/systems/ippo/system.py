@@ -16,7 +16,7 @@
 """Jax IPPO system."""
 from typing import Any, Tuple
 
-from mava.components import building, executing, training, updating
+from mava.components import building, executing, normalisation, training, updating
 from mava.components.building.guardrails import ComponentDependencyGuardrails
 from mava.specs import DesignSpec
 from mava.systems import System
@@ -56,7 +56,7 @@ class IPPOSystem(System):
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
             networks=building.DefaultNetworks,
             optimisers=building.DefaultOptimisers,
-            observation_normalisation=training.ObservationNormalisation,
+            observation_normalisation=normalisation.ObservationNormalisation,
         ).get()
 
         # Trainer
@@ -70,7 +70,7 @@ class IPPOSystem(System):
             step=training.DefaultTrainerStep,
             value_loss=training.SquaredErrorValueLoss,
             trainer_dataset=building.TrajectoryDataset,
-            value_normalisation=training.ValueNormalisation,
+            value_normalisation=normalisation.ValueNormalisation,
         ).get()
 
         # Data Server
