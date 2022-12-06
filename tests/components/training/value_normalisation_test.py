@@ -5,9 +5,7 @@ import pytest
 import tree
 
 from mava import constants
-from mava.components.training.normalisation.value_normalisation import (
-    ValueNormalisation,
-)
+from mava.components.normalisation.value_normalisation import ValueNormalisation
 from mava.systems.builder import Builder
 from mava.utils.jax_training_utils import init_norm_params
 from tests.mocks import make_fake_env_specs

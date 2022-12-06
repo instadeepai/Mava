@@ -5,7 +5,7 @@ import pytest
 import tree
 
 from mava import constants
-from mava.components.training.normalisation.observation_normalisation import (
+from mava.components.normalisation.observation_normalisation import (
     ObservationNormalisation,
 )
 from mava.systems.builder import Builder
