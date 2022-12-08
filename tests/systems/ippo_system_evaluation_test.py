@@ -29,21 +29,9 @@ def test_ippo_system_mt() -> System:
     return ippo_system_multi_thread_eval()
 
 
-# TODO Re-add once issue is solved
-# https://github.com/instadeepai/Mava/issues/842
-@pytest.mark.skip
 def test_ippo(
     test_ippo_system_mt: System,
 ) -> None:
     """Full integration test of ippo system."""
-    (trainer_node,) = test_ippo_system_mt._builder.store.program._program._groups[
-        "trainer"
-    ]
-
-    trainer_node.disable_run()
 
     test_ippo_system_mt.launch()
-    trainer_run = trainer_node.create_handle().dereference()
-
-    for _ in range(5):
-        trainer_run.step()
