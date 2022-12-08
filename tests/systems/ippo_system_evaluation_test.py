@@ -29,6 +29,9 @@ def test_ippo_system_mt() -> System:
     return ippo_system_multi_thread_eval()
 
 
+# TODO Re-add once issue is solved
+# https://github.com/instadeepai/Mava/issues/842
+@pytest.mark.skip
 def test_ippo(
     test_ippo_system_mt: System,
 ) -> None:
