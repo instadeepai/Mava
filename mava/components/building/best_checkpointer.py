@@ -40,7 +40,9 @@ class BestCheckpointer(Component):
         if not self.config.checkpoint_best_perf:
             return
 
-        server.store.parameters.update(self.init_checkpointing_params(server))
+        server.store.parameters.update(
+            {"best_checkpoint", self.init_checkpointing_params(server)}
+        )
 
     def init_checkpointing_params(
         self, system: Union[SystemParameterServer, SystemBuilder]
