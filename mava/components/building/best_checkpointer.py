@@ -41,7 +41,7 @@ class BestCheckpointer(Component):
             return
 
         server.store.parameters.update(
-            {"best_checkpoint", self.init_checkpointing_params(server)}
+            {"best_checkpoint": self.init_checkpointing_params(server)}
         )
 
     def init_checkpointing_params(
