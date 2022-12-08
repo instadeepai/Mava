@@ -68,25 +68,19 @@ class BaseSystemComponent(abc.ABC):
         self.store: SimpleNamespace = SimpleNamespace()
         self.callbacks: List
 
-    def has(self, component: Type, subtypes: bool = False) -> bool:
+    def has(self, component_type: Type) -> bool:
         """Checks if a component of the given type is in the system.
 
         Args:
             component: type of component for which to check.
-            subtypes: whether or not to check for subtypes of the given component.
 
         Returns:
             True if the system has a component of this type.
         """
-        if subtypes:  # checks for type of component and its subtypes
-            return any(
-                isinstance(other_component, component)
-                for other_component in self.callbacks
-            )
-        else:  # checks for exactly type of component
-            return any(
-                type(other_component) == component for other_component in self.callbacks
-            )
+        return any(
+            isinstance(sytem_component, component_type)
+            for sytem_component in self.callbacks
+        )
 
 
 class SystemBuilder(BaseSystemComponent):
