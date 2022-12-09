@@ -114,7 +114,9 @@ def test_on_parameter_server_init(
     # Testing when checkpointing best perf
     assert parameter_server.store.parameters == {
         "some_params": [1, 2, 3],
-        **checkpointer.init_checkpointing_params(parameter_server),
+        "best_checkpoint": {
+            **checkpointer.init_checkpointing_params(parameter_server),
+        },
     }
 
 
