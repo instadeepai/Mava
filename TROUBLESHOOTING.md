@@ -8,5 +8,7 @@
 | GPU crashes immeditely due to a lack of memory. Add this to the top of the main file, before any other code. | import tensorflow as tf<br/>import os<br/>physical_devices = tf.config.list_physical_devices("GPU")<br/>if physical_devices:<br/>    tf.config.experimental.set_memory_growth(physical_devices[0], True)<br/>os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true" |
 | `make: 'build' is up to date.` | Use `-B` option |
 | Docker container not using gpu. | Download latest [nvidia cuda drivers](https://developer.nvidia.com/cuda-downloads).|
+| `libGL error: MESA-LOADER: failed to open iris: /usr/lib/dri/iris_dri.so: cannot open shared object file: No such file or directory (search paths /usr/lib/x86_64-linux-gnu/dri:\$${ORIGIN}/dri:/usr/lib/dri, suffix _dri) <br> libGL error: failed to load driver: iris <br> libGL error: MESA-LOADER: failed to open swrast: /usr/lib/dri/swrast_dri.so: cannot open shared object file: No such file or directory (search paths /usr/lib/x86_64-linux-gnu/dri:\$${ORIGIN}/dri:/usr/lib/dri, suffix _dri) <br>libGL error: failed to load driver: swrast <br>` | Install libstdcxx-ng. E.g. using conda `conda install -c conda-forge libstdcxx-ng`|
+
 
 ## Frequently Asked Questions
