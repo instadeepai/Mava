@@ -27,6 +27,7 @@ from mava.callbacks import Callback
 from mava.components import Component
 from mava.components.building.networks import Networks
 from mava.components.building.system_init import BaseSystemInit
+from mava.components.normalisation import ObservationNormalisation
 from mava.components.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemExecutor
 from mava.types import NestedArray
@@ -96,7 +97,10 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
 
         observations = executor.store.observations
         # Normalize the observations before selecting actions.
-        if executor.store.global_config.normalize_observations:
+        if (
+            executor.has(ObservationNormalisation)
+            and executor.store.global_config.normalise_observations
+        ):
             observations = executor_normalize_observation(executor, observations)
 
         # Dict with params per network
@@ -211,7 +215,10 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
 
         observations = executor.store.observations
         # Normalize the observations before selecting actions.
-        if executor.store.global_config.normalize_observations:
+        if (
+            executor.has(ObservationNormalisation)
+            and executor.store.global_config.normalise_observations
+        ):
             observations = executor_normalize_observation(executor, observations)
 
         # Dict with params per network
