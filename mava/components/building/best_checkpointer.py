@@ -47,7 +47,7 @@ class BestCheckpointer(Component):
     def init_checkpointing_params(
         self, system: Union[SystemParameterServer, SystemBuilder]
     ) -> Dict[str, Any]:
-        """Initialises the parameters used to checkpointing the best models"""
+        """Initialises the parameters used for checkpointing the best models"""
         params: Dict[str, Dict[str, Optional[Union[float, Params]]]] = {}
         networks = system.store.networks
 
