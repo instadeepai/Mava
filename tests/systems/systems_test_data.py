@@ -308,11 +308,12 @@ def ippo_system_multi_thread_eval() -> System:
         use_next_extras=False,
         sample_batch_size=5,
         nodes_on_gpu=[],
-        is_test=True,
         checkpoint_minute_interval=3 / 60,
         trainer_parameter_update_period=1,
-        evaluation_interval={"executor_steps": 10},
-        evaluation_duration={"evaluator_episodes": 2},
+        evaluation_interval={"executor_steps": 1000},
+        evaluation_duration={"evaluator_episodes": 5},
         checkpoint_best_perf=True,
+        termination_condition={"executor_steps": 5000},
+        wait=True,
     )
     return test_system
