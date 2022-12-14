@@ -51,7 +51,7 @@ if _found_smac:
             concat_agent_id: Concat one-hot vector of agent ID to obs.
             evaluation: extra param for evaluation.
             random_seed: seed
-            death_masking: whether to mask out agent observations once dead
+            death_masking: whether to mask out agent observations once dead.
             stack_frames: number of frames to stack together.
         """
         # Env uses int64 action space due to the use of spac.Discrete.
