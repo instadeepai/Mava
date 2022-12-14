@@ -112,10 +112,10 @@ def main(_: Any) -> None:
         # Flag to activate the calculation of the absolute metric
         absolute_metric=True,
         # How many episodes the evaluator will run for
-        absolute_metric_duration=50,
+        absolute_metric_duration=32,
         # When the system will terminate and the absolute metric
         # will be calculated
-        absolute_metric_interval=40000,
+        absolute_metric_interval=50000,
         # List of metrics for which the system calculate the absolute metric
         checkpointing_metric=("mean_episode_return", "win_rate"),
     )

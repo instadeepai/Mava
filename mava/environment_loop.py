@@ -18,6 +18,7 @@
 import copy
 import logging
 import time
+import warnings
 from typing import Any, Dict, Tuple
 
 import acme
@@ -28,7 +29,8 @@ import numpy as np
 from acme.utils import counting, loggers
 
 import mava
-from mava.utils.checkpointing_utils import update_best_checkpoint
+from mava.components.normalisation.base_normalisation import BaseNormalisation
+from mava.utils.checkpointing_utils import update_best_checkpoint, update_evaluator_net
 from mava.utils.training_utils import check_count_condition
 from mava.utils.wrapper_utils import generate_zeros_from_spec
 
@@ -248,40 +250,22 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
         def run_evaluation(results: Any) -> None:
             """Calculate the absolute metric"""
+
+            if self._executor.has(BaseNormalisation):
+                warnings.warn(
+                    """The calculation of the absolute metric in
+                the case of normalisation is not supported"""
+                )
+                self._executor.store.executor_parameter_client.set_and_wait(
+                    {"terminate": True}
+                )
+
             logging.exception("Calculating the absolute metric")
             eval_result: Dict[str, Any] = {}  # create a dict with checkpointing_metric
             for metric in self._executor.store.global_config.checkpointing_metric:
                 used_results = copy.deepcopy(results)
                 # update the evaluator network
-                for agent_net_key in self._executor.store.networks.keys():
-                    self._executor.store.networks[
-                        agent_net_key
-                    ].policy_params = copy.deepcopy(
-                        self._executor.store.best_checkpoint[metric][
-                            f"policy_network-{agent_net_key}"
-                        ]
-                    )
-                    self._executor.store.networks[
-                        agent_net_key
-                    ].critic_params = copy.deepcopy(
-                        self._executor.store.best_checkpoint[metric][
-                            f"critic_network-{agent_net_key}"
-                        ]
-                    )
-                    self._executor.store.policy_opt_states[
-                        agent_net_key
-                    ] = copy.deepcopy(
-                        self._executor.store.best_checkpoint[metric][
-                            f"policy_opt_state-{agent_net_key}"
-                        ]
-                    )
-                    self._executor.store.critic_opt_states[
-                        agent_net_key
-                    ] = copy.deepcopy(
-                        self._executor.store.best_checkpoint[metric][
-                            f"critic_opt_state-{agent_net_key}"
-                        ]
-                    )
+                update_evaluator_net(executor=self._executor, metric=metric)
                 eval_returns = []
                 for _ in range(
                     self._executor.store.global_config.absolute_metric_duration
@@ -310,7 +294,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         interval_stats_json = {
                             "eval_" + str(k): v for k, v in interval_stats.items()
                         }
-
                         # Add interval stats to dictionary for json logging
                         eval_result.update(
                             jax.tree_util.tree_map(
