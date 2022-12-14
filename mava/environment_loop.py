@@ -15,6 +15,7 @@
 
 """A simple multi-agent-system-environment training loop."""
 
+import copy
 import logging
 import time
 from typing import Any, Dict, Tuple
@@ -245,6 +246,88 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             )
             evaluation_duration = eval_duration_condition[1]
 
+        def run_evaluation(results: Any) -> None:
+            """Calculate the absolute metric"""
+            logging.exception("Calculating the absolute metric")
+            eval_result: Dict[str, Any] = {}  # create a dict with checkpointing_metric
+            for metric in self._executor.store.global_config.checkpointing_metric:
+                used_results = copy.deepcopy(results)
+                # update the evaluator network
+                for agent_net_key in self._executor.store.networks.keys():
+                    self._executor.store.networks[
+                        agent_net_key
+                    ].policy_params = copy.deepcopy(
+                        self._executor.store.best_checkpoint[metric][
+                            f"policy_network-{agent_net_key}"
+                        ]
+                    )
+                    self._executor.store.networks[
+                        agent_net_key
+                    ].critic_params = copy.deepcopy(
+                        self._executor.store.best_checkpoint[metric][
+                            f"critic_network-{agent_net_key}"
+                        ]
+                    )
+                    self._executor.store.policy_opt_states[
+                        agent_net_key
+                    ] = copy.deepcopy(
+                        self._executor.store.best_checkpoint[metric][
+                            f"policy_opt_state-{agent_net_key}"
+                        ]
+                    )
+                    self._executor.store.critic_opt_states[
+                        agent_net_key
+                    ] = copy.deepcopy(
+                        self._executor.store.best_checkpoint[metric][
+                            f"critic_opt_state-{agent_net_key}"
+                        ]
+                    )
+                eval_returns = []
+                for _ in range(
+                    self._executor.store.global_config.absolute_metric_duration
+                ):
+                    # Add consecutive evaluation run data
+                    result = self.run_episode()
+                    if "return" in metric:
+                        eval_returns.append(result[metric])
+                    # Sum results for computing mean after all evaluation runs.
+                    used_results = jax.tree_map(
+                        lambda x, y: x + y, used_results, result
+                    )
+                # compute the mean over all evaluation runs
+                used_results = jax.tree_map(
+                    lambda x: x
+                    / self._executor.store.global_config.absolute_metric_duration,
+                    used_results,
+                )
+                if "return" in metric:
+                    eval_result.update({f"eval_{metric}": jnp.array(eval_returns)})
+                # Check for extra logs
+                if hasattr(self._environment, "get_interval_stats"):
+                    interval_stats = self._environment.get_interval_stats()
+                    used_results.update(interval_stats)
+                    if metric in interval_stats.keys():
+                        interval_stats_json = {
+                            "eval_" + str(k): v for k, v in interval_stats.items()
+                        }
+
+                        # Add interval stats to dictionary for json logging
+                        eval_result.update(
+                            jax.tree_util.tree_map(
+                                lambda leaf: jnp.array([leaf]), interval_stats_json
+                            )
+                        )
+                logging.exception(
+                    f"Absolute metric for {metric} is equal {used_results[metric]}"
+                )
+                logging.exception(f"Additional results {used_results}")
+            used_results.update(eval_result)
+            self._logger.write(used_results)
+            logging.exception("Terminate the system")
+            self._executor.store.executor_parameter_client.set_and_wait(
+                {"terminate": True}
+            )
+
         def step_executor() -> None:
             if (not environment_loop_schedule) or (
                 should_run_loop(eval_interval_condition)
@@ -252,6 +335,22 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 if environment_loop_schedule:
                     # Get first result dictionary
                     results = self.run_episode()
+
+                    # Check if requires calculating the absolute metric
+                    global_config = self._executor.store.global_config
+                    run_absolute_metric = hasattr(
+                        global_config, "checkpoint_best_perf"
+                    ) and (
+                        results["executor_steps"]
+                        >= self._executor.store.global_config.absolute_metric_interval
+                        and self._executor.store.global_config.absolute_metric
+                    )
+
+                    if run_absolute_metric:
+                        logging.exception(
+                            f"Executor has reached {results['executor_steps']} steps"
+                        )
+                        run_evaluation(results=results)
 
                     # Initialise list for capturing episode returns
                     eval_returns = []
@@ -292,12 +391,11 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     results.update(eval_result)
                     self._logger.write(results)
 
-                    global_config = self._executor.store.global_config
                     # ideally this would be executor.has(BestCheckpointer),
                     # but that causes circular import
-                    if (
-                        hasattr(global_config, "checkpoint_best_perf")  # yuck
-                        and global_config.checkpoint_best_perf
+                    if hasattr(global_config, "checkpoint_best_perf") and (  # yuck
+                        global_config.checkpoint_best_perf
+                        or global_config.absolute_metric
                     ):
                         # Best_performance_update
                         for (
@@ -341,7 +439,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         f"{e}: Experiment terminated due to an error on the evaluator."
                     )
                     self._executor.store.executor_parameter_client.set_and_wait(
-                        {"evaluator_or_trainer_failed": True}
+                        {"terminate": True}
                     )
                 else:
                     logging.exception(f"{e}: an executor failed.")

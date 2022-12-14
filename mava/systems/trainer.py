@@ -75,7 +75,5 @@ class Trainer(SystemTrainer, TrainerHookMixin):
                 self.step()
             except Exception as e:
                 logging.exception(f"{e} the trainer failed")
-                self.store.trainer_parameter_client.set_and_wait(
-                    {"evaluator_or_trainer_failed": True}
-                )
+                self.store.trainer_parameter_client.set_and_wait({"terminate": True})
                 break

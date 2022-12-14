@@ -12,6 +12,12 @@ from mava.core_jax import SystemBuilder, SystemParameterServer
 class BestCheckpointerConfig:
     checkpointing_metric: Tuple = ("mean_episode_return",)
     checkpoint_best_perf: bool = False
+    # Flag to calculate the absolute metric
+    absolute_metric: bool = False
+    # How many episodes to run evaluation for
+    absolute_metric_duration: Optional[int] = 320
+    # When to calculate the absolute metric
+    absolute_metric_interval: int = 2000000
 
 
 class BestCheckpointer(Component):
@@ -30,7 +36,10 @@ class BestCheckpointer(Component):
 
     def on_building_executor_start(self, builder: SystemBuilder) -> None:
         """Initialises the store for best model checkpointing"""
-        if not (builder.store.is_evaluator and self.config.checkpoint_best_perf):
+        if not (
+            builder.store.is_evaluator
+            and (self.config.checkpoint_best_perf or self.config.absolute_metric)
+        ):
             return
 
         builder.store.best_checkpoint = self.init_checkpointing_params(builder)
