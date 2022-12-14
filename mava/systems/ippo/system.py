@@ -87,6 +87,7 @@ class IPPOSystem(System):
             trainer_parameter_client=building.TrainerParameterClient,
             termination_condition=updating.CountConditionTerminator,
             checkpointer=updating.Checkpointer,
+            best_checkpointer=building.BestCheckpointer,
         ).get()
 
         system = DesignSpec(
