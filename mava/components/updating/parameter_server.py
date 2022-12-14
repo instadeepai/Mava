@@ -15,7 +15,6 @@
 
 """Parameter server Component for Mava systems."""
 import abc
-import copy
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Type, Union
 
@@ -140,8 +139,8 @@ class DefaultParameterServer(ParameterServer):
 
         server.store.experiment_path = self.config.experiment_path
 
-        # Interrupt the system flag
-        server.store.parameters["terminate"] = False
+        # Interrupt the system in case evaluator or trainer failed
+        server.store.parameters["evaluator_or_trainer_failed"] = False
 
         # Interrupt the system in case all the executors failed
         server.store.parameters["num_executor_failed"] = 0
@@ -167,9 +166,8 @@ class DefaultParameterServer(ParameterServer):
                 get_params[var_key] = server.store.parameters[var_key]
         server.store.get_parameters = get_params
 
-        # Interrupt the system flag
-        if server.store.parameters["terminate"]:
-            time.sleep(15)
+        # Interrupt the system in case the evaluator or the trainer failed
+        if server.store.parameters["evaluator_or_trainer_failed"]:
             termination_fn(server)
 
         # Interrupt the system in case all the executors failed
