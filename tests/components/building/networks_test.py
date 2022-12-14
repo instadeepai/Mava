@@ -171,10 +171,10 @@ def test_network_factory_environment_spec(
         assert (
             network["environment_spec"]
             .get_agent_environment_specs()["agent_0"]
-            .observations.shape
+            .observations.observation.shape
             == list(make_fake_env_specs().get_agent_environment_specs().values())[
                 0
-            ].observations.shape
+            ].observations.observation.shape
         )
 
 
@@ -248,6 +248,7 @@ def test_recurrent_network_factory() -> Callable:
         policy_recurrent_layer_sizes: Sequence[int] = (256,),
         critic_layer_sizes: Sequence[int] = (512, 512, 256),
     ) -> Dict[str, Any]:
+        """Creates default networks"""
         net_keys = {"net_1", "net_2", "net_3"}
         networks = {}
 
@@ -327,6 +328,7 @@ def test_no_network_factory_before_build(test_builder: SystemBuilder) -> None:
 @hk.without_apply_rng
 @hk.transform
 def mlp(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+    """Creates a standard MLP layer"""
 
     output_sizes = [64, 64, 64]
     mlp_network = hk.nets.MLP(output_sizes)
@@ -337,6 +339,7 @@ def mlp(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
 @hk.without_apply_rng
 @hk.transform
 def mlp_norm(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+    """Creates normalised MLP layer"""
 
     output_sizes = [64, 64, 64]
     mlp_network_norm = MLP_NORM(output_sizes, layer_norm=True)
@@ -347,6 +350,7 @@ def mlp_norm(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
 @hk.without_apply_rng
 @hk.transform
 def mlp_norm_false(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+    """Creates un-normalised MLP layer"""
 
     output_sizes = [64, 64, 64]
     mlp_network_norm = MLP_NORM(output_sizes, layer_norm=False)

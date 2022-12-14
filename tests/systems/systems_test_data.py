@@ -170,8 +170,8 @@ def ippo_system_single_process_norm() -> System:
         period=4,
         checkpoint_minute_interval=3 / 60,
         trainer_parameter_update_period=1,
-        normalize_observations=True,
-        normalize_target_values=True,
+        normalise_observations=True,
+        normalise_target_values=True,
     )
 
     return test_system
