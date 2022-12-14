@@ -13,10 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Example running IPPO on debug MPE environment, recording evaluations.
-For installation instructions, please follow step 4 in https://github.com/instadeepai/Mava/blob/develop/DETAILED_INSTALL.md#optional-installs. # noqa: E501
-"""
+"""Example running IPPO on debug MPE environments with layer normalisation."""
 import functools
 from datetime import datetime
 from typing import Any
@@ -24,7 +21,6 @@ from typing import Any
 import optax
 from absl import app, flags
 
-from mava.components.building.environments import MonitorExecutorEnvironmentLoop
 from mava.systems import ippo
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -67,6 +63,7 @@ def main(_: Any) -> None:
         return ippo.make_default_networks(  # type: ignore
             policy_layer_sizes=(64, 64),
             critic_layer_sizes=(64, 64, 64),
+            layer_norm=True,
             *args,
             **kwargs,
         )
@@ -96,7 +93,7 @@ def main(_: Any) -> None:
 
     # Create the system.
     system = ippo.IPPOSystem()
-    system.update(MonitorExecutorEnvironmentLoop)
+
     # Build the system.
     system.build(
         environment_factory=environment_factory,
@@ -110,7 +107,10 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        record_every=1,
+        clip_value=True,
+        normalize_target_values=True,
+        normalize_observations=True,
+        termination_condition={"executor_steps": 200000},
     )
 
     # Launch the system.

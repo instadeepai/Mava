@@ -22,7 +22,6 @@ from mava.wrappers.environment_loop_wrappers import (
     MonitorParallelEnvironmentLoop,
 )
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
-from mava.wrappers.robocup import RoboCupWrapper
 
 try:
     # The user might not have installed Flatland

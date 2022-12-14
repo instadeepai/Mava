@@ -384,20 +384,17 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         results.update(eval_result)
                         self._logger.write(results)
 
-                        if (
-                            self._executor.store.checkpoint_best_perf
-                            or self._executor.store.absolute_metric
-                        ):
-                            # Best_performance_update
-                            for (
-                                metric,
-                                best_performance,
-                            ) in self._executor.store.checkpointing_metric.items():
-                                assert (
-                                    metric in results.keys()
-                                ), f"The metric, {metric}, chosen for checkpointing doesn't exist.\
-                                    This experiment has only the following metrics:\
-                                    {results.keys()}"
+                    if self._executor.store.checkpoint_best_perf:
+                        # Best_performance_update
+                        for (
+                            metric,
+                            best_performance,
+                        ) in self._executor.store.checkpointing_metric.items():
+                            assert (
+                                metric in results.keys()
+                            ), f"The metric, {metric}, chosen for checkpointing doesn't exist.\
+                                 This experiment has only the following metrics:\
+                                 {results.keys()}"
 
                                 if (
                                     best_performance is None

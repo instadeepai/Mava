@@ -205,11 +205,15 @@ def test_parallel_sequence_adder_signature(
     assert type(signature) == reverb_base.Step
 
     # Dimensions preserved after spec is generated, ignoring the time dim
-    assert signature.observations["agent_0"].shape.as_list()[1:] == list(
-        mock_env_specs.get_agent_environment_specs()["agent_0"].observations.shape
+    assert signature.observations["agent_0"].observation.shape.as_list()[1:] == list(
+        mock_env_specs.get_agent_environment_specs()[
+            "agent_0"
+        ].observations.observation.shape
     )
-    assert signature.observations["agent_1"].shape.as_list()[1:] == list(
-        mock_env_specs.get_agent_environment_specs()["agent_1"].observations.shape
+    assert signature.observations["agent_1"].observation.shape.as_list()[1:] == list(
+        mock_env_specs.get_agent_environment_specs()[
+            "agent_1"
+        ].observations.observation.shape
     )
     assert signature.actions["agent_1"].shape.as_list()[1:] == list(
         mock_env_specs.get_agent_environment_specs()["agent_1"].actions.shape
@@ -282,11 +286,15 @@ def test_parallel_transition_adder_signature(
     assert type(signature) == types.Transition
 
     # Dimensions preserved after spec is generated
-    assert signature.observations["agent_0"].shape.as_list() == list(
-        mock_env_specs.get_agent_environment_specs()["agent_0"].observations.shape
+    assert signature.observations["agent_0"].observation.shape.as_list() == list(
+        mock_env_specs.get_agent_environment_specs()[
+            "agent_0"
+        ].observations.observation.shape
     )
-    assert signature.observations["agent_1"].shape.as_list() == list(
-        mock_env_specs.get_agent_environment_specs()["agent_1"].observations.shape
+    assert signature.observations["agent_1"].observation.shape.as_list() == list(
+        mock_env_specs.get_agent_environment_specs()[
+            "agent_1"
+        ].observations.observation.shape
     )
     assert signature.actions["agent_1"].shape.as_list() == list(
         mock_env_specs.get_agent_environment_specs()["agent_1"].actions.shape

@@ -14,7 +14,6 @@
 # limitations under the License.
 
 """Parameter client for system builders"""
-import copy
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Type
 
@@ -22,6 +21,7 @@ import numpy as np
 
 from mava.callbacks import Callback
 from mava.components import Component
+from mava.components.building.best_checkpointer import BestCheckpointer
 from mava.components.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemBuilder
 from mava.systems import ParameterClient
@@ -118,7 +118,7 @@ class ExecutorParameterClient(BaseParameterClient):
         get_keys.append("norm_params")
 
         # Create best performance network params in case of evaluator
-        if builder.store.is_evaluator:
+        if builder.store.is_evaluator and builder.store.checkpoint_best_perf:
             builder.store.best_checkpoint: Dict[str, Any] = {}  # type:ignore
             for metric in builder.store.checkpointing_metric:
                 builder.store.best_checkpoint[metric] = {}
@@ -140,9 +140,8 @@ class ExecutorParameterClient(BaseParameterClient):
                     builder.store.best_checkpoint[metric][
                         f"critic_opt_state-{agent_net_key}"
                     ] = copy.deepcopy(builder.store.critic_opt_states[agent_net_key])
-            if builder.store.checkpoint_best_perf:
-                params["best_checkpoint"] = builder.store.best_checkpoint
-                set_keys.append("best_checkpoint")
+            params["best_checkpoint"] = builder.store.best_checkpoint
+            set_keys.append("best_checkpoint")
 
         count_names, params = self._set_up_count_parameters(params=params)
 
@@ -154,8 +153,9 @@ class ExecutorParameterClient(BaseParameterClient):
         if builder.store.parameter_server_client:
             # Create parameter client
             parameter_client = ParameterClient(
-                client=builder.store.parameter_server_client,
+                server=builder.store.parameter_server_client,
                 parameters=params,
+                multi_process=builder.store.global_config.multi_process,
                 get_keys=get_keys,
                 set_keys=set_keys,
                 update_period=self.config.executor_parameter_update_period,
@@ -244,8 +244,9 @@ class TrainerParameterClient(BaseParameterClient):
         parameter_client = None
         if builder.store.parameter_server_client:
             parameter_client = ParameterClient(
-                client=builder.store.parameter_server_client,
+                server=builder.store.parameter_server_client,
                 parameters=params,
+                multi_process=builder.store.global_config.multi_process,
                 get_keys=get_keys,
                 set_keys=set_keys,
                 update_period=self.config.trainer_parameter_update_period,

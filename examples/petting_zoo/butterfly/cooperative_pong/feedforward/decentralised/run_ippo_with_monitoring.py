@@ -14,31 +14,34 @@
 # limitations under the License.
 
 """
-Example running IPPO on debug MPE environment, recording evaluations.
-For installation instructions, please follow step 4 in https://github.com/instadeepai/Mava/blob/develop/DETAILED_INSTALL.md#optional-installs. # noqa: E501
+Example running IPPO on coop pong, recording evaluations.
+For installation instructions, please follow step 1, 2 and 4 from https://github.com/instadeepai/Mava/blob/develop/DETAILED_INSTALL.md#optional-installs. # noqa: E501
 """
 import functools
 from datetime import datetime
 from typing import Any
 
+import numpy as np
 import optax
 from absl import app, flags
+from acme.jax.networks.atari import DeepAtariTorso
+from supersuit import dtype_v0
 
 from mava.components.building.environments import MonitorExecutorEnvironmentLoop
 from mava.systems import ippo
-from mava.utils.environments import debugging_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
+    "env_class",
+    "butterfly",
+    "Pettingzoo environment class, e.g. atari (str).",
 )
 flags.DEFINE_string(
-    "action_space",
-    "discrete",
-    "Environment action space type (str).",
+    "env_name",
+    "cooperative_pong_v5",
+    "Pettingzoo environment name, e.g. pong (str).",
 )
 
 flags.DEFINE_string(
@@ -46,6 +49,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
+
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
@@ -57,16 +61,20 @@ def main(_: Any) -> None:
     """
     # Environment.
     environment_factory = functools.partial(
-        debugging_utils.make_environment,
+        pettingzoo_utils.make_environment,
+        env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
+        concat_agent_id=False,  # Concat Agent ID not currently supported for 2d envs.
+        env_preprocess_wrappers=[(dtype_v0, {"dtype": np.float32})],
     )
 
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
+        obs_net_forward = lambda x: DeepAtariTorso()(x)  # noqa: E731
         return ippo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(64, 64),
-            critic_layer_sizes=(64, 64, 64),
+            policy_layer_sizes=(64,),
+            critic_layer_sizes=(256,),
+            observation_network=obs_net_forward,
             *args,
             **kwargs,
         )
@@ -97,6 +105,7 @@ def main(_: Any) -> None:
     # Create the system.
     system = ippo.IPPOSystem()
     system.update(MonitorExecutorEnvironmentLoop)
+
     # Build the system.
     system.build(
         environment_factory=environment_factory,
@@ -110,7 +119,8 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        record_every=1,
+        # record every 10 eval steps.
+        record_every=10,
     )
 
     # Launch the system.
