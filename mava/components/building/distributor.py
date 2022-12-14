@@ -72,6 +72,9 @@ class Distributor(Component):
             wait=self.config.wait,
         )
 
+        # Save number of the executors
+        builder.store.num_executors = self.config.num_executors
+
         # Generate keys for the data_server, parameter_server and evaluator.
         (
             base_key,

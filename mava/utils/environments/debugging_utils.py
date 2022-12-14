@@ -13,19 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
+from typing import Any, Dict, Optional, Tuple
 
 import dm_env
 
-from mava.utils.debugging.environments import TwoStepEnv, switch_game
 from mava.utils.debugging.make_env import make_debugging_env
 from mava.utils.jax_training_utils import set_jax_double_precision
-from mava.wrappers.debugging_envs import (
-    DebuggingEnvWrapper,
-    SwitchGameWrapper,
-    TwoStepWrapper,
+from mava.wrappers.debugging_envs import DebuggingEnvWrapper
+from mava.wrappers.env_preprocess_wrappers import (
+    ConcatAgentIdToObservation,
+    StackObservations,
 )
-from mava.wrappers.env_preprocess_wrappers import StackObservations
 
 
 def make_environment(
@@ -38,10 +36,12 @@ def make_environment(
     random_seed: Optional[int] = None,
     recurrent_test: bool = False,
     stack_frames: int = 1,
-) -> dm_env.Environment:
-    """Make small size environnments for debugging."""
+    concat_agent_id: bool = False,
+) -> Tuple[dm_env.Environment, Dict[str, str]]:
+    """Make a debugging environment."""
 
     assert action_space == "continuous" or action_space == "discrete"
+    environment: Any
 
     if action_space == "discrete":
         # Env uses int64 action space due to the use of spac.Discrete.
@@ -49,15 +49,7 @@ def make_environment(
 
     del evaluation
 
-    if env_name == "two_step":
-        environment = TwoStepEnv()
-        environment = TwoStepWrapper(environment)
-    elif env_name == "switch":
-        """Creates a SwitchGame environment."""
-        env_module_fn = switch_game.MultiAgentSwitchGame(num_agents=num_agents)
-        environment_fn = SwitchGameWrapper(env_module_fn)
-        return environment_fn
-    else:
+    if env_name == "simple_spread":
         """Creates a MPE environment."""
         env_module = make_debugging_env(
             env_name, action_space, num_agents, recurrent_test, random_seed
@@ -65,11 +57,21 @@ def make_environment(
         environment = DebuggingEnvWrapper(
             env_module, return_state_info=return_state_info
         )
+    else:
+        raise ValueError(f"Environment {env_name} not found.")
+
+    if stack_frames > 1:
+        environment = StackObservations(environment, num_frames=stack_frames)
+
+    if concat_agent_id:
+        environment = ConcatAgentIdToObservation(environment)
 
     if random_seed and hasattr(environment, "seed"):
         environment.seed(random_seed)
 
-    if stack_frames > 1:
-        return StackObservations(environment, num_frames=stack_frames)
-    else:
-        return environment
+    environment_task_name = {
+        "environment_name": "debugging",
+        "task_name": env_name,
+    }
+
+    return environment, environment_task_name

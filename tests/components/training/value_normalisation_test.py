@@ -1,119 +1,101 @@
-import jax.numpy as jnp
+from types import SimpleNamespace
+
 import numpy as np
+import pytest
+import tree
 
-from mava.types import OLT
-from mava.utils.jax_training_utils import (
-    compute_running_mean_var_count,
-    denormalize,
-    normalize,
-    normalize_observations,
-    update_and_normalize_observations,
-)
-
-
-def test_compute_running_mean_var_count() -> None:
-    """Test if the running mean, variance and data counts are computed correctly."""
-
-    for (x1, x2, x3) in [
-        (np.random.randn(20, 15), np.random.randn(20, 15), np.random.randn(20, 15)),
-        (np.random.randn(20, 15), np.random.randn(20, 15), np.random.randn(20, 15)),
-    ]:
-
-        stats = dict(
-            mean=jnp.zeros(15),
-            var=jnp.zeros(15),
-            count=jnp.array([1e-4]),
-            std=np.ones(15),
-        )
-
-        stats = compute_running_mean_var_count(stats, jnp.array(x1))
-        stats = compute_running_mean_var_count(stats, jnp.array(x2))
-        stats = compute_running_mean_var_count(stats, jnp.array(x3))
-
-        x = jnp.array(np.concatenate([x1, x2, x3], axis=0))
-        stats2 = dict(
-            mean=jnp.mean(x, axis=0),
-            var=jnp.var(x, axis=0),
-            count=jnp.array([x.shape[0]]),
-        )
-
-        assert jnp.allclose(stats["mean"], stats2["mean"], atol=1e-5)
-        assert jnp.allclose(stats["var"], stats2["var"], atol=1e-3)
-        assert jnp.allclose(stats["count"], stats2["count"])
+from mava import constants
+from mava.components.normalisation.value_normalisation import ValueNormalisation
+from mava.systems.builder import Builder
+from mava.utils.jax_training_utils import init_norm_params
+from tests.mocks import make_fake_env_specs
 
 
-def test_normalization() -> None:
-    """Test if the normalization does the right thing"""
+class MockCoreComponent(Builder):
+    def __init__(self, store: SimpleNamespace) -> None:
+        """Creates MockCoreComponent"""
+        self.store = store
 
-    x = jnp.array(np.random.randn(15))
-    stats = dict(
-        mean=jnp.array([0.2]),
-        std=jnp.array([2]),
-        var=jnp.array([4]),
-        count=jnp.array([15]),
+
+@pytest.fixture
+def trainer() -> MockCoreComponent:
+    """Creates a mock trainer"""
+    store = SimpleNamespace(
+        obs_normalisation_start=0,
+        norm_params={
+            constants.OBS_NORM_STATE_DICT_KEY: {"params": {"mean": np.zeros(1)}}
+        },
     )
-    x_norm = normalize(stats, x)
-    x_denorm = denormalize(stats, x_norm)
-
-    assert jnp.allclose(x, x_denorm)
+    return MockCoreComponent(store)
 
 
-def test_update_and_normalize_observations() -> None:
-    """Test if the stats are updated correctly"""
-
-    for (x1, x2, x3) in [
-        (
-            np.random.randn(1, 20, 15),
-            np.random.randn(1, 20, 15),
-            np.random.randn(1, 20, 15),
-        ),
-        (
-            np.random.randn(1, 20, 15),
-            np.random.randn(1, 20, 15),
-            np.random.randn(1, 20, 15),
-        ),
-    ]:
-        stats = dict(
-            mean=jnp.zeros(15),
-            var=jnp.zeros(15),
-            count=jnp.array([1e-4]),
-            std=np.ones(15),
-        )
-
-        obs = OLT(observation=jnp.array(x1), legal_actions=[1], terminal=[0.0])
-        stats, _ = update_and_normalize_observations(stats, obs)
-        obs = OLT(observation=jnp.array(x2), legal_actions=[1], terminal=[0.0])
-        stats, _ = update_and_normalize_observations(stats, obs)
-        obs = OLT(observation=jnp.array(x3), legal_actions=[1], terminal=[0.0])
-        stats, _ = update_and_normalize_observations(stats, obs)
-
-        x = jnp.array(np.concatenate([x1, x2, x3], axis=0))
-        x = jnp.reshape(x, (-1, 15))
-        stats2 = dict(
-            mean=jnp.mean(x, axis=0),
-            var=jnp.var(x, axis=0),
-            count=jnp.array([np.prod(x.shape[0])]),
-        )
-
-        assert jnp.allclose(stats["mean"], stats2["mean"], atol=1e-5)
-        assert jnp.allclose(stats["var"], stats2["var"], atol=1e-3)
-        assert jnp.allclose(stats["count"], stats2["count"])
-
-
-def test_normalize_observations() -> None:
-    """Test if normalisation of observations in OLT type works as expected"""
-
-    x = np.random.randn(15)
-    obs = OLT(observation=x, legal_actions=[1], terminal=[0.0])
-    stats = dict(
-        mean=jnp.array([0.2]),
-        var=jnp.array([4]),
-        count=jnp.array([15]),
-        std=jnp.array([2]),
+@pytest.fixture
+def builder() -> MockCoreComponent:
+    """Creates a mock builder"""
+    store = SimpleNamespace(
+        agents=["agent_0", "agent_1"], ma_environment_spec=make_fake_env_specs()
     )
-    obs = normalize_observations(stats, obs)
-    obs_norm = jnp.array(obs.observation)
+    return MockCoreComponent(store)
 
-    x_norm = normalize(stats, jnp.array(x))
 
-    assert jnp.allclose(x_norm, obs_norm)
+@pytest.fixture
+def server() -> MockCoreComponent:
+    """Creates a mock server"""
+    store = SimpleNamespace(parameters={})
+    return MockCoreComponent(store)
+
+
+@pytest.fixture
+def value_normaliser() -> ValueNormalisation:
+    """Creates a mock value normalisation component"""
+    return ValueNormalisation()
+
+
+def test_on_building_init(
+    value_normaliser: ValueNormalisation, builder: Builder
+) -> None:
+    """Test that norm params are initialised correctly"""
+    value_normaliser.on_building_init(builder)
+    assert builder.store.norm_params == {}
+
+
+def test_on_building_init_end(
+    value_normaliser: ValueNormalisation, builder: Builder
+) -> None:
+    """Tests that value normalisation parameters are initialised correctly"""
+    value_normaliser.on_building_init(builder)
+    value_normaliser.on_building_init_end(builder)
+
+    expected_norm_params = {
+        "values_norm_params": {
+            "agent_0": init_norm_params((1,)),
+            "agent_1": init_norm_params((1,)),
+        }
+    }
+
+    assert tree.map_structure(
+        lambda x, y: x == y, builder.store.norm_params, expected_norm_params
+    )
+
+
+def test_on_training_utility_fns(
+    value_normaliser: ValueNormalisation, trainer: MockCoreComponent
+) -> None:
+    """Tests that trainer creates norm_obs_running_stats_fn"""
+    value_normaliser.on_training_utility_fns(trainer)  # type: ignore
+    assert hasattr(trainer.store, "target_running_stats_fn")
+
+
+def test_on_parameter_server_init(
+    value_normaliser: ValueNormalisation, server: MockCoreComponent
+) -> None:
+    """Test that parameter get correctly added to the server"""
+    norm_params = {"params": [1, 2, 3, 4]}
+    server.store.norm_params = norm_params
+    server.store.parameters = {"test": 1}
+
+    value_normaliser.on_parameter_server_init(server)  # type: ignore
+
+    assert server.store.parameters["norm_params"] == norm_params
+    # make sure we don't overwrite parameters
+    assert server.store.parameters["test"] == 1

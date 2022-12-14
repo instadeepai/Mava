@@ -33,10 +33,6 @@ from mava.components.training.losses import Loss
 from mava.components.training.step import Step
 from mava.components.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
-from mava.utils.jax_training_utils import (
-    compute_running_mean_var_count,
-    update_and_normalize_observations,
-)
 
 
 class MinibatchUpdate(Utility):
@@ -70,8 +66,6 @@ class MinibatchUpdate(Utility):
 @dataclass
 class MAPGMinibatchUpdateConfig:
     normalize_advantage: bool = True
-    normalize_target_values: bool = False
-    normalize_observations: bool = False
 
 
 class MAPGMinibatchUpdate(MinibatchUpdate):
@@ -98,14 +92,6 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
         Returns:
             None.
         """
-
-        # Initilaise target values running mean/std function here
-        if self.config.normalize_target_values:
-            trainer.store.target_running_stats_fn = compute_running_mean_var_count
-
-        # Initilaise observations running mean/std function here
-        if self.config.normalize_observations:
-            trainer.store.norm_obs_running_stats_fn = update_and_normalize_observations
 
         def model_update_minibatch(
             carry: Tuple[
@@ -275,17 +261,6 @@ class MAPGEpochUpdate(EpochUpdate):
             ) = carry
 
             base_key, shuffle_key = jax.random.split(key)
-
-            # TODO (dries): This assert is ugly. Is there a better way to do this check?
-            # Maybe using a tree map of some sort?
-            # shapes = jax.tree_util.tree_map(
-            #         lambda x: x.shape[0]==trainer.store.full_batch_size, batch
-            #     )
-            # assert ...
-            assert (
-                list(batch.observations.values())[0].observation.shape[0]
-                == trainer.store.full_batch_size
-            )
 
             permutation = jax.random.permutation(
                 shuffle_key, trainer.store.full_batch_size

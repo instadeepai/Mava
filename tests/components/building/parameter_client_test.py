@@ -196,6 +196,10 @@ def mock_builder_with_parameter_client() -> Builder:
         ),
         components=[],
     )
+    builder.store.is_evaluator = False
+    builder.store.checkpoint_best_perf = False
+    builder.store.multi_process = False
+    builder.store.global_config = SimpleNamespace(multi_process=False)
 
     return builder
 
@@ -261,7 +265,7 @@ def test_executor_parameter_client_no_evaluator_with_parameter_client(
     assert mock_builder.store.executor_parameter_client._set_get_call_counter == 0
     assert mock_builder.store.executor_parameter_client._update_period == 500
     assert isinstance(
-        mock_builder.store.executor_parameter_client._client, ParameterServer
+        mock_builder.store.executor_parameter_client._server, ParameterServer
     )
 
     assert mock_builder.store.executor_counts == initial_count_parameters
@@ -317,7 +321,7 @@ def test_executor_parameter_client_evaluator_with_parameter_client(
     assert mock_builder.store.executor_parameter_client._set_get_call_counter == 0
     assert mock_builder.store.executor_parameter_client._update_period == 500
     assert isinstance(
-        mock_builder.store.executor_parameter_client._client, ParameterServer
+        mock_builder.store.executor_parameter_client._server, ParameterServer
     )
 
     assert mock_builder.store.executor_counts == initial_count_parameters
@@ -401,7 +405,7 @@ def test_trainer_parameter_client(
     assert mock_builder.store.trainer_parameter_client._set_get_call_counter == 0
     assert mock_builder.store.trainer_parameter_client._update_period == 500
     assert isinstance(
-        mock_builder.store.trainer_parameter_client._client, ParameterServer
+        mock_builder.store.trainer_parameter_client._server, ParameterServer
     )
 
     assert mock_builder.store.trainer_counts == initial_count_parameters

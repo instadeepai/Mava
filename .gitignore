@@ -156,7 +156,5 @@ mava_testing
 # PyCharm
 .idea/
 
-meltingpot/
-
 # Created by debugging component
 component_dependency_map.png

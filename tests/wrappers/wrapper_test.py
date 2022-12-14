@@ -58,12 +58,9 @@ This is meant to flexibily test various environments wrappers.
     ],
 )
 class TestEnvWrapper:
+    # Test that we can load a env module and that it contains agents,
+    #   agents and possible_agents.
     def test_loadmodule(self, env_spec: EnvSpec, helpers: Helpers) -> None:
-        """Test that we can load a env module
-
-        and that it contains agents and possible agents
-        """
-
         if env_spec is None:
             pytest.skip()
         env = helpers.get_env(env_spec)
@@ -72,13 +69,9 @@ class TestEnvWrapper:
             props_which_should_not_be_none
         ), "Failed to load module"
 
+    #  Test initialization of env wrapper, which should have
+    #   a nested environment, an observation and action space for each agent.
     def test_wrapper_initialization(self, env_spec: EnvSpec, helpers: Helpers) -> None:
-        """Test initialization of env wrapper,
-
-        which should have a nested environment,
-        an observation and action space for each agent.
-        """
-
         if env_spec is None:
             pytest.skip()
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
@@ -109,9 +102,8 @@ class TestEnvWrapper:
             len(wrapped_env.discount_spec()) == num_agents
         ), "Failed to generate discount specs for all agents."
 
+    # Test of reset of wrapper and that dm_env_timestep has basic props.
     def test_wrapper_env_reset(self, env_spec: EnvSpec, helpers: Helpers) -> None:
-        """Test of reset of wrapper and that dm_env_timestep has basic props."""
-
         if env_spec is None:
             pytest.skip()
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
@@ -138,15 +130,12 @@ class TestEnvWrapper:
 
         helpers.assert_env_reset(wrapped_env, dm_env_timestep, env_spec)
 
+    # Test that observations from petting zoo get converted to
+    #   dm observations correctly. This only runs
+    #   if wrapper has a _convert_observations or _convert_observation functions.
     def test_convert_env_to_dm_env_0_no_action_mask(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
-        """Test that observations from petting zoo get converted correctly.
-
-        This only runs if wrapper has a _convert_observations
-        or _convert_observation functions.
-        """
-
         if env_spec is None:
             pytest.skip()
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
@@ -185,14 +174,11 @@ class TestEnvWrapper:
                     bool(dm_env_timestep[agent].terminal) is False
                 ), "Failed to set terminal."
 
+    # Test that observations from petting zoo get converted to
+    #   dm observations correctly when empty obs are returned.
     def test_convert_env_to_dm_env_0_empty_obs(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
-        """Test that observations from petting zoo get converted
-
-        to dm observations correctly when empty obs are returned.
-        """
-
         if env_spec is None:
             pytest.skip()
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
@@ -253,13 +239,6 @@ class TestEnvWrapper:
     def test_convert_env_to_dm_env_2_with_action_mask(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
-        """Test that observations **with actions masked**
-
-        from petting zoo get converted to dm observations correctly.
-        This only runs if wrapper has a _convert_observations
-        or _convert_observation functions.
-        """
-
         if env_spec is None:
             pytest.skip()
 
@@ -308,11 +287,10 @@ class TestEnvWrapper:
                     bool(dm_env_timestep[agent].terminal) is False
                 ), "Failed to set terminal."
 
+    # Test we can take a action and it updates observations
     def test_step_0_valid_when_env_not_done(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
-        """Test we can take a action and it updates observations"""
-
         if env_spec is None:
             pytest.skip()
 
@@ -352,11 +330,10 @@ class TestEnvWrapper:
             curr_dm_timestep.step_type is dm_env.StepType.MID
         ), "Failed to update step type."
 
+    # Test we only step in our env once.
     def test_step_1_valid_when_env_not_done(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
-        """Test we only step in our env once."""
-
         if env_spec is None:
             pytest.skip()
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
@@ -379,11 +356,10 @@ class TestEnvWrapper:
             _ = wrapped_env.step(test_agents_actions)
             parallel_step.assert_called_once_with(test_agents_actions)
 
+    # Test if all agents are done, env is set to done
     def test_step_2_invalid_when_env_done(
         self, env_spec: EnvSpec, helpers: Helpers, monkeypatch: MonkeyPatch
     ) -> None:
-        """Test if all agents are done, env is set to done"""
-
         if env_spec is None:
             pytest.skip()
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
@@ -415,6 +391,43 @@ class TestEnvWrapper:
         assert (
             curr_dm_timestep.step_type is dm_env.StepType.LAST
         ), "Failed to update step type."
+
+    def test_wrapper_env_obs_normalisation_attrs(
+        self, env_spec: EnvSpec, helpers: Helpers
+    ) -> None:
+        """Test observations start attribute"""
+
+        if env_spec is None:
+            pytest.skip()
+
+        wrapped_env, _ = helpers.get_wrapped_env(env_spec)
+        agents = wrapped_env.agents
+
+        # Frist check if the death masking is list is empty
+        assert len(wrapped_env.death_masked_agents) == 0
+
+        wrapped_step = wrapped_env.reset()
+        if type(wrapped_step) == tuple:
+            wrapped_step, _ = wrapped_step
+
+        olt_type = isinstance(wrapped_step.observation[agents[0]], types.OLT)
+        if olt_type:
+            concat_id = ConcatAgentIdToObservation(wrapped_env)
+            assert (
+                concat_id.obs_normalisation_start_index
+                > wrapped_env.obs_normalisation_start_index
+            )
+            assert len(concat_id.death_masked_agents) == 0
+
+            action_spec = concat_id.action_spec()
+            discrete = isinstance(action_spec[agents[0]], DiscreteArray)
+            if discrete:
+                concat_id_action = ConcatPrevActionToObservation(concat_id)
+                assert (
+                    concat_id_action.obs_normalisation_start_index
+                    > concat_id.obs_normalisation_start_index
+                )
+                assert len(concat_id_action.death_masked_agents) == 0
 
     def test_wrapper_env_obs_stacking(
         self, env_spec: EnvSpec, helpers: Helpers

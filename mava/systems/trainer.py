@@ -16,6 +16,7 @@
 
 """System Trainer implementation."""
 
+import logging
 from types import SimpleNamespace
 from typing import List
 
@@ -70,4 +71,11 @@ class Trainer(SystemTrainer, TrainerHookMixin):
 
         # Run the trainer.
         while True:
-            self.step()
+            try:
+                self.step()
+            except Exception as e:
+                logging.exception(f"{e} the trainer failed")
+                self.store.trainer_parameter_client.set_and_wait(
+                    {"evaluator_or_trainer_failed": True}
+                )
+                break

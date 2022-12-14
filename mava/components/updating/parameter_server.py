@@ -16,7 +16,7 @@
 """Parameter server Component for Mava systems."""
 import abc
 from dataclasses import dataclass
-from typing import Any, Dict, List, Sequence, Type, Union
+from typing import Any, Dict, List, Optional, Sequence, Type, Union
 
 import numpy as np
 
@@ -24,12 +24,14 @@ from mava.callbacks import Callback
 from mava.components.building.networks import Networks
 from mava.components.component import Component
 from mava.core_jax import SystemParameterServer
+from mava.utils.lp_utils import termination_fn
 
 
 @dataclass
 class ParameterServerConfig:
     non_blocking_sleep_seconds: int = 10
     experiment_path: str = "~/mava/"
+    json_path: Optional[str] = None
 
 
 class ParameterServer(Component):
@@ -106,6 +108,9 @@ class DefaultParameterServer(ParameterServer):
         """
         networks = server.store.network_factory()
 
+        # Store net_keys
+        server.store.agents_net_keys = list(networks.keys())
+
         # Create parameters
         server.store.parameters = {
             "trainer_steps": np.zeros(1, dtype=np.int32),
@@ -132,10 +137,13 @@ class DefaultParameterServer(ParameterServer):
                 f"critic_opt_state-{agent_net_key}"
             ] = server.store.critic_opt_states[agent_net_key]
 
-        # Normalization parameters
-        server.store.parameters["norm_params"] = server.store.norm_params
-
         server.store.experiment_path = self.config.experiment_path
+
+        # Interrupt the system in case evaluator or trainer failed
+        server.store.parameters["evaluator_or_trainer_failed"] = False
+
+        # Interrupt the system in case all the executors failed
+        server.store.parameters["num_executor_failed"] = 0
 
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
@@ -157,6 +165,14 @@ class DefaultParameterServer(ParameterServer):
             for var_key in names:
                 get_params[var_key] = server.store.parameters[var_key]
         server.store.get_parameters = get_params
+
+        # Interrupt the system in case the evaluator or the trainer failed
+        if server.store.parameters["evaluator_or_trainer_failed"]:
+            termination_fn(server)
+
+        # Interrupt the system in case all the executors failed
+        if server.store.num_executors == server.store.parameters["num_executor_failed"]:
+            termination_fn(server)
 
     # Set
     def on_parameter_server_set_parameters(self, server: SystemParameterServer) -> None:

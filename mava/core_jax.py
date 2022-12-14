@@ -18,7 +18,7 @@
 
 import abc
 from types import SimpleNamespace
-from typing import Any, Dict, List, Sequence, Tuple, Union
+from typing import Any, Dict, List, Sequence, Tuple, Type, Union
 
 from mava.specs import DesignSpec
 
@@ -60,18 +60,35 @@ class BaseSystem(abc.ABC):
         """Run the system."""
 
 
-class SystemBuilder(abc.ABC):
+class BaseSystemComponent(abc.ABC):
+    """Base class for core components: builder, executor, trainer and dataserver"""
+
+    def __init__(self) -> None:
+        """Core component init"""
+        self.store: SimpleNamespace = SimpleNamespace()
+        self.callbacks: List
+
+    def has(self, component_type: Type) -> bool:
+        """Checks if a component of the given type is in the system.
+
+        Args:
+            component: type of component for which to check.
+
+        Returns:
+            True if the system has a component of this type.
+        """
+        return any(
+            isinstance(sytem_component, component_type)
+            for sytem_component in self.callbacks
+        )
+
+
+class SystemBuilder(BaseSystemComponent):
     """Abstract system builder."""
 
-    def __init__(
-        self,
-    ) -> None:
+    def __init__(self) -> None:
         """System building init"""
-
-        # Simple namespace for assigning system builder attributes dynamically
-        self.store = SimpleNamespace()
-
-        self.callbacks: Any
+        super().__init__()
 
         self._executor_id: str
         self._trainer_id: str
@@ -132,16 +149,12 @@ class SystemBuilder(abc.ABC):
         """Run the graph program."""
 
 
-class SystemExecutor(abc.ABC):
+class SystemExecutor(BaseSystemComponent):
     """Abstract system executor."""
 
-    def __init__(
-        self,
-    ) -> None:
+    def __init__(self) -> None:
         """System executor init"""
-
-        # Simple namespace for assigning system executor attributes dynamically
-        self.store = SimpleNamespace()
+        super().__init__()
 
         self._agent: str
         self._observation: Any
@@ -171,16 +184,12 @@ class SystemExecutor(abc.ABC):
         """Update executor parameters."""
 
 
-class SystemTrainer(abc.ABC):
+class SystemTrainer(BaseSystemComponent):
     """Abstract system trainer."""
 
-    def __init__(
-        self,
-    ) -> None:
+    def __init__(self) -> None:
         """System trainer init"""
-
-        # Simple namespace for assigning system executor attributes dynamically
-        self.store = SimpleNamespace()
+        super().__init__()
 
         self._inputs: Any
 
@@ -189,14 +198,10 @@ class SystemTrainer(abc.ABC):
         """Trainer forward and backward passes."""
 
 
-class SystemParameterServer(abc.ABC):
-    def __init__(
-        self,
-    ) -> None:
+class SystemParameterServer(BaseSystemComponent):
+    def __init__(self) -> None:
         """System parameter server init"""
-
-        # Simple namespace for assigning parameter server attributes dynamically
-        self.store = SimpleNamespace()
+        super().__init__()
 
     @abc.abstractmethod
     def get_parameters(
@@ -231,23 +236,19 @@ class SystemParameterServer(abc.ABC):
         centralised computations to be performed by the parameter server."""
 
 
-class SystemParameterClient(abc.ABC):
+class SystemParameterClient(BaseSystemComponent):
     """A variable client for updating variables from a remote source."""
 
-    def __init__(
-        self,
-    ) -> None:
+    def __init__(self) -> None:
         """System parameter server init"""
-
-        # Simple namespace for assigning parameter client attributes dynamically
-        self.store = SimpleNamespace()
+        super().__init__()
 
     @abc.abstractmethod
     def get_async(self) -> None:
         """Asynchronously updates the get variables with the latest copy from source."""
 
     @abc.abstractmethod
-    def set_async(self) -> None:
+    def set_async(self, params: Dict[str, Any]) -> None:
         """Asynchronously updates source with the set variables."""
 
     @abc.abstractmethod
@@ -274,6 +275,6 @@ class SystemParameterClient(abc.ABC):
         and waits for the process to complete before continuing."""
 
     @abc.abstractmethod
-    def set_and_wait(self) -> None:
+    def set_and_wait(self, params: Dict[str, Any]) -> None:
         """Updates source with the set variables \
         and waits for the process to complete before continuing."""

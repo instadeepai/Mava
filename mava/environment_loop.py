@@ -15,16 +15,19 @@
 
 """A simple multi-agent-system-environment training loop."""
 
+import logging
 import time
 from typing import Any, Dict, Tuple
 
 import acme
 import dm_env
 import jax
+import jax.numpy as jnp
 import numpy as np
 from acme.utils import counting, loggers
 
 import mava
+from mava.utils.checkpointing_utils import update_best_checkpoint
 from mava.utils.training_utils import check_count_condition
 from mava.utils.wrapper_utils import generate_zeros_from_spec
 
@@ -197,7 +200,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         self._logger.write(results)
         return results
 
-    def run(self) -> None:
+    def run(self) -> None:  # noqa: C901
         """Run the environment loop."""
 
         def should_run_loop(eval_interval_condition: Tuple) -> bool:
@@ -242,24 +245,80 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             )
             evaluation_duration = eval_duration_condition[1]
 
-        while True:
+        def step_executor() -> None:
             if (not environment_loop_schedule) or (
                 should_run_loop(eval_interval_condition)
             ):
                 if environment_loop_schedule:
-                    results = self.run_episode()
                     # Get first result dictionary
+                    results = self.run_episode()
+
+                    # Initialise list for capturing episode returns
+                    eval_returns = []
+
+                    eval_returns.append(results["raw_episode_return"])
                     for _ in range(evaluation_duration - 1):
                         # Add consecutive evaluation run data
                         result = self.run_episode()
+                        eval_returns.append(result["raw_episode_return"])
                         # Sum results for computing mean after all evaluation runs.
                         results = jax.tree_map(lambda x, y: x + y, results, result)
                     # compute the mean over all evaluation runs
                     results = jax.tree_map(lambda x: x / evaluation_duration, results)
+
+                    # Log evaluation interval results for json logging
+                    # all results with the `eval` appended will be logged
+                    # by the json logger.
+                    eval_result = {
+                        "eval_step_count": jnp.array(self._last_evaluator_run_t),
+                        "eval_return": jnp.array(eval_returns),
+                    }
+
                     # Check for extra logs
                     if hasattr(self._environment, "get_interval_stats"):
-                        results.update(self._environment.get_interval_stats())
+                        interval_stats = self._environment.get_interval_stats()
+                        results.update(interval_stats)
+                        interval_stats_json = {
+                            "eval_" + str(k): v for k, v in interval_stats.items()
+                        }
+
+                        # Add interval stats to dictionary for json logging
+                        eval_result.update(
+                            jax.tree_util.tree_map(
+                                lambda leaf: jnp.array([leaf]), interval_stats_json
+                            )
+                        )
+
+                    results.update(eval_result)
                     self._logger.write(results)
+
+                    global_config = self._executor.store.global_config
+                    # ideally this would be executor.has(BestCheckpointer),
+                    # but that causes circular import
+                    if (
+                        hasattr(global_config, "checkpoint_best_perf")  # yuck
+                        and global_config.checkpoint_best_perf
+                    ):
+                        # Best_performance_update
+                        for (
+                            metric,
+                            best_performance,
+                        ) in self._executor.store.checkpointing_metric.items():
+                            assert (
+                                metric in results.keys()
+                            ), f"The metric, {metric}, chosen for checkpointing doesn't exist.\
+                                 This experiment has only the following metrics:\
+                                 {results.keys()}"
+
+                            if (
+                                best_performance is None
+                                or best_performance < results[metric]  # type: ignore
+                            ):
+                                self._executor.store.checkpointing_metric[
+                                    metric
+                                ] = update_best_checkpoint(
+                                    self._executor, results, metric
+                                )
                 else:
                     result = self.run_episode()
                     # Log the given results.
@@ -271,3 +330,23 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             # We need to get the latest counts if we are using eval intervals.
             if environment_loop_schedule:
                 self._executor.force_update()
+
+        while True:
+            try:
+                step_executor()
+
+            except Exception as e:
+                if self._executor._evaluator:
+                    logging.exception(
+                        f"{e}: Experiment terminated due to an error on the evaluator."
+                    )
+                    self._executor.store.executor_parameter_client.set_and_wait(
+                        {"evaluator_or_trainer_failed": True}
+                    )
+                else:
+                    logging.exception(f"{e}: an executor failed.")
+                    self._executor.store.executor_parameter_client.add_and_wait(
+                        {"num_executor_failed": 1}
+                    )
+                self._executor.force_update()
+                break

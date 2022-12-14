@@ -71,26 +71,6 @@ jobs:
           tags: ${{ steps.vars2.outputs.docker_repo }}:flatland-latest
           target: flatland
 
-      -
-        name: Build and push robocup
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:robocup-latest
-          target: robocup
-
-      -
-        name: Build and push meltingpot
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:meltingpot-latest
-          target: meltingpot
-
-
-
 
   # Action pushes new docker image if we have a PR to dev and have the label benchmark
   build-push-branches:
@@ -163,21 +143,3 @@ jobs:
           push: true
           tags: ${{ steps.vars2.outputs.docker_repo }}:flatland-${{ steps.vars.outputs.sha_short }}
           target: flatland
-
-      -
-        name: Build and push robocup
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:robocup-${{ steps.vars.outputs.sha_short }}
-          target: robocup
-
-      -
-        name: Build and push meltingpot
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.vars2.outputs.docker_repo }}:meltingpot-${{ steps.vars.outputs.sha_short }}
-          target: meltingpot

@@ -20,6 +20,7 @@ from mava.components.building.adders import (
     ParallelSequenceAdderSignature,
     UniformAdderPriority,
 )
+from mava.components.building.best_checkpointer import BestCheckpointer
 from mava.components.building.data_server import OnPolicyDataServer
 from mava.components.building.datasets import TrajectoryDataset, TransitionDataset
 from mava.components.building.distributor import Distributor
@@ -27,6 +28,7 @@ from mava.components.building.environments import (
     EnvironmentSpec,
     ParallelExecutorEnvironmentLoop,
 )
+from mava.components.building.extras_spec import ExtrasSpec
 from mava.components.building.loggers import Logger
 from mava.components.building.networks import DefaultNetworks
 from mava.components.building.optimisers import DefaultOptimisers

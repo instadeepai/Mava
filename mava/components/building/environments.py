@@ -59,14 +59,16 @@ class EnvironmentSpec(Component):
             None.
         """
         builder.store.manager_pid = os.getpid()
-        builder.store.ma_environment_spec = specs.MAEnvironmentSpec(
-            self.config.environment_factory()
-        )
+        env, _ = self.config.environment_factory()
+
+        builder.store.ma_environment_spec = specs.MAEnvironmentSpec(env)
 
         builder.store.agents = sort_str_num(
             builder.store.ma_environment_spec.get_agent_ids()
         )
         builder.store.extras_spec = {}
+
+        builder.store.obs_normalisation_start = env.obs_normalisation_start_index
 
     @staticmethod
     def name() -> str:
@@ -114,8 +116,11 @@ class ExecutorEnvironmentLoop(Component):
             None.
         """
         # Global config set by EnvironmentSpec component
-        builder.store.executor_environment = (
-            builder.store.global_config.environment_factory(evaluation=False)
+        (
+            builder.store.executor_environment,
+            _,
+        ) = builder.store.global_config.environment_factory(
+            evaluation=builder.store.is_evaluator
         )  # type: ignore
 
     @abc.abstractmethod

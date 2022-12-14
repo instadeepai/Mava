@@ -13,7 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running IPPO on debug MPE environments."""
+"""
+Example running IPPO on debug MPE environment, recording evaluations.
+For installation instructions, please follow step 4 in https://github.com/instadeepai/Mava/blob/develop/DETAILED_INSTALL.md#optional-installs. # noqa: E501
+"""
 import functools
 from datetime import datetime
 from typing import Any

@@ -16,7 +16,7 @@
 """Pettingzoo environment factory."""
 
 import importlib
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import dm_env
 import numpy as np
@@ -96,7 +96,7 @@ def make_environment(
     random_seed: Optional[int] = None,
     stack_frames: int = 1,
     **kwargs: Any,
-) -> dm_env.Environment:
+) -> Tuple[dm_env.Environment, Dict[str, str]]:
     """Wraps an Pettingzoo environment.
 
     Args:
@@ -138,12 +138,15 @@ def make_environment(
     else:
         raise Exception("Pettingzoo is not installed.")
 
-    # This should not be used with petting zoo environments since
-    # stacking is already done using supersuit.
     if stack_frames > 1:
         environment = StackObservations(environment, num_frames=stack_frames)
 
     if concat_agent_id:
         environment = ConcatAgentIdToObservation(environment)
 
-    return environment
+    environment_task_name = {
+        "environment_name": "pettingzoo_{env_type}_{env_class}",
+        "task_name": env_name,
+    }
+
+    return environment, environment_task_name

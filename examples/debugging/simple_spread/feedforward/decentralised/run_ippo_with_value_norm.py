@@ -56,6 +56,7 @@ def main(_: Any) -> None:
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
+        concat_agent_id=True,
     )
 
     # Networks.
@@ -106,9 +107,15 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        clip_value=False,
+        clip_value=True,
         normalize_target_values=True,
         normalize_observations=True,
+        normalize_axes=[
+            0,
+            1,
+            (3, 10),
+        ],  # example of how to select which axes to normalize
+        termination_condition={"executor_steps": 200000},
     )
 
     # Launch the system.

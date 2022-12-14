@@ -27,9 +27,11 @@ from mava.callbacks import Callback
 from mava.components import Component
 from mava.components.building.networks import Networks
 from mava.components.building.system_init import BaseSystemInit
+from mava.components.normalisation import ObservationNormalisation
 from mava.components.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemExecutor
 from mava.types import NestedArray
+from mava.utils.jax_training_utils import executor_normalize_observation
 
 
 class ExecutorSelectAction(Component):
@@ -93,6 +95,14 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             None.
         """
 
+        observations = executor.store.observations
+        # Normalize the observations before selecting actions.
+        if (
+            executor.has(ObservationNormalisation)
+            and executor.store.global_config.normalise_observations
+        ):
+            observations = executor_normalize_observation(executor, observations)
+
         # Dict with params per network
         current_agent_params = {
             network: executor.store.networks[network].get_params()
@@ -103,7 +113,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             executor.store.policies_info,
             executor.store.base_key,
         ) = executor.store.select_actions_fn(
-            executor.store.observations, current_agent_params, executor.store.base_key
+            observations, current_agent_params, executor.store.base_key
         )
 
     def on_execution_init_end(self, executor: SystemExecutor) -> None:
@@ -203,6 +213,14 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             None.
         """
 
+        observations = executor.store.observations
+        # Normalize the observations before selecting actions.
+        if (
+            executor.has(ObservationNormalisation)
+            and executor.store.global_config.normalise_observations
+        ):
+            observations = executor_normalize_observation(executor, observations)
+
         # Dict with params per network
         current_agent_params = {
             network: executor.store.networks[network].get_params()
@@ -215,7 +233,7 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             executor.store.policy_states,
             executor.store.base_key,
         ) = executor.store.select_actions_fn(
-            executor.store.observations,
+            observations,
             current_agent_params,
             executor.store.policy_states,
             executor.store.base_key,

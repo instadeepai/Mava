@@ -62,18 +62,6 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
         make build version=flatland
         ```
 
-    * 2D RoboCup environment
-
-        ```
-        make build version=robocup
-        ```
-
-    * MeltingPot
-
-        ```bash
-        make build version=meltingpot
-        ```
-
     To allow for agent recordings, where agents evaluations are recorded and these recordings are stored in a `/recordings` folder:
 
     ```
@@ -157,16 +145,6 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
         pip install id-mava[flatland]
         ```
 
-    * 2D RoboCup environment:
-
-        A local install has only been tested using the Ubuntu 18.04 operating system.
-        The installation can be performed by running the RoboCup bash script while inside the Mava
-        python virtual environment.
-
-        ```bash
-        ./bash_scripts/install_robocup.sh
-        ```
-
     * StarCraft II:
 
         First install StarCraft II
@@ -187,23 +165,18 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
         pip install id-mava[sc2]
         ```
 
-    * MeltingPot:
+3. Developing features for mava
 
-        Install MeltingPot:
+    When developing features for MAVA one can replace the `id-mava` part of the `pip install` with a `.` (or mava's directory) in order to install all dependencies.
 
-        ```bash
-        ./bash_scripts/install_meltingpot.sh
-        ```
+    ```bash
+    git clone https://github.com/instadeepai/mava.git
+    pip install -e "mava[reverb,jax]"
+    ```
 
-        Add MeltingPot to your python path:
+    This installs the mava dependencies into your current environment, but uses your local copy of mava, instead of the one stored inside of your environments package directory.
 
-        ```bash
-        export PYTHONPATH="${PYTHONPATH}:${PWD}/../packages/meltingpot"
-        ```
-
-        If this fails, follow instructions [here](https://github.com/deepmind/meltingpot#installation).
-
-3. Run an example:
+4. Run an example:
 
     ```
     python dir/to/example/example.py

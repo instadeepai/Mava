@@ -38,9 +38,9 @@ tf_requirements = [
 
 jax_requirements = [
     "chex",
-    "jax~=0.3.20",
-    "jaxlib~=0.3.20",
-    "dm-haiku",
+    "jax==0.3.24",
+    "jaxlib==0.3.24",
+    "dm-haiku==0.0.8",
     "flax",
     "optax",
     "rlax",
@@ -57,7 +57,7 @@ pettingzoo_requirements = [
 
 smac_requirements = ["pysc2", "SMAC @ git+https://github.com/oxwhirl/smac.git"]
 testing_formatting_requirements = [
-    "pytest==6.2.4",
+    "pytest==7.2.0",
     "pre-commit",
     "mypy==0.941",
     "pytest-xdist",
@@ -72,7 +72,6 @@ testing_formatting_requirements = [
 record_episode_requirements = ["array2gif", "pyglet"]
 
 flatland_requirements = ["flatland-rl==3.0.1"]
-open_spiel_requirements = ["open_spiel"]
 
 long_description = """Mava is a library for building multi-agent reinforcement
 learning (MARL) systems. Mava builds off of Acme and in a similar way strives
@@ -118,12 +117,11 @@ setup(
         "tf": tf_requirements,
         "pz": pettingzoo_requirements,
         "flatland": flatland_requirements,
-        "open_spiel": open_spiel_requirements,
         "reverb": reverb_requirements,
         "testing_formatting": testing_formatting_requirements,
         "record_episode": record_episode_requirements,
         "sc2": smac_requirements,
-        "envs": pettingzoo_requirements + open_spiel_requirements + smac_requirements,
+        "envs": pettingzoo_requirements + smac_requirements,
         "jax": jax_requirements,
     },
     classifiers=[

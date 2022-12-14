@@ -1,6 +1,6 @@
 <p align="center">
-    <a href="docs/images/mava.png">
-        <img src="docs/images/mava.png" alt="Mava logo" width="70%"/>
+    <a href="docs/images/new_logo_name.png">
+        <img src="docs/images/new_logo_name.png" alt="Mava logo" width="50%"/>
     </a>
 </p>
 
@@ -55,7 +55,7 @@ To join us in these efforts, please feel free to reach out, raise issues or read
 ### Overview 🦜
 
 - 🥑 **Modular building blocks for MARL**: modular abstractions and [components](https://id-mava.readthedocs.io/en/latest/components/components/) for MARL to facilitate building multi-agent systems at scale.
-- 🍬 **Environment Wrappers**: easily connect to your favourite MARL environment including [SMAC][smac], [PettingZoo][pettingzoo], [Flatland][flatland], [2D RoboCup][robocup] and more. For details on our environment wrappers and how to add your own environment, please see [here](https://github.com/instadeepai/Mava/blob/develop/mava/wrappers/README.md).
+- 🍬 **Environment Wrappers**: easily connect to your favourite MARL environment including [SMAC][smac], [PettingZoo][pettingzoo], [Flatland][flatland] and more. For details on our environment wrappers and how to add your own environment, please see [here](https://github.com/instadeepai/Mava/blob/develop/mava/wrappers/README.md).
 - 🎓 **Educational Material**: [examples] and [user guides][quickstart] to facilitate Mava's adoption and highlight the added value of JAX-based MARL.
 
 ## Installation 🎬
@@ -110,6 +110,5 @@ If you use Mava in your work, please cite the accompanying
 [pettingzoo]: https://github.com/PettingZoo-Team/PettingZoo
 [smac]: https://github.com/oxwhirl/smac
 [flatland]: https://gitlab.aicrowd.com/flatland/flatland
-[robocup]: https://github.com/rcsoccersim
 [quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/quickstart.ipynb
 [documentation]: https://id-mava.readthedocs.io/

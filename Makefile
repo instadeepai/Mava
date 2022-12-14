@@ -32,12 +32,8 @@ else ifneq (,$(findstring petting,$(example)))
 DOCKER_IMAGE_TAG=pz
 else ifneq (,$(findstring flatland,$(example)))
 DOCKER_IMAGE_TAG=flatland
-else ifneq (,$(findstring robocup,$(example)))
-DOCKER_IMAGE_TAG=robocup
 else ifneq (,$(findstring smac,$(example)))
 DOCKER_IMAGE_TAG=sc2
-else ifneq (,$(findstring meltingpot,$(example)))
-DOCKER_IMAGE_TAG=meltingpot
 endif
 
 # make file commands
