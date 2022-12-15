@@ -101,7 +101,7 @@ def main(_: Any) -> None:
         run_evaluator=True,
         num_executors=1,
         max_queue_size=500,
-        sample_batch_size=5,
+        epoch_batch_size=5,
     )
     system.launch()
 

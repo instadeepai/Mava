@@ -103,7 +103,7 @@ def main(_: Any) -> None:
         policy_optimiser=policy_optimiser,
         critic_optimiser=critic_optimiser,
         run_evaluator=True,
-        sample_batch_size=5,
+        epoch_batch_size=5,
         num_epochs=15,
         num_executors=1,
         multi_process=True,
