@@ -21,11 +21,12 @@ class BestCheckpointerConfig:
 
 
 class BestCheckpointer(Component):
-    """Best checkpointer is a component that help in storing the best network
-    params for two options:
-    1- Checkpointing the best network for a specific metric.
+    """A component that stores the best network parameters for two options:"""
+
+    """ 1- Checkpointing the best network for a specific metric.
     2- Calculating the absolute metric.
     """
+
     def __init__(
         self, config: BestCheckpointerConfig = BestCheckpointerConfig()
     ) -> None:
