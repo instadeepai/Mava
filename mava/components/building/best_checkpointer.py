@@ -17,7 +17,7 @@ class BestCheckpointerConfig:
     # Flag to calculate the absolute metric
     absolute_metric: bool = False
     # How many episodes to run evaluation for
-    absolute_metric_duration: Optional[int] = 320
+    absolute_metric_duration: Optional[Any] = None
 
 
 class BestCheckpointer(Component):
@@ -41,6 +41,12 @@ class BestCheckpointer(Component):
             and (self.config.checkpoint_best_perf or self.config.absolute_metric)
         ):
             return
+
+        if self.config.absolute_metric_duration is None:
+            self.config.absolute_metric_duration = (
+                10
+                * builder.store.global_config.evaluation_duration["evaluator_episodes"]
+            )
 
         builder.store.best_checkpoint = self.init_checkpointing_params(builder)
 
