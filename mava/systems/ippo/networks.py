@@ -342,10 +342,14 @@ def make_discrete_networks(  # noqa: C901
         Returns:
             Initial state for the recurrent layers.
         """
-        # TODO: Return and handle the same as the above
-        # Passing in the `critic_batch_size` needs to be removed
+        # Passing in the `critic_batch_size` can be removed
         # and inferred from the system hyperparameters in some way.
-        return hk.GRU(64).initial_state(1), hk.GRU(64).initial_state(critic_batch_size)
+
+        network_size = critic_recurrent_layer_sizes[0]
+
+        return hk.GRU(network_size).initial_state(1), hk.GRU(
+            network_size
+        ).initial_state(critic_batch_size)
 
     @hk.without_apply_rng
     @hk.transform
