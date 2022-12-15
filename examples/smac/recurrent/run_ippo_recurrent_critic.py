@@ -46,7 +46,7 @@ BATCH_SIZE = 256
 
 
 def main(_: Any) -> None:
-    """Example running feedforward MADQN on SMAC environment."""
+    """Example running recurrent IPPO on SMAC environment."""
 
     # Environment
     environment_factory = functools.partial(
@@ -122,7 +122,7 @@ def main(_: Any) -> None:
         entropy_cost=3e-4,
         executor_parameter_update_period=20,
         normalize_advantage=False,
-        normalize_target_values=False,
+        normalise_target_values=False,
         num_minibatches=8,
         sequence_length=10,
         period=10,
@@ -130,7 +130,7 @@ def main(_: Any) -> None:
         value_clip_parameter=0.2,
         value_cost=1.0,
         max_gradient_norm=0.5,
-        normalize_observations=False,
+        normalise_observations=False,
     )
 
     # Launch the system.
