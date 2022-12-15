@@ -110,7 +110,7 @@ def main(_: Any) -> None:
         logger_factory=logger_factory,
         logger_config=logger_config,
         # Flag to activate the calculation of the absolute metric
-        absolute_metric=False,
+        absolute_metric=True,
         # How many episodes the evaluator will run for
         absolute_metric_duration=32,
         # List of metrics for which the system calculate the absolute metric
