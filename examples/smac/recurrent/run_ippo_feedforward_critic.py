@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run feedforward MADQN on SMAC."""
+"""Run IPPO on SMAC with a recurrent policy and feedforward critic."""
 
 
 import functools
@@ -112,16 +112,13 @@ def main(_: Any) -> None:
         policy_optimiser=policy_optimiser,
         critic_optimiser=critic_optimiser,
         run_evaluator=True,
-        # sample_batch_size=320,
         epoch_batch_size=batch_size,
         max_queue_size=batch_size * 2,
-        # max_queue_size=640,
         num_epochs=15,
         num_executors=1,
         multi_process=True,
         evaluation_interval={"executor_steps": 10000},
         evaluation_duration={"evaluator_episodes": 10},
-        # evaluation_duration={"evaluator_episodes": 32},
         huber_delta=10.0,
         clip_value=True,
         clipping_epsilon=0.2,
