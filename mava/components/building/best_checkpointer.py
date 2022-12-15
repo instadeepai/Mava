@@ -21,6 +21,11 @@ class BestCheckpointerConfig:
 
 
 class BestCheckpointer(Component):
+    """Best checkpointer is a component that help in storing the best network
+    params for two options:
+    1- Checkpointing the best network for a specific metric.
+    2- Calculating the absolute metric.
+    """
     def __init__(
         self, config: BestCheckpointerConfig = BestCheckpointerConfig()
     ) -> None:
@@ -53,6 +58,8 @@ class BestCheckpointer(Component):
     def on_parameter_server_init(self, server: SystemParameterServer) -> None:
         """Adding checkpointing parameters to parameter server"""
         if self.config.checkpoint_best_perf:
+            # Store the best network in the parameter server just in
+            # the case of checkpointing the best performance
             server.store.parameters.update(
                 {"best_checkpoint": self.init_checkpointing_params(server)}
             )
