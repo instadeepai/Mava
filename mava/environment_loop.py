@@ -292,7 +292,13 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     results.update(eval_result)
                     self._logger.write(results)
 
-                    if self._executor.store.checkpoint_best_perf:
+                    global_config = self._executor.store.global_config
+                    # ideally this would be executor.has(BestCheckpointer),
+                    # but that causes circular import
+                    if (
+                        hasattr(global_config, "checkpoint_best_perf")  # yuck
+                        and global_config.checkpoint_best_perf
+                    ):
                         # Best_performance_update
                         for (
                             metric,

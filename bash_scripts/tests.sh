@@ -52,6 +52,8 @@ pip install .[jax,envs,reverb,testing_formatting,record_episode]
 apt-get -y install unrar-free
 pip install autorom
 AutoROM -v
+# For opencv - in atari tests.
+apt-get install ffmpeg libsm6 libxext6  -y
 
 N_CPU=$(grep -c ^processor /proc/cpuinfo)
 

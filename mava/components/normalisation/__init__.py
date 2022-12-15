@@ -13,25 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-import pytest
-
-from mava.systems.system import System
-from tests.systems.systems_test_data import ippo_system_multi_thread_eval
-
-#########################################################################
-# Full system integration test with evaluation interval.
-
-
-@pytest.fixture
-def test_ippo_system_mt() -> System:
-    """A multi threaded built system that uses Launchpad"""
-    return ippo_system_multi_thread_eval()
-
-
-def test_ippo(
-    test_ippo_system_mt: System,
-) -> None:
-    """Full integration test of ippo system."""
-
-    test_ippo_system_mt.launch()
+"""Normalisation components for Mava systems."""
+from .observation_normalisation import ObservationNormalisation
+from .value_normalisation import ValueNormalisation
