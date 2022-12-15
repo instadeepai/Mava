@@ -324,12 +324,13 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
                     # Check if requires calculating the absolute metric
                     global_config = self._executor.store.global_config
-                    run_absolute_metric = hasattr(
-                        global_config, "checkpoint_best_perf"
-                    ) and (
-                        results["executor_steps"]
-                        >= self._executor.store.global_config.absolute_metric_interval
+                    run_absolute_metric = (
+                        hasattr(global_config, "checkpoint_best_perf")
                         and self._executor.store.global_config.absolute_metric
+                        and (
+                            results["executor_steps"]
+                            >= global_config.termination_condition["executor_steps"]
+                        )
                     )
 
                     if run_absolute_metric:
@@ -379,7 +380,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
                     # ideally this would be executor.has(BestCheckpointer),
                     # but that causes circular import
-                    if hasattr(global_config, "checkpoint_best_perf") and (  # yuck
+                    if hasattr(global_config, "checkpoint_best_perf") and (
                         global_config.checkpoint_best_perf
                         or global_config.absolute_metric
                     ):

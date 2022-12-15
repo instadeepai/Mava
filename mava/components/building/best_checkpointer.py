@@ -1,3 +1,4 @@
+import logging
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple, Union
@@ -6,6 +7,7 @@ from optax import Params
 
 from mava.components.component import Component
 from mava.core_jax import SystemBuilder, SystemParameterServer
+from mava.utils.lp_utils import termination_fn
 
 
 @dataclass
@@ -16,8 +18,6 @@ class BestCheckpointerConfig:
     absolute_metric: bool = False
     # How many episodes to run evaluation for
     absolute_metric_duration: Optional[int] = 320
-    # When to calculate the absolute metric
-    absolute_metric_interval: int = 2000000
 
 
 class BestCheckpointer(Component):
@@ -46,12 +46,24 @@ class BestCheckpointer(Component):
 
     def on_parameter_server_init(self, server: SystemParameterServer) -> None:
         """Adding checkpointing parameters to parameter server"""
-        if not self.config.checkpoint_best_perf:
-            return
+        if self.config.checkpoint_best_perf:
+            server.store.parameters.update(
+                {"best_checkpoint": self.init_checkpointing_params(server)}
+            )
 
-        server.store.parameters.update(
-            {"best_checkpoint": self.init_checkpointing_params(server)}
-        )
+        if self.config.absolute_metric:
+            if (
+                not (server.store.global_config.termination_condition is None)
+                and "executor_steps"
+                in server.store.global_config.termination_condition.keys()
+            ):
+                server.calculate_absolute_metric = True  # type: ignore
+            else:
+                logging.exception(
+                    f"{ValueError}: To calculate the absolute metric, you need to define\
+                    a termination condition related to the executor_steps."
+                )
+                termination_fn(server)
 
     def init_checkpointing_params(
         self, system: Union[SystemParameterServer, SystemBuilder]

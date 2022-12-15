@@ -110,14 +110,12 @@ def main(_: Any) -> None:
         logger_factory=logger_factory,
         logger_config=logger_config,
         # Flag to activate the calculation of the absolute metric
-        absolute_metric=True,
+        absolute_metric=False,
         # How many episodes the evaluator will run for
         absolute_metric_duration=32,
-        # When the system will terminate and the absolute metric
-        # will be calculated
-        absolute_metric_interval=50000,
         # List of metrics for which the system calculate the absolute metric
         checkpointing_metric=("mean_episode_return", "win_rate"),
+        termination_condition={"executor_steps": 50000},
     )
 
     # Launch the system.
