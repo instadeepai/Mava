@@ -211,12 +211,12 @@ def make_discrete_networks(  # noqa: C901
     recurrent_architecture_fn: Any,
     policy_layers_after_recurrent: Sequence[int],
     critic_layers_after_recurrent: Sequence[int],
+    observation_network: Optional[Callable] = None,
     orthogonal_initialisation: bool = False,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     policy_network_head_weight_gain: float = 0.01,
     layer_norm: bool = False,
     critic_batch_size: Optional[int] = None,
-    # default behaviour is to flatten observations
 ) -> PPONetworks:
     """Create PPO network for environments with discrete action spaces.
 
@@ -272,24 +272,29 @@ def make_discrete_networks(  # noqa: C901
             FeedForwardNetwork class
         """
         # Add the observation network and an MLP network.
-        policy_network = [
-            MLP_NORM(
-                policy_layer_sizes,
-                activation=activation_function,
-                w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
-                activate_final=True,
-                layer_norm=layer_norm,
-            ),
-        ]
+        policy_layers = []
+        if observation_network:
+            policy_layers.extend([observation_network])
+        policy_layers.extend(
+            [
+                MLP_NORM(
+                    policy_layer_sizes,
+                    activation=activation_function,
+                    w_init=w_init_fn(orthogonal_initialisation, jnp.sqrt(2)),
+                    activate_final=True,
+                    layer_norm=layer_norm,
+                )
+            ]
+        )
 
         # Add optional recurrent layers
         if len(policy_recurrent_layer_sizes) > 0:
             for size in policy_recurrent_layer_sizes:
-                policy_network.append(recurrent_architecture_fn(size))
+                policy_layers.append(recurrent_architecture_fn(size))
 
             # Add optional feedforward layers after the recurrent layers
             if len(policy_layers_after_recurrent) > 0:
-                policy_network.append(
+                policy_layers.append(
                     MLP_NORM(
                         policy_layers_after_recurrent,
                         activation=activation_function,
@@ -300,7 +305,7 @@ def make_discrete_networks(  # noqa: C901
                 )
 
         # Add a categorical value head.
-        policy_network.append(
+        policy_layers.append(
             networks_lib.CategoricalHead(
                 num_values=num_actions,
                 dtype=environment_spec.actions.dtype,
@@ -311,9 +316,9 @@ def make_discrete_networks(  # noqa: C901
         )
 
         if len(policy_recurrent_layer_sizes) > 0:
-            return hk.DeepRNN(policy_network)(inputs[0], inputs[1])
+            return hk.DeepRNN(policy_layers)(inputs[0], inputs[1])
         else:
-            return hk.Sequential(policy_network)(inputs)
+            return hk.Sequential(policy_layers)(inputs)
 
     @hk.without_apply_rng
     @hk.transform
@@ -363,7 +368,8 @@ def make_discrete_networks(  # noqa: C901
             FeedForwardNetwork class
         """
         critic_layers = []
-
+        if observation_network:
+            critic_layers.extend([observation_network])
         critic_layers.extend(
             [
                 MLP_NORM(
@@ -375,7 +381,6 @@ def make_discrete_networks(  # noqa: C901
                 ),
             ]
         )
-
         # Add optional recurrent layers
         if len(critic_recurrent_layer_sizes) > 0:
             for size in critic_recurrent_layer_sizes:
@@ -449,6 +454,7 @@ def make_networks(
     recurrent_architecture_fn: Any,
     policy_layers_after_recurrent: Sequence[int],
     critic_layers_after_recurrent: Sequence[int],
+    observation_network: Optional[Callable] = None,
     orthogonal_initialisation: bool = False,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     policy_network_head_weight_gain: float = 0.01,
@@ -481,6 +487,8 @@ def make_networks(
             network hidden layers.
         policy_network_head_weight_gain: value for scaling the policy
             network final layer weights by.
+        observation_network: optional network for processing observations.
+            Defaults to utils.batch_concat.
         layer_norm: apply layer normalisation to the hidden MLP layers.
         critic_batch_size: epoch batch size used for training networks.
             only relevant for recurrent critic.
@@ -508,6 +516,7 @@ def make_networks(
             layer_norm=layer_norm,
             policy_network_head_weight_gain=policy_network_head_weight_gain,
             critic_batch_size=critic_batch_size,
+            observation_network=observation_network,
         )
 
     else:
@@ -537,6 +546,7 @@ def make_default_networks(
     orthogonal_initialisation: bool = False,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     policy_network_head_weight_gain: float = 0.01,
+    observation_network: Optional[Callable] = None,
     layer_norm: bool = False,
     critic_batch_size: Optional[int] = None,
 ) -> Dict[str, Any]:
@@ -575,6 +585,8 @@ def make_default_networks(
         layer_norm: apply layer normalisation to the hidden MLP layers.
         critic_batch_size: epoch batch size used for training networks.
             only relevant for recurrent critic.
+        observation_network: optional network for processing observations.
+            Defaults to utils.batch_concat.
 
     Returns:
         networks: networks created to given spec
@@ -605,6 +617,7 @@ def make_default_networks(
             activation_function=activation_function,
             layer_norm=layer_norm,
             policy_network_head_weight_gain=policy_network_head_weight_gain,
+            observation_network=observation_network,
             critic_batch_size=critic_batch_size,
         )
 

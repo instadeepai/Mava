@@ -30,7 +30,7 @@ from mava.utils.loggers import logger_utils
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "map_name",
-    "3m",
+    "2m_vs_1z",
     "Starcraft 2 micromanagement map name (str).",
 )
 
@@ -43,6 +43,7 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 # Used for checkpoints, tensorboard logging and env monitoring
 experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+checkpointing_metric = "mean_episode_return"
 
 
 def run_system() -> None:
@@ -96,13 +97,15 @@ def run_system() -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
+        normalise_observations=False,
+        normalise_target_values=False,
         evaluation_interval={"executor_steps": 2000},
-        evaluation_duration={"evaluator_episodes": 32},
+        evaluation_duration={"evaluator_episodes": 5},
         executor_parameter_update_period=1,
         # Flag to activate best checkpointing
         checkpoint_best_perf=True,
         # metrics to checkpoint its best performance networks
-        checkpointing_metric=("mean_episode_return", "win_rate"),
+        checkpointing_metric=(checkpointing_metric, "win_rate"),
         termination_condition={"executor_steps": 30000},
         checkpoint_minute_interval=1,
         wait=True,
@@ -166,11 +169,13 @@ def run_checkpointed_model() -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
+        normalise_observations=False,
+        normalise_target_values=False,
         evaluation_interval={"executor_steps": 2000},
         evaluation_duration={"evaluator_episodes": 32},
         executor_parameter_update_period=5,
         # choose which metric you want to restore its best netrworks
-        restore_best_net="win_rate",
+        restore_best_net=checkpointing_metric,
         termination_condition={"executor_steps": 40000},
         checkpoint_minute_interval=1,
         wait=True,
@@ -185,7 +190,7 @@ def main(_: Any) -> None:
     # Run system that checkpoint the best performance for win rate
     # and mean return
     run_system()
-    print("Start restored win rate best networks")
+    print(f"Start restored {checkpointing_metric} best networks")
     time.sleep(10)
     run_checkpointed_model()
 
