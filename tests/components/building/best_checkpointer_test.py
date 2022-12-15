@@ -45,6 +45,7 @@ def builder() -> Builder:
         networks={"agent_0": MockNetwork()},
         policy_opt_states={"agent_0": {"opt_state": [1, 2, 3]}},
         critic_opt_states={"agent_0": {"opt_state": [1, 2, 3]}},
+        global_config=SimpleNamespace(evaluation_duration={"evaluator_episodes": 32}),
     )
     return MockBuilder(store)
 
