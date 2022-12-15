@@ -15,6 +15,7 @@
 
 """Jax IPPO system networks."""
 import dataclasses
+import warnings
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import chex
@@ -500,6 +501,21 @@ def make_networks(
         NotImplementedError: Raises an error if continuous network is not
                         available
     """
+
+    if len(critic_recurrent_layer_sizes) > 0:
+        warnings.warn(
+            "When using a recurrent critic network, it is advised to turn off all"
+            + " normalisation except for observation normalisation. Additionially,"
+            + " it is advised to use the MSE loss for the critic network and"
+            + " turn off orthogonal network initialisation."
+        )
+
+    if len(critic_recurrent_layer_sizes) > 1:
+        raise NotImplementedError(
+            "Recurrent critic networks with more than one"
+            + " recurrent layer are not currently supported."
+        )
+
     if isinstance(spec.actions, specs.DiscreteArray):
         return make_discrete_networks(
             environment_spec=spec,
