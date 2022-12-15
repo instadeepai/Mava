@@ -112,9 +112,8 @@ def test_off_policy_data_server(
     """
 
     mock_builder.store.rate_limiter_fn = lambda: reverb.rate_limiters.MinSize(1000)
-    mock_builder.store.adder_signature_fn = (
-        lambda ma_environment_spec, extras_specs, next_extras_specs: reverb_adders.ParallelNStepTransitionAdder.signature(ma_environment_spec,
-        extras_specs, next_extras_specs)
+    mock_builder.store.adder_signature_fn = lambda ma_environment_spec, extras_specs, next_extras_specs: reverb_adders.ParallelNStepTransitionAdder.signature(
+        ma_environment_spec, extras_specs, next_extras_specs
     )
     mock_builder.store.sampler_fn = lambda: sampler
     mock_builder.store.remover_fn = lambda: remover

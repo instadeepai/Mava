@@ -342,9 +342,9 @@ def test_on_execution_observe(
     feedforward_executor_observe.on_execution_observe(executor=mock_executor)
 
     for agent in mock_executor.store.policies_info.keys():
-        assert mock_executor.store.extras["policy_info"][
+        assert mock_executor.store.extras["policy_info"][agent] == "policy_info_" + str(
             agent
-        ] == "policy_info_" + str(agent)
+        )
 
     assert (
         mock_executor.store.next_extras["network_int_keys"]
@@ -522,9 +522,9 @@ def test_on_execution_observe_recurrent(
     recurrent_executor_observe.on_execution_observe(executor=mock_executor)
 
     for agent in mock_executor.store.policies_info.keys():
-        assert mock_executor.store.extras["policy_info"][
+        assert mock_executor.store.extras["policy_info"][agent] == "policy_info_" + str(
             agent
-        ] == "policy_info_" + str(agent)
+        )
 
     assert (
         mock_executor.store.next_extras["network_int_keys"]
