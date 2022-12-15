@@ -229,7 +229,7 @@ def get_ma_environment(
 
         @property
         def obs_normalisation_start_index(self) -> int:
-            """Returns an interger to indicate which features should not be normalised"""
+            """Returns an interger indicating which features should not be normalised"""
             return 0
 
     return MockedEnvironment
@@ -427,7 +427,11 @@ def make_fake_env_specs() -> MAEnvironmentSpec:
     env_spec = {}
     for agent in agents:
         env_spec[agent] = acme_specs.EnvironmentSpec(
-            observations=acme_specs.Array(shape=(10, 5), dtype=np.float32),
+            observations=OLT(
+                observation=acme_specs.Array(shape=(10,), dtype=np.float32),
+                legal_actions=acme_specs.DiscreteArray(num_values=3),
+                terminal=acme_specs.DiscreteArray(num_values=1),
+            ),
             actions=acme_specs.DiscreteArray(num_values=3),
             rewards=acme_specs.Array(shape=(), dtype=np.float32),
             discounts=acme_specs.BoundedArray(

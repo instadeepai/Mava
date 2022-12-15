@@ -20,10 +20,11 @@ from typing import Callable
 
 import jax
 import pytest
+from acme.jax.networks import AtariTorso
 
 from mava import specs
 from mava.systems.ippo.networks import make_default_networks
-from mava.utils.environments import debugging_utils
+from mava.utils.environments import debugging_utils, pettingzoo_utils
 
 
 @pytest.fixture
@@ -89,6 +90,39 @@ def feedforward_network() -> Callable:
     )
 
 
+@pytest.fixture
+def feedforward_network_with_atari_obs_net() -> Callable:
+    """Feeforward network fixture, with atari obs."""
+
+    # Environment.
+    # Need env with pixel obs.
+    environment_factory = functools.partial(
+        pettingzoo_utils.make_environment,
+        env_class="butterfly",
+        env_name="cooperative_pong_v5",
+    )
+
+    env, _ = environment_factory()
+    ma_environment_spec = specs.MAEnvironmentSpec(env)
+
+    agent_net_keys = {
+        "paddle_0": "network_agent",
+        "paddle_1": "network_agent",
+    }
+
+    _, network_key = jax.random.split(jax.random.PRNGKey(42))
+
+    obs_net_forward = lambda x: AtariTorso()(x)  # noqa: E731
+
+    return lambda: make_default_networks(
+        environment_spec=ma_environment_spec,
+        agent_net_keys=agent_net_keys,
+        base_key=network_key,
+        orthogonal_initialisation=True,
+        observation_network=obs_net_forward,
+    )
+
+
 def test_recurrent_network(recurrent_network: Callable) -> None:
     """Recurrent network smoke test"""
 
@@ -99,3 +133,27 @@ def test_feedforward_network(feedforward_network: Callable) -> None:
     """Feedforward network smoke test"""
 
     assert feedforward_network()
+
+
+def test_feedforward_network_with_obs(
+    feedforward_network_with_atari_obs_net: Callable,
+) -> None:
+    """Check we have obs networks in AC models."""
+
+    assert (
+        "atari"
+        in list(
+            feedforward_network_with_atari_obs_net()[
+                "network_agent"
+            ].policy_params.keys()
+        )[0]
+    )
+
+    assert (
+        "atari"
+        in list(
+            feedforward_network_with_atari_obs_net()[
+                "network_agent"
+            ].critic_params.keys()
+        )[0]
+    )

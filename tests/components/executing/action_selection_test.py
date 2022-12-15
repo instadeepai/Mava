@@ -30,6 +30,10 @@ from mava.components.executing.action_selection import (
     FeedforwardExecutorSelectAction,
     RecurrentExecutorSelectAction,
 )
+from mava.components.normalisation.observation_normalisation import (
+    ObservationNormalisation,
+)
+from mava.components.normalisation.value_normalisation import ValueNormalisation
 from mava.systems.executor import Executor
 from mava.types import OLT, NestedArray
 
@@ -73,18 +77,36 @@ def recurrent_executor_select_action() -> RecurrentExecutorSelectAction:
 
 
 @pytest.fixture
-def mock_empty_executor() -> Executor:
+def mock_empty_executor_ff() -> Executor:
     """Mock executore component with empty observations"""
     store = SimpleNamespace(
         is_evaluator=None,
         observations={},
         agent_net_keys={},
-        select_actions_fn=select_actions,
+        select_actions_fn=select_actions_ff,
         base_key=42,
         policy_states=1234,
         global_config=SimpleNamespace(
-            normalize_observations=False,
-            normalize_target_values=False,
+            normalise_observations=False,
+            normalise_target_values=False,
+        ),
+    )
+    return Executor(store=store)
+
+
+@pytest.fixture
+def mock_empty_executor_recurrent() -> Executor:
+    """Mock executore component with empty observations"""
+    store = SimpleNamespace(
+        is_evaluator=None,
+        observations={},
+        agent_net_keys={},
+        select_actions_fn=select_actions_recurrent,
+        base_key=42,
+        policy_states=1234,
+        global_config=SimpleNamespace(
+            normalise_observations=False,
+            normalise_target_values=False,
         ),
     )
     return Executor(store=store)
@@ -117,7 +139,7 @@ def get_params() -> Dict[str, jnp.ndarray]:
 #######################
 # Feedforward executors#
 #######################
-def select_actions(
+def select_actions_ff(
     observations: Dict[str, NestedArray],
     current_params: Dict[str, NestedArray],
     base_key: networks_lib.PRNGKey,
@@ -206,14 +228,16 @@ class MockFeedForwardExecutor(Executor):
             base_key=base_key,
             action_info=action_info,
             policy_info=policy_info,
-            select_actions_fn=select_actions,
+            select_actions_fn=select_actions_ff,
+            executor_environment=SimpleNamespace(death_masked_agents=[]),
             norm_params=norm_params,
             global_config=SimpleNamespace(
-                normalize_observations=True,
-                normalize_target_values=False,
+                normalise_observations=True,
+                normalise_target_values=False,
             ),
         )
         self.store = store
+        self.callbacks = [ObservationNormalisation, ValueNormalisation]
 
     def set_agent(self, agent: str) -> None:
         """Update agent, observation
@@ -235,7 +259,7 @@ def mock_feedforward_executor() -> Executor:
 
 
 # Test initiator
-def test_constructor(dummy_config: DummyExecutorSelectActionConfig) -> None:
+def test_ff_constructor(dummy_config: DummyExecutorSelectActionConfig) -> None:
     """Test adding config as an attribute.
 
     Args:
@@ -247,23 +271,25 @@ def test_constructor(dummy_config: DummyExecutorSelectActionConfig) -> None:
 
 
 # Test on_execution_select_actions
-def test_on_execution_select_actions_with_empty_observations(
-    mock_empty_executor: Executor,
+def test_on_execution_select_actions_with_empty_observations_ff(
+    mock_empty_executor_ff: Executor,
     ff_executor_select_action: FeedforwardExecutorSelectAction,
 ) -> None:
     """Test on_execution_select_actions with empty observations
 
     Args:
-        mock_empty_executor: executor with no observations and no agents
+        mock_empty_executor_ff: executor with no observations and no agents
         ff_executor_select_action: FeedforwardExecutorSelectAction
     """
-    ff_executor_select_action.on_execution_select_actions(executor=mock_empty_executor)
+    ff_executor_select_action.on_execution_select_actions(
+        executor=mock_empty_executor_ff
+    )
 
-    assert mock_empty_executor.store.actions_info == {}
-    assert mock_empty_executor.store.policies_info == {}
+    assert mock_empty_executor_ff.store.actions_info == {}
+    assert mock_empty_executor_ff.store.policies_info == {}
 
 
-def test_on_execution_select_actions(
+def test_on_execution_select_actions_ff(
     mock_feedforward_executor: Executor,
     ff_executor_select_action: FeedforwardExecutorSelectAction,
 ) -> None:
@@ -291,7 +317,7 @@ def test_on_execution_select_actions(
 #######################
 # Recurrent executors  #
 #######################
-def select_actions(  # type: ignore # noqa: E501
+def select_actions_recurrent(
     observations: Dict[str, NestedArray],
     current_params: Dict[str, NestedArray],
     policy_states: Dict[str, NestedArray],
@@ -388,12 +414,13 @@ class MockRecurrentExecutor(Executor):  # type: ignore # noqa: E501
             policy_info=policy_info,
             norm_params=norm_params,
             executor_environment=SimpleNamespace(death_masked_agents=[]),
-            select_actions_fn=select_actions,
+            select_actions_fn=select_actions_recurrent,
             global_config=SimpleNamespace(
-                normalize_observations=True,
+                normalise_observations=True,
             ),
         )
         self.store = store
+        self.callbacks = [ObservationNormalisation, ValueNormalisation]
 
     def set_agent(self, agent: str) -> None:
         """Update agent, observation
@@ -415,7 +442,7 @@ def mock_recurrent_executor() -> Executor:  # type: ignore # noqa: E501
 
 
 # Test initiator
-def test_constructor(dummy_config: DummyExecutorSelectActionConfig) -> None:  # type: ignore # noqa: E501
+def test_recurrent_constructor(dummy_config: DummyExecutorSelectActionConfig) -> None:  # type: ignore # noqa: E501
     """Test adding config as an attribute.
 
     Args:
@@ -427,25 +454,25 @@ def test_constructor(dummy_config: DummyExecutorSelectActionConfig) -> None:  # 
 
 
 # Test on_execution_select_actions
-def test_on_execution_select_actions_with_empty_observations(  # type: ignore # noqa: E501
-    mock_empty_executor: Executor,
+def test_on_execution_select_actions_with_empty_observations_recurrent(  # type: ignore # noqa: E501
+    mock_empty_executor_recurrent: Executor,
     recurrent_executor_select_action: RecurrentExecutorSelectAction,
 ) -> None:
     """Test on_execution_select_actions with empty observations
 
     Args:
-        mock_empty_executor: executor with no observations and no agents
+        mock_empty_executor_recurrent: executor with no observations and no agents
         recurrent_executor_select_action: RecurrentExecutorSelectAction
     """
     recurrent_executor_select_action.on_execution_select_actions(
-        executor=mock_empty_executor
+        executor=mock_empty_executor_recurrent
     )
 
-    assert mock_empty_executor.store.actions_info == {}
-    assert mock_empty_executor.store.policies_info == {}
+    assert mock_empty_executor_recurrent.store.actions_info == {}
+    assert mock_empty_executor_recurrent.store.policies_info == {}
 
 
-def test_on_execution_select_actions(  # type: ignore # noqa: E501
+def test_on_execution_select_actions_recurrent(  # type: ignore # noqa: E501
     mock_recurrent_executor: Executor,
     recurrent_executor_select_action: RecurrentExecutorSelectAction,
 ) -> None:

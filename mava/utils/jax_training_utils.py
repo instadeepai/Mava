@@ -28,7 +28,7 @@ def action_mask_categorical_policies(
     return tfd.Categorical(logits=masked_logits, dtype=distribution.dtype)
 
 
-def init_norm_params(stats_shape: Tuple) -> Dict[str, Union[jnp.array, float]]:
+def init_norm_params(stats_shape: Tuple) -> Dict[str, Union[jnp.ndarray, float]]:
     """Initialise normalistion parameters"""
 
     stats = dict(
