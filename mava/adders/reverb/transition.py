@@ -145,11 +145,16 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         # transition that is about to be written.
         history = self._writer.history
         s, e, a = tree.map_structure(
-            get_first, (history["observations"], history["extras"], history["actions"])
+            get_first,
+            (
+                history["observations"],
+                history.get("next_extras", {}),
+                history["actions"],
+            ),
         )
 
         s_, e_ = tree.map_structure(
-            get_last, (history["observations"], history["extras"])
+            get_last, (history["observations"], history.get("next_extras", {}))
         )
 
         # # Maybe get extras to add to the transition later.

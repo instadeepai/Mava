@@ -73,8 +73,9 @@ def test_data_server_single_process(test_system_sp: System) -> None:
     assert sorted(list(signature.actions.keys())) == ["agent_0", "agent_1", "agent_2"]
     assert sorted(list(signature.rewards.keys())) == ["agent_0", "agent_1", "agent_2"]
     assert sorted(list(signature.discounts.keys())) == ["agent_0", "agent_1", "agent_2"]
-    assert sorted(list(signature.extras.keys())) == ["network_keys", "policy_info"]
-    assert sorted(list(signature.extras["network_keys"].keys())) == [
+    assert list(signature.extras.keys()) == ["policy_info"]
+    assert list(signature.next_extras.keys()) == ["network_keys"]
+    assert sorted(list(signature.next_extras["network_keys"].keys())) == [
         "agent_0",
         "agent_1",
         "agent_2",
@@ -129,11 +130,13 @@ def test_data_server_single_process(test_system_sp: System) -> None:
         ]
         for agent_discount in sample.data.discounts.values():
             assert jnp.size(agent_discount) != 0
-        assert sorted(list(sample.data.extras.keys())) == [
-            "network_keys",
+        assert list(sample.data.extras.keys()) == [
             "policy_info",
         ]
-        assert sorted(list(sample.data.extras["network_keys"].keys())) == [
+        assert list(sample.data.next_extras.keys()) == [
+            "network_keys",
+        ]
+        assert sorted(list(sample.data.next_extras["network_keys"].keys())) == [
             "agent_0",
             "agent_1",
             "agent_2",

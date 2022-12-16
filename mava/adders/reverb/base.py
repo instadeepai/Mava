@@ -53,8 +53,8 @@ class Step(NamedTuple):
     rewards: Dict[str, mava_types.NestedArray]
     discounts: Dict[str, mava_types.NestedArray]
     start_of_episode: Union[bool, acme_specs.Array, tf.Tensor, Tuple[()]]
-    extras: Dict[str, mava_types.NestedArray]
-    next_extras: Dict[str, mava_types.NestedArray]
+    extras: Dict[str, mava_types.NestedArray] = {}
+    next_extras: Dict[str, mava_types.NestedArray] = {}
 
 
 Trajectory = Step

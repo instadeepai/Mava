@@ -90,7 +90,10 @@ def trajectory_signature(
     # Note (dries) Environment extras are passed to next extras
     # to align with the observation info.
     env_extras_specs = ma_environment_spec.get_extras_specs()
-    next_extras_specs.update(env_extras_specs)
+    if next_extras_specs != ():
+        next_extras_specs.update(env_extras_specs)
+    else:
+        next_extras_specs = env_extras_specs
 
     obs_specs = {}
     act_specs = {}

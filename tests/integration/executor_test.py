@@ -60,14 +60,19 @@ def test_executor_single_process(test_system_sp: System) -> None:
 
     # Observe first and observe
     assert executor._executor.store.adder._writer.history
-    assert list(executor._executor.store.adder._writer.history.keys()) == [
-        "observations",
-        "start_of_episode",
-        "actions",
-        "rewards",
-        "discounts",
-        "extras",
-    ]
+    assert sorted(
+        list(executor._executor.store.adder._writer.history.keys())
+    ) == sorted(
+        [
+            "observations",
+            "start_of_episode",
+            "actions",
+            "rewards",
+            "discounts",
+            "extras",
+            "next_extras",
+        ]
+    )
     assert list(
         executor._executor.store.adder._writer.history["observations"].keys()
     ) == ["agent_0", "agent_1", "agent_2"]

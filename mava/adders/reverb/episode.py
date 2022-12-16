@@ -94,7 +94,7 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
                 "max_sequence_length with the addition of this transition."
             )
 
-        super().add(action, next_timestep, extras, next_extras)
+        ReverbParallelAdder.add(self, action, next_timestep, extras, next_extras)
 
     def _write_last(self) -> None:
         if (
@@ -141,9 +141,11 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
         ma_environment_spec: specs.MAEnvironmentSpec,
         sequence_length: Optional[int] = None,
         extras_specs: Dict[str, Any] = {},
+        next_extras_specs: Dict[str, Any] = {},
     ) -> tf.TypeSpec:
         return mava_utils.trajectory_signature(
             ma_environment_spec=ma_environment_spec,
             sequence_length=sequence_length,
             extras_specs=extras_specs,
+            next_extras_specs=next_extras_specs,
         )
