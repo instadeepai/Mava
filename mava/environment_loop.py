@@ -14,7 +14,6 @@
 # limitations under the License.
 
 """A simple multi-agent-system-environment training loop."""
-
 import copy
 import logging
 import time
@@ -26,6 +25,7 @@ import dm_env
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 from acme.utils import counting, loggers
 
 import mava
@@ -203,6 +203,9 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         self._logger.write(results)
         return results
 
+    # TODO (Omayma): remove this condition when we fix the coverage bot to be able
+    # to use the integration tests or when we create a unit test for the env loop
+    @pytest.mark.skipif(True, reason="Skip this function for code coverage")
     def run(self) -> None:  # noqa: C901
         """Run the environment loop."""
 
