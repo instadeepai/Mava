@@ -141,7 +141,7 @@ def mock_trainer() -> Trainer:
     mock_trainer = Trainer(store)
 
     # Set sample batch size
-    mock_trainer.store.sample_batch_size = 1
+    mock_trainer.store.epoch_batch_size = 1
     mock_trainer.store.sequence_length = 5
 
     return mock_trainer

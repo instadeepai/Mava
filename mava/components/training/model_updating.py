@@ -23,6 +23,7 @@ import jax
 import jax.numpy as jnp
 import optax
 from acme.jax import networks as networks_lib
+from haiku._src.basic import merge_leading_dims
 from jax.random import KeyArray
 
 from mava import constants
@@ -204,7 +205,6 @@ class EpochUpdate(Utility):
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
-        Step required to set up trainer.store.full_batch_size.
         MinibatchUpdate required to set up trainer.store.minibatch_update_fn.
 
         Returns:
@@ -263,12 +263,18 @@ class MAPGEpochUpdate(EpochUpdate):
             base_key, shuffle_key = jax.random.split(key)
 
             permutation = jax.random.permutation(
-                shuffle_key, trainer.store.full_batch_size
+                shuffle_key, trainer.store.epoch_batch_size
             )
 
             shuffled_batch = jax.tree_util.tree_map(
                 lambda x: jnp.take(x, permutation, axis=0), batch
             )
+
+            # Flatten the batch.
+            shuffled_batch = jax.tree_util.tree_map(
+                lambda x: merge_leading_dims(x, 2), shuffled_batch
+            )
+
             minibatches = jax.tree_util.tree_map(
                 lambda x: jnp.reshape(
                     x, [self.config.num_minibatches, -1] + list(x.shape[1:])
