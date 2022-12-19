@@ -42,7 +42,6 @@ class ParameterServer(Component):
     ) -> None:
         """Component defining hooks to override when creating a parameter server."""
         self.config = config
-        self.calculate_absolute_metric = False
 
     @abc.abstractmethod
     def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
