@@ -205,3 +205,32 @@ def test_time_terminator_not_terminated(
     test_terminator.on_parameter_server_run_loop_termination(test_parameter_server)
 
     assert test_parameter_server.store.stopped is False
+
+
+@pytest.mark.parametrize("condition", count_condition_terminator_data())
+def test_ignore_stop_condition(
+    condition: Dict, mock_parameter_server: SystemParameterServer
+) -> None:
+    """Test the case we have the flag calculate_absolute_metric"""
+
+    mock_parameter_server.calculate_absolute_metric = True  # type: ignore
+    test_parameter_server = mock_parameter_server
+
+    def _set_stopped(parameter_server: MockParameterServer) -> None:
+        """Stop flag"""
+        test_parameter_server.store.stopped = True
+
+    test_terminator = CountConditionTerminator(
+        config=CountConditionTerminatorConfig(  # type: ignore
+            termination_condition=condition, termination_function=_set_stopped
+        )
+    )
+
+    for _ in range(15):
+        step_parameters(
+            test_parameter_server.store.parameters, list(condition.keys())[0]
+        )
+
+    test_terminator.on_parameter_server_run_loop_termination(test_parameter_server)
+
+    assert test_parameter_server.store.stopped is False
