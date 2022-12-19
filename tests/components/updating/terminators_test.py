@@ -218,7 +218,7 @@ def test_ignore_stop_condition(
 
     def _set_stopped(parameter_server: MockParameterServer) -> None:
         """Stop flag"""
-        test_parameter_server.store.stopped = True
+        test_parameter_server.store.stopped = True  # pragma: no cover
 
     test_terminator = CountConditionTerminator(
         config=CountConditionTerminatorConfig(  # type: ignore
