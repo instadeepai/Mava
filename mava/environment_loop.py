@@ -251,6 +251,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             )
             evaluation_duration = eval_duration_condition[1]
 
+        @pytest.mark.skipif(True, reason="Skip this function for code coverage")
         def run_evaluation(results: Any) -> None:
             """Calculate the absolute metric"""
 
@@ -317,6 +318,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 {"terminate": True}
             )
 
+        @pytest.mark.skipif(True, reason="Skip this function for code coverage")
         def step_executor() -> None:
             if (not environment_loop_schedule) or (
                 should_run_loop(eval_interval_condition)
