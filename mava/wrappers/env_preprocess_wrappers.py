@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from abc import ABC, abstractmethod
 from collections import deque
 from typing import TYPE_CHECKING, Any, Dict
 
@@ -37,7 +38,48 @@ if _has_petting_zoo:
 PettingZooEnv = "PettingZooParallelEnvWrapper"
 
 
-class ConcatAgentIdToObservation:
+class BasePreprocessWrapper(ABC):
+    def __init__(self, environment: Any) -> None:
+        """Initialise wrapper."""
+        self._environment = environment
+
+    @abstractmethod
+    def reset(self) -> dm_env.TimeStep:
+        """Reset the environment."""
+
+    @abstractmethod
+    def step(self, actions: Dict) -> dm_env.TimeStep:
+        """Step the environment."""
+
+    def observation_spec(self) -> Dict[str, OLT]:
+        """Observation spec.
+
+        Returns:
+            types.Observation: spec for environment.
+        """
+        timestep = self.reset()
+        if type(timestep) == tuple:
+            timestep, _ = timestep
+
+        observations = timestep.observation
+        return observations
+
+    def __getattr__(self, name: str) -> Any:
+        """Expose any other attributes of the underlying environment.
+
+        Args:
+            name (str): attribute.
+
+        Returns:
+            Any: return attribute from env or underlying env.
+        """
+        if hasattr(self.__class__, name):
+            return self.__getattribute__(name)
+        else:
+            return getattr(self._environment, name)
+
+
+class ConcatAgentIdToObservation(BasePreprocessWrapper):
     """Concat one-hot vector of agent ID to obs.
 
     We assume the environment has an ordered list
@@ -47,7 +89,8 @@ class ConcatAgentIdToObservation:
 
     def __init__(self, environment: Any) -> None:
         """Initialise wrapper."""
-        self._environment = environment
+        super().__init__(environment)
+
         self._num_agents = len(environment.possible_agents)
 
         # Check that observation of first agent is a vector
@@ -124,19 +167,6 @@ class ConcatAgentIdToObservation:
             env_extras,
         )
 
-    def observation_spec(self) -> Dict[str, OLT]:
-        """Observation spec.
-
-        Returns:
-            types.Observation: spec for environment.
-        """
-        timestep = self.reset()
-        if type(timestep) == tuple:
-            timestep, _ = timestep
-
-        observations = timestep.observation
-        return observations
-
     @property
     def obs_normalisation_start_index(self) -> int:
         """Returns an interger to indicate which features should not be normalised"""
@@ -146,22 +176,8 @@ class ConcatAgentIdToObservation:
 
         return old_value + num_values
 
-    def __getattr__(self, name: str) -> Any:
-        """Expose any other attributes of the underlying environment.
 
-        Args:
-            name (str): attribute.
-
-        Returns:
-            Any: return attribute from env or underlying env.
-        """
-        if hasattr(self.__class__, name):
-            return self.__getattribute__(name)
-        else:
-            return getattr(self._environment, name)
-
-
-class ConcatPrevActionToObservation:
+class ConcatPrevActionToObservation(BasePreprocessWrapper):
     """Concat one-hot vector of agent prev_action to obs.
 
     We assume the environment has discreet actions.
@@ -171,7 +187,7 @@ class ConcatPrevActionToObservation:
 
     def __init__(self, environment: Any):
         """Initialise wrapper."""
-        self._environment = environment
+        super().__init__(environment)
 
     def reset(self) -> dm_env.TimeStep:
         """Reset the environment and add zero action."""
@@ -237,19 +253,6 @@ class ConcatPrevActionToObservation:
             env_extras,
         )
 
-    def observation_spec(self) -> Dict[str, OLT]:
-        """Observation spec.
-
-        Returns:
-            types.Observation: spec for environment.
-        """
-        timestep = self.reset()
-        if type(timestep) == tuple:
-            timestep, _ = timestep
-
-        observations = timestep.observation
-        return observations
-
     @property
     def obs_normalisation_start_index(self) -> int:
         """Returns an interger to indicate which features should not be normalised"""
@@ -261,33 +264,19 @@ class ConcatPrevActionToObservation:
 
         return old_value + num_values
 
-    def __getattr__(self, name: str) -> Any:
-        """Expose any other attributes of the underlying environment.
 
-        Args:
-            name (str): attribute.
-
-        Returns:
-            Any: return attribute from env or underlying env.
-        """
-        if hasattr(self.__class__, name):
-            return self.__getattribute__(name)
-        else:
-            return getattr(self._environment, name)
-
-
-class StackObservations:
+class StackObservations(BasePreprocessWrapper):
     """Stack frames of observations together"""
 
     def __init__(self, environment: Any, num_frames: int = 1):
         """Initialise wrapper."""
 
-        self._environment = environment
+        super().__init__(environment)
 
         # Check that this is the first wrapper that is called on the environment
         if self._environment.obs_normalisation_start_index != 0:
             raise ValueError(
-                "Observation stacking should be the first cumstom\
+                "Observation stacking should be the first custom\
                     wrapper we call in the environment factory."
             )
 
@@ -308,35 +297,23 @@ class StackObservations:
 
         new_observations: Any = {}
 
-        agent_0 = self._environment.possible_agents[0]
-        if type(timestep.observation[agent_0]) == OLT:
-            old_observations = timestep.observation
-            for agent in self._environment.possible_agents:
-                agent_olt = old_observations[agent]
-                agent_observation = agent_olt.observation
+        old_observations = timestep.observation
+        for agent in self._environment.possible_agents:
+            agent_olt = old_observations[agent]
+            agent_observation = agent_olt.observation
 
-                for _ in range(self.num_frames):
-                    self.frames[agent].append(agent_observation)
+            for _ in range(self.num_frames):
+                self.frames[agent].append(agent_observation)
 
-                agent_stack_observation = np.array(self.frames[agent])
-                agent_stack_observation = agent_stack_observation.reshape(
-                    (-1,) + agent_observation.shape[2:]
-                )
-                new_observations[agent] = OLT(
-                    observation=agent_stack_observation,
-                    legal_actions=agent_olt.legal_actions,
-                    terminal=agent_olt.terminal,
-                )
-        else:
-            for agent, agent_observation in timestep.observation.items():
-                for _ in range(self.num_frames):
-                    self.frames[agent].append(agent_observation)
-
-                agent_stack_observation = np.array(self.frames[agent])
-                agent_stack_observation = agent_stack_observation.reshape(
-                    (-1,) + agent_observation.shape[2:]
-                )
-                new_observations[agent] = agent_stack_observation
+            agent_stack_observation = np.array(self.frames[agent])
+            agent_stack_observation = agent_stack_observation.reshape(
+                (-1,) + agent_observation.shape[2:]
+            )
+            new_observations[agent] = OLT(
+                observation=agent_stack_observation,
+                legal_actions=agent_olt.legal_actions,
+                terminal=agent_olt.terminal,
+            )
 
         return (
             dm_env.TimeStep(
@@ -355,33 +332,22 @@ class StackObservations:
 
         new_observations: Any = {}
 
-        agent_0 = self._environment.possible_agents[0]
-        if type(timestep.observation[agent_0]) == OLT:
-            old_observations = timestep.observation
-            for agent in self._environment.possible_agents:
-                agent_olt = old_observations[agent]
-                agent_observation = agent_olt.observation
+        old_observations = timestep.observation
+        for agent in self._environment.possible_agents:
+            agent_olt = old_observations[agent]
+            agent_observation = agent_olt.observation
 
-                self.frames[agent].append(agent_observation)
+            self.frames[agent].append(agent_observation)
 
-                agent_stack_observation = np.array(self.frames[agent])
-                agent_stack_observation = agent_stack_observation.reshape(
-                    (-1,) + agent_observation.shape[2:]
-                )
-                new_observations[agent] = OLT(
-                    observation=agent_stack_observation,
-                    legal_actions=agent_olt.legal_actions,
-                    terminal=agent_olt.terminal,
-                )
-        else:
-            for agent, agent_observation in timestep.observation.items():
-                self.frames[agent].append(agent_observation)
-
-                agent_stack_observation = np.array(self.frames[agent])
-                agent_stack_observation = agent_stack_observation.reshape(
-                    (-1,) + agent_observation.shape[2:]
-                )
-                new_observations[agent] = agent_stack_observation
+            agent_stack_observation = np.array(self.frames[agent])
+            agent_stack_observation = agent_stack_observation.reshape(
+                (-1,) + agent_observation.shape[2:]
+            )
+            new_observations[agent] = OLT(
+                observation=agent_stack_observation,
+                legal_actions=agent_olt.legal_actions,
+                terminal=agent_olt.terminal,
+            )
 
         return (
             dm_env.TimeStep(
@@ -389,30 +355,3 @@ class StackObservations:
             ),
             env_extras,
         )
-
-    def observation_spec(self) -> Dict[str, OLT]:
-        """Observation spec.
-
-        Returns:
-            types.Observation: spec for environment.
-        """
-        timestep = self.reset()
-        if type(timestep) == tuple:
-            timestep, _ = timestep
-
-        observations = timestep.observation
-        return observations
-
-    def __getattr__(self, name: str) -> Any:
-        """Expose any other attributes of the underlying environment.
-
-        Args:
-            name (str): attribute.
-
-        Returns:
-            Any: return attribute from env or underlying env.
-        """
-        if hasattr(self.__class__, name):
-            return self.__getattribute__(name)
-        else:
-            return getattr(self._environment, name)
