@@ -96,7 +96,7 @@ When building the system, `system.build` can contain arguments that will overwri
 
 - `run_evaluator` - a flag indicating whether a separate environment process should be run that tracks the system's performance using Tensorboard and possibly create agent gameplay recordings.
 
-- `sample_batch_size` - the batch size to use in the trainer when updating the agent networks.
+- `epoch_batch_size` - the batch size to use in the trainer when updating the agent networks.
 
 - `num_epochs` - the number of epochs to train on sampled data before discarding it.
 
