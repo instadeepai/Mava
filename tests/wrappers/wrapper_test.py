@@ -22,7 +22,6 @@ import pytest
 from _pytest.monkeypatch import MonkeyPatch
 from dm_env.specs import DiscreteArray
 
-from mava import types
 from mava.utils.environments.flatland_utils import check_flatland_import
 from mava.wrappers.env_preprocess_wrappers import (
     ConcatAgentIdToObservation,
@@ -410,24 +409,22 @@ class TestEnvWrapper:
         if type(wrapped_step) == tuple:
             wrapped_step, _ = wrapped_step
 
-        olt_type = isinstance(wrapped_step.observation[agents[0]], types.OLT)
-        if olt_type:
-            concat_id = ConcatAgentIdToObservation(wrapped_env)
-            assert (
-                concat_id.obs_normalisation_start_index
-                > wrapped_env.obs_normalisation_start_index
-            )
-            assert len(concat_id.death_masked_agents) == 0
+        concat_id = ConcatAgentIdToObservation(wrapped_env)
+        assert (
+            concat_id.obs_normalisation_start_index
+            > wrapped_env.obs_normalisation_start_index
+        )
+        assert len(concat_id.death_masked_agents) == 0
 
-            action_spec = concat_id.action_spec()
-            discrete = isinstance(action_spec[agents[0]], DiscreteArray)
-            if discrete:
-                concat_id_action = ConcatPrevActionToObservation(concat_id)
-                assert (
-                    concat_id_action.obs_normalisation_start_index
-                    > concat_id.obs_normalisation_start_index
-                )
-                assert len(concat_id_action.death_masked_agents) == 0
+        action_spec = concat_id.action_spec()
+        discrete = isinstance(action_spec[agents[0]], DiscreteArray)
+        if discrete:
+            concat_id_action = ConcatPrevActionToObservation(concat_id)
+            assert (
+                concat_id_action.obs_normalisation_start_index
+                > concat_id.obs_normalisation_start_index
+            )
+            assert len(concat_id_action.death_masked_agents) == 0
 
     def test_wrapper_env_obs_stacking(
         self, env_spec: EnvSpec, helpers: Helpers
@@ -451,15 +448,9 @@ class TestEnvWrapper:
         if type(stacked_step) == tuple:
             stacked_step, _ = stacked_step
 
-        olt_type = isinstance(normal_step.observation[agents[0]], types.OLT)
-
         for agent in agents:
-            if olt_type:
-                wrap_obs = normal_step.observation[agent].observation
-                stacked_obs = stacked_step.observation[agent].observation
-            else:
-                wrap_obs = normal_step.observation[agent]
-                stacked_obs = stacked_step.observation[agent]
+            wrap_obs = normal_step.observation[agent].observation
+            stacked_obs = stacked_step.observation[agent].observation
 
             assert wrap_obs.shape[0] * num_frames == stacked_obs.shape[0]
 
@@ -472,12 +463,8 @@ class TestEnvWrapper:
             stacked_step, _ = stacked_step
 
         for agent in agents:
-            if olt_type:
-                wrap_obs = normal_step.observation[agent].observation
-                stacked_obs = stacked_step.observation[agent].observation
-            else:
-                wrap_obs = normal_step.observation[agent]
-                stacked_obs = stacked_step.observation[agent]
+            wrap_obs = normal_step.observation[agent].observation
+            stacked_obs = stacked_step.observation[agent].observation
 
             assert wrap_obs.shape[0] * num_frames == stacked_obs.shape[0]
 
@@ -487,10 +474,7 @@ class TestEnvWrapper:
             for k in range(num_frames - 1):
                 assert np.array_equal(old_obs, stacked_obs[k * size : (k + 1) * size])
 
-            # TODO thinking of a better way to test this.
-            # assert not np.array_equal(
-            #     old_obs, stacked_obs[(num_frames - 1) * size :]
-            # )
+            assert not np.array_equal(old_obs, stacked_obs[(num_frames - 1) * size :])
 
     def test_wrapper_env_obs_stacking_and_concate(
         self, env_spec: EnvSpec, helpers: Helpers
@@ -508,36 +492,32 @@ class TestEnvWrapper:
         if type(stacked_step) == tuple:
             stacked_step, _ = stacked_step
 
-        olt_type = isinstance(stacked_step.observation[agents[0]], types.OLT)
-        if olt_type:
-            concat_id = ConcatAgentIdToObservation(stacked_env)
+        concat_id = ConcatAgentIdToObservation(stacked_env)
 
-            action_spec = concat_id.action_spec()
-            discrete = isinstance(action_spec[agents[0]], DiscreteArray)
-            if discrete:
-                concat_id_action = ConcatPrevActionToObservation(concat_id)
+        action_spec = concat_id.action_spec()
+        discrete = isinstance(action_spec[agents[0]], DiscreteArray)
+        if discrete:
+            concat_id_action = ConcatPrevActionToObservation(concat_id)
 
-                concat_id_step = concat_id.reset()
-                concat_id_action_step = concat_id_action.reset()
+            concat_id_step = concat_id.reset()
+            concat_id_action_step = concat_id_action.reset()
 
-                if type(concat_id_step) == tuple:
-                    concat_id_step, _ = concat_id_step
+            if type(concat_id_step) == tuple:
+                concat_id_step, _ = concat_id_step
 
-                if type(concat_id_action_step) == tuple:
-                    concat_id_action_step, _ = concat_id_action_step
+            if type(concat_id_action_step) == tuple:
+                concat_id_action_step, _ = concat_id_action_step
 
-                for agent in agents:
-                    stacked_shape = stacked_step.observation[agent].observation.shape[0]
-                    concat_id_shape = concat_id_step.observation[
-                        agent
-                    ].observation.shape[0]
-                    concat_id_action_shape = concat_id_action_step.observation[
-                        agent
-                    ].observation.shape[0]
+            for agent in agents:
+                stacked_shape = stacked_step.observation[agent].observation.shape[0]
+                concat_id_shape = concat_id_step.observation[agent].observation.shape[0]
+                concat_id_action_shape = concat_id_action_step.observation[
+                    agent
+                ].observation.shape[0]
 
-                    assert (stacked_shape < concat_id_shape) and (
-                        concat_id_shape < concat_id_action_shape
-                    )
+                assert (stacked_shape < concat_id_shape) and (
+                    concat_id_shape < concat_id_action_shape
+                )
 
     def test_wrapper_env_obs_stacking_and_concate_error(
         self, env_spec: EnvSpec, helpers: Helpers
@@ -549,14 +529,10 @@ class TestEnvWrapper:
             pytest.skip()
 
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
-        agents = wrapped_env.agents
-
         env_step = wrapped_env.reset()
         if type(env_step) == tuple:
             env_step, _ = env_step
 
-        olt_type = isinstance(env_step.observation[agents[0]], types.OLT)
-        if olt_type:
-            concat_id = ConcatAgentIdToObservation(wrapped_env)
-            with pytest.raises(ValueError):
-                StackObservations(concat_id, num_frames=4)
+        concat_id = ConcatAgentIdToObservation(wrapped_env)
+        with pytest.raises(ValueError):
+            StackObservations(concat_id, num_frames=4)
