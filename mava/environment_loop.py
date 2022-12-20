@@ -25,7 +25,6 @@ import dm_env
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pytest
 from acme.utils import counting, loggers
 
 import mava
@@ -203,10 +202,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         self._logger.write(results)
         return results
 
-    # TODO (Omayma): remove this condition when we fix the coverage bot to be able
-    # to use the integration tests or when we create a unit test for the env loop
-    @pytest.mark.skipif(True, reason="Skip this function for code coverage")
-    def run(self) -> None:  # noqa: C901
+    def run(self) -> None:  # pragma: no cover # noqa: C901
         """Run the environment loop."""
 
         def should_run_loop(eval_interval_condition: Tuple) -> bool:
@@ -251,8 +247,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             )
             evaluation_duration = eval_duration_condition[1]
 
-        @pytest.mark.skipif(True, reason="Skip this function for code coverage")
-        def run_evaluation(results: Any) -> None:
+        def run_evaluation(results: Any) -> None:  # pragma: no cover
             """Calculate the absolute metric"""
 
             normalisation = self._executor.has(BaseNormalisation) and (
@@ -330,8 +325,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 {"terminate": True}
             )
 
-        @pytest.mark.skipif(True, reason="Skip this function for code coverage")
-        def step_executor() -> None:
+        def step_executor() -> None:  # pragma: no cover
             if (not environment_loop_schedule) or (
                 should_run_loop(eval_interval_condition)
             ):
