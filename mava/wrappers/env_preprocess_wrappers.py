@@ -283,6 +283,14 @@ class StackObservations:
         """Initialise wrapper."""
 
         self._environment = environment
+
+        # Check that this is the first wrapper that is called on the environment
+        if self._environment.obs_normalisation_start_index != 0:
+            raise ValueError(
+                "Observation stacking should be the first cumstom\
+                    wrapper we call in the environment factory."
+            )
+
         self.frames: Any = {
             agent: deque([], maxlen=num_frames)
             for agent in self._environment.possible_agents

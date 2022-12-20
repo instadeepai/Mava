@@ -495,7 +495,7 @@ class TestEnvWrapper:
     def test_wrapper_env_obs_stacking_and_concate(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
-        """Test observations frame staking wrapper"""
+        """Test frame staking wrapper and concatenation wrappers"""
 
         if env_spec is None:
             pytest.skip()
@@ -538,3 +538,25 @@ class TestEnvWrapper:
                     assert (stacked_shape < concat_id_shape) and (
                         concat_id_shape < concat_id_action_shape
                     )
+
+    def test_wrapper_env_obs_stacking_and_concate_error(
+        self, env_spec: EnvSpec, helpers: Helpers
+    ) -> None:
+        """Test that a ValueError is raise if we call a concatenation \
+                wrapper before frame stacking."""
+
+        if env_spec is None:
+            pytest.skip()
+
+        wrapped_env, _ = helpers.get_wrapped_env(env_spec)
+        agents = wrapped_env.agents
+
+        env_step = wrapped_env.reset()
+        if type(env_step) == tuple:
+            env_step, _ = env_step
+
+        olt_type = isinstance(env_step.observation[agents[0]], types.OLT)
+        if olt_type:
+            concat_id = ConcatAgentIdToObservation(wrapped_env)
+            with pytest.raises(ValueError):
+                StackObservations(concat_id, num_frames=4)
