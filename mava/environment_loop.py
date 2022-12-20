@@ -255,10 +255,22 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         def run_evaluation(results: Any) -> None:
             """Calculate the absolute metric"""
 
-            if self._executor.has(BaseNormalisation) and (
-                self._executor.store.global_config.normalise_observations
-                or self._executor.store.global_config.normalise_target_values
-            ):
+            normalisation = self._executor.has(BaseNormalisation) and (
+                (
+                    hasattr(
+                        self._executor.store.global_config, "normalise_observations"
+                    )
+                    and self._executor.store.global_config.normalise_observations
+                )
+                or (
+                    hasattr(
+                        self._executor.store.global_config, "normalise_target_values"
+                    )
+                    and self._executor.store.global_config.normalise_target_values
+                )
+            )
+
+            if normalisation:
                 warnings.warn(
                     """The calculation of the absolute metric in
                 the case of normalisation is not supported"""

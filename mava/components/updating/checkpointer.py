@@ -68,10 +68,18 @@ class Checkpointer(Component):
         if (old_trainer_steps != server.store.parameters["trainer_steps"]) and (
             self.config.restore_best_net is not None
         ):
-            if server.has(BaseNormalisation) and (
-                server.store.global_config.normalise_observations
-                or server.store.global_config.normalise_target_values
-            ):
+            normalisation = server.has(BaseNormalisation) and (
+                (
+                    hasattr(server.store.global_config, "normalise_observations")
+                    and server.store.global_config.normalise_observations
+                )
+                or (
+                    hasattr(server.store.global_config, "normalise_target_values")
+                    and server.store.global_config.normalise_target_values
+                )
+            )
+
+            if normalisation:
                 warnings.warn(
                     """Best checkpointing does not save normalisation parameters,
                     thus checkpoint loading may not work"""

@@ -12,7 +12,9 @@ from mava.utils.lp_utils import termination_fn
 
 @dataclass
 class BestCheckpointerConfig:
+    # List of metrics to checkpoint their best performance networks
     checkpointing_metric: Tuple = ("mean_episode_return",)
+    # Flag to checkpoint and store the best networks
     checkpoint_best_perf: bool = False
     # Flag to calculate the absolute metric
     absolute_metric: bool = False
@@ -49,10 +51,10 @@ class BestCheckpointer(Component):
             return
 
         if self.config.absolute_metric_duration is None:
-            self.config.absolute_metric_duration = (
-                10
-                * builder.store.global_config.evaluation_duration["evaluator_episodes"]
-            )
+            episodes = builder.store.global_config.evaluation_duration[
+                "evaluator_episodes"
+            ]
+            self.config.absolute_metric_duration = 10 * episodes
 
         builder.store.best_checkpoint = self.init_checkpointing_params(builder)
 
