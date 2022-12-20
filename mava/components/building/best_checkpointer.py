@@ -23,9 +23,9 @@ class BestCheckpointerConfig:
 
 
 class BestCheckpointer(Component):
-    """A component that stores the best network parameters for two options:"""
+    """A component that stores the best network parameters for two options:
 
-    """ 1- Checkpointing the best network for a specific metric.
+    1- Checkpointing the best network for a specific metric.
     2- Calculating the absolute metric.
     """
 
