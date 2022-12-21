@@ -28,6 +28,7 @@ from haiku._src.basic import merge_leading_dims
 from mava.callbacks import Callback
 from mava.components import Component, training
 from mava.core_jax import SystemTrainer
+from mava.utils.jax_training_utils import action_mask_categorical_policies
 
 
 class ValueLoss(Component):
@@ -218,6 +219,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                     actions: jnp.ndarray,
                     behaviour_log_probs: jnp.ndarray,
                     advantages: jnp.ndarray,
+                    legals: Any,
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
                     """Inner policy loss function: see outer function for \
                         parameters."""
@@ -264,6 +266,10 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                             policy_params, observations
                         )
 
+                    # jax.debug.print("legal {l}", l=legals)
+                    distribution_params = action_mask_categorical_policies(
+                        distribution_params, legals
+                    )
                     log_probs = network.log_prob(distribution_params, actions)
                     entropy = network.entropy(distribution_params)
 
@@ -271,6 +277,13 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                     # current policy / behavior policy.
                     rhos = jnp.exp(log_probs - behaviour_log_probs)
                     clipping_epsilon = self.config.clipping_epsilon
+
+                    # jax.debug.print(
+                    #     "logp: {x}\nb logp: {y}\nrhos: {r}",
+                    #     x=log_probs,
+                    #     y=behaviour_log_probs,
+                    #     r=rhos,
+                    # )
 
                     policy_loss = rlax.clipped_surrogate_pg_loss(
                         rhos, advantages, clipping_epsilon
@@ -302,6 +315,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                     actions[agent_key],
                     behaviour_log_probs[agent_key],
                     advantages[agent_key],
+                    observations[agent_key].legal_actions,
                 )
             return policy_grads, loss_info_policy
 

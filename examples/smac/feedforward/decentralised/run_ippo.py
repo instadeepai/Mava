@@ -95,6 +95,9 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
+        normalise_observations=False,
+        normalise_target_values=False,
+        # terminal="gnome-terminal",
     )
 
     # Launch the system.
