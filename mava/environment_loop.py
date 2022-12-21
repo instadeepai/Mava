@@ -28,6 +28,7 @@ import numpy as np
 from acme.utils import counting, loggers
 
 import mava
+from mava.components.normalisation import ObservationNormalisation, ValueNormalisation
 from mava.utils.checkpointing_utils import update_best_checkpoint, update_evaluator_net
 from mava.utils.training_utils import check_count_condition
 from mava.utils.wrapper_utils import generate_zeros_from_spec
@@ -250,10 +251,10 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             """Calculate the absolute metric"""
 
             normalisation = (
-                hasattr(self._executor.store.global_config, "normalise_observations")
+                self._executor.has(ObservationNormalisation)
                 and self._executor.store.global_config.normalise_observations
             ) or (
-                hasattr(self._executor.store.global_config, "normalise_target_values")
+                self._executor.has(ValueNormalisation)
                 and self._executor.store.global_config.normalise_target_values
             )
 

@@ -22,6 +22,7 @@ from chex import dataclass
 
 from mava.callbacks import Callback
 from mava.components import Component
+from mava.components.normalisation import ObservationNormalisation, ValueNormalisation
 from mava.components.updating.parameter_server import ParameterServer
 from mava.core_jax import SystemParameterServer
 from mava.utils.checkpointing_utils import update_to_best_net
@@ -68,10 +69,10 @@ class Checkpointer(Component):
             self.config.restore_best_net is not None
         ):
             normalisation = (
-                server.store.global_config.has("normalise_observations")
+                server.has(ObservationNormalisation)
                 and server.store.global_config.normalise_observations
             ) or (
-                hasattr(server.store.global_config, "normalise_target_values")
+                server.has(ValueNormalisation)
                 and server.store.global_config.normalise_target_values
             )
 
