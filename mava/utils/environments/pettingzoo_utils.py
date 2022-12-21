@@ -44,8 +44,12 @@ try:
 except ModuleNotFoundError:
     _has_petting_zoo = False
 
+
 from mava.wrappers import ParallelEnvWrapper, PettingZooParallelEnvWrapper
-from mava.wrappers.env_preprocess_wrappers import ConcatAgentIdToObservation
+from mava.wrappers.env_preprocess_wrappers import (
+    ConcatAgentIdToObservation,
+    StackObservations,
+)
 
 
 def atari_preprocessing(env: ParallelEnvWrapper) -> ParallelEnvWrapper:
@@ -90,6 +94,7 @@ def make_environment(
     env_preprocess_wrappers: Optional[List] = None,
     concat_agent_id: bool = False,
     random_seed: Optional[int] = None,
+    stack_frames: int = 1,
     **kwargs: Any,
 ) -> Tuple[dm_env.Environment, Dict[str, str]]:
     """Wraps an Pettingzoo environment.
@@ -102,6 +107,9 @@ def make_environment(
     Returns:
         A Pettingzoo environment wrapped as a DeepMind environment.
     """
+
+    environment: Any
+
     if _has_petting_zoo:
         del evaluation
         set_jax_double_precision()
@@ -130,12 +138,15 @@ def make_environment(
     else:
         raise Exception("Pettingzoo is not installed.")
 
+    if stack_frames > 1:
+        environment = StackObservations(environment, num_frames=stack_frames)
+
+    if concat_agent_id:
+        environment = ConcatAgentIdToObservation(environment)
+
     environment_task_name = {
         "environment_name": "pettingzoo_{env_type}_{env_class}",
         "task_name": env_name,
     }
-
-    if concat_agent_id:
-        environment = ConcatAgentIdToObservation(environment)  # type: ignore
 
     return environment, environment_task_name
