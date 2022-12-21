@@ -274,13 +274,13 @@ class StackObservations(BasePreprocessWrapper):
         super().__init__(environment)
 
         # Check that this is the first wrapper that is called on the environment
-        if self._environment.obs_normalisation_start_index != 0:
+        if isinstance(self._environment, BasePreprocessWrapper):
             raise ValueError(
                 "Observation stacking should be the first custom\
                     wrapper we call in the environment factory."
             )
 
-        self.frames: Any = {
+        self.frames: Dict[str, deque] = {
             agent: deque([], maxlen=num_frames)
             for agent in self._environment.possible_agents
         }
@@ -302,8 +302,10 @@ class StackObservations(BasePreprocessWrapper):
             agent_olt = old_observations[agent]
             agent_observation = agent_olt.observation
 
-            for _ in range(self.num_frames):
-                self.frames[agent].append(agent_observation)
+            self.frames[agent] = deque(
+                [agent_observation for _ in range(self.num_frames)],
+                maxlen=self.num_frames,
+            )
 
             agent_stack_observation = np.array(self.frames[agent])
             agent_stack_observation = agent_stack_observation.reshape(
