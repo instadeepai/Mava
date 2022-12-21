@@ -522,7 +522,7 @@ class TestEnvWrapper:
     def test_wrapper_env_obs_stacking_and_concate_error(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
-        """Test that a ValueError is raise if we call a concatenation \
+        """Test that a ValueError exception is raise if we call a concatenation \
                 wrapper before frame stacking."""
 
         if env_spec is None:
