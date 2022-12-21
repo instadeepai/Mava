@@ -22,7 +22,7 @@ from chex import dataclass
 
 from mava.callbacks import Callback
 from mava.components import Component
-from mava.components.normalisation.base_normalisation import BaseNormalisation
+from mava.components.normalisation import ObservationNormalisation, ValueNormalisation
 from mava.components.updating.parameter_server import ParameterServer
 from mava.core_jax import SystemParameterServer
 from mava.utils.checkpointing_utils import update_to_best_net
@@ -68,7 +68,15 @@ class Checkpointer(Component):
         if (old_trainer_steps != server.store.parameters["trainer_steps"]) and (
             self.config.restore_best_net is not None
         ):
-            if server.has(BaseNormalisation):
+            normalisation = (
+                server.has(ObservationNormalisation)
+                and server.store.global_config.normalise_observations
+            ) or (
+                server.has(ValueNormalisation)
+                and server.store.global_config.normalise_target_values
+            )
+
+            if normalisation:
                 warnings.warn(
                     """Best checkpointing does not save normalisation parameters,
                     thus checkpoint loading may not work"""
