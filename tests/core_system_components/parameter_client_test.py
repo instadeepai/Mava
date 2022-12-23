@@ -124,7 +124,7 @@ def parameter_client(mock_parameter_server: ParameterServer) -> ParameterClient:
     """
 
     param_client = ParameterClient(
-        client=mock_parameter_server,
+        server=mock_parameter_server,
         parameters={
             "key_0": np.array(0, dtype=np.int32),
             "key_1": np.array(1, dtype=np.float32),
@@ -135,6 +135,8 @@ def parameter_client(mock_parameter_server: ParameterServer) -> ParameterClient:
             "critic_network-network_key_1": {"layer_0": {"weights": 1, "biases": 1}},
             "allkey_0": np.array(0, dtype=np.int32),
         },
+        # must force this to be false, otherwise would need to create lp node for server
+        multi_process=False,
         get_keys=[
             "key_0",
             "key_1",
@@ -158,7 +160,7 @@ def test_add_and_wait(parameter_client: ParameterClient) -> None:
     """Test add and wait method."""
     parameter_client.add_and_wait(params={"new_key": "new_value"})
 
-    assert parameter_client._client.store._add_to_params == {"new_key": "new_value"}
+    assert parameter_client._server.store._add_to_params == {"new_key": "new_value"}
 
 
 def test_get_and_wait(parameter_client: ParameterClient) -> None:
@@ -204,12 +206,12 @@ def test_set_and_wait(parameter_client: ParameterClient) -> None:
 
     parameter_client.set_and_wait()
 
-    assert parameter_client._client.store._set_params == {
+    assert parameter_client._server.store._set_params == {
         "key_0": np.array(1, dtype=np.int32),
         "key_2": np.array(3, dtype=np.int32),
     }
 
-    assert parameter_client._client.store.parameters == {
+    assert parameter_client._server.store.parameters == {
         "key_0": np.array(1, dtype=np.int32),
         "key_1": np.array(1, dtype=np.float32),
         "key_2": np.array(3, dtype=np.int32),
@@ -264,7 +266,7 @@ def test_set_async(parameter_client: ParameterClient) -> None:
 
     parameter_client.set_async()
 
-    assert parameter_client._client.store._set_params == {
+    assert parameter_client._server.store._set_params == {
         "key_0": np.array(1, dtype=np.int32),
         "key_2": np.array(3, dtype=np.int32),
     }
@@ -316,21 +318,21 @@ def test_add_async(parameter_client: ParameterClient) -> None:
 
     parameter_client.add_async(params={"new_key": "new_value"})
     assert parameter_client._add_future is not None
-    assert parameter_client._client.store._add_to_params == {"new_key": "new_value"}
+    assert parameter_client._server.store._add_to_params == {"new_key": "new_value"}
     assert parameter_client._async_add_buffer == {}
     assert parameter_client._add_future.done()
 
-    # set add_future to dummy variable other than none
-    parameter_client._add_future._state = "not_done"  # type: ignore
+    # force future to not be done
+    # assert that new parameter is added to async buffer
+    parameter_client._add_future.done = lambda: False
     parameter_client._async_add_buffer = {"new_key_1": 1}
-
     parameter_client.add_async(params={"new_key_1": 1})
 
     assert parameter_client._async_add_buffer == {"new_key_1": 2}
 
-    # set add_future to dummy variable other than none
+    # force future to not be done
     # assert that new parameter is added to async buffer
-    parameter_client._add_future._state = "not_done"  # type: ignore
+    parameter_client._add_future.done = lambda: False
     parameter_client._async_add_buffer = {}
     parameter_client.add_async(params={"new_key_2": 1})
 

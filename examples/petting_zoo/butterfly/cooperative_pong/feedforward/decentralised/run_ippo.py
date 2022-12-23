@@ -13,7 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running IPPO on debug MPE environments."""
+"""
+Example running IPPO on coop pong.
+For installation instructions, please follow step 1 and 2 from https://github.com/instadeepai/Mava/blob/develop/DETAILED_INSTALL.md#optional-installs. # noqa: E501
+"""
 import functools
 from datetime import datetime
 from typing import Any
@@ -60,7 +63,7 @@ def main(_: Any) -> None:
         pettingzoo_utils.make_environment,
         env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
-        concat_agent_id=True,  # Concatenate agent_ids to the environment observations.
+        concat_agent_id=False,  # Concat Agent ID not currently supported for 2d envs.
         env_preprocess_wrappers=[(dtype_v0, {"dtype": np.float32})],
     )
 
@@ -110,7 +113,7 @@ def main(_: Any) -> None:
         policy_optimiser=policy_optimiser,
         critic_optimiser=critic_optimiser,
         run_evaluator=True,
-        sample_batch_size=5,
+        epoch_batch_size=5,
         num_epochs=15,
         num_executors=1,
         multi_process=True,

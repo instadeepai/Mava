@@ -20,7 +20,11 @@ from typing import Any, Dict, Tuple
 
 import pytest
 
-from mava.utils.checkpointing_utils import update_best_checkpoint, update_to_best_net
+from mava.utils.checkpointing_utils import (
+    update_best_checkpoint,
+    update_evaluator_net,
+    update_to_best_net,
+)
 
 
 def fake_networks(k: int = 0) -> Tuple:
@@ -286,3 +290,35 @@ def test_update_to_best_net(mock_parameter_server: MockParameterServer) -> None:
     del mock_parameter_server.store.parameters["best_checkpoint"]
     with pytest.raises(Exception):
         update_to_best_net(mock_parameter_server, "reward")  # type:ignore
+
+
+def test_update_evaluator_net(mock_executor: MockExecutor) -> None:
+    """Test update_evaluator_net function"""
+    update_evaluator_net(mock_executor, "win_rate")  # type:ignore
+
+    # Check that the networks got updated by the one belong to the win rate
+    for agent_net_key in mock_executor.store.networks.keys():
+        assert (
+            mock_executor.store.best_checkpoint["win_rate"][
+                f"policy_network-{agent_net_key}"
+            ]
+            == mock_executor.store.networks[agent_net_key].policy_params
+        )
+        assert (
+            mock_executor.store.best_checkpoint["win_rate"][
+                f"critic_network-{agent_net_key}"
+            ]
+            == mock_executor.store.networks[agent_net_key].critic_params
+        )
+        assert (
+            mock_executor.store.best_checkpoint["win_rate"][
+                f"policy_opt_state-{agent_net_key}"
+            ]
+            == mock_executor.store.policy_opt_states[agent_net_key]
+        )
+        assert (
+            mock_executor.store.best_checkpoint["win_rate"][
+                f"critic_opt_state-{agent_net_key}"
+            ]
+            == mock_executor.store.critic_opt_states[agent_net_key]
+        )

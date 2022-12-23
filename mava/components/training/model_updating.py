@@ -16,14 +16,14 @@
 """Trainer components for system updating."""
 
 import abc
-from dataclasses import dataclass, field
-from functools import partial
-from typing import Any, Dict, List, Tuple, Type, Union
+from dataclasses import dataclass
+from typing import Any, Dict, List, Tuple, Type
 
 import jax
 import jax.numpy as jnp
 import optax
 from acme.jax import networks as networks_lib
+from haiku._src.basic import merge_leading_dims
 from jax.random import KeyArray
 
 from mava import constants
@@ -34,11 +34,6 @@ from mava.components.training.losses import Loss
 from mava.components.training.step import Step
 from mava.components.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
-from mava.utils.jax_training_utils import (
-    compute_running_mean_var_count,
-    construct_norm_axes_list,
-    update_and_normalize_observations,
-)
 
 
 class MinibatchUpdate(Utility):
@@ -72,11 +67,6 @@ class MinibatchUpdate(Utility):
 @dataclass
 class MAPGMinibatchUpdateConfig:
     normalize_advantage: bool = True
-    normalize_target_values: bool = False
-    normalize_observations: bool = False
-    normalize_axes: Union[List[Any], None] = field(
-        default_factory=lambda: None
-    )  # [1, 2, (4,7), [10,12]]
 
 
 class MAPGMinibatchUpdate(MinibatchUpdate):
@@ -103,28 +93,6 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
         Returns:
             None.
         """
-
-        # Initilaise target values running mean/std function here
-        if self.config.normalize_target_values:
-            trainer.store.target_running_stats_fn = compute_running_mean_var_count
-
-        # Initilaise observations running mean/std function here
-        if self.config.normalize_observations:
-            observation_stats = trainer.store.norm_params[
-                constants.OBS_NORM_STATE_DICT_KEY
-            ]
-            obs_shape = observation_stats[list(observation_stats.keys())[0]][
-                "mean"
-            ].shape
-            norm_axes = construct_norm_axes_list(
-                trainer.store.obs_normalisation_start,
-                self.config.normalize_axes,
-                obs_shape,
-            )
-            trainer.store.norm_obs_running_stats_fn = partial(
-                update_and_normalize_observations,
-                axes=norm_axes,
-            )
 
         def model_update_minibatch(
             carry: Tuple[
@@ -237,7 +205,6 @@ class EpochUpdate(Utility):
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
-        Step required to set up trainer.store.full_batch_size.
         MinibatchUpdate required to set up trainer.store.minibatch_update_fn.
 
         Returns:
@@ -295,24 +262,19 @@ class MAPGEpochUpdate(EpochUpdate):
 
             base_key, shuffle_key = jax.random.split(key)
 
-            # TODO (dries): This assert is ugly. Is there a better way to do this check?
-            # Maybe using a tree map of some sort?
-            # shapes = jax.tree_util.tree_map(
-            #         lambda x: x.shape[0]==trainer.store.full_batch_size, batch
-            #     )
-            # assert ...
-            assert (
-                list(batch.observations.values())[0].observation.shape[0]
-                == trainer.store.full_batch_size
-            )
-
             permutation = jax.random.permutation(
-                shuffle_key, trainer.store.full_batch_size
+                shuffle_key, trainer.store.epoch_batch_size
             )
 
             shuffled_batch = jax.tree_util.tree_map(
                 lambda x: jnp.take(x, permutation, axis=0), batch
             )
+
+            # Flatten the batch.
+            shuffled_batch = jax.tree_util.tree_map(
+                lambda x: merge_leading_dims(x, 2), shuffled_batch
+            )
+
             minibatches = jax.tree_util.tree_map(
                 lambda x: jnp.reshape(
                     x, [self.config.num_minibatches, -1] + list(x.shape[1:])

@@ -32,6 +32,7 @@ We also have various Jax-based examples which make use of the callback design pa
     an IPPO system running on the discrete action space Cooperative pong MPE environment.
   - *Feedforward*
     - [decentralised][pz_coop_pong_ippo_ff_dec_jax]
+    - [decentralised][pz_coop_pong_ippo_ff_dec_jax_rec] (***recording agents acting in the environment***).
 
 ### Pettingzoo - Multi-Agent Particle Environment
 
@@ -59,6 +60,7 @@ We also have various Jax-based examples which make use of the callback design pa
 [debug_ippo_ff_dec_jax_checkpoint]: https://github.com/instadeepai/Mava/blob/develop/examples/debugging/simple_spread/feedforward/decentralised/run_ippo_restore_checkpoint.py
 [flatland_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/flatland/feedforward/decentralised/run_ippo.py
 [pz_coop_pong_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/butterfly/cooperative_pong/feedforward/decentralised/run_ippo.py
+[pz_coop_pong_ippo_ff_dec_jax_rec]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/butterfly/cooperative_pong/feedforward/decentralised/run_ippo_with_monitoring.py
 [smac_ippo_ff_dec_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/smac/feedforward/decentralised/run_ippo.py
 [debug_ippo_ff_dec_eval_intevals_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/debugging/simple_spread/feedforward/decentralised/run_ippo_eval_intervals.py
 [smac_ippo_ff_dec_eval_intervals_jax]: https://github.com/instadeepai/Mava/blob/develop/examples/smac/feedforward/decentralised/run_ippo_eval_intervals.py

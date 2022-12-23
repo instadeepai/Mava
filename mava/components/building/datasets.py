@@ -72,7 +72,7 @@ class TrainerDataset(Component):
 
 @dataclass
 class TransitionDatasetConfig:
-    sample_batch_size: int = 256
+    epoch_batch_size: int = 256
     prefetch_size: Optional[int] = None
     num_parallel_calls: int = 12
     max_in_flight_samples_per_worker: Optional[int] = None
@@ -101,13 +101,13 @@ class TransitionDataset(TrainerDataset):
         Returns:
             None.
         """
-        builder.store.sample_batch_size = self.config.sample_batch_size
+        builder.store.epoch_batch_size = self.config.epoch_batch_size
         max_in_flight_samples_per_worker = self.config.max_in_flight_samples_per_worker
         dataset = datasets.make_reverb_dataset(
             table=builder.store.trainer_id,  # Set by builder
             # Set by builder
             server_address=builder.store.data_server_client.server_address,
-            batch_size=self.config.sample_batch_size,
+            batch_size=self.config.epoch_batch_size,
             prefetch_size=self.config.prefetch_size,
             num_parallel_calls=self.config.num_parallel_calls,
             max_in_flight_samples_per_worker=max_in_flight_samples_per_worker,
@@ -119,7 +119,7 @@ class TransitionDataset(TrainerDataset):
 
 @dataclass
 class TrajectoryDatasetConfig:
-    sample_batch_size: int = 256
+    epoch_batch_size: int = 256
     max_in_flight_samples_per_worker: int = 512
     num_workers_per_iterator: int = -1
     max_samples_per_stream: int = -1
@@ -152,11 +152,11 @@ class TrajectoryDataset(TrainerDataset):
         Returns:
             None.
         """
-        builder.store.sample_batch_size = self.config.sample_batch_size
+        builder.store.epoch_batch_size = self.config.epoch_batch_size
         dataset = reverb.TrajectoryDataset.from_table_signature(
             server_address=builder.store.data_server_client.server_address,
             table=builder.store.trainer_id,
-            max_in_flight_samples_per_worker=2 * self.config.sample_batch_size,
+            max_in_flight_samples_per_worker=2 * self.config.epoch_batch_size,
             num_workers_per_iterator=self.config.num_workers_per_iterator,
             max_samples_per_stream=self.config.max_samples_per_stream,
             rate_limiter_timeout_ms=self.config.rate_limiter_timeout_ms,
@@ -165,6 +165,6 @@ class TrajectoryDataset(TrainerDataset):
         )
 
         # Add batch dimension.
-        dataset = dataset.batch(self.config.sample_batch_size, drop_remainder=True)
+        dataset = dataset.batch(self.config.epoch_batch_size, drop_remainder=True)
 
         builder.store.dataset_iterator = dataset.as_numpy_iterator()

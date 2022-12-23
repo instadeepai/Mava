@@ -36,6 +36,7 @@ from mava.components.building.datasets import TrainerDataset, TrajectoryDataset
 from mava.components.building.loggers import Logger
 from mava.components.building.networks import Networks
 from mava.components.building.parameter_client import TrainerParameterClient
+from mava.components.normalisation import ObservationNormalisation, ValueNormalisation
 from mava.components.training.advantage_estimation import GAE
 from mava.components.training.base import Batch, TrainingState
 from mava.components.training.trainer import BaseTrainerInit
@@ -158,7 +159,7 @@ class Step(Component):
     def required_components() -> List[Type[Callback]]:
         """List of other Components required in the system for this Component to function.
 
-        TrainerDataset required for config sample_batch_size.
+        TrainerDataset required for config epoch_batch_size.
         BaseTrainerInit required to set up trainer.store.networks and
         trainer.store.trainer_agent_net_keys
         Networks required to set up trainer.store.base_key.
@@ -189,21 +190,6 @@ class MAPGWithTrustRegionStep(Step):
             config: MAPGWithTrustRegionStepConfig.
         """
         self.config = config
-
-    def on_training_init_start(self, trainer: SystemTrainer) -> None:
-        """Compute and store full batch size.
-
-        Args:
-            trainer: SystemTrainer.
-
-        Returns:
-            None.
-        """
-        # Note (dries): Assuming the batch and sequence dimensions are flattened.
-        trainer.store.full_batch_size = (
-            trainer.store.global_config.sample_batch_size
-            * (trainer.store.global_config.sequence_length - 1)
-        )
 
     # flake8: noqa: C901
     def on_training_step_fn(self, trainer: SystemTrainer) -> None:
@@ -243,7 +229,10 @@ class MAPGWithTrustRegionStep(Step):
 
             # Perform observation normalization if neccesary before proceeding
             observation_stats = states.observation_stats
-            if trainer.store.global_config.normalize_observations:
+            if (
+                trainer.has(ObservationNormalisation)
+                and trainer.store.global_config.normalise_observations
+            ):
                 for key in observations.keys():
                     (
                         observation_stats[key],
@@ -284,7 +273,10 @@ class MAPGWithTrustRegionStep(Step):
 
             # Denormalise the values here to keep the GAE function clean
             target_value_stats = states.target_value_stats
-            if trainer.store.global_config.normalize_target_values:
+            if (
+                trainer.has(ValueNormalisation)
+                and trainer.store.global_config.normalise_target_values
+            ):
                 for key in agent_nets:
                     behavior_values[key] = denormalize(
                         target_value_stats[key], behavior_values[key]
@@ -299,7 +291,10 @@ class MAPGWithTrustRegionStep(Step):
                 advantages[key], target_values[key] = batch_gae_advantages(
                     rewards[key], discounts[key], behavior_values[key]
                 )
-                if trainer.store.global_config.normalize_target_values:
+                if (
+                    trainer.has(ValueNormalisation)
+                    and trainer.store.global_config.normalise_target_values
+                ):
                     target_value_stats[key] = trainer.store.target_running_stats_fn(
                         target_value_stats[key],
                         jnp.reshape(target_values[key], (-1, 1)),
@@ -342,20 +337,14 @@ class MAPGWithTrustRegionStep(Step):
                 behavior_values=behavior_values,
             )
 
-            # Concatenate all trajectories. Reshape from [num_sequences, num_steps,..]
-            # to [num_sequences * num_steps,..]
             agent_0_t_vals = list(target_values.values())[0]
             assert len(agent_0_t_vals) > 1
-            num_sequences = agent_0_t_vals.shape[0]
-            num_steps = agent_0_t_vals.shape[1]
-            batch_size = num_sequences * num_steps
+            batch_size = agent_0_t_vals.shape[0]
+
             assert batch_size % trainer.store.global_config.num_minibatches == 0, (
                 "Num minibatches must divide batch size. Got batch_size={}"
                 " num_minibatches={}."
             ).format(batch_size, trainer.store.global_config.num_minibatches)
-            batch = jax.tree_util.tree_map(
-                lambda x: x.reshape((batch_size,) + x.shape[2:]), trajectories
-            )
 
             (
                 new_key,
@@ -372,7 +361,7 @@ class MAPGWithTrustRegionStep(Step):
                     states.critic_params,
                     states.policy_opt_states,
                     states.critic_opt_states,
-                    batch,
+                    trajectories,
                 ),
                 (),
                 length=trainer.store.global_config.num_epochs,

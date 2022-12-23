@@ -14,9 +14,10 @@
 # limitations under the License.
 
 """A simple multi-agent-system-environment training loop."""
-
+import copy
 import logging
 import time
+import warnings
 from typing import Any, Dict, Optional, Tuple
 
 import acme
@@ -27,7 +28,8 @@ import numpy as np
 from acme.utils import counting, loggers
 
 import mava
-from mava.utils.checkpointing_utils import update_best_checkpoint
+from mava.components.normalisation import ObservationNormalisation, ValueNormalisation
+from mava.utils.checkpointing_utils import update_best_checkpoint, update_evaluator_net
 from mava.utils.training_utils import check_count_condition
 from mava.utils.wrapper_utils import generate_zeros_from_spec
 
@@ -205,7 +207,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         self._logger.write(results)
         return results
 
-    def run(self) -> None:  # noqa: C901
+    def run(self) -> None:  # pragma: no cover # noqa: C901
         """Run the environment loop."""
 
         def should_run_loop(eval_interval_condition: Tuple) -> bool:
@@ -250,13 +252,101 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             )
             evaluation_duration = eval_duration_condition[1]
 
-        def step_executor() -> None:
+        def run_evaluation(results: Any) -> None:  # pragma: no cover
+            """Calculate the absolute metric"""
+
+            normalisation = (
+                self._executor.has(ObservationNormalisation)
+                and self._executor.store.global_config.normalise_observations
+            ) or (
+                self._executor.has(ValueNormalisation)
+                and self._executor.store.global_config.normalise_target_values
+            )
+
+            if normalisation:
+                warnings.warn(
+                    """The calculation of the absolute metric in
+                the case of normalisation is not supported"""
+                )
+                self._executor.store.executor_parameter_client.set_and_wait(
+                    {"terminate": True}
+                )
+
+            logging.exception("Calculating the absolute metric")
+            eval_result: Dict[str, Any] = {}  # create a dict with checkpointing_metric
+            for metric in self._executor.store.global_config.checkpointing_metric:
+                used_results = copy.deepcopy(results)
+                # update the evaluator network
+                update_evaluator_net(executor=self._executor, metric=metric)
+                eval_returns = []
+                for _ in range(
+                    self._executor.store.global_config.absolute_metric_duration
+                ):
+                    # Add consecutive evaluation run data
+                    result = self.run_episode()
+                    if "return" in metric:
+                        eval_returns.append(result[metric])
+                    # Sum results for computing mean after all evaluation runs.
+                    used_results = jax.tree_map(
+                        lambda x, y: x + y, used_results, result
+                    )
+                # compute the mean over all evaluation runs
+                used_results = jax.tree_map(
+                    lambda x: x
+                    / self._executor.store.global_config.absolute_metric_duration,
+                    used_results,
+                )
+                if "return" in metric:
+                    eval_result.update({f"eval_{metric}": jnp.array(eval_returns)})
+                # Check for extra logs
+                if hasattr(self._environment, "get_interval_stats"):
+                    interval_stats = self._environment.get_interval_stats()
+                    used_results.update(interval_stats)
+                    if metric in interval_stats.keys():
+                        interval_stats_json = {
+                            "eval_" + str(k): v for k, v in interval_stats.items()
+                        }
+                        # Add interval stats to dictionary for json logging
+                        eval_result.update(
+                            jax.tree_util.tree_map(
+                                lambda leaf: jnp.array([leaf]), interval_stats_json
+                            )
+                        )
+                logging.exception(
+                    f"Absolute metric for {metric} is equal {used_results[metric]}"
+                )
+                logging.exception(f"Additional results {used_results}")
+            used_results.update(eval_result)
+            self._logger.write(used_results)
+            logging.exception("Terminate the system")
+            self._executor.store.executor_parameter_client.set_and_wait(
+                {"terminate": True}
+            )
+
+        def step_executor() -> None:  # pragma: no cover
             if (not environment_loop_schedule) or (
                 should_run_loop(eval_interval_condition)
             ):
                 if environment_loop_schedule:
                     # Get first result dictionary
                     results = self.run_episode()
+
+                    # Check if requires calculating the absolute metric
+                    global_config = self._executor.store.global_config
+                    run_absolute_metric = (
+                        hasattr(global_config, "checkpoint_best_perf")
+                        and self._executor.store.global_config.absolute_metric
+                        and (
+                            results["executor_steps"]
+                            >= global_config.termination_condition["executor_steps"]
+                        )
+                    )
+
+                    if run_absolute_metric:
+                        logging.exception(
+                            f"Executor has reached {results['executor_steps']} steps"
+                        )
+                        run_evaluation(results=results)
 
                     # Initialise list for capturing episode returns
                     eval_returns = []
@@ -297,7 +387,12 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     results.update(eval_result)
                     self._logger.write(results)
 
-                    if self._executor.store.checkpoint_best_perf:
+                    # ideally this would be executor.has(BestCheckpointer),
+                    # but that causes circular import
+                    if hasattr(global_config, "checkpoint_best_perf") and (
+                        global_config.checkpoint_best_perf
+                        or global_config.absolute_metric
+                    ):
                         # Best_performance_update
                         for (
                             metric,
@@ -340,7 +435,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                         f"{e}: Experiment terminated due to an error on the evaluator."
                     )
                     self._executor.store.executor_parameter_client.set_and_wait(
-                        {"evaluator_or_trainer_failed": True}
+                        {"terminate": True}
                     )
                 else:
                     logging.exception(f"{e}: an executor failed.")
