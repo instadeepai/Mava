@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -14,12 +15,20 @@ class MockBuilder(Builder):
         """Initialises mock builder"""
         self.store = store
 
+    def has(self, instance: Any) -> bool:
+        """Has: mock method"""
+        return False
+
 
 class MockParameterServer(ParameterServer):
     def __init__(self, store: SimpleNamespace) -> None:
         """Initialises mock parameter server"""
         self.store = store
         self.calculate_absolute_metric = False
+
+    def has(self, instance: Any) -> bool:
+        """Has: mock method"""
+        return False
 
 
 class MockNetwork:
