@@ -15,13 +15,15 @@
 
 """Parameter client for system builders"""
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple, Type
+from types import SimpleNamespace
+from typing import Any, Dict, List, Set, Tuple, Type
 
 import numpy as np
 
 from mava.callbacks import Callback
 from mava.components import Component
 from mava.components.building.best_checkpointer import BestCheckpointer
+from mava.components.normalisation.base_normalisation import BaseNormalisation
 from mava.components.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemBuilder
 from mava.systems import ParameterClient
@@ -100,22 +102,14 @@ class ExecutorParameterClient(BaseParameterClient):
         set_keys: List[str] = []
         get_keys: List[str] = []
 
-        for agent_net_key in builder.store.networks.keys():
-            policy_param_key = f"policy_network-{agent_net_key}"
-            params[policy_param_key] = builder.store.networks[
-                agent_net_key
-            ].policy_params
-            get_keys.append(policy_param_key)
-
-            critic_param_key = f"critic_network-{agent_net_key}"
-            params[critic_param_key] = builder.store.networks[
-                agent_net_key
-            ].critic_params
-            get_keys.append(critic_param_key)
+        net_keys, net_params = self.get_network_parameters(builder.store)
+        params.update(net_params)
+        get_keys.extend(net_keys)
 
         # Create observations' normalisation parameters
-        params["norm_params"] = builder.store.norm_params
-        get_keys.append("norm_params")
+        if builder.has(BaseNormalisation):
+            params["norm_params"] = builder.store.norm_params
+            get_keys.append("norm_params")
 
         if (
             builder.store.is_evaluator
@@ -149,10 +143,38 @@ class ExecutorParameterClient(BaseParameterClient):
 
         builder.store.executor_parameter_client = parameter_client
 
+    def get_network_parameters(self, store: SimpleNamespace):
+        """Returns: network keys and parameters"""
+        params = {}
+        net_keys = []
+        for agent_net_key in store.networks.keys():
+            policy_param_key = f"policy_network-{agent_net_key}"
+            params[policy_param_key] = store.networks[agent_net_key].policy_params
+            net_keys.append(policy_param_key)
+
+        return net_keys, params
+
     @staticmethod
     def name() -> str:
         """Static method that returns component name."""
         return "executor_parameter_client"
+
+
+class ActorCriticExecutorParameterClient(ExecutorParameterClient):
+    def get_network_parameters(self, store: SimpleNamespace):
+        """Returns: network keys and parameters"""
+        params = {}
+        net_keys = []
+        for agent_net_key in store.networks.keys():
+            policy_param_key = f"policy_network-{agent_net_key}"
+            params[policy_param_key] = store.networks[agent_net_key].policy_params
+            net_keys.append(policy_param_key)
+
+            critic_param_key = f"critic_network-{agent_net_key}"
+            params[critic_param_key] = store.networks[agent_net_key].critic_params
+            net_keys.append(critic_param_key)
+
+        return net_keys, params
 
 
 @dataclass
@@ -188,34 +210,14 @@ class TrainerParameterClient(BaseParameterClient):
         # TODO (dries): Only add the networks this trainer is working with.
         # Not all of them.
         trainer_networks = builder.store.trainer_networks[builder.store.trainer_id]
-
-        for net_key in builder.store.networks.keys():
-            params[f"policy_network-{net_key}"] = builder.store.networks[
-                net_key
-            ].policy_params
-            params[f"critic_network-{net_key}"] = builder.store.networks[
-                net_key
-            ].critic_params
-
-            if net_key in set(trainer_networks):
-                set_keys.append(f"policy_network-{net_key}")
-                set_keys.append(f"critic_network-{net_key}")
-            else:
-                get_keys.append(f"policy_network-{net_key}")
-                get_keys.append(f"critic_network-{net_key}")
-
-            params[f"policy_opt_state-{net_key}"] = builder.store.policy_opt_states[
-                net_key
-            ]
-            params[f"critic_opt_state-{net_key}"] = builder.store.critic_opt_states[
-                net_key
-            ]
-            set_keys.append(f"policy_opt_state-{net_key}")
-            set_keys.append(f"critic_opt_state-{net_key}")
+        get_keys, set_keys, params = self.get_network_parameters(
+            builder.store, set(trainer_networks)
+        )
 
         # Add observations' normalisation parameters
-        params["norm_params"] = builder.store.norm_params
-        set_keys.append("norm_params")
+        if builder.has(BaseNormalisation):
+            params["norm_params"] = builder.store.norm_params
+            set_keys.append("norm_params")
 
         count_names, params = self._set_up_count_parameters(params=params)
 
@@ -238,6 +240,58 @@ class TrainerParameterClient(BaseParameterClient):
             parameter_client.get_all_and_wait()
 
         builder.store.trainer_parameter_client = parameter_client
+
+    def get_network_parameters(
+        self, store: SimpleNamespace, trainer_networks: Set[str]
+    ):
+        """Gets keys for this trainers networks, other trainers networks and params"""
+        params = {}
+        set_keys = []
+        get_keys = []
+        for net_key in store.networks.keys():
+            params[f"policy_network-{net_key}"] = store.networks[net_key].policy_params
+
+            if net_key in trainer_networks:
+                set_keys.append(f"policy_network-{net_key}")
+            else:
+                get_keys.append(f"policy_network-{net_key}")
+
+            params[f"policy_opt_state-{net_key}"] = store.policy_opt_states[net_key]
+            set_keys.append(f"policy_opt_state-{net_key}")
+
+        return get_keys, set_keys, params
+
+    @staticmethod
+    def name() -> str:
+        """Static method that returns component name."""
+        return "trainer_parameter_client"
+
+
+class ActorCriticTrainerParameterClient(TrainerParameterClient):
+    def get_network_parameters(
+        self, store: SimpleNamespace, trainer_networks: Set[str]
+    ):
+        """Gets keys for this trainers networks, other trainers networks and params"""
+        params = {}
+        set_keys = []
+        get_keys = []
+        for net_key in store.networks.keys():
+            params[f"policy_network-{net_key}"] = store.networks[net_key].policy_params
+            params[f"critic_network-{net_key}"] = store.networks[net_key].critic_params
+
+            if net_key in trainer_networks:
+                set_keys.append(f"policy_network-{net_key}")
+                set_keys.append(f"critic_network-{net_key}")
+            else:
+                get_keys.append(f"policy_network-{net_key}")
+                get_keys.append(f"critic_network-{net_key}")
+
+            params[f"policy_opt_state-{net_key}"] = store.policy_opt_states[net_key]
+            params[f"critic_opt_state-{net_key}"] = store.critic_opt_states[net_key]
+            set_keys.append(f"policy_opt_state-{net_key}")
+            set_keys.append(f"critic_opt_state-{net_key}")
+
+        return get_keys, set_keys, params
 
     @staticmethod
     def name() -> str:

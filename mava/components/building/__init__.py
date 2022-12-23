@@ -39,6 +39,8 @@ from mava.components.building.optimisers import DefaultOptimisers
 # ActorCriticExecutorParameterClient,
 # ActorCriticTrainerParameterClient,
 from mava.components.building.parameter_client import (
+    ActorCriticExecutorParameterClient,
+    ActorCriticTrainerParameterClient,
     ExecutorParameterClient,
     TrainerParameterClient,
 )

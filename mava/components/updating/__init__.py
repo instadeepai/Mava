@@ -16,7 +16,8 @@
 """Updating components for Mava systems."""
 
 from mava.components.updating.checkpointer import Checkpointer
-from mava.components.updating.parameter_server import (  # ActorCriticParameterServer,
+from mava.components.updating.parameter_server import (
+    ActorCriticParameterServer,
     DefaultParameterServer,
 )
 from mava.components.updating.terminators import (

@@ -16,6 +16,7 @@
 """Parameter server Component for Mava systems."""
 import abc
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Sequence, Type, Union
 
 import numpy as np
@@ -123,22 +124,9 @@ class DefaultParameterServer(ParameterServer):
             "executor_episodes": np.zeros(1, dtype=np.int32),
             "executor_steps": np.zeros(1, dtype=np.int32),
         }
-        # Network parameters
-        for agent_net_key in networks.keys():
-            # Ensure obs and target networks are sonnet modules
-            server.store.parameters[f"policy_network-{agent_net_key}"] = networks[
-                agent_net_key
-            ].policy_params
-            # Ensure obs and target networks are sonnet modules
-            server.store.parameters[f"critic_network-{agent_net_key}"] = networks[
-                agent_net_key
-            ].critic_params
-            server.store.parameters[
-                f"policy_opt_state-{agent_net_key}"
-            ] = server.store.policy_opt_states[agent_net_key]
-            server.store.parameters[
-                f"critic_opt_state-{agent_net_key}"
-            ] = server.store.critic_opt_states[agent_net_key]
+        server.store.parameters.update(
+            self._get_network_parameters(server.store, networks)
+        )
 
         server.store.experiment_path = self.config.experiment_path
 
@@ -220,3 +208,31 @@ class DefaultParameterServer(ParameterServer):
         for var_key in names:
             assert var_key in server.store.parameters
             server.store.parameters[var_key] += params[var_key]
+
+    def _get_network_parameters(self, store: SimpleNamespace, networks: Dict):
+        parameters = {}
+        for agent_net_key in networks.keys():
+            agent_net = networks[agent_net_key]
+            parameters[f"policy_network-{agent_net_key}"] = agent_net.policy_params
+            parameters[f"policy_opt_state-{agent_net_key}"] = store.policy_opt_states[
+                agent_net_key
+            ]
+
+        return parameters
+
+
+class ActorCriticParameterServer(DefaultParameterServer):
+    def _get_network_parameters(self, store: SimpleNamespace, networks: Dict):
+        parameters = {}
+        for agent_net_key in networks.keys():
+            agent_net = networks[agent_net_key]
+            parameters[f"policy_network-{agent_net_key}"] = agent_net.policy_params
+            parameters[f"critic_network-{agent_net_key}"] = agent_net.critic_params
+            parameters[f"policy_opt_state-{agent_net_key}"] = store.policy_opt_states[
+                agent_net_key
+            ]
+            parameters[f"critic_opt_state-{agent_net_key}"] = store.critic_opt_states[
+                agent_net_key
+            ]
+
+        return parameters

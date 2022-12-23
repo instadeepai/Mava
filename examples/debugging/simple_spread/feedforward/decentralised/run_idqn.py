@@ -43,7 +43,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "logs", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
@@ -100,10 +100,9 @@ def main(_: Any) -> None:
         epsilon_scheduler=epsilon_scheduler,
         reverb_table_max_size=10_000,
         run_evaluator=True,
-        sample_batch_size=128,
+        epoch_batch_size=128,
         num_executors=1,
         multi_process=True,
-        terminal="gnome-terminal",
         samples_per_insert=32,
     )
 

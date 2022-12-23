@@ -19,4 +19,4 @@ from dataclasses import dataclass
 
 @dataclass
 class IDQNDefaultConfig:
-    sample_batch_size: int = 32
+    epoch_batch_size: int = 32
