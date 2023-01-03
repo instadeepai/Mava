@@ -38,6 +38,7 @@ class Launcher:
         self,
         multi_process: bool,
         nodes_on_gpu: List = [],
+        use_tpu: bool = False,
         single_process_trainer_period: int = 1,
         single_process_evaluator_period: int = 10,
         single_process_max_episodes: Optional[int] = None,
@@ -54,6 +55,7 @@ class Launcher:
         Args:
             multi_process : whether to use launchpad to run nodes on separate processes.
             nodes_on_gpu : which nodes should be run on the GPU.
+            use_tpu: specifies if you want to use a TPU instead of a GPU.
             single_process_trainer_period : number of episodes between single process
                 trainer steps.
             single_process_evaluator_period : num episodes between single process
@@ -73,6 +75,7 @@ class Launcher:
         self._single_process_evaluator_period = single_process_evaluator_period
         self._single_process_max_episodes = single_process_max_episodes
         self._terminal = terminal
+        self._use_tpu = use_tpu
         if multi_process:
             self._program = lp.Program(name=name)
             self._nodes_on_gpu = nodes_on_gpu
@@ -173,6 +176,7 @@ class Launcher:
             local_resources = lp_utils.to_device(
                 program_nodes=self._program.groups.keys(),
                 nodes_on_gpu=self._nodes_on_gpu,
+                use_tpu=self._use_tpu,
             )
 
             worker_manager = lp.launch(

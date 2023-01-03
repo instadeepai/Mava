@@ -31,7 +31,9 @@ from mava.utils.training_utils import non_blocking_sleep
 FLAGS = flags.FLAGS
 
 
-def to_device(program_nodes: List, nodes_on_gpu: List = ["trainer"]) -> Dict:
+def to_device(
+    program_nodes: List, nodes_on_gpu: List = ["trainer"], use_tpu: bool = False
+) -> Dict:
     """Specifies which nodes should run on gpu.
 
     If nodes_on_gpu is an empty list, this returns a cpu only config.
@@ -39,14 +41,20 @@ def to_device(program_nodes: List, nodes_on_gpu: List = ["trainer"]) -> Dict:
     Args:
         program_nodes (List): nodes in lp program.
         nodes_on_gpu (List, optional): nodes to run on gpu. Defaults to ["trainer"].
+        use_tpu (bool, optional): specifies that one is using a TPU instead of a GPU.
+            Defaults to False.
 
     Returns:
         Dict: dict with cpu only lp config.
     """
+    no_accelerator_env = (
+        {"JAX_PLATFORMS": "cpu"} if use_tpu else {"CUDA_VISIBLE_DEVICES": str(-1)}
+    )
+    accelerator_node = PythonProcess(env={"JAX_PLATFORMS": "tpu"}) if use_tpu else []
     return {
-        node: PythonProcess(env={"CUDA_VISIBLE_DEVICES": str(-1)})
+        node: PythonProcess(env=no_accelerator_env)
         if (node not in nodes_on_gpu)
-        else []
+        else accelerator_node
         for node in program_nodes
     }
 

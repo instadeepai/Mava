@@ -31,6 +31,7 @@ class DistributorConfig:
     num_executors: int = 1
     multi_process: bool = True
     nodes_on_gpu: Union[List[str], str] = "trainer"
+    use_tpu: bool = False
     run_evaluator: bool = True
     distributor_name: str = "System"
     terminal: str = "current_terminal"
@@ -65,6 +66,7 @@ class Distributor(Component):
         builder.store.program = Launcher(
             multi_process=self.config.multi_process,
             nodes_on_gpu=self.config.nodes_on_gpu,
+            use_tpu=self.config.use_tpu,
             name=self.config.distributor_name,
             terminal=self.config.terminal,
             single_process_max_episodes=self.config.single_process_max_episodes,
