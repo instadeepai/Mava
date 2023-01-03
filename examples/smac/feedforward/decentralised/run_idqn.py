@@ -39,7 +39,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "logs", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
@@ -88,9 +88,7 @@ def main(_: Any) -> None:
         experiment_path=experiment_path,
         policy_optimiser=policy_optimiser,
         run_evaluator=True,
-        sample_batch_size=32,
         num_executors=1,
-        # min_data_server_size=10,
         multi_process=True,
         epsilon_scheduler=epsilon_scheduler,
     )

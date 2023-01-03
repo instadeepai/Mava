@@ -19,6 +19,7 @@ from types import SimpleNamespace
 from typing import Any, Dict, List, Set, Tuple, Type
 
 import numpy as np
+from chex import Array
 
 from mava.callbacks import Callback
 from mava.components import Component
@@ -143,7 +144,9 @@ class ExecutorParameterClient(BaseParameterClient):
 
         builder.store.executor_parameter_client = parameter_client
 
-    def get_network_parameters(self, store: SimpleNamespace):
+    def get_network_parameters(
+        self, store: SimpleNamespace
+    ) -> Tuple[List[str], Dict[str, Array]]:
         """Returns: network keys and parameters"""
         params = {}
         net_keys = []
@@ -161,7 +164,9 @@ class ExecutorParameterClient(BaseParameterClient):
 
 
 class ActorCriticExecutorParameterClient(ExecutorParameterClient):
-    def get_network_parameters(self, store: SimpleNamespace):
+    def get_network_parameters(
+        self, store: SimpleNamespace
+    ) -> Tuple[List[str], Dict[str, Array]]:
         """Returns: network keys and parameters"""
         params = {}
         net_keys = []
@@ -243,7 +248,7 @@ class TrainerParameterClient(BaseParameterClient):
 
     def get_network_parameters(
         self, store: SimpleNamespace, trainer_networks: Set[str]
-    ):
+    ) -> Tuple[List[str], List[str], Dict[str, Array]]:
         """Gets keys for this trainers networks, other trainers networks and params"""
         params = {}
         set_keys = []
@@ -270,7 +275,7 @@ class TrainerParameterClient(BaseParameterClient):
 class ActorCriticTrainerParameterClient(TrainerParameterClient):
     def get_network_parameters(
         self, store: SimpleNamespace, trainer_networks: Set[str]
-    ):
+    ) -> Tuple[List[str], List[str], Dict[str, Array]]:
         """Gets keys for this trainers networks, other trainers networks and params"""
         params = {}
         set_keys = []

@@ -11,7 +11,7 @@ from mava.systems.idqn.components.executing.action_selection import (
 )
 from mava.utils.schedulers.linear_epsilon_scheduler import LinearEpsilonScheduler
 from tests.components.executing.action_selection_test import (  # noqa; noqa
-    mock_empty_executor,
+    mock_empty_executor_ff,
     mock_feedforward_executor,
 )
 
@@ -40,16 +40,16 @@ def mock_select_actions(
 
 
 @pytest.fixture
-def mock_empty_dqn_executor(mock_empty_executor: Executor) -> Executor:  # noqa: F811
+def mock_empty_dqn_executor(mock_empty_executor_ff: Executor) -> Executor:  # noqa: F811
     """Fixture to create an empty dqn executor"""
     epsilon_scheduler = LinearEpsilonScheduler(1.0, 0.0, 10)
 
-    mock_empty_executor.store.action_selection_step = 5
-    mock_empty_executor.store.episode_metrics = {}
-    mock_empty_executor.store.epsilon_scheduler = epsilon_scheduler
-    mock_empty_executor.store.select_actions_fn = mock_select_actions
+    mock_empty_executor_ff.store.action_selection_step = 5
+    mock_empty_executor_ff.store.episode_metrics = {}
+    mock_empty_executor_ff.store.epsilon_scheduler = epsilon_scheduler
+    mock_empty_executor_ff.store.select_actions_fn = mock_select_actions
 
-    return mock_empty_executor
+    return mock_empty_executor_ff
 
 
 @pytest.fixture

@@ -20,6 +20,7 @@ from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Sequence, Type, Union
 
 import numpy as np
+from chex import Array
 
 from mava.callbacks import Callback
 from mava.components.building.networks import Networks
@@ -209,7 +210,9 @@ class DefaultParameterServer(ParameterServer):
             assert var_key in server.store.parameters
             server.store.parameters[var_key] += params[var_key]
 
-    def _get_network_parameters(self, store: SimpleNamespace, networks: Dict):
+    def _get_network_parameters(
+        self, store: SimpleNamespace, networks: Dict
+    ) -> Dict[str, Array]:
         parameters = {}
         for agent_net_key in networks.keys():
             agent_net = networks[agent_net_key]
@@ -222,7 +225,9 @@ class DefaultParameterServer(ParameterServer):
 
 
 class ActorCriticParameterServer(DefaultParameterServer):
-    def _get_network_parameters(self, store: SimpleNamespace, networks: Dict):
+    def _get_network_parameters(
+        self, store: SimpleNamespace, networks: Dict
+    ) -> Dict[str, Array]:
         parameters = {}
         for agent_net_key in networks.keys():
             agent_net = networks[agent_net_key]
