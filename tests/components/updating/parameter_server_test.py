@@ -191,7 +191,6 @@ def test_on_parameter_server_init_start_parameter_creation(
 
 def test_on_parameter_server_init_start_parameter_creation_actor_critic(
     actor_critic_parameter_server: ActorCriticParameterServer,
-
     mock_system_parameter_server: SystemParameterServer,
 ) -> None:
     """Test that parameters are correctly assigned to the store"""
@@ -201,16 +200,9 @@ def test_on_parameter_server_init_start_parameter_creation_actor_critic(
     assert actor_critic_parameter_server.config.json_path is None
     assert not actor_critic_parameter_server.calculate_absolute_metric
 
-    # Config params
-    assert default_parameter_server.config.non_blocking_sleep_seconds == 15
-    assert default_parameter_server.config.experiment_path == "~/mava/"
-    assert default_parameter_server.config.json_path is None
-    assert not default_parameter_server.calculate_absolute_metric
-
     # Delete existing parameters from store, since following method will create them
     delattr(mock_system_parameter_server.store, "parameters")
     actor_critic_parameter_server.on_parameter_server_init_start(
-
         mock_system_parameter_server
     )
 
