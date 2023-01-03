@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Local tests running inside a docker container.
-# We already have a venv in the container so no need to
-# re-install jax,tf and reverb depedencies.
+# Local tests running inside a docker container. 
+# We already have a venv in the container so no need to 
+# re-install jax,tf and reverb depedencies. 
 export DEBIAN_FRONTEND=noninteractive
 
 # Bash settings: fail on any error and display all commands being run.

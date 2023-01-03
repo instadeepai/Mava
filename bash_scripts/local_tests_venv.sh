@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Local tests running outside of docker.
+# Local tests running outside of docker. 
 export DEBIAN_FRONTEND=noninteractive
 
 # Bash settings: fail on any error and display all commands being run.

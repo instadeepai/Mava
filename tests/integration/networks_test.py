@@ -134,8 +134,6 @@ def test_feedforward_network(feedforward_network: Callable) -> None:
 
     assert feedforward_network()
 
-
-@pytest.mark.skip
 def test_feedforward_network_with_obs(
     feedforward_network_with_atari_obs_net: Callable,
 ) -> None:
