@@ -16,4 +16,3 @@
 """Training components for IDQN system."""
 from .loss import IDQNLoss
 from .step import IDQNStep
-from .trainer import SingleTrainerInit

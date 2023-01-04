@@ -34,7 +34,7 @@ from mava.components.building.environments import (
 from mava.components.building.extras_spec import ExtrasSpec
 from mava.components.building.loggers import Logger
 from mava.components.building.networks import DefaultNetworks
-from mava.components.building.optimisers import DefaultOptimisers
+from mava.components.building.optimisers import ActorCriticOptimisers
 
 # ActorCriticExecutorParameterClient,
 # ActorCriticTrainerParameterClient,

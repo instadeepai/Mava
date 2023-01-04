@@ -66,7 +66,7 @@ class IDQNSystem(System):
         # Trainer
         trainer_process = DesignSpec(
             optimisers=dqn_building.Optimiser,
-            trainer_init=dqn_training.SingleTrainerInit,
+            trainer_init=training.SingleTrainerInit,
             loss=dqn_training.IDQNLoss,
             # epoch_update=training.MAPGEpochUpdate,
             sgd_step=dqn_training.IDQNStep,
