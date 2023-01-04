@@ -97,6 +97,47 @@ TEST_CASES = [
         agents=agents,
     ),
     dict(
+        testcase_name="ShortEpsWithExtras",
+        max_sequence_length=2,  # nsteps +1
+        first=(env_restart, {"state": -1}),
+        steps=(
+            (
+                default_action,
+                parameterized_termination(
+                    reward=reward_step1,
+                    observation=obs_step1,
+                    discount=final_step_discount,
+                ),
+                {},
+                {"state": 0},
+            ),
+        ),
+        expected_sequences=(
+            # (observation, action, reward, discount, start_of_episode,  next_extras)
+            [
+                base.Trajectory(
+                    obs_first,
+                    default_action,
+                    reward_step1,
+                    final_step_discount,
+                    True,
+                    {},
+                    {"state": -1},
+                ),
+                base.Trajectory(
+                    obs_step1,
+                    default_action,
+                    {agent: 0.0 for agent in agents},
+                    {agent: 0.0 for agent in agents},
+                    False,
+                    {},
+                    {"state": 0},
+                ),
+            ],
+        ),
+        agents=agents,
+    ),
+    dict(
         testcase_name="MediumEps",
         max_sequence_length=5,  # nsteps +1
         first=env_restart,
