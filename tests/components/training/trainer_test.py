@@ -26,6 +26,7 @@ import pytest
 
 from mava import constants
 from mava.callbacks.base import Callback
+from mava.components.building.optimisers import ActorCriticOptimisers
 from mava.components.training.trainer import (
     CustomTrainerInit,
     CustomTrainerInitConfig,
@@ -116,7 +117,8 @@ def mock_builder_shared_weights_fixed_sampling() -> Builder:
     """
 
     mock_builder = MockBuilder(
-        global_config=SimpleNamespace(normalize_observations=True), components=[]
+        global_config=SimpleNamespace(normalize_observations=True),
+        components=[ActorCriticOptimisers()],
     )
 
     mock_builder.store.unique_net_keys = ["network_agent"]
@@ -135,7 +137,8 @@ def mock_builder_no_shared_weights_fixed_sampling() -> Builder:
     """
 
     mock_builder = MockBuilder(
-        global_config=SimpleNamespace(normalize_observations=True), components=[]
+        global_config=SimpleNamespace(normalize_observations=True),
+        components=[ActorCriticOptimisers()],
     )
 
     mock_builder.store.unique_net_keys = [
@@ -158,7 +161,8 @@ def mock_builder_no_shared_weights_random_sampling() -> Builder:
     """
 
     mock_builder = MockBuilder(
-        global_config=SimpleNamespace(normalize_observations=True), components=[]
+        global_config=SimpleNamespace(normalize_observations=True),
+        components=[ActorCriticOptimisers()],
     )
 
     mock_builder.store.unique_net_keys = ["network_0", "network_1", "network_2"]
