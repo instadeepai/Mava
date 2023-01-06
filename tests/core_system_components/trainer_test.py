@@ -29,7 +29,7 @@ from tests.hook_order_tracking import HookOrderTracking
 class MockParameterClient(ParameterClient):
     def __init__(self) -> None:
         """Initialise the parameter client"""
-        self.parameters = {"evaluator_or_trainer_failed": False}
+        self.parameters = {"terminate": False}
 
     def set_and_wait(self, params: Dict[str, Any] = None) -> None:
         """Mock for set_and_wait method"""
@@ -122,5 +122,5 @@ def test_error_step(mock_trainer_with_error: TestTrainerError) -> None:
     """Test if system stop once trainer step fails"""
     mock_trainer_with_error.run()
     assert mock_trainer_with_error.store.trainer_parameter_client.parameters == {
-        "evaluator_or_trainer_failed": True
+        "terminate": True
     }

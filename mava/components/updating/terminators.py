@@ -98,6 +98,12 @@ class CountConditionTerminator(Terminator):
             None.
         """
         if (
+            hasattr(parameter_server, "calculate_absolute_metric")
+            and parameter_server.calculate_absolute_metric  # type: ignore
+        ):
+            return
+
+        if (
             self.config.termination_condition is not None
             and parameter_server.store.parameters[self.termination_key]
             > self.termination_value
