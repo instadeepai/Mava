@@ -49,6 +49,7 @@ class ParallelAdder(adders.Adder):
     timestep is named `next_timestep` precisely to emphasize this point.
     """
 
+    # TODO Dries, Kale-ab Do we need a next_extras when adding?
     @abc.abstractmethod
     def add(
         self,

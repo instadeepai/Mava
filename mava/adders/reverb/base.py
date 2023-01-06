@@ -406,6 +406,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
 
         self._add_first_called = True
 
+    # TODO Dries, Kale-ab Do we need a next_extras when adding?
     def add(
         self,
         actions: Dict[str, mava_types.NestedArray],
