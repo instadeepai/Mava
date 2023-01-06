@@ -18,8 +18,10 @@ import abc
 from dataclasses import dataclass
 from typing import Any, Callable, List, Optional, Type
 
+import jax
 import reverb
 from acme import datasets
+from acme.jax import utils
 
 from mava.callbacks import Callback
 from mava.components import Component
@@ -125,6 +127,8 @@ class TrajectoryDatasetConfig:
     max_samples_per_stream: int = -1
     rate_limiter_timeout_ms: int = -1
     get_signature_timeout_secs: Optional[int] = None
+    prefetch_size: Optional[int] = 1
+    prefetch_device: str = "cpu"
     # max_samples: int = -1
     # dataset_name: str = "trajectory_dataset"
 
@@ -167,4 +171,22 @@ class TrajectoryDataset(TrainerDataset):
         # Add batch dimension.
         dataset = dataset.batch(self.config.epoch_batch_size, drop_remainder=True)
 
-        builder.store.dataset_iterator = dataset.as_numpy_iterator()
+        iterator = dataset.as_numpy_iterator()
+
+        if self.config.prefetch_size > 1:
+            # According to Acme: When working with single GPU we should prefetch
+            # to device for efficiency. If running on TPU this isn't necessary
+            # as the computation and input placement can be done automatically.
+            # For multi-gpu currently the best solution is to pre-fetch to host
+            # although this may change in the future.
+
+            device = (
+                jax.devices(self.config.prefetch_device)[0]
+                if self.config.prefetch_device != "cpu"
+                else None
+            )
+            iterator = utils.prefetch(
+                iterator, buffer_size=self.config.prefetch_size, device=device
+            )
+
+        builder.store.dataset_iterator = iterator
