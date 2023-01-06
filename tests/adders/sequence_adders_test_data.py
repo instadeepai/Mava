@@ -196,6 +196,7 @@ TEST_CASES = [
                     observation=obs_step1,
                     discount=default_discount,
                 ),
+                {},
                 {"state": 0},
             ),
             (
@@ -205,6 +206,7 @@ TEST_CASES = [
                     observation=obs_step2,
                     discount=default_discount,
                 ),
+                {},
                 {"state": 1},
             ),
             (
@@ -214,6 +216,7 @@ TEST_CASES = [
                     observation=obs_step3,
                     discount=default_discount,
                 ),
+                {},
                 {"state": 2},
             ),
             (
@@ -223,6 +226,7 @@ TEST_CASES = [
                     observation=obs_step4,
                     discount=final_step_discount,
                 ),
+                {},
                 {"state": 3},
             ),
         ),

@@ -51,8 +51,8 @@ def final_step_like(
 def trajectory_signature(
     ma_environment_spec: mava_specs.MAEnvironmentSpec,
     sequence_length: Optional[int] = None,
-    extras_specs: types.NestedSpec = (),
-    next_extras_specs: types.NestedSpec = (),
+    extras_specs: types.NestedSpec = {},
+    next_extras_specs: types.NestedSpec = {},
 ) -> tf.TypeSpec:
     """This is a helper method for generating signatures for Reverb tables.
 

@@ -148,7 +148,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             get_first,
             (
                 history["observations"],
-                history.get("next_extras", {}),
+                history.get("extras", {}),
                 history["actions"],
             ),
         )
@@ -156,10 +156,6 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         s_, e_ = tree.map_structure(
             get_last, (history["observations"], history.get("next_extras", {}))
         )
-
-        # # Maybe get extras to add to the transition later.
-        # if 'extras' in history:
-        #     extras = tree.map_structure(get_first, history['extras'])
 
         # Note: at the beginning of an episode we will add the initial N-1
         # transitions (of size 1, 2, ...) and at the end of an episode (when
