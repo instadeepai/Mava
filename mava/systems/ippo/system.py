@@ -56,7 +56,7 @@ class IPPOSystem(System):
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
             networks=building.DefaultNetworks,
             optimisers=building.DefaultOptimisers,
-            #observation_normalisation=normalisation.ObservationNormalisation,
+            observation_normalisation=normalisation.ObservationNormalisation,
         ).get()
 
         # Trainer
@@ -70,7 +70,7 @@ class IPPOSystem(System):
             step=training.DefaultTrainerStep,
             value_loss=training.SquaredErrorValueLoss,
             trainer_dataset=building.TrajectoryDataset,
-            #value_normalisation=normalisation.ValueNormalisation,
+            value_normalisation=normalisation.ValueNormalisation,
         ).get()
 
         # Data Server

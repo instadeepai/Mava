@@ -32,19 +32,20 @@ class ObservationNormalisation(BaseNormalisation):
 
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """Initialise observations' normalisation parameters"""
-        obs_norm_key = constants.OBS_NORM_STATE_DICT_KEY
-        agent_env_specs = builder.store.ma_environment_spec._agent_environment_specs
-        builder.store.norm_params[obs_norm_key] = {}
+        if self.config.normalise_observations:
+            obs_norm_key = constants.OBS_NORM_STATE_DICT_KEY
+            agent_env_specs = builder.store.ma_environment_spec._agent_environment_specs
+            builder.store.norm_params[obs_norm_key] = {}
 
-        for agent in builder.store.agents:
-            obs_shape = agent_env_specs[agent].observations.observation.shape
+            for agent in builder.store.agents:
+                obs_shape = agent_env_specs[agent].observations.observation.shape
 
-            if self.config.normalise_observations and len(obs_shape) > 1:
-                raise NotImplementedError(
-                    "Observations normalization only works for 1D feature spaces!"
-                )
+                if self.config.normalise_observations and len(obs_shape) > 1:
+                    raise NotImplementedError(
+                        "Observations normalization only works for 1D feature spaces!"
+                    )
 
-            builder.store.norm_params[obs_norm_key][agent] = init_norm_params(obs_shape)
+                builder.store.norm_params[obs_norm_key][agent] = init_norm_params(obs_shape)
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """Initialises observation normalisation function"""
