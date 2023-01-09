@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Jax IPPO system networks."""
-from typing import Any, Callable, Dict, Sequence
+from typing import Any, Callable, Dict, Optional, Sequence
 
 import haiku as hk
 import jax
@@ -32,6 +32,7 @@ def make_network(
     base_key: jax.random.KeyArray,
     policy_layer_sizes: Sequence[int],
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
+    observation_network: Optional[Callable] = None,
 ) -> IDQNNetwork:
     """Create DQN network for environments with discrete action spaces.
 
@@ -41,6 +42,8 @@ def make_network(
         policy_layer_sizes: sizes of hidden layers for the policy network
         activation_function: activation function to be used for
             network hidden layers.
+        observation_network: optional network for processing observations.
+            Defaults to nothing
 
     Returns:
         A single IDQN network
@@ -60,14 +63,18 @@ def make_network(
             FeedForwardNetwork class
         """
         # Add the observation network and an MLP network.
-        policy_network = [
+        value_network = []
+        if observation_network is not None:
+            value_network.append(observation_network)
+
+        value_network.append(
             hk.nets.MLP(
                 (*policy_layer_sizes, num_actions),
                 activation=activation_function,
             ),
-        ]
+        )
 
-        return hk.Sequential(policy_network)(inputs)
+        return hk.Sequential(value_network)(inputs)
 
     dummy_obs = utils.zeros_like(environment_spec.observations.observation)
     dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
@@ -94,6 +101,7 @@ def make_default_networks(
         64,
     ),
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
+    observation_network: Optional[Callable] = None,
 ) -> Dict[str, Any]:
     """Create default IDQN networks (one per agent)
 
@@ -104,8 +112,8 @@ def make_default_networks(
         base_key: jax random key to be used for network initialization
         net_spec_keys: keys for each agent network
         policy_layer_sizes: policy network layers
-        activation_function: activation function to be used for
-            network hidden layers.
+        activation_function: activation function to be used for network hidden layers.
+        observation_network: optional network for processing observations
 
     Returns:
         networks: IDQN networks created to given spec
@@ -127,6 +135,7 @@ def make_default_networks(
             base_key=base_key,
             policy_layer_sizes=policy_layer_sizes,
             activation_function=activation_function,
+            observation_network=observation_network,
         )
 
     return networks
