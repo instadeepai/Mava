@@ -104,31 +104,41 @@ def mock_system_parameter_server() -> SystemParameterServer:
         "param1": "param1_value",
         "param2": "param2_value",
         "param3": "param3_value",
-        "evaluator_or_trainer_failed": False,
+        "terminate": False,
         "num_executor_failed": 0,
     }
 
+    mock_system_parameter_server.store.checkpointing_metric = ["mean_episode_return"]
+
     mock_system_parameter_server.store.num_executors = 2
+
+    mock_system_parameter_server.store.checkpoint_best_perf = True
 
     return mock_system_parameter_server
 
 
 @pytest.fixture
-def test_default_parameter_server() -> DefaultParameterServer:  # noqa: E501
+def default_parameter_server() -> DefaultParameterServer:  # noqa: E501
     """Pytest fixture for default parameter server"""
     config = ParameterServerConfig(non_blocking_sleep_seconds=15)
     return DefaultParameterServer(config)
 
 
 def test_on_parameter_server_init_start_parameter_creation(
-    test_default_parameter_server: DefaultParameterServer,
+    default_parameter_server: DefaultParameterServer,
     mock_system_parameter_server: SystemParameterServer,
 ) -> None:
     """Test that parameters are correctly assigned to the store"""
 
+    # Config params
+    assert default_parameter_server.config.non_blocking_sleep_seconds == 15
+    assert default_parameter_server.config.experiment_path == "~/mava/"
+    assert default_parameter_server.config.json_path is None
+    assert not default_parameter_server.calculate_absolute_metric
+
     # Delete existing parameters from store, since following method will create them
     delattr(mock_system_parameter_server.store, "parameters")
-    test_default_parameter_server.on_parameter_server_init_start(
+    default_parameter_server.on_parameter_server_init_start(
         mock_system_parameter_server
     )
 
@@ -137,7 +147,7 @@ def test_on_parameter_server_init_start_parameter_creation(
     assert hasattr(mock_system_parameter_server.store, "experiment_path")
     assert (
         mock_system_parameter_server.store.experiment_path
-        == test_default_parameter_server.config.experiment_path
+        == default_parameter_server.config.experiment_path
     )
 
     # Parameter store training / executing info
@@ -175,21 +185,19 @@ def test_on_parameter_server_init_start_parameter_creation(
         mock_system_parameter_server.store.parameters["critic_network-agent_net_2"]
         == "net_1_2_params"
     )
-    assert not mock_system_parameter_server.store.parameters[
-        "evaluator_or_trainer_failed"
-    ]
+    assert not mock_system_parameter_server.store.parameters["terminate"]
     assert mock_system_parameter_server.store.parameters["num_executor_failed"] == 0
 
 
 def test_on_parameter_server_get_parameters_single(
-    test_default_parameter_server: DefaultParameterServer,
+    default_parameter_server: DefaultParameterServer,
     mock_system_parameter_server: SystemParameterServer,
 ) -> None:
     """Test get_parameters when only a single parameter is requested"""
 
     mock_system_parameter_server.store._param_names = "param2"
 
-    test_default_parameter_server.on_parameter_server_get_parameters(
+    default_parameter_server.on_parameter_server_get_parameters(
         mock_system_parameter_server
     )
 
@@ -197,14 +205,14 @@ def test_on_parameter_server_get_parameters_single(
 
 
 def test_on_parameter_server_get_parameters_list(
-    test_default_parameter_server: DefaultParameterServer,
+    default_parameter_server: DefaultParameterServer,
     mock_system_parameter_server: SystemParameterServer,
 ) -> None:
     """Test get_parameters when a list of parameters are requested"""
 
     mock_system_parameter_server.store._param_names = ["param1", "param3"]
 
-    test_default_parameter_server.on_parameter_server_get_parameters(
+    default_parameter_server.on_parameter_server_get_parameters(
         mock_system_parameter_server
     )
 
@@ -214,7 +222,7 @@ def test_on_parameter_server_get_parameters_list(
 
 
 def test_on_mock_system_parameter_server_set_parameters(
-    test_default_parameter_server: DefaultParameterServer,
+    default_parameter_server: DefaultParameterServer,
     mock_system_parameter_server: SystemParameterServer,
 ) -> None:
     """Test setting parameters"""
@@ -224,7 +232,7 @@ def test_on_mock_system_parameter_server_set_parameters(
         "param3": "param3_new_value",
     }
 
-    test_default_parameter_server.on_parameter_server_set_parameters(
+    default_parameter_server.on_parameter_server_set_parameters(
         mock_system_parameter_server
     )
 
@@ -234,7 +242,7 @@ def test_on_mock_system_parameter_server_set_parameters(
 
 
 def test_on_parameter_server_add_to_parameters(
-    test_default_parameter_server: DefaultParameterServer,
+    default_parameter_server: DefaultParameterServer,
     mock_system_parameter_server: SystemParameterServer,
 ) -> None:
     """Test addition on parameters"""
@@ -245,7 +253,7 @@ def test_on_parameter_server_add_to_parameters(
         "param3": 2,
     }
 
-    test_default_parameter_server.on_parameter_server_add_to_parameters(
+    default_parameter_server.on_parameter_server_add_to_parameters(
         mock_system_parameter_server
     )
 
@@ -259,7 +267,7 @@ def test_on_parameter_server_add_to_parameters(
     # Test that the number of num_executor_failed got incremneted
     mock_system_parameter_server.store._add_to_params = {"num_executor_failed": 1}
 
-    test_default_parameter_server.on_parameter_server_add_to_parameters(
+    default_parameter_server.on_parameter_server_add_to_parameters(
         mock_system_parameter_server
     )
     assert mock_system_parameter_server.store.parameters["num_executor_failed"] == 1

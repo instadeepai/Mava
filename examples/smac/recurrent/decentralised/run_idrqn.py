@@ -28,7 +28,7 @@ from mava.utils.loggers import logger_utils
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "map_name",
-    "8m",
+    "3m",
     "Starcraft 2 micromanagement map name (str).",
 )
 
@@ -37,7 +37,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "logs", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
@@ -92,7 +92,6 @@ def main(_: Any) -> None:
         multi_process=True,
         # samples_per_insert=32,
         min_data_server_size=10,
-        terminal="gnome-terminal",
         sequence_length=20,
         period=10,
     )

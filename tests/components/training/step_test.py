@@ -25,6 +25,10 @@ import pytest
 import rlax
 
 from mava import constants
+from mava.components.normalisation.observation_normalisation import (
+    ObservationNormalisation,
+)
+from mava.components.normalisation.value_normalisation import ValueNormalisation
 from mava.components.training.step import DefaultTrainerStep, MAPGWithTrustRegionStep
 from mava.systems.trainer import Trainer
 from tests.components.training.step_test_data import dummy_sample
@@ -189,13 +193,14 @@ class MockTrainer(Trainer):
             global_config=SimpleNamespace(
                 num_minibatches=1,
                 num_epochs=2,
-                sample_batch_size=2,
+                epoch_batch_size=2,
                 sequence_length=3,
-                normalize_observations=False,
-                normalize_target_values=False,
+                normalise_observations=False,
+                normalise_target_values=False,
             ),
         )
         self.store = store
+        self.callbacks = [ObservationNormalisation, ValueNormalisation]
 
 
 @pytest.fixture
@@ -278,7 +283,7 @@ def test_on_training_init_start(
 
     mapg_with_trust_region_step.on_training_init_start(trainer=mock_trainer)
 
-    assert mock_trainer.store.full_batch_size == 4
+    assert mock_trainer.store.global_config.epoch_batch_size == 2
 
 
 def test_on_training_step_fn(

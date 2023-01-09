@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run feedforward MADQN on SMAC."""
+"""Run feedforward IPPO on SMAC."""
 
 
 import functools
@@ -94,7 +94,7 @@ def main(_: Any) -> None:
         policy_optimiser=policy_optimiser,
         critic_optimiser=critic_optimiser,
         run_evaluator=True,
-        sample_batch_size=5,
+        epoch_batch_size=5,
         num_epochs=15,
         num_executors=1,
         multi_process=True,

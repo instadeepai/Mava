@@ -16,11 +16,39 @@
 
 """Tests for core Mava interfaces for Jax systems."""
 
+from types import SimpleNamespace
 from typing import Any, List
+from unittest.mock import patch
 
 import pytest
 
-from mava.core_jax import BaseSystem, SystemBuilder
+from mava.components.building.parameter_client import (
+    BaseParameterClient,
+    ExecutorParameterClient,
+    TrainerParameterClient,
+)
+from mava.components.executing.action_selection import FeedforwardExecutorSelectAction
+from mava.components.executing.observing import ExecutorObserve
+from mava.core_jax import (
+    BaseSystem,
+    SystemBuilder,
+    SystemExecutor,
+    SystemParameterClient,
+    SystemTrainer,
+)
+from mava.systems.builder import Builder
+
+
+class MockBuilder(Builder):
+    def __init__(self) -> None:
+        """Init for mock builder"""
+        self.callbacks = [ExecutorParameterClient(), FeedforwardExecutorSelectAction()]
+
+
+@pytest.fixture
+def builder() -> MockBuilder:
+    """Fixture for mock builder"""
+    return MockBuilder()
 
 
 def test_exception_for_incomplete_child_system_class() -> None:
@@ -60,3 +88,47 @@ def test_exception_for_incomplete_child_builder_class() -> None:
                 pass
 
         TestIncompleteDummySystemBuilder()  # type: ignore
+
+
+def test_has_component(builder: Builder) -> None:
+    """Tests if the core_component.has method works"""
+    # make sure builder checks for sub types by default
+    assert builder.has(BaseParameterClient)
+    # make sure that subtypes work as expected
+    assert builder.has(ExecutorParameterClient)
+    assert not builder.has(TrainerParameterClient)
+
+    assert builder.has(FeedforwardExecutorSelectAction)
+    assert not builder.has(ExecutorObserve)
+
+
+# Allows testing of abstract class
+@patch.multiple(SystemTrainer, __abstractmethods__=set())
+def test_system_trainer__init__() -> None:
+    """Test system trainer init"""
+    trainer = SystemTrainer()  # type: ignore
+    assert trainer.store == SimpleNamespace()
+
+
+# Allows testing of abstract class
+@patch.multiple(SystemBuilder, __abstractmethods__=set())
+def test_system_builder__init__() -> None:
+    """Test system builder init"""
+    builder = SystemBuilder()  # type: ignore
+    assert builder.store == SimpleNamespace()
+
+
+# Allows testing of abstract class
+@patch.multiple(SystemExecutor, __abstractmethods__=set())
+def test_system_executor__init__() -> None:
+    """Test system executor init"""
+    executor = SystemExecutor()  # type: ignore
+    assert executor.store == SimpleNamespace()
+
+
+# Allows testing of abstract class
+@patch.multiple(SystemParameterClient, __abstractmethods__=set())
+def test_system_param_client__init__() -> None:
+    """Test system parameter client init"""
+    param_client = SystemParameterClient()  # type: ignore
+    assert param_client.store == SimpleNamespace()

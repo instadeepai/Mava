@@ -42,7 +42,10 @@ ENV XLA_PYTHON_CLIENT_PREALLOCATE=false
 ## Install core jax dependencies.
 # Install jax gpu
 RUN pip install -e .[jax]
-RUN pip install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+# TODO (Ruan): This version is pinned now to avoid a breaking change in jaxlib.
+# Unpin when the issue is resolved.
+# Please see https://github.com/deepmind/dm-haiku/issues/565 for details.
+RUN pip install --upgrade "jax[cuda]==0.3.24" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ##########################################################
 
 ##########################################################
@@ -74,11 +77,4 @@ FROM jax-core AS flatland
 RUN pip install -e .[flatland]
 # To fix module 'jaxlib.xla_extension' has no attribute '__path__'
 RUN pip install cloudpickle -U
-##########################################################
-
-#########################################################
-## Robocup Image
-FROM jax-core AS robocup
-RUN apt-get install sudo -y
-RUN ./bash_scripts/install_robocup.sh
 ##########################################################
