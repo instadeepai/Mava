@@ -106,7 +106,7 @@ setup(
         "absl-py",
         "dm_env",
         "dm-tree",
-        "numpy",
+        "numpy==1.22.4",
         "pillow",
         "matplotlib",
         "dataclasses",
