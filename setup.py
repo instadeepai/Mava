@@ -59,7 +59,7 @@ smac_requirements = ["pysc2", "SMAC @ git+https://github.com/oxwhirl/smac.git"]
 testing_formatting_requirements = [
     "pytest==7.2.0",
     "pre-commit",
-    "mypy==0.941",
+    "mypy==0.981",
     "pytest-xdist",
     "flake8==3.8.2",
     "black==22.3.0",
