@@ -15,12 +15,12 @@
 
 """Parameter client for Jax system. Adapted from Deepmind's Acme library"""
 
+import time
 from concurrent import futures
 from typing import Any, Dict, List, Optional, Union
 
 import jax
 import numpy as np
-import time
 
 from mava.systems.parameter_server import ParameterServer
 from mava.utils.sort_utils import sort_str_num

@@ -22,7 +22,7 @@ WORKDIR ${folder}
 ## Copy code from current path
 COPY . /home/app/mava
 # For box2d
-RUN apt-get install swig -y
+RUN apt-get install swig git -y
 ## Install core dependencies + reverb.
 RUN pip install -e .[reverb]
 ## Optional install for screen recording.
