@@ -98,7 +98,6 @@ setup(
     author="InstaDeep Ltd",
     license="Apache License, Version 2.0",
     keywords="multi-agent reinforcement-learning python machine learning",
-    include_package_data=True,
     packages=find_namespace_packages(
         exclude=["*.tests", "*.tests.*", "tests.*", "tests"]
     ),
