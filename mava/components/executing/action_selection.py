@@ -177,11 +177,16 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             # TODO Look at tree mapping this forloop.
             # Since this is jitted, compiling a forloop with lots of agents could take
             # long, we should vectorize this.
+            #print(agent_net_keys)
+            #exit()
+            #print(observations.keys())
+            #exit()
             for agent, observation in observations.items():
-                network = networks[agent_net_keys[agent]]
+                #agent = 'agent_0'
+                network = networks[agent_net_keys['agent_0']]
                 actions_info[agent], policies_info[agent], base_key = select_action(
                     observation=observation,
-                    current_params=current_params[agent_net_keys[agent]],
+                    current_params=current_params[agent_net_keys['agent_0']],
                     network=network,
                     base_key=base_key,
                 )
@@ -311,6 +316,8 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             # Since this is jitted, compiling a forloop with lots of agents could take
             # long, we should vectorize this.
             for agent, observation in observations.items():
+                #agent = 'network_agent'
+                #agent = 'agent_0'
                 network = networks[agent_net_keys[agent]]
                 (
                     actions_info[agent],
