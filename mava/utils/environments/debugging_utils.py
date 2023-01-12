@@ -20,7 +20,10 @@ import dm_env
 from mava.utils.debugging.make_env import make_debugging_env
 from mava.utils.jax_training_utils import set_jax_double_precision
 from mava.wrappers.debugging_envs import DebuggingEnvWrapper
-from mava.wrappers.env_preprocess_wrappers import ConcatAgentIdToObservation
+from mava.wrappers.env_preprocess_wrappers import (
+    ConcatAgentIdToObservation,
+    StackObservations,
+)
 
 
 def make_environment(
@@ -32,6 +35,7 @@ def make_environment(
     return_state_info: bool = False,
     random_seed: Optional[int] = None,
     recurrent_test: bool = False,
+    stack_frames: int = 1,
     concat_agent_id: bool = False,
 ) -> Tuple[dm_env.Environment, Dict[str, str]]:
     """Make a debugging environment."""
@@ -55,6 +59,9 @@ def make_environment(
         )
     else:
         raise ValueError(f"Environment {env_name} not found.")
+
+    if stack_frames > 1:
+        environment = StackObservations(environment, num_frames=stack_frames)
 
     if concat_agent_id:
         environment = ConcatAgentIdToObservation(environment)
