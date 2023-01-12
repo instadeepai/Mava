@@ -17,7 +17,7 @@ class MockBuilder(Builder):
 
     def has(self, instance: Any) -> bool:
         """Has: mock method"""
-        return False
+        return True
 
 
 class MockParameterServer(ParameterServer):
@@ -64,7 +64,12 @@ def builder() -> Builder:
         networks={"agent_0": MockNetwork()},
         policy_opt_states={"agent_0": {"opt_state": [1, 2, 3]}},
         critic_opt_states={"agent_0": {"opt_state": [1, 2, 3]}},
-        global_config=SimpleNamespace(evaluation_duration={"evaluator_episodes": 32}),
+        norm_params={"agent_0": [0.2, 0.3, 0.5]},
+        global_config=SimpleNamespace(
+            evaluation_duration={"evaluator_episodes": 32},
+            normalise_observations=True,
+            normalise_target_values=True,
+        ),
     )
     return MockBuilder(store)
 
@@ -204,5 +209,6 @@ def test_init_checkpointing_params(
             "critic_network-agent_0": {"w": [1, 2, 3]},
             "policy_opt_state-agent_0": {"opt_state": [1, 2, 3]},
             "critic_opt_state-agent_0": {"opt_state": [1, 2, 3]},
+            "norm_params": {"agent_0": [0.2, 0.3, 0.5]},
         }
     }
