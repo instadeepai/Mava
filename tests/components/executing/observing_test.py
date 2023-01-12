@@ -47,11 +47,13 @@ class MockAdder:
         self,
         actions: Dict[str, Any],
         next_timestep: TimeStep,
+        extras: Dict[str, Any],
         next_extras: Dict[str, Any],
     ) -> None:
         """Record the observation of a trajectory."""
         self.test_adder_actions = actions
         self.test_next_timestep = next_timestep
+        self.test_extras = extras
         self.test_next_extras = next_extras
 
 
@@ -341,9 +343,9 @@ def test_on_execution_observe(
     feedforward_executor_observe.on_execution_observe(executor=mock_executor)
 
     for agent in mock_executor.store.policies_info.keys():
-        assert mock_executor.store.next_extras["policy_info"][
+        assert mock_executor.store.extras["policy_info"][agent] == "policy_info_" + str(
             agent
-        ] == "policy_info_" + str(agent)
+        )
 
     assert (
         mock_executor.store.next_extras["network_int_keys"]
@@ -356,6 +358,10 @@ def test_on_execution_observe(
         "agent_1": {"actions_info": "action_info_agent_1"},
         "agent_2": {"actions_info": "action_info_agent_2"},
     }
+
+    print("timestep: ", mock_executor.store.adder.test_next_timestep)
+    print("next: ", mock_executor.store.next_timestep)
+
     assert (
         mock_executor.store.adder.test_next_timestep
         == mock_executor.store.next_timestep
@@ -517,9 +523,9 @@ def test_on_execution_observe_recurrent(
     recurrent_executor_observe.on_execution_observe(executor=mock_executor)
 
     for agent in mock_executor.store.policies_info.keys():
-        assert mock_executor.store.next_extras["policy_info"][
+        assert mock_executor.store.extras["policy_info"][agent] == "policy_info_" + str(
             agent
-        ] == "policy_info_" + str(agent)
+        )
 
     assert (
         mock_executor.store.next_extras["network_int_keys"]

@@ -49,11 +49,13 @@ class ParallelAdder(adders.Adder):
     timestep is named `next_timestep` precisely to emphasize this point.
     """
 
+    # TODO Dries, Kale-ab Do we need a next_extras when adding?
     @abc.abstractmethod
     def add(
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
+        extras: Dict[str, types.NestedArray] = {},
         next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """Defines the adder `add` interface.
@@ -63,6 +65,8 @@ class ParallelAdder(adders.Adder):
             a_t for each agent.
           next_timestep: A dm_env Timestep object corresponding to the resulting
             data obtained by taking the given action.
-          next_extras: Dictionary of a possibly nested structure of extra data to add
+          extras: Dictionary of a possibly nested structure corresponding to
+            extra data for each agent. This is linked to the action taken.
+          next_extras: Dictionary of a possibly nested structure of next extra data to add
             to replay. This is linked to next_timestep.observation.
         """

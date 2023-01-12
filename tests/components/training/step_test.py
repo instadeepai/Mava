@@ -316,7 +316,7 @@ def test_step(mock_trainer: Trainer) -> None:
     # Step with policy states
     states = jnp.zeros((1, 5))
     policy_states = {"agent_0": states, "agent_1": states, "agent_2": states}
-    dummy_sample.data.extras["policy_states"] = policy_states
+    dummy_sample.data.next_extras["policy_states"] = policy_states
     metrics = mock_trainer.store.step_fn(dummy_sample)
 
     # Check that metrics were correctly computed

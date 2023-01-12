@@ -193,11 +193,11 @@ def test_parallel_sequence_adder_signature(
     )
 
     assert hasattr(mock_builder.store, "adder_signature_fn")
-
     signature = mock_builder.store.adder_signature_fn(
         ma_environment_spec=mock_env_specs,
         sequence_length=parallel_sequence_adder.config.sequence_length,
-        extras_specs=mock_env_specs.get_extras_specs(),
+        next_extras_specs=mock_env_specs.get_extras_specs(),
+        extras_specs={},
     )
     assert type(signature) == reverb_base.Step
 
@@ -278,7 +278,8 @@ def test_parallel_transition_adder_signature(
 
     signature = mock_builder.store.adder_signature_fn(
         ma_environment_spec=mock_env_specs,
-        extras_specs=mock_env_specs.get_extras_specs(),
+        next_extras_specs=mock_env_specs.get_extras_specs(),
+        extras_specs={},
     )
     assert type(signature) == types.Transition
 

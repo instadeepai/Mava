@@ -118,8 +118,15 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
 
         if has_extras:
             extras_specs = tree.map_structure(test_utils._numeric_to_spec, steps[0][2])
+            if len(steps[0]) > 3:
+                next_extras_specs = tree.map_structure(
+                    test_utils._numeric_to_spec, steps[0][3]
+                )
+            else:
+                next_extras_specs = {}
         else:
             extras_specs = {}
+            next_extras_specs = {}
 
         ma_spec = specs.MAEnvironmentSpec(
             environment=None,
@@ -128,7 +135,9 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
         )
 
         signature = adder.signature(
-            ma_environment_spec=ma_spec, extras_specs=extras_specs
+            ma_environment_spec=ma_spec,
+            extras_specs=extras_specs,
+            next_extras_specs=next_extras_specs,
         )
 
         for episode_id in range(repeat_episode_times):
@@ -146,10 +155,17 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
 
                 if has_extras:
                     extras = step[2]
+                    if len(step) > 3:
+                        next_extras = step[3]
+                    else:
+                        next_extras = {}
                 else:
-                    extras = ()
+                    extras = {}
+                    next_extras = {}
 
-                adder.add(action, next_timestep=ts, next_extras=extras)
+                adder.add(
+                    action, next_timestep=ts, extras=extras, next_extras=next_extras
+                )
 
             # Add the final step.
             adder.add(*steps[-1])
@@ -177,7 +193,6 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
             # setup.
             if item_transform:
                 observed_item = item_transform(observed_item)
-
             tree.map_structure(
                 np.testing.assert_array_almost_equal,
                 tree.flatten(expected_item),

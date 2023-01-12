@@ -89,7 +89,7 @@ def test_observe_first_store(
     """Test that store is handled properly in observe_first"""
     test_executor.observe_first(timestep=dummy_time_step, extras=dummy_extras)
     assert test_executor.store.timestep == dummy_time_step
-    assert test_executor.store.extras == dummy_extras
+    assert test_executor.store.next_extras == dummy_extras
 
 
 def test_observe_store(

@@ -296,7 +296,10 @@ TEST_CASES = [
         testcase_name="OneStepWithExtras",
         n_step=1,
         discount=default_discount,
-        first=(env_restart, {"state": -1}),
+        first=(
+            env_restart,
+            {"state": -1},
+        ),  # Initial state gets overwritten in next transition.
         steps=(
             (
                 default_action,
@@ -306,6 +309,7 @@ TEST_CASES = [
                     discount=default_discount,
                 ),
                 {"state": 0},
+                {"state": 1},
             ),
             (
                 default_action,
@@ -315,6 +319,7 @@ TEST_CASES = [
                     discount=default_discount,
                 ),
                 {"state": 1},
+                {"state": 2},
             ),
             (
                 default_action,
@@ -324,6 +329,7 @@ TEST_CASES = [
                     discount=final_step_discount,
                 ),
                 {"state": 2},
+                {"state": 3},
             ),
         ),
         expected_transitions=(
@@ -335,8 +341,8 @@ TEST_CASES = [
                 reward_step1,
                 default_discount,
                 obs_step1,
-                {"state": -1},
                 {"state": 0},
+                {"state": 1},
             ),
             types.Transition(
                 obs_step1,
@@ -344,8 +350,8 @@ TEST_CASES = [
                 reward_step2,
                 default_discount,
                 obs_step2,
-                {"state": 0},
                 {"state": 1},
+                {"state": 2},
             ),
             types.Transition(
                 obs_step2,
@@ -353,8 +359,8 @@ TEST_CASES = [
                 reward_step3,
                 final_step_discount,
                 obs_step3,
-                {"state": 1},
                 {"state": 2},
+                {"state": 3},
             ),
         ),
         agents=agents,
@@ -508,6 +514,7 @@ TEST_CASES = [
         n_step=2,
         discount=default_discount,
         first=(env_restart, {"state": -1}),
+        # Initial state gets overwritten in next transition.
         steps=(
             (
                 default_action,
@@ -517,6 +524,7 @@ TEST_CASES = [
                     discount=default_discount,
                 ),
                 {"state": 0},
+                {"state": 1},
             ),
             (
                 default_action,
@@ -526,6 +534,7 @@ TEST_CASES = [
                     discount=default_discount,
                 ),
                 {"state": 1},
+                {"state": 2},
             ),
             (
                 default_action,
@@ -535,6 +544,7 @@ TEST_CASES = [
                     discount=final_step_discount,
                 ),
                 {"state": 2},
+                {"state": 3},
             ),
         ),
         expected_transitions=(
@@ -546,8 +556,8 @@ TEST_CASES = [
                 reward_step1,
                 default_discount,
                 obs_step1,
-                {"state": -1},
                 {"state": 0},
+                {"state": 1},
             ),
             types.Transition(
                 obs_first,
@@ -559,8 +569,8 @@ TEST_CASES = [
                 ),
                 default_discount,
                 obs_step2,
-                {"state": -1},
-                {"state": 1},
+                {"state": 0},
+                {"state": 2},
             ),
             types.Transition(
                 obs_step1,
@@ -572,8 +582,8 @@ TEST_CASES = [
                 ),
                 final_step_discount,
                 obs_step3,
-                {"state": 0},
-                {"state": 2},
+                {"state": 1},
+                {"state": 3},
             ),
             types.Transition(
                 obs_step2,
@@ -581,8 +591,8 @@ TEST_CASES = [
                 reward_step3,
                 final_step_discount,
                 obs_step3,
-                {"state": 1},
                 {"state": 2},
+                {"state": 3},
             ),
         ),
         agents=agents,
