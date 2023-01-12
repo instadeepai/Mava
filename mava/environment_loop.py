@@ -247,7 +247,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
         def run_evaluation(results: Any) -> None:  # pragma: no cover
             """Calculate the absolute metric"""
-
             logging.exception("Calculating the absolute metric")
             eval_result: Dict[str, Any] = {}  # create a dict with checkpointing_metric
             for metric in self._executor.store.global_config.checkpointing_metric:
