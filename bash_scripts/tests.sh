@@ -71,7 +71,7 @@ fi
 # Code coverage
 curl -Os https://uploader.codecov.io/latest/linux/codecov
 chmod +x codecov
-./codecov --rootDir=./ --file=coverage.xml
+./codecov --file=coverage.xml
 
 # Clean-up.
 deactivate
