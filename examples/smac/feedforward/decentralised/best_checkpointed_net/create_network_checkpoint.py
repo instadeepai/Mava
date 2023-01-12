@@ -12,11 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run feedforward IPPO on SMAC using best checkpointed networks."""
+"""Run an example of storing the best network related to a metric."""
 
 
 import functools
-import time
 from datetime import datetime
 from typing import Any
 
@@ -41,12 +40,8 @@ flags.DEFINE_string(
 )
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
-# Used for checkpoints, tensorboard logging and env monitoring
-experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
-checkpointing_metric = "mean_episode_return"
 
-
-def run_system() -> None:
+def main(_: Any) -> None:
     """Example running feedforward IPPO on SMAC environment."""
 
     # Environment
@@ -60,6 +55,9 @@ def run_system() -> None:
             *args,
             **kwargs,
         )
+
+    # Used for checkpoints, tensorboard logging and env monitoring
+    experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
     log_every = 10
@@ -97,98 +95,19 @@ def run_system() -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        evaluation_interval={"executor_steps": 5000},
-        evaluation_duration={"evaluator_episodes": 5},
+        evaluation_interval={"executor_steps": 10000},
+        evaluation_duration={"evaluator_episodes": 32},
         executor_parameter_update_period=1,
         # Flag to activate best checkpointing
         checkpoint_best_perf=True,
         # metrics to checkpoint its best performance networks
-        checkpointing_metric=(checkpointing_metric, "win_rate"),
-        termination_condition={"executor_steps": 30000},
+        checkpointing_metric=("mean_episode_return", "win_rate"),
+        termination_condition={"executor_steps": 70000},
         checkpoint_minute_interval=1,
-        wait=True,
     )
 
     # Launch the system.
     system.launch()
-
-
-def run_checkpointed_model() -> None:
-    """Run IPPO with restored networks."""
-
-    # Environment
-    environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
-
-    # Networks.
-    def network_factory(*args: Any, **kwargs: Any) -> Any:
-        return ippo.make_default_networks(  # type: ignore
-            policy_layer_sizes=(64, 64),
-            critic_layer_sizes=(64, 64, 64),
-            *args,
-            **kwargs,
-        )
-
-    # Use same dir to restore checkpointed params
-    old_experiment_path = experiment_path
-
-    # Log every [log_every] seconds.
-    log_every = 10
-    logger_factory = functools.partial(
-        logger_utils.make_logger,
-        directory=FLAGS.base_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=FLAGS.mava_id,
-        time_delta=log_every,
-    )
-
-    # Optimisers.
-    policy_optimiser = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
-    )
-
-    critic_optimiser = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
-    )
-
-    # Create the system.
-    system = ippo.IPPOSystem()
-
-    # Build the system.
-    system.build(
-        environment_factory=environment_factory,
-        network_factory=network_factory,
-        logger_factory=logger_factory,
-        experiment_path=old_experiment_path,
-        policy_optimiser=policy_optimiser,
-        critic_optimiser=critic_optimiser,
-        run_evaluator=True,
-        epoch_batch_size=5,
-        num_epochs=15,
-        num_executors=1,
-        multi_process=True,
-        evaluation_interval={"executor_steps": 5000},
-        evaluation_duration={"evaluator_episodes": 5},
-        executor_parameter_update_period=5,
-        # choose which metric you want to restore its best netrworks
-        restore_best_net="win_rate",
-        termination_condition={"executor_steps": 50000},
-        checkpoint_minute_interval=1,
-        wait=True,
-    )
-
-    # Launch the system.
-    system.launch()
-
-
-def main(_: Any) -> None:
-    """Run the model and then restore the best networks"""
-    # Run system that checkpoint the best performance for win rate
-    # and mean return
-    run_system()
-    print(f"Start restored {checkpointing_metric} best networks")
-    time.sleep(10)
-    run_checkpointed_model()
 
 
 if __name__ == "__main__":
