@@ -19,7 +19,7 @@ import datetime
 import sys
 from importlib import util as import_util
 
-from setuptools import find_packages, setup
+from setuptools import find_packages, setup, find_namespace_packages
 
 spec = import_util.spec_from_file_location("_metadata", "mava/_metadata.py")
 _metadata = import_util.module_from_spec(spec)  # type: ignore
@@ -59,7 +59,7 @@ smac_requirements = ["pysc2", "SMAC @ git+https://github.com/oxwhirl/smac.git"]
 testing_formatting_requirements = [
     "pytest==7.2.0",
     "pre-commit",
-    "mypy==0.941",
+    "mypy==0.981",
     "pytest-xdist",
     "flake8==3.8.2",
     "black==22.3.0",
@@ -98,7 +98,9 @@ setup(
     author="InstaDeep Ltd",
     license="Apache License, Version 2.0",
     keywords="multi-agent reinforcement-learning python machine learning",
-    packages=find_packages(),
+    packages=find_namespace_packages(
+        exclude=["*.tests", "*.tests.*", "tests.*", "tests"]
+    ),
     install_requires=[
         "dm-acme~=0.4.0",
         "absl-py",
