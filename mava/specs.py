@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from types import SimpleNamespace
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import dm_env
 from acme.specs import EnvironmentSpec
@@ -26,8 +26,8 @@ class MAEnvironmentSpec:
     def __init__(
         self,
         environment: dm_env.Environment,
-        agent_environment_specs: Dict[str, EnvironmentSpec] = None,
-        extras_specs: Dict[str, Any] = None,
+        agent_environment_specs: Optional[Dict[str, EnvironmentSpec]] = None,
+        extras_specs: Optional[Dict[str, Any]] = None,
     ):
         """Multi-agent environment spec
 
