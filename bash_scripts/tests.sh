@@ -45,6 +45,9 @@ apt-get -y install git
 # For box2d
 apt-get install swig -y
 
+# Install cmake for py 3.10 
+apt-get install cmake -y
+
 # Install depedencies
 pip install .[jax,envs,reverb,testing_formatting,record_episode]
 
@@ -68,7 +71,7 @@ fi
 # Code coverage
 curl -Os https://uploader.codecov.io/latest/linux/codecov
 chmod +x codecov
-./codecov --rootDir=./ --file=coverage.xml
+./codecov --file=coverage.xml
 
 # Clean-up.
 deactivate

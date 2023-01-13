@@ -26,7 +26,7 @@ from mava.systems import ParameterServer
 from tests.hook_order_tracking import HookOrderTracking
 
 
-class TestParameterServer(HookOrderTracking, ParameterServer):
+class MockParameterServer(HookOrderTracking, ParameterServer):
     __test__ = False
 
     def __init__(
@@ -43,7 +43,7 @@ class TestParameterServer(HookOrderTracking, ParameterServer):
 @pytest.fixture
 def test_parameter_server() -> ParameterServer:
     """Dummy parameter server with no components"""
-    return TestParameterServer(
+    return MockParameterServer(
         store=SimpleNamespace(
             store_key="expected_value",
             global_config=SimpleNamespace(non_blocking_sleep_seconds=1),
@@ -53,39 +53,39 @@ def test_parameter_server() -> ParameterServer:
     )
 
 
-def test_store_loaded(test_parameter_server: TestParameterServer) -> None:
+def test_store_loaded(test_parameter_server: MockParameterServer) -> None:
     """Test that store is loaded during init"""
     assert test_parameter_server.store.store_key == "expected_value"
 
 
-def test_get_parameters_store(test_parameter_server: TestParameterServer) -> None:
+def test_get_parameters_store(test_parameter_server: MockParameterServer) -> None:
     """Test that store is handled properly in get_parameters"""
     assert test_parameter_server.get_parameters("parameter_names") == "parameter_list"
     assert test_parameter_server.store._param_names == "parameter_names"
 
 
-def test_set_parameters_store(test_parameter_server: TestParameterServer) -> None:
+def test_set_parameters_store(test_parameter_server: MockParameterServer) -> None:
     """Test that store is handled properly in set_parameters"""
     set_params = {"parameter_name": "value"}
     test_parameter_server.set_parameters(set_params)
     assert test_parameter_server.store._set_params["parameter_name"] == "value"
 
 
-def test_add_to_parameters_store(test_parameter_server: TestParameterServer) -> None:
+def test_add_to_parameters_store(test_parameter_server: MockParameterServer) -> None:
     """Test that store is handled properly in add_to_parameters"""
     add_to_params = {"parameter_name": "value"}
     test_parameter_server.add_to_parameters(add_to_params)
     assert test_parameter_server.store._add_to_params["parameter_name"] == "value"
 
 
-def test_step_sleep(test_parameter_server: TestParameterServer) -> None:
+def test_step_sleep(test_parameter_server: MockParameterServer) -> None:
     """Test that step sleeps"""
     start = time.time()
     test_parameter_server.step()
     assert time.time() - start >= 1
 
 
-def test_init_hook_order(test_parameter_server: TestParameterServer) -> None:
+def test_init_hook_order(test_parameter_server: MockParameterServer) -> None:
     """Test if init hooks are called in the correct order"""
     assert test_parameter_server.hook_list == [
         "on_parameter_server_init_start",
@@ -95,7 +95,7 @@ def test_init_hook_order(test_parameter_server: TestParameterServer) -> None:
     ]
 
 
-def test_get_parameters_hook_order(test_parameter_server: TestParameterServer) -> None:
+def test_get_parameters_hook_order(test_parameter_server: MockParameterServer) -> None:
     """Test if get_parameters hooks are called in the correct order"""
     test_parameter_server.reset_hook_list()
     test_parameter_server.get_parameters("")
@@ -106,7 +106,7 @@ def test_get_parameters_hook_order(test_parameter_server: TestParameterServer) -
     ]
 
 
-def test_set_parameters_hook_order(test_parameter_server: TestParameterServer) -> None:
+def test_set_parameters_hook_order(test_parameter_server: MockParameterServer) -> None:
     """Test if set_parameters hooks are called in the correct order"""
     test_parameter_server.reset_hook_list()
     test_parameter_server.set_parameters({})
@@ -118,7 +118,7 @@ def test_set_parameters_hook_order(test_parameter_server: TestParameterServer) -
 
 
 def test_add_to_parameters_hook_order(
-    test_parameter_server: TestParameterServer,
+    test_parameter_server: MockParameterServer,
 ) -> None:
     """Test if add_to_parameters hooks are called in the correct order"""
     test_parameter_server.reset_hook_list()
@@ -130,7 +130,7 @@ def test_add_to_parameters_hook_order(
     ]
 
 
-def test_step_hook_order(test_parameter_server: TestParameterServer) -> None:
+def test_step_hook_order(test_parameter_server: MockParameterServer) -> None:
     """Test if step hooks are called in the correct order"""
     test_parameter_server.reset_hook_list()
     test_parameter_server.step()

@@ -26,7 +26,7 @@ def sort_str_num(str_num: Any) -> List[Any]:
 def sample_new_agent_keys(
     agents: List,
     network_sampling_setup: List,
-    net_keys_to_ids: Dict[str, int] = None,
+    net_keys_to_ids: Optional[Dict[str, int]] = None,
     fix_sampler: Optional[List] = None,
 ) -> Tuple[Dict[str, np.ndarray], Dict[str, str]]:
     """
