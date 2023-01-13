@@ -278,7 +278,9 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                         loss_masks=loss_masks,
                     )
 
-                    entropy_loss = -jnp.sum(entropy * loss_masks) / jnp.sum(loss_masks)
+                    entropy_loss = -jnp.sum(entropy * loss_masks) / (
+                        jnp.sum(loss_masks) + 10e-8
+                    )
 
                     total_policy_loss = (
                         policy_loss + entropy_loss * self.config.entropy_cost
@@ -372,8 +374,9 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                         value_loss = unclipped_value_loss
 
                     # Average value function loss with loss masking.
-                    value_loss = jnp.sum(value_loss * loss_masks) / jnp.sum(loss_masks)
 
+                    # value_loss = jnp.sum(value_loss * loss_masks) / (jnp.sum(loss_masks)+10e-8)
+                    value_loss = jnp.mean(value_loss)
                     # TODO (Ruan): Including value loss parameter in the
                     # value loss for now but can add a flag
                     value_loss = value_loss * self.config.value_cost

@@ -144,10 +144,10 @@ class SMACWrapper(ParallelEnvWrapper):
         discounts = {}
         for agent in self.possible_agents:
             # If the agent was not done at the start of the episode,
-            # it is a valid step (death masking).
-            value = not self._pre_agents_alive[agent]
-            self._pre_agents_alive[agent] = self.is_dead(agent)
-            discounts[agent] = convert_np_type(self.discount_spec()[agent].dtype, value)
+            discounts[agent] = convert_np_type(
+                self.discount_spec()[agent].dtype, self._pre_agents_alive[agent]
+            )
+            self._pre_agents_alive[agent] = not self.is_dead(agent)
 
         if self._done:
             self._step_type = dm_env.StepType.LAST

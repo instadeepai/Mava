@@ -52,7 +52,7 @@ def clipped_surrogate_pg_loss(
     adv_t = jax.lax.select(use_stop_gradient, jax.lax.stop_gradient(adv_t), adv_t)
     clipped_ratios_t = jnp.clip(prob_ratios_t, 1.0 - epsilon, 1.0 + epsilon)
     clipped_objective = jnp.fmin(prob_ratios_t * adv_t, clipped_ratios_t * adv_t)
-    return -(jnp.sum(clipped_objective * loss_masks) / jnp.sum(loss_masks))
+    return -(jnp.sum(clipped_objective * loss_masks) / (jnp.sum(loss_masks) + 10e-8))
 
 
 def check_count_condition(condition: Optional[dict]) -> Tuple:
