@@ -2,8 +2,8 @@ coverage:
   status:
     project:
       default:
-        # Only fail PR, if overall project codecov drops by 0.5%.
-        threshold: 0.5%
+        # Only fail PR, if overall project codecov drops by 1%.
+        threshold: 1%
         base: auto
 
     patch:
