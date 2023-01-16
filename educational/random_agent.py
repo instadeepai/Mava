@@ -22,6 +22,11 @@ flags.DEFINE_string("system", "random agent", "What agent is running.")
 
 
 @dataclass
+class InitConfig:
+    seed: int = 42
+
+
+@dataclass
 class EnvironmentConfig:
     name: str = "random"
     seed: int = 42
@@ -33,7 +38,7 @@ class AgentConfig:
     seed: int = 42
 
 
-def init():
+def init(config=InitConfig()):
     """
     Init system.
 
