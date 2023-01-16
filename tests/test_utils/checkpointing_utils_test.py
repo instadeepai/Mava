@@ -68,8 +68,13 @@ def fake_networks(k: int = 0) -> Tuple:
         "agent_1": critic_opt_state_val[1],
         "agent_2": critic_opt_state_val[2],
     }
+    norm_params = {
+        "agent_0": 1 / (k + 1),
+        "agent_1": 1 / (k + 3),
+        "agent_2": 1 / (k + 2),
+    }
 
-    return (networks, policy_opt_states, critic_opt_states)
+    return (networks, policy_opt_states, critic_opt_states, norm_params)
 
 
 class MockParameterClient:
@@ -84,11 +89,14 @@ class MockParameterClient:
             checkpointing_metric=["win_rate", "mean_return"],
             agents_net_keys=["agent_0", "agent_1", "agent_2"],
         )
-        (networks, policy_opt_states, critic_opt_states) = fake_networks()
+        (networks, policy_opt_states, critic_opt_states, norm_params) = fake_networks()
         self.store.parameters["best_checkpoint"] = {}
         for metric in self.store.checkpointing_metric:
             self.store.parameters["best_checkpoint"][metric] = {}
             self.store.parameters["best_checkpoint"][metric]["best_performance"] = 20
+            self.store.parameters["best_checkpoint"][metric][
+                "norm_params"
+            ] = norm_params
             for agent_net_key in networks.keys():
                 self.store.parameters["best_checkpoint"][metric][
                     f"policy_network-{agent_net_key}"
@@ -119,7 +127,9 @@ class MockExecutor:
 
     def __init__(self) -> None:
         """Initialization"""
-        (networks, policy_opt_states, critic_opt_states) = fake_networks(k=2)
+        (networks, policy_opt_states, critic_opt_states, norm_params) = fake_networks(
+            k=2
+        )
         executor_parameter_client = MockParameterClient()
         self.store = SimpleNamespace(
             networks=networks,
@@ -127,12 +137,14 @@ class MockExecutor:
             policy_opt_states=policy_opt_states,
             critic_opt_states=critic_opt_states,
             checkpointing_metric=["win_rate", "mean_return"],
+            norm_params=norm_params,
         )
-        (networks, policy_opt_states, critic_opt_states) = fake_networks()
+        (networks, policy_opt_states, critic_opt_states, norm_params) = fake_networks()
         self.store.best_checkpoint: Dict[str, Any] = {}  # type: ignore
         for metric in self.store.checkpointing_metric:
             self.store.best_checkpoint[metric] = {}
             self.store.best_checkpoint[metric]["best_performance"] = 20
+            self.store.best_checkpoint[metric]["norm_params"] = norm_params
             for agent_net_key in networks.keys():
                 self.store.best_checkpoint[metric][
                     f"policy_network-{agent_net_key}"
@@ -154,7 +166,9 @@ class MockParameterServer(MockParameterClient):
     def __init__(self) -> None:
         """Initialization"""
         super().__init__()
-        (networks, policy_opt_states, critic_opt_states) = fake_networks(k=4)
+        (networks, policy_opt_states, critic_opt_states, norm_params) = fake_networks(
+            k=4
+        )
         for agent_net_key in self.store.agents_net_keys:
             self.store.parameters[f"policy_network-{agent_net_key}"] = networks[
                 agent_net_key
@@ -168,6 +182,7 @@ class MockParameterServer(MockParameterClient):
             self.store.parameters[
                 f"critic_opt_state-{agent_net_key}"
             ] = critic_opt_states[agent_net_key]
+        self.store.parameters["norm_params"] = norm_params
 
 
 @pytest.fixture
