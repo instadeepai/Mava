@@ -29,7 +29,7 @@ from mava.systems.system import System
 from tests import mocks
 
 
-class TestSystem(System):
+class MockSystem(System):
     @staticmethod
     def design() -> Tuple[DesignSpec, Dict]:
         """Mock system design with zero components.
@@ -59,7 +59,7 @@ class TestSystem(System):
 @pytest.fixture
 def test_system() -> System:
     """Dummy system with zero components."""
-    return TestSystem()
+    return MockSystem()
 
 
 # TODO Rewrite test

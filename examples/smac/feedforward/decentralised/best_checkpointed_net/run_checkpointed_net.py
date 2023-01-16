@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run feedforward IPPO on SMAC."""
+"""Run an example of restoring the best network related to a metric."""
 
 
 import functools
@@ -42,7 +42,7 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Example running feedforward IPPO on SMAC environment."""
+    """This example must be run after ./create_network_checkpoint."""
 
     # Environment
     environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
@@ -56,20 +56,13 @@ def main(_: Any) -> None:
             **kwargs,
         )
 
-    # Used for checkpoints, tensorboard logging and env monitoring
+    # experiment_path used for checkpoints, tensorboard logging and env monitoring
+    # To restore a checkpoint, experiment_path must point to a folder that contains
+    # the 'checkpoints' folder, generated from ./create_network_checkpoint.py run
     experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
     log_every = 10
-
-    # Pass custom logger config for evaluator to use.
-    # A custom json path can also be passed in.
-    logger_config = {
-        "evaluator": {
-            "to_json": True,
-        },
-    }
-
     logger_factory = functools.partial(
         logger_utils.make_logger,
         directory=FLAGS.base_dir,
@@ -95,6 +88,7 @@ def main(_: Any) -> None:
     system.build(
         environment_factory=environment_factory,
         network_factory=network_factory,
+        logger_factory=logger_factory,
         experiment_path=experiment_path,
         policy_optimiser=policy_optimiser,
         critic_optimiser=critic_optimiser,
@@ -105,15 +99,10 @@ def main(_: Any) -> None:
         multi_process=True,
         evaluation_interval={"executor_steps": 10000},
         evaluation_duration={"evaluator_episodes": 32},
-        logger_factory=logger_factory,
-        logger_config=logger_config,
-        # Flag to activate the calculation of the absolute metric
-        absolute_metric=True,
-        # How many episodes the evaluator will run for
-        absolute_metric_duration=32,
-        # List of metrics for which the system calculate the absolute metric
-        checkpointing_metric=("mean_episode_return", "win_rate"),
-        termination_condition={"executor_steps": 50000},
+        executor_parameter_update_period=1,
+        # choose which metric you want to restore its best netrworks
+        restore_best_net="win_rate",
+        checkpoint_minute_interval=1,
     )
 
     # Launch the system.

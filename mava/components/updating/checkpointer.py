@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import time
-import warnings
 from typing import List, Type, Union
 
 from acme.jax import savers as acme_savers
@@ -22,7 +21,6 @@ from chex import dataclass
 
 from mava.callbacks import Callback
 from mava.components import Component
-from mava.components.normalisation import ObservationNormalisation, ValueNormalisation
 from mava.components.updating.parameter_server import ParameterServer
 from mava.core_jax import SystemParameterServer
 from mava.utils.checkpointing_utils import update_to_best_net
@@ -68,19 +66,6 @@ class Checkpointer(Component):
         if (old_trainer_steps != server.store.parameters["trainer_steps"]) and (
             self.config.restore_best_net is not None
         ):
-            normalisation = (
-                server.has(ObservationNormalisation)
-                and server.store.global_config.normalise_observations
-            ) or (
-                server.has(ValueNormalisation)
-                and server.store.global_config.normalise_target_values
-            )
-
-            if normalisation:
-                warnings.warn(
-                    """Best checkpointing does not save normalisation parameters,
-                    thus checkpoint loading may not work"""
-                )
             update_to_best_net(server, self.config.restore_best_net)
 
         server.store.last_checkpoint_time = time.time()
