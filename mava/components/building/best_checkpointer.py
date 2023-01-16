@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional, Tuple, Union
 from optax import Params
 
 from mava.components.component import Component
+from mava.components.normalisation import ObservationNormalisation, ValueNormalisation
 from mava.core_jax import SystemBuilder, SystemParameterServer
 from mava.utils.lp_utils import termination_fn
 
@@ -87,6 +88,13 @@ class BestCheckpointer(Component):
         """Initialises the parameters used for checkpointing the best models"""
         params: Dict[str, Dict[str, Optional[Union[float, Params]]]] = {}
         networks = system.store.networks
+        normalisation = (
+            system.has(ObservationNormalisation)
+            and system.store.global_config.normalise_observations
+        ) or (
+            system.has(ValueNormalisation)
+            and system.store.global_config.normalise_target_values
+        )
 
         # Create a dictionary of all parameters to save
         for metric in self.config.checkpointing_metric:
@@ -104,6 +112,8 @@ class BestCheckpointer(Component):
 
                 critic_opt = deepcopy(system.store.critic_opt_states[agent_net_key])
                 params[metric][f"critic_opt_state-{agent_net_key}"] = critic_opt
+            if normalisation:
+                params[metric]["norm_params"] = system.store.norm_params
 
         return params
 

@@ -141,7 +141,7 @@ class Trainer(VariableSource, Worker, Saveable):
         """Function that gets executed after every trainer step."""
         pass
 
-    def save(self) -> T:
+    def save(self) -> None:
         raise NotImplementedError('Method "save" is not implemented.')
 
     def restore(self, state: T) -> None:

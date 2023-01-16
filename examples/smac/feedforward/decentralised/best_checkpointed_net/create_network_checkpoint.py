@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run feedforward IPPO on SMAC."""
+"""Run an example of storing the best network related to a metric."""
 
 
 import functools
@@ -61,15 +61,6 @@ def main(_: Any) -> None:
 
     # Log every [log_every] seconds.
     log_every = 10
-
-    # Pass custom logger config for evaluator to use.
-    # A custom json path can also be passed in.
-    logger_config = {
-        "evaluator": {
-            "to_json": True,
-        },
-    }
-
     logger_factory = functools.partial(
         logger_utils.make_logger,
         directory=FLAGS.base_dir,
@@ -95,6 +86,7 @@ def main(_: Any) -> None:
     system.build(
         environment_factory=environment_factory,
         network_factory=network_factory,
+        logger_factory=logger_factory,
         experiment_path=experiment_path,
         policy_optimiser=policy_optimiser,
         critic_optimiser=critic_optimiser,
@@ -105,15 +97,13 @@ def main(_: Any) -> None:
         multi_process=True,
         evaluation_interval={"executor_steps": 10000},
         evaluation_duration={"evaluator_episodes": 32},
-        logger_factory=logger_factory,
-        logger_config=logger_config,
-        # Flag to activate the calculation of the absolute metric
-        absolute_metric=True,
-        # How many episodes the evaluator will run for
-        absolute_metric_duration=32,
-        # List of metrics for which the system calculate the absolute metric
+        executor_parameter_update_period=1,
+        # Flag to activate best checkpointing
+        checkpoint_best_perf=True,
+        # metrics to checkpoint its best performance networks
         checkpointing_metric=("mean_episode_return", "win_rate"),
-        termination_condition={"executor_steps": 50000},
+        termination_condition={"executor_steps": 70000},
+        checkpoint_minute_interval=1,
     )
 
     # Launch the system.
