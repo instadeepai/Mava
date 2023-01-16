@@ -1,4 +1,4 @@
-# MAVA Educational 
+# MAVA Educational
 
 ## How to run
 Inside of the `educational` folder, run

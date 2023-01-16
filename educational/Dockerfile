@@ -11,7 +11,7 @@ RUN apt-get update -y && \
     apt install -y python3.9 && \
     apt install -y python3.9-dev && \
     apt-get install -y python3-pip && \
-    apt-get install -y python3.9-venv && \ 
+    apt-get install -y python3.9-venv && \
     apt-get -y install git
 
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.9 10
@@ -48,7 +48,7 @@ COPY . /home/app/mava
 RUN apt-get install swig -y
 
 # Install packages
-RUN pip install -r requirements.txt 
+RUN pip install -r requirements.txt
 # Install jax gpu
 RUN pip install --upgrade "jax[cuda]==0.4.1" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ## Optional install for screen recording.

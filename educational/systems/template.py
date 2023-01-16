@@ -12,9 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 from typing import Any
+
 from absl import app, flags
 
 FLAGS = flags.FLAGS
@@ -42,10 +43,11 @@ class AgentConfig:
     seed: int = 42
 
 
-def init(config=InitConfig()):
+def init(config: InitConfig = InitConfig()) -> None:
     """Init system.
 
-    This would handle thing to be done upon system once in the beginning of a run, e.g. set random seeds.
+    This would handle thing to be done upon system once in the beginning of a run,
+    e.g. set random seeds.
 
     Args:
         config : init config.
@@ -54,7 +56,7 @@ def init(config=InitConfig()):
     return
 
 
-def make_environment(config=EnvironmentConfig()) -> Any:
+def make_environment(config: EnvironmentConfig = EnvironmentConfig()) -> Any:
     """Init and return environment or wrapper.
 
     Args:
@@ -72,7 +74,7 @@ def make_environment(config=EnvironmentConfig()) -> Any:
     return env
 
 
-def make_agents(config=AgentConfig()) -> Any:
+def make_agents(config: AgentConfig = AgentConfig()) -> Any:
     """Inits and returns agents/networks.
 
     Args:
@@ -90,7 +92,12 @@ def make_agents(config=AgentConfig()) -> Any:
     return system
 
 
-def main(_):
+def main(_: Any) -> None:
+    """Template for educational system implementations.
+
+    Args:
+        _ : unused param - for absl.
+    """
 
     init()
     env = make_environment()
