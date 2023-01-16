@@ -20,6 +20,9 @@ from absl import app, flags
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string("system", "test agent", "What agent is running.")
+flags.DEFINE_string(
+    "base_dir", "~/mava", "Base dir to store experiment data e.g. checkpoints."
+)
 
 
 @dataclass
