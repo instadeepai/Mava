@@ -84,8 +84,8 @@ def make_environment(
 
 
 def make_system(
+    environment_spec: mava_specs.MAEnvironmentSpec,
     config: SystemConfig = SystemConfig(),
-    environment_spec: mava_specs.MAEnvironmentSpec = None,
 ) -> Tuple[Any, SystemConfig]:
     """Inits and returns system/networks.
 
@@ -117,7 +117,7 @@ def main(_: Any) -> None:
     init_config = init()
     env, env_config = make_environment()
     env_spec = mava_specs.MAEnvironmentSpec(env)
-    system, system_config = make_system(environment_spec=env_spec)
+    system, system_config = make_system(env_spec)
     logging.info(f"Running {FLAGS.system}")
 
     # Run system on env
