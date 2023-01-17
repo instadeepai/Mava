@@ -10,3 +10,5 @@ coverage:
       default:
         # New code, should have 80% code coverage.
         target: 80%
+  ignore:
+    - "educational" # ignore educational folder and all its contents
