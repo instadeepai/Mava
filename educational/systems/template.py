@@ -14,9 +14,11 @@
 # limitations under the License.
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Tuple
 
 from absl import app, flags
+from mava import specs as mava_specs
+from mava.utils.environments import debugging_utils
 
 FLAGS = flags.FLAGS
 
@@ -33,17 +35,19 @@ class InitConfig:
 
 @dataclass
 class EnvironmentConfig:
-    name: str = "random"
+    env_name: str = "simple_spread"
     seed: int = 42
+    type: str = "debug"
+    action_space: str = "discrete"
 
 
 @dataclass
-class AgentConfig:
+class SystemConfig:
     name: str = "random"
     seed: int = 42
 
 
-def init(config: InitConfig = InitConfig()) -> None:
+def init(config: InitConfig = InitConfig()) -> InitConfig:
     """Init system.
 
     This would handle thing to be done upon system once in the beginning of a run,
@@ -51,45 +55,55 @@ def init(config: InitConfig = InitConfig()) -> None:
 
     Args:
         config : init config.
+
+    Returns:
+        config.
     """
 
-    return
+    return config
 
 
-def make_environment(config: EnvironmentConfig = EnvironmentConfig()) -> Any:
+def make_environment(
+    config: EnvironmentConfig = EnvironmentConfig(),
+) -> Tuple[Any, EnvironmentConfig]:
     """Init and return environment or wrapper.
 
     Args:
         config : env config.
 
     Returns:
-        env or wrapper.
+        (env, config).
     """
 
-    class Environment:
-        pass
+    if config.type == "debug":
+        env, _ = debugging_utils.make_environment(
+            env_name=config.env_name, action_space=config.action_space
+        )
+    return env, config
 
-    logging.info(config)
-    env = Environment()
-    return env
 
-
-def make_agents(config: AgentConfig = AgentConfig()) -> Any:
-    """Inits and returns agents/networks.
+def make_system(
+    config: SystemConfig = SystemConfig(),
+    environment_spec: mava_specs.MAEnvironmentSpec = None,
+) -> Tuple[Any, SystemConfig]:
+    """Inits and returns system/networks.
 
     Args:
         config : system config.
+        environment_spec: spec for multi-agent env.
 
     Returns:
-        agents.
+        system.
     """
+
+    del environment_spec
 
     class System:
         pass
 
     logging.info(config)
     system = System()
-    return system
+    return system, config
 
 
 def main(_: Any) -> None:
@@ -99,13 +113,14 @@ def main(_: Any) -> None:
         _ : unused param - for absl.
     """
 
-    init()
-    env = make_environment()
-    system = make_agents()
+    init_config = init()
+    env, env_config = make_environment()
+    env_spec = mava_specs.MAEnvironmentSpec(env)
+    system, system_config = make_system(env_spec)
     logging.info(f"Running {FLAGS.system}")
 
-    # Run agents on env
-    del env, system
+    # Run system on env
+    del env, system, env_config, system_config, init_config
 
 
 if __name__ == "__main__":
