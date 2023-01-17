@@ -5,6 +5,8 @@ coverage:
         # Only fail PR, if overall project codecov drops by 1%.
         threshold: 1%
         target: auto
+
     patch:
       default:
+        # New code, should have 80% code coverage.
         target: 80%
