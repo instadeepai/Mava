@@ -7,5 +7,5 @@ ARG folder=/home/app/mava
 ## working directory
 WORKDIR ${folder}
 # Install packages
-RUN pip install -r requirements.txt
+RUN pip install -r educational/requirements.txt
 EXPOSE 6006
