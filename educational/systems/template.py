@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Any, Tuple
 
 from absl import app, flags
+
 from mava import specs as mava_specs
 from mava.utils.environments import debugging_utils
 
@@ -116,7 +117,7 @@ def main(_: Any) -> None:
     init_config = init()
     env, env_config = make_environment()
     env_spec = mava_specs.MAEnvironmentSpec(env)
-    system, system_config = make_system(env_spec)
+    system, system_config = make_system(environment_spec=env_spec)
     logging.info(f"Running {FLAGS.system}")
 
     # Run system on env

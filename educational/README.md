@@ -18,9 +18,9 @@ make build && make run example=[]
     ```
     conda create -n mava_edu python=3.9
     conda activate mava_edu
-    ``` 
+    ```
 Then install requirements:
 ```
 pip install --upgrade pip setuptools
-pip install -r requirements.txt 
+pip install -r requirements.txt
 ```
