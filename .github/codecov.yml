@@ -12,3 +12,4 @@ coverage:
         target: 80%
   ignore:
     - "educational" # ignore educational folder and all its contents
+    - "setup.py"
