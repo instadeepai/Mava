@@ -72,20 +72,25 @@ class SMACWrapper(ParallelEnvWrapper):
         if not self._is_reset:
             self._environment.reset()
             self._is_reset = True
-        self._done = False
+        # self._done = False
 
         self._step_type = dm_env.StepType.FIRST
 
         # Get observation from env
+        discount_spec = self.discount_spec()
+        discounts_mask = {
+            agent: convert_np_type(discount_spec[agent].dtype, 1)
+            for agent in self._agents
+        }
         observation = self.environment.get_obs()
         legal_actions = self._get_legal_actions()
         observations = self._convert_observations(
-            observation, legal_actions, self._done
+            observation, legal_actions, discounts_mask
         )
 
         # Set env discount to 1 for all agents
         discount_spec = self.discount_spec()
-        discounts = {
+        self._discounts = {
             agent: convert_np_type(discount_spec[agent].dtype, 1)
             for agent in self._agents
         }
@@ -106,7 +111,7 @@ class SMACWrapper(ParallelEnvWrapper):
         else:
             extras = {}
 
-        return parameterized_restart(rewards, discounts, observations), extras
+        return parameterized_restart(rewards, self._discounts, observations), extras
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps in env.
@@ -127,8 +132,15 @@ class SMACWrapper(ParallelEnvWrapper):
         # Get the next observations
         next_observations = self._environment.get_obs()
         legal_actions = self._get_legal_actions()
+        discounts_mask = {}
+        for agent in self.possible_agents:
+            # If the agent was not done at the start of the episode,
+            discounts_mask[agent] = convert_np_type(
+                self.discount_spec()[agent].dtype, self._pre_agents_alive[agent]
+            )
+            self._pre_agents_alive[agent] = not self.is_dead(agent)
         next_observations = self._convert_observations(
-            next_observations, legal_actions, self._done
+            next_observations, legal_actions, discounts_mask
         )
 
         # Convert team reward to agent-wise rewards
@@ -141,16 +153,13 @@ class SMACWrapper(ParallelEnvWrapper):
         else:
             extras = {}
 
-        discounts = {}
-        for agent in self.possible_agents:
-            # If the agent was not done at the start of the episode,
-            discounts[agent] = convert_np_type(
-                self.discount_spec()[agent].dtype, self._pre_agents_alive[agent]
-            )
-            self._pre_agents_alive[agent] = not self.is_dead(agent)
-
         if self._done:
             self._step_type = dm_env.StepType.LAST
+            # Discount on last timestep set to zero
+            self._discounts = {
+                agent: convert_np_type(self.discount_spec()[agent].dtype, 0.0)
+                for agent in self._agents
+            }
         else:
             self._step_type = dm_env.StepType.MID
 
@@ -158,7 +167,7 @@ class SMACWrapper(ParallelEnvWrapper):
         timestep = dm_env.TimeStep(
             observation=next_observations,
             reward=rewards,
-            discount=discounts,
+            discount=self._discounts,
             step_type=self._step_type,
         )
 
@@ -202,7 +211,7 @@ class SMACWrapper(ParallelEnvWrapper):
         return self._environment.agents[int(agent.rsplit("_", -1)[-1])].health == 0.0
 
     def _convert_observations(
-        self, observations: List, legal_actions: List, done: bool
+        self, observations: List, legal_actions: List, done
     ) -> types.Observation:
         """Convert SMAC observation so it's dm_env compatible.
 
@@ -216,7 +225,7 @@ class SMACWrapper(ParallelEnvWrapper):
         olt_observations = {}
         for i, agent in enumerate(self._agents):
             # Check if agent is dead, if so, apply death mask.
-            if self._death_masking and self.is_dead(i):
+            if self._death_masking and self.is_dead(agent):
                 observation = np.zeros_like(observations[i])
             else:
                 observation = observations[i]
@@ -224,6 +233,7 @@ class SMACWrapper(ParallelEnvWrapper):
             olt_observations[agent] = types.OLT(
                 observation=observation,
                 legal_actions=legal_actions[i],
+                terminal=np.asarray([done[agent]], dtype=np.float32),
             )
 
         return olt_observations
@@ -258,6 +268,7 @@ class SMACWrapper(ParallelEnvWrapper):
             observation_specs[agent] = types.OLT(
                 observation=observations[i],
                 legal_actions=legal_actions[i],
+                terminal=np.asarray([True], dtype=np.float32),
             )
 
         return observation_specs

@@ -277,11 +277,15 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                         epsilon=clipping_epsilon,
                         loss_masks=loss_masks,
                     )
-
+                    # jax.debug.print("here {x}",x=loss_masks)
+                    # loss_masks=loss_masks.reshape((95,))
+                    # jax.debug.print("Loss {x}",x=loss_masks.shape)
                     entropy_loss = -jnp.sum(entropy * loss_masks) / (
                         jnp.sum(loss_masks) + 10e-8
                     )
-
+                    # y=-jnp.mean(entropy)
+                    # jax.debug.print("entropy {x} or{z}",x=entropy_loss, z=y)
+                    # entropy_loss = -jnp.mean(entropy)
                     total_policy_loss = (
                         policy_loss + entropy_loss * self.config.entropy_cost
                     )
