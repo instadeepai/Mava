@@ -16,7 +16,7 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 import chex
 import jax
@@ -24,7 +24,7 @@ import jax.numpy as jnp
 from absl import app, flags
 
 from mava import specs as mava_specs
-from mava.utils.environments import debugging_utils
+from mava.utils.environments import debugging_utils, smac_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
@@ -32,6 +32,33 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string("system", "test agent", "What agent is running.")
 flags.DEFINE_string(
     "base_dir", "~/mava", "Base dir to store experiment data e.g. checkpoints."
+)
+flags.DEFINE_string(
+    "env_name",
+    "simple_spread",
+    "Env name e.g. sinple_spread, 3m or 8m.",
+)
+flags.DEFINE_string(
+    "env_type",
+    "debug",
+    "Env type e.g. debug or smac.",
+)
+flags.DEFINE_string(
+    "env_action_type",
+    "discrete",
+    "Discrete or continous. Only applies for debug env,\
+    other env have their predefined types.",
+)
+flags.DEFINE_integer(
+    "max_total_steps",
+    100000,
+    "Max total steps (across all episodes).",
+)
+
+flags.DEFINE_integer(
+    "num_episodes",
+    None,
+    "Max number of episodes.",
 )
 
 
@@ -42,18 +69,18 @@ class InitConfig:
 
 @dataclass
 class EnvironmentConfig:
-    env_name: str = "simple_spread"
+    env_name: str
+    type: str
+    action_space: str
     seed: int = 42
-    type: str = "debug"
-    action_space: str = "discrete"
 
 
 @dataclass
 class SystemConfig:
+    max_total_steps: int
+    num_episodes: int
     name: str = "random"
     seed: int = 42
-    max_total_steps: int = 50000
-    num_episodes: int = 1000
 
 
 @chex.dataclass(frozen=True, mappable_dataclass=False)
@@ -74,7 +101,7 @@ def init(config: InitConfig = InitConfig()) -> InitConfig:
 
 
 def make_environment(
-    config: EnvironmentConfig = EnvironmentConfig(),
+    config: EnvironmentConfig,
 ) -> Tuple[Any, EnvironmentConfig]:
     """Init and return environment or wrapper.
 
@@ -88,12 +115,14 @@ def make_environment(
         env, _ = debugging_utils.make_environment(
             env_name=config.env_name, action_space=config.action_space
         )
+    elif config.type == "smac":
+        env, _ = smac_utils.make_environment(map_name=config.env_name)
     return env, config
 
 
 def make_system(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    config: SystemConfig = SystemConfig(),
+    config: SystemConfig,
 ) -> Tuple[Any, SystemConfig]:
     """Inits and returns system/networks.
 
@@ -108,51 +137,93 @@ def make_system(
 
     @dataclass
     class RandomExecutor:
+        """Pure jittable executor/actor."""
+
         def init(state) -> None:
+            """Init executor.
+
+            Args:
+                state : state that holds variables.
+            """
             pass
 
         @jax.jit
         def select_actions(
             observations: chex.Array, state: chex.dataclass
         ) -> Tuple[Dict, chex.dataclass]:
-            # Not used in random agent
-            del observations
+            """Select actions using obs.
+
+            Args:
+                observations : observations from env.
+                state : state for variables.
+
+            Returns:
+                actions per agent in a dict.
+            """
             key = state.rng
             key, subkey = jax.random.split(key)
 
             actions = {}
             for net_key, spec in agent_specs.items():
-                action_spec = spec.actions
-                actions[net_key] = jax.random.randint(
-                    subkey,
-                    action_spec.shape,
-                    action_spec.minimum,
-                    action_spec.maximum + 1,
-                    action_spec.dtype,
+                # Select random discrete action.
+                # If we don't have legal actions, we could have used
+                # jax.random.randint.
+                mask = observations[net_key].legal_actions
+                logits = jax.random.uniform(subkey, mask.shape)
+                logits = jnp.where(
+                    mask.astype(bool),
+                    logits,
+                    jnp.finfo(logits.dtype).min,
                 )
-            return (actions, RandomSystemState(rng=key))
+                actions[net_key] = logits.argmax(axis=-1)
+            return (actions, RandomSystemState(rng=key))  # type: ignore
 
     class RandomSystem:
-        def __init__(self, rng_key, executor) -> None:
-            self._executor = executor
-            self._state = RandomSystemState(rng=rng_key)
-            pass
+        """Multi-Agent System (Group of agents)."""
 
-        def select_actions(self, observation) -> Dict:
+        def __init__(self, rng_key: jnp.array, executor: Any) -> None:
+            """Init system.
+
+            Args:
+                rng_key : rng jax key.
+                executor : executor/actor.
+            """
+            self._executor = executor
+            self._state = RandomSystemState(rng=rng_key)  # type: ignore
+
+        def select_actions(self, observation: Dict) -> Dict:
+            """Select actions.
+
+            Args:
+                observation : observation for current timestep.
+
+            Returns:
+                actions per agent in a dict.
+            """
             action, self._state = self._executor.select_actions(
                 observation, self._state
             )
             return action
 
-        def observe_first(self, observations) -> None:
-            del observations
-            pass
+        def observe_first(self, observations: Dict) -> None:
+            """Add first element to replay buffer/queue.
 
-        def observe(self, actions, observations) -> None:
+            Args:
+                observations : observation from first timestep.
+            """
+            del observations
+
+        def observe(self, actions: Dict, observations: Dict) -> None:
+            """Add element to replay buffer/queue.
+
+            Args:
+                actions : action taken.
+                observations : observation.
+            """
             del actions, observations
-            pass
 
         def update(self) -> None:
+            """Update networks parameters/do some learning."""
             pass
 
     logging.info(config)
@@ -167,14 +238,29 @@ def main(_: Any) -> None:
         _ : unused param - for absl.
     """
 
+    # Init env and system.
     _ = init()
-    env, _ = make_environment()
+    env, _ = make_environment(
+        EnvironmentConfig(
+            env_name=FLAGS.env_name,
+            type=FLAGS.env_type,
+            action_space=FLAGS.env_action_type,
+        )
+    )
     env_spec = mava_specs.MAEnvironmentSpec(env)
-    system, system_config = make_system(env_spec)
+    system, system_config = make_system(
+        env_spec,
+        SystemConfig(
+            max_total_steps=FLAGS.max_total_steps, num_episodes=FLAGS.num_episodes
+        ),
+    )
+
+    # Init variables.
     num_episodes = system_config.num_episodes
     max_total_steps = system_config.max_total_steps
 
-    result = {
+    # Init results dict.
+    result: Dict[str, Union[float, int]] = {
         "episode_length": 0,
         "episode_return": 0,
         "steps_per_second": 0,
@@ -182,32 +268,71 @@ def main(_: Any) -> None:
         "total_step_count": 0,
     }
 
+    # Create logger.
+    # Log every time_delta seconds
+    time_delta = 5
     logger = logger_utils.make_logger(
         directory=FLAGS.base_dir,
         to_terminal=True,
         to_tensorboard=True,
         time_stamp=str(datetime.now()),
-        time_delta=0,
+        time_delta=time_delta,
         label="random_agent",
     )
 
-    for episode in range(num_episodes):
-        # Reset episode
-        # TODO Remove _ once mava has been updated.
+    episode_count: int = 0
+    step_count: int = 0
+
+    def should_terminate(episode_count: Optional[int], step_count: int) -> bool:
+        """Func which checks if we should stop running.
+
+        Args:
+            episode_count : max episodes.
+            step_count : max steps.
+
+        Returns:
+            bool indicating if we should terminate.
+        """
+        should_stop = (num_episodes is not None and episode_count >= num_episodes) or (  # type: ignore # noqa: E501
+            max_total_steps is not None and step_count >= max_total_steps
+        )
+
+        if should_stop:
+            logging.info(
+                f"Reached max step count: {max_total_steps} or max episode: {num_episodes} , \
+                Current steps: {step_count}, Current episode: {episode_count}"
+            )
+
+        return should_stop
+
+    # Episode loop.
+    while not should_terminate(episode_count, step_count):
+        # Reset env.
+        # TODO Remove `_` once env wrappers are more consistent.
         timestep, _ = env.reset()
         start_time = time.time()
         episode_steps = 0
 
+        # Returns dict.
         episode_returns: Dict[str, float] = {}
         for agent, spec in env.reward_spec().items():
             episode_returns.update({agent: jnp.zeros(spec.shape, spec.dtype)})
 
         # Add first element to replay buffer
         system.observe_first(timestep.observation)
+
+        # Run single episode.
         while not timestep.last():
 
             action = system.select_actions(timestep.observation)
             timestep = env.step(action)
+
+            # Check for extras
+            # TODO Remove once return_state_info param get added to make env.
+            if type(timestep) == tuple:
+                timestep, _ = timestep
+            else:
+                _ = {}
 
             # Add to replay buffer
             system.observe(action, timestep)
@@ -225,17 +350,16 @@ def main(_: Any) -> None:
         steps_per_second = episode_steps / (time.time() - start_time)
         result = {
             "episode_length": episode_steps,
-            "episode_return": episode_returns,
             "mean_episode_return": jnp.mean(jnp.array(list(episode_returns.values()))),
             "steps_per_second": steps_per_second,
-            "episodes": episode,
+            "episodes": episode_count,
             "total_step_count": episode_steps + result["total_step_count"],
         }
-        logger.write(result)
+        result.update({"episode_returns": episode_returns})  # type: ignore
 
-        if result["total_step_count"] >= max_total_steps:
-            logging.info(f"Reached max step count: {max_total_steps}")
-            break
+        episode_count += 1
+        step_count = int(result["total_step_count"])
+        logger.write(result)
 
 
 if __name__ == "__main__":
