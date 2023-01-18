@@ -113,10 +113,14 @@ def make_environment(
     """
     if config.type == "debug":
         env, _ = debugging_utils.make_environment(
-            env_name=config.env_name, action_space=config.action_space, random_seed=config.seed
+            env_name=config.env_name,
+            action_space=config.action_space,
+            random_seed=config.seed,
         )
     elif config.type == "smac":
-        env, _ = smac_utils.make_environment(map_name=config.env_name,random_seed=config.seed)
+        env, _ = smac_utils.make_environment(
+            map_name=config.env_name, random_seed=config.seed
+        )
     return env, config
 
 
