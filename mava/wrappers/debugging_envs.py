@@ -51,9 +51,7 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
         }
         observe, env_extras = self._environment.reset()
 
-        observations = self._convert_observations(
-            observe, {agent: False for agent in self.possible_agents}
-        )
+        observations = self._convert_observations(observe, None)
         rewards_spec = self.reward_spec()
         rewards = {
             agent: convert_np_type(rewards_spec[agent].dtype, 0)
@@ -72,7 +70,7 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
         if self._reset_next_step:
             return self.reset()
 
-        observations, rewards, dones, state = self._environment.step(actions)
+        observations, rewards, _, state = self._environment.step(actions)
 
         rewards_spec = self.reward_spec()
         #  Handle empty rewards
@@ -88,7 +86,7 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
             }
 
         if observations:
-            observations = self._convert_observations(observations, dones)
+            observations = self._convert_observations(observations, None)
 
         if self._environment.env_done:
             self._step_type = dm_env.StepType.LAST
@@ -110,7 +108,7 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
     # Convert Debugging environment observation so it's dm_env compatible.
     # Also, the list of legal actions must be converted to a legal actions mask.
     def _convert_observations(
-        self, observes: Dict[str, np.ndarray], dones: Dict[str, bool]
+        self, observes: Dict[str, np.ndarray], agents_mask: Union[Dict[str, bool], None]
     ) -> Dict[str, OLT]:
         observations: Dict[str, OLT] = {}
         for agent, observation in observes.items():
@@ -135,10 +133,20 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
                     )
 
             observation = np.array(observation, dtype=np.float32)
-            observations[agent] = OLT(
-                observation=observation,
-                legal_actions=legals,
-            )
+
+            if agents_mask is None:
+                # agent masking is set to True in case we don't use this variable
+                observations[agent] = OLT(
+                    observation=observation,
+                    legal_actions=legals,
+                    agent_mask=np.asarray([True], dtype=np.float32),
+                )
+            else:
+                observations[agent] = OLT(
+                    observation=observation,
+                    legal_actions=legals,
+                    agent_mask=np.asarray([agents_mask[agent]], dtype=np.float32),
+                )
 
         return observations
 
@@ -158,11 +166,13 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
                     dtype=self._environment.action_spaces[agent].dtype,
                 )
 
+            # agent masking is set to True in case we don't use this variable
             observation_specs[agent] = OLT(
                 observation=_convert_to_spec(
                     self._environment.observation_spaces[agent]
                 ),
                 legal_actions=legals,
+                agent_mask=np.asarray([True], dtype=np.float32),
             )
         return observation_specs
 

@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Wraper for SMAC."""
+import copy
 from typing import Any, Dict, List, Optional, Union
 
 import dm_env
@@ -50,9 +51,9 @@ class SMACWrapper(ParallelEnvWrapper):
         self._return_state_info = return_state_info
         self._agents = [f"agent_{n}" for n in range(self._environment.n_agents)]
 
-        # This prevents resetting SMAC if it is already in the reset state. SMAC has a bug
-        # where the max returns become less than 20 if reset is called more than once directly
-        # after each other.
+        # This prevents resetting SMAC if it is already in the reset state.
+        # SMAC has a bug where the max returns become less than 20 if reset
+        # is called more than once directly after each other.
         self._is_reset = False
         self._done = False
 
@@ -89,11 +90,7 @@ class SMACWrapper(ParallelEnvWrapper):
         )
 
         # Set env discount to 1 for all agents
-        discount_spec = self.discount_spec()
-        self._discounts = {
-            agent: convert_np_type(discount_spec[agent].dtype, 1)
-            for agent in self._agents
-        }
+        self._discounts = copy.deepcopy(agents_mask)
 
         # Set reward to zero for all agents
         rewards_spec = self.reward_spec()
@@ -211,13 +208,13 @@ class SMACWrapper(ParallelEnvWrapper):
         return self._environment.agents[int(agent.rsplit("_", -1)[-1])].health == 0.0
 
     def _convert_observations(
-        self, observations: List, legal_actions: List, done
+        self, observations: List, legal_actions: List, agents_mask: Dict[str, Any]
     ) -> types.Observation:
         """Convert SMAC observation so it's dm_env compatible.
 
         Args:
             observes (Dict[str, np.ndarray]): observations per agent.
-            dones (Dict[str, bool]): dones per agent.
+            agents_mask (Dict[str, bool]): Masked agents.
 
         Returns:
             types.Observation: dm compatible observations.
@@ -233,7 +230,7 @@ class SMACWrapper(ParallelEnvWrapper):
             olt_observations[agent] = types.OLT(
                 observation=observation,
                 legal_actions=legal_actions[i],
-                agent_mask=np.asarray([done[agent]], dtype=np.float32),
+                agent_mask=np.asarray([agents_mask[agent]], dtype=np.float32),
             )
 
         return olt_observations
