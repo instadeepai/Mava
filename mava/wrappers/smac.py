@@ -233,7 +233,7 @@ class SMACWrapper(ParallelEnvWrapper):
             olt_observations[agent] = types.OLT(
                 observation=observation,
                 legal_actions=legal_actions[i],
-                terminal=np.asarray([done[agent]], dtype=np.float32),
+                agent_mask=np.asarray([done[agent]], dtype=np.float32),
             )
 
         return olt_observations
@@ -268,7 +268,7 @@ class SMACWrapper(ParallelEnvWrapper):
             observation_specs[agent] = types.OLT(
                 observation=observations[i],
                 legal_actions=legal_actions[i],
-                terminal=np.asarray([True], dtype=np.float32),
+                agent_mask=np.asarray([True], dtype=np.float32),
             )
 
         return observation_specs

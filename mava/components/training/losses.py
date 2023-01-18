@@ -277,15 +277,10 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                         epsilon=clipping_epsilon,
                         loss_masks=loss_masks,
                     )
-                    # jax.debug.print("here {x}",x=loss_masks)
-                    # loss_masks=loss_masks.reshape((95,))
-                    # jax.debug.print("Loss {x}",x=loss_masks.shape)
                     entropy_loss = -jnp.sum(entropy * loss_masks) / (
                         jnp.sum(loss_masks) + 10e-8
                     )
-                    # y=-jnp.mean(entropy)
-                    # jax.debug.print("entropy {x} or{z}",x=entropy_loss, z=y)
-                    # entropy_loss = -jnp.mean(entropy)
+
                     total_policy_loss = (
                         policy_loss + entropy_loss * self.config.entropy_cost
                     )
@@ -373,14 +368,12 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                         clipped_value_loss = trainer.store.value_loss_fn(
                             clipped_value_error
                         )
-                        value_loss = jnp.fmax(unclipped_value_loss, clipped_value_loss)
+                        value_loss = jnp.mean(
+                            jnp.fmax(unclipped_value_loss, clipped_value_loss)
+                        )
                     else:
-                        value_loss = unclipped_value_loss
+                        value_loss = jnp.mean(unclipped_value_loss)
 
-                    # Average value function loss with loss masking.
-
-                    # value_loss = jnp.sum(value_loss * loss_masks) / (jnp.sum(loss_masks)+10e-8)
-                    value_loss = jnp.mean(value_loss)
                     # TODO (Ruan): Including value loss parameter in the
                     # value loss for now but can add a flag
                     value_loss = value_loss * self.config.value_cost
