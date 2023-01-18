@@ -6,6 +6,8 @@ RUN pip install --upgrade pip setuptools wheel
 ARG folder=/home/app/mava
 ## working directory
 WORKDIR ${folder}
+## Copy code from current path
+COPY . /home/app/mava
 # Install packages
 RUN pip install -r educational/requirements.txt
 EXPOSE 6006
