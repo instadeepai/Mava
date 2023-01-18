@@ -55,6 +55,8 @@ class TFSummaryLogger(base.Logger):
         self._iter = 0
         self._logdir = logdir
         self._summary = tf.summary.create_file_writer(self._logdir)
+        print(self._logdir)
+        print("*"*20)
 
     def write(self, values: base.LoggingData) -> None:
         """Write logging data.
@@ -80,18 +82,18 @@ class TFSummaryLogger(base.Logger):
                             for index, elements in enumerate(value):
                                 self.write({f"{key}_info_{index}": elements})
                         else:
-                            warnings.warn(
+                            print(
                                 f"Unable to log: {key}, unknown type: {type(value)}"
                             )
                 elif isinstance(values, tuple) or isinstance(value, list):
                     for elements in values:
                         self.write(elements)
                 else:
-                    warnings.warn(
+                    print(
                         f"Unable to log: {values}, unknown type: {type(values)}"
                     )
             except Exception as ex:
-                warnings.warn(
+                print(
                     f"Unable to log: {key}, type: {type(value)} , value: {value}"
                     + f"ex: {ex}"
                 )
