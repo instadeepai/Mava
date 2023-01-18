@@ -24,6 +24,7 @@ try:
     # https://github.com/tensorflow/tensorboard/issues/5480#issuecomment-1016612630
     import tensorflow_io  # noqa: F401
 except ModuleNotFoundError:
+    print("tensorflow_io is not installed")
     pass
 
 from acme.utils import loggers, paths
