@@ -245,9 +245,8 @@ class MAPGWithTrustRegionStep(Step):
             # The final timestep is not masked.
             loss_masks = {}
             for agent in observations.keys():
-                loss_masks[agent] = observations[agent].terminal
+                loss_masks[agent] = observations[agent].agent_mask
                 loss_masks[agent] = loss_masks[agent].reshape(discounts[agent].shape)
-            # jax.debug.print("check {x}",x=loss_masks)
             discounts = tree.map_structure(
                 lambda x: x * self.config.discount, discounts
             )

@@ -72,20 +72,20 @@ class SMACWrapper(ParallelEnvWrapper):
         if not self._is_reset:
             self._environment.reset()
             self._is_reset = True
-        # self._done = False
+        self._done = False
 
         self._step_type = dm_env.StepType.FIRST
 
         # Get observation from env
         discount_spec = self.discount_spec()
-        discounts_mask = {
+        agents_mask = {
             agent: convert_np_type(discount_spec[agent].dtype, 1)
             for agent in self._agents
         }
         observation = self.environment.get_obs()
         legal_actions = self._get_legal_actions()
         observations = self._convert_observations(
-            observation, legal_actions, discounts_mask
+            observation, legal_actions, agents_mask
         )
 
         # Set env discount to 1 for all agents

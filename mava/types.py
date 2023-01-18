@@ -25,11 +25,11 @@ NestedArray = Any
 
 
 class OLT(NamedTuple):
-    """Container for (observation, legal_actions, terminal) tuples."""
+    """Container for (observation, legal_actions, agent_mask) tuples."""
 
     observation: types.Nest
     legal_actions: types.Nest
-    terminal: types.Nest
+    agent_mask: types.Nest
 
 
 NestedLogger = Union[loggers.Logger, Dict[str, loggers.Logger]]
