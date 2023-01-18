@@ -7,7 +7,7 @@ ARG folder=/home/app/mava
 ## working directory
 WORKDIR ${folder}
 ## Copy code from current path
-COPY . /home/app/mava
+COPY . /home/app/mava/educational
 # Install packages
 RUN pip install -r requirements.txt
 EXPOSE 6006
