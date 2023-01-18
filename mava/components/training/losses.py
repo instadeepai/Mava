@@ -146,9 +146,9 @@ class Loss(Component):
 
 @dataclass
 class MAPGTrustRegionClippingLossConfig:
-    """The value_clip_parameter should be relatively small when value_normalization is True.
-
-    The idea is to scale it to try and match the effect of the normalisation on the target values.
+    """The value_clip_parameter should be relatively small when
+    value_normalization is True. The idea is to scale it to try and
+    match the effect of the normalisation on the target values.
     """
 
     clipping_epsilon: float = 0.2
@@ -156,6 +156,7 @@ class MAPGTrustRegionClippingLossConfig:
     clip_value: bool = True
     entropy_cost: float = 0.01
     value_cost: float = 0.5
+    loss_masking: bool = False
 
 
 class MAPGWithTrustRegionClippingLoss(Loss):
@@ -223,7 +224,8 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
                     """Inner policy loss function: see outer function for parameters."""
 
-                    # TODO (dries): Can we implement something more general here? Like a function call?
+                    # TODO (dries): Can we implement something more general here?
+                    # Like a function call?
                     if policy_states:
                         # Recurrent actor.
                         minibatch_size = int(
@@ -240,7 +242,8 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                             minibatch_size, seq_len, -1
                         )
 
-                        # Use the state at the start of the sequence and unroll the policy.
+                        # Use the state at the start of the sequence
+                        # and unroll the policy.
                         core = lambda x, y: network.policy_network.apply(
                             policy_params, [x, y]
                         )
@@ -271,15 +274,21 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                     rhos = jnp.exp(log_probs - behaviour_log_probs)
                     clipping_epsilon = self.config.clipping_epsilon
 
-                    policy_loss = clipped_surrogate_pg_loss(
-                        prob_ratios_t=rhos,
-                        adv_t=advantages,
-                        epsilon=clipping_epsilon,
-                        loss_masks=loss_masks,
-                    )
-                    entropy_loss = -jnp.sum(entropy * loss_masks) / (
-                        jnp.sum(loss_masks) + 10e-8
-                    )
+                    if self.config.loss_masking:
+                        policy_loss = clipped_surrogate_pg_loss(
+                            prob_ratios_t=rhos,
+                            adv_t=advantages,
+                            epsilon=clipping_epsilon,
+                            loss_masks=loss_masks,
+                        )
+                        entropy_loss = -jnp.sum(entropy * loss_masks) / (
+                            jnp.sum(loss_masks) + 10e-8
+                        )
+                    else:
+                        policy_loss = rlax.clipped_surrogate_pg_loss(
+                            rhos, advantages, clipping_epsilon
+                        )
+                        entropy_loss = -jnp.mean(entropy)
 
                     total_policy_loss = (
                         policy_loss + entropy_loss * self.config.entropy_cost

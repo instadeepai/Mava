@@ -29,7 +29,8 @@ def clipped_surrogate_pg_loss(
     use_stop_gradient: bool = True,
 ) -> jnp.array:
     """
-    Modified from: https://github.com/deepmind/rlax/blob/master/rlax/_src/policy_gradients.py
+    Modified from:
+    https://github.com/deepmind/rlax/blob/master/rlax/_src/policy_gradients.py
     Computes the clipped surrogate policy gradient loss.
     L_clipₜ(θ) = - min(rₜ(θ)Âₜ, clip(rₜ(θ), 1-ε, 1+ε)Âₜ)
     Where rₜ(θ) = π_θ(aₜ| sₜ) / π_θ_old(aₜ| sₜ) and Âₜ are the advantages.
@@ -52,8 +53,7 @@ def clipped_surrogate_pg_loss(
     adv_t = jax.lax.select(use_stop_gradient, jax.lax.stop_gradient(adv_t), adv_t)
     clipped_ratios_t = jnp.clip(prob_ratios_t, 1.0 - epsilon, 1.0 + epsilon)
     clipped_objective = jnp.fmin(prob_ratios_t * adv_t, clipped_ratios_t * adv_t)
-    # z=-(jnp.sum(clipped_objective * loss_masks) / (jnp.sum(loss_masks) + 10e-8))
-    # jax.debug.print("LOSS  {x} or {y}, dead {h}",x=-jnp.mean(clipped_objective), y=z, h=loss_masks)
+    tf.print("I AM HERE")
     return -(jnp.sum(clipped_objective * loss_masks) / (jnp.sum(loss_masks) + 10e-8))
 
 
