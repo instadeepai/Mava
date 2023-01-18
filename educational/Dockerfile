@@ -9,5 +9,5 @@ WORKDIR ${folder}
 ## Copy code from current path
 COPY . /home/app/mava
 # Install packages
-RUN pip install -r educational/requirements.txt
+RUN pip install -r requirements.txt
 EXPOSE 6006
