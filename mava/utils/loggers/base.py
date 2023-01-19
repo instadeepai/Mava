@@ -20,6 +20,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Union
 
+try:
+    # https://github.com/tensorflow/tensorboard/issues/5480#issuecomment-1016612630
+    import tensorflow_io  # noqa: F401
+except ModuleNotFoundError:
+    pass
+
 from acme.utils import loggers, paths
 from acme.utils.loggers import base
 
@@ -61,8 +67,12 @@ class Logger(MavaLogger):
         """Initialise logger."""
         self._label = label
 
-        if not isinstance(directory, Path):
-            directory = Path(directory)
+        is_s3_url = isinstance(directory, str) and "s3" in directory
+        # Don't modify path if s3 url, use url string.
+        # Note this requires tensorflow_io to be installed.
+        if not is_s3_url:
+            if not isinstance(directory, Path):
+                directory = Path(directory)
 
         self._directory = directory
         self._time_stamp = time_stamp if time_stamp else str(datetime.now())
@@ -149,7 +159,10 @@ class Logger(MavaLogger):
                 json_path = extra_logger_kwargs["json_path"]
 
             else:
-                json_path = str(self._directory / self._time_stamp)
+                if isinstance(self._directory, Path):
+                    json_path = str(self._directory / self._time_stamp)
+                else:
+                    json_path = f"{self._directory}/{self._time_stamp}"
 
             del extra_logger_kwargs["json_path"]
 
@@ -173,13 +186,20 @@ class Logger(MavaLogger):
         return logger
 
     def _path(self, subdir: Optional[str] = None) -> str:
-        if subdir:
-            path = str(self._directory / self._time_stamp / subdir / self._label)
+        if isinstance(self._directory, str):
+            if subdir:
+                path = f"{self._directory}/{self._time_stamp}/{subdir}/{ self._label}"
+            else:
+                path = f"{self._directory}/{self._time_stamp}/{self._label}"
+            return path
         else:
-            path = str(self._directory / self._time_stamp / self._label)
+            if subdir:
+                path = str(self._directory / self._time_stamp / subdir / self._label)
+            else:
+                path = str(self._directory / self._time_stamp / self._label)
 
-        # Recursively replace "~"
-        return paths.process_path(path)
+            # Recursively replace "~"
+            return paths.process_path(path)
 
     def write(self, data: Any) -> None:
         """Method used for writing data."""
