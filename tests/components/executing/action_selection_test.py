@@ -171,14 +171,17 @@ class MockFeedForwardExecutor(Executor):
             "agent_0": OLT(
                 observation=jnp.array([0.1, 0.5, 0.7]),
                 legal_actions=[1],
+                agent_mask=[1],
             ),
             "agent_1": OLT(
                 observation=jnp.array([0.8, 0.3, 0.7]),
                 legal_actions=[1],
+                agent_mask=[1],
             ),
             "agent_2": OLT(
                 observation=jnp.array([0.9, 0.9, 0.8]),
                 legal_actions=[1],
+                agent_mask=[1],
             ),
         }
         agent_net_keys = {
@@ -355,14 +358,17 @@ class MockRecurrentExecutor(Executor):  # type: ignore # noqa: E501
             "agent_0": OLT(
                 observation=jnp.array([0.1, 0.5, 0.7]),
                 legal_actions=[1],
+                agent_mask=[1],
             ),
             "agent_1": OLT(
                 observation=jnp.array([0.8, 0.3, 0.7]),
                 legal_actions=[1],
+                agent_mask=[1],
             ),
             "agent_2": OLT(
                 observation=jnp.array([0.9, 0.9, 0.8]),
                 legal_actions=[1],
+                agent_mask=[1],
             ),
         }
         agent_net_keys = {

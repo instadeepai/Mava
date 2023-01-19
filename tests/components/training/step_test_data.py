@@ -194,6 +194,10 @@ dummy_sample = reverb.ReplaySample(
                         [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
                     ]
                 ),
+                agent_mask=jnp.array(
+                    [[[1.0], [1.0], [1.0]], [[1.0], [1.0], [1.0]]],
+                    dtype=jnp.float32,
+                ),
             ),
             "agent_1": OLT(
                 observation=jnp.array(
@@ -313,6 +317,10 @@ dummy_sample = reverb.ReplaySample(
                         [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
                     ]
                 ),
+                agent_mask=jnp.array(
+                    [[[1.0], [1.0], [1.0]], [[1.0], [1.0], [1.0]]],
+                    dtype=jnp.float32,
+                ),
             ),
             "agent_2": OLT(
                 observation=jnp.array(
@@ -431,6 +439,10 @@ dummy_sample = reverb.ReplaySample(
                         [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
                         [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
                     ]
+                ),
+                agent_mask=jnp.array(
+                    [[[1.0], [1.0], [1.0]], [[1.0], [1.0], [1.0]]],
+                    dtype=jnp.float32,
                 ),
             ),
         },

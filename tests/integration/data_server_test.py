@@ -107,6 +107,7 @@ def test_data_server_single_process(test_system_sp: System) -> None:
         for observation in sample.data.observations.values():
             assert jnp.size(observation.observation) != 0
             assert jnp.size(observation.legal_actions) != 0
+            assert jnp.size(observation.agent_mask) != 0
         assert sorted(list(sample.data.actions.keys())) == [
             "agent_0",
             "agent_1",

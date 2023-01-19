@@ -138,8 +138,7 @@ class MockExecutor(Executor):
             reward=0.0,
             discount=1.0,
             observation=OLT(
-                observation=[0.1, 0.3, 0.7],
-                legal_actions=[1],
+                observation=[0.1, 0.3, 0.7], legal_actions=[1], agent_mask=[1]
             ),
         )
         # extras
@@ -358,9 +357,6 @@ def test_on_execution_observe(
         "agent_1": {"actions_info": "action_info_agent_1"},
         "agent_2": {"actions_info": "action_info_agent_2"},
     }
-
-    print("timestep: ", mock_executor.store.adder.test_next_timestep)
-    print("next: ", mock_executor.store.next_timestep)
 
     assert (
         mock_executor.store.adder.test_next_timestep

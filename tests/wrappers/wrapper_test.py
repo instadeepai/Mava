@@ -160,7 +160,7 @@ class TestEnvWrapper:
 
             # Parallel env_types
             dm_env_timestep = wrapped_env._convert_observations(
-                test_agents_observations, dones={agent: False for agent in agents}
+                test_agents_observations, agents_mask={agent: False for agent in agents}
             )
 
             for agent in wrapped_env.agents:
@@ -168,6 +168,9 @@ class TestEnvWrapper:
                     test_agents_observations[agent],
                     dm_env_timestep[agent].observation,
                 )
+                assert (
+                    bool(dm_env_timestep[agent].agent_mask) is False
+                ), "Failed to set agent_mask."
 
     # Test that observations from petting zoo get converted to
     #   dm observations correctly when empty obs are returned.
@@ -188,7 +191,7 @@ class TestEnvWrapper:
 
             # Parallel env_types
             dm_env_timestep = wrapped_env._convert_observations(
-                test_agents_observations, dones={agent: False for agent in agents}
+                test_agents_observations, agents_mask={agent: False for agent in agents}
             )
 
             # We have empty OLT for all agents
@@ -266,7 +269,7 @@ class TestEnvWrapper:
             # Parallel env_types
             dm_env_timestep = wrapped_env._convert_observations(
                 test_agents_observations,
-                dones={agent: False for agent in agents},
+                agents_mask={agent: False for agent in agents},
             )
 
             for agent in wrapped_env.agents:
@@ -278,6 +281,9 @@ class TestEnvWrapper:
                     test_agents_observations[agent].get("action_mask"),  # type: ignore # noqa: E501
                     dm_env_timestep[agent].legal_actions,
                 )
+                assert (
+                    bool(dm_env_timestep[agent].agent_mask) is False
+                ), "Failed to set agent_mask."
 
     # Test we can take a action and it updates observations
     def test_step_0_valid_when_env_not_done(
