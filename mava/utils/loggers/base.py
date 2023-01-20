@@ -70,9 +70,8 @@ class Logger(MavaLogger):
         is_s3_url = isinstance(directory, str) and "s3" in directory
         # Don't modify path if s3 url, use url string.
         # Note this requires tensorflow_io to be installed.
-        if not is_s3_url:
-            if not isinstance(directory, Path):
-                directory = Path(directory)
+        if not is_s3_url and not isinstance(directory, Path):
+            directory = Path(directory)
 
         self._directory = directory
         self._time_stamp = time_stamp if time_stamp else str(datetime.now())
