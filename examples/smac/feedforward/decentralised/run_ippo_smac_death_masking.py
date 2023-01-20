@@ -29,13 +29,13 @@ from mava.utils.loggers import logger_utils
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "map_name",
-    "3m",
+    "8m",
     "Starcraft 2 micromanagement map name (str).",
 )
 
 flags.DEFINE_string(
     "mava_id",
-    str(datetime.now()),
+    'feedforward_addertest', #str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
@@ -45,7 +45,7 @@ def main(_: Any) -> None:
     """Run IPPO on SMAC with death masking."""
     # Environment
     environment_factory = functools.partial(
-        make_environment, map_name=FLAGS.map_name, death_masking=True
+        make_environment, map_name=FLAGS.map_name, death_masking=False
     )
 
     # Networks.
@@ -73,11 +73,11 @@ def main(_: Any) -> None:
 
     # Optimisers.
     policy_optimiser = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(eps=1e-5), optax.scale(-5e-4)
     )
 
     critic_optimiser = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(eps=1e-5), optax.scale(-5e-4)
     )
 
     # Create the system.
@@ -92,10 +92,17 @@ def main(_: Any) -> None:
         policy_optimiser=policy_optimiser,
         critic_optimiser=critic_optimiser,
         run_evaluator=True,
-        epoch_batch_size=5,
+        epoch_batch_size=1,
         num_epochs=15,
         num_executors=1,
-        multi_process=True,
+        multi_process=False,
+        sequence_length=401,
+        period=401,
+        seed=1,
+        trainer_parameter_update_period=1,
+        executor_parameter_update_period=1,
+        checkpoint_minute_interval=1,
+        termination_condition={"executor_steps": 500000}
     )
 
     # Launch the system.

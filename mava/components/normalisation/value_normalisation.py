@@ -12,7 +12,7 @@ from .base_normalisation import BaseNormalisation
 
 @dataclass
 class ValueNormalisationConfig:
-    normalise_target_values: bool = True
+    normalise_target_values: bool = False
 
 
 class ValueNormalisation(BaseNormalisation):

@@ -43,6 +43,8 @@ from mava.components.training.trainer import BaseTrainerInit
 from mava.core_jax import SystemTrainer
 from mava.utils.jax_training_utils import denormalize, normalize
 
+from haiku._src.basic import merge_leading_dims
+
 
 @dataclass
 class TrainerStepConfig:
@@ -202,7 +204,7 @@ class MAPGWithTrustRegionStep(Step):
             None.
         """
 
-        @jit
+        # @jit
         def sgd_step(
             states: TrainingState, sample: reverb.ReplaySample
         ) -> Tuple[TrainingState, Dict[str, jnp.ndarray]]:
@@ -282,9 +284,24 @@ class MAPGWithTrustRegionStep(Step):
                     behavior_values[key] = denormalize(
                         target_value_stats[key], behavior_values[key]
                     )
-
+            
             # Vmap over batch dimension
-            batch_gae_advantages = jax.vmap(trainer.store.gae_fn, in_axes=0)
+            batch_gae_advantages =  trainer.store.gae_fn # jax.vmap(trainer.store.gae_fn, in_axes=0)
+
+            # reshape here by merging leading dimensions
+            # rewards, discounts, behaviour values
+
+            # import pdb; pdb.set_trace()
+            old_shape = rewards["agent_0"].shape
+
+            (
+                rewards,
+                discounts,
+                behavior_values,
+            )  = jax.tree_util.tree_map(
+                lambda x: merge_leading_dims(x, 2), (rewards, discounts, behavior_values)
+            )
+
 
             advantages = {}
             target_values = {}
@@ -307,19 +324,70 @@ class MAPGWithTrustRegionStep(Step):
                     behavior_values[key] = normalize(
                         target_value_stats[key], behavior_values[key]
                     )
+            
+            # reshape again to previous shape here
+            # rewards, discounts, behaviour_values
+        
+            (
+                rewards,
+                discounts,
+                behavior_values,
+                advantages,
+                target_values
+            )  = jax.tree_util.tree_map(
+                lambda x: jnp.reshape(x, old_shape), (rewards, discounts, behavior_values, advantages, target_values)
+            )
+
+            # create a discount mask
+            masks = jax.tree_util.tree_map(
+                lambda x: jnp.array(x!=0),
+                discounts
+            )
+
+            masks = jax.tree_util.tree_map(
+                lambda x: x.at[-1,-1].set(False),
+                masks
+            )
 
             # Exclude the last step - it was only used for bootstrapping.
             # The shape is [num_sequences, num_steps, ..]
-            (
-                observations,
-                actions,
-                behavior_log_probs,
-                behavior_values,
-            ) = jax.tree_util.tree_map(
-                lambda x: x[:, :-1],
-                (observations, actions, behavior_log_probs, behavior_values),
-            )
+            # (
+            #     observations,
+            #     actions,
+            #     behavior_log_probs,
+            #     behavior_values,
+            #     masks
+            # ) = jax.tree_util.tree_map(
+            #     lambda x: x[:, :-1],
+            #     (observations, actions, behavior_log_probs, behavior_values, masks),
+            # )
 
+            # now mask all the data is meant to go to batch
+            for agent in rewards.keys():
+                obs = observations[agent].observation
+                mask = masks[agent][:,:,None]
+                observations[agent] = observations[agent]._replace(observation=obs*mask)
+
+            actions = jax.tree_util.tree_map(
+                lambda x,m: x*m,
+                actions, masks)
+            
+            advantages = jax.tree_util.tree_map(
+                lambda x,m: x*m,
+                advantages, masks)
+            
+            behavior_log_probs = jax.tree_util.tree_map(
+                lambda x,m: x*m,
+                behavior_log_probs, masks)
+            
+            target_values = jax.tree_util.tree_map(
+                lambda x,m: x*m,
+                target_values, masks)
+
+            behavior_values = jax.tree_util.tree_map(
+                lambda x,m: x*m,
+                behavior_values, masks)
+                        
             if "policy_states" in next_extras:
                 policy_states = jax.tree_util.tree_map(
                     lambda x: x[:, :-1],
@@ -336,10 +404,11 @@ class MAPGWithTrustRegionStep(Step):
                 behavior_log_probs=behavior_log_probs,
                 target_values=target_values,
                 behavior_values=behavior_values,
+                masks=masks,
             )
 
             agent_0_t_vals = list(target_values.values())[0]
-            assert len(agent_0_t_vals) > 1
+            assert len(agent_0_t_vals) > 0 #1
             batch_size = agent_0_t_vals.shape[0]
 
             assert batch_size % trainer.store.global_config.num_minibatches == 0, (
@@ -367,7 +436,8 @@ class MAPGWithTrustRegionStep(Step):
                 (),
                 length=trainer.store.global_config.num_epochs,
             )
-
+            
+            # TODO : normalise these correctly taking masking into account
             # Set the metrics
             metrics = jax.tree_util.tree_map(jnp.mean, metrics)
             metrics["norm_policy_params"] = optax.global_norm(states.policy_params)
