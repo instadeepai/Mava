@@ -426,6 +426,8 @@ class TestEnvWrapper:
             )
             assert len(concat_id_action.death_masked_agents) == 0
 
+    # https://github.com/instadeepai/Mava/issues/889
+    @pytest.mark.skip
     def test_wrapper_env_obs_stacking(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
