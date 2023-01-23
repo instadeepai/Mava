@@ -60,9 +60,12 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
             for agent in self.possible_agents
         }
         if not self.return_state_info:
-            env_extras = {}
-
-        return parameterized_restart(rewards, self._discounts, observations), env_extras
+            return parameterized_restart(rewards, self._discounts, observations)
+        else:
+            return (
+                parameterized_restart(rewards, self._discounts, observations),
+                env_extras,
+            )
 
     def step(
         self, actions: Dict[str, np.ndarray]
