@@ -49,7 +49,7 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         delta_encoded: bool = False,
         priority_fns: Optional[base.PriorityFnMapping] = None,
         max_in_flight_items: int = 2,
-        end_of_episode_behavior: Optional[EndBehavior] = EndBehavior.CONTINUE #ZERO_PAD,
+        end_of_episode_behavior: Optional[EndBehavior] = EndBehavior.ZERO_PAD, #CONTINUE
     ):
         """Makes a SequenceAdder instance.
 

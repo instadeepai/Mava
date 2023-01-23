@@ -82,10 +82,10 @@ class GAE(Utility):
                 self.config.gae_lambda,
                 values,
             )
-            advantages =  jnp.append(advantages, jnp.array(0)) # jax.lax.stop_gradient(advantages)
+            advantages = jax.lax.stop_gradient(advantages) # jnp.append(advantages, jnp.array(0))
 
             # Exclude the bootstrap value
-            target_values = values + advantages #[:-1]
+            target_values = values[:-1] + advantages
             target_values = jax.lax.stop_gradient(target_values)
 
             return advantages, target_values
