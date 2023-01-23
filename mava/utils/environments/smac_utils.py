@@ -42,6 +42,7 @@ if _found_smac:
         random_seed: Optional[int] = None,
         death_masking: bool = False,
         stack_frames: int = 1,
+        return_state_info: bool = True,
     ) -> Tuple[Any, Dict[str, str]]:
         """Make a SMAC enviroment.
 
@@ -53,6 +54,7 @@ if _found_smac:
             random_seed: seed
             death_masking: whether to mask out agent observations once dead.
             stack_frames: number of frames to stack together.
+            return_state_info: should step and reset return state information.
         """
         # Env uses int64 action space due to the use of spac.Discrete.
         set_jax_double_precision()
@@ -60,7 +62,9 @@ if _found_smac:
         env: Any
         env = StarCraft2Env(map_name=map_name, seed=random_seed)
 
-        env = SMACWrapper(env, death_masking=death_masking)
+        env = SMACWrapper(
+            env, death_masking=death_masking, return_state_info=return_state_info
+        )
 
         if stack_frames > 1:
             env = StackObservations(env, num_frames=stack_frames)
