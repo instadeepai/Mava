@@ -12,7 +12,7 @@ RUN apt-get update -y && \
     apt install -y python3.9 && \
     apt install -y python3.9-dev && \
     apt-get install -y python3-pip && \
-    apt-get install -y python3.9-venv 
+    apt-get install -y python3.9-venv
 
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.9 10
 
