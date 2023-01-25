@@ -122,7 +122,7 @@ class FeedforwardExecutorObserve(ExecutorObserve):
         ] = executor.store.network_int_keys_extras
 
         # executor.store.timestep set by Executor
-        executor.store.adder.add_first(executor.store.timestep, executor.store.extras)
+        executor.store.adder.add_first(executor.store.timestep)
 
     def on_execution_observe(self, executor: SystemExecutor) -> None:
         """Handle observations and pass along to the adder.
@@ -140,22 +140,25 @@ class FeedforwardExecutorObserve(ExecutorObserve):
         policies_info = executor.store.policies_info
 
         adder_actions: Dict[str, Any] = {}
-        # executor.store.next_extras set by Executor
-        executor.store.next_extras["policy_info"] = {}
+        
+        executor.store.extras["policy_info"] = {}
         for agent in actions_info.keys():
             adder_actions[agent] = {
                 "actions_info": actions_info[agent],
             }
-            executor.store.next_extras["policy_info"][agent] = policies_info[agent]
+            executor.store.extras["policy_info"][agent] = policies_info[agent]
 
-        executor.store.next_extras[
-            "network_int_keys"
-        ] = executor.store.network_int_keys_extras
+        
 
         # executor.store.next_timestep set by Executor
         executor.store.adder.add(
-            adder_actions, executor.store.next_timestep, executor.store.next_extras
+            adder_actions, executor.store.next_timestep, executor.store.extras
         )
+
+        # Store for the next round.
+        executor.store.extras[
+            "network_int_keys"
+        ] = executor.store.network_int_keys_extras
 
     def on_execution_update(self, executor: SystemExecutor) -> None:
         """Update the executor variables."""
@@ -219,7 +222,7 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
         executor.store.extras["policy_states"] = executor.store.policy_states
 
         # executor.store.timestep set by Executor
-        executor.store.adder.add_first(executor.store.timestep, executor.store.extras)
+        executor.store.adder.add_first(executor.store.timestep)
 
     def on_execution_observe(self, executor: SystemExecutor) -> None:
         """Handle observations and pass along to the adder.
@@ -237,21 +240,28 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
         policies_info = executor.store.policies_info
 
         adder_actions: Dict[str, Any] = {}
-        # executor.store.next_extras set by Executor
-        executor.store.next_extras["policy_info"] = {}
+
+        executor.store.extras["policy_info"] = {}
         for agent in actions_info.keys():
             adder_actions[agent] = {
                 "actions_info": actions_info[agent],
             }
-            executor.store.next_extras["policy_info"][agent] = policies_info[agent]
+            executor.store.extras["policy_info"][agent] = policies_info[agent]
+        
+        executor.store.adder.add(
+            adder_actions, executor.store.next_timestep, executor.store.extras
+        )
 
-        executor.store.next_extras[
+        # Store policy_states and network_int_keys for next add operation
+        executor.store.extras["policy_states"] = executor.store.policy_states
+        executor.store.extras[
             "network_int_keys"
         ] = executor.store.network_int_keys_extras
 
-        # executor.store.extras set by Executor
-        executor.store.next_extras["policy_states"] = executor.store.policy_states
 
-        executor.store.adder.add(
-            adder_actions, executor.store.next_timestep, executor.store.next_extras
-        )
+        
+
+        
+        
+
+        

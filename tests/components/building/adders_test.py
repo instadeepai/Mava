@@ -64,8 +64,7 @@ def parallel_sequence_adder() -> ParallelSequenceAdder:
 
     adder = ParallelSequenceAdder(
         config=ParallelSequenceAdderConfig(
-            sequence_length=1, period=1, use_next_extras=True
-        )
+            sequence_length=1, period=1)
     )
     return adder
 
@@ -147,7 +146,6 @@ def test_parallel_sequence_adder(
     # ParallelSequenceAdderConfig parameters set correctly
     assert parallel_sequence_adder.config.sequence_length == 1
     assert parallel_sequence_adder.config.period == 1
-    assert parallel_sequence_adder.config.use_next_extras is True
 
     parallel_sequence_adder.on_building_init_start(builder=mock_builder)
     parallel_sequence_adder.on_building_executor_adder(builder=mock_builder)
@@ -159,10 +157,6 @@ def test_parallel_sequence_adder(
         == parallel_sequence_adder.config.sequence_length
     )
     assert mock_builder.store.adder._period == parallel_sequence_adder.config.period
-    assert (
-        mock_builder.store.adder._use_next_extras
-        == parallel_sequence_adder.config.use_next_extras
-    )
     assert mock_builder.store.adder._client == mock_builder.store.data_server_client
     assert mock_builder.store.adder._priority_fns == mock_builder.store.priority_fns
     assert (
