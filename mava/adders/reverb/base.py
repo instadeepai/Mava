@@ -180,7 +180,8 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
         self._writer.flush(self._max_in_flight_items)
 
     def add_first(
-        self, timestep: dm_env.TimeStep,
+        self,
+        timestep: dm_env.TimeStep,
     ) -> None:
         """Record the first observation of a trajectory."""
         if not timestep.first():

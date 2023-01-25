@@ -36,7 +36,7 @@ class ParallelAdder(adders.Adder):
     ```python
     # Reset the environment and add the first observation.
     timestep = env.reset()
-    adder.add_first(timestep.observation)
+    adder.(timestep.observation)
     while not timestep.last():
         # Generate an action from the policy and step the environment.
         action = my_policy(timestep)

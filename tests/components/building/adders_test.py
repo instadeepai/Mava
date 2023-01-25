@@ -63,8 +63,7 @@ def parallel_sequence_adder() -> ParallelSequenceAdder:
     """
 
     adder = ParallelSequenceAdder(
-        config=ParallelSequenceAdderConfig(
-            sequence_length=1, period=1)
+        config=ParallelSequenceAdderConfig(sequence_length=1, period=1)
     )
     return adder
 
