@@ -136,9 +136,7 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
             # Check if first step has extras
             if type(first) == tuple:
                 first, extras = first
-                adder.add_first(first, extras)
-            else:
-                adder.add_first(first)
+            adder.add_first(first)
 
             # timestep: dm_env.TimeStep, extras: Dict[str, types.NestedArray]
             for step in steps[:-1]:
@@ -149,7 +147,7 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
                 else:
                     extras = ()
 
-                adder.add(action, next_timestep=ts, next_extras=extras)
+                adder.add(action, next_timestep=ts)
 
             # Add the final step.
             adder.add(*steps[-1])

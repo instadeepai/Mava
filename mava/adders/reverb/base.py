@@ -15,7 +15,6 @@
 
 """Adders that use Reverb (github.com/deepmind/reverb) as a backend."""
 
-import copy
 from typing import (
     Any,
     Callable,
@@ -208,7 +207,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
         self,
         actions: Dict[str, mava_types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extras: Dict[str, mava_types.NestedArray] = {},
+        extras: Dict[str, mava_types.NestedArray] = {},
     ) -> None:
         """Record an action and the following timestep."""
         if not self._add_first_called:
@@ -223,8 +222,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             # Start of episode indicator was passed at the previous add call.
         )
 
-        current_step["extras"] = next_extras
-
+        current_step["extras"] = extras
         self._writer.append(current_step)
 
         # Record the next observation and write.

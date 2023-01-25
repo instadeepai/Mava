@@ -196,7 +196,7 @@ TEST_CASES = [
                     reward_step1,
                     default_discount,
                     True,
-                    {"state": -1},
+                    {"state": 0},
                 ),
                 base.Trajectory(
                     obs_step1,
@@ -204,7 +204,7 @@ TEST_CASES = [
                     reward_step2,
                     default_discount,
                     False,
-                    {"state": 0},
+                    {"state": 1},
                 ),
                 base.Trajectory(
                     obs_step2,
@@ -212,7 +212,7 @@ TEST_CASES = [
                     reward_step3,
                     default_discount,
                     False,
-                    {"state": 1},
+                    {"state": 2},
                 ),
             ],
             [
@@ -222,7 +222,7 @@ TEST_CASES = [
                     reward_step2,
                     default_discount,
                     False,
-                    {"state": 0},
+                    {"state": 1},
                 ),
                 base.Trajectory(
                     obs_step2,
@@ -230,7 +230,7 @@ TEST_CASES = [
                     reward_step3,
                     default_discount,
                     False,
-                    {"state": 1},
+                    {"state": 2},
                 ),
                 base.Trajectory(
                     obs_step3,
@@ -238,7 +238,7 @@ TEST_CASES = [
                     reward_step4,
                     final_step_discount,
                     False,
-                    {"state": 2},
+                    {"state": 3},
                 ),
             ],
             [
@@ -248,7 +248,7 @@ TEST_CASES = [
                     reward_step3,
                     default_discount,
                     False,
-                    {"state": 1},
+                    {"state": 2},
                 ),
                 base.Trajectory(
                     obs_step3,
@@ -256,7 +256,7 @@ TEST_CASES = [
                     reward_step4,
                     final_step_discount,
                     False,
-                    {"state": 2},
+                    {"state": 3},
                 ),
                 base.Trajectory(
                     obs_step4,
@@ -264,7 +264,7 @@ TEST_CASES = [
                     {agent: 0.0 for agent in agents},
                     final_step_discount,
                     False,
-                    {"state": 3},
+                    {"state": 0},
                 ),
             ],
         ),

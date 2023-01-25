@@ -194,7 +194,6 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             rewards=n_step_return,
             discounts=total_discount,
             next_observations=s_,
-            next_extras=e_,
         )
 
         # Calculate the priority for this transition.
@@ -264,7 +263,6 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             rewards=reward_specs,
             discounts=step_discount_specs,
             extras=extras_specs,
-            next_extras=extras_specs,
         )
 
         return tree.map_structure_with_path(
