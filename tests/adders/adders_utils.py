@@ -147,7 +147,7 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
                 else:
                     extras = ()
 
-                adder.add(action, next_timestep=ts)
+                adder.add(action, next_timestep=ts, extras=extras)
 
             # Add the final step.
             adder.add(*steps[-1])
