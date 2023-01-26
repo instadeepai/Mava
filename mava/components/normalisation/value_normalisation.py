@@ -28,6 +28,7 @@ class ValueNormalisation(BaseNormalisation):
 
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """Initialise target value normalisation parameters"""
+        #if self.config.normalise_target_values:
         values_norm_key = constants.VALUES_NORM_STATE_DICT_KEY
         builder.store.norm_params[values_norm_key] = {}
         for agent in builder.store.agents:

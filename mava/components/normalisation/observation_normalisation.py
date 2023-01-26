@@ -32,12 +32,17 @@ class ObservationNormalisation(BaseNormalisation):
 
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """Initialise observations' normalisation parameters"""
+        #if self.config.normalise_observations:
         obs_norm_key = constants.OBS_NORM_STATE_DICT_KEY
         agent_env_specs = builder.store.ma_environment_spec._agent_environment_specs
         builder.store.norm_params[obs_norm_key] = {}
 
         for agent in builder.store.agents:
-            obs_shape = agent_env_specs[agent].observations.observation.shape
+            #TODO: cleaner solution
+            if type(agent_env_specs[agent].observations.observation) is dict:
+                obs_shape = (1,)
+            else:
+                obs_shape = agent_env_specs[agent].observations.observation.shape
 
             if self.config.normalise_observations and len(obs_shape) > 1:
                 raise NotImplementedError(
