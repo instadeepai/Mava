@@ -341,7 +341,7 @@ class MAPGWithTrustRegionStep(Step):
 
             if "policy_states" in extras:
                 policy_states = jax.tree_util.tree_map(
-                    lambda x : x[:, :-1]
+                    lambda x : x[:, :-1],
                     extras["policy_states"],
                 )
             else:

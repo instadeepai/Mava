@@ -94,7 +94,7 @@ def main(_: Any) -> None:
         policy_optimiser=policy_optimiser,
         critic_optimiser=critic_optimiser,
         run_evaluator=True,
-        epoch_batch_size=120,
+        epoch_batch_size=32,
         num_epochs=15,
         num_executors=1,
         multi_process=False,
