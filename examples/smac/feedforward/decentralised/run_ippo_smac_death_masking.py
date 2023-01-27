@@ -36,7 +36,7 @@ flags.DEFINE_string(
 
 flags.DEFINE_string(
     "mava_id",
-    "ff_seq_pad_dev",  # str(datetime.now()),
+    str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
@@ -46,7 +46,7 @@ def main(_: Any) -> None:
     """Run IPPO on SMAC with death masking."""
     # Environment
     environment_factory = functools.partial(
-        make_environment, map_name=FLAGS.map_name, death_masking=False
+        make_environment, map_name=FLAGS.map_name, death_masking=True
     )
 
     # Networks.
