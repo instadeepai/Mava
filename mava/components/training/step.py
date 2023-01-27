@@ -341,8 +341,8 @@ class MAPGWithTrustRegionStep(Step):
 
             if "policy_states" in extras:
                 policy_states = jax.tree_util.tree_map(
-                    lambda x, m: x[:, :-1] * m,
-                    (extras["policy_states"], masks),
+                    lambda x : x[:, :-1]
+                    extras["policy_states"],
                 )
             else:
                 policy_states = {agent: None for agent in trainer.store.agents}
