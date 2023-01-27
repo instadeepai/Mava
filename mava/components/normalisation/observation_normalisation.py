@@ -15,7 +15,7 @@ from .base_normalisation import BaseNormalisation
 
 @dataclass
 class ObservationNormalisationConfig:
-    normalise_observations: bool = True
+    normalise_observations: bool = False
     normalize_axes: Optional[List[float]] = field(default_factory=lambda: None)
 
 

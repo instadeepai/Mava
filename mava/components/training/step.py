@@ -307,6 +307,9 @@ class MAPGWithTrustRegionStep(Step):
                         target_value_stats[key], behavior_values[key]
                     )
 
+            # create a discount mask
+            masks = jax.tree_util.tree_map(lambda x: jnp.array(x != 0), discounts)
+
             # Exclude the last step - it was only used for bootstrapping.
             # The shape is [num_sequences, num_steps, ..]
             (
@@ -314,15 +317,32 @@ class MAPGWithTrustRegionStep(Step):
                 actions,
                 behavior_log_probs,
                 behavior_values,
+                masks,
             ) = jax.tree_util.tree_map(
                 lambda x: x[:, :-1],
-                (observations, actions, behavior_log_probs, behavior_values),
+                (observations, actions, behavior_log_probs, behavior_values, masks),
+            )
+
+            actions = jax.tree_util.tree_map(lambda x, m: x * m, actions, masks)
+
+            advantages = jax.tree_util.tree_map(lambda x, m: x * m, advantages, masks)
+
+            behavior_log_probs = jax.tree_util.tree_map(
+                lambda x, m: x * m, behavior_log_probs, masks
+            )
+
+            target_values = jax.tree_util.tree_map(
+                lambda x, m: x * m, target_values, masks
+            )
+
+            behavior_values = jax.tree_util.tree_map(
+                lambda x, m: x * m, behavior_values, masks
             )
 
             if "policy_states" in extras:
                 policy_states = jax.tree_util.tree_map(
-                    lambda x: x[:, :-1],
-                    extras["policy_states"],
+                    lambda x, m: x[:, :-1] * m,
+                    (extras["policy_states"], masks),
                 )
             else:
                 policy_states = {agent: None for agent in trainer.store.agents}
@@ -335,6 +355,7 @@ class MAPGWithTrustRegionStep(Step):
                 behavior_log_probs=behavior_log_probs,
                 target_values=target_values,
                 behavior_values=behavior_values,
+                masks=masks,
             )
 
             agent_0_t_vals = list(target_values.values())[0]

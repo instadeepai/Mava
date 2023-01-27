@@ -120,6 +120,7 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
                 minibatch.actions,
                 minibatch.behavior_log_probs,
                 advantages,
+                minibatch.masks,
             )
 
             # Calculate the gradients and agent metrics.
@@ -128,6 +129,7 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
                 minibatch.observations,
                 minibatch.target_values,
                 minibatch.behavior_values,
+                minibatch.masks,
             )
 
             metrics = {}
