@@ -108,6 +108,7 @@ def main(_: Any) -> None:
         termination_condition={"executor_steps": 500000},
         evaluation_interval={"executor_steps": 10000},
         evaluation_duration={"evaluator_episodes": 32},
+        mask_padded_sequence=True,
     )
 
     # Launch the system.

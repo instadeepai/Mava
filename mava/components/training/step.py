@@ -177,6 +177,7 @@ class Step(Component):
 @dataclass
 class MAPGWithTrustRegionStepConfig:
     discount: float = 0.99
+    mask_padded_sequence: bool = False
 
 
 class MAPGWithTrustRegionStep(Step):
@@ -308,9 +309,12 @@ class MAPGWithTrustRegionStep(Step):
                     )
 
             # create a padded sequence mask from discounts
-            masks = jax.tree_util.tree_map(
-                lambda x: jnp.array(x != 0).astype(float), discounts
-            )
+            if self.config.mask_padded_sequence:
+                masks = jax.tree_util.tree_map(
+                    lambda x: jnp.array(x != 0).astype(float), discounts
+                )
+            else:
+                masks = jax.tree_util.tree_map(lambda x: jnp.ones_like(x), discounts)
 
             # Exclude the last step - it was only used for bootstrapping.
             # The shape is [num_sequences, num_steps, ..]

@@ -74,7 +74,9 @@ def clipped_surrogate_pg_loss(
     clipped_ratios_t = jnp.clip(prob_ratios_t, 1.0 - epsilon, 1.0 + epsilon)
     clipped_objective = jnp.fmin(prob_ratios_t * adv_t, clipped_ratios_t * adv_t)
 
-    return -jnp.sum(clipped_objective * mask) / jnp.sum(mask)
+    eps = 1e-10
+
+    return -jnp.sum(clipped_objective * mask) / (jnp.sum(mask) + eps)
 
 
 class ValueLoss(Component):
@@ -325,8 +327,9 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                         rhos, advantages, clipping_epsilon, mask
                     )
 
+                    eps = 1e-10
                     # Entropy regulariser.
-                    entropy_loss = -jnp.sum(entropy) / jnp.sum(mask)
+                    entropy_loss = -jnp.sum(entropy) / (jnp.sum(mask) + eps)
 
                     total_policy_loss = (
                         policy_loss + entropy_loss * self.config.entropy_cost
@@ -403,6 +406,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                         unclipped_value_error
                     )
 
+                    eps = 1e-10
                     value_clip_parameter = self.config.value_clip_parameter
                     if self.config.clip_value:
                         # Clip values to reduce variablility during critic training.
@@ -418,9 +422,11 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                         )
                         value_loss = jnp.sum(
                             jnp.fmax(unclipped_value_loss, clipped_value_loss)
-                        ) / jnp.sum(mask)
+                        ) / (jnp.sum(mask) + eps)
                     else:
-                        value_loss = jnp.sum(unclipped_value_loss) / jnp.sum(mask)
+                        value_loss = jnp.sum(unclipped_value_loss) / (
+                            jnp.sum(mask) + eps
+                        )
 
                     # TODO (Ruan): Including value loss parameter in the
                     # value loss for now but can add a flag
