@@ -307,8 +307,10 @@ class MAPGWithTrustRegionStep(Step):
                         target_value_stats[key], behavior_values[key]
                     )
 
-            # create a discount mask
-            masks = jax.tree_util.tree_map(lambda x: jnp.array(x != 0), discounts)
+            # create a padded sequence mask from discounts
+            masks = jax.tree_util.tree_map(
+                lambda x: jnp.array(x != 0).astype(float), discounts
+            )
 
             # Exclude the last step - it was only used for bootstrapping.
             # The shape is [num_sequences, num_steps, ..]
@@ -341,7 +343,7 @@ class MAPGWithTrustRegionStep(Step):
 
             if "policy_states" in extras:
                 policy_states = jax.tree_util.tree_map(
-                    lambda x : x[:, :-1],
+                    lambda x: x[:, :-1],
                     extras["policy_states"],
                 )
             else:

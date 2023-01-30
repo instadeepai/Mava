@@ -40,21 +40,32 @@ def clipped_surrogate_pg_loss(
     use_stop_gradient: bool = True,
 ) -> Array:
     """Computes the clipped surrogate policy gradient loss.
+
     L_clipₜ(θ) = - min(rₜ(θ)Âₜ, clip(rₜ(θ), 1-ε, 1+ε)Âₜ)
     Where rₜ(θ) = π_θ(aₜ| sₜ) / π_θ_old(aₜ| sₜ) and Âₜ are the advantages.
     See Proximal Policy Optimization Algorithms, Schulman et al.:
     https://arxiv.org/abs/1707.06347
+    -----------------------------------------------
+    This was copied from the RLAX packaged and only modifed to accept a mask
+    -----------------------------------------------
+
     Args:
-    prob_ratios_t: Ratio of action probabilities for actions a_t:
-        rₜ(θ) = π_θ(aₜ| sₜ) / π_θ_old(aₜ| sₜ)
-    adv_t: the observed or estimated advantages from executing actions a_t.
-    epsilon: Scalar value corresponding to how much to clip the objecctive.
-    mask: Mask to apply for sequence padding.
-    use_stop_gradient: bool indicating whether or not to apply stop gradient to
-        advantages.
+        prob_ratios_t:
+            Ratio of action probabilities for actions a_t:
+            rₜ(θ) = π_θ(aₜ| sₜ) / π_θ_old(aₜ| sₜ)
+        adv_t:
+            the observed or estimated advantages from executing actions a_t.
+        epsilon:
+            Scalar value corresponding to how much to clip the objecctive.
+        mask:
+            Mask to apply for sequence padding.
+        use_stop_gradient:
+            bool indicating whether or not to apply stop gradient to
+            advantages.
+
     Returns:
-    Loss whose gradient corresponds to a clipped surrogate policy gradient
-        update.
+        Loss whose gradient corresponds to a clipped surrogate policy gradient
+            update.
     """
     chex.assert_rank([prob_ratios_t, adv_t], [1, 1])
     chex.assert_type([prob_ratios_t, adv_t], [float, float])
@@ -69,8 +80,7 @@ def clipped_surrogate_pg_loss(
 class ValueLoss(Component):
     @abc.abstractmethod
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """An abstract class for a component that defines the
-        final value loss function."""
+        """An abstract class for a component for the final value loss function."""
 
     @staticmethod
     def name() -> str:
@@ -152,8 +162,7 @@ class HuberValueLoss(ValueLoss):
 class Loss(Component):
     @abc.abstractmethod
     def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
-        """An abstract class for a component that defines the
-        entire policy and critic loss functions."""
+        """Abstract class component for the entire policy and critic loss functions."""
 
     @staticmethod
     def name() -> str:
@@ -183,7 +192,8 @@ class Loss(Component):
 class MAPGTrustRegionClippingLossConfig:
     """The value_clip_parameter should be relatively small when value_normalization is True.
 
-    The idea is to scale it to try and match the effect of the normalisation on the target values.
+    The idea is to scale it to try and match the effect of the normalisation
+    on the target values.
     """
 
     clipping_epsilon: float = 0.2
@@ -257,7 +267,8 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
                     """Inner policy loss function: see outer function for parameters."""
 
-                    # TODO (dries): Can we implement something more general here? Like a function call?
+                    # TODO (dries): Can we implement something more general here?
+                    # Like a function call?
                     if policy_states:
                         # Recurrent actor.
                         minibatch_size = int(
@@ -274,10 +285,15 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                             minibatch_size, seq_len, -1
                         )
 
-                        # Use the state at the start of the sequence and unroll the policy.
-                        core = lambda x, y: network.policy_network.apply(
-                            policy_params, [x, y]
-                        )
+                        # Use the state at the start of the sequence
+                        # and unroll the policy.
+                        # core = lambda x, y: network.policy_network.apply(
+                        #     policy_params, [x, y]
+                        # )
+
+                        def core(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
+                            return network.policy_network.apply(policy_params, [x, y])
+
                         distribution_params, _ = hk.static_unroll(
                             core,
                             batch_seq_observations,
