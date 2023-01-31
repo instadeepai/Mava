@@ -315,8 +315,8 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                             policy_params, observations
                         )
 
-                    log_probs = network.log_prob(distribution_params, actions) * mask
-                    entropy = network.entropy(distribution_params) * mask
+                    log_probs = network.log_prob(distribution_params, actions)
+                    entropy = network.entropy(distribution_params)
 
                     # Compute importance sampling weights:
                     # current policy / behavior policy.
@@ -329,7 +329,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
 
                     eps = 1e-10
                     # Entropy regulariser.
-                    entropy_loss = -jnp.sum(entropy) / (jnp.sum(mask) + eps)
+                    entropy_loss = -jnp.sum(entropy * mask) / (jnp.sum(mask) + eps)
 
                     total_policy_loss = (
                         policy_loss + entropy_loss * self.config.entropy_cost
