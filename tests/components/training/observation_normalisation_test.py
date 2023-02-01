@@ -7,6 +7,7 @@ import tree
 from mava import constants
 from mava.components.normalisation.observation_normalisation import (
     ObservationNormalisation,
+    ObservationNormalisationConfig,
 )
 from mava.systems.builder import Builder
 from mava.utils.jax_training_utils import init_norm_params
@@ -50,7 +51,9 @@ def server() -> MockCoreComponent:
 @pytest.fixture
 def obs_normaliser() -> ObservationNormalisation:
     """Creates mock observation normalisation component"""
-    return ObservationNormalisation()
+    return ObservationNormalisation(
+        ObservationNormalisationConfig(normalise_observations=True)
+    )
 
 
 def test_on_building_init(
