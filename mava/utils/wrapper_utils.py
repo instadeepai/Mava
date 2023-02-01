@@ -18,7 +18,7 @@ from mava import types
 
 def convert_dm_compatible_observations(
     observes: Dict,
-    dones: Dict[str, bool],
+    agents_mask: Union[Dict[str, bool], None],
     observation_spec: Dict[str, types.OLT],
     env_done: bool,
     possible_agents: List,
@@ -27,7 +27,7 @@ def convert_dm_compatible_observations(
 
     Args:
         observes : observations per agent.
-        dones : dones per agent.
+        agents_mask : mask the agent info.
         observation_spec : env observation spec.
         env_done : is env done.
         possible_agents : possible agents in env.
@@ -84,16 +84,21 @@ def convert_dm_compatible_observations(
                 observation_spec[agent].legal_actions.shape,
                 dtype=observation_spec[agent].legal_actions.dtype,
             )
-        if agent in dones:
-            terminal = dones[agent]
-        else:
-            terminal = env_done
 
-        observations[agent] = types.OLT(
-            observation=observation,
-            legal_actions=legals,
-            terminal=np.asarray([terminal], dtype=np.float32),
-        )
+        if agents_mask is None:
+            # agent masking is set to True in case we don't use this variable
+            observations[agent] = types.OLT(
+                observation=observation,
+                legal_actions=legals,
+                agent_mask=np.asarray([True], dtype=np.float32),
+            )
+        else:
+            observations[agent] = types.OLT(
+                observation=observation,
+                legal_actions=legals,
+                agent_mask=np.asarray([agents_mask[agent]], dtype=np.float32),
+            )
+
     return observations
 
 

@@ -331,8 +331,8 @@ def test_step(mock_trainer: Trainer) -> None:
     assert jnp.isclose(metrics["norm_policy_params"], 9.327378)
     assert jnp.isclose(metrics["norm_critic_params"], 9.327378)
 
-    assert jnp.isclose(metrics["observations_mean"], 0.5667871)
-    assert jnp.isclose(metrics["observations_std"], 0.104980744)
+    assert jnp.isclose(metrics["observations_mean"], 0.614406168460846)
+    assert jnp.isclose(metrics["observations_std"], 0.10498074442148209)
 
     assert sorted(list(metrics["rewards_mean"].keys())) == [
         "agent_0",

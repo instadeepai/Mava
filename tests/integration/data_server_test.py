@@ -69,7 +69,7 @@ def test_data_server_single_process(test_system_sp: System) -> None:
     for observation in signature.observations.values():
         assert observation.observation
         assert observation.legal_actions
-        assert observation.terminal
+
     assert sorted(list(signature.actions.keys())) == ["agent_0", "agent_1", "agent_2"]
     assert sorted(list(signature.rewards.keys())) == ["agent_0", "agent_1", "agent_2"]
     assert sorted(list(signature.discounts.keys())) == ["agent_0", "agent_1", "agent_2"]
@@ -107,7 +107,7 @@ def test_data_server_single_process(test_system_sp: System) -> None:
         for observation in sample.data.observations.values():
             assert jnp.size(observation.observation) != 0
             assert jnp.size(observation.legal_actions) != 0
-            assert jnp.size(observation.terminal) != 0
+            assert jnp.size(observation.agent_mask) != 0
         assert sorted(list(sample.data.actions.keys())) == [
             "agent_0",
             "agent_1",

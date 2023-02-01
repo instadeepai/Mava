@@ -152,11 +152,11 @@ def test_update_and_normalize_observations() -> None:
         )
 
         axes = tuple([slice(0, 15)])
-        obs = OLT(observation=jnp.array(x1), legal_actions=[1], terminal=[0.0])
+        obs = OLT(observation=jnp.array(x1), legal_actions=[1], agent_mask=[1.0])
         stats, _ = update_and_normalize_observations(stats, obs, axes=axes)
-        obs = OLT(observation=jnp.array(x2), legal_actions=[1], terminal=[0.0])
+        obs = OLT(observation=jnp.array(x2), legal_actions=[1], agent_mask=[1.0])
         stats, _ = update_and_normalize_observations(stats, obs, axes=axes)
-        obs = OLT(observation=jnp.array(x3), legal_actions=[1], terminal=[0.0])
+        obs = OLT(observation=jnp.array(x3), legal_actions=[1], agent_mask=[1.0])
         stats, _ = update_and_normalize_observations(stats, obs, axes=axes)
 
         x = jnp.array(np.concatenate([x1, x2, x3], axis=0))
@@ -176,7 +176,7 @@ def test_normalize_observations() -> None:
     """Test if normalisation of observations in OLT type works as expected"""
 
     x = np.random.randn(15)
-    obs = OLT(observation=x, legal_actions=[1], terminal=[0.0])
+    obs = OLT(observation=x, legal_actions=[1], agent_mask=[1])
     stats = dict(
         mean=jnp.array([0.2]),
         var=jnp.array([4]),

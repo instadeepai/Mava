@@ -219,17 +219,17 @@ def fake_batch() -> Batch:
             "agent_0": OLT(
                 observation=jnp.array([[0.1, 0.5, 0.7], [1.1, 1.5, 1.7]]),
                 legal_actions=jnp.array([[1], [1], [1], [1]]),
-                terminal=jnp.array([[1], [1]]),
+                agent_mask=jnp.array([[1], [1], [1], [1]]),
             ),
             "agent_1": OLT(
                 observation=jnp.array([[0.8, 0.3, 0.7], [1.8, 1.3, 1.7]]),
                 legal_actions=jnp.array([[1], [1], [1], [1]]),
-                terminal=jnp.array([[1], [1]]),
+                agent_mask=jnp.array([[1], [1], [1], [1]]),
             ),
             "agent_2": OLT(
                 observation=jnp.array([[0.9, 0.9, 0.8], [1.9, 1.9, 1.8]]),
                 legal_actions=jnp.array([[1], [1], [1], [1]]),
-                terminal=jnp.array([[1], [1]]),
+                agent_mask=jnp.array([[1], [1], [1], [1]]),
             ),
         },
         actions={
@@ -242,7 +242,12 @@ def fake_batch() -> Batch:
         behavior_values=jnp.array([4.1, 4.5, 4.7]),
         behavior_log_probs=jnp.array([5.1, 5.5, 5.7]),
         policy_states=None,
-        masks={
+        sequence_padding_masks={
+            "agent_0": jnp.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]),
+            "agent_1": jnp.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]),
+            "agent_2": jnp.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]),
+        },
+        death_masks={
             "agent_0": jnp.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]),
             "agent_1": jnp.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]),
             "agent_2": jnp.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]),

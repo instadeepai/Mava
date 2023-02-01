@@ -191,8 +191,8 @@ dummy_sample = reverb.ReplaySample(
                         [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
                     ]
                 ),
-                terminal=jnp.array(
-                    [[[0.0], [0.0], [0.0]], [[0.0], [0.0], [0.0]]],
+                agent_mask=jnp.array(
+                    [[[1.0], [1.0], [1.0]], [[1.0], [1.0], [1.0]]],
                     dtype=jnp.float32,
                 ),
             ),
@@ -314,8 +314,8 @@ dummy_sample = reverb.ReplaySample(
                         [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
                     ]
                 ),
-                terminal=jnp.array(
-                    [[[0.0], [0.0], [0.0]], [[0.0], [0.0], [0.0]]],
+                agent_mask=jnp.array(
+                    [[[1.0], [1.0], [1.0]], [[1.0], [1.0], [1.0]]],
                     dtype=jnp.float32,
                 ),
             ),
@@ -437,8 +437,8 @@ dummy_sample = reverb.ReplaySample(
                         [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
                     ]
                 ),
-                terminal=jnp.array(
-                    [[[0.0], [0.0], [0.0]], [[0.0], [0.0], [0.0]]],
+                agent_mask=jnp.array(
+                    [[[1.0], [1.0], [1.0]], [[1.0], [1.0], [1.0]]],
                     dtype=jnp.float32,
                 ),
             ),

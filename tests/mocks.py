@@ -259,15 +259,10 @@ class ParallelEnvironment(MockedEnvironment, ParallelEnvWrapper):
         observation_specs = {}
         for agent in self.agents:
             legals = self.action_spec()[agent]
-            terminal = acme_specs.Array(
-                (1,),
-                np.float32,
-            )
-
             observation_specs[agent] = OLT(
                 observation=super().observation_spec(),
                 legal_actions=legals,
-                terminal=terminal,
+                agent_mask=super().discount_spec(),
             )
         return observation_specs
 
@@ -436,7 +431,7 @@ def make_fake_env_specs() -> MAEnvironmentSpec:
             observations=OLT(
                 observation=acme_specs.Array(shape=(10,), dtype=np.float32),
                 legal_actions=acme_specs.DiscreteArray(num_values=3),
-                terminal=acme_specs.DiscreteArray(num_values=1),
+                agent_mask=acme_specs.DiscreteArray(num_values=1),
             ),
             actions=acme_specs.DiscreteArray(num_values=3),
             rewards=acme_specs.Array(shape=(), dtype=np.float32),
