@@ -247,6 +247,11 @@ def fake_batch() -> Batch:
         behavior_values=jnp.array([4.1, 4.5, 4.7]),
         behavior_log_probs=jnp.array([5.1, 5.5, 5.7]),
         policy_states=None,
+        masks={
+            "agent_0": jnp.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]),
+            "agent_1": jnp.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]),
+            "agent_2": jnp.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]),
+        },
     )
     return batch
 

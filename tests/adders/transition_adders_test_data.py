@@ -76,8 +76,7 @@ TEST_CASES = [
             ),
         ),
         expected_transitions=(
-            # (observation, action, reward, discount, next_observation, extras,
-            #  next_extras)
+            # (observation, action, reward, discount, next_observation, extras,)
             types.Transition(
                 obs_first, default_action, reward_step1, default_discount, obs_step1
             ),
@@ -126,8 +125,7 @@ TEST_CASES = [
             ),
         ),
         expected_transitions=(
-            # (observation, action, reward, discount, next_observation, extras,
-            #  next_extras)
+            # (observation, action, reward, discount, next_observation, extras,)
             types.Transition(
                 obs_first,
                 {"agent_0": 1, "agent_1": 2, "agent_2": 3},
@@ -184,8 +182,7 @@ TEST_CASES = [
             ),
         ),
         expected_transitions=(
-            # (observation, action, reward, discount, next_observation, extras,
-            #  next_extras)
+            # (observation, action, reward, discount, next_observation, extras,)
             types.Transition(
                 obs_first,
                 {"agent_0": 1.5, "agent_1": 2.5, "agent_2": 3.5},
@@ -254,8 +251,7 @@ TEST_CASES = [
             ),
         ),
         expected_transitions=(
-            # (observation, action, reward, discount, next_observation, extras,
-            # next_extras)
+            # (observation, action, reward, discount, next_observation, extras)
             types.Transition(
                 obs_first,
                 {
@@ -333,8 +329,7 @@ TEST_CASES = [
             ),
         ),
         expected_transitions=(
-            # (observation, action, reward, discount, next_observation, extras,
-            # next_extras)
+            # (observation, action, reward, discount, next_observation, extras)
             types.Transition(
                 obs_first,
                 default_action,
@@ -397,8 +392,7 @@ TEST_CASES = [
             ),
         ),
         expected_transitions=(
-            # (observation, action, reward, discount, next_observation, extras,
-            #  next_extras)
+            # (observation, action, reward, discount, next_observation, extras,)
             types.Transition(
                 obs_first, default_action, reward_step1, default_discount, obs_step1
             ),
@@ -466,8 +460,7 @@ TEST_CASES = [
             ),
         ),
         expected_transitions=(
-            # (observation, action, reward, discount, next_observation, extras,
-            #  next_extras)
+            # (observation, action, reward, discount, next_observation, extras,)
             types.Transition(
                 obs_first,
                 default_action,
@@ -548,8 +541,7 @@ TEST_CASES = [
             ),
         ),
         expected_transitions=(
-            # (observation, action, reward, discount, next_observation, extras,
-            #  next_extras)
+            # (observation, action, reward, discount, next_observation, extras,)
             types.Transition(
                 obs_first,
                 default_action,
@@ -629,8 +621,7 @@ TEST_CASES = [
             ),
         ),
         expected_transitions=(
-            # (observation, action, reward, discount, next_observation, extras,
-            #  next_extras)
+            # (observation, action, reward, discount, next_observation, extras,)
             types.Transition(
                 obs_first,
                 default_action,

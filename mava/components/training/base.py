@@ -44,6 +44,7 @@ class Batch(NamedTuple):
     death_masks: Any
 
 
+
 class TrainingState(NamedTuple):
     """Training state consists of network parameters and optimiser state."""
 

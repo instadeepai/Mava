@@ -340,6 +340,7 @@ class MAPGWithTrustRegionStep(Step):
                     masks,
                     death_masks,
                 ),
+
             )
 
             actions = jax.tree_util.tree_map(lambda x, m: x * m, actions, masks)
@@ -376,6 +377,7 @@ class MAPGWithTrustRegionStep(Step):
                 behavior_values=behavior_values,
                 sequence_padding_masks=masks,
                 death_masks=death_masks,
+
             )
 
             agent_0_t_vals = list(target_values.values())[0]

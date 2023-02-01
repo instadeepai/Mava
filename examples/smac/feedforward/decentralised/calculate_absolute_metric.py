@@ -103,8 +103,6 @@ def main(_: Any) -> None:
         num_epochs=15,
         num_executors=1,
         multi_process=True,
-        normalise_observations=False,
-        normalise_target_values=False,
         evaluation_interval={"executor_steps": 10000},
         evaluation_duration={"evaluator_episodes": 32},
         logger_factory=logger_factory,

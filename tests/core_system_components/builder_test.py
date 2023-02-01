@@ -26,7 +26,7 @@ from mava.systems import Builder, Executor, ParameterServer, Trainer
 from tests.hook_order_tracking import HookOrderTracking
 
 
-class TestBuilder(HookOrderTracking, Builder):
+class MockBuilder(HookOrderTracking, Builder):
     """Mock for the builder"""
 
     __test__ = False
@@ -54,32 +54,32 @@ class TestBuilder(HookOrderTracking, Builder):
 @pytest.fixture
 def test_builder() -> Builder:
     """Dummy builder with no components."""
-    return TestBuilder(
+    return MockBuilder(
         components=[Logger()],
         global_config=SimpleNamespace(config_key="config_value"),
     )
 
 
-def test_global_config_loaded(test_builder: TestBuilder) -> None:
+def test_global_config_loaded(test_builder: MockBuilder) -> None:
     """Test that global config is loaded into the store during init()."""
     assert test_builder.store.global_config.config_key == "config_value"
     assert len(test_builder.callbacks) == 1
     assert isinstance(test_builder.callbacks[0], Logger)
 
 
-def test_data_server_store(test_builder: TestBuilder) -> None:
+def test_data_server_store(test_builder: MockBuilder) -> None:
     """Test that store is handled correctly in data_server()."""
     assert test_builder.data_server() == ["data_table_1", "data_table_2"]
 
 
-def test_parameter_server_store(test_builder: TestBuilder) -> None:
+def test_parameter_server_store(test_builder: MockBuilder) -> None:
     """Test that store is handled correctly in parameter_server()."""
     parameter_server = test_builder.parameter_server()
     assert isinstance(parameter_server, ParameterServer)
     assert parameter_server.store == test_builder.store
 
 
-def test_executor_store_when_is_evaluator(test_builder: TestBuilder) -> None:
+def test_executor_store_when_is_evaluator(test_builder: MockBuilder) -> None:
     """Test that store is handled correctly in executor() when it's an evaluator."""
     executor_id = "evaluator"
     data_server_client = "data_server_client"
@@ -103,7 +103,7 @@ def test_executor_store_when_is_evaluator(test_builder: TestBuilder) -> None:
     assert test_builder.store.executor.store == test_builder.store
 
 
-def test_executor_store_when_executor(test_builder: TestBuilder) -> None:
+def test_executor_store_when_executor(test_builder: MockBuilder) -> None:
     """Test that store is handled correctly in executor() when it's an executor."""
     executor_id = "executor_0"
     data_server_client = "data_server_client"
@@ -127,7 +127,7 @@ def test_executor_store_when_executor(test_builder: TestBuilder) -> None:
     assert test_builder.store.executor.store == test_builder.store
 
 
-def test_trainer_store(test_builder: TestBuilder) -> None:
+def test_trainer_store(test_builder: MockBuilder) -> None:
     """Test that store is handled correctly in trainer()."""
     trainer_id = "trainer_0"
     data_server_client = "data_server_client"
@@ -146,7 +146,7 @@ def test_trainer_store(test_builder: TestBuilder) -> None:
     assert test_builder.store.parameter_server_client == parameter_server_client
 
 
-def test_init_hook_order(test_builder: TestBuilder) -> None:
+def test_init_hook_order(test_builder: MockBuilder) -> None:
     """Test if init() hooks are called in the correct order."""
     assert test_builder.hook_list == [
         "on_building_init_start",
@@ -155,7 +155,7 @@ def test_init_hook_order(test_builder: TestBuilder) -> None:
     ]
 
 
-def test_data_server_hook_order(test_builder: TestBuilder) -> None:
+def test_data_server_hook_order(test_builder: MockBuilder) -> None:
     """Test if data_server() hooks are called in the correct order."""
     test_builder.reset_hook_list()
     test_builder.data_server()
@@ -168,7 +168,7 @@ def test_data_server_hook_order(test_builder: TestBuilder) -> None:
     ]
 
 
-def test_parameter_server_hook_order(test_builder: TestBuilder) -> None:
+def test_parameter_server_hook_order(test_builder: MockBuilder) -> None:
     """Test if parameter_server() hooks are called in the correct order."""
     test_builder.reset_hook_list()
     test_builder.parameter_server()
@@ -179,7 +179,7 @@ def test_parameter_server_hook_order(test_builder: TestBuilder) -> None:
     ]
 
 
-def test_executor_hook_order_when_executor(test_builder: TestBuilder) -> None:
+def test_executor_hook_order_when_executor(test_builder: MockBuilder) -> None:
     """Test if executor() hooks are called in the correct order when executor."""
     test_builder.reset_hook_list()
     test_builder.executor(
@@ -198,7 +198,7 @@ def test_executor_hook_order_when_executor(test_builder: TestBuilder) -> None:
     ]
 
 
-def test_executor_hook_order_when_evaluator(test_builder: TestBuilder) -> None:
+def test_executor_hook_order_when_evaluator(test_builder: MockBuilder) -> None:
     """Test if executor() hooks are called in the correct order when evaluator."""
     test_builder.reset_hook_list()
     test_builder.executor(
@@ -215,7 +215,7 @@ def test_executor_hook_order_when_evaluator(test_builder: TestBuilder) -> None:
     ]
 
 
-def test_trainer_hook_order(test_builder: TestBuilder) -> None:
+def test_trainer_hook_order(test_builder: MockBuilder) -> None:
     """Test if trainer() hooks are called in the correct order."""
     test_builder.reset_hook_list()
     test_builder.trainer(
@@ -231,7 +231,7 @@ def test_trainer_hook_order(test_builder: TestBuilder) -> None:
     ]
 
 
-def test_build_hook_order(test_builder: TestBuilder) -> None:
+def test_build_hook_order(test_builder: MockBuilder) -> None:
     """Test if build() hooks are called in the correct order."""
     test_builder.reset_hook_list()
     test_builder.build()
@@ -242,7 +242,7 @@ def test_build_hook_order(test_builder: TestBuilder) -> None:
     ]
 
 
-def test_launch_hook_order(test_builder: TestBuilder) -> None:
+def test_launch_hook_order(test_builder: MockBuilder) -> None:
     """Test if launch() hooks are called in the correct order."""
     test_builder.reset_hook_list()
     test_builder.launch()

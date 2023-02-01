@@ -27,7 +27,7 @@ from mava.types import NestedArray
 from tests.hook_order_tracking import HookOrderTracking
 
 
-class TestExecutor(HookOrderTracking, Executor):
+class MockExecutor(HookOrderTracking, Executor):
     def __init__(
         self,
         store: SimpleNamespace,
@@ -42,7 +42,7 @@ class TestExecutor(HookOrderTracking, Executor):
 @pytest.fixture
 def test_executor() -> Executor:
     """Dummy Executor with no components."""
-    return TestExecutor(
+    return MockExecutor(
         store=SimpleNamespace(
             store_key="expected_value",
             is_evaluator=False,
@@ -141,7 +141,7 @@ def test_update_store(
     assert test_executor.store._wait
 
 
-def test_init_hook_order(test_executor: TestExecutor) -> None:
+def test_init_hook_order(test_executor: MockExecutor) -> None:
     """Test if init hooks are called in the correct order"""
     assert test_executor.hook_list == [
         "on_execution_init_start",
@@ -151,7 +151,7 @@ def test_init_hook_order(test_executor: TestExecutor) -> None:
 
 
 def test_observe_first_hook_order(
-    test_executor: TestExecutor,
+    test_executor: MockExecutor,
     dummy_time_step: dm_env.TimeStep,
     dummy_extras: Dict[str, NestedArray],
 ) -> None:
@@ -166,7 +166,7 @@ def test_observe_first_hook_order(
 
 
 def test_observe_hook_order(
-    test_executor: TestExecutor,
+    test_executor: MockExecutor,
     dummy_actions: Dict[str, NestedArray],
     dummy_time_step: dm_env.TimeStep,
     dummy_extras: Dict[str, NestedArray],
@@ -184,7 +184,7 @@ def test_observe_hook_order(
 
 
 def test_select_actions_hook_order(
-    test_executor: TestExecutor,
+    test_executor: MockExecutor,
 ) -> None:
     """Test if select_actions hooks are called in the correct order"""
     test_executor.reset_hook_list()
@@ -199,7 +199,7 @@ def test_select_actions_hook_order(
 
 
 def test_update_hook_order(
-    test_executor: TestExecutor,
+    test_executor: MockExecutor,
 ) -> None:
     """Test if update hooks are called in the correct order"""
     test_executor.reset_hook_list()

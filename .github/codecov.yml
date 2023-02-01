@@ -2,13 +2,14 @@ coverage:
   status:
     project:
       default:
+        # Only fail PR, if overall project codecov drops by 1%.
+        threshold: 1%
         target: auto
-        # Only fail PR, if overall project codecov drops by 0.5%.
-        threshold: 0.5%
-        base: auto
-        branch:
-          - develop
+
     patch:
       default:
         # New code, should have 80% code coverage.
         target: 80%
+  ignore:
+    - "educational" # ignore educational folder and all its contents
+    - "setup.py"

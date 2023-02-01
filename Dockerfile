@@ -1,15 +1,24 @@
 ##########################################################
 # Core Mava image
-FROM nvidia/cuda:11.5.1-cudnn8-devel-ubuntu20.04 as mava-core
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as mava-core
 # Flag to record agents
 ARG record
 # Ensure no installs try launch interactive screen
 ARG DEBIAN_FRONTEND=noninteractive
 # Update packages
-RUN apt-get update --fix-missing -y && apt-get install -y python3-pip && apt-get install -y python3-venv
-# Update python path
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 10 &&\
-    rm -rf /root/.cache && apt-get clean
+RUN apt-get update -y && \
+    apt-get install -y software-properties-common && \
+    add-apt-repository -y ppa:deadsnakes/ppa && \
+    apt install -y python3.9 && \
+    apt install -y python3.9-dev && \
+    apt-get install -y python3-pip && \
+    apt-get install -y python3.9-venv
+
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.9 10
+
+# Check python v
+RUN python -V
+
 # Setup virtual env
 RUN python -m venv mava
 ENV VIRTUAL_ENV /mava

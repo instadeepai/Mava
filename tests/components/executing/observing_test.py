@@ -38,10 +38,9 @@ class MockAdder:
         """Initiator of a mock adder"""
         pass
 
-    def add_first(self, timestep: TimeStep, extras: Dict[str, Any]) -> None:
+    def add_first(self, timestep: TimeStep) -> None:
         """Record the first observation of a trajectory."""
         self.test_timestep = timestep
-        self.test_extras = extras
 
     def add(
         self,
@@ -175,7 +174,6 @@ class MockExecutor(Executor):
             policy_states=policy_states,
             networks=networks,
             adder=adder,
-            next_extras=extras,
             next_timestep=timestep,
             actions_info=actions_info,
             policies_info=policies_info,
@@ -268,7 +266,6 @@ def test_on_execution_observe_first(
     )
 
     assert mock_executor.store.adder.test_timestep == mock_executor.store.timestep
-    assert mock_executor.store.adder.test_extras == mock_executor.store.extras
 
 
 def test_on_execution_observe_first_fixed_sampling(
@@ -307,10 +304,6 @@ def test_on_execution_observe_first_fixed_sampling(
         mock_executor_fixed_net.store.adder.test_timestep
         == mock_executor_fixed_net.store.timestep
     )
-    assert (
-        mock_executor_fixed_net.store.adder.test_extras
-        == mock_executor_fixed_net.store.extras
-    )
 
 
 def test_on_execution_observe_without_adder(
@@ -325,7 +318,6 @@ def test_on_execution_observe_without_adder(
     """
     feedforward_executor_observe.on_execution_observe(executor=executor_without_adder)
 
-    assert not hasattr(executor_without_adder.store, "next_extras")
     assert not hasattr(executor_without_adder.store.adder, "add")
 
 
@@ -347,7 +339,7 @@ def test_on_execution_observe(
         )
 
     assert (
-        mock_executor.store.next_extras["network_int_keys"]
+        mock_executor.store.extras["network_int_keys"]
         == mock_executor.store.network_int_keys_extras
     )
 
@@ -362,7 +354,7 @@ def test_on_execution_observe(
         mock_executor.store.adder.test_next_timestep
         == mock_executor.store.next_timestep
     )
-    assert mock_executor.store.adder.test_next_extras == mock_executor.store.next_extras
+    assert mock_executor.store.adder.test_extras == mock_executor.store.extras
 
 
 def test_on_execution_update(
@@ -445,7 +437,6 @@ def test_on_execution_observe_first_recurrent(
     )
 
     assert mock_executor.store.adder.test_timestep == mock_executor.store.timestep
-    assert mock_executor.store.adder.test_extras == mock_executor.store.extras
 
 
 def test_on_execution_observe_first_fixed_sampling_recurrent(
@@ -484,10 +475,6 @@ def test_on_execution_observe_first_fixed_sampling_recurrent(
         mock_executor_fixed_net.store.adder.test_timestep
         == mock_executor_fixed_net.store.timestep
     )
-    assert (
-        mock_executor_fixed_net.store.adder.test_extras
-        == mock_executor_fixed_net.store.extras
-    )
 
 
 def test_on_execution_observe_without_adder_recurrent(
@@ -502,7 +489,6 @@ def test_on_execution_observe_without_adder_recurrent(
     """
     recurrent_executor_observe.on_execution_observe(executor=executor_without_adder)
 
-    assert not hasattr(executor_without_adder.store, "next_extras")
     assert not hasattr(executor_without_adder.store.adder, "add")
 
 
@@ -524,7 +510,7 @@ def test_on_execution_observe_recurrent(
         )
 
     assert (
-        mock_executor.store.next_extras["network_int_keys"]
+        mock_executor.store.extras["network_int_keys"]
         == mock_executor.store.network_int_keys_extras
     )
 
@@ -538,10 +524,10 @@ def test_on_execution_observe_recurrent(
         mock_executor.store.adder.test_next_timestep
         == mock_executor.store.next_timestep
     )
-    assert mock_executor.store.adder.test_next_extras == mock_executor.store.next_extras
+    assert mock_executor.store.adder.test_extras == mock_executor.store.extras
 
     # Test that policy_states are set correctly in extras
-    assert mock_executor.store.adder.test_next_extras["policy_states"] == 1234
+    assert mock_executor.store.adder.test_extras["policy_states"] == 1234
 
 
 def test_on_execution_update_recurrent(

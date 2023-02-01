@@ -159,7 +159,6 @@ def test_parallel_sequence_adder(
         == parallel_sequence_adder.config.sequence_length
     )
     assert mock_builder.store.adder._period == parallel_sequence_adder.config.period
-
     assert mock_builder.store.adder._client == mock_builder.store.data_server_client
     assert mock_builder.store.adder._priority_fns == mock_builder.store.priority_fns
     assert (
