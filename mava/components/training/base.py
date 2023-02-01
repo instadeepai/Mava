@@ -31,7 +31,6 @@ class Batch(NamedTuple):
     policy_states: Any
     actions: Any
     advantages: Any
-    loss_masks: Any
 
     # Target value estimate used to bootstrap the value function.
     target_values: Any
@@ -39,6 +38,10 @@ class Batch(NamedTuple):
     # Value estimate and action log-prob at behavior time.
     behavior_values: Any
     behavior_log_probs: Any
+
+    # Sequence padding mask
+    sequence_padding_masks: Any
+    death_masks: Any
 
 
 class TrainingState(NamedTuple):

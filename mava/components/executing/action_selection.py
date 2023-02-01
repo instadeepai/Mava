@@ -281,8 +281,6 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
                 base_key=action_key,
                 mask=utils.add_batch_dim(observation.legal_actions),
             )
-            # Note (dries): This is done so that the init policy state is aligned
-            # with init state shape.
             return action_info, policy_info, policy_state, base_key
 
         def select_actions(

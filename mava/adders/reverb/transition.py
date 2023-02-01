@@ -143,19 +143,13 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
 
         # Get the state, action, next_state, as well as possibly extras for the
         # transition that is about to be written.
+
         history = self._writer.history
         s, e, a = tree.map_structure(
-            get_first,
-            (
-                history["observations"],
-                history.get("extras", {}),
-                history["actions"],
-            ),
+            get_first, (history["observations"], history["extras"], history["actions"])
         )
 
-        s_, e_ = tree.map_structure(
-            get_last, (history["observations"], history.get("next_extras", {}))
-        )
+        s_ = tree.map_structure(get_last, (history["observations"]))
 
         # Note: at the beginning of an episode we will add the initial N-1
         # transitions (of size 1, 2, ...) and at the end of an episode (when
@@ -195,7 +189,6 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             rewards=n_step_return,
             discounts=total_discount,
             next_observations=s_,
-            next_extras=e_,
         )
 
         # Calculate the priority for this transition.
@@ -211,7 +204,6 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         cls,
         ma_environment_spec: mava_specs.MAEnvironmentSpec,
         extras_specs: Dict[str, Any] = {},
-        next_extras_specs: Dict[str, Any] = {},
     ) -> tf.TypeSpec:
         """Signature for adder.
 
@@ -236,7 +228,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         agent_environment_specs = ma_environment_spec.get_agent_environment_specs()
         agents = ma_environment_spec.get_agent_ids()
         env_extras_specs = ma_environment_spec.get_extras_specs()
-        next_extras_specs.update(env_extras_specs)
+        extras_specs.update(env_extras_specs)
 
         obs_specs = {}
         act_specs = {}
@@ -266,7 +258,6 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             rewards=reward_specs,
             discounts=step_discount_specs,
             extras=extras_specs,
-            next_extras=next_extras_specs,
         )
 
         return tree.map_structure_with_path(

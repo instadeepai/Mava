@@ -19,23 +19,70 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any, Dict, List, Tuple, Type
 
+import chex
 import haiku as hk
 import jax
 import jax.numpy as jnp
 import rlax
+from chex import Array
 from haiku._src.basic import merge_leading_dims
 
 from mava.callbacks import Callback
 from mava.components import Component, training
 from mava.core_jax import SystemTrainer
-from mava.utils.training_utils import clipped_surrogate_pg_loss
+
+
+def clipped_surrogate_pg_loss(
+    prob_ratios_t: Array,
+    adv_t: Array,
+    epsilon: float,
+    mask: Array,
+    use_stop_gradient: bool = True,
+) -> Array:
+    """Computes the clipped surrogate policy gradient loss.
+
+    L_clipₜ(θ) = - min(rₜ(θ)Âₜ, clip(rₜ(θ), 1-ε, 1+ε)Âₜ)
+    Where rₜ(θ) = π_θ(aₜ| sₜ) / π_θ_old(aₜ| sₜ) and Âₜ are the advantages.
+    See Proximal Policy Optimization Algorithms, Schulman et al.:
+    https://arxiv.org/abs/1707.06347
+    -----------------------------------------------
+    This was copied from the RLAX packaged and only modifed to accept a mask
+    -----------------------------------------------
+
+    Args:
+        prob_ratios_t:
+            Ratio of action probabilities for actions a_t:
+            rₜ(θ) = π_θ(aₜ| sₜ) / π_θ_old(aₜ| sₜ)
+        adv_t:
+            the observed or estimated advantages from executing actions a_t.
+        epsilon:
+            Scalar value corresponding to how much to clip the objecctive.
+        mask:
+            Mask to apply for sequence padding.
+        use_stop_gradient:
+            bool indicating whether or not to apply stop gradient to
+            advantages.
+
+    Returns:
+        Loss whose gradient corresponds to a clipped surrogate policy gradient
+            update.
+    """
+    chex.assert_rank([prob_ratios_t, adv_t], [1, 1])
+    chex.assert_type([prob_ratios_t, adv_t], [float, float])
+
+    adv_t = jax.lax.select(use_stop_gradient, jax.lax.stop_gradient(adv_t), adv_t)
+    clipped_ratios_t = jnp.clip(prob_ratios_t, 1.0 - epsilon, 1.0 + epsilon)
+    clipped_objective = jnp.fmin(prob_ratios_t * adv_t, clipped_ratios_t * adv_t)
+
+    eps = 1e-10
+
+    return -jnp.sum(clipped_objective * mask) / (jnp.sum(mask) + eps)
 
 
 class ValueLoss(Component):
     @abc.abstractmethod
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
-        """An abstract class for a component that defines the
-        final value loss function."""
+        """An abstract class for a component for the final value loss function."""
 
     @staticmethod
     def name() -> str:
@@ -117,8 +164,7 @@ class HuberValueLoss(ValueLoss):
 class Loss(Component):
     @abc.abstractmethod
     def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
-        """An abstract class for a component that defines the
-        entire policy and critic loss functions."""
+        """Abstract class component for the entire policy and critic loss functions."""
 
     @staticmethod
     def name() -> str:
@@ -146,9 +192,10 @@ class Loss(Component):
 
 @dataclass
 class MAPGTrustRegionClippingLossConfig:
-    """The value_clip_parameter should be relatively small when
-    value_normalization is True. The idea is to scale it to try and
-    match the effect of the normalisation on the target values.
+    """The value_clip_parameter should be relatively small when value_normalization is True.
+
+    The idea is to scale it to try and match the effect of the normalisation
+    on the target values.
     """
 
     clipping_epsilon: float = 0.2
@@ -156,7 +203,6 @@ class MAPGTrustRegionClippingLossConfig:
     clip_value: bool = True
     entropy_cost: float = 0.01
     value_cost: float = 0.5
-    loss_masking: bool = False
 
 
 class MAPGWithTrustRegionClippingLoss(Loss):
@@ -185,17 +231,16 @@ class MAPGWithTrustRegionClippingLoss(Loss):
             policy_params: Any,
             policy_states: Any,
             observations: Any,
-            loss_masks: Any,
             actions: Dict[str, jnp.ndarray],
             behaviour_log_probs: Dict[str, jnp.ndarray],
             advantages: Dict[str, jnp.ndarray],
+            masks: Dict[str, jnp.ndarray],
         ) -> Tuple[Dict[str, jnp.ndarray], Dict[str, Dict[str, jnp.ndarray]]]:
             """Surrogate loss using clipped probability ratios.
 
             Args:
                 policy_params: policy network parameters.
                 observations: agent observations.
-                loss_masks: loss masks.
                 actions: actions the agents took.
                 behaviour_log_probs: Log probabilities of actions taken by
                     current policy in the environment.
@@ -217,10 +262,10 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                     policy_params: Any,
                     policy_states: Any,
                     observations: Any,
-                    loss_masks: Any,
                     actions: jnp.ndarray,
                     behaviour_log_probs: jnp.ndarray,
                     advantages: jnp.ndarray,
+                    mask: jnp.ndarray,
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
                     """Inner policy loss function: see outer function for parameters."""
 
@@ -244,9 +289,13 @@ class MAPGWithTrustRegionClippingLoss(Loss):
 
                         # Use the state at the start of the sequence
                         # and unroll the policy.
-                        core = lambda x, y: network.policy_network.apply(
-                            policy_params, [x, y]
-                        )
+                        # core = lambda x, y: network.policy_network.apply(
+                        #     policy_params, [x, y]
+                        # )
+
+                        def core(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
+                            return network.policy_network.apply(policy_params, [x, y])
+
                         distribution_params, _ = hk.static_unroll(
                             core,
                             batch_seq_observations,
@@ -274,21 +323,13 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                     rhos = jnp.exp(log_probs - behaviour_log_probs)
                     clipping_epsilon = self.config.clipping_epsilon
 
-                    if self.config.loss_masking:
-                        policy_loss = clipped_surrogate_pg_loss(
-                            prob_ratios_t=rhos,
-                            adv_t=advantages,
-                            epsilon=clipping_epsilon,
-                            loss_masks=loss_masks,
-                        )
-                        entropy_loss = -jnp.sum(entropy * loss_masks) / (
-                            jnp.sum(loss_masks) + 10e-8
-                        )
-                    else:
-                        policy_loss = rlax.clipped_surrogate_pg_loss(
-                            rhos, advantages, clipping_epsilon
-                        )
-                        entropy_loss = -jnp.mean(entropy)
+                    policy_loss = clipped_surrogate_pg_loss(
+                        rhos, advantages, clipping_epsilon, mask
+                    )
+
+                    eps = 1e-10
+                    # Entropy regulariser.
+                    entropy_loss = -jnp.sum(entropy * mask) / (jnp.sum(mask) + eps)
 
                     total_policy_loss = (
                         policy_loss + entropy_loss * self.config.entropy_cost
@@ -310,26 +351,25 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                     policy_params[agent_net_key],
                     policy_states[agent_key],
                     observations[agent_key].observation,
-                    loss_masks[agent_key],
                     actions[agent_key],
                     behaviour_log_probs[agent_key],
                     advantages[agent_key],
+                    masks[agent_key],
                 )
             return policy_grads, loss_info_policy
 
         def critic_loss_grad_fn(
             critic_params: Any,
             observations: Any,
-            loss_masks: Any,
             target_values: Dict[str, jnp.ndarray],
             behavior_values: Dict[str, jnp.ndarray],
+            masks: Dict[str, jnp.ndarray],
         ) -> Tuple[Dict[str, jnp.ndarray], Dict[str, Dict[str, jnp.ndarray]]]:
             """Clipped critic loss.
 
             Args:
                 critic_params: critic network parameters.
                 observations: agent observations.
-                loss_masks: loss masks.
                 actions: actions the agents took.
                 target_values: target values to be used for optimizing the
                     critic network.
@@ -349,13 +389,15 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                 def critic_loss_fn(
                     critic_params: Any,
                     observations: Any,
-                    loss_masks: Any,
                     target_values: jnp.ndarray,
                     behavior_values: jnp.ndarray,
+                    mask: jnp.ndarray,
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
                     """Inner critic loss function: see outer function for parameters."""
 
-                    values = network.critic_network.apply(critic_params, observations)
+                    values = (
+                        network.critic_network.apply(critic_params, observations) * mask
+                    )
 
                     # Value function loss. Exclude the bootstrap value
                     unclipped_value_error = target_values - values
@@ -364,6 +406,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                         unclipped_value_error
                     )
 
+                    eps = 1e-10
                     value_clip_parameter = self.config.value_clip_parameter
                     if self.config.clip_value:
                         # Clip values to reduce variablility during critic training.
@@ -377,11 +420,13 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                         clipped_value_loss = trainer.store.value_loss_fn(
                             clipped_value_error
                         )
-                        value_loss = jnp.mean(
+                        value_loss = jnp.sum(
                             jnp.fmax(unclipped_value_loss, clipped_value_loss)
-                        )
+                        ) / (jnp.sum(mask) + eps)
                     else:
-                        value_loss = jnp.mean(unclipped_value_loss)
+                        value_loss = jnp.sum(unclipped_value_loss) / (
+                            jnp.sum(mask) + eps
+                        )
 
                     # TODO (Ruan): Including value loss parameter in the
                     # value loss for now but can add a flag
@@ -396,9 +441,9 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                 )(
                     critic_params[agent_net_key],
                     observations[agent_key].observation,
-                    loss_masks[agent_key],
                     target_values[agent_key],
                     behavior_values[agent_key],
+                    masks[agent_key],
                 )
             return critic_grads, loss_info_critic
 

@@ -101,16 +101,7 @@ class DataServer(Component):
                 builder.store.extras_spec,
                 num_networks,
             )
-
-            next_extras_specs = convert_specs(
-                builder.store.agent_net_keys,
-                builder.store.next_extras_spec,
-                num_networks,
-            )
-
-            table = self.table(
-                table_key, env_specs, extras_specs, next_extras_specs, builder
-            )
+            table = self.table(table_key, env_specs, extras_specs, builder)
             data_tables.append(table)
         return data_tables
 
@@ -120,7 +111,6 @@ class DataServer(Component):
         table_key: str,
         environment_specs: specs.MAEnvironmentSpec,
         extras_specs: Dict[str, Any],
-        next_extras_specs: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
         """Abstract method defining signature for table creation.
@@ -128,8 +118,7 @@ class DataServer(Component):
         Args:
             table_key: Identifier for table.
             environment_specs: Environment specs.
-            extras_specs: Other specs aligned with the actions.
-            next_extras_specs: Other specs aligned with the observations.
+            extras_specs: Other specs.
             builder: SystemBuilder.
 
         Returns:
@@ -158,8 +147,8 @@ class DataServer(Component):
 
         BaseSystemInit required to set up builder.store.agent_net_keys
         and for config network_sampling_setup.
-        EnvironmentSpec required to set up builder.store.environment_spec,
-        builder.store.extras_spec and builder.store.next_extras_spec.
+        EnvironmentSpec required to set up builder.store.environment_spec
+        and builder.store.extras_spec.
         AdderSignature required to set up builder.store.adder_signature_fn.
 
         Returns:
@@ -191,7 +180,6 @@ class OffPolicyDataServer(DataServer):
         table_key: str,
         environment_specs: specs.MAEnvironmentSpec,
         extras_specs: Dict[str, Any],
-        next_extras_specs: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
         """Create OffPolicyDataServer table.
@@ -201,8 +189,7 @@ class OffPolicyDataServer(DataServer):
         Args:
             table_key: Identifier for table.
             environment_specs: Environment specs.
-            extras_specs: Other specs aligned with the actions.
-            next_extras_specs: Other specs aligned with the observations.
+            extras_specs: Other specs.
             builder: SystemBuilder.
 
         Returns:
@@ -224,9 +211,7 @@ class OffPolicyDataServer(DataServer):
             remover=builder.store.remover_fn(),
             max_size=self.config.max_size,
             rate_limiter=builder.store.rate_limiter_fn(),
-            signature=builder.store.adder_signature_fn(
-                environment_specs, extras_specs, next_extras_specs
-            ),
+            signature=builder.store.adder_signature_fn(environment_specs, extras_specs),
             max_times_sampled=self.config.max_times_sampled,
         )
         return table
@@ -268,7 +253,6 @@ class OnPolicyDataServer(DataServer):
         table_key: str,
         environment_specs: specs.MAEnvironmentSpec,
         extras_specs: Dict[str, Any],
-        next_extras_specs: Dict[str, Any],
         builder: SystemBuilder,
     ) -> reverb.Table:
         """Create OnPolicyDataServer table.
@@ -278,8 +262,7 @@ class OnPolicyDataServer(DataServer):
         Args:
             table_key: Identifier for table.
             environment_specs: Environment specs.
-            extras_specs: Other specs aligned with the actions.
-            next_extras_specs: Other specs aligned with the observations.
+            extras_specs: Other specs.
             builder: SystemBuilder.
 
         Returns:
@@ -290,11 +273,10 @@ class OnPolicyDataServer(DataServer):
                 environment_specs,
                 builder.store.global_config.sequence_length,
                 extras_specs,
-                next_extras_specs,
             )
         else:
             signature = builder.store.adder_signature_fn(
-                environment_specs, extras_specs, next_extras_specs
+                environment_specs, extras_specs
             )
         table = reverb.Table.queue(
             name=table_key,
