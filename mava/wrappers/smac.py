@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Wraper for SMAC."""
+import copy
 from typing import Any, Dict, List, Optional, Union
 
 import dm_env
@@ -50,9 +51,9 @@ class SMACWrapper(ParallelEnvWrapper):
         self._return_state_info = return_state_info
         self._agents = [f"agent_{n}" for n in range(self._environment.n_agents)]
 
-        # This prevents resetting SMAC if it is already in the reset state. SMAC has a bug
-        # where the max returns become less than 20 if reset is called more than once directly
-        # after each other.
+        # This prevents resetting SMAC if it is already in the reset state.
+        # SMAC has a bug where the max returns become less than 20 if reset
+        # is called more than once directly after each other.
         self._is_reset = False
         self._done = False
 
@@ -60,6 +61,7 @@ class SMACWrapper(ParallelEnvWrapper):
         self._battles_game = 0
 
         self._death_masking = death_masking
+        self._pre_agents_alive: Dict[str, Any] = {}
 
     def reset(self) -> dm_env.TimeStep:
         """Resets the env, if it was not reset on the previous step.
@@ -76,18 +78,19 @@ class SMACWrapper(ParallelEnvWrapper):
         self._step_type = dm_env.StepType.FIRST
 
         # Get observation from env
-        observation = self.environment.get_obs()
-        legal_actions = self._get_legal_actions()
-        observations = self._convert_observations(
-            observation, legal_actions, self._done
-        )
-
-        # Set env discount to 1 for all agents
         discount_spec = self.discount_spec()
-        self._discounts = {
+        agents_mask = {
             agent: convert_np_type(discount_spec[agent].dtype, 1)
             for agent in self._agents
         }
+        observation = self.environment.get_obs()
+        legal_actions = self._get_legal_actions()
+        observations = self._convert_observations(
+            observation, legal_actions, agents_mask
+        )
+
+        # Set env discount to 1 for all agents
+        self._discounts = copy.deepcopy(agents_mask)
 
         # Set reward to zero for all agents
         rewards_spec = self.reward_spec()
@@ -95,6 +98,8 @@ class SMACWrapper(ParallelEnvWrapper):
             agent: convert_np_type(rewards_spec[agent].dtype, 0)
             for agent in self._agents
         }
+
+        self._pre_agents_alive = {agent: True for agent in self._agents}
 
         # Possibly add state information to extras
         if self._return_state_info:
@@ -124,8 +129,15 @@ class SMACWrapper(ParallelEnvWrapper):
         # Get the next observations
         next_observations = self._environment.get_obs()
         legal_actions = self._get_legal_actions()
+        discounts_mask = {}
+        for agent in self.possible_agents:
+            # If the agent was not done at the start of the episode,
+            discounts_mask[agent] = convert_np_type(
+                self.discount_spec()[agent].dtype, self._pre_agents_alive[agent]
+            )
+            self._pre_agents_alive[agent] = not self.is_dead(agent)
         next_observations = self._convert_observations(
-            next_observations, legal_actions, self._done
+            next_observations, legal_actions, discounts_mask
         )
 
         # Convert team reward to agent-wise rewards
@@ -140,7 +152,6 @@ class SMACWrapper(ParallelEnvWrapper):
 
         if self._done:
             self._step_type = dm_env.StepType.LAST
-
             # Discount on last timestep set to zero
             self._discounts = {
                 agent: convert_np_type(self.discount_spec()[agent].dtype, 0.0)
@@ -194,19 +205,16 @@ class SMACWrapper(ParallelEnvWrapper):
         Returns:
             is_dead: boolean indicating whether the agent is alive or dead.
         """
-        is_dead = False
-        if self._environment.agents[agent].health == 0.0:
-            is_dead = True
-        return is_dead
+        return self._environment.agents[int(agent.rsplit("_", -1)[-1])].health == 0.0
 
     def _convert_observations(
-        self, observations: List, legal_actions: List, done: bool
+        self, observations: List, legal_actions: List, agents_mask: Dict[str, Any]
     ) -> types.Observation:
         """Convert SMAC observation so it's dm_env compatible.
 
         Args:
             observes (Dict[str, np.ndarray]): observations per agent.
-            dones (Dict[str, bool]): dones per agent.
+            agents_mask (Dict[str, bool]): Masked agents.
 
         Returns:
             types.Observation: dm compatible observations.
@@ -214,7 +222,7 @@ class SMACWrapper(ParallelEnvWrapper):
         olt_observations = {}
         for i, agent in enumerate(self._agents):
             # Check if agent is dead, if so, apply death mask.
-            if self._death_masking and self.is_dead(i):
+            if self._death_masking and self.is_dead(agent):
                 observation = np.zeros_like(observations[i])
             else:
                 observation = observations[i]
@@ -222,7 +230,7 @@ class SMACWrapper(ParallelEnvWrapper):
             olt_observations[agent] = types.OLT(
                 observation=observation,
                 legal_actions=legal_actions[i],
-                terminal=np.asarray([done], dtype=np.float32),
+                agent_mask=np.asarray([agents_mask[agent]], dtype=np.float32),
             )
 
         return olt_observations
@@ -257,7 +265,7 @@ class SMACWrapper(ParallelEnvWrapper):
             observation_specs[agent] = types.OLT(
                 observation=observations[i],
                 legal_actions=legal_actions[i],
-                terminal=np.asarray([True], dtype=np.float32),
+                agent_mask=np.asarray([True], dtype=np.float32),
             )
 
         return observation_specs
@@ -354,8 +362,8 @@ class SMACWrapper(ParallelEnvWrapper):
         """Check and returns all death masked agents"""
 
         masked_agents = []
-        for i, agent in enumerate(self._agents):
-            if self._death_masking and self.is_dead(i):
+        for agent in self._agents:
+            if self._death_masking and self.is_dead(agent):
                 masked_agents.append(agent)
 
         return masked_agents

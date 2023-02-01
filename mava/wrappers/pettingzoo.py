@@ -15,6 +15,7 @@
 
 """Wraps a PettingZoo MARL environment to be used as a dm_env environment."""
 
+import copy
 from typing import Any, Dict, List, Optional, Union
 
 import dm_env
@@ -62,6 +63,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         self._environment = environment
         self._reset_next_step = True
         self._return_state_info = return_state_info
+        self._pre_dones: Dict[str, Any] = {}
 
         if env_preprocess_wrappers:
             self._environment = apply_env_wrapper_preprocessors(
@@ -84,15 +86,13 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
             agent: convert_np_type(discount_spec[agent].dtype, 1)
             for agent in self.possible_agents
         }
-
+        agents_mask = copy.deepcopy(self._discounts)
         if self._return_state_info and type(observe) == tuple:
             observe, state = observe
         else:
             state = None
 
-        observations = self._convert_observations(
-            observe, {agent: False for agent in self.possible_agents}
-        )
+        observations = self._convert_observations(observe, agents_mask)
         rewards_spec = self.reward_spec()
         rewards = {
             agent: convert_np_type(rewards_spec[agent].dtype, 0)
@@ -103,6 +103,9 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         # the env reset - e.g. smac.
         if not state:
             state = self.get_state()
+
+        # Assuming no agents are done at the start of the episode.
+        self._pre_dones = {agent: False for agent in self.agents}
 
         if state is not None:
             return parameterized_restart(rewards, self._discounts, observations), {
@@ -133,8 +136,18 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
 
         observations, rewards, dones, infos = self._environment.step(actions)
 
+        agents_mask = {}
+        for agent in self.possible_agents:
+            # If the agent was not done at the start of the episode,
+            # it is a valid step (death masking).
+            value = not self._pre_dones[agent]
+            self._pre_dones[agent] = dones[agent]
+            agents_mask[agent] = convert_np_type(
+                self.discount_spec()[agent].dtype, value
+            )
+
         rewards = self._convert_reward(rewards)
-        observations = self._convert_observations(observations, dones)
+        observations = self._convert_observations(observations, agents_mask)
 
         state = self.get_state()
 
@@ -142,18 +155,18 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
             self._step_type = dm_env.StepType.LAST
             self._reset_next_step = True
             # Terminal discount should be 0.0 as per dm_env
-            discount = {
+            discounts = {
                 agent: convert_np_type(self.discount_spec()[agent].dtype, 0.0)
                 for agent in self.possible_agents
             }
         else:
             self._step_type = dm_env.StepType.MID
-            discount = self._discounts
+            discounts = self._discounts
 
         timestep = dm_env.TimeStep(
             observation=observations,
             reward=rewards,
-            discount=discount,
+            discount=discounts,
             step_type=self._step_type,
         )
 
@@ -215,20 +228,20 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         return rewards_return
 
     def _convert_observations(
-        self, observes: Dict[str, np.ndarray], dones: Dict[str, bool]
+        self, observes: Dict[str, np.ndarray], agents_mask: Dict[str, Any]
     ) -> types.Observation:
         """Convert PettingZoo observation so it's dm_env compatible.
 
         Args:
             observes (Dict[str, np.ndarray]): observations per agent.
-            dones (Dict[str, bool]): dones per agent.
+            agents_mask (Dict[str, bool]): agents_mask per agent.
 
         Returns:
             types.Observation: dm compatible observations.
         """
         return convert_dm_compatible_observations(
             observes,
-            dones,
+            agents_mask,
             self.observation_spec(),
             self.env_done(),
             self.possible_agents,
@@ -273,7 +286,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
             observation_specs[agent] = types.OLT(
                 observation=observation,
                 legal_actions=legal_actions,
-                terminal=specs.Array((1,), np.float32),
+                agent_mask=np.asarray([True], dtype=np.float32),
             )
 
         return observation_specs

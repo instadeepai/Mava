@@ -96,6 +96,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         self._reset_next_step = True
         self._step_type = dm_env.StepType.FIRST
         self.num_actions = 5
+        self._pre_dones: Dict[str, Any] = {}
 
         self.action_spaces = {
             agent: Discrete(self.num_actions) for agent in self.possible_agents
@@ -191,8 +192,9 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         self._discounts = {
             agent: np.dtype("float32").type(1.0) for agent in self.agents
         }
+        agents_mask = {agent: np.dtype("float32").type(1.0) for agent in self.agents}
         observe, info = self._environment.reset()
-        observations = self._create_observations(observe, info, self._environment.dones)
+        observations = self._create_observations(observe, info, agents_mask)
         rewards_spec = self.reward_spec()
         rewards = {
             agent: convert_np_type(rewards_spec[agent].dtype, 0)
@@ -204,6 +206,10 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
             agent: convert_np_type(discount_spec[agent].dtype, 1)
             for agent in self.possible_agents
         }
+
+        # Assuming no agents are done at the start of the episode.
+        self._pre_dones = {agent: False for agent in self.agents}
+
         return parameterized_restart(rewards, discounts, observations), {}
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
@@ -237,7 +243,16 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
             }
 
         if observations:
-            observations = self._create_observations(observations, infos, dones)
+            agents_mask = {}
+            for agent in self.possible_agents:
+                # If the agent was not done at the start of the episode,
+                # it is a valid step (death masking).
+                value = not self._pre_dones[agent]
+                self._pre_dones[agent] = dones[agent]
+                agents_mask[agent] = convert_np_type(
+                    self.discount_spec()[agent].dtype, value
+                )
+            observations = self._create_observations(observations, infos, agents_mask)
 
         if self.env_done():
             self._step_type = dm_env.StepType.LAST
@@ -274,12 +289,12 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
     def _convert_observations(
         self,
         observes: Dict[str, Tuple[np.ndarray, np.ndarray]],
-        dones: Dict[str, bool],
+        agents_mask: Dict[Any, Any],
     ) -> Observation:
         """Convert observation"""
         return convert_dm_compatible_observations(
             observes,
-            dones,
+            agents_mask,
             self.observation_spec(),
             self.env_done(),
             self.possible_agents,
@@ -309,12 +324,13 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         self,
         obs: Dict[int, np.ndarray],
         info: Dict[str, Dict[int, Any]],
-        dones: Dict[int, bool],
+        agents_mask: Dict[Any, Any],
     ) -> Observation:
         """Convert observation."""
         observations_ = self._collate_obs_and_info(obs, info)
-        dones_ = {get_agent_id(k): v for k, v in dones.items()}
-        observations = self._convert_observations(observations_, dones_)
+        # TODO(Omayma): check the agents masking working without
+        # agents_mask_ = {get_agent_id(k): v for k, v in agents_mask.items()}
+        observations = self._convert_observations(observations_, agents_mask)
         return observations
 
     def _obtain_preprocessor(
@@ -377,7 +393,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
                 if self._include_agent_info
                 else _convert_to_spec(self.observation_spaces[agent]),
                 legal_actions=legals,
-                terminal=specs.Array((1,), np.float32),
+                agent_mask=np.asarray([True], dtype=np.float32),
             )
         return observation_specs
 

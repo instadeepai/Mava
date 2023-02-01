@@ -127,7 +127,7 @@ class ConcatAgentIdToObservation(BasePreprocessWrapper):
             new_observations[agent] = OLT(
                 observation=np.concatenate([agent_one_hot, agent_observation]),
                 legal_actions=agent_olt.legal_actions,
-                terminal=agent_olt.terminal,
+                agent_mask=agent_olt.agent_mask,
             )
 
         return (
@@ -157,7 +157,7 @@ class ConcatAgentIdToObservation(BasePreprocessWrapper):
             new_observations[agent] = OLT(
                 observation=np.concatenate([agent_one_hot, agent_observation]),
                 legal_actions=agent_olt.legal_actions,
-                terminal=agent_olt.terminal,
+                agent_mask=agent_olt.agent_mask,
             )
 
         return (
@@ -211,7 +211,7 @@ class ConcatPrevActionToObservation(BasePreprocessWrapper):
             new_observations[agent] = OLT(
                 observation=np.concatenate([agent_one_hot_action, agent_observation]),
                 legal_actions=agent_olt.legal_actions,
-                terminal=agent_olt.terminal,
+                agent_mask=agent_olt.agent_mask,
             )
 
         return (
@@ -243,7 +243,7 @@ class ConcatPrevActionToObservation(BasePreprocessWrapper):
             new_observations[agent] = OLT(
                 observation=np.concatenate([agent_one_hot_action, agent_observation]),
                 legal_actions=agent_olt.legal_actions,
-                terminal=agent_olt.terminal,
+                agent_mask=agent_olt.agent_mask,
             )
 
         return (
@@ -314,7 +314,7 @@ class StackObservations(BasePreprocessWrapper):
             new_observations[agent] = OLT(
                 observation=agent_stack_observation,
                 legal_actions=agent_olt.legal_actions,
-                terminal=agent_olt.terminal,
+                agent_mask=agent_olt.agent_mask,
             )
 
         return (
@@ -348,7 +348,7 @@ class StackObservations(BasePreprocessWrapper):
             new_observations[agent] = OLT(
                 observation=agent_stack_observation,
                 legal_actions=agent_olt.legal_actions,
-                terminal=agent_olt.terminal,
+                agent_mask=agent_olt.agent_mask,
             )
 
         return (

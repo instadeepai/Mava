@@ -67,6 +67,7 @@ class MinibatchUpdate(Utility):
 @dataclass
 class MAPGMinibatchUpdateConfig:
     normalize_advantage: bool = True
+    death_masking_loss: bool = False
 
 
 class MAPGMinibatchUpdate(MinibatchUpdate):
@@ -113,6 +114,15 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
                 advantages = minibatch.advantages
 
             # Calculate the gradients and agent metrics.
+            if self.config.death_masking_loss:
+                masks = {}
+                for agent in minibatch.sequence_padding_masks:
+                    masks[agent] = (
+                        minibatch.sequence_padding_masks[agent]
+                        * minibatch.death_masks[agent]
+                    )
+            else:
+                masks = minibatch.sequence_padding_masks
             policy_gradients, policy_agent_metrics = trainer.store.policy_grad_fn(
                 policy_params,
                 minibatch.policy_states,
@@ -120,7 +130,7 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
                 minibatch.actions,
                 minibatch.behavior_log_probs,
                 advantages,
-                minibatch.masks,
+                masks,
             )
 
             # Calculate the gradients and agent metrics.
@@ -129,7 +139,7 @@ class MAPGMinibatchUpdate(MinibatchUpdate):
                 minibatch.observations,
                 minibatch.target_values,
                 minibatch.behavior_values,
-                minibatch.masks,
+                minibatch.sequence_padding_masks,
             )
 
             metrics = {}

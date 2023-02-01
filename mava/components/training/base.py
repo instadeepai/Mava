@@ -40,7 +40,8 @@ class Batch(NamedTuple):
     behavior_log_probs: Any
 
     # Sequence padding mask
-    masks: Any
+    sequence_padding_masks: Any
+    death_masks: Any
 
 
 class TrainingState(NamedTuple):
