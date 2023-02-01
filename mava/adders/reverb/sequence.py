@@ -135,7 +135,6 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         ma_environment_spec: specs.MAEnvironmentSpec,
         sequence_length: Optional[int] = None,
         extras_specs: Dict[str, Any] = {},
-        next_extras_specs: Dict[str, Any] = {},
     ) -> tf.TypeSpec:
         """Returns adder signature.
 
@@ -144,7 +143,6 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
             sequence_length (Optional[int], optional): Length of sequence.
                 Defaults to None.
             extras_specs (Dict, optional): Spec for extra data. Defaults to {}.
-            next_extras_specs (Dict, optional): Spec for next extra data. Defaults to {}.
 
         Returns:
             tf.TypeSpec: Signature for sequence adder.
@@ -153,5 +151,4 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
             ma_environment_spec=ma_environment_spec,
             sequence_length=sequence_length,
             extras_specs=extras_specs,
-            next_extras_specs=next_extras_specs,
         )

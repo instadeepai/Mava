@@ -15,7 +15,7 @@ from .base_normalisation import BaseNormalisation
 
 @dataclass
 class ObservationNormalisationConfig:
-    normalise_observations: bool = True
+    normalise_observations: bool = False
     normalize_axes: Optional[List[float]] = field(default_factory=lambda: None)
 
 
@@ -32,7 +32,6 @@ class ObservationNormalisation(BaseNormalisation):
 
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """Initialise observations' normalisation parameters"""
-        #if self.config.normalise_observations:
         obs_norm_key = constants.OBS_NORM_STATE_DICT_KEY
         agent_env_specs = builder.store.ma_environment_spec._agent_environment_specs
         builder.store.norm_params[obs_norm_key] = {}

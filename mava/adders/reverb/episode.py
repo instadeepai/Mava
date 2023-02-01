@@ -86,7 +86,6 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
         action: types.NestedArray,
         next_timestep: dm_env.TimeStep,
         extras: types.NestedArray = (),
-        next_extras: types.NestedArray = (),
     ) -> None:
         if self._writer.episode_steps >= self._max_sequence_length - 1:
             raise ValueError(
@@ -94,7 +93,7 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
                 "max_sequence_length with the addition of this transition."
             )
 
-        ReverbParallelAdder.add(self, action, next_timestep, extras, next_extras)
+        super().add(action, next_timestep, extras)
 
     def _write_last(self) -> None:
         if (
@@ -107,7 +106,6 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
                 action=history["action"],
                 reward=history["reward"],
                 discount=history["discount"],
-                next_extras=history.get("next_extras", ()),
                 extras=history.get("extras", ()),
             )
             # Get shapes and dtypes from the last element.
@@ -141,11 +139,9 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
         ma_environment_spec: specs.MAEnvironmentSpec,
         sequence_length: Optional[int] = None,
         extras_specs: Dict[str, Any] = {},
-        next_extras_specs: Dict[str, Any] = {},
     ) -> tf.TypeSpec:
         return mava_utils.trajectory_signature(
             ma_environment_spec=ma_environment_spec,
             sequence_length=sequence_length,
             extras_specs=extras_specs,
-            next_extras_specs=next_extras_specs,
         )

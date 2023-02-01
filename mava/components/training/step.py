@@ -177,6 +177,7 @@ class Step(Component):
 @dataclass
 class MAPGWithTrustRegionStepConfig:
     discount: float = 0.99
+    mask_padded_sequence: bool = False
 
 
 class MAPGWithTrustRegionStep(Step):
@@ -219,13 +220,12 @@ class MAPGWithTrustRegionStep(Step):
             # Extract the data.
             data = sample.data
 
-            observations, actions, rewards, discounts, extras, next_extras = (
+            observations, actions, rewards, discounts, extras = (
                 data.observations,
                 data.actions,
                 data.rewards,
                 data.discounts,
                 data.extras,
-                data.next_extras,
             )
 
             # Perform observation normalization if neccesary before proceeding
@@ -241,12 +241,12 @@ class MAPGWithTrustRegionStep(Step):
                     ) = trainer.store.norm_obs_running_stats_fn(
                         observation_stats[key], observations[key]
                     )
-            # Mask which is zero if an episode is done or an agent is done.
-            # The final timestep is not masked.
-            loss_masks = {}
+
+            death_masks = {}
             for agent in observations.keys():
-                loss_masks[agent] = observations[agent].agent_mask
-                loss_masks[agent] = loss_masks[agent].reshape(discounts[agent].shape)
+                death_masks[agent] = observations[agent].agent_mask
+                death_masks[agent] = death_masks[agent].reshape(discounts[agent].shape)
+
             discounts = tree.map_structure(
                 lambda x: x * self.config.discount, discounts
             )
@@ -313,29 +313,55 @@ class MAPGWithTrustRegionStep(Step):
                         target_value_stats[key], behavior_values[key]
                     )
 
+            # create a padded sequence mask from discounts
+            if self.config.mask_padded_sequence:
+                masks = jax.tree_util.tree_map(
+                    lambda x: jnp.array(x != 0).astype(float), discounts
+                )
+            else:
+                masks = jax.tree_util.tree_map(lambda x: jnp.ones_like(x), discounts)
+
             # Exclude the last step - it was only used for bootstrapping.
             # The shape is [num_sequences, num_steps, ..]
             (
                 observations,
-                loss_masks,
                 actions,
                 behavior_log_probs,
                 behavior_values,
+                masks,
+                death_masks,
             ) = jax.tree_util.tree_map(
                 lambda x: x[:, :-1],
                 (
                     observations,
-                    loss_masks,
                     actions,
                     behavior_log_probs,
                     behavior_values,
+                    masks,
+                    death_masks,
                 ),
             )
 
-            if "policy_states" in next_extras:
+            actions = jax.tree_util.tree_map(lambda x, m: x * m, actions, masks)
+
+            advantages = jax.tree_util.tree_map(lambda x, m: x * m, advantages, masks)
+
+            behavior_log_probs = jax.tree_util.tree_map(
+                lambda x, m: x * m, behavior_log_probs, masks
+            )
+
+            target_values = jax.tree_util.tree_map(
+                lambda x, m: x * m, target_values, masks
+            )
+
+            behavior_values = jax.tree_util.tree_map(
+                lambda x, m: x * m, behavior_values, masks
+            )
+
+            if "policy_states" in extras:
                 policy_states = jax.tree_util.tree_map(
                     lambda x: x[:, :-1],
-                    next_extras["policy_states"],
+                    extras["policy_states"],
                 )
             else:
                 policy_states = {agent: None for agent in trainer.store.agents}
@@ -345,15 +371,17 @@ class MAPGWithTrustRegionStep(Step):
                 policy_states=policy_states,
                 actions=actions,
                 advantages=advantages,
-                loss_masks=loss_masks,
                 behavior_log_probs=behavior_log_probs,
                 target_values=target_values,
                 behavior_values=behavior_values,
+                sequence_padding_masks=masks,
+                death_masks=death_masks,
             )
 
             agent_0_t_vals = list(target_values.values())[0]
             assert len(agent_0_t_vals) > 1
             batch_size = agent_0_t_vals.shape[0]
+
             assert batch_size % trainer.store.global_config.num_minibatches == 0, (
                 "Num minibatches must divide batch size. Got batch_size={}"
                 " num_minibatches={}."
