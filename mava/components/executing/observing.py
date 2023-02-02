@@ -213,11 +213,11 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
             executor.store.net_keys_to_ids,
         )
         # executor.store.extras set by Executor
-        executor.store.next_extras[
+        executor.store.extras[
             "network_int_keys"
         ] = executor.store.network_int_keys_extras
 
-        executor.store.next_extras["policy_states"] = executor.store.policy_states
+        executor.store.extras["policy_states"] = executor.store.policy_states
 
         # executor.store.timestep set by Executor
         executor.store.adder.add_first(executor.store.timestep)
@@ -238,8 +238,6 @@ class RecurrentExecutorObserve(FeedforwardExecutorObserve):
         policies_info = executor.store.policies_info
 
         adder_actions: Dict[str, Any] = {}
-        # executor.store.next_extras set by Executor
-        executor.store.extras = {}
         executor.store.extras["policy_info"] = {}
         for agent in actions_info.keys():
             adder_actions[agent] = {

@@ -53,13 +53,12 @@ class ExtrasLogProbSpec(ExtrasSpec):
                 shape=(), dtype=np.float32
             )
 
-        builder.store.next_extras_spec = {}
         # Add the networks keys to extras.
         net_spec = self.get_network_keys(
             builder.store.unique_net_keys,
             builder.store.ma_environment_spec.get_agent_ids(),
         )
-        builder.store.next_extras_spec.update(net_spec)
+        builder.store.extras_spec.update(net_spec)
 
         # Get the policy state specs
         networks = builder.store.network_factory()
@@ -72,4 +71,4 @@ class ExtrasLogProbSpec(ExtrasSpec):
         if net_states:
             net_spec = {"policy_states": net_states}
 
-        builder.store.next_extras_spec.update(net_spec)
+        builder.store.extras_spec.update(net_spec)

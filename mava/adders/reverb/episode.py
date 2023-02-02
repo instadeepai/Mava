@@ -53,22 +53,12 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
         Args:
           client: See docstring for BaseAdder.
           max_sequence_length: The maximum length of an episode.
-          period: The period with which we add sequences. If less than
-            sequence_length, overlapping sequences are added. If equal to
-            sequence_length, sequences are exactly non-overlapping.
           delta_encoded: If `True` (False by default) enables delta encoding, see
             `Client` for more information.
-          chunk_length: Number of timesteps grouped together before delta encoding
-            and compression. See `Client` for more information.
           priority_fns: See docstring for BaseAdder.
-          pad_end_of_episode: If True (default) then upon end of episode the current
-            sequence will be padded (with observations, actions, etc... whose values
-            are 0) until its length is `sequence_length`. If False then the last
-            sequence in the episode may have length less than `sequence_length`.
-          break_end_of_episode: If 'False' (True by default) does not break
-            sequences on env reset. In this case 'pad_end_of_episode' is not used.
           max_in_flight_items: The maximum number of items allowed to be "in flight"
             at the same time. See `reverb.Writer.writer` for more info.
+          padding_fn: function to use for padding sequences upon end of episode.
         """
 
         ReverbParallelAdder.__init__(
@@ -87,12 +77,13 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
         next_timestep: dm_env.TimeStep,
         extras: types.NestedArray = (),
     ) -> None:
+        """Add sequences."""
+
         if self._writer.episode_steps >= self._max_sequence_length - 1:
             raise ValueError(
                 "The number of observations within the same episode will exceed "
                 "max_sequence_length with the addition of this transition."
             )
-
         super().add(action, next_timestep, extras)
 
     def _write_last(self) -> None:
@@ -106,7 +97,6 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
                 action=history["action"],
                 reward=history["reward"],
                 discount=history["discount"],
-                next_extras=history.get("next_extras", ()),
                 extras=history.get("extras", ()),
             )
             # Get shapes and dtypes from the last element.
@@ -141,6 +131,8 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
         sequence_length: Optional[int] = None,
         extras_specs: Dict[str, Any] = {},
     ) -> tf.TypeSpec:
+        """Adder signature."""
+
         return mava_utils.trajectory_signature(
             ma_environment_spec=ma_environment_spec,
             sequence_length=sequence_length,

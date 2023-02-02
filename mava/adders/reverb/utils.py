@@ -39,12 +39,9 @@ def final_step_like(
         rewards=zero_reward,
         discounts=zero_discount,
         start_of_episode=False,
-        extras=tree.map_structure(
-            acme_utils.zeros_like, step.extras
-        ),  # Actions are zero-filled.
-        next_extras=next_extras
+        extras=next_extras
         if next_extras
-        else tree.map_structure(acme_utils.zeros_like, step.next_extras),
+        else tree.map_structure(acme_utils.zeros_like, step.extras),
     )
 
 
@@ -52,7 +49,6 @@ def trajectory_signature(
     ma_environment_spec: mava_specs.MAEnvironmentSpec,
     sequence_length: Optional[int] = None,
     extras_specs: types.NestedSpec = (),
-    next_extras_specs: types.NestedSpec = (),
 ) -> tf.TypeSpec:
     """This is a helper method for generating signatures for Reverb tables.
 
@@ -67,9 +63,6 @@ def trajectory_signature(
         extras_specs: A nested structure with leaf nodes that have `.shape` and
         `.dtype` attributes. The structure (and shapes/dtypes) of this must
         be the same as the `extras` passed into `ReverbAdder.add`.
-        next_extras_specs: A nested structure with leaf nodes that have `.shape` and
-        `.dtype` attributes. The structure (and shapes/dtypes) of this must
-        be the same as the `next_extras` passed into `ReverbAdder.add`.
         sequence_length: An optional integer representing the expected length of
         sequences that will be added to replay.
 
@@ -90,7 +83,7 @@ def trajectory_signature(
     # Note (dries) Environment extras are passed to next extras
     # to align with the observation info.
     env_extras_specs = ma_environment_spec.get_extras_specs()
-    next_extras_specs.update(env_extras_specs)
+    extras_specs.update(env_extras_specs)
 
     obs_specs = {}
     act_specs = {}
@@ -114,7 +107,6 @@ def trajectory_signature(
         step_discount_specs,
         soe_spec,
         extras_specs,
-        next_extras_specs,
     ) = tree.map_structure_with_path(
         add_time_dim,
         (
@@ -124,7 +116,6 @@ def trajectory_signature(
             step_discount_specs,
             specs.Array(shape=(), dtype=bool),
             extras_specs,
-            next_extras_specs,
         ),
     )
 
@@ -135,7 +126,6 @@ def trajectory_signature(
         discounts=step_discount_specs,
         start_of_episode=soe_spec,
         extras=extras_specs,
-        next_extras=next_extras_specs,
     )
 
     return spec_step

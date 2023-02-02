@@ -203,14 +203,12 @@ class ParallelTransitionAdderSignature(AdderSignature):
         def adder_sig_fn(
             ma_environment_spec: specs.MAEnvironmentSpec,
             extras_specs: Dict[str, Any],
-            next_extras_specs: Dict[str, Any],
         ) -> Any:
             """Constructs a ParallelNStepTransitionAdder signature from specs.
 
             Args:
                 ma_environment_spec: Environment specs.
                 extras_specs: Extra specs aligned with the actions.
-                next_extras_specs: Extra specs aligned with the observations.
 
             Returns:
                 ParallelNStepTransitionAdder signature.
@@ -218,7 +216,6 @@ class ParallelTransitionAdderSignature(AdderSignature):
             return reverb_adders.ParallelNStepTransitionAdder.signature(
                 ma_environment_spec=ma_environment_spec,
                 extras_specs=extras_specs,
-                next_extras_specs=next_extras_specs,
             )
 
         builder.store.adder_signature_fn = adder_sig_fn
@@ -288,7 +285,6 @@ class ParallelSequenceAdderSignature(AdderSignature):
             ma_environment_spec: specs.MAEnvironmentSpec,
             sequence_length: int,
             extras_specs: Dict[str, Any],
-            next_extras_specs: Dict[str, Any],
         ) -> Any:
             """Creates a ParallelSequenceAdder signature.
 
@@ -296,7 +292,6 @@ class ParallelSequenceAdderSignature(AdderSignature):
                 ma_environment_spec: Environment specs.
                 sequence_length: Length of the adder sequences.
                 extras_specs: Extra specs aligned with the actions.
-                next_extras_specs: Extra specs aligned with the observations.
 
             Returns:
                 ParallelSequenceAdder signature.
@@ -305,7 +300,6 @@ class ParallelSequenceAdderSignature(AdderSignature):
                 ma_environment_spec=ma_environment_spec,
                 sequence_length=sequence_length,
                 extras_specs=extras_specs,
-                next_extras_specs=next_extras_specs,
             )
 
         builder.store.adder_signature_fn = adder_sig_fn

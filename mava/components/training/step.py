@@ -221,13 +221,12 @@ class MAPGWithTrustRegionStep(Step):
             # Extract the data.
             data = sample.data
 
-            observations, actions, rewards, termination, extras, next_extras = (
+            observations, actions, rewards, termination, extras = (
                 data.observations,
                 data.actions,
                 data.rewards,
                 data.discounts,
                 data.extras,
-                data.next_extras,
             )
 
             # Perform observation normalization if neccesary before proceeding
@@ -365,10 +364,10 @@ class MAPGWithTrustRegionStep(Step):
                 lambda x, m: x * m, behavior_values, masks
             )
 
-            if "policy_states" in next_extras:
+            if "policy_states" in extras:
                 policy_states = jax.tree_util.tree_map(
                     lambda x: x[:, :-1],
-                    next_extras["policy_states"],
+                    extras["policy_states"],
                 )
             else:
                 policy_states = {agent: None for agent in trainer.store.agents}

@@ -66,9 +66,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         """
         self.store.timestep = timestep
 
-        # Store environment extras in next_extras.
-        self.store.next_extras = {}
-        self.store.next_extras = extras
+        self.store.extras = extras
 
         self.on_execution_observe_first_start()
 
@@ -92,8 +90,6 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         self.store.actions = actions
         self.store.next_timestep = next_timestep
 
-        # Store environment extras in next_extras.
-        self.store.next_extras = {}
         self.store.next_extras = next_extras
 
         self.on_execution_observe_start()

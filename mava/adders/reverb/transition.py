@@ -204,7 +204,6 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         cls,
         ma_environment_spec: mava_specs.MAEnvironmentSpec,
         extras_specs: Dict[str, Any] = {},
-        next_extras_specs: Dict[str, Any] = {},
     ) -> tf.TypeSpec:
         """Signature for adder.
 
@@ -229,7 +228,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         agent_environment_specs = ma_environment_spec.get_agent_environment_specs()
         agents = ma_environment_spec.get_agent_ids()
         env_extras_specs = ma_environment_spec.get_extras_specs()
-        next_extras_specs.update(env_extras_specs)
+        extras_specs.update(env_extras_specs)
 
         obs_specs = {}
         act_specs = {}
