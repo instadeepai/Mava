@@ -29,6 +29,7 @@ from mava.wrappers import SMACWrapper
 from mava.wrappers.env_preprocess_wrappers import (
     ConcatAgentIdToObservation,
     ConcatPrevActionToObservation,
+    StackObservations,
 )
 
 if _found_smac:
@@ -40,6 +41,8 @@ if _found_smac:
         evaluation: bool = False,
         random_seed: Optional[int] = None,
         death_masking: bool = False,
+        stack_frames: int = 1,
+        return_state_info: bool = True,
     ) -> Tuple[Any, Dict[str, str]]:
         """Make a SMAC enviroment.
 
@@ -47,15 +50,24 @@ if _found_smac:
             map_name: the name of the scenario
             concat_prev_actions: Concat one-hot vector of agent prev_action to obs.
             concat_agent_id: Concat one-hot vector of agent ID to obs.
-            evaluation: extra param for evaluation
+            evaluation: extra param for evaluation.
             random_seed: seed
-            death_masking: whether to mask out agent observations once dead
+            death_masking: whether to mask out agent observations once dead.
+            stack_frames: number of frames to stack together.
+            return_state_info: should step and reset return state information.
         """
         # Env uses int64 action space due to the use of spac.Discrete.
         set_jax_double_precision()
+
+        env: Any
         env = StarCraft2Env(map_name=map_name, seed=random_seed)
 
-        env = SMACWrapper(env, death_masking=death_masking)
+        env = SMACWrapper(
+            env, death_masking=death_masking, return_state_info=return_state_info
+        )
+
+        if stack_frames > 1:
+            env = StackObservations(env, num_frames=stack_frames)
 
         if concat_prev_actions:
             env = ConcatPrevActionToObservation(env)

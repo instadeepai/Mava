@@ -300,6 +300,8 @@ def ippo_system_multi_thread_eval() -> System:
         executor_parameter_update_period=1,
         multi_process=True,
         run_evaluator=True,
+        normalise_observations=False,
+        normalise_target_values=False,
         num_executors=1,
         max_queue_size=500,
         epoch_batch_size=5,
@@ -309,7 +311,11 @@ def ippo_system_multi_thread_eval() -> System:
         evaluation_interval={"executor_steps": 1000},
         evaluation_duration={"evaluator_episodes": 5},
         checkpoint_best_perf=True,
-        termination_condition={"executor_steps": 5000},
+        # Flag to activate the calculation of the absolute metric
+        absolute_metric=True,
+        # How many episodes the evaluator will run for
+        absolute_metric_duration=32,
+        termination_condition={"executor_steps": 10000},
         wait=True,
     )
     return test_system

@@ -97,8 +97,11 @@ class DefaultParameterServer(ParameterServer):
 
         Args:
             config: ParameterServerConfig.
+            calculate_absolute_metric: Flag to stop terminating the
+        system before the calculation of the absolute metric
         """
         self.config = config
+        self.calculate_absolute_metric = False
 
     def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
         """Register parameters and network params to track.
@@ -139,8 +142,8 @@ class DefaultParameterServer(ParameterServer):
 
         server.store.experiment_path = self.config.experiment_path
 
-        # Interrupt the system in case evaluator or trainer failed
-        server.store.parameters["evaluator_or_trainer_failed"] = False
+        # Interrupt the system flag
+        server.store.parameters["terminate"] = False
 
         # Interrupt the system in case all the executors failed
         server.store.parameters["num_executor_failed"] = 0
@@ -166,8 +169,8 @@ class DefaultParameterServer(ParameterServer):
                 get_params[var_key] = server.store.parameters[var_key]
         server.store.get_parameters = get_params
 
-        # Interrupt the system in case the evaluator or the trainer failed
-        if server.store.parameters["evaluator_or_trainer_failed"]:
+        # Interrupt the system flag
+        if server.store.parameters["terminate"]:
             termination_fn(server)
 
         # Interrupt the system in case all the executors failed

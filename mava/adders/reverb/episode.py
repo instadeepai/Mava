@@ -86,7 +86,6 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
         action: types.NestedArray,
         next_timestep: dm_env.TimeStep,
         extras: types.NestedArray = (),
-        next_extras: types.NestedArray = (),
     ) -> None:
         if self._writer.episode_steps >= self._max_sequence_length - 1:
             raise ValueError(
@@ -94,7 +93,7 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
                 "max_sequence_length with the addition of this transition."
             )
 
-        super().add(action, next_timestep, extras, next_extras)
+        super().add(action, next_timestep, extras)
 
     def _write_last(self) -> None:
         if (

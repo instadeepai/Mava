@@ -20,7 +20,11 @@ from typing import Any, Dict, Tuple
 
 import pytest
 
-from mava.utils.checkpointing_utils import update_best_checkpoint, update_to_best_net
+from mava.utils.checkpointing_utils import (
+    update_best_checkpoint,
+    update_evaluator_net,
+    update_to_best_net,
+)
 
 
 def fake_networks(k: int = 0) -> Tuple:
@@ -64,8 +68,13 @@ def fake_networks(k: int = 0) -> Tuple:
         "agent_1": critic_opt_state_val[1],
         "agent_2": critic_opt_state_val[2],
     }
+    norm_params = {
+        "agent_0": 1 / (k + 1),
+        "agent_1": 1 / (k + 3),
+        "agent_2": 1 / (k + 2),
+    }
 
-    return (networks, policy_opt_states, critic_opt_states)
+    return (networks, policy_opt_states, critic_opt_states, norm_params)
 
 
 class MockParameterClient:
@@ -80,11 +89,14 @@ class MockParameterClient:
             checkpointing_metric=["win_rate", "mean_return"],
             agents_net_keys=["agent_0", "agent_1", "agent_2"],
         )
-        (networks, policy_opt_states, critic_opt_states) = fake_networks()
+        (networks, policy_opt_states, critic_opt_states, norm_params) = fake_networks()
         self.store.parameters["best_checkpoint"] = {}
         for metric in self.store.checkpointing_metric:
             self.store.parameters["best_checkpoint"][metric] = {}
             self.store.parameters["best_checkpoint"][metric]["best_performance"] = 20
+            self.store.parameters["best_checkpoint"][metric][
+                "norm_params"
+            ] = norm_params
             for agent_net_key in networks.keys():
                 self.store.parameters["best_checkpoint"][metric][
                     f"policy_network-{agent_net_key}"
@@ -115,7 +127,9 @@ class MockExecutor:
 
     def __init__(self) -> None:
         """Initialization"""
-        (networks, policy_opt_states, critic_opt_states) = fake_networks(k=2)
+        (networks, policy_opt_states, critic_opt_states, norm_params) = fake_networks(
+            k=2
+        )
         executor_parameter_client = MockParameterClient()
         self.store = SimpleNamespace(
             networks=networks,
@@ -123,12 +137,14 @@ class MockExecutor:
             policy_opt_states=policy_opt_states,
             critic_opt_states=critic_opt_states,
             checkpointing_metric=["win_rate", "mean_return"],
+            norm_params=norm_params,
         )
-        (networks, policy_opt_states, critic_opt_states) = fake_networks()
+        (networks, policy_opt_states, critic_opt_states, norm_params) = fake_networks()
         self.store.best_checkpoint: Dict[str, Any] = {}  # type: ignore
         for metric in self.store.checkpointing_metric:
             self.store.best_checkpoint[metric] = {}
             self.store.best_checkpoint[metric]["best_performance"] = 20
+            self.store.best_checkpoint[metric]["norm_params"] = norm_params
             for agent_net_key in networks.keys():
                 self.store.best_checkpoint[metric][
                     f"policy_network-{agent_net_key}"
@@ -150,7 +166,9 @@ class MockParameterServer(MockParameterClient):
     def __init__(self) -> None:
         """Initialization"""
         super().__init__()
-        (networks, policy_opt_states, critic_opt_states) = fake_networks(k=4)
+        (networks, policy_opt_states, critic_opt_states, norm_params) = fake_networks(
+            k=4
+        )
         for agent_net_key in self.store.agents_net_keys:
             self.store.parameters[f"policy_network-{agent_net_key}"] = networks[
                 agent_net_key
@@ -164,6 +182,7 @@ class MockParameterServer(MockParameterClient):
             self.store.parameters[
                 f"critic_opt_state-{agent_net_key}"
             ] = critic_opt_states[agent_net_key]
+        self.store.parameters["norm_params"] = norm_params
 
 
 @pytest.fixture
@@ -286,3 +305,35 @@ def test_update_to_best_net(mock_parameter_server: MockParameterServer) -> None:
     del mock_parameter_server.store.parameters["best_checkpoint"]
     with pytest.raises(Exception):
         update_to_best_net(mock_parameter_server, "reward")  # type:ignore
+
+
+def test_update_evaluator_net(mock_executor: MockExecutor) -> None:
+    """Test update_evaluator_net function"""
+    update_evaluator_net(mock_executor, "win_rate")  # type:ignore
+
+    # Check that the networks got updated by the one belong to the win rate
+    for agent_net_key in mock_executor.store.networks.keys():
+        assert (
+            mock_executor.store.best_checkpoint["win_rate"][
+                f"policy_network-{agent_net_key}"
+            ]
+            == mock_executor.store.networks[agent_net_key].policy_params
+        )
+        assert (
+            mock_executor.store.best_checkpoint["win_rate"][
+                f"critic_network-{agent_net_key}"
+            ]
+            == mock_executor.store.networks[agent_net_key].critic_params
+        )
+        assert (
+            mock_executor.store.best_checkpoint["win_rate"][
+                f"policy_opt_state-{agent_net_key}"
+            ]
+            == mock_executor.store.policy_opt_states[agent_net_key]
+        )
+        assert (
+            mock_executor.store.best_checkpoint["win_rate"][
+                f"critic_opt_state-{agent_net_key}"
+            ]
+            == mock_executor.store.critic_opt_states[agent_net_key]
+        )

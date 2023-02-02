@@ -41,6 +41,11 @@ def update_best_checkpoint(
             f"critic_opt_state-{agent_net_key}"
         ] = copy.deepcopy(executor.store.critic_opt_states[agent_net_key])
 
+    if "norm_params" in executor.store.best_checkpoint[metric].keys():
+        executor.store.best_checkpoint[metric]["norm_params"] = copy.deepcopy(
+            executor.store.norm_params
+        )
+
     return executor.store.best_checkpoint[metric]["best_performance"]
 
 
@@ -70,4 +75,29 @@ def update_to_best_net(server: SystemParameterServer, metric: str) -> None:
         )
         server.store.parameters[f"critic_opt_state-{agent_net_key}"] = copy.deepcopy(
             network[f"critic_opt_state-{agent_net_key}"]
+        )
+
+    if "norm_params" in network.keys():
+        server.store.parameters["norm_params"] = copy.deepcopy(network["norm_params"])
+
+
+def update_evaluator_net(executor: SystemExecutor, metric: str) -> None:
+    """Restore the network to have the values of the network with best performance"""
+    for agent_net_key in executor.store.networks.keys():
+        executor.store.networks[agent_net_key].policy_params = copy.deepcopy(
+            executor.store.best_checkpoint[metric][f"policy_network-{agent_net_key}"]
+        )
+        executor.store.networks[agent_net_key].critic_params = copy.deepcopy(
+            executor.store.best_checkpoint[metric][f"critic_network-{agent_net_key}"]
+        )
+        executor.store.policy_opt_states[agent_net_key] = copy.deepcopy(
+            executor.store.best_checkpoint[metric][f"policy_opt_state-{agent_net_key}"]
+        )
+        executor.store.critic_opt_states[agent_net_key] = copy.deepcopy(
+            executor.store.best_checkpoint[metric][f"critic_opt_state-{agent_net_key}"]
+        )
+
+    if "norm_params" in executor.store.best_checkpoint[metric].keys():
+        executor.store.norm_params = copy.deepcopy(
+            executor.store.best_checkpoint[metric]["norm_params"]
         )

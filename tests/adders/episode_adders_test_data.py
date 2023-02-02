@@ -121,8 +121,7 @@ TEST_CASES = [
                     reward_step1,
                     final_step_discount,
                     True,
-                    {},
-                    {"state": -1},
+                    {"state": 0},
                 ),
                 base.Trajectory(
                     obs_step1,

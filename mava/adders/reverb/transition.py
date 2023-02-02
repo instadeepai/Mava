@@ -143,18 +143,13 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
 
         # Get the state, action, next_state, as well as possibly extras for the
         # transition that is about to be written.
+
         history = self._writer.history
         s, e, a = tree.map_structure(
             get_first, (history["observations"], history["extras"], history["actions"])
         )
 
-        s_, e_ = tree.map_structure(
-            get_last, (history["observations"], history["extras"])
-        )
-
-        # # Maybe get extras to add to the transition later.
-        # if 'extras' in history:
-        #     extras = tree.map_structure(get_first, history['extras'])
+        s_ = tree.map_structure(get_last, (history["observations"]))
 
         # Note: at the beginning of an episode we will add the initial N-1
         # transitions (of size 1, 2, ...) and at the end of an episode (when
@@ -194,7 +189,6 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             rewards=n_step_return,
             discounts=total_discount,
             next_observations=s_,
-            next_extras=e_,
         )
 
         # Calculate the priority for this transition.
@@ -265,7 +259,6 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             rewards=reward_specs,
             discounts=step_discount_specs,
             extras=extras_specs,
-            next_extras=next_extras_specs,
         )
 
         return tree.map_structure_with_path(

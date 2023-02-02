@@ -21,7 +21,7 @@ set -x
 # Update
 apt-get update
 
-# Python must be 3.7 or higher.
+# Python must be 3.8 or higher.
 python --version
 
 # Install dependencies.

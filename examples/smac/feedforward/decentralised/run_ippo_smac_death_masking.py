@@ -29,7 +29,7 @@ from mava.utils.loggers import logger_utils
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "map_name",
-    "3m",
+    "8m",
     "Starcraft 2 micromanagement map name (str).",
 )
 
@@ -73,11 +73,11 @@ def main(_: Any) -> None:
 
     # Optimisers.
     policy_optimiser = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-5e-4)
     )
 
     critic_optimiser = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-5e-4)
     )
 
     # Create the system.
@@ -92,10 +92,21 @@ def main(_: Any) -> None:
         policy_optimiser=policy_optimiser,
         critic_optimiser=critic_optimiser,
         run_evaluator=True,
-        epoch_batch_size=5,
+        epoch_batch_size=32,
         num_epochs=15,
         num_executors=1,
         multi_process=True,
+        sequence_length=121,
+        period=121,
+        seed=0,
+        trainer_parameter_update_period=1,
+        executor_parameter_update_period=1,
+        checkpoint_minute_interval=1,
+        huber_delta=10,
+        termination_condition={"executor_steps": 500000},
+        evaluation_interval={"executor_steps": 10000},
+        evaluation_duration={"evaluator_episodes": 32},
+        mask_padded_sequence=True,
     )
 
     # Launch the system.

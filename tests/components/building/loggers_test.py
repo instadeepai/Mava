@@ -115,6 +115,25 @@ def test_logger_with_json(test_logger_factory: Callable) -> Logger:
     return Logger(logger_config)
 
 
+@pytest.fixture
+def test_s3_logger() -> Logger:
+    """Pytest fixture for s3 logger (not a factory).
+
+    Returns:
+        Logger.
+    """
+    s3_logger = logger_utils.make_logger(
+        directory="s3://test-url-path.com",
+        to_terminal=True,
+        to_tensorboard=False,
+        time_stamp="01/01/1997-00:00:00",
+        time_delta=10,
+        label="s3-logger",
+    )
+
+    return s3_logger
+
+
 def test_on_building_executor_logger_executor(
     test_logger: Logger, test_builder: SystemBuilder
 ) -> None:
@@ -213,3 +232,15 @@ def test_on_building_trainer_logger(
     # Correct logger config has been loaded
     assert test_builder.store.trainer_logger._label == "trainer_2"
     assert test_builder.store.trainer_logger._time_stamp == "trainer_logger_config"
+
+
+def test_logger_s3_url(test_s3_logger: Logger):
+    """Test that correct paths are set when using s3 logger.
+
+    Args:
+        test_s3_logger : logger with s3 path.
+    """
+    assert test_s3_logger._directory == "s3://test-url-path.com"
+    assert (
+        test_s3_logger._path() == "s3://test-url-path.com/01/01/1997-00:00:00/s3-logger"
+    )
