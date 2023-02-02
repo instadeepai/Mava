@@ -95,24 +95,33 @@ class IDQNLoss(Loss):
                     """Inner policy loss function: see outer function for parameters."""
 
                     # Feedforward actor.
-                    q_tm1 = network.forward(policy_params, observations)
-                    q_t_value = network.forward(target_policy_params, next_observations)
-                    q_t_selector = network.forward(policy_params, next_observations)
-
-                    q_t_selector = jnp.where(masks == 1.0, q_t_selector, -99999)  # TODO
-
-                    batch_double_q_learning_loss_fn = jax.vmap(
-                        rlax.double_q_learning, (0, 0, 0, 0, 0, 0, None)
+                    _, logits_tm1, atoms_tm1 = network.forward(
+                        policy_params, observations
+                    )
+                    _, logits_t, atoms_t = network.forward(
+                        target_policy_params, next_observations
+                    )
+                    q_t_selector, _, _ = network.forward(
+                        policy_params, next_observations
+                    )
+                    q_t_selector = jnp.where(
+                        masks == 1.0, q_t_selector, jnp.finfo(jnp.float32).min
                     )
 
-                    error = batch_double_q_learning_loss_fn(
-                        q_tm1,
+                    batch_loss_fn = jax.vmap(
+                        rlax.categorical_double_q_learning,
+                        in_axes=(None, 0, 0, 0, 0, None, 0, 0),
+                    )
+
+                    error = batch_loss_fn(
+                        atoms_tm1,
+                        logits_tm1,
                         actions,
                         rewards,
-                        discounts * self.config.gamma,
-                        q_t_value,
+                        discounts,
+                        atoms_t,
+                        logits_t,
                         q_t_selector,
-                        True,
                     )
 
                     loss = jax.numpy.mean(rlax.l2_loss(error))
