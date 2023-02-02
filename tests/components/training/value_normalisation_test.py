@@ -5,7 +5,10 @@ import pytest
 import tree
 
 from mava import constants
-from mava.components.normalisation.value_normalisation import ValueNormalisation
+from mava.components.normalisation.value_normalisation import (
+    ValueNormalisation,
+    ValueNormalisationConfig,
+)
 from mava.systems.builder import Builder
 from mava.utils.jax_training_utils import init_norm_params
 from tests.mocks import make_fake_env_specs
@@ -48,7 +51,7 @@ def server() -> MockCoreComponent:
 @pytest.fixture
 def value_normaliser() -> ValueNormalisation:
     """Creates a mock value normalisation component"""
-    return ValueNormalisation()
+    return ValueNormalisation(ValueNormalisationConfig(normalise_target_values=True))
 
 
 def test_on_building_init(

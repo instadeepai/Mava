@@ -45,7 +45,7 @@ apt-get -y install git
 # For box2d
 apt-get install swig -y
 
-# Install cmake for py 3.10 
+# Install cmake for py 3.10
 apt-get install cmake -y
 
 # Install depedencies

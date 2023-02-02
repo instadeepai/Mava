@@ -39,6 +39,9 @@ class Batch(NamedTuple):
     behavior_values: Any
     behavior_log_probs: Any
 
+    # Sequence padding mask
+    masks: Any
+
 
 class TrainingState(NamedTuple):
     """Training state consists of network parameters and optimiser state."""

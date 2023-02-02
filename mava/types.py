@@ -53,4 +53,3 @@ class Transition(NamedTuple):
     discounts: NestedArray
     next_observations: NestedArray
     extras: NestedArray = ()
-    next_extras: NestedArray = ()

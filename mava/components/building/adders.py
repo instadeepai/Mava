@@ -224,7 +224,6 @@ class ParallelTransitionAdderSignature(AdderSignature):
 class ParallelSequenceAdderConfig:
     sequence_length: int = 20
     period: int = 10
-    use_next_extras: bool = False
 
 
 class ParallelSequenceAdder(Adder):
@@ -265,7 +264,6 @@ class ParallelSequenceAdder(Adder):
             sequence_length=self.config.sequence_length,
             table_network_config=builder.store.table_network_config,
             period=self.config.period,
-            use_next_extras=self.config.use_next_extras,
         )
 
         builder.store.adder = adder
