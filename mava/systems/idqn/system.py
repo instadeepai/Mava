@@ -68,7 +68,6 @@ class IDQNSystem(System):
             optimisers=dqn_building.Optimiser,
             trainer_init=training.SingleTrainerInit,
             loss=dqn_training.IDQNLoss,
-            # epoch_update=training.MAPGEpochUpdate,
             sgd_step=dqn_training.IDQNStep,
             step=training.DefaultTrainerStep,
             trainer_dataset=building.TransitionDataset,

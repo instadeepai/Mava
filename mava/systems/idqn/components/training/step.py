@@ -119,14 +119,10 @@ class IDQNStep(Step):
                     policy_params[agent_net_key], policy_updates
                 )
 
-                # TODO (sasha): does this need to be included
-                # policy_agent_metrics[agent_key]["norm_policy_grad"] = optax.global_norm(
-                #     policy_gradients[agent_key]
-                # )
-                # policy_agent_metrics[agent_key][
-                #     "norm_policy_updates"
-                # ] = optax.global_norm(policy_updates)
-                # metrics[agent_key] = policy_agent_metrics[agent_key]
+                metrics[agent_key] = {
+                    "norm_policy_grad": optax.global_norm(policy_gradients[agent_key]),
+                    "norm_policy_updates": optax.global_norm(policy_updates),
+                }
 
             # update target net
             target_policy_params = rlax.periodic_update(

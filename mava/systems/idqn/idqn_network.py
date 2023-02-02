@@ -74,9 +74,9 @@ class IDQNNetwork:
 
         random_action_probs = mask / jnp.sum(mask)
 
-        weighted_gready_probs = (1 - epsilon) * greedy_actions_probs
+        weighted_greedy_probs = (1 - epsilon) * greedy_actions_probs
         weighted_rand_probs = epsilon * random_action_probs
-        combined_probs = weighted_gready_probs + weighted_rand_probs
+        combined_probs = weighted_greedy_probs + weighted_rand_probs
 
         action_dist = Categorical(probs=combined_probs)
         return action_dist.sample(seed=base_key)

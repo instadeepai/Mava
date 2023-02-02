@@ -114,6 +114,7 @@ class TransitionDataset(TrainerDataset):
             postprocess=self.config.postprocess,
         )
 
+        builder.store.dataset = dataset
         builder.store.dataset_iterator = dataset.as_numpy_iterator()
 
 
