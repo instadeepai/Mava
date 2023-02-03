@@ -63,8 +63,8 @@ def main(_: Any) -> None:
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return idqn.make_c51_networks(  # type: ignore
             policy_layer_sizes=(64, 64),
-            v_min=0,
-            v_max=40,
+            v_min=-20,
+            v_max=45,
             *args,
             **kwargs,
         )
@@ -87,7 +87,7 @@ def main(_: Any) -> None:
     policy_optimiser = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
-    epsilon_scheduler = LinearEpsilonScheduler(1.0, 0.1, 10_000)
+    epsilon_scheduler = LinearEpsilonScheduler(1.0, 0.1, 100_000)
 
     # Create the system.
     system = idqn.IDQNSystem()

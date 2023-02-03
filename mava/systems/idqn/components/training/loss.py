@@ -17,6 +17,7 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Tuple
 
+import chex
 import jax
 import jax.numpy as jnp
 import rlax
@@ -76,6 +77,9 @@ class IDQNLoss(Loss):
                 Tuple[policy gradients, policy loss information]
             """
 
+            num_atoms = 51
+            huber_param = 1.0
+
             policy_grads = {}
             loss_info_policy = {}
             for agent_key in trainer.store.trainer_agents:
@@ -94,41 +98,55 @@ class IDQNLoss(Loss):
                 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
                     """Inner policy loss function: see outer function for parameters."""
 
-                    # Feedforward actor.
-                    _, logits_tm1, atoms_tm1 = network.forward(
-                        policy_params, observations
-                    )
-                    _, logits_t, atoms_t = network.forward(
+                    _, dist_q_tm1 = network.forward(policy_params, observations)
+                    _, dist_q_target_t = network.forward(
                         target_policy_params, next_observations
                     )
-                    q_t_selector, _, _ = network.forward(
-                        policy_params, next_observations
+                    batch_size = len(observations)
+                    chex.assert_shape(
+                        dist_q_tm1,
+                        (
+                            batch_size,
+                            None,
+                            num_atoms,
+                        ),
+                        custom_message=f"Expected (batch_size, num_actions, num_atoms), got: {dist_q_tm1.shape}",
+                        include_default_message=True,
                     )
-                    q_t_selector = jnp.where(
-                        masks == 1.0, q_t_selector, jnp.finfo(jnp.float32).min
+                    chex.assert_shape(
+                        dist_q_target_t,
+                        (
+                            batch_size,
+                            None,
+                            num_atoms,
+                        ),
+                        custom_message=f"Expected (batch_size, num_actions, num_atoms), got: {dist_q_target_t.shape}",
+                        include_default_message=True,
                     )
-
-                    batch_loss_fn = jax.vmap(
-                        rlax.categorical_double_q_learning,
-                        in_axes=(None, 0, 0, 0, 0, None, 0, 0),
+                    # Swap distribution and action dimension, since
+                    # rlax.quantile_q_learning expects it that way.
+                    dist_q_tm1 = jnp.swapaxes(dist_q_tm1, 1, 2)
+                    dist_q_target_t = jnp.swapaxes(dist_q_target_t, 1, 2)
+                    quantiles = (
+                        jnp.arange(num_atoms, dtype=jnp.float32) + 0.5
+                    ) / num_atoms
+                    batch_quantile_q_learning = jax.vmap(
+                        rlax.quantile_q_learning, in_axes=(0, None, 0, 0, 0, 0, 0, None)
                     )
-
-                    error = batch_loss_fn(
-                        atoms_tm1,
-                        logits_tm1,
+                    losses = batch_quantile_q_learning(
+                        dist_q_tm1,
+                        quantiles,
                         actions,
                         rewards,
                         discounts,
-                        atoms_t,
-                        logits_t,
-                        q_t_selector,
+                        dist_q_target_t,  # No double Q-learning here.
+                        dist_q_target_t,
+                        huber_param,
                     )
-
-                    loss = jax.numpy.mean(rlax.l2_loss(error))
-
-                    loss_info_policy = {"policy_loss_total": loss}
-
-                    return loss, loss_info_policy
+                    loss = jnp.mean(losses)
+                    chex.assert_shape(losses, (batch_size,))
+                    extra = {"mean_loss": loss}
+                    return loss, extra
 
                 policy_grads[agent_key], loss_info_policy[agent_key] = jax.grad(
                     policy_loss_fn, has_aux=True

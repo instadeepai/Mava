@@ -3,12 +3,17 @@ from typing import Any, Callable, Dict, Optional, Sequence
 import haiku as hk
 import jax
 import jax.numpy as jnp
+import rlax
 from acme import specs
 from acme.jax import networks as networks_lib
 from acme.jax import utils
+from acme.jax.networks.distributional import DiscreteValued
 
 from mava import specs as mava_specs
 from mava.systems.idqn.c51_network import C51DuellingMLP, C51DuellingNetwork
+from mava.systems.idqn.quantile_network import QuantileRegressionHead
+
+rlax.quantile_q_learning
 
 
 def make_c51_network(
@@ -27,27 +32,15 @@ def make_c51_network(
     @hk.transform
     def policy_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
         # Add the observation network and an MLP network.
-        value_network = []
-        if observation_network is not None:
-            value_network.append(observation_network)
-
-        value_network.append(
-            hk.nets.MLP(
-                (*policy_layer_sizes, num_actions),
-                activation=activation_function,
-            ),
+        model = hk.Sequential(
+            [
+                hk.nets.MLP([512, environment_spec.actions.num_values * 51]),
+            ]
         )
-        value_network.append(
-            C51DuellingMLP(
-                num_actions,
-                policy_layer_sizes,
-                v_max=v_max,
-                v_min=v_min,
-                num_atoms=num_atoms,
-            )
-        )
+        q_dist = model(inputs).reshape(-1, environment_spec.actions.num_values, 51)
+        q_values = jnp.mean(q_dist, axis=-1)
 
-        return hk.Sequential(value_network)(inputs)
+        return q_values, q_dist
 
     dummy_obs = utils.zeros_like(environment_spec.observations.observation)
     dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.

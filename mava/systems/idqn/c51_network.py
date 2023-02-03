@@ -122,7 +122,7 @@ class C51DuellingNetwork:
         Returns:
             an action to take in the current state
         """
-        q_values, _, _ = self.forward(params, observations)
+        q_values, _ = self.forward(params, observations)
         masked_q_values = jnp.where(mask == 1.0, q_values, jnp.finfo(jnp.float32).min)
 
         greedy_actions = masked_q_values == jnp.max(masked_q_values)
