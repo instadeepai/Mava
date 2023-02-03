@@ -22,6 +22,7 @@ import optax
 from absl import app, flags
 
 from mava.systems import idqn
+from mava.systems.idqn.components.training.qr_loss import QrIDQNLoss
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 from mava.utils.schedulers.linear_epsilon_scheduler import LinearEpsilonScheduler
@@ -60,14 +61,9 @@ def main(_: Any) -> None:
     )
 
     # Networks.
-    def network_factory(*args: Any, **kwargs: Any) -> Any:
-        return idqn.make_c51_networks(  # type: ignore
-            policy_layer_sizes=(64, 64),
-            v_min=-20,
-            v_max=45,
-            *args,
-            **kwargs,
-        )
+    network_factory = lambda *a, **k: idqn.make_quantile_regression_networks(
+        policy_layer_sizes=[256], *a, **k
+    )
 
     # Used for checkpoints, tensorboard logging and env monitoring
     experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
@@ -91,6 +87,7 @@ def main(_: Any) -> None:
 
     # Create the system.
     system = idqn.IDQNSystem()
+    system.update(QrIDQNLoss)
 
     # Build the system.
     system.build(

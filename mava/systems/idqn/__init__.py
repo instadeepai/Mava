@@ -15,6 +15,6 @@
 
 """Independent DQN system"""
 
-from .make_c51_network import make_c51_networks
 from .networks import make_default_networks
+from .quantile_network import make_quantile_regression_networks
 from .system import IDQNSystem
