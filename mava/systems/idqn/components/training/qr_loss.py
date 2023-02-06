@@ -70,9 +70,6 @@ class QrIDQNLoss(IDQNLoss):
                 Tuple[policy gradients, policy loss information]
             """
 
-            num_atoms = 51
-            huber_param = 1.0
-
             policy_grads = {}
             loss_info_policy = {}
             for agent_key in trainer.store.trainer_agents:
@@ -95,27 +92,36 @@ class QrIDQNLoss(IDQNLoss):
                     _, dist_q_target_t = network.forward(
                         target_policy_params, next_observations
                     )
+                    _, q_t_selector_dist = network.forward(
+                        policy_params, next_observations
+                    )
+
+                    cond = jnp.expand_dims(masks == 1.0, -1)
+                    q_t_selector_dist = jnp.where(
+                        cond, q_t_selector_dist, jnp.finfo(float).min
+                    )
 
                     # Swap distribution and action dimension, since
                     # rlax.quantile_q_learning expects it that way.
                     dist_q_tm1 = jnp.swapaxes(dist_q_tm1, 1, 2)
                     dist_q_target_t = jnp.swapaxes(dist_q_target_t, 1, 2)
+
+                    num_atoms = dist_q_tm1.shape[1]
                     quantiles = (
                         jnp.arange(num_atoms, dtype=jnp.float32) + 0.5
                     ) / num_atoms
                     batch_quantile_q_learning = jax.vmap(
                         rlax.quantile_q_learning, in_axes=(0, None, 0, 0, 0, 0, 0, None)
                     )
-                    # TODO: double q-learning
                     losses = batch_quantile_q_learning(
                         dist_q_tm1,
                         quantiles,
                         actions,
                         rewards,
                         discounts,
-                        dist_q_target_t,  # No double Q-learning here.
+                        q_t_selector_dist,
                         dist_q_target_t,
-                        huber_param,
+                        self.config.huber_param,
                     )
                     loss = jnp.mean(losses)
                     extra = {"policy_loss_total": loss}

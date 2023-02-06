@@ -109,9 +109,9 @@ def _make_quantile_network(
     observation_network: Optional[Callable] = None,
 ) -> QuantileRegressionNetwork:
     # TODO: why?
-    assert (
-        len(policy_layer_sizes) == 1
-    ), "QR DQN doesn't seem to work with more than 1 layer in the Q network"
+    # assert (
+    #     len(policy_layer_sizes) == 1
+    # ), "QR DQN doesn't seem to work with more than 1 layer in the Q network"
     num_actions = environment_spec.actions.num_values
 
     @hk.without_apply_rng
@@ -126,12 +126,12 @@ def _make_quantile_network(
         )
 
         # Add obs net
-        if observation_network is not None:
-            model = [observation_network, model]
-        else:
-            model = [model]
+        # if observation_network is not None:
+        #     model = [observation_network, model]
+        # else:
+        #     model = [model]
 
-        model = hk.Sequential(model)
+        # model = hk.Sequential(model)
 
         q_dist = model(inputs).reshape(
             -1, environment_spec.actions.num_values, num_atoms

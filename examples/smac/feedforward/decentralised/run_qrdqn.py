@@ -23,20 +23,15 @@ from absl import app, flags
 
 from mava.systems import idqn
 from mava.systems.idqn.components.training.qr_loss import QrIDQNLoss
-from mava.utils.environments import debugging_utils
+from mava.utils.environments.smac_utils import make_environment
 from mava.utils.loggers import logger_utils
 from mava.utils.schedulers.linear_epsilon_scheduler import LinearEpsilonScheduler
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
-)
-flags.DEFINE_string(
-    "action_space",
-    "discrete",
-    "Environment action space type (str).",
+    "map_name",
+    "3m",
+    "Starcraft 2 micromanagement map name (str).",
 )
 
 flags.DEFINE_string(
@@ -54,11 +49,7 @@ def main(_: Any) -> None:
         _ : _
     """
     # Environment.
-    environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
-    )
+    environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
 
     # Networks.
     network_factory = lambda *a, **k: idqn.make_quantile_regression_networks(
@@ -83,7 +74,7 @@ def main(_: Any) -> None:
     policy_optimiser = optax.chain(
         optax.clip_by_global_norm(10.0), optax.scale_by_adam(), optax.scale(-5e-5)
     )
-    epsilon_scheduler = LinearEpsilonScheduler(1.0, 0.05, 100_000)
+    epsilon_scheduler = LinearEpsilonScheduler(1.0, 0.1, 100_000)
 
     # Create the system.
     system = idqn.IDQNSystem()
@@ -99,7 +90,7 @@ def main(_: Any) -> None:
         epsilon_scheduler=epsilon_scheduler,
         reverb_table_max_size=1_000_000,
         run_evaluator=True,
-        epoch_batch_size=32,
+        epoch_batch_size=64,
         num_executors=1,
         multi_process=True,
         samples_per_insert=8,
