@@ -38,10 +38,10 @@ def test_on_execution_observe(
     dqn_observer.on_execution_observe(executor=mock_executor)
 
     # DQN has no policy info
-    assert "policy_info" not in mock_executor.store.next_extras
+    assert "policy_info" not in mock_executor.store.extras
 
     assert (
-        mock_executor.store.next_extras["network_int_keys"]
+        mock_executor.store.extras["network_int_keys"]
         == mock_executor.store.network_int_keys_extras
     )
 
@@ -55,4 +55,3 @@ def test_on_execution_observe(
         mock_executor.store.adder.test_next_timestep
         == mock_executor.store.next_timestep
     )
-    assert mock_executor.store.adder.test_next_extras == mock_executor.store.next_extras
