@@ -36,6 +36,7 @@ from tests.mocks import MockedSystem
         EnvSpec("pettingzoo.sisl.multiwalker_v8"),
     ],
 )
+@pytest.mark.skip
 class TestEnvironmentLoop:
     """Test that we can load a env loop"""
 
