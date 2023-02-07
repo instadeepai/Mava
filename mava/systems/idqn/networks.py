@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Jax IPPO system networks."""
+"""Jax IDQN system networks."""
 from typing import Any, Callable, Dict, Optional, Sequence
 
 import haiku as hk
