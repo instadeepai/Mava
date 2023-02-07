@@ -24,6 +24,7 @@ from optax import EmptyState
 
 from mava import constants
 from mava.components.updating.parameter_server import (
+    ActorCriticParameterServer,
     DefaultParameterServer,
     ParameterServerConfig,
 )
@@ -124,6 +125,13 @@ def default_parameter_server() -> DefaultParameterServer:  # noqa: E501
     return DefaultParameterServer(config)
 
 
+@pytest.fixture
+def actor_critic_parameter_server() -> ActorCriticParameterServer:  # noqa: E501
+    """Pytest fixture for default parameter server"""
+    config = ParameterServerConfig(non_blocking_sleep_seconds=15)
+    return ActorCriticParameterServer(config)
+
+
 def test_on_parameter_server_init_start_parameter_creation(
     default_parameter_server: DefaultParameterServer,
     mock_system_parameter_server: SystemParameterServer,
@@ -148,6 +156,62 @@ def test_on_parameter_server_init_start_parameter_creation(
     assert (
         mock_system_parameter_server.store.experiment_path
         == default_parameter_server.config.experiment_path
+    )
+
+    # Parameter store training / executing info
+    required_int_keys = {
+        "trainer_steps",
+        "evaluator_steps",
+        "evaluator_episodes",
+        "executor_episodes",
+        "executor_steps",
+    }
+    required_float_keys = {"trainer_walltime"}
+    for required_int_key in required_int_keys:
+        assert mock_system_parameter_server.store.parameters[
+            required_int_key
+        ] == np.zeros(1, dtype=np.int32)
+    for required_float_key in required_float_keys:
+        assert mock_system_parameter_server.store.parameters[
+            required_float_key
+        ] == np.zeros(1, dtype=np.float32)
+
+    # Parameter store network parameters
+    assert (
+        mock_system_parameter_server.store.parameters["policy_network-agent_net_1"]
+        == "net_1_1_params"
+    )
+    assert (
+        mock_system_parameter_server.store.parameters["policy_network-agent_net_2"]
+        == "net_1_2_params"
+    )
+    assert not mock_system_parameter_server.store.parameters["terminate"]
+    assert mock_system_parameter_server.store.parameters["num_executor_failed"] == 0
+
+
+def test_on_parameter_server_init_start_parameter_creation_actor_critic(
+    actor_critic_parameter_server: ActorCriticParameterServer,
+    mock_system_parameter_server: SystemParameterServer,
+) -> None:
+    """Test that parameters are correctly assigned to the store"""
+    # Config params
+    assert actor_critic_parameter_server.config.non_blocking_sleep_seconds == 15
+    assert actor_critic_parameter_server.config.experiment_path == "~/mava/"
+    assert actor_critic_parameter_server.config.json_path is None
+    assert not actor_critic_parameter_server.calculate_absolute_metric
+
+    # Delete existing parameters from store, since following method will create them
+    delattr(mock_system_parameter_server.store, "parameters")
+    actor_critic_parameter_server.on_parameter_server_init_start(
+        mock_system_parameter_server
+    )
+
+    # Parameters attribute in store
+    assert hasattr(mock_system_parameter_server.store, "parameters")
+    assert hasattr(mock_system_parameter_server.store, "experiment_path")
+    assert (
+        mock_system_parameter_server.store.experiment_path
+        == actor_critic_parameter_server.config.experiment_path
     )
 
     # Parameter store training / executing info

@@ -19,8 +19,8 @@ import optax
 import pytest
 
 from mava.components.building.optimisers import (
-    DefaultOptimisers,
-    DefaultOptimisersConfig,
+    ActorCriticOptimisers,
+    ActorCriticOptimisersConfig,
     Optimisers,
 )
 from mava.core_jax import SystemBuilder
@@ -43,8 +43,8 @@ def test_builder() -> SystemBuilder:
 @pytest.fixture
 def default_optimisers_with_config() -> Optimisers:
     """Create default optimisers"""
-    return DefaultOptimisers(
-        config=DefaultOptimisersConfig(
+    return ActorCriticOptimisers(
+        config=ActorCriticOptimisersConfig(
             policy_learning_rate=1e-4,
             critic_learning_rate=1e-4,
             adam_epsilon=1e-4,
@@ -56,8 +56,8 @@ def default_optimisers_with_config() -> Optimisers:
 @pytest.fixture
 def default_optimisers_empty_config_optimisers() -> Optimisers:
     """Create default optimisers"""
-    return DefaultOptimisers(
-        config=DefaultOptimisersConfig(
+    return ActorCriticOptimisers(
+        config=ActorCriticOptimisersConfig(
             policy_optimiser=optax.chain(
                 optax.clip_by_global_norm(40.0),
                 optax.scale_by_adam(),

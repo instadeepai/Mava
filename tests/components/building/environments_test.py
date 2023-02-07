@@ -44,6 +44,12 @@ class AbstractExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
         pass
 
 
+class SimpleMockExecutor:
+    def __init__(self) -> None:
+        """Init"""
+        self.store = SimpleNamespace()
+
+
 @pytest.fixture
 def test_environment_spec() -> EnvironmentSpec:
     """Pytest fixture for environment spec"""
@@ -99,7 +105,7 @@ def test_builder() -> SystemBuilder:
     global_config = SimpleNamespace(environment_factory=environment_factory)
     system_builder = Builder(components=[], global_config=global_config)
     system_builder.store.executor_environment = "environment"
-    system_builder.store.executor = "executor"
+    system_builder.store.executor = SimpleMockExecutor()
     system_builder.store.executor_logger = "executor_logger"
     system_builder.store.is_evaluator = True
 
@@ -210,7 +216,7 @@ class TestParallelExecutorEnvironmentLoop:
             test_builder.store.system_executor.executor_environment_loop
         )
         assert executor_environment_loop._environment == "environment"
-        assert executor_environment_loop._executor == "executor"
+        assert type(executor_environment_loop._executor) == SimpleMockExecutor
         assert executor_environment_loop._logger == "executor_logger"
         assert (
             executor_environment_loop._should_update
@@ -236,7 +242,7 @@ class TestParallelExecutorEnvironmentLoop:
         # Check that environment loop was created correctly
         executor_environment_loop = test_builder.store.system_executor
         assert executor_environment_loop._environment == "environment"
-        assert executor_environment_loop._executor == "executor"
+        assert type(executor_environment_loop._executor) == SimpleMockExecutor
         assert executor_environment_loop._logger == "executor_logger"
         assert (
             executor_environment_loop._should_update

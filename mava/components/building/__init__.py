@@ -15,13 +15,16 @@
 
 """Builder components for Mava systems."""
 
+from mava.components.building import reverb_components
 from mava.components.building.adders import (
     ParallelSequenceAdder,
     ParallelSequenceAdderSignature,
+    ParallelTransitionAdder,
+    ParallelTransitionAdderSignature,
     UniformAdderPriority,
 )
 from mava.components.building.best_checkpointer import BestCheckpointer
-from mava.components.building.data_server import OnPolicyDataServer
+from mava.components.building.data_server import OffPolicyDataServer, OnPolicyDataServer
 from mava.components.building.datasets import TrajectoryDataset, TransitionDataset
 from mava.components.building.distributor import Distributor
 from mava.components.building.environments import (
@@ -31,8 +34,13 @@ from mava.components.building.environments import (
 from mava.components.building.extras_spec import ExtrasSpec
 from mava.components.building.loggers import Logger
 from mava.components.building.networks import DefaultNetworks
-from mava.components.building.optimisers import DefaultOptimisers
+from mava.components.building.optimisers import ActorCriticOptimisers
+
+# ActorCriticExecutorParameterClient,
+# ActorCriticTrainerParameterClient,
 from mava.components.building.parameter_client import (
+    ActorCriticExecutorParameterClient,
+    ActorCriticTrainerParameterClient,
     ExecutorParameterClient,
     TrainerParameterClient,
 )

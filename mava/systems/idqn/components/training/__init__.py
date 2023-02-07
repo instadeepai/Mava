@@ -13,14 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Updating components for Mava systems."""
-
-from mava.components.updating.checkpointer import Checkpointer
-from mava.components.updating.parameter_server import (
-    ActorCriticParameterServer,
-    DefaultParameterServer,
-)
-from mava.components.updating.terminators import (
-    CountConditionTerminator,
-    TimeTerminator,
-)
+"""Training components for IDQN system."""
+from .loss import IDQNLoss
+from .step import IDQNStep
