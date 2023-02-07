@@ -99,7 +99,7 @@ class IDQNLoss(Loss):
                     q_t_value = network.forward(target_policy_params, next_observations)
                     q_t_selector = network.forward(policy_params, next_observations)
 
-                    q_t_selector = jnp.where(masks == 1.0, q_t_selector, -99999)  # TODO
+                    q_t_selector = jnp.where(masks == 1.0, q_t_selector, -jnp.inf)
 
                     batch_double_q_learning_loss_fn = jax.vmap(
                         rlax.double_q_learning, (0, 0, 0, 0, 0, 0, None)
