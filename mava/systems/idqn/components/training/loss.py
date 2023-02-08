@@ -15,19 +15,24 @@
 
 """Trainer components for calculating losses."""
 from dataclasses import dataclass
-from typing import Any, Dict, Tuple
+from typing import Dict, Tuple
 
+import chex
+import haiku as hk
 import jax
 import jax.numpy as jnp
 import rlax
+from acme.agents.jax.dqn.learning_lib import ReverbUpdate
 
 from mava.components.training.losses import Loss
 from mava.core_jax import SystemTrainer
+from mava.types import OLT
 
 
 @dataclass
 class IDQNLossConfig:
     gamma: float = 0.99
+    importance_sampling_exponent: float = 0.6
 
 
 class IDQNLoss(Loss):
@@ -53,14 +58,16 @@ class IDQNLoss(Loss):
         """
 
         def policy_loss_grad_fn(
-            policy_params: Any,
-            target_policy_params: Any,
-            observations: Any,
-            actions: Dict[str, jnp.ndarray],
-            rewards: Dict[str, jnp.ndarray],
-            next_observations: Any,
-            discounts: Dict[str, jnp.ndarray],
-        ) -> Tuple[Dict[str, jnp.ndarray], Dict[str, Dict[str, jnp.ndarray]]]:
+            policy_params: Dict[str, hk.Params],
+            target_policy_params: Dict[str, hk.Params],
+            observations: Dict[str, OLT],
+            actions: Dict[str, chex.Array],
+            rewards: Dict[str, chex.Array],
+            next_observations: Dict[str, OLT],
+            discounts: Dict[str, chex.Array],
+            probs: chex.Array,
+            keys: chex.Array,
+        ) -> Tuple[Dict[str, chex.Array], Dict[str, chex.Array], Dict[str, chex.Array]]:
             """Surrogate loss using clipped probability ratios.
 
             Args:
@@ -71,27 +78,30 @@ class IDQNLoss(Loss):
                 rewards: rewards given to the agent
                 next_observations: agent observations at timestep t+1
                 discounts: terminal agent mask (dm_env discounts)
+                probs: probabilities for priotised experience replay
+                keys: keys of reverb table entries
 
             Returns:
                 Tuple[policy gradients, policy loss information]
             """
 
-            policy_grads = {}
-            loss_info_policy = {}
+            grads = {}
+            loss_info = {}
+            reverb_updates = {}
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
                 network = trainer.store.networks[agent_net_key]
 
                 def policy_loss_fn(
-                    policy_params: Any,
-                    target_policy_params: Any,
-                    observations: Any,
-                    actions: jnp.ndarray,
-                    rewards: jnp.ndarray,
-                    next_observations: Any,
-                    discounts: jnp.ndarray,
-                    masks: jnp.ndarray,
-                ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
+                    policy_params: hk.Params,
+                    target_policy_params: hk.Params,
+                    observations: chex.Array,
+                    actions: chex.Array,
+                    rewards: chex.Array,
+                    next_observations: chex.Array,
+                    discounts: chex.Array,
+                    masks: chex.Array,
+                ) -> Tuple[chex.Array, Tuple[Dict[str, chex.Array], ReverbUpdate]]:
                     """Inner policy loss function: see outer function for parameters."""
 
                     # Feedforward actor.
@@ -115,15 +125,28 @@ class IDQNLoss(Loss):
                         True,
                     )
 
-                    loss = jax.numpy.mean(rlax.l2_loss(error))
+                    batch_loss = rlax.l2_loss(error)
 
-                    loss_info_policy = {"policy_loss_total": loss}
+                    importance_weights = (1.0 / probs).astype(jnp.float32)
+                    importance_weights **= self.config.importance_sampling_exponent
+                    importance_weights /= jnp.max(importance_weights)
 
-                    return loss, loss_info_policy
+                    # Weigthing loss by probability transition was chosen
+                    loss = jnp.mean(importance_weights * batch_loss)
+                    # makes sure prio never exceeds one
+                    reverb_update = ReverbUpdate(keys=keys, priorities=jnp.abs(error))
+                    loss_info = (
+                        {"policy_loss_total": loss},
+                        reverb_update,
+                    )
 
-                policy_grads[agent_key], loss_info_policy[agent_key] = jax.grad(
-                    policy_loss_fn, has_aux=True
-                )(
+                    return loss, loss_info
+
+                grad_fn = jax.grad(policy_loss_fn, has_aux=True)
+                (
+                    grads[agent_key],
+                    (loss_info[agent_key], reverb_updates[agent_key]),
+                ) = grad_fn(
                     policy_params[agent_net_key],
                     target_policy_params[agent_net_key],
                     observations[agent_key].observation,
@@ -133,7 +156,7 @@ class IDQNLoss(Loss):
                     discounts[agent_key],
                     next_observations[agent_key].legal_actions,
                 )
-            return policy_grads, loss_info_policy
+            return grads, loss_info, reverb_updates
 
         # Save the gradient funcitons.
         trainer.store.policy_grad_fn = policy_loss_grad_fn

@@ -22,6 +22,7 @@ import jax.numpy as jnp
 import optax
 import reverb
 import rlax
+from acme.agents.jax.dqn.learning_lib import ReverbUpdate
 from jax import jit
 
 import mava.components.building.adders  # To avoid circular imports
@@ -65,7 +66,7 @@ class IDQNStep(Step):
         @jit
         def sgd_step(
             states: DQNTrainingState, sample: reverb.ReplaySample
-        ) -> Tuple[DQNTrainingState, Dict[str, jnp.ndarray]]:
+        ) -> Tuple[DQNTrainingState, Dict[str, jnp.ndarray], Dict[str, ReverbUpdate]]:
             """Performs a minibatch SGD step.
 
             Args:
@@ -78,6 +79,8 @@ class IDQNStep(Step):
 
             # Extract the data.
             data = sample.data
+            keys, probs, *_ = sample.info
+            print(sample.info.priority)
 
             observations, actions, rewards, next_observations, discounts, _ = (
                 data.observations,  # type: ignore
@@ -92,7 +95,11 @@ class IDQNStep(Step):
             policy_params = states.policy_params
             policy_opt_states = states.policy_opt_states
 
-            policy_gradients, grad_metrics = trainer.store.policy_grad_fn(
+            (
+                policy_gradients,
+                grad_metrics,
+                reverb_updates,
+            ) = trainer.store.policy_grad_fn(
                 policy_params,
                 target_policy_params,
                 observations,
@@ -100,6 +107,8 @@ class IDQNStep(Step):
                 rewards,
                 next_observations,
                 discounts,
+                probs,
+                keys,
             )
 
             metrics: Dict[str, jnp.ndarray] = {}
@@ -142,7 +151,7 @@ class IDQNStep(Step):
                 random_key=states.random_key,
                 trainer_iteration=states.trainer_iteration,
             )
-            return new_states, metrics
+            return new_states, metrics, reverb_updates
 
         def step(sample: reverb.ReplaySample) -> Tuple[Dict[str, jnp.ndarray]]:
             """Step over the reverb sample and update the parameters / optimiser states.
@@ -178,7 +187,7 @@ class IDQNStep(Step):
                 trainer_iteration=steps,
             )
 
-            new_states, metrics = sgd_step(states, sample)
+            new_states, metrics, reverb_updates = sgd_step(states, sample)
 
             # Set the new variables
             # TODO (dries): key is probably not being store correctly.
@@ -186,6 +195,18 @@ class IDQNStep(Step):
             # We also need to add the optimiser and random_key to the variable
             # server.
             trainer.store.base_key = new_states.random_key
+
+            # update reverb priorities
+            # because MAVA stores all agents experience in a single row of a reverb table
+            # priorities must be aggregated over all agents transisitions.
+            reverb_keys = list(reverb_updates.values())[0].keys.tolist()
+            priorities = [update.priorities for update in reverb_updates.values()]
+            agg_priorities = jnp.array(priorities).mean(0)
+
+            trainer.store.data_server_client.mutate_priorities(
+                table="trainer_0",
+                updates=dict(zip(reverb_keys, agg_priorities.tolist())),
+            )
 
             # UPDATING THE PARAMETERS IN THE NETWORK IN THE STORE
             for net_key in policy_params.keys():
