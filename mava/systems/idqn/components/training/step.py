@@ -22,7 +22,9 @@ import jax.numpy as jnp
 import optax
 import reverb
 import rlax
+import tree
 from acme.agents.jax.dqn.learning_lib import ReverbUpdate
+from acme.jax import utils
 from jax import jit
 
 import mava.components.building.adders  # To avoid circular imports
@@ -79,8 +81,13 @@ class IDQNStep(Step):
 
             # Extract the data.
             data = sample.data
-            keys, probs, *_ = sample.info
-            print(sample.info.priority)
+            jax.debug.print(
+                "jitted | all vals==1: {}", jnp.all(sample.info.priority == 1.0)
+            )
+
+            # keys, probs, *_ = sample.info
+            # jax.debug.print("this is it: {x}", x=jnp.all(sample.info.key == 1.0))
+            # print(sample.info.priority)
 
             observations, actions, rewards, next_observations, discounts, _ = (
                 data.observations,  # type: ignore
@@ -95,11 +102,7 @@ class IDQNStep(Step):
             policy_params = states.policy_params
             policy_opt_states = states.policy_opt_states
 
-            (
-                policy_gradients,
-                grad_metrics,
-                reverb_updates,
-            ) = trainer.store.policy_grad_fn(
+            (policy_gradients, grad_metrics) = trainer.store.policy_grad_fn(
                 policy_params,
                 target_policy_params,
                 observations,
@@ -107,9 +110,13 @@ class IDQNStep(Step):
                 rewards,
                 next_observations,
                 discounts,
-                probs,
-                keys,
+                sample.info.probability,
+                sample.info.key,
             )
+            priorities = grad_metrics["agent_0"]["reverb_updates"].priorities
+            keys = grad_metrics["agent_0"]["reverb_updates"].keys
+            # priorities = [update.priorities for update in reverb_updates.values()]
+            # agg_priorities = jnp.array(priorities).mean(0)
 
             metrics: Dict[str, jnp.ndarray] = {}
             for agent_key in trainer.store.trainer_agents:
@@ -144,6 +151,18 @@ class IDQNStep(Step):
             # Set the metrics
             metrics = jax.tree_util.tree_map(jnp.mean, {**metrics, **grad_metrics})
 
+            # keys = sample.info.key
+            # priorities = jax.random.uniform(states.random_key, (128,)).astype(float) + 1
+            # keys, priorities = tree.map_structure(
+            #     # Fetch array and combine device and batch dimensions.
+            #     lambda x: utils.fetch_devicearray(x).reshape((-1,) + x.shape[2:]),
+            #     (keys, priorities),
+            # )
+
+            # trainer.store.data_server_client.mutate_priorities(
+            #     table="trainer", updates=dict(zip(keys, priorities))
+            # )
+
             new_states = DQNTrainingState(
                 policy_params=policy_params,
                 target_policy_params=target_policy_params,
@@ -151,7 +170,7 @@ class IDQNStep(Step):
                 random_key=states.random_key,
                 trainer_iteration=states.trainer_iteration,
             )
-            return new_states, metrics, reverb_updates
+            return new_states, metrics, priorities
 
         def step(sample: reverb.ReplaySample) -> Tuple[Dict[str, jnp.ndarray]]:
             """Step over the reverb sample and update the parameters / optimiser states.
@@ -187,7 +206,10 @@ class IDQNStep(Step):
                 trainer_iteration=steps,
             )
 
-            new_states, metrics, reverb_updates = sgd_step(states, sample)
+            jax.debug.print(
+                "no jit | all vals==1: {}", jnp.all(sample.info.priority == 1.0)
+            )
+            new_states, metrics, priorities = sgd_step(states, sample)
 
             # Set the new variables
             # TODO (dries): key is probably not being store correctly.
@@ -199,13 +221,13 @@ class IDQNStep(Step):
             # update reverb priorities
             # because MAVA stores all agents experience in a single row of a reverb table
             # priorities must be aggregated over all agents transisitions.
-            reverb_keys = list(reverb_updates.values())[0].keys.tolist()
-            priorities = [update.priorities for update in reverb_updates.values()]
-            agg_priorities = jnp.array(priorities).mean(0)
+            # reverb_keys = list(reverb_updates.values())[0].keys.tolist()
+            # priorities = [update.priorities for update in reverb_updates.values()]
+            # agg_priorities = jnp.array(priorities).mean(0)
 
             trainer.store.data_server_client.mutate_priorities(
                 table="trainer_0",
-                updates=dict(zip(reverb_keys, agg_priorities.tolist())),
+                updates=dict(zip(sample.info.key.tolist(), priorities.tolist())),
             )
 
             # UPDATING THE PARAMETERS IN THE NETWORK IN THE STORE

@@ -57,6 +57,7 @@ class IDQNLoss(Loss):
             None.
         """
 
+        @jax.jit
         def policy_loss_grad_fn(
             policy_params: Dict[str, hk.Params],
             target_policy_params: Dict[str, hk.Params],
@@ -134,19 +135,18 @@ class IDQNLoss(Loss):
                     # Weigthing loss by probability transition was chosen
                     loss = jnp.mean(importance_weights * batch_loss)
                     # makes sure prio never exceeds one
-                    reverb_update = ReverbUpdate(keys=keys, priorities=jnp.abs(error))
-                    loss_info = (
-                        {"policy_loss_total": loss},
-                        reverb_update,
+                    reverb_update = ReverbUpdate(
+                        keys=keys, priorities=jnp.abs(error).astype(jnp.float64)
                     )
+                    loss_info = {
+                        "policy_loss_total": loss,
+                        "reverb_updates": reverb_update,
+                    }
 
                     return loss, loss_info
 
                 grad_fn = jax.grad(policy_loss_fn, has_aux=True)
-                (
-                    grads[agent_key],
-                    (loss_info[agent_key], reverb_updates[agent_key]),
-                ) = grad_fn(
+                (grads[agent_key], loss_info[agent_key]) = grad_fn(
                     policy_params[agent_net_key],
                     target_policy_params[agent_net_key],
                     observations[agent_key].observation,
@@ -156,7 +156,8 @@ class IDQNLoss(Loss):
                     discounts[agent_key],
                     next_observations[agent_key].legal_actions,
                 )
-            return grads, loss_info, reverb_updates
+
+            return grads, loss_info
 
         # Save the gradient funcitons.
         trainer.store.policy_grad_fn = policy_loss_grad_fn
