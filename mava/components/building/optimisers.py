@@ -68,7 +68,7 @@ class Optimisers(Component):
 
 
 @dataclass
-class DefaultOptimisersConfig:
+class ActorCriticOptimisersConfig:
     policy_learning_rate: float = 1e-3
     critic_learning_rate: float = 1e-3
     adam_epsilon: float = 1e-5
@@ -77,10 +77,10 @@ class DefaultOptimisersConfig:
     critic_optimiser: Optional[optax_base.GradientTransformation] = None
 
 
-class DefaultOptimisers(Optimisers):
+class ActorCriticOptimisers(Optimisers):
     def __init__(
         self,
-        config: DefaultOptimisersConfig = DefaultOptimisersConfig(),
+        config: ActorCriticOptimisersConfig = ActorCriticOptimisersConfig(),
     ):
         """Component defines the default way to initialise optimisers.
 

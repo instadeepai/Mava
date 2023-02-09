@@ -112,7 +112,6 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         Returns:
             Action and policy info for all agents in the system.
         """
-
         self.store.observations = observations
 
         self.on_execution_select_actions_start()

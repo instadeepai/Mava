@@ -12,15 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""DQN executor components"""
 
-"""Updating components for Mava systems."""
-
-from mava.components.updating.checkpointer import Checkpointer
-from mava.components.updating.parameter_server import (
-    ActorCriticParameterServer,
-    DefaultParameterServer,
-)
-from mava.components.updating.terminators import (
-    CountConditionTerminator,
-    TimeTerminator,
-)
+from .action_selection import DQNFeedforwardExecutorSelectAction
+from .epsilon_scheduler import EpsilonScheduler
+from .observing import DQNFeedforwardExecutorObserve

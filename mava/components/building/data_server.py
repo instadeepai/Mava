@@ -160,7 +160,7 @@ class DataServer(Component):
 
 @dataclass
 class OffPolicyDataServerConfig:
-    max_size: int = 100000
+    reverb_table_max_size: int = 100_000
     max_times_sampled: int = 0
 
 
@@ -210,7 +210,7 @@ class OffPolicyDataServer(DataServer):
             name=table_key,
             sampler=builder.store.sampler_fn(),
             remover=builder.store.remover_fn(),
-            max_size=self.config.max_size,
+            max_size=self.config.reverb_table_max_size,
             rate_limiter=builder.store.rate_limiter_fn(),
             signature=builder.store.adder_signature_fn(
                 environment_specs,
