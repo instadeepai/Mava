@@ -81,13 +81,6 @@ class IDQNStep(Step):
 
             # Extract the data.
             data = sample.data
-            jax.debug.print(
-                "jitted | all vals==1: {}", jnp.all(sample.info.priority == 1.0)
-            )
-
-            # keys, probs, *_ = sample.info
-            # jax.debug.print("this is it: {x}", x=jnp.all(sample.info.key == 1.0))
-            # print(sample.info.priority)
 
             observations, actions, rewards, next_observations, discounts, _ = (
                 data.observations,  # type: ignore
@@ -102,7 +95,7 @@ class IDQNStep(Step):
             policy_params = states.policy_params
             policy_opt_states = states.policy_opt_states
 
-            (policy_gradients, grad_metrics) = trainer.store.policy_grad_fn(
+            (policy_gradients, grad_metrics, priorities) = trainer.store.policy_grad_fn(
                 policy_params,
                 target_policy_params,
                 observations,
@@ -111,12 +104,11 @@ class IDQNStep(Step):
                 next_observations,
                 discounts,
                 sample.info.probability,
-                sample.info.key,
             )
-            priorities = grad_metrics["agent_0"]["reverb_updates"].priorities
-            keys = grad_metrics["agent_0"]["reverb_updates"].keys
-            # priorities = [update.priorities for update in reverb_updates.values()]
-            # agg_priorities = jnp.array(priorities).mean(0)
+
+            # Because MAVA stores all agents experience in a single row of a reverb table
+            # priorities must be aggregated over all agents transisitions.
+            priorities = jnp.array(list(priorities.values())).max(0)
 
             metrics: Dict[str, jnp.ndarray] = {}
             for agent_key in trainer.store.trainer_agents:
@@ -150,18 +142,6 @@ class IDQNStep(Step):
 
             # Set the metrics
             metrics = jax.tree_util.tree_map(jnp.mean, {**metrics, **grad_metrics})
-
-            # keys = sample.info.key
-            # priorities = jax.random.uniform(states.random_key, (128,)).astype(float) + 1
-            # keys, priorities = tree.map_structure(
-            #     # Fetch array and combine device and batch dimensions.
-            #     lambda x: utils.fetch_devicearray(x).reshape((-1,) + x.shape[2:]),
-            #     (keys, priorities),
-            # )
-
-            # trainer.store.data_server_client.mutate_priorities(
-            #     table="trainer", updates=dict(zip(keys, priorities))
-            # )
 
             new_states = DQNTrainingState(
                 policy_params=policy_params,
@@ -206,9 +186,6 @@ class IDQNStep(Step):
                 trainer_iteration=steps,
             )
 
-            jax.debug.print(
-                "no jit | all vals==1: {}", jnp.all(sample.info.priority == 1.0)
-            )
             new_states, metrics, priorities = sgd_step(states, sample)
 
             # Set the new variables
@@ -218,13 +195,12 @@ class IDQNStep(Step):
             # server.
             trainer.store.base_key = new_states.random_key
 
-            # update reverb priorities
-            # because MAVA stores all agents experience in a single row of a reverb table
-            # priorities must be aggregated over all agents transisitions.
-            # reverb_keys = list(reverb_updates.values())[0].keys.tolist()
-            # priorities = [update.priorities for update in reverb_updates.values()]
-            # agg_priorities = jnp.array(priorities).mean(0)
-
+            # Update priorities in reverb table
+            # `sample.info.key` is used here, as it is the same keys as the sample passed to
+            # `sgd_step` however if pass keys out of `sgd_step` with the priorities (like acme does)
+            # it does not update properly. It has something to do with jit as when we didn't jit
+            # and passed the keys out it does work. But this way we can jit and use the same keys
+            # from outside `sgd_step`
             trainer.store.data_server_client.mutate_priorities(
                 table="trainer_0",
                 updates=dict(zip(sample.info.key.tolist(), priorities.tolist())),

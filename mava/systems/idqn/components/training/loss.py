@@ -67,7 +67,6 @@ class IDQNLoss(Loss):
             next_observations: Dict[str, OLT],
             discounts: Dict[str, chex.Array],
             probs: chex.Array,
-            keys: chex.Array,
         ) -> Tuple[Dict[str, chex.Array], Dict[str, chex.Array], Dict[str, chex.Array]]:
             """Surrogate loss using clipped probability ratios.
 
@@ -80,15 +79,14 @@ class IDQNLoss(Loss):
                 next_observations: agent observations at timestep t+1
                 discounts: terminal agent mask (dm_env discounts)
                 probs: probabilities for priotised experience replay
-                keys: keys of reverb table entries
 
             Returns:
                 Tuple[policy gradients, policy loss information]
             """
 
-            grads = {}
-            loss_info = {}
-            reverb_updates = {}
+            agent_grads = {}
+            agent_loss_infos = {}
+            agent_priorities = {}
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
                 network = trainer.store.networks[agent_net_key]
@@ -110,13 +108,13 @@ class IDQNLoss(Loss):
                     q_t_value = network.forward(target_policy_params, next_observations)
                     q_t_selector = network.forward(policy_params, next_observations)
 
-                    q_t_selector = jnp.where(masks == 1.0, q_t_selector, -99999)  # TODO
+                    q_t_selector = jnp.where(masks == 1.0, q_t_selector, -jnp.inf)
 
                     batch_double_q_learning_loss_fn = jax.vmap(
                         rlax.double_q_learning, (0, 0, 0, 0, 0, 0, None)
                     )
 
-                    error = batch_double_q_learning_loss_fn(
+                    td_error = batch_double_q_learning_loss_fn(
                         q_tm1,
                         actions,
                         rewards,
@@ -126,27 +124,27 @@ class IDQNLoss(Loss):
                         True,
                     )
 
-                    batch_loss = rlax.l2_loss(error)
+                    batch_loss = rlax.l2_loss(td_error)
 
                     importance_weights = (1.0 / probs).astype(jnp.float32)
                     importance_weights **= self.config.importance_sampling_exponent
                     importance_weights /= jnp.max(importance_weights)
-
                     # Weigthing loss by probability transition was chosen
                     loss = jnp.mean(importance_weights * batch_loss)
-                    # makes sure prio never exceeds one
-                    reverb_update = ReverbUpdate(
-                        keys=keys, priorities=jnp.abs(error).astype(jnp.float64)
-                    )
+
+                    # TODO: makes sure prio never exceeds one?
+                    priorities = jnp.abs(td_error).astype(jnp.float32)
                     loss_info = {
                         "policy_loss_total": loss,
-                        "reverb_updates": reverb_update,
+                        "td_error": td_error,
                     }
 
-                    return loss, loss_info
+                    return loss, (loss_info, priorities)
 
+                # create grad function
                 grad_fn = jax.grad(policy_loss_fn, has_aux=True)
-                (grads[agent_key], loss_info[agent_key]) = grad_fn(
+                # call grad function and collect outputs
+                grads, (loss_info, priorities) = grad_fn(
                     policy_params[agent_net_key],
                     target_policy_params[agent_net_key],
                     observations[agent_key].observation,
@@ -156,8 +154,12 @@ class IDQNLoss(Loss):
                     discounts[agent_key],
                     next_observations[agent_key].legal_actions,
                 )
+                # organise grads, metrics and priorities in agent dicts
+                agent_grads[agent_key] = grads
+                agent_loss_infos[agent_key] = loss_info
+                agent_priorities[agent_key] = priorities
 
-            return grads, loss_info
+            return agent_grads, agent_loss_infos, agent_priorities
 
         # Save the gradient funcitons.
         trainer.store.policy_grad_fn = policy_loss_grad_fn
