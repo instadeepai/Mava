@@ -59,6 +59,7 @@ class MockedExecutor(ActorMock, core.Executor):
         super().__init__(spec)
         self._specs = spec
         self._evaluator = False
+        self.store = SimpleNamespace()
 
     def select_actions(
         self, observations: Dict[str, NestedArray]

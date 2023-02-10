@@ -61,3 +61,13 @@ class Utility(Component):
     @abc.abstractmethod
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """Hook to override to define training utility functions."""
+
+
+class DQNTrainingState(NamedTuple):
+    """Training state consists of network parameters and optimiser state."""
+
+    policy_params: Any
+    target_policy_params: Any
+    policy_opt_states: Dict[str, optax.OptState]
+    random_key: Any
+    trainer_iteration: int

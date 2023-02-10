@@ -13,18 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Jax IPPO system."""
+"""Jax IDQN system."""
 from typing import Any, Tuple
 
-from mava.components import building, executing, normalisation, training, updating
+from mava.components import building, executing, training, updating
+from mava.components.building.adders import ParallelTransitionAdder
 from mava.components.building.guardrails import ComponentDependencyGuardrails
 from mava.specs import DesignSpec
 from mava.systems import System
-from mava.systems.ippo.components import ExtrasLogProbSpec
-from mava.systems.ippo.config import IPPODefaultConfig
+from mava.systems.idqn.components import building as dqn_building
+from mava.systems.idqn.components import executing as dqn_executing
+from mava.systems.idqn.components import training as dqn_training
+from mava.systems.idqn.components.building.extras_spec import DQNExtrasSpec
+from mava.systems.idqn.config import IDQNDefaultConfig
 
 
-class IPPOSystem(System):
+class IDQNSystem(System):
     @staticmethod
     def design() -> Tuple[DesignSpec, Any]:
         """System design for IPPO with single optimiser.
@@ -37,7 +41,7 @@ class IPPOSystem(System):
             default_params: default IPPO configuration
         """
         # Set the default configs
-        default_params = IPPODefaultConfig()
+        default_params = IDQNDefaultConfig()
 
         # Default system processes
         # System initialization
@@ -49,45 +53,42 @@ class IPPOSystem(System):
         # Executor
         executor_process = DesignSpec(
             executor_init=executing.ExecutorInit,
-            executor_observe=executing.FeedforwardExecutorObserve,
-            executor_select_action=executing.FeedforwardExecutorSelectAction,
-            executor_adder=building.ParallelSequenceAdder,
+            executor_observe=dqn_executing.DQNFeedforwardExecutorObserve,
+            executor_select_action=dqn_executing.DQNFeedforwardExecutorSelectAction,
+            executor_adder=ParallelTransitionAdder,
             adder_priority=building.UniformAdderPriority,
+            rate_limiter=building.reverb_components.SampleToInsertRateLimiter,
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
             networks=building.DefaultNetworks,
-            optimisers=building.ActorCriticOptimisers,
-            observation_normalisation=normalisation.ObservationNormalisation,
+            epsilon_scheduler=dqn_executing.EpsilonScheduler,
         ).get()
 
         # Trainer
         trainer_process = DesignSpec(
+            optimisers=dqn_building.Optimiser,
             trainer_init=training.SingleTrainerInit,
-            gae_fn=training.GAE,
-            loss=training.MAPGWithTrustRegionClippingLoss,
-            epoch_update=training.MAPGEpochUpdate,
-            minibatch_update=training.MAPGMinibatchUpdate,
-            sgd_step=training.MAPGWithTrustRegionStep,
+            loss=dqn_training.IDQNLoss,
+            sgd_step=dqn_training.IDQNStep,
             step=training.DefaultTrainerStep,
-            value_loss=training.SquaredErrorValueLoss,
-            trainer_dataset=building.TrajectoryDataset,
-            value_normalisation=normalisation.ValueNormalisation,
+            trainer_dataset=building.TransitionDataset,
         ).get()
 
         # Data Server
         data_server_process = DesignSpec(
-            data_server=building.OnPolicyDataServer,
-            data_server_adder_signature=building.ParallelSequenceAdderSignature,
-            extras_spec=ExtrasLogProbSpec,
+            data_server=building.OffPolicyDataServer,
+            data_server_adder_signature=building.ParallelTransitionAdderSignature,
+            data_server_remover=building.reverb_components.FIFORemover,
+            data_server_sampler=building.reverb_components.UniformSampler,
+            extras_spec=DQNExtrasSpec,
         ).get()
 
         # Parameter Server
         parameter_server_process = DesignSpec(
-            parameter_server=updating.ActorCriticParameterServer,
-            executor_parameter_client=building.ActorCriticExecutorParameterClient,
-            trainer_parameter_client=building.ActorCriticTrainerParameterClient,
+            parameter_server=updating.DefaultParameterServer,
+            executor_parameter_client=building.ExecutorParameterClient,
+            trainer_parameter_client=building.TrainerParameterClient,
             termination_condition=updating.CountConditionTerminator,
             checkpointer=updating.Checkpointer,
-            best_checkpointer=building.BestCheckpointer,
         ).get()
 
         system = DesignSpec(

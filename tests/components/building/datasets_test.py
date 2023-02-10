@@ -20,7 +20,6 @@ from typing import Any, Callable, Dict
 
 import pytest
 import reverb
-from tensorflow.python.framework import dtypes, ops
 
 from mava import specs
 from mava.adders import reverb as reverb_adders
@@ -113,6 +112,8 @@ def trajectory_dataset() -> TrajectoryDataset:
     return trajectory_dataset
 
 
+# TODO (sasha): not quite sure what to do for the transition dataset stuff because it
+# is now a numpy iterator and we cannot access the fields we want to test
 def test_init_transition_dataset(transition_dataset: TransitionDataset) -> None:
     """Test init of TransitionDataset component
 
@@ -126,7 +127,7 @@ def test_init_transition_dataset(transition_dataset: TransitionDataset) -> None:
     assert transition_dataset.config.postprocess is None
 
 
-def test_on_building_trainer_dataset_transition_dataset_non_max_in_flight(
+def test_on_building_trainer_dataset_transition_dataset(
     mock_builder: MockBuilder,
 ) -> None:
     """Test on_building_trainer_dataset of TransitionDataset Component.
@@ -136,100 +137,9 @@ def test_on_building_trainer_dataset_transition_dataset_non_max_in_flight(
     Args:
         mock_builder : Builder
     """
-
+    # make sure that creating the dataset does not cause an error
     transition_dataset = TransitionDataset()
     transition_dataset.on_building_trainer_dataset(builder=mock_builder)
-
-    # mock_builder.store.dataset_iterator._dataset._map_func._func(1)._dataset \
-    # is needed to check the parameters i.e. obtain the dataset from the \
-    # tf.data.Dataset dataset iterator
-
-    dataset = mock_builder.store.dataset_iterator._dataset._map_func._func(1)._dataset
-    assert (
-        dataset._input_dataset._server_address
-        == mock_builder.store.data_server_client.server_address
-    )
-    assert dataset._input_dataset._table == mock_builder.store.trainer_id
-    assert dataset._batch_size == transition_dataset.config.epoch_batch_size
-    assert (
-        dataset._input_dataset._max_in_flight_samples_per_worker
-        == 2 * transition_dataset.config.epoch_batch_size
-    )
-    assert (
-        mock_builder.store.dataset_iterator._dataset._num_parallel_calls
-        == ops.convert_to_tensor(
-            transition_dataset.config.num_parallel_calls,
-            dtype=dtypes.int64,
-            name="num_parallel_calls",
-        )
-    )
-
-
-def test_on_building_trainer_dataset_transition_dataset_non_max_in_flight_non_batch(
-    mock_builder: MockBuilder,
-) -> None:
-    """Test on_building_trainer_dataset of TransitionDataset Component
-
-    Case max_in_flight_samples_per_worker is None and epoch_batch_size is None
-
-    Args:
-        mock_builder: Builder
-    """
-    transition_dataset = TransitionDataset()
-    transition_dataset.config.epoch_batch_size = None
-    transition_dataset.on_building_trainer_dataset(builder=mock_builder)
-
-    dataset = mock_builder.store.dataset_iterator._dataset._map_func._func(1)
-    assert (
-        dataset._server_address == mock_builder.store.data_server_client.server_address
-    )
-    assert dataset._table == mock_builder.store.trainer_id
-    assert dataset._max_in_flight_samples_per_worker == 100
-    assert (
-        mock_builder.store.dataset_iterator._dataset._num_parallel_calls
-        == ops.convert_to_tensor(
-            transition_dataset.config.num_parallel_calls,
-            dtype=dtypes.int64,
-            name="num_parallel_calls",
-        )
-    )
-
-
-def test_on_building_trainer_dataset_transition_dataset(
-    mock_builder: MockBuilder,
-) -> None:
-    """Test on_building_trainer_dataset of TransitionDataset Component
-
-    With max_in_flight_samples_per_worker and with epoch_batch_size
-
-    Args:
-        mock_builder: Builder
-    """
-    transition_dataset = TransitionDataset()
-    transition_dataset.config.epoch_batch_size = 512
-    transition_dataset.config.max_in_flight_samples_per_worker = 120
-    transition_dataset.on_building_trainer_dataset(builder=mock_builder)
-
-    # mock_builder.store.dataset_iterator._dataset._map_func._func(1)._dataset \
-    # is needed to check the parameters i.e. obtain the dataset from the \
-    # tf.data.Dataset dataset iterator
-
-    dataset = mock_builder.store.dataset_iterator._dataset._map_func._func(1)._dataset
-    assert (
-        dataset._input_dataset._server_address
-        == mock_builder.store.data_server_client.server_address
-    )
-    assert dataset._input_dataset._table == mock_builder.store.trainer_id
-    assert dataset._batch_size == transition_dataset.config.epoch_batch_size
-    assert dataset._input_dataset._max_in_flight_samples_per_worker == 120
-    assert (
-        mock_builder.store.dataset_iterator._dataset._num_parallel_calls
-        == ops.convert_to_tensor(
-            transition_dataset.config.num_parallel_calls,
-            dtype=dtypes.int64,
-            name="num_parallel_calls",
-        )
-    )
 
 
 def test_init_trajectory_dataset(trajectory_dataset: TrajectoryDataset) -> None:

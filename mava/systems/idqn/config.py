@@ -13,14 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Updating components for Mava systems."""
+"""Default hyperparameters for IDQN system."""
+from dataclasses import dataclass
 
-from mava.components.updating.checkpointer import Checkpointer
-from mava.components.updating.parameter_server import (
-    ActorCriticParameterServer,
-    DefaultParameterServer,
-)
-from mava.components.updating.terminators import (
-    CountConditionTerminator,
-    TimeTerminator,
-)
+
+@dataclass
+class IDQNDefaultConfig:
+    epoch_batch_size: int = 32

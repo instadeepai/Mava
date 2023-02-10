@@ -25,7 +25,7 @@ from mava.callbacks import Callback
 from mava.components import Component
 from mava.components.building.environments import EnvironmentSpec
 from mava.components.building.networks import Networks
-from mava.components.building.optimisers import Optimisers
+from mava.components.building.optimisers import ActorCriticOptimisers, Optimisers
 from mava.components.building.system_init import BaseSystemInit
 from mava.core_jax import SystemBuilder, SystemTrainer
 from mava.utils.sort_utils import sort_str_num
@@ -81,18 +81,22 @@ class BaseTrainerInit(Component):
 
         # Wrap opt_states in a mutable type (dict) since optax return an immutable tuple
         builder.store.policy_opt_states = {}
-        builder.store.critic_opt_states = {}
+        if builder.has(ActorCriticOptimisers):
+            builder.store.critic_opt_states = {}
+
         for net_key in builder.store.networks.keys():
             builder.store.policy_opt_states[net_key] = {
                 constants.OPT_STATE_DICT_KEY: builder.store.policy_optimiser.init(
                     builder.store.networks[net_key].policy_params
                 )
             }  # pytype: disable=attribute-error
-            builder.store.critic_opt_states[net_key] = {
-                constants.OPT_STATE_DICT_KEY: builder.store.critic_optimiser.init(
-                    builder.store.networks[net_key].critic_params
-                )
-            }  # pytype: disable=attribute-error
+
+            if builder.has(ActorCriticOptimisers):
+                builder.store.critic_opt_states[net_key] = {
+                    constants.OPT_STATE_DICT_KEY: builder.store.critic_optimiser.init(
+                        builder.store.networks[net_key].critic_params
+                    )
+                }  # pytype: disable=attribute-error
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """Set up and store trainer agents.
