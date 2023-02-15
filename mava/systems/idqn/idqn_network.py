@@ -17,11 +17,11 @@ class IDQNNetwork:
     ) -> None:
         """A container for IDQN networks.
 
-        Holds target and main network
+        Holds target and main network.
 
         Args:
-            policy_params: parameters of the policy network
-            network: structure of the policy network
+            policy_params: parameters of the policy network.
+            network: structure of the policy network.
 
         Return:
             IDQNNetwork
@@ -34,13 +34,13 @@ class IDQNNetwork:
             policy_params: Dict[str, jnp.ndarray],
             observations: networks_lib.Observation,
         ) -> jnp.ndarray:
-            """Get Q values from the network given observations
+            """Get Q values from the network given observations.
 
             Args:
-                policy_params: parameters of the policy network
-                observations: agent observations
+                policy_params: parameters of the policy network.
+                observations: agent observations.
 
-            Returns: Q-values of all actions in the current state
+            Returns: Q-values of all actions in the current state.
             """
             return self.policy_network.apply(policy_params, observations)
 
@@ -57,14 +57,14 @@ class IDQNNetwork:
         """Get actions from policy network given observations.
 
         Args:
-            policy_params: parameters of the policy network
-            observations: agent observations
-            epsilon: probability that the agent takes a random action
-            base_key: jax random key
-            mask: action mask of the legal actions
+            policy_params: parameters of the policy network.
+            observations: agent observations.
+            epsilon: probability that the agent takes a random action.
+            base_key: jax random key.
+            mask: action mask of the legal actions.
 
         Returns:
-            an action to take in the current state
+            an action to take in the current state.
         """
         q_values = self.forward(params, observations)
         masked_q_values = jnp.where(mask == 1.0, q_values, jnp.finfo(jnp.float32).min)
