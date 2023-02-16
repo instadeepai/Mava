@@ -18,6 +18,7 @@ import functools
 from datetime import datetime
 from typing import Any
 
+import jax.numpy as jnp
 import optax
 from absl import app, flags
 
@@ -83,7 +84,7 @@ def main(_: Any) -> None:
 
     # Optimisers.
     policy_optimiser = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+        optax.clip_by_global_norm(10.0), optax.scale_by_adam(), optax.scale(-5e-5)
     )
     epsilon_scheduler = LinearEpsilonScheduler(1.0, 0.1, 100_000)
 
@@ -98,12 +99,18 @@ def main(_: Any) -> None:
         experiment_path=experiment_path,
         policy_optimiser=policy_optimiser,
         epsilon_scheduler=epsilon_scheduler,
-        reverb_table_max_size=10_000,
+        reverb_table_max_size=1_000_000,
+        min_data_server_size=20_000,
         run_evaluator=True,
-        epoch_batch_size=128,
+        epoch_batch_size=32,
         num_executors=1,
         multi_process=True,
-        samples_per_insert=32,
+        samples_per_insert=8,
+        n_step=5,
+        target_update_period=10000,
+        priority_exponent=0.2,
+        importance_sampling_exponent=0.2,
+        priority_agg_fn=jnp.min,
     )
 
     # Launch the system.

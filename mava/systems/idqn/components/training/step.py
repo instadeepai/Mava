@@ -15,8 +15,9 @@
 
 """Trainer components for gradient step calculations."""
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Type
+from typing import Callable, Dict, List, Tuple, Type
 
+import chex
 import jax
 import jax.numpy as jnp
 import optax
@@ -40,6 +41,7 @@ from mava.systems.idqn.components.training.loss import IDQNLoss
 @dataclass
 class IDQNStepConfig:
     target_update_period: int = 100
+    priority_agg_fn: Callable[[chex.Array, int], chex.Numeric] = jnp.max
 
 
 class IDQNStep(Step):
@@ -108,7 +110,8 @@ class IDQNStep(Step):
 
             # Because MAVA stores all agents experience in a single row of a reverb table
             # priorities must be aggregated over all agents transisitions.
-            priorities = jnp.array(list(priorities.values())).max(0)
+            priorities = jnp.array(list(priorities.values()))
+            agg_priorities = self.config.priority_agg_fn(priorities, 0)
 
             metrics: Dict[str, jnp.ndarray] = {}
             for agent_key in trainer.store.trainer_agents:
@@ -150,7 +153,7 @@ class IDQNStep(Step):
                 random_key=states.random_key,
                 trainer_iteration=states.trainer_iteration,
             )
-            return new_states, metrics, priorities
+            return new_states, metrics, agg_priorities
 
         def step(sample: reverb.ReplaySample) -> Tuple[Dict[str, jnp.ndarray]]:
             """Step over the reverb sample and update the parameters / optimiser states.
