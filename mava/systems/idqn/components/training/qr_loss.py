@@ -97,9 +97,7 @@ class QrIDQNLoss(IDQNLoss):
                     )
 
                     cond = jnp.expand_dims(masks == 1.0, -1)
-                    q_t_selector_dist = jnp.where(
-                        cond, q_t_selector_dist, jnp.finfo(float).min
-                    )
+                    q_t_selector_dist = jnp.where(cond, q_t_selector_dist, -jnp.inf)
 
                     # Swap distribution and action dimension, since
                     # rlax.quantile_q_learning expects it that way.
@@ -107,9 +105,7 @@ class QrIDQNLoss(IDQNLoss):
                     dist_q_target_t = jnp.swapaxes(dist_q_target_t, 1, 2)
 
                     num_atoms = dist_q_tm1.shape[1]
-                    quantiles = (
-                        jnp.arange(num_atoms, dtype=jnp.float32) + 0.5
-                    ) / num_atoms
+                    quantiles = (jnp.arange(num_atoms, dtype=float) + 0.5) / num_atoms
                     batch_quantile_q_learning = jax.vmap(
                         rlax.quantile_q_learning, in_axes=(0, None, 0, 0, 0, 0, 0, None)
                     )
@@ -118,7 +114,7 @@ class QrIDQNLoss(IDQNLoss):
                         quantiles,
                         actions,
                         rewards,
-                        discounts,
+                        discounts * self.config.gamma,
                         q_t_selector_dist,
                         dist_q_target_t,
                         self.config.huber_param,

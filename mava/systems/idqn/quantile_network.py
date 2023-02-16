@@ -104,7 +104,7 @@ def _make_quantile_network(
     environment_spec: specs.EnvironmentSpec,
     base_key: jax.random.KeyArray,
     policy_layer_sizes: Sequence[int] = (512,),
-    num_atoms: int = 51,
+    num_atoms: int = 200,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     observation_network: Optional[Callable] = None,
 ) -> QuantileRegressionNetwork:
