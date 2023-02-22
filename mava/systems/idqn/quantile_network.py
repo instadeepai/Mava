@@ -1,6 +1,6 @@
 import copy
 import dataclasses
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Sequence, Tuple
 
 import chex
 import haiku as hk  # type: ignore
@@ -107,7 +107,6 @@ def _make_quantile_network(
     policy_layer_sizes: Sequence[int] = (512,),
     num_atoms: int = 200,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
-    observation_network: Optional[Callable] = None,
 ) -> QuantileRegressionNetwork:
     num_actions = environment_spec.actions.num_values
 
@@ -121,14 +120,6 @@ def _make_quantile_network(
             ],
             activation=activation_function,
         )
-
-        # Add obs net
-        # if observation_network is not None:
-        #     model = [observation_network, model]
-        # else:
-        #     model = [model]
-
-        # model = hk.Sequential(model)
 
         q_dist = model(inputs).reshape(-1, num_actions, num_atoms)
         q_values = jnp.mean(q_dist, axis=-1)
@@ -156,7 +147,6 @@ def _make_dueling_quantile_network(
     policy_layer_sizes: Sequence[int] = (512,),
     num_atoms: int = 200,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
-    observation_network: Optional[Callable] = None,
 ) -> QuantileRegressionNetwork:
     num_actions = environment_spec.actions.num_values
 
@@ -219,7 +209,6 @@ def make_quantile_regression_networks(
     policy_layer_sizes: Sequence[int] = (512, 512),
     num_atoms: int = 200,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
-    observation_network: Optional[Callable] = None,
     dueling: bool = False,
 ) -> Dict[str, Any]:
     """Create quantile regression IDQN networks (one per agent)
@@ -260,7 +249,6 @@ def make_quantile_regression_networks(
             base_key=base_key,
             policy_layer_sizes=policy_layer_sizes,
             activation_function=activation_function,
-            observation_network=observation_network,
             num_atoms=num_atoms,
         )
 

@@ -19,7 +19,7 @@ import datetime
 import sys
 from importlib import util as import_util
 
-from setuptools import find_namespace_packages, find_packages, setup
+from setuptools import find_namespace_packages, setup
 
 spec = import_util.spec_from_file_location("_metadata", "mava/_metadata.py")
 _metadata = import_util.module_from_spec(spec)  # type: ignore
@@ -45,6 +45,7 @@ jax_requirements = [
     "optax",
     "rlax",
     "networkx",
+    "distrax",
 ] + tf_requirements
 
 pettingzoo_requirements = [

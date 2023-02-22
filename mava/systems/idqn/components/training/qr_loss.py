@@ -17,12 +17,10 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Tuple
 
-import chex
 import jax
 import jax.numpy as jnp
 import rlax
 
-from mava.components.training.losses import Loss
 from mava.core_jax import SystemTrainer
 from mava.systems.idqn.components.training.loss import IDQNLoss, IDQNLossConfig
 
@@ -34,6 +32,7 @@ class QrIDQNLossConfig(IDQNLossConfig):
 
 class QrIDQNLoss(IDQNLoss):
     def __init__(self, config: QrIDQNLossConfig = QrIDQNLossConfig()) -> None:
+        """Initialize."""
         super().__init__(config)
 
     def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
