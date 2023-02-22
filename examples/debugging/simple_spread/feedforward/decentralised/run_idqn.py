@@ -85,7 +85,7 @@ def main(_: Any) -> None:
     policy_optimiser = optax.chain(
         optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
     )
-    epsilon_scheduler = LinearEpsilonScheduler(1.0, 0.1, 10_000)
+    epsilon_scheduler = LinearEpsilonScheduler(1.0, 0.1, 100_000)
 
     # Create the system.
     system = idqn.IDQNSystem()
@@ -98,12 +98,12 @@ def main(_: Any) -> None:
         experiment_path=experiment_path,
         policy_optimiser=policy_optimiser,
         epsilon_scheduler=epsilon_scheduler,
-        reverb_table_max_size=10_000,
+        reverb_table_max_size=1_000_000,
         run_evaluator=True,
-        epoch_batch_size=128,
+        epoch_batch_size=32,
         num_executors=1,
         multi_process=True,
-        samples_per_insert=32,
+        samples_per_insert=8,
     )
 
     # Launch the system.

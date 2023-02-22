@@ -2,6 +2,7 @@ import copy
 import dataclasses
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple
 
+import chex
 import haiku as hk  # type: ignore
 import jax
 import jax.numpy as jnp
@@ -18,7 +19,7 @@ class QuantileRegressionNetwork:
     def __init__(
         self,
         policy_params: networks_lib.Params,
-        network: networks_lib.FeedForwardNetwork,
+        network: hk.Transformed,
     ) -> None:
         """A container for IDQN networks.
 
@@ -108,15 +109,11 @@ def _make_quantile_network(
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     observation_network: Optional[Callable] = None,
 ) -> QuantileRegressionNetwork:
-    # TODO: why?
-    # assert (
-    #     len(policy_layer_sizes) == 1
-    # ), "QR DQN doesn't seem to work with more than 1 layer in the Q network"
     num_actions = environment_spec.actions.num_values
 
     @hk.without_apply_rng
     @hk.transform
-    def q_function(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+    def q_function(inputs: jnp.ndarray) -> Tuple[chex.Array, chex.Array]:
         model = hk.nets.MLP(
             [
                 *policy_layer_sizes,
@@ -133,9 +130,68 @@ def _make_quantile_network(
 
         # model = hk.Sequential(model)
 
-        q_dist = model(inputs).reshape(
-            -1, environment_spec.actions.num_values, num_atoms
+        q_dist = model(inputs).reshape(-1, num_actions, num_atoms)
+        q_values = jnp.mean(q_dist, axis=-1)
+
+        return q_values, q_dist
+
+    dummy_obs = utils.zeros_like(environment_spec.observations.observation)
+    dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
+
+    base_key, network_key = jax.random.split(base_key)
+
+    policy_params = q_function.init(network_key, dummy_obs)
+
+    base_key, network_key = jax.random.split(base_key)
+
+    return QuantileRegressionNetwork(
+        network=q_function,
+        policy_params=policy_params,
+    )
+
+
+def _make_dueling_quantile_network(
+    environment_spec: specs.EnvironmentSpec,
+    base_key: jax.random.KeyArray,
+    policy_layer_sizes: Sequence[int] = (512,),
+    num_atoms: int = 200,
+    activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
+    observation_network: Optional[Callable] = None,
+) -> QuantileRegressionNetwork:
+    num_actions = environment_spec.actions.num_values
+
+    @hk.without_apply_rng
+    @hk.transform
+    def q_function(inputs: jnp.ndarray) -> Tuple[chex.Array, chex.Array]:
+        value_mlp = hk.nets.MLP(
+            [
+                *policy_layer_sizes,
+                num_atoms,
+            ],
+            activation=activation_function,
         )
+
+        advantage_mlp = hk.nets.MLP(
+            [
+                *policy_layer_sizes,
+                num_actions * num_atoms,
+            ],
+            activation=activation_function,
+        )
+
+        # Dueling:
+        # Compute value & advantage for dueling.
+        value = value_mlp(inputs)  # [B, 1]
+        advantages = advantage_mlp(inputs)  # [B, A]
+
+        # Advantages have zero mean.
+        advantages -= jnp.mean(advantages, axis=-1, keepdims=True)  # [B, A]
+        advantages = advantages.reshape(-1, num_actions, num_atoms)
+        value = jax.numpy.expand_dims(value, axis=1)
+        q_dist = value + advantages  # [B, A]
+
+        # distributional part
+        # q_dist = model(inputs).reshape(-1, num_actions, num_atoms)
         q_values = jnp.mean(q_dist, axis=-1)
 
         return q_values, q_dist
@@ -160,10 +216,11 @@ def make_quantile_regression_networks(
     agent_net_keys: Dict[str, str],
     base_key: jax.random.KeyArray,
     net_spec_keys: Dict[str, str] = {},
-    policy_layer_sizes: Sequence[int] = (512,),
-    num_atoms: int = 51,
+    policy_layer_sizes: Sequence[int] = (512, 512),
+    num_atoms: int = 200,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     observation_network: Optional[Callable] = None,
+    dueling: bool = False,
 ) -> Dict[str, Any]:
     """Create quantile regression IDQN networks (one per agent)
 
@@ -177,6 +234,7 @@ def make_quantile_regression_networks(
         policy_layer_sizes: policy network layers
         activation_function: activation function to be used for network hidden layers.
         observation_network: optional network for processing observations
+        dueling: whether to use dueling networks
 
     Returns:
         networks: IDQN networks created to given spec
@@ -191,10 +249,14 @@ def make_quantile_regression_networks(
     else:
         specs = {net_key: specs[value] for net_key, value in net_spec_keys.items()}
 
+    make_network_fn = (
+        _make_dueling_quantile_network if dueling else _make_quantile_network
+    )
+
     networks: Dict[str, Any] = {}
     for net_key in specs.keys():
-        networks[net_key] = _make_quantile_network(
-            specs[net_key],
+        networks[net_key] = make_network_fn(
+            environment_spec=specs[net_key],
             base_key=base_key,
             policy_layer_sizes=policy_layer_sizes,
             activation_function=activation_function,

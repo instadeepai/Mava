@@ -62,7 +62,7 @@ def main(_: Any) -> None:
 
     # Networks.
     network_factory = lambda *a, **k: idqn.make_quantile_regression_networks(
-        policy_layer_sizes=[256, 512, 512], num_atoms=200, *a, **k
+        policy_layer_sizes=[512, 512], num_atoms=200, dueling=True, *a, **k
     )
 
     # Used for checkpoints, tensorboard logging and env monitoring
@@ -103,8 +103,8 @@ def main(_: Any) -> None:
         num_executors=1,
         multi_process=True,
         samples_per_insert=8,
-        n_step=3,
-        target_update_period=10000,
+        n_step=5,
+        target_update_period=10_000,
     )
 
     # Launch the system.
