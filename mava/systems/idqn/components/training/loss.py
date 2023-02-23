@@ -35,12 +35,8 @@ class IDQNLoss(Loss):
         self,
         config: IDQNLossConfig = IDQNLossConfig(),
     ):
-        """Component defines a MAPGWithTrustRegionClipping loss function.
-
-        Args:
-            config: MAPGTrustRegionClippingLossConfig.
-        """
-        self.config = config
+        """Component for Independant DQN Loss."""
+        super().__init__(config)
 
     def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
         """Create and store IDQN loss function.

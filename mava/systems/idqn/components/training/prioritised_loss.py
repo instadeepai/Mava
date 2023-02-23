@@ -30,7 +30,7 @@ from mava.types import OLT
 
 
 @dataclass
-class IDQNLossConfig:
+class PrioritisedIDQNLossConfig:
     gamma: float = 0.99
     importance_sampling_exponent: float = 0.6
 
@@ -38,10 +38,10 @@ class IDQNLossConfig:
 class PrioritisedIDQNLoss(Loss):
     def __init__(
         self,
-        config: IDQNLossConfig = IDQNLossConfig(),
+        config: PrioritisedIDQNLossConfig = PrioritisedIDQNLossConfig(),
     ):
         """IDQN Loss with prioritised experience replay."""
-        self.config = config
+        super().__init__(config)
 
     def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
         """Create and store IDQN loss function.
