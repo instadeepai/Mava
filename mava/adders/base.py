@@ -36,7 +36,7 @@ class ParallelAdder(adders.Adder):
     ```python
     # Reset the environment and add the first observation.
     timestep = env.reset()
-    adder.add_first(timestep.observation)
+    adder.(timestep.observation)
     while not timestep.last():
         # Generate an action from the policy and step the environment.
         action = my_policy(timestep)
@@ -54,7 +54,7 @@ class ParallelAdder(adders.Adder):
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extras: Dict[str, types.NestedArray] = {},
+        extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """Defines the adder `add` interface.
 
@@ -63,6 +63,6 @@ class ParallelAdder(adders.Adder):
             a_t for each agent.
           next_timestep: A dm_env Timestep object corresponding to the resulting
             data obtained by taking the given action.
-          next_extras: Dictionary of a possibly nested structure of extra data to add
+          extras: Dictionary of a possibly nested structure of extra data to add
             to replay. This is linked to next_timestep.observation.
         """

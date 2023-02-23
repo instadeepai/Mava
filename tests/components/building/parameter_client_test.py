@@ -411,17 +411,11 @@ def test_trainer_parameter_client(
 
     assert mock_builder.store.trainer_parameter_client._set_keys == [
         "policy_network-network_agent_0",
-        # "critic_network-network_agent_0",
         "policy_opt_state-network_agent_0",
-        # "critic_opt_state-network_agent_0",
         "policy_network-network_agent_1",
-        # "critic_network-network_agent_1",
         "policy_opt_state-network_agent_1",
-        # "critic_opt_state-network_agent_1",
         "policy_network-network_agent_2",
-        # "critic_network-network_agent_2",
         "policy_opt_state-network_agent_2",
-        # "critic_opt_state-network_agent_2",
         "norm_params",
     ]
     assert (

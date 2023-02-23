@@ -15,13 +15,17 @@
 
 """Trainer components for gradient step calculations."""
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Type
+from typing import Callable, Dict, List, Tuple, Type
 
+import chex
 import jax
 import jax.numpy as jnp
 import optax
 import reverb
 import rlax
+import tree
+from acme.agents.jax.dqn.learning_lib import ReverbUpdate
+from acme.jax import utils
 from jax import jit
 
 import mava.components.building.adders  # To avoid circular imports
@@ -37,6 +41,7 @@ from mava.systems.idqn.components.training.loss import IDQNLoss
 @dataclass
 class IDQNStepConfig:
     target_update_period: int = 100
+    priority_agg_fn: Callable[[chex.Array, int], chex.Numeric] = jnp.max
 
 
 class IDQNStep(Step):
@@ -65,7 +70,7 @@ class IDQNStep(Step):
         @jit
         def sgd_step(
             states: DQNTrainingState, sample: reverb.ReplaySample
-        ) -> Tuple[DQNTrainingState, Dict[str, jnp.ndarray]]:
+        ) -> Tuple[DQNTrainingState, Dict[str, jnp.ndarray], Dict[str, ReverbUpdate]]:
             """Performs a minibatch SGD step.
 
             Args:
@@ -92,7 +97,7 @@ class IDQNStep(Step):
             policy_params = states.policy_params
             policy_opt_states = states.policy_opt_states
 
-            policy_gradients, grad_metrics = trainer.store.policy_grad_fn(
+            (policy_gradients, grad_metrics, priorities) = trainer.store.policy_grad_fn(
                 policy_params,
                 target_policy_params,
                 observations,
@@ -100,7 +105,13 @@ class IDQNStep(Step):
                 rewards,
                 next_observations,
                 discounts,
+                sample.info.probability,
             )
+
+            # Because MAVA stores all agents experience in a single row of a reverb table
+            # priorities must be aggregated over all agents transisitions.
+            priorities = jnp.array(list(priorities.values()))
+            agg_priorities = self.config.priority_agg_fn(priorities, 0)
 
             metrics: Dict[str, jnp.ndarray] = {}
             for agent_key in trainer.store.trainer_agents:
@@ -119,14 +130,10 @@ class IDQNStep(Step):
                     policy_params[agent_net_key], policy_updates
                 )
 
-                # TODO (sasha): does this need to be included
-                # policy_agent_metrics[agent_key]["norm_policy_grad"] = optax.global_norm(
-                #     policy_gradients[agent_key]
-                # )
-                # policy_agent_metrics[agent_key][
-                #     "norm_policy_updates"
-                # ] = optax.global_norm(policy_updates)
-                # metrics[agent_key] = policy_agent_metrics[agent_key]
+                metrics[agent_key] = {
+                    "norm_policy_grad": optax.global_norm(policy_gradients[agent_key]),
+                    "norm_policy_updates": optax.global_norm(policy_updates),
+                }
 
             # update target net
             target_policy_params = rlax.periodic_update(
@@ -146,7 +153,7 @@ class IDQNStep(Step):
                 random_key=states.random_key,
                 trainer_iteration=states.trainer_iteration,
             )
-            return new_states, metrics
+            return new_states, metrics, agg_priorities
 
         def step(sample: reverb.ReplaySample) -> Tuple[Dict[str, jnp.ndarray]]:
             """Step over the reverb sample and update the parameters / optimiser states.
@@ -182,7 +189,7 @@ class IDQNStep(Step):
                 trainer_iteration=steps,
             )
 
-            new_states, metrics = sgd_step(states, sample)
+            new_states, metrics, priorities = sgd_step(states, sample)
 
             # Set the new variables
             # TODO (dries): key is probably not being store correctly.
@@ -190,6 +197,17 @@ class IDQNStep(Step):
             # We also need to add the optimiser and random_key to the variable
             # server.
             trainer.store.base_key = new_states.random_key
+
+            # Update priorities in reverb table
+            # `sample.info.key` is used here, as it is the same keys as the sample passed to
+            # `sgd_step` however if pass keys out of `sgd_step` with the priorities (like acme does)
+            # it does not update properly. It has something to do with jit as when we didn't jit
+            # and passed the keys out it does work. But this way we can jit and use the same keys
+            # from outside `sgd_step`
+            trainer.store.data_server_client.mutate_priorities(
+                table="trainer_0",
+                updates=dict(zip(sample.info.key.tolist(), priorities.tolist())),
+            )
 
             # UPDATING THE PARAMETERS IN THE NETWORK IN THE STORE
             for net_key in policy_params.keys():

@@ -68,7 +68,6 @@ class IDQNSystem(System):
             optimisers=dqn_building.Optimiser,
             trainer_init=training.SingleTrainerInit,
             loss=dqn_training.IDQNLoss,
-            # epoch_update=training.MAPGEpochUpdate,
             sgd_step=dqn_training.IDQNStep,
             step=training.DefaultTrainerStep,
             trainer_dataset=building.TransitionDataset,
@@ -79,7 +78,7 @@ class IDQNSystem(System):
             data_server=building.OffPolicyDataServer,
             data_server_adder_signature=building.ParallelTransitionAdderSignature,
             data_server_remover=building.reverb_components.FIFORemover,
-            data_server_sampler=building.reverb_components.UniformSampler,
+            data_server_sampler=building.reverb_components.PrioritySampler,
             extras_spec=DQNExtrasSpec,
         ).get()
 

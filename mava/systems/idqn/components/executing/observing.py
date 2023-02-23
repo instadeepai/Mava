@@ -46,16 +46,16 @@ class DQNFeedforwardExecutorObserve(FeedforwardExecutorObserve):
         actions_info = executor.store.actions_info
 
         adder_actions: Dict[str, Any] = {}
-        # executor.store.next_extras set by Executor
+        # executor.store.extras set by Executor
         for agent in actions_info.keys():
             adder_actions[agent] = {
                 "actions_info": actions_info[agent],
             }
 
         network_int_keys = executor.store.network_int_keys_extras
-        executor.store.next_extras["network_int_keys"] = network_int_keys
+        executor.store.extras["network_int_keys"] = network_int_keys
 
         # executor.store.next_timestep set by Executor
         executor.store.adder.add(
-            adder_actions, executor.store.next_timestep, executor.store.next_extras
+            adder_actions, executor.store.next_timestep, executor.store.extras
         )

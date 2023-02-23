@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Jax IPPO system networks."""
+"""Jax IDQN system networks."""
 from typing import Any, Callable, Dict, Optional, Sequence
 
 import haiku as hk
@@ -63,18 +63,18 @@ def make_network(
             FeedForwardNetwork class
         """
         # Add the observation network and an MLP network.
-        value_network = []
+        q_value_network = []
         if observation_network is not None:
-            value_network.append(observation_network)
+            q_value_network.append(observation_network)
 
-        value_network.append(
+        q_value_network.append(
             hk.nets.MLP(
                 (*policy_layer_sizes, num_actions),
                 activation=activation_function,
             ),
         )
 
-        return hk.Sequential(value_network)(inputs)
+        return hk.Sequential(q_value_network)(inputs)
 
     dummy_obs = utils.zeros_like(environment_spec.observations.observation)
     dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
