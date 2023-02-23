@@ -54,7 +54,7 @@ class QrIDQNLoss(IDQNLoss):
             next_observations: Any,
             discounts: Dict[str, jnp.ndarray],
         ) -> Tuple[Dict[str, jnp.ndarray], Dict[str, Dict[str, jnp.ndarray]]]:
-            """Surrogate loss using clipped probability ratios.
+            """QR-DQN Loss.
 
             Args:
                 policy_params: policy network parameters.

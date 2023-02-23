@@ -16,37 +16,37 @@ from mava import specs as mava_specs
 
 @dataclasses.dataclass
 class QuantileRegressionNetwork:
+    """A container for Quantile Regression networks for IDQN.
+
+    Holds target and main network.
+    """
+
     def __init__(
         self,
         policy_params: networks_lib.Params,
         network: hk.Transformed,
     ) -> None:
-        """A container for IDQN networks.
-
-        Holds target and main network
+        """Init for QuantileRegressionNetwork.
 
         Args:
             policy_params: parameters of the policy network
             network: structure of the policy network
-
-        Return:
-            IDQNNetwork
         """
         self.policy_params: networks_lib.Params = policy_params
         self.target_policy_params: networks_lib.Params = copy.deepcopy(policy_params)
-        self.policy_network: networks_lib.FeedForwardNetwork = network
+        self.policy_network: hk.Transformed = network
 
         def forward_fn(
             policy_params: Dict[str, jnp.ndarray],
             observations: networks_lib.Observation,
         ) -> jnp.ndarray:
-            """Get Q values from the network given observations
+            """Get Q values and distribution from the acting network given observations.
 
             Args:
-                policy_params: parameters of the policy network
-                observations: agent observations
+                policy_params: parameters of the policy network.
+                observations: agent observations.
 
-            Returns: Q-values of all actions in the current state
+            Returns: Q-values of all actions in the current state.
             """
             return self.policy_network.apply(policy_params, observations)
 
@@ -70,7 +70,7 @@ class QuantileRegressionNetwork:
             mask: action mask of the legal actions
 
         Returns:
-            an action to take in the current state
+            An action to take in the current state
         """
         q_values, _ = self.forward(params, observations)
         masked_q_values = jnp.where(mask == 1.0, q_values, jnp.finfo(jnp.float32).min)
@@ -80,9 +80,9 @@ class QuantileRegressionNetwork:
 
         random_action_probs = mask / jnp.sum(mask)
 
-        weighted_gready_probs = (1 - epsilon) * greedy_actions_probs
+        weighted_greedy_probs = (1 - epsilon) * greedy_actions_probs
         weighted_rand_probs = epsilon * random_action_probs
-        combined_probs = weighted_gready_probs + weighted_rand_probs
+        combined_probs = weighted_greedy_probs + weighted_rand_probs
 
         action_dist = Categorical(probs=combined_probs)
         return action_dist.sample(seed=base_key)
@@ -90,11 +90,7 @@ class QuantileRegressionNetwork:
     def get_params(
         self,
     ) -> Dict[str, networks_lib.Params]:
-        """Return current params of the target and policy network.
-
-        Returns:
-            policy and target policy params.
-        """
+        """Returns: policy and target policy params."""
         return {
             "policy_network": self.policy_params,
             "target_policy_network": self.target_policy_params,
@@ -104,10 +100,15 @@ class QuantileRegressionNetwork:
 def _make_quantile_network(
     environment_spec: specs.EnvironmentSpec,
     base_key: jax.random.KeyArray,
-    policy_layer_sizes: Sequence[int] = (512,),
+    policy_layer_sizes: Sequence[int] = (512, 512),
     num_atoms: int = 200,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
 ) -> QuantileRegressionNetwork:
+    """Makes a single quantile regression network.
+
+    This network returns a tuple (q values, q distribution).
+    The Q distribution has the shape (batch, actions, atoms)
+    """
     num_actions = environment_spec.actions.num_values
 
     @hk.without_apply_rng
@@ -126,8 +127,9 @@ def _make_quantile_network(
 
         return q_values, q_dist
 
+    # Initialising params
     dummy_obs = utils.zeros_like(environment_spec.observations.observation)
-    dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
+    dummy_obs = utils.add_batch_dim(dummy_obs)
 
     base_key, network_key = jax.random.split(base_key)
 
@@ -148,6 +150,11 @@ def _make_dueling_quantile_network(
     num_atoms: int = 200,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
 ) -> QuantileRegressionNetwork:
+    """Makes a single quantile regression network, with a dueling head.
+
+    This network returns a tuple (q values, q distribution).
+    The Q distribution has the shape (batch, actions, atoms)
+    """
     num_actions = environment_spec.actions.num_values
 
     @hk.without_apply_rng
@@ -171,23 +178,22 @@ def _make_dueling_quantile_network(
 
         # Dueling:
         # Compute value & advantage for dueling.
-        value = value_mlp(inputs)  # [B, 1]
-        advantages = advantage_mlp(inputs)  # [B, A]
+        value = value_mlp(inputs)  # [B, Atoms]
+        advantages = advantage_mlp(inputs)  # [B, Acts*Atoms]
 
         # Advantages have zero mean.
-        advantages -= jnp.mean(advantages, axis=-1, keepdims=True)  # [B, A]
-        advantages = advantages.reshape(-1, num_actions, num_atoms)
-        value = jax.numpy.expand_dims(value, axis=1)
-        q_dist = value + advantages  # [B, A]
-
-        # distributional part
-        # q_dist = model(inputs).reshape(-1, num_actions, num_atoms)
+        advantages -= jnp.mean(advantages, axis=-1, keepdims=True)  # [B, Acts*Atoms]
+        # Reshaping
+        advantages = advantages.reshape(-1, num_actions, num_atoms)  # [B, Acts, Atom]
+        value = jax.numpy.expand_dims(value, axis=1)  # [B, 1, Atoms]
+        # Distributional part
+        q_dist = value + advantages  # [B, Acts, Atoms]
         q_values = jnp.mean(q_dist, axis=-1)
 
         return q_values, q_dist
 
     dummy_obs = utils.zeros_like(environment_spec.observations.observation)
-    dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
+    dummy_obs = utils.add_batch_dim(dummy_obs)
 
     base_key, network_key = jax.random.split(base_key)
 
@@ -211,12 +217,11 @@ def make_quantile_regression_networks(
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     dueling: bool = False,
 ) -> Dict[str, Any]:
-    """Create quantile regression IDQN networks (one per agent)
+    """Create Quantile Regression IDQN networks (one per agent)
 
     Args:
         environment_spec: mava multi-agent environment spec
-        agent_net_keys: dictionary specifying which networks are
-            used by which agent
+        agent_net_keys: dictionary specifying which networks are used by which agent
         base_key: jax random key to be used for network initialization
         net_spec_keys: keys for each agent network
         num_atoms: the number of quantiles to use
@@ -226,7 +231,7 @@ def make_quantile_regression_networks(
         dueling: whether to use dueling networks
 
     Returns:
-        networks: IDQN networks created to given spec
+        networks: QuantileRegressionNetworks created to given spec
     """
 
     # Create agent_type specs.
