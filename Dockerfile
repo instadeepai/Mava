@@ -9,10 +9,10 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -y && \
     apt-get install -y software-properties-common && \
     add-apt-repository -y ppa:deadsnakes/ppa && \
-    apt install -y python3.9 && \
-    apt install -y python3.9-dev && \
+    apt install -y python3.8 && \
+    apt install -y python3.8-dev && \
     apt-get install -y python3-pip && \
-    apt-get install -y python3.9-venv
+    apt-get install -y python3.8-venv
 
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.9 10
 
