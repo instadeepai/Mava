@@ -27,7 +27,7 @@ from mava.systems.idqn.components.training.loss import IDQNLoss, IDQNLossConfig
 
 @dataclass
 class QrIDQNLossConfig(IDQNLossConfig):
-    huber_param = 1.0
+    huber_param: float = 1.0
 
 
 class QrIDQNLoss(IDQNLoss):

@@ -22,7 +22,9 @@ import optax
 from absl import app, flags
 
 from mava.systems import idqn
+from mava.systems.idqn.components.training.prioritised_step import PrioritisedIDQNStep
 from mava.systems.idqn.components.training.qr_loss import QrIDQNLoss
+from mava.systems.idqn.components.training.rainbow_loss import RainbowIDQNLoss
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 from mava.utils.schedulers.linear_epsilon_scheduler import LinearEpsilonScheduler
@@ -87,7 +89,8 @@ def main(_: Any) -> None:
 
     # Create the system.
     system = idqn.IDQNSystem()
-    system.update(QrIDQNLoss)
+    system.update(RainbowIDQNLoss)
+    system.update(PrioritisedIDQNStep)
 
     # Build the system.
     system.build(
@@ -102,9 +105,11 @@ def main(_: Any) -> None:
         epoch_batch_size=32,
         num_executors=1,
         multi_process=True,
-        samples_per_insert=8,
+        samples_per_insert=4,
         n_step=5,
         target_update_period=10_000,
+        priority_exponent=0.6,
+        importance_sampling_exponent=0.2,
     )
 
     # Launch the system.

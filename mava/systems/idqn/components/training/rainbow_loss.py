@@ -15,35 +15,30 @@
 
 """Trainer components for calculating losses."""
 from dataclasses import dataclass
-from typing import Dict, Tuple
+from typing import Any, Dict, Tuple
 
 import chex
-import haiku as hk
 import jax
 import jax.numpy as jnp
 import rlax
 
-from mava.components.training.losses import Loss
 from mava.core_jax import SystemTrainer
-from mava.types import OLT
+from mava.systems.idqn.components.training.loss import IDQNLoss, IDQNLossConfig
 
 
 @dataclass
-class PrioritisedIDQNLossConfig:
-    gamma: float = 0.99
+class RainbowIDQNLossConfig(IDQNLossConfig):
     importance_sampling_exponent: float = 0.6
+    huber_param: float = 1.0
 
 
-class PrioritisedIDQNLoss(Loss):
-    def __init__(
-        self,
-        config: PrioritisedIDQNLossConfig = PrioritisedIDQNLossConfig(),
-    ):
-        """IDQN Loss with prioritised experience replay."""
+class RainbowIDQNLoss(IDQNLoss):
+    def __init__(self, config: RainbowIDQNLossConfig = RainbowIDQNLossConfig()) -> None:
+        """Initialize."""
         super().__init__(config)
 
     def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
-        """Create and store IDQN loss function.
+        """Create and store Quantile regression IDQN loss function.
 
         Args:
             trainer: SystemTrainer.
@@ -52,18 +47,17 @@ class PrioritisedIDQNLoss(Loss):
             None.
         """
 
-        @jax.jit
         def policy_loss_grad_fn(
-            policy_params: Dict[str, hk.Params],
-            target_policy_params: Dict[str, hk.Params],
-            observations: Dict[str, OLT],
+            policy_params: Any,
+            target_policy_params: Any,
+            observations: Any,
             actions: Dict[str, chex.Array],
             rewards: Dict[str, chex.Array],
-            next_observations: Dict[str, OLT],
+            next_observations: Any,
             discounts: Dict[str, chex.Array],
             probs: chex.Array,
         ) -> Tuple[Dict[str, chex.Array], Dict[str, chex.Array], Dict[str, chex.Array]]:
-            """Surrogate loss using clipped probability ratios.
+            """QR-DQN Loss.
 
             Args:
                 policy_params: policy network parameters.
@@ -82,43 +76,56 @@ class PrioritisedIDQNLoss(Loss):
             agent_grads = {}
             agent_loss_infos = {}
             agent_priorities = {}
+
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
                 network = trainer.store.networks[agent_net_key]
 
                 def policy_loss_fn(
-                    policy_params: hk.Params,
-                    target_policy_params: hk.Params,
-                    observations: chex.Array,
-                    actions: chex.Array,
-                    rewards: chex.Array,
-                    next_observations: chex.Array,
-                    discounts: chex.Array,
-                    masks: chex.Array,
+                    policy_params: Any,
+                    target_policy_params: Any,
+                    observations: Any,
+                    actions: jnp.ndarray,
+                    rewards: jnp.ndarray,
+                    next_observations: Any,
+                    discounts: jnp.ndarray,
+                    masks: jnp.ndarray,
                 ) -> Tuple[chex.Array, Tuple[Dict[str, chex.Array], chex.Array]]:
                     """Inner policy loss function: see outer function for parameters."""
 
-                    # Feedforward actor.
-                    q_tm1 = network.forward(policy_params, observations)
-                    q_t_value = network.forward(target_policy_params, next_observations)
-                    q_t_selector = network.forward(policy_params, next_observations)
-
-                    q_t_selector = jnp.where(masks == 1.0, q_t_selector, -jnp.inf)
-
-                    batch_double_q_learning_loss_fn = jax.vmap(
-                        rlax.double_q_learning, (0, 0, 0, 0, 0, 0, None)
+                    _, dist_q_tm1 = network.forward(policy_params, observations)
+                    _, dist_q_target_t = network.forward(
+                        target_policy_params, next_observations
+                    )
+                    _, q_t_selector_dist = network.forward(
+                        policy_params, next_observations
                     )
 
-                    td_error = batch_double_q_learning_loss_fn(
-                        q_tm1,
+                    cond = jnp.expand_dims(masks == 1.0, -1)
+                    q_t_selector_dist = jnp.where(cond, q_t_selector_dist, -jnp.inf)
+
+                    # Swap distribution and action dimension, since
+                    # rlax.quantile_q_learning expects it that way.
+                    dist_q_tm1 = jnp.swapaxes(dist_q_tm1, 1, 2)
+                    dist_q_target_t = jnp.swapaxes(dist_q_target_t, 1, 2)
+
+                    num_atoms = dist_q_tm1.shape[1]
+                    quantiles = (jnp.arange(num_atoms, dtype=float) + 0.5) / num_atoms
+                    batch_quantile_q_learning = jax.vmap(
+                        rlax.quantile_q_learning, in_axes=(0, None, 0, 0, 0, 0, 0, None)
+                    )
+                    td_error = batch_quantile_q_learning(
+                        dist_q_tm1,
+                        quantiles,
                         actions,
                         rewards,
                         discounts * self.config.gamma,
-                        q_t_value,
-                        q_t_selector,
-                        True,
+                        q_t_selector_dist,
+                        dist_q_target_t,
+                        self.config.huber_param,
                     )
 
+                    # New
                     batch_loss = rlax.l2_loss(td_error)
 
                     importance_weights = (1.0 / probs).astype(jnp.float32)
