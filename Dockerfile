@@ -14,7 +14,7 @@ RUN apt-get update -y && \
     apt-get install -y python3-pip && \
     apt-get install -y python3.8-venv
 
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.9 10
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 10
 
 # Check python v
 RUN python -V
