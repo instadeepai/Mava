@@ -103,6 +103,7 @@ def _make_quantile_network(
     policy_layer_sizes: Sequence[int] = (512, 512),
     num_atoms: int = 200,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
+    observation_network: Callable[[jnp.ndarray], jnp.ndarray] = lambda x: x,
 ) -> QuantileRegressionNetwork:
     """Makes a single quantile regression network.
 
@@ -114,6 +115,7 @@ def _make_quantile_network(
     @hk.without_apply_rng
     @hk.transform
     def q_function(inputs: jnp.ndarray) -> Tuple[chex.Array, chex.Array]:
+        x = observation_network(inputs)
         model = hk.nets.MLP(
             [
                 *policy_layer_sizes,
@@ -122,7 +124,7 @@ def _make_quantile_network(
             activation=activation_function,
         )
 
-        q_dist = model(inputs).reshape(-1, num_actions, num_atoms)
+        q_dist = model(x).reshape(-1, num_actions, num_atoms)
         q_values = jnp.mean(q_dist, axis=-1)
 
         return q_values, q_dist
@@ -149,6 +151,7 @@ def _make_dueling_quantile_network(
     policy_layer_sizes: Sequence[int] = (512,),
     num_atoms: int = 200,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
+    observation_network: Callable[[jnp.ndarray], jnp.ndarray] = lambda x: x,
 ) -> QuantileRegressionNetwork:
     """Makes a single quantile regression network, with a dueling head.
 
@@ -160,6 +163,7 @@ def _make_dueling_quantile_network(
     @hk.without_apply_rng
     @hk.transform
     def q_function(inputs: jnp.ndarray) -> Tuple[chex.Array, chex.Array]:
+        x = observation_network(inputs)
         value_mlp = hk.nets.MLP(
             [
                 *policy_layer_sizes,
@@ -178,8 +182,8 @@ def _make_dueling_quantile_network(
 
         # Dueling:
         # Compute value & advantage for dueling.
-        value = value_mlp(inputs)  # [B, Atoms]
-        advantages = advantage_mlp(inputs)  # [B, Acts*Atoms]
+        value = value_mlp(x)  # [B, Atoms]
+        advantages = advantage_mlp(x)  # [B, Acts*Atoms]
 
         # Advantages have zero mean.
         advantages -= jnp.mean(advantages, axis=-1, keepdims=True)  # [B, Acts*Atoms]
@@ -216,6 +220,7 @@ def make_quantile_regression_networks(
     num_atoms: int = 200,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     dueling: bool = False,
+    observation_network: Callable[[jnp.ndarray], jnp.ndarray] = lambda x: x,
 ) -> Dict[str, Any]:
     """Create Quantile Regression IDQN networks (one per agent)
 
@@ -255,6 +260,7 @@ def make_quantile_regression_networks(
             policy_layer_sizes=policy_layer_sizes,
             activation_function=activation_function,
             num_atoms=num_atoms,
+            observation_network=observation_network,
         )
 
     return networks

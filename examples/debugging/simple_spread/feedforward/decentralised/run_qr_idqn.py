@@ -16,14 +16,13 @@
 """Example running IPPO on debug MPE environments."""
 import functools
 from datetime import datetime
-from typing import Any
+from typing import Any, Dict
 
 import optax
 from absl import app, flags
 
 from mava.systems import idqn
 from mava.systems.idqn.components.training.prioritised_step import PrioritisedIDQNStep
-from mava.systems.idqn.components.training.qr_loss import QrIDQNLoss
 from mava.systems.idqn.components.training.rainbow_loss import RainbowIDQNLoss
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -63,9 +62,13 @@ def main(_: Any) -> None:
     )
 
     # Networks.
-    network_factory = lambda *a, **k: idqn.make_quantile_regression_networks(
-        policy_layer_sizes=[512, 512], num_atoms=200, dueling=True, *a, **k
-    )
+    def network_factory(**k: Any) -> Dict[str, Any]:
+        return idqn.make_quantile_regression_networks(
+            policy_layer_sizes=[512, 512],
+            num_atoms=200,
+            dueling=False,
+            **k,
+        )
 
     # Used for checkpoints, tensorboard logging and env monitoring
     experiment_path = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
