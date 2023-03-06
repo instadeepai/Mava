@@ -22,6 +22,7 @@ import optax
 from absl import app, flags
 
 from mava.systems import idrqn
+from mava.systems.idqn.components.training.qr_loss import QrIDQNLoss
 from mava.components.component_groups import dqn_recurrent_policy_components, recurrent_policy_components
 from mava.systems import idqn
 from mava.utils.environments import debugging_utils
@@ -64,7 +65,7 @@ def main(_: Any) -> None:
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return idrqn.make_quantile_regression_networks(  # type: ignore
-            policy_layer_sizes=(64,64),
+            policy_layer_sizes=(64,),
             num_atoms=200,
             dueling=False,
             *args,
@@ -97,6 +98,7 @@ def main(_: Any) -> None:
     system = idrqn.IDRQNSystem()
     # Update the system with the components necessary to make the policy recurrent.
     system.update(dqn_recurrent_policy_components)
+    system.update(QrIDQNLoss)
 
     # Build the system.
     system.build(
