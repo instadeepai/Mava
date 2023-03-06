@@ -65,8 +65,8 @@ def main(_: Any) -> None:
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
         return idrqn.make_quantile_regression_networks(  # type: ignore
-            policy_layer_sizes=(64,),
-            num_atoms=200,
+            policy_layer_sizes=[256,256],
+            num_atoms=51,
             dueling=False,
             *args,
             **kwargs,
@@ -88,7 +88,7 @@ def main(_: Any) -> None:
 
     # Optimisers.
     policy_optimiser = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-3)
+        optax.clip_by_global_norm(10.0), optax.scale_by_adam(), optax.scale(-5e-5)
     )
 
     epsilon_scheduler = LinearEpsilonScheduler(1.0, 0.05, 100_000)
@@ -113,7 +113,7 @@ def main(_: Any) -> None:
         epoch_batch_size=32,
         num_executors=1,
         multi_process=True,
-        samples_per_insert=4,
+        samples_per_insert=8,
         #n_step=5,
         target_update_period=10_000,
         #priority_exponent=0.6,

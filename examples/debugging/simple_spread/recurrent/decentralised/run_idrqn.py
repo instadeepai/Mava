@@ -84,7 +84,7 @@ def main(_: Any) -> None:
 
     # Optimisers.
     policy_optimiser = optax.chain(
-        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-3)
+        optax.clip_by_global_norm(10.0), optax.scale_by_adam(), optax.scale(-5e-5)
     )
 
     epsilon_scheduler = LinearEpsilonScheduler(1.0, 0.05, 100_000)

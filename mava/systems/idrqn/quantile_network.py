@@ -113,7 +113,7 @@ def _make_quantile_network(
     base_key: jax.random.KeyArray,
     policy_layer_sizes: Sequence[int] = (512, 512),
     num_atoms: int = 200,
-    recurrent_layer_dim: int = 64,
+    recurrent_layer_dim: int = 128,
     activation_function: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
     observation_network: Callable[[jnp.ndarray], jnp.ndarray] = lambda x: x,
 ) -> QuantileRegressionNetwork:
@@ -132,18 +132,22 @@ def _make_quantile_network(
             hk.nets.MLP(
                 policy_layer_sizes,
                 activation=activation_function,
-                activate_final=True,
+                #activate_final=True,
                 #num_actions * num_atoms,
             ),
             hk.GRU(recurrent_layer_dim),
-            activation_function,
-            hk.Linear(num_actions * num_atoms)
+            #activation_function,
+            hk.nets.MLP(
+                [recurrent_layer_dim,num_actions * num_atoms],
+                activation=activation_function,
+                activate_final=True,
+                #num_actions * num_atoms,
+            ),
+            #hk.Linear(num_actions * num_atoms)
         ]
         
         rnn_model = hk.DeepRNN(model)(inputs[0], inputs[1])
-        #print(num_actions * num_atoms)
-        #print(rnn_model[0].shape)
-        #exit()
+
         q_dist = rnn_model[0].reshape(-1, num_actions, num_atoms)
         q_values = jnp.mean(q_dist, axis=-1)
         policy_state = rnn_model[1]

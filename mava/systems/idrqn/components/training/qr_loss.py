@@ -103,7 +103,7 @@ class QrIDQNLoss(IRDQNLoss):
                         policy_states[:, 0],
                         time_major=False,
                     )
-                    online_qs,online_dist_q = online
+                    _,online_dist_q = online
 
                     target, _ = hk.static_unroll(
                         target_policy_net_core,
@@ -112,20 +112,10 @@ class QrIDQNLoss(IRDQNLoss):
                         time_major=False,
                     )
 
-                    target_qs, target_dist_q = target
+                    _, target_dist_q = target
                     dist_q_tm1 = online_dist_q[:, :-1]
                     q_t_selector_dist = online_dist_q[:, 1:]
                     dist_q_target_t = target_dist_q[:, 1:]
-
-
-
-                    #_, dist_q_tm1 = network.forward(policy_params, observations)
-                    #_, dist_q_target_t = network.forward(
-                    #    target_policy_params, next_observations
-                    #)
-                    #_, q_t_selector_dist = network.forward(
-                    #    policy_params, next_observations
-                    #)
 
                     cond = jnp.expand_dims(masks[:, 1:] == 1.0, -1)
                     q_t_selector_dist = jnp.where(cond, q_t_selector_dist, -jnp.inf)
@@ -134,18 +124,15 @@ class QrIDQNLoss(IRDQNLoss):
                     #    masks[:, 1:] == 1.0, q_t_selector_dist, -99999  # TODO
                     #)
 
-                    # Swap distribution and action dimension, since
-                    # rlax.quantile_q_learning expects it that way.
+
                     actions = actions[:, :-1]
                     rewards = rewards[:, :-1]
                     discounts = discounts[:, :-1]
 
-                    #print(dist_q_tm1.shape)
 
 
                     (
                         dist_q_tm1,
-                        #quantiles,
                         q_t_selector_dist,
                         dist_q_target_t,
                         actions,
@@ -156,19 +143,15 @@ class QrIDQNLoss(IRDQNLoss):
                         (dist_q_tm1, q_t_selector_dist, dist_q_target_t, actions, rewards, discounts),
                     )
 
+                    # Swap distribution and action dimension, since
+                    # rlax.quantile_q_learning expects it that way.
+
                     dist_q_tm1 = jnp.swapaxes(dist_q_tm1, 1, 2)
                     dist_q_target_t = jnp.swapaxes(dist_q_target_t, 1, 2)
 
                     num_atoms = dist_q_tm1.shape[1]
                     quantiles = (jnp.arange(num_atoms, dtype=float) + 0.5) / num_atoms
-                    print(dist_q_tm1.shape)
-                    print(dist_q_target_t)
-                    print(quantiles.shape)
-                    print(q_t_selector_dist.shape)
-                    print(actions.shape)
-                    print(rewards.shape)
-                    print(discounts.shape)
-                    exit()
+                    
                     batch_quantile_q_learning = jax.vmap(
                         rlax.quantile_q_learning, in_axes=(0, None, 0, 0, 0, 0, 0, None)
                     )
@@ -197,7 +180,6 @@ class QrIDQNLoss(IRDQNLoss):
                     observations[agent_key].observation,
                     actions[agent_key],
                     rewards[agent_key],
-                    #next_observations[agent_key].observation,
                     discounts[agent_key],
                     observations[agent_key].legal_actions,
                 )
