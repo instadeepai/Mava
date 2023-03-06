@@ -153,6 +153,13 @@ class IRDQNLoss(Loss):
                         (q_tm1, q_t_selector, q_t_value, actions, rewards, discounts),
                     )
 
+                    print(q_tm1.shape)
+                    print(q_t_selector.shape)
+                    print(q_t_value.shape)
+                    print(actions.shape)
+                    print(rewards.shape)
+                    print(discounts.shape)
+                    exit()
                     batch_double_q_learning_loss_fn = jax.vmap(
                         rlax.double_q_learning, (0, 0, 0, 0, 0, 0, None)
                     )

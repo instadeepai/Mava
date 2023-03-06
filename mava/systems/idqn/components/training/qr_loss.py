@@ -105,6 +105,16 @@ class QrIDQNLoss(IDQNLoss):
 
                     num_atoms = dist_q_tm1.shape[1]
                     quantiles = (jnp.arange(num_atoms, dtype=float) + 0.5) / num_atoms
+
+
+                    print(dist_q_tm1.shape)
+                    print(quantiles.shape)
+                    print(q_t_selector_dist.shape)
+                    print(actions.shape)
+                    print(rewards.shape)
+                    print(discounts.shape)
+                    exit()
+                    
                     batch_quantile_q_learning = jax.vmap(
                         rlax.quantile_q_learning, in_axes=(0, None, 0, 0, 0, 0, 0, None)
                     )

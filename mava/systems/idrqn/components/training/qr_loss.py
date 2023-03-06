@@ -140,15 +140,12 @@ class QrIDQNLoss(IRDQNLoss):
                     rewards = rewards[:, :-1]
                     discounts = discounts[:, :-1]
 
-                    dist_q_tm1 = jnp.swapaxes(dist_q_tm1, 1, 2)
-                    dist_q_target_t = jnp.swapaxes(dist_q_target_t, 1, 2)
+                    #print(dist_q_tm1.shape)
 
-                    num_atoms = dist_q_tm1.shape[1]
-                    quantiles = (jnp.arange(num_atoms, dtype=float) + 0.5) / num_atoms
 
                     (
                         dist_q_tm1,
-                        quantiles,
+                        #quantiles,
                         q_t_selector_dist,
                         dist_q_target_t,
                         actions,
@@ -156,10 +153,16 @@ class QrIDQNLoss(IRDQNLoss):
                         discounts,
                     ) = jax.tree_map(
                         lambda x: merge_leading_dims(x, 2),
-                        (dist_q_tm1,quantiles, q_t_selector_dist, dist_q_target_t, actions, rewards, discounts),
+                        (dist_q_tm1, q_t_selector_dist, dist_q_target_t, actions, rewards, discounts),
                     )
 
+                    dist_q_tm1 = jnp.swapaxes(dist_q_tm1, 1, 2)
+                    dist_q_target_t = jnp.swapaxes(dist_q_target_t, 1, 2)
+
+                    num_atoms = dist_q_tm1.shape[1]
+                    quantiles = (jnp.arange(num_atoms, dtype=float) + 0.5) / num_atoms
                     print(dist_q_tm1.shape)
+                    print(dist_q_target_t)
                     print(quantiles.shape)
                     print(q_t_selector_dist.shape)
                     print(actions.shape)
