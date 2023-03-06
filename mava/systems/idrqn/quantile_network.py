@@ -78,7 +78,8 @@ class QuantileRegressionNetwork:
         Returns:
             An action to take in the current state
         """
-        q_values, _,new_policy_state = self.forward(params, observations, policy_state)
+        q_data,new_policy_state = self.forward(params, observations, policy_state)
+        q_values, _ = q_data
         masked_q_values = jnp.where(mask == 1.0, q_values, jnp.finfo(jnp.float32).min)
 
         greedy_actions = masked_q_values == jnp.max(masked_q_values)
@@ -147,7 +148,7 @@ def _make_quantile_network(
         q_values = jnp.mean(q_dist, axis=-1)
         policy_state = rnn_model[1]
 
-        return q_values, q_dist, policy_state
+        return (q_values, q_dist), policy_state
 
     # Initialising params
     dummy_obs = utils.zeros_like(environment_spec.observations.observation)

@@ -50,7 +50,6 @@ flags.DEFINE_string("base_dir", "logs", "Base dir to store experiments.")
 
 def main(_: Any) -> None:
     """Run main script
-
     Args:
         _ : _
     """
@@ -63,10 +62,8 @@ def main(_: Any) -> None:
 
     # Networks.
     def network_factory(*args: Any, **kwargs: Any) -> Any:
-        return idrqn.make_quantile_regression_networks(  # type: ignore
-            policy_layer_sizes=(64,64),
-            num_atoms=200,
-            dueling=False,
+        return idrqn.make_default_networks(  # type: ignore
+            policy_layer_sizes=(64,),
             *args,
             **kwargs,
         )

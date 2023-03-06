@@ -22,7 +22,7 @@ import optax
 from absl import app, flags
 
 from mava.systems import idrqn
-from mava.systems.idqn.components.training.qr_loss import QrIDQNLoss
+from mava.systems.idrqn.components.training.qr_loss import QrIDQNLoss
 from mava.components.component_groups import dqn_recurrent_policy_components, recurrent_policy_components
 from mava.systems import idqn
 from mava.utils.environments import debugging_utils
