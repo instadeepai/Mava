@@ -13,16 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Executor components for Mava systems."""
-from mava.components.executing.action_selection import (
-    FeedforwardExecutorSelectAction,
-    RecurrentExecutorSelectAction,
-)
-from mava.components.executing.base import ExecutorInit
-from mava.components.executing.observing import (
-    FeedforwardExecutorObserve,
-    RecurrentExecutorObserve,
-)
+"""Default hyperparameters for IDQN system."""
+from dataclasses import dataclass
 
-from mava.components.executing.dqn_action_selection import IRDQNExecutorSelectAction
-from mava.components.executing.dqn_observing import IDRQNExecutorObserve
+
+@dataclass
+class IDRQNDefaultConfig:
+    epoch_batch_size: int = 32
+    # use_next_extras: bool = False

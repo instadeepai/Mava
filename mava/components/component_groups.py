@@ -5,3 +5,8 @@ recurrent_policy_components = [
     executing.RecurrentExecutorSelectAction,
     executing.RecurrentExecutorObserve,
 ]
+
+dqn_recurrent_policy_components = [
+    executing.IRDQNExecutorSelectAction,
+    executing.IDRQNExecutorObserve,
+]
