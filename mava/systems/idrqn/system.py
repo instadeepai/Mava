@@ -24,6 +24,8 @@ from mava.systems import System
 from mava.systems.idqn.components import building as dqn_building
 from mava.systems.idqn.components import executing as dqn_executing
 from mava.systems.idqn.components import training as dqn_training
+from mava.systems.idrqn.components import executing as drqn_executing
+from mava.systems.idrqn.components import training as drqn_training
 from mava.systems.idrqn.components.building.extras_spec import DRQNExtrasSpec
 from mava.systems.idqn.components.building.extras_spec import DQNExtrasSpec
 from mava.systems.idqn.config import IDQNDefaultConfig
@@ -54,11 +56,11 @@ class IDRQNSystem(System):
         # Executor
         executor_process = DesignSpec(
             executor_init=executing.ExecutorInit,
-            executor_observe=dqn_executing.DQNFeedforwardExecutorObserve,
-            executor_select_action=dqn_executing.DQNFeedforwardExecutorSelectAction,
+            executor_observe=drqn_executing.IDRQNExecutorObserve,
+            executor_select_action=drqn_executing.IRDQNExecutorSelectAction,
             executor_adder=building.ParallelSequenceAdder,
             adder_priority=building.UniformAdderPriority,
-            rate_limiter=building.reverb_components.SampleToInsertRateLimiter,
+            rate_limiter=building.reverb_components.MinSizeRateLimiter,
             executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
             networks=building.DefaultNetworks,
             epsilon_scheduler=dqn_executing.EpsilonScheduler,
@@ -68,8 +70,8 @@ class IDRQNSystem(System):
         trainer_process = DesignSpec(
             optimisers=dqn_building.Optimiser,
             trainer_init=training.SingleTrainerInit,
-            loss=dqn_training.IDQNLoss,
-            sgd_step=dqn_training.IDQNStep,
+            loss=drqn_training.IRDQNLoss,
+            sgd_step=drqn_training.IRDQNStep,
             step=training.DefaultTrainerStep,
             trainer_dataset=building.TrajectoryDataset,
         ).get()

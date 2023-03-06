@@ -24,7 +24,7 @@ import reverb
 from mava import specs
 from mava.callbacks import Callback
 from mava.components import Component
-from mava.components.building.adders import AdderSignature
+from mava.components.building.adders import AdderSignature, ParallelSequenceAdder
 from mava.components.building.environments import EnvironmentSpec
 from mava.components.building.reverb_components import RateLimiter, Remover, Sampler
 from mava.components.building.system_init import BaseSystemInit
@@ -205,13 +205,24 @@ class OffPolicyDataServer(DataServer):
                 "A remover component for the dataserver has not been given"
             )
 
+        if builder.has(ParallelSequenceAdder):
+            signature = builder.store.adder_signature_fn(
+                environment_specs,
+                builder.store.global_config.sequence_length,
+                extras_specs,
+            )
+        else:
+            signature = builder.store.adder_signature_fn(
+                environment_specs, extras_specs
+            )
+
         table = reverb.Table(
             name=table_key,
             sampler=builder.store.sampler_fn(),
             remover=builder.store.remover_fn(),
             max_size=self.config.reverb_table_max_size,
             rate_limiter=builder.store.rate_limiter_fn(),
-            signature=builder.store.adder_signature_fn(environment_specs, extras_specs),
+            signature=signature,
             max_times_sampled=self.config.max_times_sampled,
         )
         return table

@@ -106,13 +106,13 @@ class IDRQNExecutorObserve(FeedforwardExecutorObserve):
                 "actions_info": actions_info[agent],
             }
 
-        executor.store.next_extras[
+        executor.store.extras[
             "network_int_keys"
         ] = executor.store.network_int_keys_extras
 
         # executor.store.extras set by Executor
-        executor.store.next_extras["policy_states"] = executor.store.policy_states
+        executor.store.extras["policy_states"] = executor.store.policy_states
 
         executor.store.adder.add(
-            adder_actions, executor.store.next_timestep, executor.store.next_extras
+            adder_actions, executor.store.next_timestep, executor.store.extras
         )
