@@ -49,3 +49,95 @@ verbose = 0
 quiet = false
 whitelist-regex = []
 color = true
+
+[tool.coverage.run]
+omit = [
+  "mava/environment_loops/open_spiel_environment_loop.py",
+  "mava/environment_loops/debugging_envs.py",
+  "*/utils/debugging/*",
+  "*/utils/environments/*",
+  "mava/utils/training_utils.py",
+  "mava/utils/wrapper_utils.py",
+  "*/wrappers/*",
+  "mava/utils/loggers/tf_logger.py"
+]
+
+[tool.pytest.ini_options]
+addopts = "-p no:warnings"
+
+[tool.mypy]
+python_version = "3.8"
+namespace_packages = true
+incremental = false
+cache_dir = "mypy_cache"
+warn_reduntant_casts = true
+warn_return_any = true
+warn_unused_configs = true
+warn_unused_ignore = true
+disallow_untyped_calls = false
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_decorators = false
+check_untyped_defs = true
+strict_optional = true
+strict_equality = true
+explicit_package_bases = true
+exclude = '''
+
+(
+  /(
+      \.eggs
+    | \.git
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | \.pytype
+    | _build
+    | buck-out
+    | build
+    | dist
+    | proto
+    | docs
+    | mava_testing
+  )/
+)
+'''
+
+[[tool.mypy.overrides]]
+module = [
+    'mypy-six.*',
+    'mypy-acme.*',
+    'mypy-dm_env.*',
+    'mypy-numpy.*',
+    'mypy-jax.*',
+    'mypy-optax.*',
+    'mypy-rlax.*',
+    'mypy-trfl.*',
+    'mypy-sonnet.*',
+    'mypy-tensorflow.*',
+    'mypy-tensorflow_probability.*',
+    'mypy-tree.*',
+    'mypy-launchpad.*',
+    'mypy-reverb.*',
+    'mypy-setuptools.*',
+    'mypy-pettingzoo.*',
+    'mypy-flatland.*',
+    'mypy-absl.*',
+    'mypy-gym.*',
+    'mypy-pytest.*',
+    'mypy-supersuit.*',
+    'mypy-array2gif.*',
+    'mypy-matplotlib.*',
+    'mypy-smac.*',
+    'open_spiel.*',
+    'mypy-pygame.*',
+    'mypy-pysc2.*',
+    'mypy-chex.*',
+    'mypy-terminators_test_data.*',
+    'mypy-networkx.*',
+    'mypy-haiku.*',
+    'mypy-psutil.*',
+    'mypy-tensorflow_io.*',
+]
+ignore_missing_imports = true
