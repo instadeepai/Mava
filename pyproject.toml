@@ -105,39 +105,133 @@ exclude = '''
 '''
 
 [[tool.mypy.overrides]]
-module = [
-    'mypy-six.*',
-    'mypy-acme.*',
-    'mypy-dm_env.*',
-    'mypy-numpy.*',
-    'mypy-jax.*',
-    'mypy-optax.*',
-    'mypy-rlax.*',
-    'mypy-trfl.*',
-    'mypy-sonnet.*',
-    'mypy-tensorflow.*',
-    'mypy-tensorflow_probability.*',
-    'mypy-tree.*',
-    'mypy-launchpad.*',
-    'mypy-reverb.*',
-    'mypy-setuptools.*',
-    'mypy-pettingzoo.*',
-    'mypy-flatland.*',
-    'mypy-absl.*',
-    'mypy-gym.*',
-    'mypy-pytest.*',
-    'mypy-supersuit.*',
-    'mypy-array2gif.*',
-    'mypy-matplotlib.*',
-    'mypy-smac.*',
-    'open_spiel.*',
-    'mypy-pygame.*',
-    'mypy-pysc2.*',
-    'mypy-chex.*',
-    'mypy-terminators_test_data.*',
-    'mypy-networkx.*',
-    'mypy-haiku.*',
-    'mypy-psutil.*',
-    'mypy-tensorflow_io.*',
-]
+module = "mypy-six.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-acme.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-dm_env.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-numpy.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-jax.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-optax.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-rlax.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-trfl.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-sonnet.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-tensorflow.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-tensorflow_probability.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-tree.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-launchpad.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-reverb.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-setuptools.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-pettingzoo.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-flatland.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-absl.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-gym.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-pytest.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-supersuit.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-array2gif.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-matplotlib.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-smac.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "open_spiel.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-pygame.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-pysc2.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-chex.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-terminators_test_data.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-networkx.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-haiku.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-psutil.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mypy-tensorflow_io.*"
 ignore_missing_imports = true
