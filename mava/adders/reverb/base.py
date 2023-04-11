@@ -123,7 +123,6 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
         max_in_flight_items: int,
         delta_encoded: bool = False,
         priority_fns: Optional[PriorityFnMapping] = None,
-        get_signature_timeout_ms: int = 300_000,
     ):
         """Reverb Base Adder.
 
@@ -138,8 +137,6 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
                 more information. Defaults to False.
             priority_fns (Optional[PriorityFnMapping], optional): A mapping from
                 table names to priority functions. Defaults to None.
-            get_signature_timeout_ms (int, optional): Timeout while fetching
-                signature. Defaults to 300_000.
         """
         super().__init__(
             client=client,
@@ -147,7 +144,6 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             max_in_flight_items=max_in_flight_items,
             delta_encoded=delta_encoded,
             priority_fns=priority_fns,
-            get_signature_timeout_ms=get_signature_timeout_ms,
         )
 
     def write_experience_to_tables(  # noqa
