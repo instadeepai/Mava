@@ -178,10 +178,16 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
             # Since this is jitted, compiling a forloop with lots of agents could take
             # long, we should vectorize this.
             for agent, observation in observations.items():
-                network = networks[agent_net_keys[agent]]
+                # TODO Change tmp hack - to get agent number generalization working (e.g. train with 3 agents, eval with 5)
+                if agent in agent_net_keys:
+                    network_key = agent_net_keys[agent]
+                else:
+                    # Take first network as key - assuming shared weights - indepedent agents
+                    network_key = next(iter(agent_net_keys.values()))
+                network = networks[network_key]
                 actions_info[agent], policies_info[agent], base_key = select_action(
                     observation=observation,
-                    current_params=current_params[agent_net_keys[agent]],
+                    current_params=current_params[network_key],
                     network=network,
                     base_key=base_key,
                 )
@@ -309,7 +315,13 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
             # Since this is jitted, compiling a forloop with lots of agents could take
             # long, we should vectorize this.
             for agent, observation in observations.items():
-                network = networks[agent_net_keys[agent]]
+                # TODO Change tmp hack - to get agent number generalization working (e.g. train with 3 agents, eval with 5)
+                if agent in agent_net_keys:
+                    network_key = agent_net_keys[agent]
+                else:
+                    # Take first network as key - assuming shared weights - indepedent agents
+                    network_key = next(iter(agent_net_keys.values()))
+                network = networks[network_key]
                 (
                     actions_info[agent],
                     policies_info[agent],
@@ -317,7 +329,7 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
                     base_key,
                 ) = select_action(
                     observation=observation,
-                    current_params=current_params[agent_net_keys[agent]],
+                    current_params=current_params[network_key],
                     policy_state=policy_states[agent],
                     network=network,
                     base_key=base_key,
