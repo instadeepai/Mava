@@ -16,6 +16,7 @@
 """Execution components for system builders"""
 
 import abc
+import copy
 from types import SimpleNamespace
 from typing import Any, Dict, List, Tuple, Type
 
@@ -323,6 +324,10 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
                     # Assign agent network using type.
                     agent_type = agent.split("_")[0]
                     network_key = f"network_{agent_type}"
+
+                # TODO Change tmp hack - init policy state for new agents during generalization.
+                if agent not in policy_states:
+                    policy_states[agent] = copy.copy(next(iter(policy_states.values())))
                 network = networks[network_key]
                 (
                     actions_info[agent],
