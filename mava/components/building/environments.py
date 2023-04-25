@@ -120,7 +120,7 @@ class ExecutorEnvironmentLoop(Component):
             builder.store.executor_environment,
             _,
         ) = builder.store.global_config.environment_factory(
-            evaluation=builder.store.is_evaluator
+            evaluation=builder.store.is_evaluator, executor_id=builder.store.executor_id
         )  # type: ignore
 
     @abc.abstractmethod
