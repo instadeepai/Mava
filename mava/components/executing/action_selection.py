@@ -182,8 +182,9 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
                 if agent in agent_net_keys:
                     network_key = agent_net_keys[agent]
                 else:
-                    # Take first network as key - assuming shared weights - indepedent agents
-                    network_key = next(iter(agent_net_keys.values()))
+                    # Assign agent network using type.
+                    agent_type = agent.split("_")[0]
+                    network_key = f"network_{agent_type}"
                 network = networks[network_key]
                 actions_info[agent], policies_info[agent], base_key = select_action(
                     observation=observation,
@@ -319,8 +320,9 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
                 if agent in agent_net_keys:
                     network_key = agent_net_keys[agent]
                 else:
-                    # Take first network as key - assuming shared weights - indepedent agents
-                    network_key = next(iter(agent_net_keys.values()))
+                    # Assign agent network using type.
+                    agent_type = agent.split("_")[0]
+                    network_key = f"network_{agent_type}"
                 network = networks[network_key]
                 (
                     actions_info[agent],
