@@ -29,6 +29,7 @@ from mava.systems.launcher import Launcher, NodeType
 @dataclass
 class DistributorConfig:
     num_executors: int = 1
+    num_evaluators: int = 1
     multi_process: bool = True
     nodes_on_gpu: Union[List[str], str] = "trainer"
     run_evaluator: bool = True
@@ -74,6 +75,7 @@ class Distributor(Component):
 
         # Save number of the executors
         builder.store.num_executors = self.config.num_executors
+        builder.store.num_evaluators = self.config.num_evaluators
 
         # Generate keys for the data_server, parameter_server and evaluator.
         (
@@ -121,12 +123,13 @@ class Distributor(Component):
 
         if self.config.run_evaluator:
             # evaluator node
-            builder.store.program.add(
-                builder.executor,
-                ["evaluator", data_server, parameter_server],
-                node_type=NodeType.courier,
-                name="evaluator",
-            )
+            for evaluator_id in range(self.config.num_evaluators):
+                builder.store.program.add(
+                    builder.executor,
+                    [f"evaluator_{evaluator_id}", data_server, parameter_server],
+                    node_type=NodeType.courier,
+                    name="evaluator",
+                )
 
         # trainer nodes
         for trainer_id in builder.store.trainer_networks.keys():

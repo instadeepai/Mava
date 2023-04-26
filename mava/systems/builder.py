@@ -118,16 +118,10 @@ class Builder(SystemBuilder, BuilderHookMixin):
         self.store.executor_id = executor_id
         self.store.data_server_client = data_server_client
         self.store.parameter_server_client = parameter_server_client
-        self.store.is_evaluator = self.store.executor_id == "evaluator"
+        self.store.is_evaluator = "evaluator" in self.store.executor_id
 
-        if self.store.is_evaluator:
-            # Set the rng key for the evaluator.
-            self.store.base_key = self.store.eval_key
-        else:
-            # Set the rng key for the executor.
-            self.store.base_key = self.store.executor_keys[
-                int(executor_id.split("_")[-1])
-            ]
+        # Set the rng key for the executor.
+        self.store.base_key = self.store.executor_keys[int(executor_id.split("_")[-1])]
 
         # start of making the executor
         self.on_building_executor_start()
