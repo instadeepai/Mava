@@ -283,8 +283,8 @@ config = {
 }
 
 rng = jax.random.PRNGKey(42)
-# train_jit = jax.jit(make_train(config))
-# out = train_jit(rng)
+train_jit = jax.jit(make_train(config))
+out = train_jit(rng)
 
-train = make_train(config)
-out = train(rng)
+# train = make_train(config)
+# out = train(rng)

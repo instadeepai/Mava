@@ -25,6 +25,7 @@ import optax
 from flax.linen.initializers import constant, orthogonal
 from flax.training.train_state import TrainState
 from gymnax.wrappers.purerl import FlattenObservationWrapper, LogWrapper
+from jumanji.types import TimeStep
 
 
 class ActorCritic(nn.Module):
@@ -32,9 +33,9 @@ class ActorCritic(nn.Module):
     activation: str = "tanh"
 
     @nn.compact
-    def __call__(self, agent_observation, action_mask):
+    def __call__(self, observation, action_mask):
 
-        x = agent_observation
+        x = observation
         if self.activation == "relu":
             activation = nn.relu
         else:
@@ -51,9 +52,12 @@ class ActorCritic(nn.Module):
             self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(actor_mean)
 
-        # Mask out legal actions
-        actor_mean = jnp.where(action_mask, actor_mean, jnp.finfo(jnp.float32).min)
-        pi = distrax.Categorical(logits=actor_mean)
+        logits = jnp.where(
+            action_mask,
+            actor_mean,
+            jnp.finfo(jnp.float32).min, 
+        )
+        pi = distrax.Categorical(logits=logits)
 
         critic = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
@@ -76,7 +80,7 @@ class Transition(NamedTuple):
     value: jnp.ndarray
     reward: jnp.ndarray
     log_prob: jnp.ndarray
-    obs: jnp.ndarray
+    obs: TimeStep
     info: jnp.ndarray
 
 
@@ -106,9 +110,14 @@ def make_train(config):
         # INIT NETWORK FOR SINGLE AGENT
 
         # Since agents action homogeneous, use action dim of first agent
+        # network = ActorCritic(
+        #     env.action_spec().num_values[0].tolist(), activation=config["ACTIVATION"]
+        # )
+
         network = ActorCritic(
-            env.action_spec().num_values[0], activation=config["ACTIVATION"]
+            5, activation=config["ACTIVATION"]
         )
+
         rng, _rng = jax.random.split(rng)
         init_obs = env.observation_spec().generate_value()
         network_params = network.init(
@@ -125,14 +134,17 @@ def make_train(config):
                 optax.adam(config["LR"], eps=1e-5),
             )
         train_state = TrainState.create(
-            apply_fn=jax.vmap(network.apply, in_axes=(None, 0, 0)),
+            apply_fn=network.apply,
             params=network_params,
             tx=tx,
         )
         # INIT ENV
         rng, _rng = jax.random.split(rng)
         reset_rng = jax.random.split(_rng, config["NUM_ENVS"])
+        # env_state, timestep = env.reset(_rng)
         env_state, timestep = jax.vmap(env.reset, in_axes=(0))(reset_rng)
+        # pi, values = network.apply(network_params, timestep.observation.agents_view, timestep.observation.action_mask)
+        # x=0
 
         # TRAIN LOOP
         def _update_step(runner_state, unused):
@@ -142,8 +154,7 @@ def make_train(config):
 
                 # SELECT ACTION
                 rng, _rng = jax.random.split(rng)
-                # Split for num agents
-                _rng = jax.random.split(_rng, 4)
+               
                 pi, value = network.apply(
                     train_state.params,
                     last_timestep.observation.agents_view,
@@ -155,13 +166,21 @@ def make_train(config):
                 # STEP ENV
                 rng, _rng = jax.random.split(rng)
                 rng_step = jax.random.split(_rng, config["NUM_ENVS"])
-                obsv, env_state, reward, done, info = jax.vmap(
-                    env.step, in_axes=(0, 0, 0, None)
-                )(rng_step, env_state, action, None)
+
+                env_state, next_timestep = jax.vmap(
+                    env.step, in_axes=(0, 0),
+                )(env_state, action)
+
                 transition = Transition(
-                    done, action, value, reward, log_prob, last_obs, info
+                    next_timestep.last(),
+                    action,
+                    value,
+                    next_timestep.reward,
+                    log_prob,
+                    last_timestep,
+                    {}
                 )
-                runner_state = (train_state, env_state, obsv, rng)
+                runner_state = (train_state, env_state, next_timestep, rng)
                 return runner_state, transition
 
             runner_state, traj_batch = jax.lax.scan(
@@ -169,8 +188,8 @@ def make_train(config):
             )
 
             # CALCULATE ADVANTAGE
-            train_state, env_state, last_obs, rng = runner_state
-            _, last_val = network.apply(train_state.params, last_obs)
+            train_state, env_state, last_timestep, rng = runner_state
+            _, last_val = network.apply(train_state.params, last_timestep.observation.agents_view, last_timestep.observation.action_mask)
 
             def _calculate_gae(traj_batch, last_val):
                 def _get_advantages(gae_and_next_value, transition):
@@ -205,7 +224,7 @@ def make_train(config):
 
                     def _loss_fn(params, traj_batch, gae, targets):
                         # RERUN NETWORK
-                        pi, value = network.apply(params, traj_batch.obs)
+                        pi, value = network.apply(params, traj_batch.obs.observation.agents_view, traj_batch.obs.observation.action_mask)
                         log_prob = pi.log_prob(traj_batch.action)
 
                         # CALCULATE VALUE LOSS
@@ -283,7 +302,7 @@ def make_train(config):
             metric = traj_batch.info
             rng = update_state[-1]
 
-            runner_state = (train_state, env_state, last_obs, rng)
+            runner_state = (train_state, env_state, last_timestep, rng)
             return runner_state, metric
 
         rng, _rng = jax.random.split(rng)
@@ -300,7 +319,7 @@ config = {
     "LR": 5e-3,
     "NUM_ENVS": 1,
     "NUM_STEPS": 128,
-    "TOTAL_TIMESTEPS": 1e7,
+    "TOTAL_TIMESTEPS": 5e6,
     "UPDATE_EPOCHS": 4,
     "NUM_MINIBATCHES": 8,
     "GAMMA": 0.99,
@@ -315,7 +334,9 @@ config = {
 }
 
 rng = jax.random.PRNGKey(42)
-# train_jit = jax.jit(make_train(config))
-# out = train_jit(rng)
-train = make_train(config)
-out = train(rng)
+train_jit = jax.jit(make_train(config))
+out = train_jit(rng)
+# train = make_train(config)
+# out = train(rng)
+
+print(out)
