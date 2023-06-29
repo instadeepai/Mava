@@ -13,19 +13,78 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, NamedTuple, Sequence
+from typing import Any, NamedTuple, Sequence, Tuple
 
 import distrax
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
+import chex 
+import time 
 import jumanji
 import numpy as np
 import optax
 from flax.linen.initializers import constant, orthogonal
 from flax.training.train_state import TrainState
-from gymnax.wrappers.purerl import FlattenObservationWrapper, LogWrapper
+from flax import struct
+from gymnax.wrappers.purerl import FlattenObservationWrapper
+from jumanji.wrappers import AutoResetWrapper, Wrapper
 from jumanji.types import TimeStep
+from jumanji.environments.routing.robot_warehouse.types import State
+from functools import partial
+import pickle
+import matplotlib.pyplot as plt
+
+import os 
+
+os.environ['XLA_FLAGS'] = '--xla_gpu_cuda_data_dir=/usr/lib/cuda'
+
+@struct.dataclass
+class LogEnvState:
+    env_state: State
+    episode_returns: float
+    episode_lengths: int
+    returned_episode_returns: float
+    returned_episode_lengths: int
+
+
+class LogWrapper(Wrapper):
+    """Log the episode returns and lengths."""
+
+    def reset(
+        self, key: chex.PRNGKey
+    ) -> Tuple[LogEnvState, TimeStep]:
+        state, timestep = self._env.reset(key)
+        # timestep.extras = {}
+        state = LogEnvState(state, 0, 0, 0, 0)
+        return state, timestep 
+
+
+    def step(
+        self,
+        state: State,
+        action: jnp.ndarray,
+    ) -> Tuple[State, TimeStep]:
+        
+        env_state, timestep = self._env.step(
+            state.env_state, action
+        )
+
+        new_episode_return = state.episode_returns + jnp.mean(timestep.reward)
+        new_episode_length = state.episode_lengths + 1
+        state = LogEnvState(
+            env_state=env_state,
+            episode_returns=new_episode_return * (1 - timestep.last()),
+            episode_lengths=new_episode_length * (1 - timestep.last()),
+            returned_episode_returns=state.returned_episode_returns * (1 - timestep.last())
+            + new_episode_return * timestep.last(),
+            returned_episode_lengths=state.returned_episode_lengths * (1 - timestep.last())
+            + new_episode_length * timestep.last(),
+        )
+        # timestep.extras["returned_episode_returns"] = state.returned_episode_returns
+        # timestep.extras["returned_episode_lengths"] = state.returned_episode_lengths
+        # timestep.extras["returned_episode"] = timestep.last()
+        return state, timestep
 
 
 class ActorCritic(nn.Module):
@@ -93,9 +152,10 @@ def make_train(config):
     )
 
     env = jumanji.make(config["ENV_NAME"])
+    env = AutoResetWrapper(env)
     # env = JumanjiToGymnaxWrapper(env)
     # env = FlattenObservationWrapper(env)
-    # env = LogWrapper(env)
+    env = LogWrapper(env)
 
     def linear_schedule(count):
         frac = (
@@ -121,7 +181,7 @@ def make_train(config):
         rng, _rng = jax.random.split(rng)
         init_obs = env.observation_spec().generate_value()
         network_params = network.init(
-            _rng, init_obs.agents_view[0], init_obs.action_mask[0]
+            _rng, init_obs.agents_view, init_obs.action_mask
         )
         if config["ANNEAL_LR"]:
             tx = optax.chain(
@@ -144,7 +204,6 @@ def make_train(config):
         # env_state, timestep = env.reset(_rng)
         env_state, timestep = jax.vmap(env.reset, in_axes=(0))(reset_rng)
         # pi, values = network.apply(network_params, timestep.observation.agents_view, timestep.observation.action_mask)
-        # x=0
 
         # TRAIN LOOP
         def _update_step(runner_state, unused):
@@ -170,15 +229,19 @@ def make_train(config):
                 env_state, next_timestep = jax.vmap(
                     env.step, in_axes=(0, 0),
                 )(env_state, action)
-
+                
                 transition = Transition(
-                    next_timestep.last(),
+                    jnp.repeat(next_timestep.last(), 4).reshape(config["NUM_ENVS"], -1),  # TODO: duplicating for now. But this should be per agent.
                     action,
                     value,
-                    next_timestep.reward,
+                    jnp.repeat(next_timestep.reward, 4).reshape(config["NUM_ENVS"], -1), # TODO: duplicating for now. But this should be per agent.
                     log_prob,
                     last_timestep,
-                    {}
+                    {
+                        "returned_episode_returns": jnp.repeat(env_state.returned_episode_returns, 4).reshape(config["NUM_ENVS"], -1),
+                        "returned_episode_lengths": jnp.repeat(env_state.returned_episode_lengths, 4).reshape(config["NUM_ENVS"], -1),
+                        "returned_episode": jnp.repeat(next_timestep.last(), 4).reshape(config["NUM_ENVS"], -1),
+                    },
                 )
                 runner_state = (train_state, env_state, next_timestep, rng)
                 return runner_state, transition
@@ -299,7 +362,8 @@ def make_train(config):
                 _update_epoch, update_state, None, config["UPDATE_EPOCHS"]
             )
             train_state = update_state[0]
-            metric = traj_batch.info
+            # metric = traj_batch.info
+            metric = jax.tree_util.tree_map(lambda x: x[:, :, 0], traj_batch.info) # only the team rewards 
             rng = update_state[-1]
 
             runner_state = (train_state, env_state, last_timestep, rng)
@@ -317,9 +381,9 @@ def make_train(config):
 
 config = {
     "LR": 5e-3,
-    "NUM_ENVS": 1,
+    "NUM_ENVS": 16,
     "NUM_STEPS": 128,
-    "TOTAL_TIMESTEPS": 5e6,
+    "TOTAL_TIMESTEPS": 2e7,
     "UPDATE_EPOCHS": 4,
     "NUM_MINIBATCHES": 8,
     "GAMMA": 0.99,
@@ -334,9 +398,22 @@ config = {
 }
 
 rng = jax.random.PRNGKey(42)
-train_jit = jax.jit(make_train(config))
+print(jax.devices())
+train_jit = jax.jit(chex.assert_max_traces(make_train(config), n=1))
+start_time = time.time()
 out = train_jit(rng)
+total_time = time.time() - start_time
+print(f"TOTAL TIME TO RUN: {total_time}")
 # train = make_train(config)
 # out = train(rng)
 
-print(out)
+print(out['metrics']['returned_episode_returns'].mean())
+
+plt.plot(out["metrics"]["returned_episode_returns"].mean(-1).reshape(-1))
+plt.xlabel("Update Step")
+plt.ylabel("Return")
+plt.savefig('results.png')
+
+# Store the output dictionary using pickle 
+with open('training_results.pkl', 'wb') as f:
+    pickle.dump(out['metrics'], f)
