@@ -13,32 +13,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import os
+import pickle
+import time
+from functools import partial
 from typing import Any, NamedTuple, Sequence, Tuple
 
+import chex
 import distrax
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
-import chex 
-import time 
 import jumanji
+import matplotlib.pyplot as plt
 import numpy as np
 import optax
+from flax import struct
 from flax.linen.initializers import constant, orthogonal
 from flax.training.train_state import TrainState
-from flax import struct
 from gymnax.wrappers.purerl import FlattenObservationWrapper
-from jumanji.wrappers import AutoResetWrapper, Wrapper
-from jumanji.types import TimeStep
 from jumanji.environments.routing.robot_warehouse.types import State
-from functools import partial
-import pickle
-import matplotlib.pyplot as plt
-import json 
+from jumanji.types import TimeStep
+from jumanji.wrappers import AutoResetWrapper, Wrapper
 
-import os 
-
-os.environ['XLA_FLAGS'] = '--xla_gpu_cuda_data_dir=/usr/lib/cuda'
 
 @struct.dataclass
 class LogEnvState:
@@ -52,24 +50,19 @@ class LogEnvState:
 class LogWrapper(Wrapper):
     """Log the episode returns and lengths."""
 
-    def reset(
-        self, key: chex.PRNGKey
-    ) -> Tuple[LogEnvState, TimeStep]:
+    def reset(self, key: chex.PRNGKey) -> Tuple[LogEnvState, TimeStep]:
         state, timestep = self._env.reset(key)
         # timestep.extras = {}
         state = LogEnvState(state, 0, 0, 0, 0)
-        return state, timestep 
-
+        return state, timestep
 
     def step(
         self,
         state: State,
         action: jnp.ndarray,
     ) -> Tuple[State, TimeStep]:
-        
-        env_state, timestep = self._env.step(
-            state.env_state, action
-        )
+
+        env_state, timestep = self._env.step(state.env_state, action)
 
         new_episode_return = state.episode_returns + jnp.mean(timestep.reward)
         new_episode_length = state.episode_lengths + 1
@@ -77,9 +70,11 @@ class LogWrapper(Wrapper):
             env_state=env_state,
             episode_returns=new_episode_return * (1 - timestep.last()),
             episode_lengths=new_episode_length * (1 - timestep.last()),
-            returned_episode_returns=state.returned_episode_returns * (1 - timestep.last())
+            returned_episode_returns=state.returned_episode_returns
+            * (1 - timestep.last())
             + new_episode_return * timestep.last(),
-            returned_episode_lengths=state.returned_episode_lengths * (1 - timestep.last())
+            returned_episode_lengths=state.returned_episode_lengths
+            * (1 - timestep.last())
             + new_episode_length * timestep.last(),
         )
 
@@ -113,7 +108,7 @@ class ActorCritic(nn.Module):
         logits = jnp.where(
             action_mask,
             actor_mean,
-            jnp.finfo(jnp.float32).min, 
+            jnp.finfo(jnp.float32).min,
         )
         pi = distrax.Categorical(logits=logits)
 
@@ -142,6 +137,14 @@ class Transition(NamedTuple):
     info: jnp.ndarray
 
 
+def expand_and_repeat(array):
+
+    array_expanded = jnp.expand_dims(array, axis=-1)
+    array_out = jnp.repeat(array_expanded, 4, axis=-1)
+
+    return array_out
+
+
 def make_train(config):
     config["NUM_UPDATES"] = (
         config["TOTAL_TIMESTEPS"] // config["NUM_STEPS"] // config["NUM_ENVS"]
@@ -149,6 +152,10 @@ def make_train(config):
     config["MINIBATCH_SIZE"] = (
         config["NUM_ENVS"] * config["NUM_STEPS"] // config["NUM_MINIBATCHES"]
     )
+
+    config["NUM_DEVICES"] = jax.device_count()  # Will be 8 on TPU v3-8
+
+    config["NUM_ENVS_PER_DEVICE"] = config["NUM_ENVS"] // config["NUM_DEVICES"]
 
     env = jumanji.make(config["ENV_NAME"])
     env = AutoResetWrapper(env)
@@ -171,9 +178,7 @@ def make_train(config):
         #     env.action_spec().num_values[0].tolist(), activation=config["ACTIVATION"]
         # )
 
-        network = ActorCritic(
-            5, activation=config["ACTIVATION"]
-        )
+        network = ActorCritic(5, activation=config["ACTIVATION"])
 
         rng, _rng = jax.random.split(rng)
         init_obs = env.observation_spec().generate_value()
@@ -181,9 +186,7 @@ def make_train(config):
         init_obs_add = jnp.expand_dims(init_obs.agents_view, axis=0)
         init_mask_add = jnp.expand_dims(init_obs.action_mask, axis=0)
 
-        network_params = network.init(
-            _rng, init_obs_add, init_mask_add
-        )
+        network_params = network.init(_rng, init_obs_add, init_mask_add)
 
         # network_params = network.init(
         #     _rng, init_obs.agents_view, init_obs.action_mask
@@ -207,7 +210,17 @@ def make_train(config):
         rng, _rng = jax.random.split(rng)
         reset_rng = jax.random.split(_rng, config["NUM_ENVS"])
         # env_state, timestep = env.reset(_rng)
-        env_state, timestep = jax.vmap(env.reset, in_axes=(0))(reset_rng)
+
+        vmap_reset = jax.vmap(env.reset, in_axes=(0))
+        # Cannot assert max retraces of vmapped.
+        jit_vmap_reset = jax.jit(vmap_reset)
+        pmap_reset = jax.pmap(jit_vmap_reset, axis_name="devices")
+
+        reset_rng = jnp.reshape(
+            reset_rng, (config["NUM_DEVICES"], config["NUM_ENVS_PER_DEVICE"], 2)
+        )
+
+        env_state, timestep = pmap_reset(reset_rng)
         # pi, values = network.apply(network_params, timestep.observation.agents_view, timestep.observation.action_mask)
 
         # TRAIN LOOP
@@ -218,7 +231,7 @@ def make_train(config):
 
                 # SELECT ACTION
                 rng, _rng = jax.random.split(rng)
-               
+
                 pi, value = network.apply(
                     train_state.params,
                     last_timestep.observation.agents_view,
@@ -231,21 +244,36 @@ def make_train(config):
                 rng, _rng = jax.random.split(rng)
                 rng_step = jax.random.split(_rng, config["NUM_ENVS"])
 
-                env_state, next_timestep = jax.vmap(
-                    env.step, in_axes=(0, 0),
-                )(env_state, action)
-                
+                vmap_step = jax.vmap(env.step, in_axes=(0))
+                # Cannot assert max retraces of vmapped.
+                jit_vmap_step = jax.jit(vmap_step)
+                pmap_step = jax.pmap(jit_vmap_step, axis_name="devices")
+
+                # env_state, next_timestep = jax.vmap(
+                #     env.step, in_axes=(0, 0),
+                # )(env_state, action)
+
+                env_state, next_timestep = pmap_step(env_state, action)
+
                 transition = Transition(
-                    jnp.repeat(next_timestep.last(), 4).reshape(config["NUM_ENVS"], -1),  # TODO: duplicating for now. But this should be per agent.
+                    expand_and_repeat(
+                        next_timestep.last()
+                    ),  # TODO: duplicating for now. But this should be per agent.
                     action,
                     value,
-                    jnp.repeat(next_timestep.reward, 4).reshape(config["NUM_ENVS"], -1), # TODO: duplicating for now. But this should be per agent.
+                    expand_and_repeat(
+                        next_timestep.reward
+                    ),  # TODO: duplicating for now. But this should be per agent.
                     log_prob,
                     last_timestep,
                     {
-                        "returned_episode_returns": jnp.repeat(env_state.returned_episode_returns, 4).reshape(config["NUM_ENVS"], -1),
-                        "returned_episode_lengths": jnp.repeat(env_state.returned_episode_lengths, 4).reshape(config["NUM_ENVS"], -1),
-                        "returned_episode": jnp.repeat(next_timestep.last(), 4).reshape(config["NUM_ENVS"], -1),
+                        "returned_episode_returns": expand_and_repeat(
+                            env_state.returned_episode_returns
+                        ),
+                        "returned_episode_lengths": expand_and_repeat(
+                            env_state.returned_episode_lengths
+                        ),
+                        "returned_episode": expand_and_repeat(next_timestep.last()),
                     },
                 )
                 runner_state = (train_state, env_state, next_timestep, rng)
@@ -257,7 +285,11 @@ def make_train(config):
 
             # CALCULATE ADVANTAGE
             train_state, env_state, last_timestep, rng = runner_state
-            _, last_val = network.apply(train_state.params, last_timestep.observation.agents_view, last_timestep.observation.action_mask)
+            _, last_val = network.apply(
+                train_state.params,
+                last_timestep.observation.agents_view,
+                last_timestep.observation.action_mask,
+            )
 
             def _calculate_gae(traj_batch, last_val):
                 def _get_advantages(gae_and_next_value, transition):
@@ -292,7 +324,11 @@ def make_train(config):
 
                     def _loss_fn(params, traj_batch, gae, targets):
                         # RERUN NETWORK
-                        pi, value = network.apply(params, traj_batch.obs.observation.agents_view, traj_batch.obs.observation.action_mask)
+                        pi, value = network.apply(
+                            params,
+                            traj_batch.obs.observation.agents_view,
+                            traj_batch.obs.observation.action_mask,
+                        )
                         log_prob = pi.log_prob(traj_batch.action)
 
                         # CALCULATE VALUE LOSS
@@ -329,7 +365,7 @@ def make_train(config):
                         return total_loss, (value_loss, loss_actor, entropy)
 
                     grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
-                    
+
                     total_loss, grads = grad_fn(
                         train_state.params, traj_batch, advantages, targets
                     )
@@ -345,15 +381,23 @@ def make_train(config):
                 permutation = jax.random.permutation(_rng, batch_size)
                 batch = (traj_batch, advantages, targets)
 
+                # TODO: Need to think about this training batch shape now
+
                 batch = jax.tree_util.tree_map(
-                    lambda x: x.reshape((batch_size,) + x.shape[2:]), batch
+                    lambda x: x.reshape((batch_size,) + x.shape[3:]), batch
                 )
                 shuffled_batch = jax.tree_util.tree_map(
                     lambda x: jnp.take(x, permutation, axis=0), batch
                 )
                 minibatches = jax.tree_util.tree_map(
                     lambda x: jnp.reshape(
-                        x, [config["NUM_MINIBATCHES"], -1] + list(x.shape[1:])
+                        x,
+                        [
+                            config["NUM_MINIBATCHES"],
+                            config["MINIBATCH_SIZE"] // config["NUM_ENVS_PER_DEVICE"],
+                            config["NUM_ENVS_PER_DEVICE"],
+                        ]
+                        + list(x.shape[1:]),
                     ),
                     shuffled_batch,
                 )
@@ -369,7 +413,9 @@ def make_train(config):
             )
             train_state = update_state[0]
             # metric = traj_batch.info
-            metric = jax.tree_util.tree_map(lambda x: x[:, :, 0], traj_batch.info) # only the team rewards 
+            metric = jax.tree_util.tree_map(
+                lambda x: x[:, :, 0], traj_batch.info
+            )  # only the team rewards
             rng = update_state[-1]
 
             runner_state = (train_state, env_state, last_timestep, rng)
@@ -406,31 +452,39 @@ config = {
 SEEDS = [42]
 STORE_RESULTS = False
 
-print("Starting run.")
+# For implementing.
 rng = jax.random.PRNGKey(42)
-print("Compiling")
-compile_start_time = time.time()
-train_jit = jax.jit(chex.assert_max_traces(make_train(config), n=1))
-jax.block_until_ready(train_jit(rng))  # compile your code
-print(f"Compile done and took {time.time() - compile_start_time} seconds.")
+train = make_train(config)
+out = train(rng)
 
-# Run and store multiple seeds.
-for seed_num in SEEDS:
-    print(f"Training starting for {seed_num}.")
-    rng = jax.random.PRNGKey(seed_num)
-    start_time = time.perf_counter()
-    out = train_jit(rng)
-    jax.block_until_ready(out)
-    total_time = time.perf_counter() - start_time
-    print(f"TOTAL TIME TO RUN: {total_time}")
+# ###########################
+# # For running.
+# ###########################
+# print("Starting run.")
+# rng = jax.random.PRNGKey(42)
+# print("Compiling")
+# compile_start_time = time.time()
+# train_jit = jax.jit(chex.assert_max_traces(make_train(config), n=1))
+# jax.block_until_ready(train_jit(rng))  # compile your code
+# print(f"Compile done and took {time.time() - compile_start_time} seconds.")
 
-    out['metrics']['run_time'] = total_time
-    print(out['metrics']['returned_episode_returns'].mean())
+# # Run and store multiple seeds.
+# for seed_num in SEEDS:
+#     print(f"Training starting for {seed_num}.")
+#     rng = jax.random.PRNGKey(seed_num)
+#     start_time = time.perf_counter()
+#     out = train_jit(rng)
+#     jax.block_until_ready(out)
+#     total_time = time.perf_counter() - start_time
+#     print(f"TOTAL TIME TO RUN: {total_time}")
 
-    store_dict = {}
-    store_dict['returns'] = out['metrics']['returned_episode_returns'].tolist()
-    store_dict['run_time'] = total_time
+#     out['metrics']['run_time'] = total_time
+#     print(out['metrics']['returned_episode_returns'].mean())
 
-    if STORE_RESULTS:
-        with open(f"results_{config['NUM_ENVS']}/{seed_num}.json", 'w') as f:
-            json.dump(store_dict, f)
+#     store_dict = {}
+#     store_dict['returns'] = out['metrics']['returned_episode_returns'].tolist()
+#     store_dict['run_time'] = total_time
+
+#     if STORE_RESULTS:
+#         with open(f"results_{config['NUM_ENVS']}/{seed_num}.json", 'w') as f:
+#             json.dump(store_dict, f)
