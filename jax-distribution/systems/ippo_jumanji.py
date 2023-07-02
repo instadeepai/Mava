@@ -34,6 +34,7 @@ from jumanji.environments.routing.robot_warehouse.types import State
 from functools import partial
 import pickle
 import matplotlib.pyplot as plt
+import json 
 
 import os 
 
@@ -153,8 +154,6 @@ def make_train(config):
 
     env = jumanji.make(config["ENV_NAME"])
     env = AutoResetWrapper(env)
-    # env = JumanjiToGymnaxWrapper(env)
-    # env = FlattenObservationWrapper(env)
     env = LogWrapper(env)
 
     def linear_schedule(count):
@@ -180,9 +179,17 @@ def make_train(config):
 
         rng, _rng = jax.random.split(rng)
         init_obs = env.observation_spec().generate_value()
+
+        init_obs_add = jnp.expand_dims(init_obs.agents_view, axis=0)
+        init_mask_add = jnp.expand_dims(init_obs.action_mask, axis=0)
+
         network_params = network.init(
-            _rng, init_obs.agents_view, init_obs.action_mask
+            _rng, init_obs_add, init_mask_add
         )
+
+        # network_params = network.init(
+        #     _rng, init_obs.agents_view, init_obs.action_mask
+        # )
         if config["ANNEAL_LR"]:
             tx = optax.chain(
                 optax.clip_by_global_norm(config["MAX_GRAD_NORM"]),
@@ -381,7 +388,7 @@ def make_train(config):
 
 config = {
     "LR": 5e-3,
-    "NUM_ENVS": 16,
+    "NUM_ENVS": 256,
     "NUM_STEPS": 128,
     "TOTAL_TIMESTEPS": 2e7,
     "UPDATE_EPOCHS": 4,
@@ -397,23 +404,61 @@ config = {
     "ANNEAL_LR": True,
 }
 
+print("Starting run.")
 rng = jax.random.PRNGKey(42)
-print(jax.devices())
+print("Compiling")
+compile_start_time = time.time()
 train_jit = jax.jit(chex.assert_max_traces(make_train(config), n=1))
-start_time = time.time()
-out = train_jit(rng)
-total_time = time.time() - start_time
-print(f"TOTAL TIME TO RUN: {total_time}")
-# train = make_train(config)
-# out = train(rng)
+jax.block_until_ready(train_jit(rng))  # compile your code
+print(f"Compile done and took {time.time() - compile_start_time} seconds.")
 
-print(out['metrics']['returned_episode_returns'].mean())
 
-plt.plot(out["metrics"]["returned_episode_returns"].mean(-1).reshape(-1))
-plt.xlabel("Update Step")
-plt.ylabel("Return")
-plt.savefig('results.png')
+for seed_num in [42, 43, 44, 45, 46]:
+    print(f"Training starting for {seed_num}.")
+    rng = jax.random.PRNGKey(seed_num)
+    start_time = time.perf_counter()
+    out = train_jit(rng)
+    jax.block_until_ready(out)
+    total_time = time.perf_counter() - start_time
+    print(f"TOTAL TIME TO RUN: {total_time}")
 
-# Store the output dictionary using pickle 
-with open('training_results.pkl', 'wb') as f:
-    pickle.dump(out['metrics'], f)
+    out['metrics']['run_time'] = total_time
+    print(out['metrics']['returned_episode_returns'].mean())
+
+    store_dict = {}
+    store_dict['returns'] = out['metrics']['returned_episode_returns'].tolist()
+    store_dict['run_time'] = total_time
+
+    with open(f"results_256/{seed_num}.json", 'w') as f:
+        json.dump(store_dict, f)
+
+
+# rng = jax.random.PRNGKey(42)
+# # print(jax.devices())
+# train_jit = jax.jit(chex.assert_max_traces(make_train(config), n=1))
+# start_time = time.time()
+# out = train_jit(rng)
+# total_time = time.time() - start_time
+# print(f"TOTAL TIME TO RUN: {total_time}")
+# # train = make_train(config)
+# # out = train(rng)
+
+# rng = jax.random.PRNGKey(42)
+# train_jit = jax.jit(chex.assert_max_traces(make_train(config), n=1))
+# jax.block_until_ready(train_jit(rng))  # compile your code
+# start_time = time.perf_counter()
+# out = train_jit(rng)
+# jax.block_until_ready(out)
+# total_time = time.perf_counter() - start_time
+# print(f"TOTAL TIME TO RUN: {total_time}")
+
+# print(out['metrics']['returned_episode_returns'].mean())
+
+# plt.plot(out["metrics"]["returned_episode_returns"].mean(-1).reshape(-1))
+# plt.xlabel("Update Step")
+# plt.ylabel("Return")
+# plt.savefig('results.png')
+
+# # Store the output dictionary using pickle 
+# with open('training_results.pkl', 'wb') as f:
+#     pickle.dump(out['metrics'], f)
