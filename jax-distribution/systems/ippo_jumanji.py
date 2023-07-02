@@ -331,6 +331,7 @@ def make_train(config):
                         return total_loss, (value_loss, loss_actor, entropy)
 
                     grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
+                    
                     total_loss, grads = grad_fn(
                         train_state.params, traj_batch, advantages, targets
                     )
@@ -388,9 +389,9 @@ def make_train(config):
 
 config = {
     "LR": 5e-3,
-    "NUM_ENVS": 256,
+    "NUM_ENVS": 16,
     "NUM_STEPS": 128,
-    "TOTAL_TIMESTEPS": 2e7,
+    "TOTAL_TIMESTEPS": 1e5,
     "UPDATE_EPOCHS": 4,
     "NUM_MINIBATCHES": 8,
     "GAMMA": 0.99,
@@ -404,6 +405,9 @@ config = {
     "ANNEAL_LR": True,
 }
 
+SEEDS = [42]
+STORE_RESULTS = False
+
 print("Starting run.")
 rng = jax.random.PRNGKey(42)
 print("Compiling")
@@ -412,8 +416,8 @@ train_jit = jax.jit(chex.assert_max_traces(make_train(config), n=1))
 jax.block_until_ready(train_jit(rng))  # compile your code
 print(f"Compile done and took {time.time() - compile_start_time} seconds.")
 
-
-for seed_num in [42, 43, 44, 45, 46]:
+# Run and store multiple seeds.
+for seed_num in SEEDS:
     print(f"Training starting for {seed_num}.")
     rng = jax.random.PRNGKey(seed_num)
     start_time = time.perf_counter()
@@ -429,36 +433,6 @@ for seed_num in [42, 43, 44, 45, 46]:
     store_dict['returns'] = out['metrics']['returned_episode_returns'].tolist()
     store_dict['run_time'] = total_time
 
-    with open(f"results_256/{seed_num}.json", 'w') as f:
-        json.dump(store_dict, f)
-
-
-# rng = jax.random.PRNGKey(42)
-# # print(jax.devices())
-# train_jit = jax.jit(chex.assert_max_traces(make_train(config), n=1))
-# start_time = time.time()
-# out = train_jit(rng)
-# total_time = time.time() - start_time
-# print(f"TOTAL TIME TO RUN: {total_time}")
-# # train = make_train(config)
-# # out = train(rng)
-
-# rng = jax.random.PRNGKey(42)
-# train_jit = jax.jit(chex.assert_max_traces(make_train(config), n=1))
-# jax.block_until_ready(train_jit(rng))  # compile your code
-# start_time = time.perf_counter()
-# out = train_jit(rng)
-# jax.block_until_ready(out)
-# total_time = time.perf_counter() - start_time
-# print(f"TOTAL TIME TO RUN: {total_time}")
-
-# print(out['metrics']['returned_episode_returns'].mean())
-
-# plt.plot(out["metrics"]["returned_episode_returns"].mean(-1).reshape(-1))
-# plt.xlabel("Update Step")
-# plt.ylabel("Return")
-# plt.savefig('results.png')
-
-# # Store the output dictionary using pickle 
-# with open('training_results.pkl', 'wb') as f:
-#     pickle.dump(out['metrics'], f)
+    if STORE_RESULTS:
+        with open(f"results_{config['NUM_ENVS']}/{seed_num}.json", 'w') as f:
+            json.dump(store_dict, f)
