@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import functools
 import json
 import os
 import pickle
@@ -199,35 +198,14 @@ def make_train(config):
             params=network_params,
             tx=tx,
         )
-        train_state = (jax.device_put_replicated(train_state, jax.local_devices()),)
         # INIT ENV
         rng, _rng = jax.random.split(rng)
         reset_rng = jax.random.split(_rng, config["NUM_ENVS"])
         # env_state, timestep = env.reset(_rng)
-        num_local_devices = jax.local_device_count()
-        num_global_devices = jax.device_count()
-        num_workers = num_global_devices // num_local_devices
-        local_batch_size = config["NUM_ENVS"] // num_global_devices
-        reset_keys = jax.random.split(rng, config["NUM_ENVS"]).reshape(
-            (
-                num_workers,
-                num_local_devices,
-                config["NUM_ENVS"] // num_local_devices,
-                -1,
-            )
-        )
-        """reset_keys = jnp.reshape(
-            reset_rng, (num_local_devices, config["NUM_ENVS"]//num_local_devices, -1)
-        )"""
-        reset_keys_per_worker = reset_keys[jax.process_index()]
-        # reset_keys_per_worker = reset_keys
-        env_state, timestep = jax.pmap(
-            jax.vmap(env.reset, in_axes=(0)), axis_name="devices"
-        )(reset_keys_per_worker)
+        env_state, timestep = jax.vmap(env.reset, in_axes=(0))(reset_rng)
         # pi, values = network.apply(network_params, timestep.observation.agents_view, timestep.observation.action_mask)
 
         # TRAIN LOOP
-        @functools.partial(jax.pmap, axis_name="devices")
         def _update_step(runner_state, unused):
             # COLLECT TRAJECTORIES
             def _env_step(runner_state, unused):
@@ -255,24 +233,24 @@ def make_train(config):
 
                 transition = Transition(
                     jnp.repeat(next_timestep.last(), 4).reshape(
-                        config["NUM_ENVS"] // num_local_devices, -1
+                        config["NUM_ENVS"], -1
                     ),  # TODO: duplicating for now. But this should be per agent.
                     action,
                     value,
                     jnp.repeat(next_timestep.reward, 4).reshape(
-                        config["NUM_ENVS"] // num_local_devices, -1
+                        config["NUM_ENVS"], -1
                     ),  # TODO: duplicating for now. But this should be per agent.
                     log_prob,
                     last_timestep,
                     {
                         "returned_episode_returns": jnp.repeat(
                             env_state.returned_episode_returns, 4
-                        ).reshape(config["NUM_ENVS"] // num_local_devices, -1),
+                        ).reshape(config["NUM_ENVS"], -1),
                         "returned_episode_lengths": jnp.repeat(
                             env_state.returned_episode_lengths, 4
-                        ).reshape(config["NUM_ENVS"] // num_local_devices, -1),
+                        ).reshape(config["NUM_ENVS"], -1),
                         "returned_episode": jnp.repeat(next_timestep.last(), 4).reshape(
-                            config["NUM_ENVS"] // num_local_devices, -1
+                            config["NUM_ENVS"], -1
                         ),
                     },
                 )
@@ -369,21 +347,15 @@ def make_train(config):
                     total_loss, grads = grad_fn(
                         train_state.params, traj_batch, advantages, targets
                     )
-                    total_loss, grads = jax.lax.pmean(
-                        (total_loss, grads), axis_name="devices"
-                    )
                     train_state = train_state.apply_gradients(grads=grads)
                     return train_state, total_loss
 
                 train_state, traj_batch, advantages, targets, rng = update_state
                 rng, _rng = jax.random.split(rng)
                 batch_size = config["MINIBATCH_SIZE"] * config["NUM_MINIBATCHES"]
-                batch_size = (
-                    config["NUM_STEPS"] * config["NUM_ENVS"] // num_local_devices
-                )
-                """assert (
-                    batch_size == config["NUM_STEPS"] * config["NUM_ENVS"]//num_local_devices
-                ), "batch size must be equal to number of steps * number of envs"""
+                assert (
+                    batch_size == config["NUM_STEPS"] * config["NUM_ENVS"]
+                ), "batch size must be equal to number of steps * number of envs"
                 permutation = jax.random.permutation(_rng, batch_size)
                 batch = (traj_batch, advantages, targets)
 
@@ -402,7 +374,6 @@ def make_train(config):
                 train_state, total_loss = jax.lax.scan(
                     _update_minbatch, train_state, minibatches
                 )
-
                 update_state = (train_state, traj_batch, advantages, targets, rng)
                 return update_state, total_loss
 
@@ -421,11 +392,7 @@ def make_train(config):
             return runner_state, metric
 
         rng, _rng = jax.random.split(rng)
-        _rng = jax.random.split(_rng, config["NUM_ENVS"]).reshape(
-            num_local_devices, config["NUM_ENVS"] // num_local_devices, -1
-        )
-        _rng = _rng[:, :, 0]
-        runner_state = (train_state[jax.process_index()], env_state, timestep, _rng)
+        runner_state = (train_state, env_state, timestep, _rng)
         runner_state, metric = jax.lax.scan(
             _update_step, runner_state, None, config["NUM_UPDATES"]
         )
@@ -459,9 +426,8 @@ print("Starting run.")
 rng = jax.random.PRNGKey(42)
 print("Compiling")
 compile_start_time = time.time()
-# train_jit = jax.jit(chex.assert_max_traces(make_train(config), n=1))
-train_jit = make_train(config)
-# jax.block_until_ready(train_jit(rng))  # compile your code
+train_jit = jax.jit(chex.assert_max_traces(make_train(config), n=1))
+jax.block_until_ready(train_jit(rng))  # compile your code
 print(f"Compile done and took {time.time() - compile_start_time} seconds.")
 
 # Run and store multiple seeds.
@@ -470,7 +436,7 @@ for seed_num in SEEDS:
     rng = jax.random.PRNGKey(seed_num)
     start_time = time.perf_counter()
     out = train_jit(rng)
-    # jax.block_until_ready(out)
+    jax.block_until_ready(out)
     total_time = time.perf_counter() - start_time
     print(f"TOTAL TIME TO RUN: {total_time}")
 
