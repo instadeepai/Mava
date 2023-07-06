@@ -141,12 +141,13 @@ class Transition(NamedTuple):
 
 
 def make_train(config):
+    config["NUM_DEVICES"] =  jax.local_device_count()
+
+    config["NUM_ENVS_PER_DEVICE"] = config["NUM_ENVS"] // config["NUM_DEVICES"]
+
     config["NUM_UPDATES"] = (
         config["TOTAL_TIMESTEPS"] // config["NUM_STEPS"] // config["NUM_ENVS"]
     )
-
-    config["NUM_DEVICES"] = 8
-    config["NUM_ENVS_PER_DEVICE"] = config["NUM_ENVS"] // jax.local_device_count()
 
     config["MINIBATCH_SIZE"] = (
         config["NUM_ENVS_PER_DEVICE"] * config["NUM_STEPS"] // config["NUM_MINIBATCHES"]
@@ -206,12 +207,11 @@ def make_train(config):
         reset_rng = jax.random.split(_rng, config["NUM_ENVS"])
         reset_rng = jnp.reshape(
             reset_rng, 
-            (jax.local_device_count(), config["NUM_ENVS_PER_DEVICE"], -1) # Num devices, num envs per device, ...
+            (config["NUM_DEVICES"], config["NUM_ENVS_PER_DEVICE"], -1) # Num devices, num envs per device, ...
         )
         # env_state, timestep = env.reset(_rng)
         env_state, timestep = jax.pmap(jax.vmap(env.reset, in_axes=(0)), axis_name="devices")(reset_rng)
-        # pi, values = network.apply(network_params, timestep.observation.agents_view, timestep.observation.action_mask)
-        x =0 
+   
         # TRAIN LOOP
         # @partial(jax.pmap, axis_name="devices")
         def _update_step(runner_state, unused):
@@ -232,8 +232,6 @@ def make_train(config):
 
                 # STEP ENV
                 rng, _rng = jax.random.split(rng)
-                rng_step = jax.random.split(_rng, config["NUM_ENVS"])
-
                 env_state, next_timestep = jax.vmap(
                     env.step,
                     in_axes=(0, 0),
@@ -403,18 +401,14 @@ def make_train(config):
 
         rng, _rng = jax.random.split(rng)
         # Split for num envs. 
-        _rng = jax.random.split(_rng, jax.local_device_count())
+        _rng = jax.random.split(_rng, config["NUM_DEVICES"])
         runner_state = (jax.device_put_replicated(train_state, jax.local_devices()), env_state, timestep, _rng)
         
         @partial(jax.pmap, axis_name="devices")
         def epoch_fn(runner_state, _): 
             runner_state, metric = jax.lax.scan(_update_step, runner_state, None, config["NUM_UPDATES"])
-
             return runner_state, metric
-        
-        # runner_state, metric = jax.lax.scan(
-        #     _update_step, runner_state, None, config["NUM_UPDATES"]
-        # )
+
         runner_state, metric = epoch_fn(runner_state, None)
 
         return {"runner_state": runner_state, "metrics": metric}
@@ -424,9 +418,9 @@ def make_train(config):
 
 config = {
     "LR": 5e-3,
-    "NUM_ENVS": 256,
+    "NUM_ENVS": 16,
     "NUM_STEPS": 128,
-    "TOTAL_TIMESTEPS": 1e6 // jax.local_device_count(),
+    "TOTAL_TIMESTEPS": 1e6,
     "UPDATE_EPOCHS": 4,
     "NUM_MINIBATCHES": 8,
     "GAMMA": 0.99,
