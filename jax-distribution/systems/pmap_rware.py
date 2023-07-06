@@ -143,15 +143,23 @@ class Transition(NamedTuple):
 def make_train(config):
     config["NUM_DEVICES"] =  jax.local_device_count()
 
+    print("Num devices: ", config["NUM_DEVICES"])
+
     config["NUM_ENVS_PER_DEVICE"] = config["NUM_ENVS"] // config["NUM_DEVICES"]
+
+    print("Num envs per device: ", config["NUM_ENVS_PER_DEVICE"])
 
     config["NUM_UPDATES"] = (
         config["TOTAL_TIMESTEPS"] // config["NUM_STEPS"] // config["NUM_ENVS"]
     )
 
+    print("Num updates: ", config["NUM_UPDATES"])
+
     config["MINIBATCH_SIZE"] = (
         config["NUM_ENVS_PER_DEVICE"] * config["NUM_STEPS"] // config["NUM_MINIBATCHES"]
     )
+
+    print("Minibatch size: ", config["MINIBATCH_SIZE"])
 
     env = jumanji.make(config["ENV_NAME"])
     env = AutoResetWrapper(env)
@@ -209,11 +217,9 @@ def make_train(config):
             reset_rng, 
             (config["NUM_DEVICES"], config["NUM_ENVS_PER_DEVICE"], -1) # Num devices, num envs per device, ...
         )
-        # env_state, timestep = env.reset(_rng)
         env_state, timestep = jax.pmap(jax.vmap(env.reset, in_axes=(0)), axis_name="devices")(reset_rng)
    
         # TRAIN LOOP
-        # @partial(jax.pmap, axis_name="devices")
         def _update_step(runner_state, unused):
             # COLLECT TRAJECTORIES
             def _env_step(runner_state, unused):
@@ -408,7 +414,7 @@ def make_train(config):
         def epoch_fn(runner_state, _): 
             runner_state, metric = jax.lax.scan(_update_step, runner_state, None, config["NUM_UPDATES"])
             return runner_state, metric
-
+        
         runner_state, metric = epoch_fn(runner_state, None)
 
         return {"runner_state": runner_state, "metrics": metric}
@@ -418,7 +424,7 @@ def make_train(config):
 
 config = {
     "LR": 5e-3,
-    "NUM_ENVS": 16,
+    "NUM_ENVS": 64,
     "NUM_STEPS": 128,
     "TOTAL_TIMESTEPS": 1e6,
     "UPDATE_EPOCHS": 4,
