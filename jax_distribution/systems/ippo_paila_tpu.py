@@ -302,12 +302,35 @@ if __name__ == "__main__":
         "ACTIVATION": "tanh",
         "ENV_NAME": "CartPole-v1",
         "ANNEAL_LR": True,
-        "DEBUG": True,
+        "DEBUG": False,
     }
     rng = jax.random.PRNGKey(30)
     start = time.time()
-    train_jit = jax.jit(make_train(config))
-    out = train_jit(rng)
+
+    # Get the number of devices
+    num_devices = jax.device_count()
+
+    fn = make_train(config)
+    
+    # Num experiments to run
+    num_exp = 128
+
+    num_per_device = num_exp // num_devices
+    assert num_exp == num_per_device * num_devices, "num_exp must be divisible by num_devices"
+
+
+    # Vmap over experiments
+    vmap_fn = jax.vmap(fn, in_axes=(0,))
+
+    # Pmap over devices
+    pmap_fn = jax.pmap(vmap_fn, in_axes=(0,))
+
+    rngs = jax.random.split(rng, num_exp)
+
+    # Reshape the keys
+    rngs_reshaped = jnp.reshape(rngs, (num_devices, num_per_device, -1))
+
+    out = pmap_fn(rngs_reshaped)
     jax.block_until_ready(out)
     end = time.time()
     print("Time taken: ", round(end - start, 2))
