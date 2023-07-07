@@ -96,7 +96,7 @@ def make_train(config):
     )
     # env, env_params = gymnax.make(config["ENV_NAME"])
     env = jumanji.make(config["ENV_NAME"])
-    # env = FlattenObservationWrapper(env)
+    env = AutoResetWrapper(env)
     # env = LogWrapper(env)
 
     def linear_schedule(count):
