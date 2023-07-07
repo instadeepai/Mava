@@ -272,6 +272,13 @@ def make_train(config):
                         print(f"global step={timesteps[t]}, episodic return={return_values[t]}")
                 jax.debug.callback(callback, metric)
 
+            # Pmean the train state
+            types = jax.tree_util.tree_map(lambda x: x.dtype, train_state)
+            train_state = jax.lax.pmean(train_state, axis_name="batch")
+            train_state = jax.tree_util.tree_map(
+                lambda x, t: jnp.asarray(x, dtype=t), train_state, types,
+            ) 
+
             runner_state = (train_state, env_state, last_obs, rng)
             return runner_state, metric
 
@@ -313,7 +320,7 @@ if __name__ == "__main__":
     fn = make_train(config)
     
     # Num experiments to run
-    num_exp = 128
+    num_exp = 16
 
     num_per_device = num_exp // num_devices
     assert num_exp == num_per_device * num_devices, "num_exp must be divisible by num_devices"
@@ -323,7 +330,7 @@ if __name__ == "__main__":
     vmap_fn = jax.vmap(fn, in_axes=(0,))
 
     # Pmap over devices
-    pmap_fn = jax.pmap(vmap_fn, in_axes=(0,))
+    pmap_fn = jax.pmap(vmap_fn, in_axes=(0,), axis_name="batch")
 
     rngs = jax.random.split(rng, num_exp)
 
