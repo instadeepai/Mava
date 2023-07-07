@@ -26,6 +26,7 @@ import gymnax
 from jax_distribution.wrappers.purejaxrl import LogWrapper, FlattenObservationWrapper
 import time
 import jumanji 
+from jumanji.wrappers import AutoResetWrapper
 
 
 class ActorCritic(nn.Module):
@@ -337,7 +338,7 @@ if __name__ == "__main__":
         "LR": 2.5e-4,
         "NUM_ENVS": 4,
         "NUM_STEPS": 128,
-        "TOTAL_TIMESTEPS": 5e4, # 1e6 / 20
+        "TOTAL_TIMESTEPS": 10000, #5e4, # 1e6 / 20
         "UPDATE_EPOCHS": 4,
         "NUM_MINIBATCHES": 4,
         "GAMMA": 0.99,
