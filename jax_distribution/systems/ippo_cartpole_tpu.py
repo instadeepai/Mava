@@ -320,11 +320,10 @@ if __name__ == "__main__":
     fn = make_train(config)
     
     # Num experiments to run
-    num_exp = 16
+    num_exp = 4
 
     num_per_device = num_exp // num_devices
     assert num_exp == num_per_device * num_devices, "num_exp must be divisible by num_devices"
-
 
     # Vmap over experiments
     vmap_fn = jax.vmap(fn, in_axes=(0,))
