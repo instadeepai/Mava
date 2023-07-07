@@ -46,12 +46,15 @@ build_venv:
 	mava_env/bin/pip install -r https://raw.githubusercontent.com/luchris429/purejaxrl/main/requirements.txt
 	mava_env/bin/pip install jax==0.4.9
 	mava_env/bin/pip install jaxlib==0.4.7+cuda11.cudnn82  -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+	echo 'export PYTHONPATH="./"' >> mava_env/bin/activate
 
 build_tpu_venv:
 	python3 -m venv mava_env
 	mava_env/bin/pip install git+https://github.com/RuanJohn/jumanji.git@vmap-ippo
 	mava_env/bin/pip install -r https://raw.githubusercontent.com/luchris429/purejaxrl/main/requirements.txt
 	mava_env/bin/pip install -U "jax[tpu]" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
+	echo 'export PYTHONPATH="./"' >> mava_env/bin/activate
+
 
 run:
 	$(DOCKER_RUN) python $(example) --base_dir /home/app/mava/logs/
