@@ -238,40 +238,48 @@ def make_train(config):
 
                 # STEP ENV
                 rng, _rng = jax.random.split(rng)
+                # old_env_state = env_state
                 env_state, next_timestep = jax.vmap(
                     env.step,
                     in_axes=(0, 0),
                 )(env_state, action)
 
+                # chex.assert_trees_all_equal_dtypes(env_state, old_env_state)
+
+                
+                def update_output(x, num_agents=4):
+                    # TODO: Get the num_agents value from the env.
+                    return jnp.repeat(x, num_agents).reshape(config["NUM_ENVS_PER_DEVICE"], num_agents)
+                
+
                 transition = Transition(
-                    jnp.repeat(next_timestep.last(), 4).reshape(
-                        config["NUM_ENVS_PER_DEVICE"], -1
-                    ),  # TODO: duplicating for now. But this should be per agent.
+                    update_output(next_timestep.last()),
                     action,
                     value,
-                    jnp.repeat(next_timestep.reward, 4).reshape(
-                        config["NUM_ENVS_PER_DEVICE"], -1
-                    ),  # TODO: duplicating for now. But this should be per agent.
+                    update_output(next_timestep.reward),
                     log_prob,
                     last_timestep,
                     {
-                        "returned_episode_returns": jnp.repeat(
-                            env_state.returned_episode_returns, 4
-                        ).reshape(config["NUM_ENVS_PER_DEVICE"], -1),
-                        "returned_episode_lengths": jnp.repeat(
-                            env_state.returned_episode_lengths, 4
-                        ).reshape(config["NUM_ENVS_PER_DEVICE"], -1),
-                        "returned_episode": jnp.repeat(next_timestep.last(), 4).reshape(
-                            config["NUM_ENVS_PER_DEVICE"], -1
-                        ),
+                        "returned_episode_returns": update_output(env_state.returned_episode_returns),
+                        "returned_episode_lengths": update_output(env_state.returned_episode_lengths),
+                        "returned_episode": update_output(next_timestep.last()),
                     },
                 )
                 runner_state = (train_state, env_state, next_timestep, rng)
                 return runner_state, transition
 
+            # old_runner_state = runner_state
             runner_state, traj_batch = jax.lax.scan(
                 _env_step, runner_state, None, config["NUM_STEPS"]
             )
+            # chex.assert_trees_all_equal_dtypes(runner_state, old_runner_state)
+
+            # print("It works!")
+            # exit()
+             # Args shaper
+            # args = [tree1]
+            # for arg in args:
+            #     print(jax.tree_util.tree_map(lambda p: p.shape, arg))
 
             # CALCULATE ADVANTAGE
             train_state, env_state, last_timestep, rng = runner_state
@@ -311,7 +319,6 @@ def make_train(config):
             def _update_epoch(update_state, unused):
                 def _update_minbatch(train_state, batch_info):
                     traj_batch, advantages, targets = batch_info
-
                     def _loss_fn(params, traj_batch, gae, targets):
                         # RERUN NETWORK
                         pi, value = network.apply(
@@ -359,8 +366,9 @@ def make_train(config):
                     total_loss, grads = grad_fn(
                         train_state.params, traj_batch, advantages, targets
                     )
-                    total_loss = jax.lax.pmean(total_loss, axis_name="devices")
-                    grads = jax.lax.pmean(grads, axis_name="devices")
+                    # TODO: Add this back
+                    # total_loss = jax.lax.pmean(total_loss, axis_name="devices")
+                    # grads = jax.lax.pmean(grads, axis_name="devices")
                     train_state = train_state.apply_gradients(grads=grads)
                     return train_state, total_loss
 
@@ -396,10 +404,11 @@ def make_train(config):
                 _update_epoch, update_state, None, config["UPDATE_EPOCHS"]
             )
             train_state = update_state[0]
-            # metric = traj_batch.info
-            metric = jax.tree_util.tree_map(
-                lambda x: x[:, :, 0], traj_batch.info
-            )  # only the team rewards
+
+            metric = traj_batch.info
+            # metric = jax.tree_util.tree_map(
+            #     lambda x: x[:, :, 0], traj_batch.info
+            # )  # only the team rewards
             rng = update_state[-1]
 
             runner_state = (train_state, env_state, last_timestep, rng)
@@ -410,12 +419,23 @@ def make_train(config):
         _rng = jax.random.split(_rng, config["NUM_DEVICES"])
         runner_state = (jax.device_put_replicated(train_state, jax.local_devices()), env_state, timestep, _rng)
         
-        @partial(jax.pmap, axis_name="devices")
+        @partial(jax.pmap)
         def epoch_fn(runner_state, _): 
+            
+            # tree1 = runner_state
+            
+            # TODO: Remove this
+            config["NUM_UPDATES"] = 10
+
             runner_state, metric = jax.lax.scan(_update_step, runner_state, None, config["NUM_UPDATES"])
+            # runner_state = tree2
+            # chex.assert_trees_all_equal_dtypes(tree1, tree2)
+
             return runner_state, metric
         
         runner_state, metric = epoch_fn(runner_state, None)
+
+        print("metric: ", metric["returned_episode_returns"].shape)
 
         return {"runner_state": runner_state, "metrics": metric}
 
