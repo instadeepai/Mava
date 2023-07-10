@@ -351,6 +351,7 @@ def run_experiment(env, config):
         * config["ROLLOUT_LENGTH"]
         * config["BATCH_SIZE"]
     )
+    print("num_frames", num_frames)
     with TimeIt(tag="EXECUTION", frames=num_frames):
         params, opt_state, step_rngs, env_states, env_timesteps = learn(  # runs compiled fn
             params, opt_state, step_rngs, env_states, env_timesteps, 

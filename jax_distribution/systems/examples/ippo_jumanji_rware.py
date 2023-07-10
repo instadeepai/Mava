@@ -361,7 +361,7 @@ if __name__ == "__main__":
     
     # Num experiments to run
     # number_envs = num_exp*config["NUM_ENVS"]
-    num_exp = 4
+    num_exp = jax.device_count()
 
     num_per_device = num_exp // num_devices
     assert num_exp == num_per_device * num_devices, "num_exp must be divisible by num_devices"
