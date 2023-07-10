@@ -4,8 +4,9 @@ https://colab.research.google.com/drive/1974D-qP17fd5mLxy6QZv-ic4yxlPJp-G?usp=sh
 """
 
 import timeit
-from typing import NamedTuple, Sequence
+from typing import NamedTuple, Sequence, Tuple
 
+import chex
 import distrax
 import flax.linen as nn
 import jax
@@ -13,7 +14,11 @@ import jax.numpy as jnp
 import jumanji
 import numpy as np
 import optax
+from flax import struct
 from flax.linen.initializers import constant, orthogonal
+from jumanji.environments.routing.robot_warehouse.types import State
+from jumanji.types import TimeStep
+from jumanji.wrappers import Wrapper
 
 
 class TimeIt:
@@ -31,6 +36,48 @@ class TimeIt:
         if self.frames:
             msg += ", FPS=%.2e" % (self.frames / self.elapsed_secs)
         print(msg)
+
+
+@struct.dataclass
+class LogEnvState:
+    env_state: State
+    episode_returns: float
+    episode_lengths: int
+    returned_episode_returns: float
+    returned_episode_lengths: int
+
+
+class LogWrapper(Wrapper):
+    """Log the episode returns and lengths."""
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[LogEnvState, TimeStep]:
+        state, timestep = self._env.reset(key)
+        # timestep.extras = {}
+        state = LogEnvState(state, 0.0, 0.0, 0.0, 0.0)
+        return state, timestep
+
+    def step(
+        self,
+        state: State,
+        action: jnp.ndarray,
+    ) -> Tuple[State, TimeStep]:
+
+        env_state, timestep = self._env.step(state.env_state, action)
+
+        new_episode_return = state.episode_returns + jnp.mean(timestep.reward)
+        new_episode_length = state.episode_lengths + 1
+        state = LogEnvState(
+            env_state=env_state,
+            episode_returns=new_episode_return * (1 - timestep.last()),
+            episode_lengths=new_episode_length * (1 - timestep.last()),
+            returned_episode_returns=state.returned_episode_returns
+            * (1 - timestep.last())
+            + new_episode_return * timestep.last(),
+            returned_episode_lengths=state.returned_episode_lengths
+            * (1 - timestep.last())
+            + new_episode_length * timestep.last(),
+        )
+        return state, timestep
 
 
 class Transition(NamedTuple):
@@ -120,7 +167,15 @@ def get_learner_fn(env, forward_pass, opt_update, config):
                 reward,
                 log_prob,
                 last_timestep.observation,
-                {},
+                {
+                    "returned_episode_returns": jnp.repeat(
+                        env_state.returned_episode_returns, 4
+                    ).reshape(-1),
+                    "returned_episode_lengths": jnp.repeat(
+                        env_state.returned_episode_lengths, 4
+                    ).reshape(-1),
+                    "returned_episode": jnp.repeat(next_timestep.last(), 4).reshape(-1),
+                },
             )
             runner_state = (params, env_state, next_timestep, rng)
             return runner_state, transition
@@ -212,7 +267,7 @@ def get_learner_fn(env, forward_pass, opt_update, config):
 
             (params, opt_state), traj_batch, advantages, targets, rng = update_state
             rng, _rng = jax.random.split(rng)
-            batch_size = config['ROLLOUT_LENGTH']
+            batch_size = config["ROLLOUT_LENGTH"]
             # batch_size = config["MINIBATCH_SIZE"] * config["NUM_MINIBATCHES"]
             # assert (
             #     batch_size == config["NUM_STEPS"] * config["NUM_ENVS"]
@@ -245,20 +300,21 @@ def get_learner_fn(env, forward_pass, opt_update, config):
         )
 
         ((params, opt_state), traj_batch, advantages, targets, rng) = update_state
-
-        return params, opt_state, rng, env_state, last_timestep
+        metric_info = jax.tree_util.tree_map(lambda x: x[:, 0], traj_batch.info)
+        return params, opt_state, rng, env_state, last_timestep, metric_info
 
     def update_fn(params, opt_state, rng, env_state, timestep):
         """Compute a gradient update from a single trajectory."""
         rng, loss_rng = jax.random.split(rng)
-        # grads, new_env_state = jax.grad(  # compute gradient on a single trajectory.
-        #     loss_fn, has_aux=True)(params, loss_rng, env_state)
-        # grads = lax.pmean(grads, axis_name='j')  # reduce mean across cores.
-        # grads = lax.pmean(grads, axis_name='i')  # reduce mean across batch.
-        # updates, new_opt_state = opt_update(grads, opt_state)  # transform grads.
-        # new_params = optax.apply_updates(params, updates)  # update parameters.
 
-        new_params, new_opt_state, rng, new_env_state, new_timestep = update_step_fn(
+        (
+            new_params,
+            new_opt_state,
+            rng,
+            new_env_state,
+            new_timestep,
+            metric_info,
+        ) = update_step_fn(
             params,
             opt_state,
             rng,
@@ -266,7 +322,13 @@ def get_learner_fn(env, forward_pass, opt_update, config):
             timestep,
         )
 
-        return new_params, new_opt_state, rng, new_env_state, new_timestep
+        return (
+            new_params,
+            new_opt_state,
+            rng,
+            new_env_state,
+            new_timestep,
+        ), metric_info
 
     def learner_fn(params, opt_state, rngs, env_states, timesteps):
         """Vectorise and repeat the update."""
@@ -274,23 +336,33 @@ def get_learner_fn(env, forward_pass, opt_update, config):
             update_fn, axis_name="j"
         )  # vectorize across batch.
 
-        def iterate_fn(_, val):  # repeat many times to avoid going back to Python.
+        def iterate_fn(val, _):  # repeat many times to avoid going back to Python.
             params, opt_state, rngs, env_states, timesteps = val
             # params = jax.lax.pmean(params, axis_name="j")  # reduce mean across batch.
             return batched_update_fn(params, opt_state, rngs, env_states, timesteps)
 
-        return jax.lax.fori_loop(
-            0,
-            config["ITERATIONS"],
-            iterate_fn,
-            (params, opt_state, rngs, env_states, timesteps),
+        runner_state = (params, opt_state, rngs, env_states, timesteps)
+        runner_state, metric = jax.lax.scan(
+            iterate_fn, runner_state, None, config["ITERATIONS"]
         )
+        return {"runner_state": runner_state, "metrics": metric}
 
     return learner_fn
 
 
 def run_experiment(env, config):
+    env = LogWrapper(env)
     cores_count = len(jax.devices())
+    # Number of iterations
+    timesteps_per_iteration = (
+        cores_count * config["ROLLOUT_LENGTH"] * config["BATCH_SIZE"]
+    )
+    config["ITERATIONS"] = (
+        config["TOTAL_TIMESTEPS"] // timesteps_per_iteration
+    )  # Number of training updates
+
+    num_frames = config["TOTAL_TIMESTEPS"]
+
     num_actions = int(env.action_spec().num_values[0])
     network = ActorCritic(num_actions, activation=config["ACTIVATION"])
     optim = optax.chain(
@@ -346,18 +418,18 @@ def run_experiment(env, config):
         out = learn(params, opt_state, step_rngs, env_states, env_timesteps)  # compiles
         jax.block_until_ready(out)
 
-
-    # Number of iterations
-    timesteps_per_iteration = (cores_count*config["ROLLOUT_LENGTH"]* config["BATCH_SIZE"])
-    config["ITERATIONS"] = config["TOTAL_TIMESTEPS"] // timesteps_per_iteration # Number of training updates 
-
-    num_frames = config["TOTAL_TIMESTEPS"]
-
     with TimeIt(tag="EXECUTION", frames=num_frames):
         out = learn(  # runs compiled fn
-            params, opt_state, step_rngs, env_states, env_timesteps, 
+            params,
+            opt_state,
+            step_rngs,
+            env_states,
+            env_timesteps,
         )
         jax.block_until_ready(out)
+    val = out["metrics"]["returned_episode_returns"].mean()
+    print(f"Mean Episode Return: {val}")
+
 
 if __name__ == "__main__":
     config = {
@@ -372,9 +444,9 @@ if __name__ == "__main__":
         "ENT_COEF": 0.01,
         "VF_COEF": 0.5,
         "MAX_GRAD_NORM": 0.5,
-        "BATCH_SIZE": 4, # Parallel updates / environmnents
-        "ROLLOUT_LENGTH": 128, # Length of each rollout
-        "TOTAL_TIMESTEPS": 204800, # Number of training timesteps
+        "BATCH_SIZE": 4,  # Parallel updates / environmnents
+        "ROLLOUT_LENGTH": 128,  # Length of each rollout
+        "TOTAL_TIMESTEPS": 204800,  # Number of training timesteps
         "SEED": 42,
     }
 
