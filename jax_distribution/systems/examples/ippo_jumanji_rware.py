@@ -337,7 +337,7 @@ if __name__ == "__main__":
         "LR": 2.5e-4,
         "NUM_ENVS": 4,
         "NUM_STEPS": 128,
-        "TOTAL_TIMESTEPS": 10000, #5e4, # 1e6 / 20
+        "TOTAL_TIMESTEPS": 51200, #5e4, # 1e6 / 20
         "UPDATE_EPOCHS": 4,
         "NUM_MINIBATCHES": 4,
         "GAMMA": 0.99,
@@ -361,7 +361,7 @@ if __name__ == "__main__":
     
     # Num experiments to run
     # number_envs = num_exp*config["NUM_ENVS"]
-    num_exp = 16
+    num_exp = 4
 
     num_per_device = num_exp // num_devices
     assert num_exp == num_per_device * num_devices, "num_exp must be divisible by num_devices"
@@ -377,11 +377,6 @@ if __name__ == "__main__":
     # Reshape the keys
     rngs_reshaped = jnp.reshape(rngs, (num_devices, num_per_device, -1))
 
-    # out = pmap_fn(rngs_reshaped)
-    # jax.block_until_ready(out)
-    # end = time.time()
-    # print("Time taken: ", round(end - start, 2))
-
     # Compile 
     with TimeIt(tag="COMPILATION"): 
         out = pmap_fn(rngs_reshaped)
@@ -390,3 +385,4 @@ if __name__ == "__main__":
     num_frames = config["TOTAL_TIMESTEPS"] * num_exp
     with TimeIt(tag="EXECUTION", frames=num_frames):
         out = pmap_fn(rngs_reshaped)
+        jax.block_until_ready(out)

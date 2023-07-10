@@ -356,22 +356,23 @@ def run_experiment(env, config):
             params, opt_state, step_rngs, env_states, env_timesteps, 
         )
 
+if __name__ == "__main__":
+    config = {
+        "LR": 5e-3,
+        "ENV_NAME": "RobotWarehouse-v0",
+        "ACTIVATION": "relu",
+        "UPDATE_EPOCHS": 4,
+        "NUM_MINIBATCHES": 8,
+        "GAMMA": 0.99,
+        "GAE_LAMBDA": 0.95,
+        "CLIP_EPS": 0.2,
+        "ENT_COEF": 0.01,
+        "VF_COEF": 0.5,
+        "MAX_GRAD_NORM": 0.5,
+        "BATCH_SIZE": 4, # Parallel updates / environmnents
+        "ROLLOUT_LENGTH": 128, # Length of each rollout
+        "ITERATIONS": 100, # Number of training updates 
+        "SEED": 42,
+    }
 
-config = {
-    "LR": 5e-3,
-    "ENV_NAME": "RobotWarehouse-v0",
-    "ACTIVATION": "relu",
-    "UPDATE_EPOCHS": 4,
-    "NUM_MINIBATCHES": 8,
-    "GAMMA": 0.99,
-    "GAE_LAMBDA": 0.95,
-    "CLIP_EPS": 0.2,
-    "ENT_COEF": 0.01,
-    "VF_COEF": 0.5,
-    "MAX_GRAD_NORM": 0.5,
-    "BATCH_SIZE": 4, # Parallel updates / environmnents
-    "ROLLOUT_LENGTH": 128, # Length of each rollout
-    "ITERATIONS": 100, # Number of training updates 
-    "SEED": 42,
-}
-run_experiment(jumanji.make(config["ENV_NAME"]), config)
+    run_experiment(jumanji.make(config["ENV_NAME"]), config)
