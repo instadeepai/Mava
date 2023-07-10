@@ -22,11 +22,10 @@ from flax.linen.initializers import constant, orthogonal
 from typing import Sequence, NamedTuple, Any
 from flax.training.train_state import TrainState
 import distrax
-import gymnax
-from jax_distribution.wrappers.purejaxrl import LogWrapper, FlattenObservationWrapper
 import time
 import jumanji 
 from jumanji.wrappers import AutoResetWrapper
+from ippo_anakin_example import TimeIt
 
 
 class ActorCritic(nn.Module):
@@ -362,7 +361,7 @@ if __name__ == "__main__":
     
     # Num experiments to run
     # number_envs = num_exp*config["NUM_ENVS"]
-    num_exp = 20
+    num_exp = 16
 
     num_per_device = num_exp // num_devices
     assert num_exp == num_per_device * num_devices, "num_exp must be divisible by num_devices"
@@ -378,7 +377,16 @@ if __name__ == "__main__":
     # Reshape the keys
     rngs_reshaped = jnp.reshape(rngs, (num_devices, num_per_device, -1))
 
-    out = pmap_fn(rngs_reshaped)
-    jax.block_until_ready(out)
-    end = time.time()
-    print("Time taken: ", round(end - start, 2))
+    # out = pmap_fn(rngs_reshaped)
+    # jax.block_until_ready(out)
+    # end = time.time()
+    # print("Time taken: ", round(end - start, 2))
+
+    # Compile 
+    with TimeIt(tag="COMPILATION"): 
+        out = pmap_fn(rngs_reshaped)
+        jax.block_until_ready(out)
+
+    num_frames = config["TOTAL_TIMESTEPS"] * num_exp
+    with TimeIt(tag="EXECUTION", frames=num_frames):
+        out = pmap_fn(rngs_reshaped)

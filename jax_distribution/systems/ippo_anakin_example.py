@@ -204,6 +204,7 @@ def get_learner_fn(env, forward_pass, opt_update, config):
                 total_loss, grads = grad_fn(params, traj_batch, advantages, targets)
                 # pmean
                 total_loss = jax.lax.pmean(total_loss, axis_name="i")
+                grads = jax.lax.pmean(grads, axis_name="j")
                 grads = jax.lax.pmean(grads, axis_name="i")
                 updates, new_opt_state = opt_update(grads, opt_state)
                 new_params = optax.apply_updates(params, updates)
@@ -211,7 +212,7 @@ def get_learner_fn(env, forward_pass, opt_update, config):
 
             (params, opt_state), traj_batch, advantages, targets, rng = update_state
             rng, _rng = jax.random.split(rng)
-            batch_size = 128
+            batch_size = config['ROLLOUT_LENGTH']
             # batch_size = config["MINIBATCH_SIZE"] * config["NUM_MINIBATCHES"]
             # assert (
             #     batch_size == config["NUM_STEPS"] * config["NUM_ENVS"]
@@ -275,7 +276,7 @@ def get_learner_fn(env, forward_pass, opt_update, config):
 
         def iterate_fn(_, val):  # repeat many times to avoid going back to Python.
             params, opt_state, rngs, env_states, timesteps = val
-            params = jax.lax.pmean(params, axis_name="j")  # reduce mean across batch.
+            # params = jax.lax.pmean(params, axis_name="j")  # reduce mean across batch.
             return batched_update_fn(params, opt_state, rngs, env_states, timesteps)
 
         return jax.lax.fori_loop(
@@ -351,8 +352,8 @@ def run_experiment(env, config):
         * config["BATCH_SIZE"]
     )
     with TimeIt(tag="EXECUTION", frames=num_frames):
-        params, opt_state, step_rngs, env_states = learn(  # runs compiled fn
-            params, opt_state, step_rngs, env_states
+        params, opt_state, step_rngs, env_states, env_timesteps = learn(  # runs compiled fn
+            params, opt_state, step_rngs, env_states, env_timesteps, 
         )
 
 
@@ -368,9 +369,9 @@ config = {
     "ENT_COEF": 0.01,
     "VF_COEF": 0.5,
     "MAX_GRAD_NORM": 0.5,
-    "BATCH_SIZE": 128,
-    "ROLLOUT_LENGTH": 128,
-    "ITERATIONS": 100,
+    "BATCH_SIZE": 4, # Parallel updates / environmnents
+    "ROLLOUT_LENGTH": 128, # Length of each rollout
+    "ITERATIONS": 100, # Number of training updates 
     "SEED": 42,
 }
 run_experiment(jumanji.make(config["ENV_NAME"]), config)
