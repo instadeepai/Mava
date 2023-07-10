@@ -124,7 +124,7 @@ def get_learner_fn(env, forward_pass, opt_update, config):
             rng, _rng = jax.random.split(rng)
             env_state, next_timestep = env.step(env_state, action)
 
-            num_agents = 2
+            num_agents = 2-
             done, reward = jax.tree_map(
                 lambda x: jnp.repeat(x, num_agents).reshape(-1),
                 [next_timestep.last(), next_timestep.reward],
