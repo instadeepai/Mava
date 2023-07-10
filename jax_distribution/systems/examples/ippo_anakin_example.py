@@ -343,7 +343,8 @@ def run_experiment(env, config):
     # env_timesteps = reshape(env_timesteps)  # add dimension to pmap over.
 
     with TimeIt(tag="COMPILATION"):
-        learn(params, opt_state, step_rngs, env_states, env_timesteps)  # compiles
+        out = learn(params, opt_state, step_rngs, env_states, env_timesteps)  # compiles
+        jax.block_until_ready(out)
 
     num_frames = (
         cores_count
@@ -351,11 +352,11 @@ def run_experiment(env, config):
         * config["ROLLOUT_LENGTH"]
         * config["BATCH_SIZE"]
     )
-    print("num_frames", num_frames)
     with TimeIt(tag="EXECUTION", frames=num_frames):
-        params, opt_state, step_rngs, env_states, env_timesteps = learn(  # runs compiled fn
+        out = learn(  # runs compiled fn
             params, opt_state, step_rngs, env_states, env_timesteps, 
         )
+        jax.block_until_ready(out)
 
 if __name__ == "__main__":
     config = {
