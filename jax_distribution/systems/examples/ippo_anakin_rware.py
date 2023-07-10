@@ -374,7 +374,7 @@ if __name__ == "__main__":
         "MAX_GRAD_NORM": 0.5,
         "BATCH_SIZE": 4, # Parallel updates / environmnents
         "ROLLOUT_LENGTH": 128, # Length of each rollout
-        "TOTAL_TIMESTEPS": 204800,
+        "TOTAL_TIMESTEPS": 204800, # Number of training timesteps
         "SEED": 42,
     }
 
