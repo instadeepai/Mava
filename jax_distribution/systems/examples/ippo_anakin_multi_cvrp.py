@@ -124,7 +124,6 @@ def get_learner_fn(env, forward_pass, opt_update, config):
             rng, _rng = jax.random.split(rng)
             env_state, next_timestep = env.step(env_state, action)
 
-            num_agents = 2
             done, reward = jax.tree_map(
                 lambda x: jnp.repeat(x, num_agents).reshape(-1),
                 [next_timestep.last(), next_timestep.reward],
@@ -305,10 +304,10 @@ def get_learner_fn(env, forward_pass, opt_update, config):
 
     return learner_fn
 
-
+num_agents = 3
 def run_experiment(env_name, config):
 
-    generator = UniformRandomGenerator(num_vehicles=2, num_customers=6)
+    generator = UniformRandomGenerator(num_vehicles=num_agents, num_customers=6)
     env = jumanji.make(env_name, generator=generator)
 
     cores_count = len(jax.devices())
@@ -384,7 +383,7 @@ if __name__ == "__main__":
         "LR": 5e-3,
         "ENV_NAME": "MultiCVRP-v0",
         "ACTIVATION": "relu",
-        "UPDATE_EPOCHS": 1,
+        "UPDATE_EPOCHS": 4,
         "NUM_MINIBATCHES": 1,
         "GAMMA": 0.99,
         "GAE_LAMBDA": 0.95,
@@ -392,7 +391,7 @@ if __name__ == "__main__":
         "ENT_COEF": 0.01,
         "VF_COEF": 0.5,
         "MAX_GRAD_NORM": 0.5,
-        "BATCH_SIZE": 4, # Parallel updates / environmnents
+        "BATCH_SIZE": 128, # Parallel updates / environmnents
         "ROLLOUT_LENGTH": 128, # Length of each rollout
         "ITERATIONS": 100, # Number of training updates 
         "SEED": 42,

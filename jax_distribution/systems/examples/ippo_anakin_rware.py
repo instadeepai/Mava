@@ -346,12 +346,13 @@ def run_experiment(env, config):
         out = learn(params, opt_state, step_rngs, env_states, env_timesteps)  # compiles
         jax.block_until_ready(out)
 
-    num_frames = (
-        cores_count
-        * config["ITERATIONS"]
-        * config["ROLLOUT_LENGTH"]
-        * config["BATCH_SIZE"]
-    )
+
+    # Number of iterations
+    timesteps_per_iteration = (cores_count*config["ROLLOUT_LENGTH"]* config["BATCH_SIZE"])
+    config["ITERATIONS"] = config["TOTAL_TIMESTEPS"] // timesteps_per_iteration # Number of training updates 
+
+    num_frames = config["TOTAL_TIMESTEPS"]
+
     with TimeIt(tag="EXECUTION", frames=num_frames):
         out = learn(  # runs compiled fn
             params, opt_state, step_rngs, env_states, env_timesteps, 
@@ -373,7 +374,7 @@ if __name__ == "__main__":
         "MAX_GRAD_NORM": 0.5,
         "BATCH_SIZE": 4, # Parallel updates / environmnents
         "ROLLOUT_LENGTH": 128, # Length of each rollout
-        "ITERATIONS": 100, # Number of training updates 
+        "TOTAL_TIMESTEPS": 204800,
         "SEED": 42,
     }
 
