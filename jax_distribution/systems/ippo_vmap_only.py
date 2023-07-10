@@ -14,10 +14,7 @@
 # limitations under the License.
 
 import json
-import os
-import pickle
 import time
-from functools import partial
 from typing import Any, NamedTuple, Sequence, Tuple
 
 import chex
@@ -26,18 +23,14 @@ import flax.linen as nn
 import jax
 import jax.numpy as jnp
 import jumanji
-import matplotlib.pyplot as plt
 import numpy as np
 import optax
 from flax import struct
 from flax.linen.initializers import constant, orthogonal
 from flax.training.train_state import TrainState
-from gymnax.wrappers.purerl import FlattenObservationWrapper
 from jumanji.environments.routing.robot_warehouse.types import State
 from jumanji.types import TimeStep
 from jumanji.wrappers import AutoResetWrapper, Wrapper
-
-os.environ["XLA_FLAGS"] = "--xla_gpu_cuda_data_dir=/usr/lib/cuda"
 
 
 @struct.dataclass
@@ -63,7 +56,6 @@ class LogWrapper(Wrapper):
         state: State,
         action: jnp.ndarray,
     ) -> Tuple[State, TimeStep]:
-
         env_state, timestep = self._env.step(state.env_state, action)
 
         new_episode_return = state.episode_returns + jnp.mean(timestep.reward)
@@ -91,7 +83,6 @@ class ActorCritic(nn.Module):
 
     @nn.compact
     def __call__(self, observation, action_mask):
-
         x = observation
         if self.activation == "relu":
             activation = nn.relu
@@ -162,7 +153,6 @@ def make_train(config):
         return config["LR"] * frac
 
     def train(rng):
-
         # INIT NETWORK FOR SINGLE AGENT
 
         # Since agents action homogeneous, use action dim of first agent
