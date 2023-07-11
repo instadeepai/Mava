@@ -377,8 +377,6 @@ def get_learner_fn(env, forward_pass, opt_update, config):
 
 
 num_agents = 3
-
-
 def run_experiment(env_name, config):
 
     generator = UniformRandomGenerator(num_vehicles=num_agents, num_customers=6)
