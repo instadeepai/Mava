@@ -6,19 +6,15 @@ Inside of the `jax_distribution` folder, run:
 ### Python virtual env
 - venv:
     ```
-    python -m venv mava_30
-    source mava_30/bin/activate
+    make build_30
     ```
 - OR conda:
     ```
     conda create -n mava_30 python=3.9
     conda activate mava_30
+    pip install --upgrade pip setuptools
+    pip install -r requirements.txt
     ```
-Then install requirements:
-```
-pip install --upgrade pip setuptools
-pip install -r requirements.txt
-```
 
 ## When using accelerators
 For different accelerators you would need to install the correct version of Jax for that accelerator after following the above instructions. Please run the following command in either your python virtual environment or conda environment.
