@@ -16,7 +16,8 @@ import numpy as np
 import optax
 from flax import struct
 from flax.linen.initializers import constant, orthogonal
-from jumanji.environments.routing.robot_warehouse.types import State
+from jumanji.environments.routing.multi_cvrp.generator import UniformRandomGenerator
+from jumanji.environments.routing.multi_cvrp.types import State
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
 
@@ -53,7 +54,7 @@ class LogWrapper(Wrapper):
     def reset(self, key: chex.PRNGKey) -> Tuple[LogEnvState, TimeStep]:
         state, timestep = self._env.reset(key)
         # timestep.extras = {}
-        state = LogEnvState(state, 0.0, 0.0, 0.0, 0.0)
+        state = LogEnvState(state, 0.0, 0, 0.0, 0)
         return state, timestep
 
     def step(
@@ -93,24 +94,30 @@ class Transition(NamedTuple):
 class ActorCritic(nn.Module):
     action_dim: Sequence[int]
     activation: str = "tanh"
+    env_name: str = "RobotWarehouse-v0"
 
     @nn.compact
     def __call__(self, observation):
-
-        x = observation.agents_view
+        if "MultiCVRP" in self.env_name:
+            x = observation.vehicles.coordinates  # .shape
+        elif "RobotWarehouse" in self.env_name:
+            x = observation.agents_view
 
         if self.activation == "relu":
             activation = nn.relu
         else:
             activation = nn.tanh
+
         actor_mean = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(x)
+
         actor_mean = activation(actor_mean)
         actor_mean = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(actor_mean)
         actor_mean = activation(actor_mean)
+
         actor_mean = nn.Dense(
             self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(actor_mean)
@@ -156,7 +163,7 @@ def get_learner_fn(env, forward_pass, opt_update, config):
             env_state, next_timestep = env.step(env_state, action)
 
             done, reward = jax.tree_map(
-                lambda x: jnp.repeat(x, 4).reshape(-1),
+                lambda x: jnp.repeat(x, config["NUM_AGENTS"]).reshape(-1),
                 [next_timestep.last(), next_timestep.reward],
             )
 
@@ -169,12 +176,14 @@ def get_learner_fn(env, forward_pass, opt_update, config):
                 last_timestep.observation,
                 {
                     "returned_episode_returns": jnp.repeat(
-                        env_state.returned_episode_returns, 4
+                        env_state.returned_episode_returns, config["NUM_AGENTS"]
                     ).reshape(-1),
                     "returned_episode_lengths": jnp.repeat(
-                        env_state.returned_episode_lengths, 4
+                        env_state.returned_episode_lengths, config["NUM_AGENTS"]
                     ).reshape(-1),
-                    "returned_episode": jnp.repeat(next_timestep.last(), 4).reshape(-1),
+                    "returned_episode": jnp.repeat(
+                        next_timestep.last(), config["NUM_AGENTS"]
+                    ).reshape(-1),
                 },
             )
             runner_state = (params, env_state, next_timestep, rng)
@@ -268,7 +277,7 @@ def get_learner_fn(env, forward_pass, opt_update, config):
             (params, opt_state), traj_batch, advantages, targets, rng = update_state
             rng, _rng = jax.random.split(rng)
             batch_size = config["ROLLOUT_LENGTH"]
-            # batch_size = config["MINIBATCH_SIZE"] * config["NUM_MINIBATCHES"]
+            # TODO: check batch_size
             # assert (
             #     batch_size == config["NUM_STEPS"] * config["NUM_ENVS"]
             # ), "batch size must be equal to number of steps * number of envs"
@@ -300,13 +309,13 @@ def get_learner_fn(env, forward_pass, opt_update, config):
         )
 
         ((params, opt_state), traj_batch, advantages, targets, rng) = update_state
+
         metric_info = jax.tree_util.tree_map(lambda x: x[:, 0], traj_batch.info)
         return params, opt_state, rng, env_state, last_timestep, metric_info
 
     def update_fn(params, opt_state, rng, env_state, timestep):
         """Compute a gradient update from a single trajectory."""
         rng, loss_rng = jax.random.split(rng)
-
         (
             new_params,
             new_opt_state,
@@ -338,7 +347,6 @@ def get_learner_fn(env, forward_pass, opt_update, config):
 
         def iterate_fn(val, _):  # repeat many times to avoid going back to Python.
             params, opt_state, rngs, env_states, timesteps = val
-            # params = jax.lax.pmean(params, axis_name="j")  # reduce mean across batch.
             return batched_update_fn(params, opt_state, rngs, env_states, timesteps)
 
         runner_state = (params, opt_state, rngs, env_states, timesteps)
@@ -350,7 +358,20 @@ def get_learner_fn(env, forward_pass, opt_update, config):
     return learner_fn
 
 
-def run_experiment(env, config):
+def run_experiment(env_name, config):
+    if "MultiCVRP" in env_name:
+        config["NUM_AGENTS"] = 3
+        generator = UniformRandomGenerator(
+            num_vehicles=config["NUM_AGENTS"], num_customers=6
+        )
+        env = jumanji.make(env_name, generator=generator)
+        num_actions = int(env.action_spec().maximum)
+
+    elif "RobotWarehouse" in env_name:
+        env = jumanji.make(env_name)
+        num_actions = int(env.action_spec().num_values[0])
+        config["NUM_AGENTS"] = env.num_agents
+
     env = LogWrapper(env)
     cores_count = len(jax.devices())
     # Number of iterations
@@ -363,8 +384,9 @@ def run_experiment(env, config):
 
     num_frames = config["TOTAL_TIMESTEPS"]
 
-    num_actions = int(env.action_spec().num_values[0])
-    network = ActorCritic(num_actions, activation=config["ACTIVATION"])
+    network = ActorCritic(
+        num_actions, activation=config["ACTIVATION"], env_name=env_name
+    )
     optim = optax.chain(
         optax.clip_by_global_norm(config["MAX_GRAD_NORM"]),
         optax.adam(config["LR"], eps=1e-5),
@@ -434,7 +456,7 @@ def run_experiment(env, config):
 if __name__ == "__main__":
     config = {
         "LR": 5e-3,
-        "ENV_NAME": "RobotWarehouse-v0",
+        "ENV_NAME": "RobotWarehouse-v0",  # [RobotWarehouse-v0, MultiCVRP-v0]
         "ACTIVATION": "relu",
         "UPDATE_EPOCHS": 1,
         "NUM_MINIBATCHES": 1,
@@ -450,4 +472,4 @@ if __name__ == "__main__":
         "SEED": 42,
     }
 
-    run_experiment(jumanji.make(config["ENV_NAME"]), config)
+    run_experiment(config["ENV_NAME"], config)
