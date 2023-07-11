@@ -6,7 +6,7 @@ Inside of the `jax_distribution` folder, run:
 ### Python virtual env
 - venv:
     ```
-    make build_30
+    make build_venv
     ```
 - OR conda:
     ```
