@@ -3,7 +3,9 @@ An example following the Anakin podracer example found here:
 https://colab.research.google.com/drive/1974D-qP17fd5mLxy6QZv-ic4yxlPJp-G?usp=sharing#scrollTo=myLN2J47oNGq
 """
 
+import os
 import timeit
+from os.path import abspath, dirname
 from typing import NamedTuple, Sequence, Tuple
 
 import chex
@@ -20,6 +22,11 @@ from jumanji.environments.routing.multi_cvrp.generator import UniformRandomGener
 from jumanji.environments.routing.multi_cvrp.types import State
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
+from sacred import Experiment
+from sacred.observers import FileStorageObserver
+from sacred.utils import apply_backspaces_and_linefeeds
+
+from jax_distribution.utils.logger_tools import Logger, config_copy, get_logger
 
 
 class TimeIt:
@@ -145,7 +152,7 @@ class ActorCritic(nn.Module):
         return pi, jnp.squeeze(critic, axis=-1)
 
 
-def get_learner_fn(env, forward_pass, opt_update, config):
+def get_learner_fn(env, forward_pass, opt_update, config, logger):
     def update_step_fn(params, opt_state, outer_rng, env_state, timestep):
 
         # COLLECT TRAJECTORIES
@@ -358,17 +365,52 @@ def get_learner_fn(env, forward_pass, opt_update, config):
     return learner_fn
 
 
-def run_experiment(env_name, config):
-    if "MultiCVRP" in env_name:
+# Logger setup
+logger = get_logger()
+ex = Experiment("mava", save_git_info=False)
+ex.logger = logger
+ex.captured_out_filter = apply_backspaces_and_linefeeds
+results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
+
+
+@ex.config
+def make_config():
+    LR = 5e-3
+    ENV_NAME = "RobotWarehouse-v0"  # [RobotWarehouse-v0, MultiCVRP-v0]
+    ACTIVATION = "relu"
+    UPDATE_EPOCHS = 1
+    NUM_MINIBATCHES = 1
+    GAMMA = 0.99
+    GAE_LAMBDA = 0.95
+    CLIP_EPS = 0.2
+    ENT_COEF = 0.01
+    VF_COEF = 0.5
+    MAX_GRAD_NORM = 0.5
+    BATCH_SIZE = 4  # Parallel updates / environmnents
+    ROLLOUT_LENGTH = 128  # Length of each rollout
+    TOTAL_TIMESTEPS = 204800  # Number of training timesteps
+    SEED = 42
+    # Logging config
+    USE_TF = False
+    USE_SACRED = True
+
+
+@ex.main
+def run_experiment(_run, _config, _log):
+    config = config_copy(_config)
+    logger = Logger(_log)
+    if config["USE_SACRED"]:
+        logger.setup_sacred(_run)
+    if "MultiCVRP" in config["ENV_NAME"]:
         config["NUM_AGENTS"] = 3
         generator = UniformRandomGenerator(
             num_vehicles=config["NUM_AGENTS"], num_customers=6
         )
-        env = jumanji.make(env_name, generator=generator)
+        env = jumanji.make(config["ENV_NAME"], generator=generator)
         num_actions = int(env.action_spec().maximum)
 
-    elif "RobotWarehouse" in env_name:
-        env = jumanji.make(env_name)
+    elif "RobotWarehouse" in config["ENV_NAME"]:
+        env = jumanji.make(config["ENV_NAME"])
         num_actions = int(env.action_spec().num_values[0])
         config["NUM_AGENTS"] = env.num_agents
 
@@ -385,7 +427,7 @@ def run_experiment(env_name, config):
     num_frames = config["TOTAL_TIMESTEPS"]
 
     network = ActorCritic(
-        num_actions, activation=config["ACTIVATION"], env_name=env_name
+        num_actions, activation=config["ACTIVATION"], env_name=config["ENV_NAME"]
     )
     optim = optax.chain(
         optax.clip_by_global_norm(config["MAX_GRAD_NORM"]),
@@ -405,12 +447,7 @@ def run_experiment(env_name, config):
     opt_state = optim.init(params)
 
     # TODO: Complete this
-    learn = get_learner_fn(
-        env,
-        network.apply,
-        optim.update,
-        config,
-    )
+    learn = get_learner_fn(env, network.apply, optim.update, config, logger)
 
     learn = jax.pmap(learn, axis_name="i")  # replicate over multiple cores.
 
@@ -454,22 +491,8 @@ def run_experiment(env_name, config):
 
 
 if __name__ == "__main__":
-    config = {
-        "LR": 5e-3,
-        "ENV_NAME": "RobotWarehouse-v0",  # [RobotWarehouse-v0, MultiCVRP-v0]
-        "ACTIVATION": "relu",
-        "UPDATE_EPOCHS": 1,
-        "NUM_MINIBATCHES": 1,
-        "GAMMA": 0.99,
-        "GAE_LAMBDA": 0.95,
-        "CLIP_EPS": 0.2,
-        "ENT_COEF": 0.01,
-        "VF_COEF": 0.5,
-        "MAX_GRAD_NORM": 0.5,
-        "BATCH_SIZE": 4,  # Parallel updates / environmnents
-        "ROLLOUT_LENGTH": 128,  # Length of each rollout
-        "TOTAL_TIMESTEPS": 204800,  # Number of training timesteps
-        "SEED": 42,
-    }
-
-    run_experiment(config["ENV_NAME"], config)
+    file_obs_path = os.path.join(
+        results_path, f"sacred/"
+    )  # TODO: Change the path to include the env and scenario names.
+    ex.observers.append(FileStorageObserver.create(file_obs_path))
+    ex.run()
