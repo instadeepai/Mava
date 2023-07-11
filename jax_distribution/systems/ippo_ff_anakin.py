@@ -189,9 +189,9 @@ def get_learner_fn(env, forward_pass, opt_update, config):
                     "returned_episode_lengths": jnp.repeat(
                         env_state.returned_episode_lengths, config["NUM_AGENTS"]
                     ).reshape(-1),
-                    "returned_episode": jnp.repeat(
-                        next_timestep.last(), config["NUM_AGENTS"]
-                    ).reshape(-1),
+                    "returned_episode": jnp.repeat(done, config["NUM_AGENTS"]).reshape(
+                        -1
+                    ),
                 },
             )
             runner_state = (params, env_state, next_timestep, rng)
@@ -383,6 +383,7 @@ def log(logger, metrics_info):
             episodes_return.append(returned_episode_returns[i])
             steps.append(i)
     logger.log_stat("mean_episode_returns", np.mean(episodes_return), steps[-1])
+    print("MEAN EPISODE RETURN: ", np.mean(episodes_return))
 
 
 # Logger setup
