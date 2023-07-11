@@ -46,6 +46,32 @@ class Logger:
 
             self._run_obj.log_scalar(key, value, t)
 
+    def log_list(self, key, values, timestamps=None, to_sacred=True):
+        if values is not list:
+            values = [values]
+        if timestamps is None:
+            timestamps = range(1, len(values) + 1)
+        elif timestamps is not list:
+            timestamps = [timestamps]
+        elif len(values) != len(timestamps):
+            raise ValueError("Number of values and timestamps should match.")
+
+        for value, t in zip(values, timestamps):
+            self.stats[key].append((t, value))
+
+            if self.use_tb:
+                self.tb_logger(key, value, t)
+
+            if self.use_sacred and to_sacred:
+                if key in self.sacred_info:
+                    self.sacred_info["{}_T".format(key)].append(t)
+                    self.sacred_info[key].append(value)
+                else:
+                    self.sacred_info["{}_T".format(key)] = [t]
+                    self.sacred_info[key] = [value]
+
+                self._run_obj.log_scalar(key, value, t)
+
     def print_recent_stats(self):
         log_str = "Recent Stats | t_env: {:>10} | Episode: {:>8}\n".format(
             *self.stats["episode"][-1]

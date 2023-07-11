@@ -3,6 +3,7 @@ An example following the Anakin podracer example found here:
 https://colab.research.google.com/drive/1974D-qP17fd5mLxy6QZv-ic4yxlPJp-G?usp=sharing#scrollTo=myLN2J47oNGq
 """
 
+import datetime
 import os
 import timeit
 from os.path import abspath, dirname
@@ -152,7 +153,7 @@ class ActorCritic(nn.Module):
         return pi, jnp.squeeze(critic, axis=-1)
 
 
-def get_learner_fn(env, forward_pass, opt_update, config, logger):
+def get_learner_fn(env, forward_pass, opt_update, config):
     def update_step_fn(params, opt_state, outer_rng, env_state, timestep):
 
         # COLLECT TRAJECTORIES
@@ -365,6 +366,25 @@ def get_learner_fn(env, forward_pass, opt_update, config, logger):
     return learner_fn
 
 
+def log(logger, metrics_info):
+    returned_episode = jnp.ravel(metrics_info["returned_episode"]).tolist()
+    returned_episode_returns = jnp.ravel(
+        metrics_info["returned_episode_returns"]
+    ).tolist()
+    returned_episode_lengths = jnp.ravel(
+        metrics_info["returned_episode_lengths"]
+    ).tolist()
+    episodes_return = []
+    steps = []
+    for i, terminate in enumerate(returned_episode):
+        if terminate:
+            logger.log_stat("episode_returns", returned_episode_returns[i], i)
+            logger.log_stat("episode_lengths", returned_episode_lengths[i], i)
+            episodes_return.append(returned_episode_returns[i])
+            steps.append(i)
+    logger.log_stat("mean_episode_returns", np.mean(episodes_return), steps[-1])
+
+
 # Logger setup
 logger = get_logger()
 ex = Experiment("mava", save_git_info=False)
@@ -391,16 +411,28 @@ def make_config():
     TOTAL_TIMESTEPS = 204800  # Number of training timesteps
     SEED = 42
     # Logging config
-    USE_TF = False
+    USE_TF = True
     USE_SACRED = True
 
 
 @ex.main
 def run_experiment(_run, _config, _log):
+    # Logger setup
     config = config_copy(_config)
     logger = Logger(_log)
+    unique_token = (
+        f"{_config['ENV_NAME']}_seed{_config['SEED']}_{datetime.datetime.now()}"
+    )
     if config["USE_SACRED"]:
         logger.setup_sacred(_run)
+    if config["USE_TF"]:
+        tb_logs_direc = os.path.join(
+            dirname(dirname(abspath(__file__))), "results", "tb_logs"
+        )
+        tb_exp_direc = os.path.join(tb_logs_direc, "{}").format(unique_token)
+        logger.setup_tb(tb_exp_direc)
+
+    # Environment setup
     if "MultiCVRP" in config["ENV_NAME"]:
         config["NUM_AGENTS"] = 3
         generator = UniformRandomGenerator(
@@ -447,7 +479,7 @@ def run_experiment(_run, _config, _log):
     opt_state = optim.init(params)
 
     # TODO: Complete this
-    learn = get_learner_fn(env, network.apply, optim.update, config, logger)
+    learn = get_learner_fn(env, network.apply, optim.update, config)
 
     learn = jax.pmap(learn, axis_name="i")  # replicate over multiple cores.
 
@@ -486,8 +518,7 @@ def run_experiment(_run, _config, _log):
             env_timesteps,
         )
         jax.block_until_ready(out)
-    val = out["metrics"]["returned_episode_returns"].mean()
-    print(f"Mean Episode Return: {val}")
+    log(logger, out["metrics"])
 
 
 if __name__ == "__main__":
