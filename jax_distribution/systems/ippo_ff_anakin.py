@@ -57,6 +57,37 @@ class LogEnvState:
 class LogWrapper(Wrapper):
     """Log the episode returns and lengths."""
 
+    def __init__(self, env_name: str, num_agents=None) -> None:
+        self._env_name = env_name
+        if "MultiCVRP" in env_name:
+            if num_agents is None:
+                num_agents = 3
+            generator = UniformRandomGenerator(num_vehicles=num_agents, num_customers=6)
+            env = jumanji.make(env_name, generator=generator)
+        elif "RobotWarehouse" in env_name:
+            env = jumanji.make(env_name)
+        self._env = AutoResetWrapper(env)
+
+    def get_num_agents(self) -> int:
+        """Get the number of agents in the environment"""
+        if "MultiCVRP" in self._env_name:
+            num_agents = self._env.num_vehicles
+        elif "RobotWarehouse" in self._env_name:
+            num_agents = self._env.num_agents
+        else:
+            raise NotImplementedError("This environment is not supported")
+        return num_agents
+
+    def get_num_actions(self) -> int:
+        """Get the number of actions in the environment"""
+        if "MultiCVRP" in self._env_name:
+            num_actions = int(self._env.action_spec().maximum)
+        elif "RobotWarehouse" in self._env_name:
+            num_actions = int(self._env.action_spec().num_values[0])
+        else:
+            raise NotImplementedError("This environment is not supported")
+        return num_actions
+
     def reset(self, key: chex.PRNGKey) -> Tuple[LogEnvState, TimeStep]:
         """Reset the environment."""
         state, timestep = self._env.reset(key)
@@ -86,6 +117,16 @@ class LogWrapper(Wrapper):
         )
         return state, timestep
 
+    @staticmethod
+    def process_observation(observation: Any, env_name: str) -> Any:
+        if "MultiCVRP" in env_name:
+            observation = observation.vehicles.coordinates
+        elif "RobotWarehouse" in env_name:
+            observation = observation.agents_view
+        else:
+            raise NotImplementedError("This environment is not supported")
+        return observation
+
 
 class Transition(NamedTuple):
     done: jnp.ndarray
@@ -107,10 +148,7 @@ class ActorCritic(nn.Module):
     @nn.compact
     def __call__(self, observation) -> Tuple[distrax.Categorical, jnp.ndarray]:
         """Forward pass."""
-        if "MultiCVRP" in self.env_name:
-            x = observation.vehicles.coordinates
-        elif "RobotWarehouse" in self.env_name:
-            x = observation.agents_view
+        x = LogWrapper.process_observation(observation, self.env_name)
 
         if self.activation == "relu":
             activation = nn.relu
@@ -186,7 +224,7 @@ def get_learner_fn(
             env_state, next_timestep = env.step(env_state, action)
 
             done, reward = jax.tree_map(
-                lambda x: jnp.repeat(x, config["NUM_AGENTS"]).reshape(-1),
+                lambda x: jnp.repeat(x, env.get_num_agents()).reshape(-1),
                 [next_timestep.last(), next_timestep.reward],
             )
 
@@ -199,13 +237,13 @@ def get_learner_fn(
                 last_timestep.observation,
                 {
                     "returned_episode_returns": jnp.repeat(
-                        env_state.returned_episode_returns, config["NUM_AGENTS"]
+                        env_state.returned_episode_returns, env.get_num_agents()
                     ).reshape(-1),
                     "returned_episode_lengths": jnp.repeat(
-                        env_state.returned_episode_lengths, config["NUM_AGENTS"]
+                        env_state.returned_episode_lengths, env.get_num_agents()
                     ).reshape(-1),
                     "returned_episode": jnp.repeat(
-                        next_timestep.last(), config["NUM_AGENTS"]
+                        next_timestep.last(), env.get_num_agents()
                     ).reshape(-1),
                 },
             )
@@ -408,21 +446,9 @@ def get_learner_fn(
 
 
 def run_experiment(env_name, config):
-    if "MultiCVRP" in env_name:
-        config["NUM_AGENTS"] = 3
-        generator = UniformRandomGenerator(
-            num_vehicles=config["NUM_AGENTS"], num_customers=6
-        )
-        env = jumanji.make(env_name, generator=generator)
-        num_actions = int(env.action_spec().maximum)
-
-    elif "RobotWarehouse" in env_name:
-        env = jumanji.make(env_name)
-        num_actions = int(env.action_spec().num_values[0])
-        config["NUM_AGENTS"] = env.num_agents
-    env = AutoResetWrapper(env)
-    env = LogWrapper(env)
+    env = LogWrapper(env_name)
     cores_count = len(jax.devices())
+
     # Number of iterations
     timesteps_per_iteration = (
         cores_count * config["ROLLOUT_LENGTH"] * config["BATCH_SIZE"]
@@ -430,11 +456,11 @@ def run_experiment(env_name, config):
     config["ITERATIONS"] = (
         config["TOTAL_TIMESTEPS"] // timesteps_per_iteration
     )  # Number of training updates
-
     total_time_steps = config["TOTAL_TIMESTEPS"]
 
+    # Create the network
     network = ActorCritic(
-        num_actions, activation=config["ACTIVATION"], env_name=env_name
+        env.get_num_actions(), activation=config["ACTIVATION"], env_name=env_name
     )
     optim = optax.chain(
         optax.clip_by_global_norm(config["MAX_GRAD_NORM"]),
@@ -453,7 +479,7 @@ def run_experiment(env_name, config):
     params = network.init(rng_params, init_obs)
     opt_state = optim.init(params)
 
-    # TODO: Complete this
+    # Create the learner function.
     learn = get_learner_fn(
         env,
         network.apply,
@@ -483,6 +509,8 @@ def run_experiment(env_name, config):
         reshape,
         env_timesteps,
     )
+
+    # Run the experiment.
     with TimeIt(tag="COMPILATION"):
         out = learn(params, opt_state, step_rngs, env_states, env_timesteps)  # compiles
         jax.block_until_ready(out)
