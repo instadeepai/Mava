@@ -100,7 +100,7 @@ class LogWrapper(Wrapper):
     def get_num_agents(self) -> int:
         """Get the number of agents in the environment"""
         if "MultiCVRP" in self._env_name:
-            num_agents = self._env.num_vehicles
+            num_agents = self._env._num_vehicles
         elif "RobotWarehouse" in self._env_name:
             num_agents = self._env.num_agents
         else:
