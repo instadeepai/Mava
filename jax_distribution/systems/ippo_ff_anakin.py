@@ -53,7 +53,6 @@ class LogWrapper(Wrapper):
 
     def reset(self, key: chex.PRNGKey) -> Tuple[LogEnvState, TimeStep]:
         state, timestep = self._env.reset(key)
-        # timestep.extras = {}
         state = LogEnvState(state, 0.0, 0, 0.0, 0)
         return state, timestep
 
@@ -99,7 +98,7 @@ class ActorCritic(nn.Module):
     @nn.compact
     def __call__(self, observation):
         if "MultiCVRP" in self.env_name:
-            x = observation.vehicles.coordinates  # .shape
+            x = observation.vehicles.coordinates
         elif "RobotWarehouse" in self.env_name:
             x = observation.agents_view
 
@@ -108,41 +107,41 @@ class ActorCritic(nn.Module):
         else:
             activation = nn.tanh
 
-        actor_mean = nn.Dense(
+        actor_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(x)
 
-        actor_mean = activation(actor_mean)
-        actor_mean = nn.Dense(
+        actor_output = activation(actor_output)
+        actor_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(actor_mean)
-        actor_mean = activation(actor_mean)
+        )(actor_output)
+        actor_output = activation(actor_output)
 
-        actor_mean = nn.Dense(
+        actor_output = nn.Dense(
             self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
-        )(actor_mean)
+        )(actor_output)
 
         masked_logits = jnp.where(
             observation.action_mask,
-            actor_mean,
+            actor_output,
             jnp.finfo(jnp.float32).min,
         )
 
         pi = distrax.Categorical(logits=masked_logits)
 
-        critic = nn.Dense(
+        critic_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(x)
-        critic = activation(critic)
-        critic = nn.Dense(
+        critic_output = activation(critic_output)
+        critic_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(critic)
-        critic = activation(critic)
-        critic = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
-            critic
-        )
+        )(critic_output)
+        critic_output = activation(critic_output)
+        critic_output = nn.Dense(
+            1, kernel_init=orthogonal(1.0), bias_init=constant(0.0)
+        )(critic_output)
 
-        return pi, jnp.squeeze(critic, axis=-1)
+        return pi, jnp.squeeze(critic_output, axis=-1)
 
 
 def get_learner_fn(env, forward_pass, opt_update, config):
@@ -382,7 +381,7 @@ def run_experiment(env_name, config):
         config["TOTAL_TIMESTEPS"] // timesteps_per_iteration
     )  # Number of training updates
 
-    num_frames = config["TOTAL_TIMESTEPS"]
+    total_time_steps = config["TOTAL_TIMESTEPS"]
 
     network = ActorCritic(
         num_actions, activation=config["ACTIVATION"], env_name=env_name
@@ -434,13 +433,11 @@ def run_experiment(env_name, config):
         reshape,
         env_timesteps,
     )
-    # env_timesteps = reshape(env_timesteps)  # add dimension to pmap over.
-
     with TimeIt(tag="COMPILATION"):
         out = learn(params, opt_state, step_rngs, env_states, env_timesteps)  # compiles
         jax.block_until_ready(out)
 
-    with TimeIt(tag="EXECUTION", frames=num_frames):
+    with TimeIt(tag="EXECUTION", frames=total_time_steps):
         out = learn(  # runs compiled fn
             params,
             opt_state,
