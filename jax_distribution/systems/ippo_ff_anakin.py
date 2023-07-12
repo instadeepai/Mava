@@ -68,26 +68,6 @@ class LogWrapper(Wrapper):
             env = jumanji.make(env_name)
         self._env = AutoResetWrapper(env)
 
-    def get_num_agents(self) -> int:
-        """Get the number of agents in the environment"""
-        if "MultiCVRP" in self._env_name:
-            num_agents = self._env.num_vehicles
-        elif "RobotWarehouse" in self._env_name:
-            num_agents = self._env.num_agents
-        else:
-            raise NotImplementedError("This environment is not supported")
-        return num_agents
-
-    def get_num_actions(self) -> int:
-        """Get the number of actions in the environment"""
-        if "MultiCVRP" in self._env_name:
-            num_actions = int(self._env.action_spec().maximum)
-        elif "RobotWarehouse" in self._env_name:
-            num_actions = int(self._env.action_spec().num_values[0])
-        else:
-            raise NotImplementedError("This environment is not supported")
-        return num_actions
-
     def reset(self, key: chex.PRNGKey) -> Tuple[LogEnvState, TimeStep]:
         """Reset the environment."""
         state, timestep = self._env.reset(key)
@@ -117,15 +97,36 @@ class LogWrapper(Wrapper):
         )
         return state, timestep
 
-    @staticmethod
-    def process_observation(observation: Any, env_name: str) -> Any:
-        if "MultiCVRP" in env_name:
-            observation = observation.vehicles.coordinates
-        elif "RobotWarehouse" in env_name:
-            observation = observation.agents_view
+    def get_num_agents(self) -> int:
+        """Get the number of agents in the environment"""
+        if "MultiCVRP" in self._env_name:
+            num_agents = self._env.num_vehicles
+        elif "RobotWarehouse" in self._env_name:
+            num_agents = self._env.num_agents
         else:
             raise NotImplementedError("This environment is not supported")
-        return observation
+        return num_agents
+
+    def get_num_actions(self) -> int:
+        """Get the number of actions in the environment"""
+        if "MultiCVRP" in self._env_name:
+            num_actions = int(self._env.action_spec().maximum)
+        elif "RobotWarehouse" in self._env_name:
+            num_actions = int(self._env.action_spec().num_values[0])
+        else:
+            raise NotImplementedError("This environment is not supported")
+        return num_actions
+
+
+def process_observation(observation: Any, env_name: str) -> Any:
+    """Process the observation to be fed into the network based on the environment."""
+    if "MultiCVRP" in env_name:
+        observation = observation.vehicles.coordinates
+    elif "RobotWarehouse" in env_name:
+        observation = observation.agents_view
+    else:
+        raise NotImplementedError("This environment is not supported")
+    return observation
 
 
 class Transition(NamedTuple):
@@ -148,7 +149,7 @@ class ActorCritic(nn.Module):
     @nn.compact
     def __call__(self, observation) -> Tuple[distrax.Categorical, jnp.ndarray]:
         """Forward pass."""
-        x = LogWrapper.process_observation(observation, self.env_name)
+        x = process_observation(observation, self.env_name)
 
         if self.activation == "relu":
             activation = nn.relu
