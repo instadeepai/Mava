@@ -492,9 +492,7 @@ def run_experiment(_run: Run, _config: dict, _log: SacredLogger) -> None:
     # Logger setup
     config = config_copy(_config)
     logger = Logger(_log)
-    unique_token = (
-        f"{_config['env']['ENV_NAME']}_seed{_config['SEED']}_{datetime.datetime.now()}"
-    )
+    unique_token = f"{_config['env_config']['ENV_NAME']}_seed{_config['SEED']}_{datetime.datetime.now()}"
     if config["USE_SACRED"]:
         logger.setup_sacred(_run)
     if config["USE_TF"]:
@@ -505,7 +503,7 @@ def run_experiment(_run: Run, _config: dict, _log: SacredLogger) -> None:
         logger.setup_tb(tb_exp_direc)
 
     # Environment setup
-    env = LogWrapper(config["env"]["ENV_NAME"])
+    env = LogWrapper(config["env_config"]["ENV_NAME"])
     cores_count = len(jax.devices())
 
     # Number of iterations
@@ -521,7 +519,7 @@ def run_experiment(_run: Run, _config: dict, _log: SacredLogger) -> None:
     network = ActorCritic(
         env.get_num_actions(),
         activation=config["ACTIVATION"],
-        env_name=config["env"]["ENV_NAME"],
+        env_name=config["env_config"]["ENV_NAME"],
     )
     optim = optax.chain(
         optax.clip_by_global_norm(config["MAX_GRAD_NORM"]),
@@ -587,7 +585,9 @@ def run_experiment(_run: Run, _config: dict, _log: SacredLogger) -> None:
 
 @hydra.main(config_path="../configs", config_name="default.yaml")
 def hydra_entry_point(cfg: DictConfig) -> None:
-    file_obs_path = os.path.join(results_path, f"sacred/{cfg['env']['ENV_NAME']}")
+    file_obs_path = os.path.join(
+        results_path, f"sacred/{cfg['env_config']['ENV_NAME']}"
+    )
     ex.observers.append(FileStorageObserver.create(file_obs_path))
     ex.add_config(OmegaConf.to_container(cfg, resolve=True))
     ex.run()

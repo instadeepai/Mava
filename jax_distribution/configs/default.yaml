@@ -3,7 +3,7 @@
 # --- Experiment params ---
 defaults:
   - _self_
-  - env: MultiCVRP # [RobotWarehouse, MultiCVRP]
+  - env_config: MultiCVRP # [RobotWarehouse, MultiCVRP]
 
 BATCH_SIZE: 4  # Parallel updates / environments
 TOTAL_TIMESTEPS: 204800  # Number of training timesteps
