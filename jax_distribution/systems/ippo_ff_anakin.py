@@ -22,7 +22,7 @@ from flax.linen.initializers import constant, orthogonal
 from jumanji.environments.routing.multi_cvrp.generator import UniformRandomGenerator
 from jumanji.environments.routing.multi_cvrp.types import State
 from jumanji.types import TimeStep
-from jumanji.wrappers import Wrapper
+from jumanji.wrappers import AutoResetWrapper, Wrapper
 from sacred import Experiment
 from sacred.observers import FileStorageObserver
 from sacred.utils import apply_backspaces_and_linefeeds
@@ -189,9 +189,9 @@ def get_learner_fn(env, forward_pass, opt_update, config):
                     "returned_episode_lengths": jnp.repeat(
                         env_state.returned_episode_lengths, config["NUM_AGENTS"]
                     ).reshape(-1),
-                    "returned_episode": jnp.repeat(done, config["NUM_AGENTS"]).reshape(
-                        -1
-                    ),
+                    "episode_done": jnp.repeat(
+                        next_timestep.last(), config["NUM_AGENTS"]
+                    ).reshape(-1),
                 },
             )
             runner_state = (params, env_state, next_timestep, rng)
@@ -367,23 +367,22 @@ def get_learner_fn(env, forward_pass, opt_update, config):
 
 
 def log(logger, metrics_info):
-    returned_episode = jnp.ravel(metrics_info["returned_episode"]).tolist()
-    returned_episode_returns = jnp.ravel(
-        metrics_info["returned_episode_returns"]
-    ).tolist()
-    returned_episode_lengths = jnp.ravel(
-        metrics_info["returned_episode_lengths"]
-    ).tolist()
-    episodes_return = []
-    steps = []
-    for i, terminate in enumerate(returned_episode):
-        if terminate:
-            logger.log_stat("episode_returns", returned_episode_returns[i], i)
-            logger.log_stat("episode_lengths", returned_episode_lengths[i], i)
-            episodes_return.append(returned_episode_returns[i])
-            steps.append(i)
-    logger.log_stat("mean_episode_returns", np.mean(episodes_return), steps[-1])
-    print("MEAN EPISODE RETURN: ", np.mean(episodes_return))
+    """Log the episode returns and lengths."""
+    dones = jnp.ravel(metrics_info["episode_done"])
+
+    returned_episode_returns = jnp.ravel(metrics_info["returned_episode_returns"])
+    returned_episode_lengths = jnp.ravel(metrics_info["returned_episode_lengths"])
+    episode_returns = returned_episode_returns[dones]
+    episode_lengths = returned_episode_lengths[dones]
+
+    print("MEAN EPISODE RETURN: ", np.mean(episode_returns))
+
+    for ep_i in range(len(episode_returns)):
+        logger.log_stat("episode_returns", episode_returns[ep_i], ep_i)
+        logger.log_stat("episode_lengths", episode_lengths[ep_i], ep_i)
+    logger.log_stat(
+        "mean_episode_returns", np.mean(episode_returns), len(episode_returns)
+    )
 
 
 # Logger setup
@@ -407,9 +406,9 @@ def make_config():
     ENT_COEF = 0.01
     VF_COEF = 0.5
     MAX_GRAD_NORM = 0.5
-    BATCH_SIZE = 4  # Parallel updates / environmnents
+    BATCH_SIZE = 16  # Parallel updates / environmnents
     ROLLOUT_LENGTH = 128  # Length of each rollout
-    TOTAL_TIMESTEPS = 204800  # Number of training timesteps
+    TOTAL_TIMESTEPS = 1000000  # Number of training timesteps
     SEED = 42
     # Logging config
     USE_TF = True
@@ -446,7 +445,7 @@ def run_experiment(_run, _config, _log):
         env = jumanji.make(config["ENV_NAME"])
         num_actions = int(env.action_spec().num_values[0])
         config["NUM_AGENTS"] = env.num_agents
-
+    env = AutoResetWrapper(env)
     env = LogWrapper(env)
     cores_count = len(jax.devices())
     # Number of iterations
