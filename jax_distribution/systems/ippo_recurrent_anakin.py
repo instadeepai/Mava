@@ -122,7 +122,7 @@ def get_runner_fn(env, network, config):
             env_state, next_timestep = env.step(env_state, action)
             obsv = next_timestep.observation
             
-            done, reward, ep_returns, ep_lenghts, ep_done = jax.tree_map(
+            done, reward, ep_returns, ep_lengths, ep_done = jax.tree_map(
                 lambda x: jnp.repeat(x, config["NUM_AGENTS"]).reshape(-1),
                 [next_timestep.last(),
                  next_timestep.reward,
@@ -133,7 +133,7 @@ def get_runner_fn(env, network, config):
 
             info = {
                     "returned_episode_returns": ep_returns,
-                    "returned_episode_lengths": ep_lenghts,
+                    "returned_episode_lengths": ep_lengths,
                     "returned_episode": ep_done,
                 }
 
