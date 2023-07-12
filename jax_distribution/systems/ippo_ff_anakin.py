@@ -4,7 +4,7 @@ https://colab.research.google.com/drive/1974D-qP17fd5mLxy6QZv-ic4yxlPJp-G?usp=sh
 """
 
 import timeit
-from typing import NamedTuple, Sequence, Tuple
+from typing import Any, NamedTuple, Sequence, Tuple
 
 import chex
 import distrax
@@ -15,6 +15,7 @@ import jumanji
 import numpy as np
 import optax
 from flax import struct
+from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
 from jumanji.environments.routing.multi_cvrp.generator import UniformRandomGenerator
 from jumanji.environments.routing.multi_cvrp.types import State
@@ -23,15 +24,20 @@ from jumanji.wrappers import Wrapper
 
 
 class TimeIt:
-    def __init__(self, tag, frames=None):
+    """Context manager for timing execution."""
+
+    def __init__(self, tag: str, frames=None) -> None:
+        """Initialise the context manager."""
         self.tag = tag
         self.frames = frames
 
-    def __enter__(self):
+    def __enter__(self) -> "TimeIt":
+        """Start the timer."""
         self.start = timeit.default_timer()
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, *args: Any) -> None:
+        """Print the elapsed time."""
         self.elapsed_secs = timeit.default_timer() - self.start
         msg = self.tag + (": Elapsed time=%.2fs" % self.elapsed_secs)
         if self.frames:
@@ -52,6 +58,7 @@ class LogWrapper(Wrapper):
     """Log the episode returns and lengths."""
 
     def reset(self, key: chex.PRNGKey) -> Tuple[LogEnvState, TimeStep]:
+        """Reset the environment."""
         state, timestep = self._env.reset(key)
         state = LogEnvState(state, 0.0, 0, 0.0, 0)
         return state, timestep
@@ -61,7 +68,7 @@ class LogWrapper(Wrapper):
         state: State,
         action: jnp.ndarray,
     ) -> Tuple[State, TimeStep]:
-
+        """Step the environment."""
         env_state, timestep = self._env.step(state.env_state, action)
 
         new_episode_return = state.episode_returns + jnp.mean(timestep.reward)
@@ -91,12 +98,15 @@ class Transition(NamedTuple):
 
 
 class ActorCritic(nn.Module):
+    """Actor Critic Network."""
+
     action_dim: Sequence[int]
     activation: str = "tanh"
     env_name: str = "RobotWarehouse-v0"
 
     @nn.compact
-    def __call__(self, observation):
+    def __call__(self, observation) -> Tuple[distrax.Categorical, jnp.ndarray]:
+        """Forward pass."""
         if "MultiCVRP" in self.env_name:
             x = observation.vehicles.coordinates
         elif "RobotWarehouse" in self.env_name:
@@ -144,11 +154,25 @@ class ActorCritic(nn.Module):
         return pi, jnp.squeeze(critic_output, axis=-1)
 
 
-def get_learner_fn(env, forward_pass, opt_update, config):
-    def update_step_fn(params, opt_state, outer_rng, env_state, timestep):
+def get_learner_fn(
+    env: jumanji.Environment,
+    forward_pass: nn.Module,
+    opt_update: optax.GradientTransformation,
+    config: dict,
+) -> callable:
+    """Get the learner function."""
 
+    def update_step_fn(
+        params: FrozenDict,
+        opt_state: optax.OptState,
+        outer_rng: chex.PRNGKey,
+        env_state: LogEnvState,
+        timestep: TimeStep,
+    ) -> Tuple:
+        """Update the network."""
         # COLLECT TRAJECTORIES
-        def _env_step(runner_state, unused):
+        def _env_step(runner_state: Tuple, unused: Any) -> Tuple:
+            """Step the environment."""
             params, env_state, last_timestep, rng = runner_state
 
             # SELECT ACTION
@@ -185,6 +209,7 @@ def get_learner_fn(env, forward_pass, opt_update, config):
                     ).reshape(-1),
                 },
             )
+
             runner_state = (params, env_state, next_timestep, rng)
             return runner_state, transition
 
@@ -197,8 +222,15 @@ def get_learner_fn(env, forward_pass, opt_update, config):
         params, env_state, last_timestep, rng = runner_state
         _, last_val = forward_pass(params, last_timestep.observation)
 
-        def _calculate_gae(traj_batch, last_val):
-            def _get_advantages(gae_and_next_value, transition):
+        def _calculate_gae(
+            traj_batch: Transition, last_val: jnp.ndarray
+        ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+            """Calculate the GAE."""
+
+            def _get_advantages(
+                gae_and_next_value: Tuple, transition: Transition
+            ) -> Tuple:
+                """Calculate the GAE for a single transition."""
                 gae, next_value = gae_and_next_value
                 done, value, reward = (
                     transition.done,
@@ -221,11 +253,20 @@ def get_learner_fn(env, forward_pass, opt_update, config):
         advantages, targets = _calculate_gae(traj_batch, last_val)
 
         # UPDATE NETWORK
-        def _update_epoch(update_state, unused):
-            def _update_minbatch(train_state, batch_info):
+        def _update_epoch(update_state: Tuple, unused: Any) -> Tuple:
+            """Update the network for a single epoch."""
+
+            def _update_minbatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
+                """Update the network for a single minibatch."""
                 traj_batch, advantages, targets = batch_info
 
-                def _loss_fn(params, traj_batch, gae, targets):
+                def _loss_fn(
+                    params: FrozenDict,
+                    traj_batch: Transition,
+                    gae: jnp.ndarray,
+                    targets: jnp.ndarray,
+                ) -> Tuple:
+                    """Calculate the loss."""
                     # RERUN NETWORK
                     pi, value = forward_pass(params, traj_batch.observation)
                     log_prob = pi.log_prob(traj_batch.action)
@@ -276,10 +317,6 @@ def get_learner_fn(env, forward_pass, opt_update, config):
             (params, opt_state), traj_batch, advantages, targets, rng = update_state
             rng, _rng = jax.random.split(rng)
             batch_size = config["ROLLOUT_LENGTH"]
-            # TODO: check batch_size
-            # assert (
-            #     batch_size == config["NUM_STEPS"] * config["NUM_ENVS"]
-            # ), "batch size must be equal to number of steps * number of envs"
             permutation = jax.random.permutation(_rng, batch_size)
             batch = (traj_batch, advantages, targets)
             batch = jax.tree_util.tree_map(
@@ -312,7 +349,13 @@ def get_learner_fn(env, forward_pass, opt_update, config):
         metric_info = jax.tree_util.tree_map(lambda x: x[:, 0], traj_batch.info)
         return params, opt_state, rng, env_state, last_timestep, metric_info
 
-    def update_fn(params, opt_state, rng, env_state, timestep):
+    def update_fn(
+        params: FrozenDict,
+        opt_state: optax.OptState,
+        rng: chex.PRNGKey,
+        env_state: LogEnvState,
+        timestep: TimeStep,
+    ) -> Tuple:
         """Compute a gradient update from a single trajectory."""
         rng, loss_rng = jax.random.split(rng)
         (
@@ -338,13 +381,20 @@ def get_learner_fn(env, forward_pass, opt_update, config):
             new_timestep,
         ), metric_info
 
-    def learner_fn(params, opt_state, rngs, env_states, timesteps):
+    def learner_fn(
+        params: FrozenDict,
+        opt_state: optax.OptState,
+        rngs: chex.Array,
+        env_states: LogEnvState,
+        timesteps: TimeStep,
+    ) -> Tuple:
         """Vectorise and repeat the update."""
         batched_update_fn = jax.vmap(
             update_fn, axis_name="j"
         )  # vectorize across batch.
 
-        def iterate_fn(val, _):  # repeat many times to avoid going back to Python.
+        def iterate_fn(val: Tuple, unused: Any) -> Tuple:
+            """Repeat the update function."""
             params, opt_state, rngs, env_states, timesteps = val
             return batched_update_fn(params, opt_state, rngs, env_states, timesteps)
 
