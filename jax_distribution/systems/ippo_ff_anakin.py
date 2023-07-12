@@ -18,7 +18,6 @@ import jax
 import jax.numpy as jnp
 import jumanji
 import numpy as np
-import omegaconf
 import optax
 from flax import struct
 from flax.core.frozen_dict import FrozenDict
@@ -586,15 +585,13 @@ def run_experiment(_run: Run, _config: dict, _log: SacredLogger) -> None:
     log(logger, out["metrics"])
 
 
-@hydra.main(config_path="./", config_name="config.yaml")
+@hydra.main(config_path="../configs", config_name="default.yaml")
 def hydra_entry_point(cfg: DictConfig) -> None:
+    file_obs_path = os.path.join(results_path, f"sacred/{cfg['ENV_NAME']}")
+    ex.observers.append(FileStorageObserver.create(file_obs_path))
     ex.add_config(OmegaConf.to_container(cfg, resolve=True))
     ex.run()
 
 
 if __name__ == "__main__":
-    file_obs_path = os.path.join(
-        results_path, f"sacred/"
-    )  # TODO: Change the path to include the env and scenario names.
-    ex.observers.append(FileStorageObserver.create(file_obs_path))
     hydra_entry_point()

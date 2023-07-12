@@ -9,4 +9,6 @@ numpy
 brax
 sacred
 tensorboard_logger
+hydra
+omegaconf
 git+https://github.com/instadeepai/jumanji.git
