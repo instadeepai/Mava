@@ -165,5 +165,9 @@ mava_testing
 # Created by debugging component
 component_dependency_map.png
 
+# Mava env
+mava_env
+mava_30
+
 # Mava 3.0 env
 mava_30/

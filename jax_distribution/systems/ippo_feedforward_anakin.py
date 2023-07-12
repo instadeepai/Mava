@@ -17,7 +17,7 @@ import optax
 from flax import struct
 from flax.linen.initializers import constant, orthogonal
 from jumanji.environments.routing.multi_cvrp.generator import UniformRandomGenerator
-from jumanji.environments.routing.multi_cvrp.types import State
+from jumanji.environments.routing.multi_cvrp.types import State # TODO: use the base jumanji state here
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
 
