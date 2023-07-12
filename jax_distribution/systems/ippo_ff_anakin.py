@@ -13,10 +13,12 @@ from typing import Any, NamedTuple, Sequence, Tuple
 import chex
 import distrax
 import flax.linen as nn
+import hydra
 import jax
 import jax.numpy as jnp
 import jumanji
 import numpy as np
+import omegaconf
 import optax
 from flax import struct
 from flax.core.frozen_dict import FrozenDict
@@ -25,6 +27,7 @@ from jumanji.environments.routing.multi_cvrp.generator import UniformRandomGener
 from jumanji.environments.routing.multi_cvrp.types import State
 from jumanji.types import TimeStep
 from jumanji.wrappers import AutoResetWrapper, Wrapper
+from omegaconf import DictConfig, OmegaConf
 from sacred import Experiment
 from sacred.observers import FileStorageObserver
 from sacred.run import Run
@@ -483,29 +486,6 @@ ex.captured_out_filter = apply_backspaces_and_linefeeds
 results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
 
 
-@ex.config
-def make_config() -> None:
-    """Config for the experiment."""
-    LR = 5e-3
-    ENV_NAME = "RobotWarehouse-v0"  # [RobotWarehouse-v0, MultiCVRP-v0]
-    ACTIVATION = "relu"
-    UPDATE_EPOCHS = 1
-    NUM_MINIBATCHES = 1
-    GAMMA = 0.99
-    GAE_LAMBDA = 0.95
-    CLIP_EPS = 0.2
-    ENT_COEF = 0.01
-    VF_COEF = 0.5
-    MAX_GRAD_NORM = 0.5
-    BATCH_SIZE = 4  # Parallel updates / environmnents
-    ROLLOUT_LENGTH = 128  # Length of each rollout
-    TOTAL_TIMESTEPS = 204800  # Number of training timesteps
-    SEED = 42
-    # Logging config
-    USE_TF = True
-    USE_SACRED = True
-
-
 @ex.main
 def run_experiment(_run: Run, _config: dict, _log: SacredLogger) -> None:
     """Run the experiment."""
@@ -606,9 +586,15 @@ def run_experiment(_run: Run, _config: dict, _log: SacredLogger) -> None:
     log(logger, out["metrics"])
 
 
+@hydra.main(config_path="./", config_name="config.yaml")
+def hydra_entry_point(cfg: DictConfig) -> None:
+    ex.add_config(OmegaConf.to_container(cfg, resolve=True))
+    ex.run()
+
+
 if __name__ == "__main__":
     file_obs_path = os.path.join(
         results_path, f"sacred/"
     )  # TODO: Change the path to include the env and scenario names.
     ex.observers.append(FileStorageObserver.create(file_obs_path))
-    ex.run()
+    hydra_entry_point()

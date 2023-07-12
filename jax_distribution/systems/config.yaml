@@ -1,0 +1,17 @@
+LR: 5e-3
+ENV_NAME: RobotWarehouse-v0  # [RobotWarehouse-v0, MultiCVRP-v0]
+ACTIVATION: relu
+UPDATE_EPOCHS: 1
+NUM_MINIBATCHES: 1
+GAMMA: 0.99
+GAE_LAMBDA: 0.95
+CLIP_EPS: 0.2
+ENT_COEF: 0.01
+VF_COEF: 0.5
+MAX_GRAD_NORM: 0.5
+BATCH_SIZE: 4  # Parallel updates / environments
+ROLLOUT_LENGTH: 128  # Length of each rollout
+TOTAL_TIMESTEPS: 204800  # Number of training timesteps
+SEED: 42
+USE_TF: true
+USE_SACRED: true
