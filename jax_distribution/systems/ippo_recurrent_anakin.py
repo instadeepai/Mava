@@ -13,6 +13,7 @@ import jumanji
 # Instead of having to import all the environments's functions.
 from jumanji.environments.routing.multi_cvrp.generator import UniformRandomGenerator
 from jax_distribution.systems.ippo_feedforward_anakin import TimeIt, LogWrapper
+from jumanji.wrappers import AutoResetWrapper
 
 class ScannedRNN(nn.Module):
     @functools.partial(
@@ -329,6 +330,7 @@ def run_experiment(env_name, config):
         num_actions = int(env.action_spec().num_values[0])
         config["NUM_AGENTS"] = env.num_agents
 
+    env = AutoResetWrapper(env)
     env = LogWrapper(env)
     cores_count = len(jax.devices())
     # Number of updates
@@ -429,7 +431,7 @@ if __name__ == "__main__":
         "ENT_COEF": 0.01,
         "VF_COEF": 0.5,
         "MAX_GRAD_NORM": 0.5,
-        "ENV_NAME": "RobotWarehouse-v0",  # [RobotWarehouse-v0, MultiCVRP-v0]
+        "ENV_NAME": "MultiCVRP-v0",  # [RobotWarehouse-v0, MultiCVRP-v0]
         "SEED": 1234,
     }
 

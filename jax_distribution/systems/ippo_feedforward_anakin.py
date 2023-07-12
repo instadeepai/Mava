@@ -19,7 +19,7 @@ from flax.linen.initializers import constant, orthogonal
 from jumanji.environments.routing.multi_cvrp.generator import UniformRandomGenerator
 from jumanji.environments.routing.multi_cvrp.types import State # TODO: use the base jumanji state here
 from jumanji.types import TimeStep
-from jumanji.wrappers import Wrapper
+from jumanji.wrappers import Wrapper, AutoResetWrapper
 
 
 class TimeIt:
@@ -372,6 +372,7 @@ def run_experiment(env_name, config):
         num_actions = int(env.action_spec().num_values[0])
         config["NUM_AGENTS"] = env.num_agents
 
+    env = AutoResetWrapper(env)
     env = LogWrapper(env)
     cores_count = len(jax.devices())
     # Number of iterations
