@@ -233,9 +233,9 @@ def get_runner_fn(env, network, config):
                 )
 
                 # AVERAGE ACROSS DEVICES AND BATCHES
-                total_loss = jax.lax.pmean(total_loss, axis_name="i")
-                grads = jax.lax.pmean(grads, axis_name="j")
-                grads = jax.lax.pmean(grads, axis_name="i")
+                total_loss = jax.lax.pmean(total_loss, axis_name="core")
+                grads = jax.lax.pmean(grads, axis_name="batch")
+                grads = jax.lax.pmean(grads, axis_name="core")
 
                 train_state = train_state.apply_gradients(grads=grads)
                 return train_state, total_loss
@@ -295,23 +295,14 @@ def get_runner_fn(env, network, config):
         runner_state = (train_state, env_state, last_obs, last_done, hstate, rng)
         return runner_state, metric
 
-    def runner_fn(params, opt_state, rngs, env_states, timesteps):
+    def runner_fn(runner_state):
         """Vectorise and repeat the update."""
         batched_update_fn = jax.vmap(
-            _update_step, axis_name="j"
+            _update_step, axis_name="batch"
         )  # vectorize across batch.
 
-        def iterate_fn(val, _):  # repeat many times to avoid going back to Python.
-            params, opt_state, rngs, env_states, timesteps = val
-            return batched_update_fn(params, opt_state, rngs, env_states, timesteps)
-
-        runner_state = (params, opt_state, rngs, env_states, timesteps)
         runner_state, metric = jax.lax.scan(
-            iterate_fn, runner_state, None, config["NUM_UPDATES"]
-        )
-
-        runner_state, metric = jax.lax.scan(
-        _update_step, runner_state, None, config["NUM_UPDATES"]
+        batched_update_fn, runner_state, None, config["NUM_UPDATES"]
         )
         return {"runner_state": runner_state, "metric": metric}
 
@@ -356,11 +347,11 @@ def run_experiment(env_name, config):
     init_hstate = ScannedRNN.initialize_carry(config["NUM_AGENTS"], 128)
     
     # Support for multiple agents
-    init_x, init_hstate = jax.tree_util.tree_map(
+    init_net_x, init_net_hstate = jax.tree_util.tree_map(
         lambda x: x[None, ...],
         [init_x, init_hstate],
     )
-    network_params = network.init(_rng, init_hstate, init_x)
+    network_params = network.init(_rng, init_net_hstate, init_net_x)
     tx = optax.chain(
         optax.clip_by_global_norm(config["MAX_GRAD_NORM"]),
         optax.adam(config["LR"], eps=1e-5),
@@ -378,7 +369,7 @@ def run_experiment(env_name, config):
         network,
         config,
     )
-    runner = jax.pmap(runner, axis_name="i")  # replicate over multiple cores.
+    runner = jax.pmap(runner, axis_name="core")  # replicate over multiple cores.
 
     # BROADCAST TRAIN STATE
     def broadcast(x):
@@ -386,7 +377,7 @@ def run_experiment(env_name, config):
             x = jnp.array(x)  # convert it to a JAX array
         return jnp.broadcast_to(x, (cores_count, config["BATCH_SIZE"]) + x.shape)
 
-    train_state = jax.tree_map(broadcast, train_state)  # broadcast to cores and batch.
+    train_state, init_hstate = jax.tree_map(broadcast, [train_state, init_hstate])  # broadcast to cores and batch.
 
     # RESHAPE ENV STATES, TIMESTEPS and RNGS
     reshape = lambda x: x.reshape((cores_count, config["BATCH_SIZE"]) + x.shape[1:])
@@ -396,7 +387,7 @@ def run_experiment(env_name, config):
     
     env_states, env_timesteps, step_rngs = jax.tree_util.tree_map(
         reshape,
-        [env_states, env_timesteps, step_rngs],
+        [env_states, env_timesteps, jnp.array(step_rngs)],
     )  # add dimension to pmap over.
     
     dones = jnp.zeros((cores_count, config["BATCH_SIZE"]), dtype=bool)
@@ -423,7 +414,7 @@ def run_experiment(env_name, config):
 if __name__ == "__main__":
     config = {
         "LR": 2.5e-4,
-        "BATCH_SIZE": 4,
+        "BATCH_SIZE": 8, # TODO: Change this back to 4
         "ROLLOUT_LENGTH": 128,
         "TOTAL_TIMESTEPS": 204800,
         "UPDATE_EPOCHS": 1,
