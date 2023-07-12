@@ -6,6 +6,7 @@ https://colab.research.google.com/drive/1974D-qP17fd5mLxy6QZv-ic4yxlPJp-G?usp=sh
 import datetime
 import os
 import timeit
+from logging import Logger as SacredLogger
 from os.path import abspath, dirname
 from typing import Any, NamedTuple, Sequence, Tuple
 
@@ -26,6 +27,7 @@ from jumanji.types import TimeStep
 from jumanji.wrappers import AutoResetWrapper, Wrapper
 from sacred import Experiment
 from sacred.observers import FileStorageObserver
+from sacred.run import Run
 from sacred.utils import apply_backspaces_and_linefeeds
 
 from jax_distribution.utils.logger_tools import Logger, config_copy, get_logger
@@ -482,7 +484,8 @@ results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
 
 
 @ex.config
-def make_config():
+def make_config() -> None:
+    """Config for the experiment."""
     LR = 5e-3
     ENV_NAME = "RobotWarehouse-v0"  # [RobotWarehouse-v0, MultiCVRP-v0]
     ACTIVATION = "relu"
@@ -504,7 +507,9 @@ def make_config():
 
 
 @ex.main
-def run_experiment(_run, _config, _log):
+def run_experiment(_run: Run, _config: dict, _log: SacredLogger) -> None:
+    """Run the experiment."""
+
     # Logger setup
     config = config_copy(_config)
     logger = Logger(_log)
@@ -596,6 +601,8 @@ def run_experiment(_run, _config, _log):
             env_timesteps,
         )
         jax.block_until_ready(out)
+
+    # Log the results
     log(logger, out["metrics"])
 
 
