@@ -43,22 +43,25 @@ class ScannedRNN(nn.Module):
         )
 
 
+def process_observation(obs, env_name):
+    # TODO: We probably need an preprocessing function here
+    # If else is maybe not the best
+    if "MultiCVRP" in env_name:
+        # We should provide more observation details to the network
+        obs = obs.vehicles.coordinates
+    elif "RobotWarehouse" in env_name:
+        obs = obs.agents_view
+    else:
+        raise NotImplementedError("This environment is not supported")
+    return obs
+
 class ActorCriticRNN(nn.Module):
     action_dim: Sequence[int]
     config: Dict
-    env_name: str = "RobotWarehouse-v0"
 
     @nn.compact
     def __call__(self, hidden, x):
         obs, dones = x
-
-        # TODO: We probably need an preprocessing function here
-        # If else is maybe not the best
-        if "MultiCVRP" in self.env_name:
-            # We should provide more observation details to the network
-            obs = obs.vehicles.coordinates
-        elif "RobotWarehouse" in self.env_name:
-            obs = obs.agents_view
 
         embedding = nn.Dense(
             128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
@@ -120,7 +123,7 @@ def get_runner_fn(env, network, config):
 
             # STEP ENV
             env_state, next_timestep = env.step(env_state, action)
-            obsv = next_timestep.observation
+            obsv = process_observation(next_timestep.observation, config["ENV_NAME"])
             
             done, reward, ep_returns, ep_lengths, ep_done = jax.tree_map(
                 lambda x: jnp.repeat(x, config["NUM_AGENTS"]).reshape(-1),
@@ -337,11 +340,11 @@ def run_experiment(env_name, config):
     )
 
    # INIT NETWORK AND OPTIMIZER
-    network = ActorCriticRNN(num_actions, config=config, env_name=env_name)
+    network = ActorCriticRNN(num_actions, config=config)
     rng = jax.random.PRNGKey(config["SEED"])
     rng, _rng = jax.random.split(rng)
     init_x = (
-        env.observation_spec().generate_value(),
+        process_observation(env.observation_spec().generate_value(), env_name),
         jnp.zeros((1)),
     )
     init_hstate = ScannedRNN.initialize_carry(config["NUM_AGENTS"], 128)
@@ -383,18 +386,19 @@ def run_experiment(env_name, config):
     reshape = lambda x: x.reshape((cores_count, config["BATCH_SIZE"]) + x.shape[1:])
     rng, *reset_rngs = jax.random.split(rng, 1 + cores_count * config["BATCH_SIZE"])
     env_states, env_timesteps = jax.vmap(env.reset)(jnp.stack(reset_rngs))  # init envs.
+    observation = process_observation(env_timesteps.observation, env_name)
     rng, *step_rngs = jax.random.split(rng, 1 + cores_count * config["BATCH_SIZE"])
     
-    env_states, env_timesteps, step_rngs = jax.tree_util.tree_map(
+    env_states, observation, step_rngs = jax.tree_util.tree_map(
         reshape,
-        [env_states, env_timesteps, jnp.array(step_rngs)],
+        [env_states, observation, jnp.array(step_rngs)],
     )  # add dimension to pmap over.
     
-    dones = jnp.zeros((cores_count, config["BATCH_SIZE"]), dtype=bool)
+    dones = jnp.zeros((cores_count, config["BATCH_SIZE"], config["NUM_AGENTS"]), dtype=bool)
     runner_state = (
         train_state,
         env_states,
-        env_timesteps,
+        observation,
         dones,
         init_hstate,
         step_rngs,
@@ -408,13 +412,13 @@ def run_experiment(env_name, config):
     with TimeIt(tag="EXECUTION", frames=config["TOTAL_TIMESTEPS"]):
         out = runner(runner_state)
         jax.block_until_ready(out)
-    val = out["metrics"]["returned_episode_returns"].mean()
+    val = out["metric"]["returned_episode_returns"].mean()
     print(f"Mean Episode Return: {val}")
 
 if __name__ == "__main__":
     config = {
         "LR": 2.5e-4,
-        "BATCH_SIZE": 8, # TODO: Change this back to 4
+        "BATCH_SIZE": 4,
         "ROLLOUT_LENGTH": 128,
         "TOTAL_TIMESTEPS": 204800,
         "UPDATE_EPOCHS": 1,
