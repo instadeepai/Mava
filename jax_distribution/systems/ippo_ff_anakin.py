@@ -130,15 +130,20 @@ class LogWrapper(Wrapper):
         return num_actions
 
 
-def process_observation(observation: Any, env_name: str) -> Any:
+def process_observation(observation: Any, env_config: dict) -> Any:
     """Process the observation to be fed into the network based on the environment."""
-    if "MultiCVRP" in env_name:
-        observation = observation.vehicles.coordinates
-    elif "RobotWarehouse" in env_name:
-        observation = observation.agents_view
-    else:
+    method = env_config["agents_obs"]
+    if method is None:
         raise NotImplementedError("This environment is not supported")
-    return observation
+    # Split the method path into nested attributes
+    method_attributes = method.split(".")
+    processed_observation = observation
+
+    # Access the nested attributes dynamically
+    for attribute in method_attributes:
+        processed_observation = getattr(processed_observation, attribute)
+
+    return processed_observation
 
 
 class Transition(NamedTuple):
@@ -156,12 +161,12 @@ class ActorCritic(nn.Module):
 
     action_dim: Sequence[int]
     activation: str = "tanh"
-    env_name: str = "RobotWarehouse-v0"
+    env_config: dict = None
 
     @nn.compact
     def __call__(self, observation) -> Tuple[distrax.Categorical, jnp.ndarray]:
         """Forward pass."""
-        x = process_observation(observation, self.env_name)
+        x = process_observation(observation, self.env_config)
 
         if self.activation == "relu":
             activation = nn.relu
@@ -519,7 +524,7 @@ def run_experiment(_run: Run, _config: dict, _log: SacredLogger) -> None:
     network = ActorCritic(
         env.get_num_actions(),
         activation=config["ACTIVATION"],
-        env_name=config["env_config"]["ENV_NAME"],
+        env_config=config["env_config"],
     )
     optim = optax.chain(
         optax.clip_by_global_norm(config["MAX_GRAD_NORM"]),
