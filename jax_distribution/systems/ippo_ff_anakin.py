@@ -345,9 +345,9 @@ def get_learner_fn(
                 grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
                 total_loss, grads = grad_fn(params, traj_batch, advantages, targets)
                 # pmean
-                total_loss = jax.lax.pmean(total_loss, axis_name="i")
+                total_loss = jax.lax.pmean(total_loss, axis_name="devices")
                 grads = jax.lax.pmean(grads, axis_name="j")
-                grads = jax.lax.pmean(grads, axis_name="i")
+                grads = jax.lax.pmean(grads, axis_name="devices")
                 updates, new_opt_state = opt_update(grads, opt_state)
                 new_params = optax.apply_updates(params, updates)
                 return (new_params, new_opt_state), total_loss
@@ -487,7 +487,7 @@ def run_experiment(env_name, config):
         config,
     )
 
-    learn = jax.pmap(learn, axis_name="i")  # replicate over multiple cores.
+    learn = jax.pmap(learn, axis_name="devices")  # replicate over multiple cores.
 
     broadcast = lambda x: jnp.broadcast_to(
         x, (cores_count, config["BATCH_SIZE"]) + x.shape
