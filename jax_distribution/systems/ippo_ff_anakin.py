@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import timeit
-from typing import Any, NamedTuple, Sequence, Tuple
+from typing import Any, NamedTuple, Sequence, Tuple, Optional
 
 import chex
 import distrax
@@ -128,7 +128,7 @@ def process_observation(observation: Any, env_name: str) -> Any:
         raise NotImplementedError("This environment is not supported")
     return observation
 
-def get_env(env_name: str) -> jumanji.Environment:
+def get_env(env_name: str, num_agents: Optional[int] = None) -> jumanji.Environment:
     """Create the environment."""
     if "MultiCVRP" in env_name:
         if num_agents is None:
