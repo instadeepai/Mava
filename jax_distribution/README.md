@@ -10,10 +10,10 @@ Inside of the `jax_distribution` folder, run:
     ```
 - OR conda:
     ```
-    conda create -n mava_30 python=3.9
-    conda activate mava_30
+    conda create -n mava_env python=3.9
+    conda activate mava_env
     pip install --upgrade pip setuptools
-    pip install -r requirements.txt
+    pip install -r jax_distribution/requirements.txt
     ```
 
 ## When using accelerators

@@ -347,16 +347,20 @@ def run_experiment(env_name, config):
     rng, _rng = jax.random.split(rng)
     init_x = (
         process_observation(env.observation_spec().generate_value(), env_name),
-        jnp.zeros((1)),
+        jnp.zeros((1)), # TODO: Should this not be (config["NUM_AGENTS"], 1)?
     )
     init_hstate = ScannedRNN.initialize_carry(config["NUM_AGENTS"], 128)
-    
-    # Support for multiple agents
-    init_net_x, init_net_hstate = jax.tree_util.tree_map(
+
+    # Add sequence dimension to init_hstate and init_x and
+    # TODO: Check if this dimension assignment is correct
+    # and that the agent's memory is setup correctly.
+    init_net_hstate, init_net_x = jax.tree_util.tree_map(
         lambda x: x[None, ...],
-        [init_x, init_hstate],
+        [init_hstate, init_x],
     )
+
     network_params = network.init(_rng, init_net_hstate, init_net_x)
+
     tx = optax.chain(
         optax.clip_by_global_norm(config["MAX_GRAD_NORM"]),
         optax.adam(config["LR"], eps=1e-5),

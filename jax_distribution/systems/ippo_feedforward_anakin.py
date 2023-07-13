@@ -1,10 +1,20 @@
-"""
-An example following the Anakin podracer example found here:
-https://colab.research.google.com/drive/1974D-qP17fd5mLxy6QZv-ic4yxlPJp-G?usp=sharing#scrollTo=myLN2J47oNGq
-"""
+# python3
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import timeit
-from typing import NamedTuple, Sequence, Tuple
+from typing import Any, NamedTuple, Sequence, Tuple
 
 import chex
 import distrax
@@ -15,23 +25,30 @@ import jumanji
 import numpy as np
 import optax
 from flax import struct
+from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
 from jumanji.environments.routing.multi_cvrp.generator import UniformRandomGenerator
 from jumanji.environments.routing.multi_cvrp.types import State # TODO: use the base jumanji state here
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper, AutoResetWrapper
+from flax.training.train_state import TrainState
 
 
 class TimeIt:
-    def __init__(self, tag, frames=None):
+    """Context manager for timing execution."""
+
+    def __init__(self, tag: str, frames=None) -> None:
+        """Initialise the context manager."""
         self.tag = tag
         self.frames = frames
 
-    def __enter__(self):
+    def __enter__(self) -> "TimeIt":
+        """Start the timer."""
         self.start = timeit.default_timer()
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, *args: Any) -> None:
+        """Print the elapsed time."""
         self.elapsed_secs = timeit.default_timer() - self.start
         msg = self.tag + (": Elapsed time=%.2fs" % self.elapsed_secs)
         if self.frames:
@@ -50,10 +67,9 @@ class LogEnvState:
 
 class LogWrapper(Wrapper):
     """Log the episode returns and lengths."""
-
     def reset(self, key: chex.PRNGKey) -> Tuple[LogEnvState, TimeStep]:
+        """Reset the environment."""
         state, timestep = self._env.reset(key)
-        # timestep.extras = {}
         state = LogEnvState(state, 0.0, 0, 0.0, 0)
         return state, timestep
 
@@ -62,7 +78,7 @@ class LogWrapper(Wrapper):
         state: State,
         action: jnp.ndarray,
     ) -> Tuple[State, TimeStep]:
-
+        """Step the environment."""
         env_state, timestep = self._env.step(state.env_state, action)
 
         new_episode_return = state.episode_returns + jnp.mean(timestep.reward)
@@ -80,6 +96,51 @@ class LogWrapper(Wrapper):
         )
         return state, timestep
 
+    def get_num_agents(self) -> int:
+        """Get the number of agents in the environment"""
+        if "MultiCVRP" in self._env_name:
+            num_agents = self._env._num_vehicles
+        elif "RobotWarehouse" in self._env_name:
+            num_agents = self._env.num_agents
+        else:
+            raise NotImplementedError("This environment is not supported")
+        return num_agents
+
+    def get_num_actions(self) -> int:
+        """Get the number of actions in the environment"""
+        if "MultiCVRP" in self._env_name:
+            num_actions = int(self._env.action_spec().maximum)
+        elif "RobotWarehouse" in self._env_name:
+            num_actions = int(self._env.action_spec().num_values[0])
+        else:
+            raise NotImplementedError("This environment is not supported")
+        return num_actions
+
+def process_observation(observation: Any, env_name: str) -> Any:
+    """Process the observation to be fed into the network based on the environment."""
+    # TODO: We probably need an preprocessing function here
+    # If else is maybe not the best solution going forward.
+    if "MultiCVRP" in env_name:
+        observation = observation.vehicles.coordinates
+    elif "RobotWarehouse" in env_name:
+        observation = observation.agents_view
+    else:
+        raise NotImplementedError("This environment is not supported")
+    return observation
+
+def get_env(env_name: str) -> jumanji.Environment:
+    """Create the environment."""
+    if "MultiCVRP" in env_name:
+        if num_agents is None:
+            num_agents = 3
+        generator = UniformRandomGenerator(num_vehicles=num_agents, num_customers=6)
+        env = jumanji.make(env_name, generator=generator)
+        num_actions = int(env.action_spec().maximum)
+    elif "RobotWarehouse" in env_name:
+        env = jumanji.make(env_name)
+        num_actions = int(env.action_spec().num_values[0])
+        num_agents = env.num_agents
+    return env, num_agents, num_actions
 
 class Transition(NamedTuple):
     done: jnp.ndarray
@@ -92,114 +153,128 @@ class Transition(NamedTuple):
 
 
 class ActorCritic(nn.Module):
+    """Actor Critic Network."""
     action_dim: Sequence[int]
+    env_name: str
     activation: str = "tanh"
-    env_name: str = "RobotWarehouse-v0"
 
     @nn.compact
-    def __call__(self, observation):
-        if "MultiCVRP" in self.env_name:
-            x = observation.vehicles.coordinates  # .shape
-        elif "RobotWarehouse" in self.env_name:
-            x = observation.agents_view
+    def __call__(self, observation) -> Tuple[distrax.Categorical, jnp.ndarray]:
 
+        x = process_observation(observation, self.env_name)
+
+        """Forward pass."""
         if self.activation == "relu":
             activation = nn.relu
         else:
             activation = nn.tanh
 
-        actor_mean = nn.Dense(
+        actor_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(x)
 
-        actor_mean = activation(actor_mean)
-        actor_mean = nn.Dense(
+        actor_output = activation(actor_output)
+        actor_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(actor_mean)
-        actor_mean = activation(actor_mean)
+        )(actor_output)
+        actor_output = activation(actor_output)
 
-        actor_mean = nn.Dense(
+        actor_output = nn.Dense(
             self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
-        )(actor_mean)
+        )(actor_output)
 
         masked_logits = jnp.where(
             observation.action_mask,
-            actor_mean,
+            actor_output,
             jnp.finfo(jnp.float32).min,
         )
 
         pi = distrax.Categorical(logits=masked_logits)
 
-        critic = nn.Dense(
+        critic_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(x)
-        critic = activation(critic)
-        critic = nn.Dense(
+        critic_output = activation(critic_output)
+        critic_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(critic)
-        critic = activation(critic)
-        critic = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
-            critic
-        )
+        )(critic_output)
+        critic_output = activation(critic_output)
+        critic_output = nn.Dense(
+            1, kernel_init=orthogonal(1.0), bias_init=constant(0.0)
+        )(critic_output)
 
-        return pi, jnp.squeeze(critic, axis=-1)
+        return pi, jnp.squeeze(critic_output, axis=-1)
 
 
-def get_learner_fn(env, forward_pass, opt_update, config):
-    def update_step_fn(params, opt_state, outer_rng, env_state, timestep):
+def get_runner_fn(
+    env: jumanji.Environment,
+    network: nn.Module,
+    config: dict,
+) -> callable:
+    """Get the learner function."""
 
+    def _update_step(runner_state, unused) -> Tuple:
         # COLLECT TRAJECTORIES
-        def _env_step(runner_state, unused):
-            params, env_state, last_timestep, rng = runner_state
+        def _env_step(runner_state: Tuple, unused: Any) -> Tuple:
+            """Step the environment."""
+            train_state, env_state, last_observation, rng = runner_state
 
             # SELECT ACTION
             rng, _rng = jax.random.split(rng)
-            pi, value = forward_pass(params, last_timestep.observation)
+            pi, value = network.apply(train_state.params, last_observation)
             action = pi.sample(seed=_rng)
             log_prob = pi.log_prob(action)
 
             # STEP ENV
             rng, _rng = jax.random.split(rng)
+
             env_state, next_timestep = env.step(env_state, action)
 
-            done, reward = jax.tree_map(
+            done, reward, ep_returns, ep_lengths, ep_done = jax.tree_map(
                 lambda x: jnp.repeat(x, config["NUM_AGENTS"]).reshape(-1),
-                [next_timestep.last(), next_timestep.reward],
+                [next_timestep.last(),
+                 next_timestep.reward,
+                 env_state.returned_episode_returns,
+                 env_state.returned_episode_lengths,
+                 next_timestep.last()],
             )
 
+            observation = next_timestep.observation
             transition = Transition(
                 done,
                 action,
                 value,
                 reward,
                 log_prob,
-                last_timestep.observation,
+                observation,
                 {
-                    "returned_episode_returns": jnp.repeat(
-                        env_state.returned_episode_returns, config["NUM_AGENTS"]
-                    ).reshape(-1),
-                    "returned_episode_lengths": jnp.repeat(
-                        env_state.returned_episode_lengths, config["NUM_AGENTS"]
-                    ).reshape(-1),
-                    "returned_episode": jnp.repeat(
-                        next_timestep.last(), config["NUM_AGENTS"]
-                    ).reshape(-1),
+                    "returned_episode_returns": ep_returns,
+                    "returned_episode_lengths": ep_lengths,
+                    "returned_episode": ep_done,
                 },
             )
-            runner_state = (params, env_state, next_timestep, rng)
+
+            
+            runner_state = (train_state, env_state, observation, rng)
             return runner_state, transition
 
-        runner_state = (params, env_state, timestep, outer_rng)
         runner_state, traj_batch = jax.lax.scan(
             _env_step, runner_state, None, config["ROLLOUT_LENGTH"]
         )
 
         # CALCULATE ADVANTAGE
-        params, env_state, last_timestep, rng = runner_state
-        _, last_val = forward_pass(params, last_timestep.observation)
+        train_state, env_state, last_observation, rng = runner_state
+        _, last_val = network.apply(train_state.params, last_observation)
 
-        def _calculate_gae(traj_batch, last_val):
-            def _get_advantages(gae_and_next_value, transition):
+        def _calculate_gae(
+            traj_batch: Transition, last_val: jnp.ndarray
+        ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+            """Calculate the GAE."""
+
+            def _get_advantages(
+                gae_and_next_value: Tuple, transition: Transition
+            ) -> Tuple:
+                """Calculate the GAE for a single transition."""
                 gae, next_value = gae_and_next_value
                 done, value, reward = (
                     transition.done,
@@ -222,13 +297,22 @@ def get_learner_fn(env, forward_pass, opt_update, config):
         advantages, targets = _calculate_gae(traj_batch, last_val)
 
         # UPDATE NETWORK
-        def _update_epoch(update_state, unused):
-            def _update_minbatch(train_state, batch_info):
+        def _update_epoch(update_state: Tuple, unused: Any) -> Tuple:
+            """Update the network for a single epoch."""
+
+            def _update_minbatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
+                """Update the network for a single minibatch."""
                 traj_batch, advantages, targets = batch_info
 
-                def _loss_fn(params, traj_batch, gae, targets):
+                def _loss_fn(
+                    params: FrozenDict,
+                    traj_batch: Transition,
+                    gae: jnp.ndarray,
+                    targets: jnp.ndarray,
+                ) -> Tuple:
+                    """Calculate the loss."""
                     # RERUN NETWORK
-                    pi, value = forward_pass(params, traj_batch.observation)
+                    pi, value = network.apply(params, traj_batch.observation)
                     log_prob = pi.log_prob(traj_batch.action)
 
                     # CALCULATE VALUE LOSS
@@ -265,22 +349,18 @@ def get_learner_fn(env, forward_pass, opt_update, config):
                     return total_loss, (value_loss, loss_actor, entropy)
 
                 grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
-                total_loss, grads = grad_fn(params, traj_batch, advantages, targets)
-                # pmean
-                total_loss = jax.lax.pmean(total_loss, axis_name="i")
-                grads = jax.lax.pmean(grads, axis_name="j")
-                grads = jax.lax.pmean(grads, axis_name="i")
-                updates, new_opt_state = opt_update(grads, opt_state)
-                new_params = optax.apply_updates(params, updates)
-                return (new_params, new_opt_state), total_loss
+                total_loss, grads = grad_fn(train_state.params, traj_batch, advantages, targets)
 
-            (params, opt_state), traj_batch, advantages, targets, rng = update_state
+                # pmean
+                total_loss = jax.lax.pmean(total_loss, axis_name="device")
+                grads = jax.lax.pmean(grads, axis_name="batch")
+                grads = jax.lax.pmean(grads, axis_name="device")
+                train_state = train_state.apply_gradients(grads=grads)
+                return train_state, total_loss
+
+            train_state, traj_batch, advantages, targets, rng = update_state
             rng, _rng = jax.random.split(rng)
             batch_size = config["ROLLOUT_LENGTH"]
-            # TODO: check batch_size
-            # assert (
-            #     batch_size == config["NUM_STEPS"] * config["NUM_ENVS"]
-            # ), "batch size must be equal to number of steps * number of envs"
             permutation = jax.random.permutation(_rng, batch_size)
             batch = (traj_batch, advantages, targets)
             batch = jax.tree_util.tree_map(
@@ -295,162 +375,123 @@ def get_learner_fn(env, forward_pass, opt_update, config):
                 ),
                 shuffled_batch,
             )
-            (params, opt_state), total_loss = jax.lax.scan(
-                _update_minbatch, (params, opt_state), minibatches
+            train_state, total_loss = jax.lax.scan(
+                _update_minbatch, train_state, minibatches
             )
 
-            update_state = ((params, opt_state), traj_batch, advantages, targets, rng)
+            update_state = (train_state, traj_batch, advantages, targets, rng)
             return update_state, total_loss
 
-        update_state = ((params, opt_state), traj_batch, advantages, targets, rng)
-
+        update_state = (train_state, traj_batch, advantages, targets, rng)
         update_state, loss_info = jax.lax.scan(
-            _update_epoch, update_state, None, config["UPDATE_EPOCHS"]
-        )
+                _update_epoch, update_state, None, config["UPDATE_EPOCHS"]
+            )
 
-        ((params, opt_state), traj_batch, advantages, targets, rng) = update_state
+        train_state = update_state[0]
+        metric = traj_batch.info
+        rng = update_state[-1]
 
-        metric_info = jax.tree_util.tree_map(lambda x: x[:, 0], traj_batch.info)
-        return params, opt_state, rng, env_state, last_timestep, metric_info
 
-    def update_fn(params, opt_state, rng, env_state, timestep):
-        """Compute a gradient update from a single trajectory."""
-        rng, loss_rng = jax.random.split(rng)
-        (
-            new_params,
-            new_opt_state,
-            rng,
-            new_env_state,
-            new_timestep,
-            metric_info,
-        ) = update_step_fn(
-            params,
-            opt_state,
-            rng,
-            env_state,
-            timestep,
-        )
+        runner_state = (train_state, env_state, last_observation, rng)
+        return runner_state, metric
 
-        return (
-            new_params,
-            new_opt_state,
-            rng,
-            new_env_state,
-            new_timestep,
-        ), metric_info
-
-    def learner_fn(params, opt_state, rngs, env_states, timesteps):
+    def runner_fn(runner_state):
         """Vectorise and repeat the update."""
         batched_update_fn = jax.vmap(
-            update_fn, axis_name="j"
+            _update_step, axis_name="batch"
         )  # vectorize across batch.
 
-        def iterate_fn(val, _):  # repeat many times to avoid going back to Python.
-            params, opt_state, rngs, env_states, timesteps = val
-            return batched_update_fn(params, opt_state, rngs, env_states, timesteps)
-
-        runner_state = (params, opt_state, rngs, env_states, timesteps)
         runner_state, metric = jax.lax.scan(
-            iterate_fn, runner_state, None, config["ITERATIONS"]
+        batched_update_fn, runner_state, None, config["NUM_UPDATES"]
         )
-        return {"runner_state": runner_state, "metrics": metric}
-
-    return learner_fn
+        return {"runner_state": runner_state, "metric": metric}
+       
+    return runner_fn
 
 
 def run_experiment(env_name, config):
-    if "MultiCVRP" in env_name:
-        config["NUM_AGENTS"] = 3
-        generator = UniformRandomGenerator(
-            num_vehicles=config["NUM_AGENTS"], num_customers=6
-        )
-        env = jumanji.make(env_name, generator=generator)
-        num_actions = int(env.action_spec().maximum)
-
-    elif "RobotWarehouse" in env_name:
-        env = jumanji.make(env_name)
-        num_actions = int(env.action_spec().num_values[0])
-        config["NUM_AGENTS"] = env.num_agents
-
-    env = AutoResetWrapper(env)
+    """Run the experiment.
+    
+    Args:
+        env_name: Name of the environment.
+        config: Configuration dictionary.
+        
+    Returns:
+        None
+    """
+    env, config["NUM_AGENTS"], num_actions = get_env(env_name)
+    env= AutoResetWrapper(env)
     env = LogWrapper(env)
+
     cores_count = len(jax.devices())
-    # Number of iterations
-    timesteps_per_iteration = (
+
+    # Number of updates
+    timesteps_per_update = (
         cores_count * config["ROLLOUT_LENGTH"] * config["BATCH_SIZE"]
     )
-    config["ITERATIONS"] = (
-        config["TOTAL_TIMESTEPS"] // timesteps_per_iteration
+    config["NUM_UPDATES"] = (
+        config["TOTAL_TIMESTEPS"] // timesteps_per_update
     )  # Number of training updates
+    total_time_steps = config["TOTAL_TIMESTEPS"]
 
-    num_frames = config["TOTAL_TIMESTEPS"]
-
+    # Create the network
     network = ActorCritic(
-        num_actions, activation=config["ACTIVATION"], env_name=env_name
-    )
-    optim = optax.chain(
-        optax.clip_by_global_norm(config["MAX_GRAD_NORM"]),
-        optax.adam(config["LR"], eps=1e-5),
+        num_actions,
+        env_name=env_name,
+        activation=config["ACTIVATION"],
     )
 
     rng = jax.random.PRNGKey(config["SEED"])
-    rng, rng_env, rng_params = jax.random.split(rng, 3)
-
     init_obs = env.observation_spec().generate_value()
-    init_obs = jax.tree_util.tree_map(
-        lambda x: x[None, ...],
-        init_obs,
+
+    rng, _rng = jax.random.split(rng)
+    network_params = network.init(_rng, init_obs)
+    tx = optax.chain(
+        optax.clip_by_global_norm(config["MAX_GRAD_NORM"]),
+        optax.adam(config["LR"], eps=1e-5),
+    )
+    train_state = TrainState.create(
+        apply_fn=network.apply,
+        params=network_params,
+        tx=tx,
     )
 
-    params = network.init(rng_params, init_obs)
-    opt_state = optim.init(params)
-
-    # TODO: Complete this
-    learn = get_learner_fn(
+    # Create the runner function.
+    runner = get_runner_fn(
         env,
-        network.apply,
-        optim.update,
+        network,
         config,
     )
+    runner = jax.pmap(runner, axis_name="device")  # replicate over multiple cores.
 
-    learn = jax.pmap(learn, axis_name="i")  # replicate over multiple cores.
+    # BROADCAST TRAIN STATE
+    def broadcast(x):
+        if np.isscalar(x):  # x is an int or float
+            x = jnp.array(x)  # convert it to a JAX array
+        return jnp.broadcast_to(x, (cores_count, config["BATCH_SIZE"]) + x.shape)
+    train_state = jax.tree_map(broadcast, train_state) # broadcast to cores and batch.
 
-    broadcast = lambda x: jnp.broadcast_to(
-        x, (cores_count, config["BATCH_SIZE"]) + x.shape
-    )
-    params = jax.tree_map(broadcast, params)  # broadcast to cores and batch.
-    opt_state = jax.tree_map(broadcast, opt_state)  # broadcast to cores and batch
-
-    rng, *env_rngs = jax.random.split(rng, cores_count * config["BATCH_SIZE"] + 1)
-    env_states, env_timesteps = jax.vmap(env.reset)(jnp.stack(env_rngs))  # init envs.
-    rng, *step_rngs = jax.random.split(rng, cores_count * config["BATCH_SIZE"] + 1)
-
+    rng, *reset_rngs = jax.random.split(rng, 1 + cores_count * config["BATCH_SIZE"] )
+    env_states, env_timesteps = jax.vmap(env.reset)(jnp.stack(reset_rngs))  # init envs.
+   
+    # RESHAPE OBSERVATION, ENV STATES AND STEP RNGS
     reshape = lambda x: x.reshape((cores_count, config["BATCH_SIZE"]) + x.shape[1:])
-    step_rngs = reshape(jnp.stack(step_rngs))  # add dimension to pmap over.
-    env_states = jax.tree_util.tree_map(
+    rng, *step_rngs = jax.random.split(rng, 1 + cores_count * config["BATCH_SIZE"])
+    env_states, observation, step_rngs = jax.tree_util.tree_map(
         reshape,
-        env_states,
+        [env_states, env_timesteps.observation, jnp.array(step_rngs)],
     )  # add dimension to pmap over.
-    env_timesteps = jax.tree_util.tree_map(
-        reshape,
-        env_timesteps,
-    )
-    # env_timesteps = reshape(env_timesteps)  # add dimension to pmap over.
+    runner_state = (train_state, env_states, observation, step_rngs)
 
+    # Run the experiment.
     with TimeIt(tag="COMPILATION"):
-        out = learn(params, opt_state, step_rngs, env_states, env_timesteps)  # compiles
+        out = runner(runner_state)  # compiles
         jax.block_until_ready(out)
 
-    with TimeIt(tag="EXECUTION", frames=num_frames):
-        out = learn(  # runs compiled fn
-            params,
-            opt_state,
-            step_rngs,
-            env_states,
-            env_timesteps,
-        )
+    with TimeIt(tag="EXECUTION", frames=total_time_steps):
+        out = runner(runner_state) # runs compiled fn
         jax.block_until_ready(out)
-    val = out["metrics"]["returned_episode_returns"].mean()
+    val = out["metric"]["returned_episode_returns"].mean()
     print(f"Mean Episode Return: {val}")
 
 
