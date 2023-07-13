@@ -1,13 +1,14 @@
+from functools import partial
+from typing import Any, Optional, Tuple, Union
+
+import chex
 import jax
 import jax.numpy as jnp
-import chex
 import numpy as np
-from flax import struct
-from functools import partial
-from typing import Optional, Tuple, Union, Any
-from gymnax.environments import environment, spaces
 from brax import envs
-from brax.envs.wrappers.training import EpisodeWrapper, AutoResetWrapper
+from brax.envs.wrappers.training import AutoResetWrapper, EpisodeWrapper
+from flax import struct
+from gymnax.environments import environment, spaces
 
 
 class GymnaxWrapper(object):

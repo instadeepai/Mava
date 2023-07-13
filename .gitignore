@@ -166,7 +166,7 @@ mava_testing
 component_dependency_map.png
 
 # Mava 3.0 env
-mava_30/
+mava_env/
 
 # Sacred logs
 results/
