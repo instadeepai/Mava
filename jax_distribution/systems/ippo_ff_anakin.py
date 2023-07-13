@@ -442,17 +442,7 @@ def run_experiment(env_name, config):
     )
 
     rng = jax.random.PRNGKey(config["SEED"])
-    
-
     init_obs = env.observation_spec().generate_value()
-
-    # TODO: Why do we use this? Is the observaton
-    # not already batched? Check the recurrent case
-    # as well.
-    init_obs = jax.tree_util.tree_map(
-        lambda x: x[None, ...],
-        init_obs,
-    )
 
     rng, _rng = jax.random.split(rng)
     network_params = network.init(_rng, init_obs)
@@ -472,7 +462,6 @@ def run_experiment(env_name, config):
         network,
         config,
     )
-
     runner = jax.pmap(runner, axis_name="device")  # replicate over multiple cores.
 
     # BROADCAST TRAIN STATE
