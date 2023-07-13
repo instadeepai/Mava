@@ -160,10 +160,9 @@ class ActorCritic(nn.Module):
 
     @nn.compact
     def __call__(self, observation) -> Tuple[distrax.Categorical, jnp.ndarray]:
-
+        """Forward pass."""
         x = process_observation(observation, self.env_name)
 
-        """Forward pass."""
         if self.activation == "relu":
             activation = nn.relu
         else:
