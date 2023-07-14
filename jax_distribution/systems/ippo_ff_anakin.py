@@ -280,7 +280,7 @@ def get_runner_fn(
                 {
                     "returned_episode_returns": env_state.returned_episode_returns,
                     "returned_episode_lengths": env_state.returned_episode_lengths,
-                    "returned_episode": next_timestep.last(),
+                    "episode_done": next_timestep.last(),
                 },
             )
 
