@@ -161,11 +161,7 @@ def get_env(env_name: str, num_agents: Optional[int] = None) -> jumanji.Environm
         env = jumanji.make(env_name, generator=generator)
         num_actions = int(env.action_spec().maximum)
     elif "RobotWarehouse" in env_name:
-        from jumanji.environments.routing.robot_warehouse.generator import RandomGenerator
-        generator = RandomGenerator(shelf_rows=1, shelf_columns=3, column_height=3, num_agents=1,
-                                    sensor_range=1, request_queue_size=3)
-
-        env = jumanji.make(env_name, generator=generator)
+        env = jumanji.make(env_name)
         num_actions = int(env.action_spec().num_values[0])
         num_agents = env.num_agents
     return env, num_agents, num_actions
@@ -529,7 +525,7 @@ def run_experiment(env_name: str, config: dict) -> None:
 if __name__ == "__main__":
     config = {
         "LR": 5e-3,
-        "ENV_NAME": "MultiCVRP-v0",  # [RobotWarehouse-v0, MultiCVRP-v0]
+        "ENV_NAME": "RobotWarehouse-v0",  # [RobotWarehouse-v0, MultiCVRP-v0]
         "ACTIVATION": "relu",
         "UPDATE_EPOCHS": 1,
         "NUM_MINIBATCHES": 1,
