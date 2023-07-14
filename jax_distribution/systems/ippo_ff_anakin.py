@@ -229,13 +229,10 @@ def get_runner_fn(
 
             env_state, next_timestep = env.step(env_state, action)
 
-            done, reward, ep_returns, ep_lengths, ep_done = jax.tree_map(
+            done, reward = jax.tree_map(
                 lambda x: jnp.repeat(x, config["NUM_AGENTS"]).reshape(-1),
                 [next_timestep.last(),
-                 next_timestep.reward,
-                 env_state.returned_episode_returns,
-                 env_state.returned_episode_lengths,
-                 next_timestep.last()],
+                 next_timestep.reward],
             )
 
             observation = next_timestep.observation
@@ -247,9 +244,9 @@ def get_runner_fn(
                 log_prob,
                 observation,
                 {
-                    "returned_episode_returns": ep_returns,
-                    "returned_episode_lengths": ep_lengths,
-                    "returned_episode": ep_done,
+                    "returned_episode_returns": env_state.returned_episode_returns,
+                    "returned_episode_lengths": env_state.returned_episode_lengths,
+                    "returned_episode": next_timestep.last(),
                 },
             )
 
@@ -492,6 +489,9 @@ def run_experiment(env_name, config):
         jax.block_until_ready(out)
     val = out["metric"]["returned_episode_returns"].mean()
     print(f"Mean Episode Return: {val}")
+    val = out["metric"]["returned_episode_lengths"].mean()
+    print(f"Mean Episode Length: {val}")
+
 
 
 if __name__ == "__main__":
