@@ -123,7 +123,28 @@ def process_observation(observation: Any, env_name: str) -> Any:
     # TODO: We probably need an preprocessing function here
     # If else is maybe not the best solution going forward.
     if "MultiCVRP" in env_name:
-        observation = observation.vehicles.coordinates
+        concat_list = [
+            observation.vehicles.coordinates,
+            observation.vehicles.local_times[..., None],
+            observation.vehicles.capacities[..., None],
+        ]
+        o_vehicles = jnp.concatenate(concat_list, axis=-1)
+
+         # customer encoder
+        concat_list = [
+            observation.nodes.coordinates,
+            observation.nodes.demands[..., None],
+            observation.windows.start[..., None],
+            observation.windows.end[..., None],
+            observation.coeffs.early[..., None],
+            observation.coeffs.late[..., None],
+        ]
+        o_customers = jnp.concatenate(concat_list, axis=-1)
+        o_customers = o_customers.reshape(o_customers.shape[:-2] + (-1,) + o_customers.shape[-2:])
+        o_customers = o_customers.reshape(o_customers.shape[:-2] + (-1,))
+        o_customers = jnp.repeat(o_customers, o_vehicles.shape[-2], axis=-2)
+        observation = jnp.concatenate([o_vehicles, o_customers], axis=-1)
+
     elif "RobotWarehouse" in env_name:
         observation = observation.agents_view
     else:
@@ -140,7 +161,11 @@ def get_env(env_name: str, num_agents: Optional[int] = None) -> jumanji.Environm
         env = jumanji.make(env_name, generator=generator)
         num_actions = int(env.action_spec().maximum)
     elif "RobotWarehouse" in env_name:
-        env = jumanji.make(env_name)
+        from jumanji.environments.routing.robot_warehouse.generator import RandomGenerator
+        generator = RandomGenerator(shelf_rows=1, shelf_columns=3, column_height=3, num_agents=1,
+                                    sensor_range=1, request_queue_size=3)
+
+        env = jumanji.make(env_name, generator=generator)
         num_actions = int(env.action_spec().num_values[0])
         num_agents = env.num_agents
     return env, num_agents, num_actions
@@ -504,7 +529,7 @@ def run_experiment(env_name: str, config: dict) -> None:
 if __name__ == "__main__":
     config = {
         "LR": 5e-3,
-        "ENV_NAME": "RobotWarehouse-v0",  # [RobotWarehouse-v0, MultiCVRP-v0]
+        "ENV_NAME": "MultiCVRP-v0",  # [RobotWarehouse-v0, MultiCVRP-v0]
         "ACTIVATION": "relu",
         "UPDATE_EPOCHS": 1,
         "NUM_MINIBATCHES": 1,
@@ -514,9 +539,9 @@ if __name__ == "__main__":
         "ENT_COEF": 0.01,
         "VF_COEF": 0.5,
         "MAX_GRAD_NORM": 0.5,
-        "BATCH_SIZE": 4,  # Parallel updates / environmnents
+        "BATCH_SIZE": 128,  # Parallel updates / environmnents
         "ROLLOUT_LENGTH": 128,  # Length of each rollout
-        "TOTAL_TIMESTEPS": 204800,  # Number of training timesteps
+        "TOTAL_TIMESTEPS": 2004800,  # Number of training timesteps
         "SEED": 42,
     }
 
