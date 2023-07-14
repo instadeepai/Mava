@@ -110,20 +110,39 @@ class LogWrapper(Wrapper):
         return state, timestep
 
 
-def process_observation(observation: Any, env_config: dict) -> Any:
+def process_observation(observation: Any, env_name: str) -> Any:
     """Process the observation to be fed into the network based on the environment."""
-    method = env_config["agents_obs"]
-    if method is None:
+    # TODO: change this to work using hydra config
+    if "MultiCVRP" in env_name:
+        concat_list = [
+            observation.vehicles.coordinates,
+            observation.vehicles.local_times[..., None],
+            observation.vehicles.capacities[..., None],
+        ]
+        o_vehicles = jnp.concatenate(concat_list, axis=-1)
+
+        # customer encoder
+        concat_list = [
+            observation.nodes.coordinates,
+            observation.nodes.demands[..., None],
+            observation.windows.start[..., None],
+            observation.windows.end[..., None],
+            observation.coeffs.early[..., None],
+            observation.coeffs.late[..., None],
+        ]
+        o_customers = jnp.concatenate(concat_list, axis=-1)
+        o_customers = o_customers.reshape(
+            o_customers.shape[:-2] + (-1,) + o_customers.shape[-2:]
+        )
+        o_customers = o_customers.reshape(o_customers.shape[:-2] + (-1,))
+        o_customers = jnp.repeat(o_customers, o_vehicles.shape[-2], axis=-2)
+        observation = jnp.concatenate([o_vehicles, o_customers], axis=-1)
+
+    elif "RobotWarehouse" in env_name:
+        observation = observation.agents_view
+    else:
         raise NotImplementedError("This environment is not supported")
-    # Split the method path into nested attributes
-    method_attributes = method.split(".")
-    processed_observation = observation
-
-    # Access the nested attributes dynamically
-    for attribute in method_attributes:
-        processed_observation = getattr(processed_observation, attribute)
-
-    return processed_observation
+    return observation
 
 
 def get_env(env_name: str, num_agents: Optional[int] = None) -> jumanji.Environment:
@@ -135,7 +154,20 @@ def get_env(env_name: str, num_agents: Optional[int] = None) -> jumanji.Environm
         env = jumanji.make(env_name, generator=generator)
         num_actions = int(env.action_spec().maximum)
     elif "RobotWarehouse" in env_name:
-        env = jumanji.make(env_name)
+        from jumanji.environments.routing.robot_warehouse.generator import (
+            RandomGenerator,
+        )
+
+        generator = RandomGenerator(
+            shelf_rows=1,
+            shelf_columns=3,
+            column_height=3,
+            num_agents=1,
+            sensor_range=1,
+            request_queue_size=3,
+        )
+
+        env = jumanji.make(env_name, generator=generator)
         num_actions = int(env.action_spec().num_values[0])
         num_agents = env.num_agents
     return env, num_agents, num_actions
@@ -156,12 +188,12 @@ class ActorCritic(nn.Module):
 
     action_dim: Sequence[int]
     activation: str = "tanh"
-    env_config: dict = None
+    env_name: str = None
 
     @nn.compact
     def __call__(self, observation) -> Tuple[distrax.Categorical, jnp.ndarray]:
         """Forward pass."""
-        x = process_observation(observation, self.env_config)
+        x = process_observation(observation, self.env_name)
 
         if self.activation == "relu":
             activation = nn.relu
@@ -229,14 +261,11 @@ def get_runner_fn(
 
             env_state, next_timestep = env.step(env_state, action)
 
-            done, reward, ep_returns, ep_lengths, ep_done = jax.tree_map(
+            done, reward = jax.tree_map(
                 lambda x: jnp.repeat(x, config["NUM_AGENTS"]).reshape(-1),
                 [
                     next_timestep.last(),
                     next_timestep.reward,
-                    env_state.returned_episode_returns,
-                    env_state.returned_episode_lengths,
-                    next_timestep.last(),
                 ],
             )
 
@@ -249,9 +278,9 @@ def get_runner_fn(
                 log_prob,
                 observation,
                 {
-                    "returned_episode_returns": ep_returns,
-                    "returned_episode_lengths": ep_lengths,
-                    "episode_done": ep_done,
+                    "returned_episode_returns": env_state.returned_episode_returns,
+                    "returned_episode_lengths": env_state.returned_episode_lengths,
+                    "returned_episode": next_timestep.last(),
                 },
             )
 
@@ -420,6 +449,7 @@ def log(logger, metrics_info):
     episode_lengths = returned_episode_lengths[dones]
 
     print("MEAN EPISODE RETURN: ", np.mean(episode_returns))
+    print("MEAN EPISODE LENGTH: ", np.mean(episode_lengths))
 
     for ep_i in range(len(episode_returns)):
         logger.log_stat("episode_returns", episode_returns[ep_i], ep_i)
@@ -471,7 +501,7 @@ def run_experiment(_run: Run, _config: dict, _log: SacredLogger) -> None:
     network = ActorCritic(
         num_actions,
         activation=config["ACTIVATION"],
-        env_config=config["env_config"],
+        env_name=config["env_config"]["ENV_NAME"],
     )
 
     rng = jax.random.PRNGKey(config["SEED"])
