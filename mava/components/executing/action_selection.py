@@ -154,6 +154,7 @@ class FeedforwardExecutorSelectAction(ExecutorSelectAction):
                 params=current_params,
                 base_key=action_key,
                 mask=utils.add_batch_dim(observation.legal_actions),
+                evaluate=executor.store.is_evaluator,
             )
             return action_info, policy_info, base_key
 
@@ -288,6 +289,7 @@ class RecurrentExecutorSelectAction(ExecutorSelectAction):
                 policy_state=policy_state,
                 base_key=action_key,
                 mask=utils.add_batch_dim(observation.legal_actions),
+                evaluate=executor.store.is_evaluator,
             )
             return action_info, policy_info, policy_state, base_key
 
