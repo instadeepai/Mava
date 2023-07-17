@@ -33,6 +33,7 @@ from mava.wrappers.environment_loop_wrappers import (
     EnvironmentLoopStatisticsBase,
     MonitorParallelEnvironmentLoop,
 )
+import inspect
 
 
 @dataclass
@@ -116,12 +117,28 @@ class ExecutorEnvironmentLoop(Component):
             None.
         """
         # Global config set by EnvironmentSpec component
-        (
-            builder.store.executor_environment,
-            _,
-        ) = builder.store.global_config.environment_factory(
-            evaluation=builder.store.is_evaluator, executor_id=builder.store.executor_id
-        )  # type: ignore
+
+        env_has_id_param = (
+            inspect.signature(
+                builder.store.global_config.environment_factory
+            ).parameters.get("executor_id")
+            != None
+        )
+        if env_has_id_param:
+            (
+                builder.store.executor_environment,
+                _,
+            ) = builder.store.global_config.environment_factory(
+                evaluation=builder.store.is_evaluator,
+                executor_id=builder.store.executor_id,
+            )  # type: ignore
+        else:
+            (
+                builder.store.executor_environment,
+                _,
+            ) = builder.store.global_config.environment_factory(
+                evaluation=builder.store.is_evaluator
+            )  # type: ignore
 
     @abc.abstractmethod
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:

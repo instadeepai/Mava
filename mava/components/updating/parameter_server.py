@@ -163,7 +163,12 @@ class DefaultParameterServer(ParameterServer):
             termination_fn(server)
 
         # Interrupt the system in case all the executors failed
-        if server.store.num_executors == server.store.parameters["num_executor_failed"]:
+        if server.store.num_executors > 0 and (
+            server.store.num_executors == server.store.parameters["num_executor_failed"]
+        ):
+            import tensorflow as tf
+
+            tf.print("All executors failed. Terminating the system.")
             termination_fn(server)
 
     # Set

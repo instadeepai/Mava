@@ -225,9 +225,13 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 count = counts[eval_interval_key]
                 # We run eval loops around every eval_interval_count (not exactly
                 # every eval_interval_count due to latency in getting updated counts).
-                should_run_loop = (
-                    (count - self._last_evaluator_run_t) / eval_interval_count
-                ) >= 1.0
+                if eval_interval_count > 0:
+                    should_run_loop = (
+                        (count - self._last_evaluator_run_t) / eval_interval_count
+                    ) >= 1.0
+                # Evaluation only runs
+                else:
+                    should_run_loop = True
                 if should_run_loop:
                     self._last_evaluator_run_t = int(count)
                     print(
@@ -242,9 +246,14 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         )
 
         if environment_loop_schedule:
-            eval_interval_condition = check_count_condition(
-                self._executor.store.evaluation_interval
-            )
+            if self._executor.store.num_executors > 0:
+                eval_interval_condition = check_count_condition(
+                    self._executor.store.evaluation_interval
+                )
+            # eval only run
+            else:
+                eval_interval_condition = "evaluator_steps", 0
+
             eval_duration_condition = check_count_condition(
                 self._executor.store.evaluation_duration
             )

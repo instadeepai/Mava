@@ -86,7 +86,12 @@ class Distributor(Component):
         ) = jax.random.split(builder.store.base_key, 4)
 
         # Generate keys for the executors
-        keys = jax.random.split(base_key, 1 + self.config.num_executors)
+        if self.config.num_executors > 0:
+            keys = jax.random.split(base_key, 1 + self.config.num_executors)
+        # Evaluation only runs
+        else:
+            keys = jax.random.split(base_key, 1 + self.config.num_evaluators)
+
         base_key = keys[0]
         builder.store.executor_keys = keys[1:]
 
@@ -113,13 +118,14 @@ class Distributor(Component):
         )
 
         # executor nodes
-        for executor_id in range(self.config.num_executors):
-            builder.store.program.add(
-                builder.executor,
-                [f"executor_{executor_id}", data_server, parameter_server],
-                node_type=NodeType.courier,
-                name="executor",
-            )
+        if self.config.num_executors > 0:
+            for executor_id in range(self.config.num_executors):
+                builder.store.program.add(
+                    builder.executor,
+                    [f"executor_{executor_id}", data_server, parameter_server],
+                    node_type=NodeType.courier,
+                    name="executor",
+                )
 
         if self.config.run_evaluator:
             # evaluator node
