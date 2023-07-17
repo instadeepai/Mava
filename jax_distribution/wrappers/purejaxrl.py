@@ -41,9 +41,9 @@ class FlattenObservationWrapper(GymnaxWrapper):
 
     @partial(jax.jit, static_argnums=(0,))
     def reset(
-        self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
+        self, key: chex.PRNGKey,
     ) -> Tuple[chex.Array, environment.EnvState]:
-        obs, state = self._env.reset(key, params)
+        obs, state = self._env.reset(key)
         obs = jnp.reshape(obs, (-1,))
         return obs, state
 
@@ -53,9 +53,8 @@ class FlattenObservationWrapper(GymnaxWrapper):
         key: chex.PRNGKey,
         state: environment.EnvState,
         action: Union[int, float],
-        params: Optional[environment.EnvParams] = None,
     ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
-        obs, state, reward, done, info = self._env.step(key, state, action, params)
+        obs, state, reward, done, info = self._env.step(key, state, action)
         obs = jnp.reshape(obs, (-1,))
         return obs, state, reward, done, info
 
@@ -78,9 +77,9 @@ class LogWrapper(GymnaxWrapper):
 
     @partial(jax.jit, static_argnums=(0,))
     def reset(
-        self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
+        self, key: chex.PRNGKey,
     ) -> Tuple[chex.Array, environment.EnvState]:
-        obs, env_state = self._env.reset(key, params)
+        obs, env_state = self._env._main_reset(key)
         state = LogEnvState(env_state, 0, 0, 0, 0, 0)
         return obs, state
 
@@ -90,10 +89,9 @@ class LogWrapper(GymnaxWrapper):
         key: chex.PRNGKey,
         state: environment.EnvState,
         action: Union[int, float],
-        params: Optional[environment.EnvParams] = None,
     ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
-        obs, env_state, reward, done, info = self._env.step(
-            key, state.env_state, action, params
+        obs, env_state, reward, done, info = self._env._main_step(
+            key, state.env_state, action
         )
         new_episode_return = state.episode_returns + reward
         new_episode_length = state.episode_lengths + 1
