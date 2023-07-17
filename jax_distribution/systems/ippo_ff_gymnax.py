@@ -51,11 +51,6 @@ class TimeIt:
             msg += ", FPS=%.2e" % (self.frames / self.elapsed_secs)
         print(msg)
 
-def process_observation(observation: Any, env_name: str) -> Any:
-    """Process the observation to be fed into the network based on the environment."""
-    return observation
-
-
 def get_env(env_name: str, num_agents: Optional[int] = None):
     """Create the environment."""
     env, env_params = gymnax.make(config["ENV_NAME"])
@@ -89,51 +84,41 @@ def plot_episode_returns(episode_returns, timesteps):
 
 
 class ActorCritic(nn.Module):
-    """Actor Critic Network."""
-
     action_dim: Sequence[int]
-    env_name: str
     activation: str = "tanh"
 
     @nn.compact
-    def __call__(self, observation) -> Tuple[distrax.Categorical, jnp.ndarray]:
-        """Forward pass."""
-        x = process_observation(observation, self.env_name)
-
+    def __call__(self, x):
         if self.activation == "relu":
             activation = nn.relu
         else:
             activation = nn.tanh
-
-        actor_output = nn.Dense(
+        actor_mean = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(x)
-
-        actor_output = activation(actor_output)
-        actor_output = nn.Dense(
+        actor_mean = activation(actor_mean)
+        actor_mean = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(actor_output)
-        actor_output = activation(actor_output)
-
-        actor_output = nn.Dense(
+        )(actor_mean)
+        actor_mean = activation(actor_mean)
+        actor_mean = nn.Dense(
             self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
-        )(actor_output)
+        )(actor_mean)
+        pi = distrax.Categorical(logits=actor_mean)
 
-        pi = distrax.Categorical(logits=actor_output)
-
-        critic_output = nn.Dense(
+        critic = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(x)
-        critic_output = activation(critic_output)
-        critic_output = nn.Dense(
+        critic = activation(critic)
+        critic = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(critic_output)
-        critic_output = activation(critic_output)
-        critic_output = nn.Dense(
-            1, kernel_init=orthogonal(1.0), bias_init=constant(0.0)
-        )(critic_output)
+        )(critic)
+        critic = activation(critic)
+        critic = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
+            critic
+        )
 
-        return pi, jnp.squeeze(critic_output, axis=-1)
+        return pi, jnp.squeeze(critic, axis=-1)
 
 
 def get_runner_fn(
@@ -372,7 +357,6 @@ def run_experiment(env_name: str, config: dict) -> None:
     # Create the network
     network = ActorCritic(
         num_actions,
-        env_name=env_name,
         activation=config["ACTIVATION"],
     )
 
@@ -381,9 +365,18 @@ def run_experiment(env_name: str, config: dict) -> None:
 
     rng, _rng = jax.random.split(rng)
     network_params = network.init(_rng, init_obs)
+    
+    def linear_schedule(count):
+        frac = (
+            1.0
+            - (count // (config["NUM_MINIBATCHES"] * config["UPDATE_EPOCHS"]))
+            / config["NUM_UPDATES"]
+        )
+        return config["LR"] * frac
+
     tx = optax.chain(
         optax.clip_by_global_norm(config["MAX_GRAD_NORM"]),
-        optax.adam(config["LR"], eps=1e-5),
+        optax.adam(learning_rate=linear_schedule, eps=1e-5),
     )
     train_state = TrainState.create(
         apply_fn=network.apply,
@@ -432,9 +425,6 @@ def run_experiment(env_name: str, config: dict) -> None:
     print(f"Mean Episode Return: {val}")
     val = out["metric"]["returned_episode_lengths"].mean()
     print(f"Mean Episode Length: {val}")
-
-    print("Reward shape: ", )
-
     ep_returns = out["metric"]["returned_episode_returns"].reshape((config["NUM_UPDATES"], -1)).mean(axis=1)
 
     plot_episode_returns(ep_returns, np.arange(0, config["NUM_UPDATES"]))
@@ -452,9 +442,9 @@ if __name__ == "__main__":
         "ENT_COEF": 0.01,
         "VF_COEF": 0.5,
         "MAX_GRAD_NORM": 0.5,
-        "BATCH_SIZE": 128,  # Parallel updates / environmnents
+        "BATCH_SIZE": 4,  # Parallel updates / environmnents
         "ROLLOUT_LENGTH": 128,  # Length of each rollout
-        "TOTAL_TIMESTEPS": 5e6,  # Number of training timesteps
+        "TOTAL_TIMESTEPS": 5e5,  # Number of training timesteps
         "SEED": 42,
     }
 
