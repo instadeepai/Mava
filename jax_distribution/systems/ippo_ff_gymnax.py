@@ -435,7 +435,7 @@ if __name__ == "__main__":
         "ENV_NAME": "CartPole-v1",
         "ACTIVATION": "tanh",
         "UPDATE_EPOCHS": 4,
-        "NUM_MINIBATCHES": 4,
+        "NUM_MINIBATCHES": 1, # OLD NUM ENVS / OLD NUM MINIMATCHES = 1
         "GAMMA": 0.99,
         "GAE_LAMBDA": 0.95,
         "CLIP_EPS": 0.2,
