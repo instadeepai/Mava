@@ -113,9 +113,10 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
         steps_per_second = episode_steps / (time.time() - start_time)
         mean_episode_return = np.mean(np.array(list(episode_returns.values())))
 
+        # executor or evaluator
+        loop_type = self._loop_label.split("_")[0]
         # Record counts.
         if hasattr(self._executor, "_counts"):
-            loop_type = "evaluator" if "_" not in self._loop_label else "executor"
             if hasattr(self._executor, "_variable_client"):
                 self._executor._variable_client.add_async(
                     [f"{loop_type}_episodes", f"{loop_type}_steps"],
@@ -127,7 +128,6 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
 
             counts = self._executor._counts
         elif hasattr(self._executor, "store"):
-            loop_type = "evaluator" if "_" not in self._loop_label else "executor"
             self._executor.store.executor_parameter_client.add_async(
                 {f"{loop_type}_episodes": 1, f"{loop_type}_steps": episode_steps}
             )
@@ -231,9 +231,11 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
         steps_per_second = episode_steps / (time.time() - start_time)
         mean_episode_return = np.mean(np.array(list(episode_returns.values())))
         raw_sum_episode_return = np.sum(np.array(list(episode_returns.values())))
+
+        # executor or evaluator
+        loop_type = self._loop_label.split("_")[0]
         # Record counts.
         if hasattr(self._executor, "_counts"):
-            loop_type = "evaluator" if "_" not in self._loop_label else "executor"
             if hasattr(self._executor, "_variable_client"):
                 self._executor._variable_client.add_async(
                     [f"{loop_type}_episodes", f"{loop_type}_steps"],
@@ -245,7 +247,6 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
 
             counts = self._executor._counts
         elif hasattr(self._executor, "store"):
-            loop_type = "evaluator" if "_" not in self._loop_label else "executor"
             self._executor.store.executor_parameter_client.add_async(
                 {f"{loop_type}_episodes": 1, f"{loop_type}_steps": episode_steps}
             )
