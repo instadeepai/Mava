@@ -85,6 +85,7 @@ class PPONetworks:
             rng_key: networks_lib.PRNGKey,
             mask: chex.Array = None,
             policy_state: Tuple[jnp.ndarray] = None,
+            evaluate: bool = False,
         ) -> Tuple[NestedArray, NestedArray, NestedArray]:
             """Get actions and relevant log probabilities from the \
                 policy network given some observations.
@@ -105,19 +106,25 @@ class PPONetworks:
             # The parameters of the network might change. So it has to
             # be fed into the jitted function.
             if not self.policy_init_state:
-                distribution = self.policy_network.apply(policy_params, observations)
+                logits = self.policy_network.apply(policy_params, observations)
             else:
-                distribution, policy_state = self.policy_network.apply(
+                logits, policy_state = self.policy_network.apply(
                     policy_params, [observations, policy_state]
                 )
 
             if mask is not None:
-                distribution = action_mask_categorical_policies(distribution, mask)
+                distribution = action_mask_categorical_policies(logits, mask)
 
-            actions = jnp.squeeze(distribution.sample(seed=rng_key))
+            actions = jax.lax.cond(
+                evaluate,
+                lambda dist: dist.mode(),
+                lambda dist: dist.sample(seed=rng_key),
+                distribution,
+            )
+
             log_prob = jnp.squeeze(distribution.log_prob(actions))
 
-            return actions, log_prob, policy_state
+            return jnp.squeeze(actions), log_prob, policy_state
 
         self.forward_fn = forward_fn
 
@@ -128,6 +135,7 @@ class PPONetworks:
         base_key: networks_lib.PRNGKey,
         mask: chex.Array = None,
         policy_state: Any = None,
+        evaluate: bool = False,
     ) -> Tuple[jnp.ndarray, Dict]:
         """Get actions from policy network given observations."""
 
@@ -137,6 +145,7 @@ class PPONetworks:
             rng_key=base_key,
             mask=mask,
             policy_state=policy_state,
+            evaluate=evaluate,
         )
 
         if self.policy_init_state:

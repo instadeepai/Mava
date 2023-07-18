@@ -25,6 +25,7 @@ from mava.components.updating.parameter_server import ParameterServer
 from mava.core_jax import SystemParameterServer
 from mava.utils.checkpointing_utils import update_to_best_net
 from mava.wrappers import SaveableWrapper
+import numpy as np
 
 """Checkpointer component for Mava systems."""
 
@@ -67,6 +68,13 @@ class Checkpointer(Component):
             self.config.restore_best_net is not None
         ):
             update_to_best_net(server, self.config.restore_best_net)
+
+        # If eval only run - we set num of evaluator_episodes to 0
+        # This is when we load an experiment and want to run for x evaluator_episodes.
+        if server.store.num_executors == 0:
+            server.store.parameters.update(
+                {"evaluator_episodes": np.zeros(1, dtype=np.int32)}
+            )
 
         server.store.last_checkpoint_time = time.time()
         server.store.checkpoint_minute_interval = self.config.checkpoint_minute_interval
