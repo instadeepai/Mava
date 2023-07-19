@@ -115,13 +115,14 @@ class PPONetworks:
             if mask is not None:
                 distribution = action_mask_categorical_policies(logits, mask)
 
-            actions = jax.lax.cond(
-                evaluate,
-                lambda dist: dist.mode(),
-                lambda dist: dist.sample(seed=rng_key),
-                distribution,
-            )
+            # actions = jax.lax.cond(
+            #     evaluate,
+            #     lambda dist: dist.mode(),
+            #     lambda dist: dist.sample(seed=rng_key),
+            #     distribution,
+            # )
 
+            actions = distribution.sample(seed=rng_key)
             log_prob = jnp.squeeze(distribution.log_prob(actions))
 
             return jnp.squeeze(actions), log_prob, policy_state
