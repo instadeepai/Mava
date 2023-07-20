@@ -21,10 +21,77 @@ import optax
 from flax.linen.initializers import constant, orthogonal
 from typing import Sequence, NamedTuple, Any
 from flax.training.train_state import TrainState
+from flax import struct
 import distrax
-import gymnax
-from jax_distribution.wrappers.purejaxrl import LogWrapper, FlattenObservationWrapper
+import jumanji
+from jumanji.wrappers import AutoResetWrapper
+# from jax_distribution.wrappers.purejaxrl import LogWrapper, FlattenObservationWrapper
 import time
+from jumanji.environments.routing.robot_warehouse.types import State
+from jumanji.wrappers import Wrapper
+from jumanji.types import TimeStep
+import chex 
+from typing import Tuple
+import timeit
+
+class TimeIt:
+    """Context manager for timing execution."""
+
+    def __init__(self, tag: str, frames=None) -> None:
+        """Initialise the context manager."""
+        self.tag = tag
+        self.frames = frames
+
+    def __enter__(self) -> "TimeIt":
+        """Start the timer."""
+        self.start = timeit.default_timer()
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        """Print the elapsed time."""
+        self.elapsed_secs = timeit.default_timer() - self.start
+        msg = self.tag + (": Elapsed time=%.2fs" % self.elapsed_secs)
+        if self.frames:
+            msg += ", FPS=%.2e" % (self.frames / self.elapsed_secs)
+        print(msg)
+
+@struct.dataclass
+class LogEnvState:
+    env_state: State
+    episode_returns: float
+    episode_lengths: int
+    returned_episode_returns: float
+    returned_episode_lengths: int
+
+class LogWrapper(Wrapper):
+    """Log the episode returns and lengths."""
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[LogEnvState, TimeStep]:
+        state, timestep = self._env.reset(key)
+        state = LogEnvState(state, 0.0, 0.0, 0.0, 0.0)
+        return state, timestep
+
+    def step(
+        self,
+        state: State,
+        action: jnp.ndarray,
+    ) -> Tuple[State, TimeStep]:
+        env_state, timestep = self._env.step(state.env_state, action)
+
+        new_episode_return = state.episode_returns + jnp.mean(timestep.reward)
+        new_episode_length = state.episode_lengths + 1
+        state = LogEnvState(
+            env_state=env_state,
+            episode_returns=new_episode_return * (1 - timestep.last()),
+            episode_lengths=new_episode_length * (1 - timestep.last()),
+            returned_episode_returns=state.returned_episode_returns
+            * (1 - timestep.last())
+            + new_episode_return * timestep.last(),
+            returned_episode_lengths=state.returned_episode_lengths
+            * (1 - timestep.last())
+            + new_episode_length * timestep.last(),
+        )
+        return state, timestep
 
 
 class ActorCritic(nn.Module):
@@ -32,7 +99,17 @@ class ActorCritic(nn.Module):
     activation: str = "tanh"
 
     @nn.compact
-    def __call__(self, x):
+    def __call__(self, observation):
+        
+        # TODO: Include grid embedding to the network. 
+        # Something like this. 
+        # observation.grid (B, 10, 10) -> CNN -> (B, 1, H) -> (B, 3, H)
+        # observation.agents_locations (B, 3, 2)
+
+        # x = concat(grid_embedding, agent_locations) (B, 3, H+2)
+
+        x = observation.agents_locations
+
         if self.activation == "relu":
             activation = nn.relu
         else:
@@ -48,7 +125,14 @@ class ActorCritic(nn.Module):
         actor_mean = nn.Dense(
             self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(actor_mean)
-        pi = distrax.Categorical(logits=actor_mean)
+
+        masked_logits = jnp.where(
+            observation.action_mask,
+            actor_mean,
+            jnp.finfo(jnp.float32).min,
+        )
+
+        pi = distrax.Categorical(logits=masked_logits)
 
         critic = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
@@ -72,7 +156,7 @@ class Transition(NamedTuple):
     reward: jnp.ndarray
     log_prob: jnp.ndarray
     obs: jnp.ndarray
-    info: jnp.ndarray
+    info: dict
 
 
 def make_train(config):
@@ -82,8 +166,8 @@ def make_train(config):
     config["MINIBATCH_SIZE"] = (
         config["NUM_ENVS"] * config["NUM_STEPS"] // config["NUM_MINIBATCHES"]
     )
-    env, env_params = gymnax.make(config["ENV_NAME"])
-    env = FlattenObservationWrapper(env)
+    env = jumanji.make(config["ENV_NAME"])
+    env = AutoResetWrapper(env)
     env = LogWrapper(env)
 
     def linear_schedule(count):
@@ -97,10 +181,11 @@ def make_train(config):
     def train(rng):
         # INIT NETWORK
         network = ActorCritic(
-            env.action_space(env_params).n, activation=config["ACTIVATION"]
+            4, activation=config["ACTIVATION"]
         )
         rng, _rng = jax.random.split(rng)
-        init_x = jnp.zeros(env.observation_space(env_params).shape)
+        init_x = env.observation_spec().generate_value()
+        # init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
         network_params = network.init(_rng, init_x)
         if config["ANNEAL_LR"]:
             tx = optax.chain(
@@ -121,30 +206,38 @@ def make_train(config):
         # INIT ENV
         rng, _rng = jax.random.split(rng)
         reset_rng = jax.random.split(_rng, config["NUM_ENVS"])
-        obsv, env_state = jax.vmap(env.reset, in_axes=(0, None))(reset_rng, env_params)
+        env_state, timestep = jax.vmap(env.reset, in_axes=(0))(reset_rng)
 
         # TRAIN LOOP
         def _update_step(runner_state, unused):
             # COLLECT TRAJECTORIES
             def _env_step(runner_state, unused):
-                train_state, env_state, last_obs, rng = runner_state
+                train_state, env_state, last_timestep, rng = runner_state
 
                 # SELECT ACTION
                 rng, _rng = jax.random.split(rng)
-                pi, value = network.apply(train_state.params, last_obs)
+                pi, value = network.apply(train_state.params, last_timestep.observation)
                 action = pi.sample(seed=_rng)
                 log_prob = pi.log_prob(action)
 
-                # STEP ENV
-                rng, _rng = jax.random.split(rng)
-                rng_step = jax.random.split(_rng, config["NUM_ENVS"])
-                obsv, env_state, reward, done, info = jax.vmap(
-                    env.step, in_axes=(0, 0, 0, None)
-                )(rng_step, env_state, action, env_params)
-                transition = Transition(
-                    done, action, value, reward, log_prob, last_obs, info
+                # TAKE ENV STEP
+                env_state, timestep = jax.vmap(
+                    env.step, in_axes=(0, 0)
+                )(env_state, action)
+
+                done, reward  = jax.tree_util.tree_map(
+                    lambda x: jnp.repeat(x, 3).reshape(config["NUM_ENVS"], -1),
+                    (timestep.last(), timestep.reward),
                 )
-                runner_state = (train_state, env_state, obsv, rng)
+                transition = Transition(
+                    done, action, value, reward, log_prob, last_timestep.observation, 
+                    {
+                        "returned_episode_returns": env_state.returned_episode_returns,
+                        "returned_episode_lengths": env_state.returned_episode_lengths,
+                        "returned_episode": timestep.last(), 
+                    }
+                )
+                runner_state = (train_state, env_state, timestep, rng)
                 return runner_state, transition
 
             runner_state, traj_batch = jax.lax.scan(
@@ -152,8 +245,8 @@ def make_train(config):
             )
 
             # CALCULATE ADVANTAGE
-            train_state, env_state, last_obs, rng = runner_state
-            _, last_val = network.apply(train_state.params, last_obs)
+            train_state, env_state, last_timestep, rng = runner_state
+            _, last_val = network.apply(train_state.params, last_timestep.observation)
 
             def _calculate_gae(traj_batch, last_val):
                 def _get_advantages(gae_and_next_value, transition):
@@ -275,15 +368,16 @@ def make_train(config):
             # Pmean the train state
             types = jax.tree_util.tree_map(lambda x: x.dtype, train_state)
             train_state = jax.lax.pmean(train_state, axis_name="batch")
+            train_state = jax.lax.pmean(train_state, axis_name="devices")
             train_state = jax.tree_util.tree_map(
                 lambda x, t: jnp.asarray(x, dtype=t), train_state, types,
             ) 
 
-            runner_state = (train_state, env_state, last_obs, rng)
+            runner_state = (train_state, env_state, last_timestep, rng)
             return runner_state, metric
 
         rng, _rng = jax.random.split(rng)
-        runner_state = (train_state, env_state, obsv, _rng)
+        runner_state = (train_state, env_state, timestep, _rng)
         runner_state, metric = jax.lax.scan(
             _update_step, runner_state, None, config["NUM_UPDATES"]
         )
@@ -295,9 +389,9 @@ def make_train(config):
 if __name__ == "__main__":
     config = {
         "LR": 2.5e-4,
-        "NUM_ENVS": 4,
+        "NUM_ENVS": 512,
         "NUM_STEPS": 128,
-        "TOTAL_TIMESTEPS": 5e5,
+        "TOTAL_TIMESTEPS": 2e6,
         "UPDATE_EPOCHS": 4,
         "NUM_MINIBATCHES": 4,
         "GAMMA": 0.99,
@@ -306,8 +400,8 @@ if __name__ == "__main__":
         "ENT_COEF": 0.01,
         "VF_COEF": 0.5,
         "MAX_GRAD_NORM": 0.5,
-        "ACTIVATION": "tanh",
-        "ENV_NAME": "CartPole-v1",
+        "ACTIVATION": "relu",
+        "ENV_NAME": "Cleaner-v0",
         "ANNEAL_LR": True,
         "DEBUG": False,
     }
@@ -320,23 +414,79 @@ if __name__ == "__main__":
     fn = make_train(config)
     
     # Num experiments to run
-    num_exp = 4
+    num_exp = 32
 
     num_per_device = num_exp // num_devices
     assert num_exp == num_per_device * num_devices, "num_exp must be divisible by num_devices"
 
     # Vmap over experiments
-    vmap_fn = jax.vmap(fn, in_axes=(0,))
+    vmap_fn = jax.vmap(fn, in_axes=(0,), axis_name="batch")
 
     # Pmap over devices
-    pmap_fn = jax.pmap(vmap_fn, in_axes=(0,), axis_name="batch")
+    pmap_fn = jax.pmap(vmap_fn, in_axes=(0,), axis_name="devices")
 
     rngs = jax.random.split(rng, num_exp)
 
     # Reshape the keys
     rngs_reshaped = jnp.reshape(rngs, (num_devices, num_per_device, -1))
 
-    out = pmap_fn(rngs_reshaped)
-    jax.block_until_ready(out)
-    end = time.time()
-    print("Time taken: ", round(end - start, 2))
+    with TimeIt(tag="COMPILATION"):
+        print("Compiling")
+        jax.block_until_ready(pmap_fn(rngs_reshaped))
+
+    total_frames = config["TOTAL_TIMESTEPS"] * num_exp
+    with TimeIt(tag="EXECUTION", frames=total_frames):
+        print("Execution")
+        out = pmap_fn(rngs_reshaped)
+        jax.block_until_ready(out)
+
+    val = out["metrics"]["returned_episode_returns"].mean()
+    print(f"Mean Episode Return: {val}")
+    val = out["metrics"]["returned_episode_lengths"].mean()
+    print(f"Mean Episode Length: {val}")
+
+    # Evaluate agent 
+    print("STARTING EVAL")
+    trained_params = jax.tree_util.tree_map(lambda x: x[0, 0, ...], out['runner_state'][0].params)
+    network = ActorCritic(4, "relu")
+
+    eval_env = jumanji.make(config["ENV_NAME"])
+    eval_env = AutoResetWrapper(eval_env)
+
+    rng = jax.random.PRNGKey(42)
+    rng, _rng = jax.random.split(rng)
+    init_obs = eval_env.observation_spec().generate_value()
+    
+    _ = network.init(_rng, init_obs)
+
+
+    states = []
+    rng, _rng = jax.random.split(rng)
+    jit_reset = jax.jit(eval_env.reset)
+    jit_step = jax.jit(eval_env.step)
+    env_state, timestep = jit_reset(_rng)
+
+    states.append(env_state)
+    episode_returns = []
+    current_return = 0 
+    for _ in range(300): 
+
+        
+        rng, _rng = jax.random.split(rng)
+        pi, _ = network.apply(
+            trained_params, 
+            timestep.observation)
+        
+        action = pi.sample(seed=_rng)
+
+        env_state, timestep = jit_step(env_state, action)
+        if timestep.last():
+            episode_returns.append(current_return)
+            current_return = 0
+        else:
+            current_return += timestep.reward
+        states.append(env_state)
+
+    print(episode_returns)
+
+    # eval_env.animate(states, interval=150, save_path="cleaner.gif")
