@@ -34,6 +34,11 @@ import chex
 from typing import Tuple
 import timeit
 
+#TODO: import these from jumanji 
+DIRTY = 0
+CLEAN = 1
+WALL = 2
+
 class TimeIt:
     """Context manager for timing execution."""
 
@@ -93,6 +98,57 @@ class LogWrapper(Wrapper):
         )
         return state, timestep
 
+def all_agents_channel(agents_locations: chex.Array, grid: chex.Array) -> chex.Array:
+    """Create a channel containing the number of agents per tile.
+
+    Args:
+        grid: the maze grid.
+        agents_locations: the location of all the agents.
+
+    Returns:
+        array: a 2D jax array containing the number of agents on each tile."""
+
+    xs, ys = agents_locations[:, 0], agents_locations[:, 1]
+    num_agents = agents_locations.shape[0]
+    agents_channel = jnp.repeat(jnp.zeros_like(grid)[None, :, :], num_agents, axis=0)
+    return jnp.sum(agents_channel.at[jnp.arange(num_agents), xs, ys].set(1), axis=0)
+    
+
+
+def process_obs(observation) -> chex.Array:
+    """Process the `Observation`.
+
+    Args:
+        observation: the observation as returned by the environment.
+
+    Returns:
+        array: a 4D jax array with 4 channels per agent:
+            - Dirty channel: 2D array with 1 for dirty tiles and 0 otherwise.
+            - Wall channel: 2D array with 1 for walls and 0 otherwise.
+            - Agent channel: 2D array with 1 for the agent position and 0 otherwise.
+            - Agents channel: 2D array with the number of agents on each tile.
+    """
+    grid = observation.grid
+    agents_locations = observation.agents_locations
+
+    def create_channels_for_one_agent(agent_location: chex.Array) -> chex.Array:
+        dirty_channel = jnp.where(grid == DIRTY, 1, 0)
+        wall_channel = jnp.where(grid == WALL, 1, 0)
+        agent_channel = (
+            jnp.zeros_like(grid).at[agent_location[0], agent_location[1]].set(1)
+        )
+        agents_channel = all_agents_channel(agents_locations, grid)
+        return jnp.stack(
+            [dirty_channel, wall_channel, agent_channel, agents_channel],
+            axis=-1,
+            dtype=float,
+        )
+
+    return jax.vmap(create_channels_for_one_agent)(agents_locations)
+    
+class Flatten(nn.Module):
+    def __call__(self, x):
+        return jnp.reshape(x, (x.shape[0],x.shape[1], -1))
 
 class ActorCritic(nn.Module):
     action_dim: Sequence[int]
@@ -107,8 +163,24 @@ class ActorCritic(nn.Module):
         # observation.agents_locations (B, 3, 2)
 
         # x = concat(grid_embedding, agent_locations) (B, 3, H+2)
-
-        x = observation.agents_locations
+        
+        num_conv_channels=[4, 4, 1]
+        conv_layers = [
+            [
+                nn.Conv(output_channels, (3, 3)),
+                jax.nn.relu,
+            ]
+            for output_channels in num_conv_channels
+        ]
+        torso = nn.Sequential(
+            [
+                *[layer for conv_layer in conv_layers for layer in conv_layer],
+                Flatten()
+            ]
+        )
+        obs =jax.vmap(process_obs)(observation)
+        embedding=torso(obs) # (B, N, W*H)
+        x = embedding
 
         if self.activation == "relu":
             activation = nn.relu
@@ -185,6 +257,7 @@ def make_train(config):
         )
         rng, _rng = jax.random.split(rng)
         init_x = env.observation_spec().generate_value()
+        init_x = jax.tree_util.tree_map(lambda x: jnp.expand_dims(x, axis=0), init_x)
         # init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
         network_params = network.init(_rng, init_x)
         if config["ANNEAL_LR"]:
@@ -456,7 +529,7 @@ if __name__ == "__main__":
     rng = jax.random.PRNGKey(42)
     rng, _rng = jax.random.split(rng)
     init_obs = eval_env.observation_spec().generate_value()
-    
+    init_obs = jax.tree_util.tree_map(lambda x: jnp.expand_dims(x, axis=0), init_obs)
     _ = network.init(_rng, init_obs)
 
 
@@ -471,11 +544,11 @@ if __name__ == "__main__":
     current_return = 0 
     for _ in range(300): 
 
-        
+        obs=jax.tree_util.tree_map(lambda x: jnp.expand_dims(x, axis=0), timestep.observation)
         rng, _rng = jax.random.split(rng)
         pi, _ = network.apply(
             trained_params, 
-            timestep.observation)
+            obs)
         
         action = pi.sample(seed=_rng)
 
