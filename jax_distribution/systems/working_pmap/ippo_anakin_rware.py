@@ -1,15 +1,24 @@
-import time
-import timeit
-from typing import Any, NamedTuple, Sequence
+import os
 
+os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=8"  # Spoof 8 devices
+
+
+import timeit
+from typing import Any, NamedTuple, Sequence, Tuple
+
+import chex
 import distrax
 import flax.linen as nn
-import jumanji
 import jax
 import jax.numpy as jnp
+import jumanji
 import numpy as np
 import optax
+from flax import struct
 from flax.linen.initializers import constant, orthogonal
+from jumanji.environments.routing.robot_warehouse.types import State
+from jumanji.types import TimeStep
+from jumanji.wrappers import AutoResetWrapper, Wrapper
 
 
 class TimeIt:
@@ -28,6 +37,7 @@ class TimeIt:
             msg += ", FPS=%.2e" % (self.frames / self.elapsed_secs)
         print(msg)
 
+
 @struct.dataclass
 class LogEnvState:
     env_state: State
@@ -43,7 +53,7 @@ class LogWrapper(Wrapper):
     def reset(self, key: chex.PRNGKey) -> Tuple[LogEnvState, TimeStep]:
         state, timestep = self._env.reset(key)
         # timestep.extras = {}
-        state = LogEnvState(state, 0, 0, 0, 0)
+        state = LogEnvState(state, 0.0, 0, 0.0, 0)
         return state, timestep
 
     def step(
@@ -67,9 +77,6 @@ class LogWrapper(Wrapper):
             * (1 - timestep.last())
             + new_episode_length * timestep.last(),
         )
-        # timestep.extras["returned_episode_returns"] = state.returned_episode_returns
-        # timestep.extras["returned_episode_lengths"] = state.returned_episode_lengths
-        # timestep.extras["returned_episode"] = timestep.last()
         return state, timestep
 
 
@@ -80,7 +87,7 @@ class ActorCritic(nn.Module):
     @nn.compact
     def __call__(self, observation):
 
-        x = observation
+        x = observation.agents_view
         if self.activation == "relu":
             activation = nn.relu
         else:
@@ -97,7 +104,13 @@ class ActorCritic(nn.Module):
             self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(actor_mean)
 
-        pi = distrax.Categorical(logits=actor_mean)
+        masked_logits = jnp.where(
+            observation.action_mask,
+            actor_mean,
+            jnp.finfo(jnp.float32).min,
+        )
+
+        pi = distrax.Categorical(logits=masked_logits)
 
         critic = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
@@ -124,28 +137,35 @@ class Transition(NamedTuple):
     info: dict
 
 
-def get_learner_fn(env, env_params, apply_fn, update_fn, config):
+def get_learner_fn(env, apply_fn, update_fn, config):
     def _update_step(runner_state, unused_target):
         def _env_step(runner_state, unused):
             # runner_state = (params, opt_state, rng, env_state, obs)
-            params, opt_state, rng, env_state, last_obs = runner_state
+            params, opt_state, rng, env_state, last_timestep = runner_state
 
             # SELECT ACTION
             rng, _rng = jax.random.split(rng)
-            pi, value = apply_fn(params, last_obs)
+            pi, value = apply_fn(params, last_timestep.observation)
             action = pi.sample(seed=_rng)
             log_prob = pi.log_prob(action)
 
-            # STEP ENV
-            rng, _rng = jax.random.split(rng)
-            rng_step = jax.random.split(_rng, config["NUM_ENVS"])
-            obsv, env_state, reward, done, info = jax.vmap(
-                env.step, in_axes=(0, 0, 0, None)
-            )(rng_step, env_state, action, env_params)
-            transition = Transition(
-                done, action, value, reward, log_prob, last_obs, info
+            env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
+
+            done, reward = jax.tree_util.tree_map(
+                lambda x: jnp.repeat(x, config["NUM_AGENTS"]).reshape(
+                    config["NUM_ENVS"], -1
+                ),
+                (timestep.last(), timestep.reward),
             )
-            runner_state = (params, opt_state, rng, env_state, obsv)
+            info = {
+                "returned_episode_returns": env_state.returned_episode_returns,
+                "returned_episode_lengths": env_state.returned_episode_lengths,
+            }
+
+            transition = Transition(
+                done, action, value, reward, log_prob, last_timestep.observation, info
+            )
+            runner_state = (params, opt_state, rng, env_state, timestep)
             return runner_state, transition
 
         runner_state, traj_batch = jax.lax.scan(
@@ -153,8 +173,8 @@ def get_learner_fn(env, env_params, apply_fn, update_fn, config):
         )
 
         # CALCULATE ADVANTAGE
-        params, opt_state, rng, env_state, last_obs = runner_state
-        _, last_val = apply_fn(params, last_obs)
+        params, opt_state, rng, env_state, last_timestep = runner_state
+        _, last_val = apply_fn(params, last_timestep.observation)
 
         def _calculate_gae(traj_batch, last_val):
             def _get_advantages(gae_and_next_value, transition):
@@ -276,13 +296,13 @@ def get_learner_fn(env, env_params, apply_fn, update_fn, config):
         )
 
         params, opt_state, traj_batch, advantages, targets, rng = update_state
-        runner_state = (params, opt_state, rng, env_state, last_obs)
+        runner_state = (params, opt_state, rng, env_state, last_timestep)
         metric = traj_batch.info
 
         return runner_state, metric
 
-    def learner_fn(params, opt_state, rng, env_state, obs):
-        runner_state = (params, opt_state, rng, env_state, obs)
+    def learner_fn(params, opt_state, rng, env_state, timesteps):
+        runner_state = (params, opt_state, rng, env_state, timesteps)
 
         batched_update_step = jax.vmap(
             _update_step, in_axes=(0, None), axis_name="batch"
@@ -296,23 +316,25 @@ def get_learner_fn(env, env_params, apply_fn, update_fn, config):
     return learner_fn
 
 
-def run_experiment(env, env_params, config):
+def run_experiment(env, config):
     """Runs experiment."""
     cores_count = len(jax.devices())  # get available TPU cores.
-    network = ActorCritic(env.num_actions, "relu")  # define network.
+    num_actions = int(env.action_spec().num_values[0])
+    num_agents = env.action_spec().shape[0]
+    config["NUM_AGENTS"] = num_agents
+    network = ActorCritic(num_actions, config["ACTIVATION"])  # define network.
     optim = optax.adam(config["LR"])  # define optimiser.
 
     rng, rng_e, rng_p = jax.random.split(
         jax.random.PRNGKey(config["SEED"]), num=3
     )  # prng keys.
-    init_x = jnp.zeros(env.observation_space(env_params).shape)[
-        None,
-    ]
+    init_x = env.observation_spec().generate_value()
+    init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
     params = network.init(rng_p, init_x)
     opt_state = optim.init(params)  # initialise optimiser stats.
 
     learn = get_learner_fn(  # get batched iterated update.
-        env, env_params, network.apply, optim.update, config
+        env, network.apply, optim.update, config
     )
     learn = jax.pmap(learn, axis_name="device")  # replicate over multiple cores.
 
@@ -325,8 +347,8 @@ def run_experiment(env, env_params, config):
     rng, *env_rngs = jax.random.split(
         rng, cores_count * config["BATCH_SIZE"] * config["NUM_ENVS"] + 1
     )
-    obsvs, env_states = jax.vmap(env.reset, in_axes=(0, None))(
-        jnp.stack(env_rngs), env_params
+    env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
+        jnp.stack(env_rngs),
     )  # init envs.
     rng, *step_rngs = jax.random.split(rng, cores_count * config["BATCH_SIZE"] + 1)
 
@@ -341,10 +363,12 @@ def run_experiment(env, env_params, config):
     env_states = jax.tree_util.tree_map(
         reshape_states, env_states
     )  # add dimension to pmap over.
-    obsvs = reshape_states(obsvs)  # add dimension to pmap over.
+    timesteps = jax.tree_util.tree_map(
+        reshape_states, timesteps
+    )  # add dimension to pmap over.
 
     with TimeIt(tag="COMPILATION"):
-        learn(params, opt_state, step_rngs, env_states, obsvs)  # compiles
+        learn(params, opt_state, step_rngs, env_states, timesteps)  # compiles
 
     num_frames = (
         cores_count
@@ -355,16 +379,17 @@ def run_experiment(env, env_params, config):
     )
     with TimeIt(tag="EXECUTION", frames=num_frames):
         output = learn(  # runs compiled fn
-            params, opt_state, step_rngs, env_states, obsvs
+            params, opt_state, step_rngs, env_states, timesteps
         )
 
-    return output 
+    return output
+
 
 config = {
     "LR": 2.5e-4,
     "BATCH_SIZE": 4,
     "ROLLOUT_LENGTH": 128,
-    "NUM_UPDATES": 2000,
+    "NUM_UPDATES": 10,
     "NUM_ENVS": 32,
     "UPDATE_EPOCHS": 4,
     "NUM_MINIBATCHES": 8,
@@ -374,16 +399,16 @@ config = {
     "ENT_COEF": 0.01,
     "VF_COEF": 0.5,
     "MAX_GRAD_NORM": 0.5,
-    "ACTIVATION": "tanh",
-    "ENV_NAME": "CartPole-v1",
+    "ACTIVATION": "relu",
+    "ENV_NAME": "RobotWarehouse-v0",
     "SEED": 42,
 }
 
-env, env_params = gymnax.make(config["ENV_NAME"])
-env = FlattenObservationWrapper(env)
+env = jumanji.make(config["ENV_NAME"])
+env = AutoResetWrapper(env)
 env = LogWrapper(env)
 
-output = run_experiment(env, env_params, config)
+output = run_experiment(env, config)
 print(f"MEAN RETURN: {output['metrics']['returned_episode_returns'].mean()}")
 print(f"MAX RETURN: {output['metrics']['returned_episode_returns'].max()}")
-x = 0 
+x = 0
