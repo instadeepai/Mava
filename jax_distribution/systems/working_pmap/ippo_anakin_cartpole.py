@@ -309,21 +309,23 @@ def run_experiment(env, env_params, config):
         * config["NUM_UPDATES"]
         * config["ROLLOUT_LENGTH"]
         * config["BATCH_SIZE"]
+        * config["NUM_ENVS"]
     )
     with TimeIt(tag="EXECUTION", frames=num_frames):
         output = learn(  # runs compiled fn
             params, opt_state, step_rngs, env_states, obsvs
         )
 
+    return output 
 
 config = {
     "LR": 2.5e-4,
     "BATCH_SIZE": 4,
     "ROLLOUT_LENGTH": 128,
-    "NUM_UPDATES": 10,
-    "NUM_ENVS": 4,
+    "NUM_UPDATES": 2000,
+    "NUM_ENVS": 32,
     "UPDATE_EPOCHS": 4,
-    "NUM_MINIBATCHES": 4,
+    "NUM_MINIBATCHES": 8,
     "GAMMA": 0.99,
     "GAE_LAMBDA": 0.95,
     "CLIP_EPS": 0.2,
@@ -339,4 +341,7 @@ env, env_params = gymnax.make(config["ENV_NAME"])
 env = FlattenObservationWrapper(env)
 env = LogWrapper(env)
 
-run_experiment(env, env_params, config)
+output = run_experiment(env, env_params, config)
+print(f"MEAN RETURN: {output['metrics']['returned_episode_returns'].mean()}")
+print(f"MAX RETURN: {output['metrics']['returned_episode_returns'].max()}")
+x = 0 
