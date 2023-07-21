@@ -1,38 +1,35 @@
-# Spoof 8 devices for local development.
+import time
+import timeit
+from typing import Any, NamedTuple, Sequence
 
-import os 
-os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=8"  # Use 8 devices
-
+import distrax
+import flax.linen as nn
+import gymnax
 import jax
 import jax.numpy as jnp
-import flax.linen as nn
 import numpy as np
 import optax
 from flax.linen.initializers import constant, orthogonal
-from typing import Sequence, NamedTuple, Any
-from flax.training.train_state import TrainState
-import distrax
-import gymnax
-from jax_distribution.wrappers.purejaxrl import LogWrapper, FlattenObservationWrapper
-import time
-import timeit
 
-class TimeIt():
+from jax_distribution.wrappers.purejaxrl import FlattenObservationWrapper, LogWrapper
 
+
+class TimeIt:
     def __init__(self, tag, frames=None):
-      self.tag = tag
-      self.frames = frames
+        self.tag = tag
+        self.frames = frames
 
     def __enter__(self):
-      self.start = timeit.default_timer()
-      return self
+        self.start = timeit.default_timer()
+        return self
 
     def __exit__(self, *args):
-      self.elapsed_secs = timeit.default_timer() - self.start
-      msg = self.tag + (': Elapsed time=%.2fs' % self.elapsed_secs)
-      if self.frames:
-        msg += ', FPS=%.2e' % (self.frames / self.elapsed_secs)
-      print(msg)
+        self.elapsed_secs = timeit.default_timer() - self.start
+        msg = self.tag + (": Elapsed time=%.2fs" % self.elapsed_secs)
+        if self.frames:
+            msg += ", FPS=%.2e" % (self.frames / self.elapsed_secs)
+        print(msg)
+
 
 class ActorCritic(nn.Module):
     action_dim: Sequence[int]
@@ -74,6 +71,7 @@ class ActorCritic(nn.Module):
 
         return pi, jnp.squeeze(critic, axis=-1)
 
+
 class Transition(NamedTuple):
     done: jnp.ndarray
     action: jnp.ndarray
@@ -83,10 +81,9 @@ class Transition(NamedTuple):
     obs: jnp.ndarray
     info: dict
 
-def get_learner_fn(env, env_params, apply_fn, update_fn, config):
 
+def get_learner_fn(env, env_params, apply_fn, update_fn, config):
     def _update_step(runner_state, unused_target):
-        
         def _env_step(runner_state, unused):
             # runner_state = (params, opt_state, rng, env_state, obs)
             params, opt_state, rng, env_state, last_obs = runner_state
@@ -106,7 +103,7 @@ def get_learner_fn(env, env_params, apply_fn, update_fn, config):
             transition = Transition(
                 done, action, value, reward, log_prob, last_obs, info
             )
-            runner_state = (params, opt_state, env_state, obsv, rng)
+            runner_state = (params, opt_state, rng, env_state, obsv)
             return runner_state, transition
 
         runner_state, traj_batch = jax.lax.scan(
@@ -114,7 +111,7 @@ def get_learner_fn(env, env_params, apply_fn, update_fn, config):
         )
 
         # CALCULATE ADVANTAGE
-        params, opt_state, env_state, last_obs, rng = runner_state
+        params, opt_state, rng, env_state, last_obs = runner_state
         _, last_val = apply_fn(params, last_obs)
 
         def _calculate_gae(traj_batch, last_val):
@@ -126,10 +123,7 @@ def get_learner_fn(env, env_params, apply_fn, update_fn, config):
                     transition.reward,
                 )
                 delta = reward + config["GAMMA"] * next_value * (1 - done) - value
-                gae = (
-                    delta
-                    + config["GAMMA"] * config["GAE_LAMBDA"] * (1 - done) * gae
-                )
+                gae = delta + config["GAMMA"] * config["GAE_LAMBDA"] * (1 - done) * gae
                 return (gae, value), gae
 
             _, advantages = jax.lax.scan(
@@ -145,7 +139,8 @@ def get_learner_fn(env, env_params, apply_fn, update_fn, config):
 
         # UPDATE NETWORK
         def _update_epoch(update_state, unused):
-            def _update_minbatch(params, opt_state, batch_info):
+            def _update_minbatch(train_state, batch_info):
+                params, opt_state = train_state
                 traj_batch, advantages, targets = batch_info
 
                 def _loss_fn(params, opt_state, traj_batch, gae, targets):
@@ -190,15 +185,28 @@ def get_learner_fn(env, env_params, apply_fn, update_fn, config):
                 total_loss, grads = grad_fn(
                     params, opt_state, traj_batch, advantages, targets
                 )
-                train_state = train_state.apply_gradients(grads=grads)
-                return (params, opt_state), total_loss
 
-            (params, opt_state), traj_batch, advantages, targets, rng = update_state
+                grads, total_loss = jax.lax.pmean(
+                    (grads, total_loss), axis_name="batch"
+                )
+                grads, total_loss = jax.lax.pmean(
+                    (grads, total_loss), axis_name="device"
+                )
+
+                updates, new_opt_state = update_fn(grads, opt_state)
+                new_params = optax.apply_updates(params, updates)
+
+                return (new_params, new_opt_state), total_loss
+
+            params, opt_state, traj_batch, advantages, targets, rng = update_state
             rng, _rng = jax.random.split(rng)
-            batch_size = config["MINIBATCH_SIZE"] * config["NUM_MINIBATCHES"]
-            assert (
-                batch_size == config["NUM_STEPS"] * config["NUM_ENVS"]
-            ), "batch size must be equal to number of steps * number of envs"
+
+            # TODO: Set this properly
+            batch_size = config["ROLLOUT_LENGTH"] * config["NUM_ENVS"]
+            # batch_size = config["MINIBATCH_SIZE"] * config["NUM_MINIBATCHES"]
+            # assert (
+            #     batch_size == config["NUM_STEPS"] * config["NUM_ENVS"]
+            # ), "batch size must be equal to number of steps * number of envs"
             permutation = jax.random.permutation(_rng, batch_size)
             batch = (traj_batch, advantages, targets)
             batch = jax.tree_util.tree_map(
@@ -216,20 +224,27 @@ def get_learner_fn(env, env_params, apply_fn, update_fn, config):
             (params, opt_state), total_loss = jax.lax.scan(
                 _update_minbatch, (params, opt_state), minibatches
             )
-            update_state = ((params, opt_state), traj_batch, advantages, targets, rng)
+            update_state = (params, opt_state, traj_batch, advantages, targets, rng)
             return update_state, total_loss
 
-        update_state = ((params, opt_state), traj_batch, advantages, targets, rng)
-        
+        update_state = (params, opt_state, traj_batch, advantages, targets, rng)
+
         update_state, loss_info = jax.lax.scan(
             _update_epoch, update_state, None, config["UPDATE_EPOCHS"]
         )
 
+        params, opt_state, traj_batch, advantages, targets, rng = update_state
+        runner_state = (params, opt_state, rng, env_state, last_obs)
+        metric = traj_batch.info
+
+        return runner_state, metric
 
     def learner_fn(params, opt_state, rng, env_state, obs):
         runner_state = (params, opt_state, rng, env_state, obs)
 
-        batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
+        batched_update_step = jax.vmap(
+            _update_step, in_axes=(0, None), axis_name="batch"
+        )
 
         runner_state, metric = jax.lax.scan(
             batched_update_step, runner_state, None, config["NUM_UPDATES"]
@@ -238,49 +253,74 @@ def get_learner_fn(env, env_params, apply_fn, update_fn, config):
 
     return learner_fn
 
+
 def run_experiment(env, env_params, config):
     """Runs experiment."""
     cores_count = len(jax.devices())  # get available TPU cores.
     network = ActorCritic(env.num_actions, "relu")  # define network.
     optim = optax.adam(config["LR"])  # define optimiser.
 
-    rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["SEED"]), num=3)  # prng keys.
-    init_x = jnp.zeros(env.observation_space(env_params).shape)[None, ]
+    rng, rng_e, rng_p = jax.random.split(
+        jax.random.PRNGKey(config["SEED"]), num=3
+    )  # prng keys.
+    init_x = jnp.zeros(env.observation_space(env_params).shape)[
+        None,
+    ]
     params = network.init(rng_p, init_x)
     opt_state = optim.init(params)  # initialise optimiser stats.
 
     learn = get_learner_fn(  # get batched iterated update.
-        env, env_params, network.apply, optim.update, config)
-    learn = jax.pmap(learn, axis_name='device')  # replicate over multiple cores.
+        env, env_params, network.apply, optim.update, config
+    )
+    learn = jax.pmap(learn, axis_name="device")  # replicate over multiple cores.
 
-    broadcast = lambda x: jnp.broadcast_to(x, (cores_count, config["BATCH_SIZE"]) + x.shape)
+    broadcast = lambda x: jnp.broadcast_to(
+        x, (cores_count, config["BATCH_SIZE"]) + x.shape
+    )
     params = jax.tree_map(broadcast, params)  # broadcast to cores and batch.
     opt_state = jax.tree_map(broadcast, opt_state)  # broadcast to cores and batch
 
-    rng, *env_rngs = jax.random.split(rng, cores_count * config["BATCH_SIZE"] * config["NUM_ENVS"] + 1)
-    obsvs, env_states = jax.vmap(env.reset, in_axes=(0, None))(jnp.stack(env_rngs), env_params)  # init envs.
+    rng, *env_rngs = jax.random.split(
+        rng, cores_count * config["BATCH_SIZE"] * config["NUM_ENVS"] + 1
+    )
+    obsvs, env_states = jax.vmap(env.reset, in_axes=(0, None))(
+        jnp.stack(env_rngs), env_params
+    )  # init envs.
     rng, *step_rngs = jax.random.split(rng, cores_count * config["BATCH_SIZE"] + 1)
 
-    reshape_step_rngs = lambda x: x.reshape((cores_count, config["BATCH_SIZE"]) + x.shape[1:])
+    reshape_step_rngs = lambda x: x.reshape(
+        (cores_count, config["BATCH_SIZE"]) + x.shape[1:]
+    )
     step_rngs = reshape_step_rngs(jnp.stack(step_rngs))  # add dimension to pmap over.
 
-    reshape_states = lambda x: x.reshape((cores_count, config["BATCH_SIZE"], config["NUM_ENVS"]) + x.shape[1:])
-    env_states = jax.tree_util.tree_map(reshape_states, env_states)  # add dimension to pmap over.
+    reshape_states = lambda x: x.reshape(
+        (cores_count, config["BATCH_SIZE"], config["NUM_ENVS"]) + x.shape[1:]
+    )
+    env_states = jax.tree_util.tree_map(
+        reshape_states, env_states
+    )  # add dimension to pmap over.
     obsvs = reshape_states(obsvs)  # add dimension to pmap over.
 
-    with TimeIt(tag='COMPILATION'):
-      learn(params, opt_state, step_rngs, env_states, obsvs)  # compiles
+    with TimeIt(tag="COMPILATION"):
+        learn(params, opt_state, step_rngs, env_states, obsvs)  # compiles
 
-    num_frames = cores_count * config["NUM_ITERATIONS"] * config["ROLLOUT_LENGTH"] * config["BATCH_SIZE"]
-    with TimeIt(tag='EXECUTION', frames=num_frames):
-      output = learn(  # runs compiled fn
-          params, opt_state, step_rngs, env_states, obsvs)
+    num_frames = (
+        cores_count
+        * config["NUM_UPDATES"]
+        * config["ROLLOUT_LENGTH"]
+        * config["BATCH_SIZE"]
+    )
+    with TimeIt(tag="EXECUTION", frames=num_frames):
+        output = learn(  # runs compiled fn
+            params, opt_state, step_rngs, env_states, obsvs
+        )
+
 
 config = {
     "LR": 2.5e-4,
     "BATCH_SIZE": 4,
     "ROLLOUT_LENGTH": 128,
-    "NUM_UPDATES": 10, 
+    "NUM_UPDATES": 10,
     "NUM_ENVS": 4,
     "UPDATE_EPOCHS": 4,
     "NUM_MINIBATCHES": 4,
@@ -292,8 +332,8 @@ config = {
     "MAX_GRAD_NORM": 0.5,
     "ACTIVATION": "tanh",
     "ENV_NAME": "CartPole-v1",
-    "SEED":42, 
-    }
+    "SEED": 42,
+}
 
 env, env_params = gymnax.make(config["ENV_NAME"])
 env = FlattenObservationWrapper(env)
