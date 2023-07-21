@@ -74,15 +74,68 @@ class LogWrapper(Wrapper):
         )
         return state, timestep
 
+class Flatten(nn.Module):
+    def __call__(self, x):
+        return jnp.reshape(x, (x.shape[0],x.shape[1], -1))
 
 class ActorCritic(nn.Module):
     action_dim: Sequence[int]
     activation: str = "tanh"
+    time_limit: int = 100
 
     @nn.compact
     def __call__(self, observation):
+        
+        # TODO: Include grid embedding to the network. 
+        # Something like this. 
+        # observation.grid (B, 10, 10) -> CNN -> (B, 1, H) -> (B, 3, H)
+        # observation.agents_locations (B, 3, 2)
 
-        x = observation.agents_view
+        # x = concat(grid_embedding, agent_locations) (B, 3, H+2)
+        
+        """num_conv_channels=[4, 4, 1]
+        conv_layers = [
+            [
+                nn.Conv(output_channels, (3, 3)),
+                jax.nn.relu,
+            ]
+            for output_channels in num_conv_channels
+        ]
+        torso = nn.Sequential(
+            [
+                *[layer for conv_layer in conv_layers for layer in conv_layer],
+                Flatten()
+            ]
+        )
+        obs =jax.vmap(process_obs)(observation)
+        embedding=torso(obs) # (B, N, W*H)
+        num_agents = obs.shape[1]
+        normalised_step_count = jnp.repeat(
+            jnp.expand_dims(observation.step_count, axis=(-1)) / self.time_limit,
+            num_agents,
+            axis=1,
+        )  # (B, N, 1)
+        output = jnp.concatenate(
+            [embedding, normalised_step_count], axis=-1
+        )
+        x = output"""
+
+        # Define convolutional an dense layers
+        grid=jnp.expand_dims(observation.grid, axis=-1)
+        conv_output = nn.Conv(32, kernel_size=(3, 3), strides=(2, 2))(grid)
+        conv_output = jax.nn.relu(conv_output)
+        conv_output = nn.Conv(32, kernel_size=(3, 3), strides=(2, 2))(conv_output)
+        conv_output = jax.nn.relu(conv_output)
+        conv_output = nn.Conv(1, kernel_size=(1, 1), strides=(1, 1))(conv_output)
+        conv_output = jax.nn.relu(conv_output)
+        # Flatten the output
+        conv_output = jnp.reshape(conv_output, (observation.agents_locations.shape[0],observation.agents_locations.shape[1], -1))
+        # Pass through dense layers
+        grid_embedding = nn.Dense(8)(conv_output)
+        x =  jnp.concatenate(
+            [grid_embedding, observation.agents_locations], axis=-1
+        )
+
         if self.activation == "relu":
             activation = nn.relu
         else:
@@ -384,8 +437,8 @@ config = {
     "LR": 2.5e-4,
     "BATCH_SIZE": 4,
     "ROLLOUT_LENGTH": 128,
-    "NUM_UPDATES": 10,
-    "NUM_ENVS": 32,
+    "NUM_UPDATES": 1000,
+    "NUM_ENVS": 64,
     "UPDATE_EPOCHS": 4,
     "NUM_MINIBATCHES": 8,
     "GAMMA": 0.99,
@@ -395,7 +448,7 @@ config = {
     "VF_COEF": 0.5,
     "MAX_GRAD_NORM": 0.5,
     "ACTIVATION": "relu",
-    "ENV_NAME": "RobotWarehouse-v0",
+    "ENV_NAME": "Cleaner-v0",
     "SEED": 42,
 }
 
