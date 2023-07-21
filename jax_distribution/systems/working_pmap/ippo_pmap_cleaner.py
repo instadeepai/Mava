@@ -153,6 +153,7 @@ class Flatten(nn.Module):
 class ActorCritic(nn.Module):
     action_dim: Sequence[int]
     activation: str = "tanh"
+    time_limit: int = 100
 
     @nn.compact
     def __call__(self, observation):
@@ -164,7 +165,7 @@ class ActorCritic(nn.Module):
 
         # x = concat(grid_embedding, agent_locations) (B, 3, H+2)
         
-        num_conv_channels=[4, 4, 1]
+        """num_conv_channels=[4, 4, 1]
         conv_layers = [
             [
                 nn.Conv(output_channels, (3, 3)),
@@ -180,7 +181,32 @@ class ActorCritic(nn.Module):
         )
         obs =jax.vmap(process_obs)(observation)
         embedding=torso(obs) # (B, N, W*H)
-        x = embedding
+        num_agents = obs.shape[1]
+        normalised_step_count = jnp.repeat(
+            jnp.expand_dims(observation.step_count, axis=(-1)) / self.time_limit,
+            num_agents,
+            axis=1,
+        )  # (B, N, 1)
+        output = jnp.concatenate(
+            [embedding, normalised_step_count], axis=-1
+        )
+        x = output"""
+
+        # Define convolutional an dense layers
+        grid=jnp.expand_dims(observation.grid, axis=-1)
+        conv_output = nn.Conv(32, kernel_size=(3, 3), strides=(2, 2))(grid)
+        conv_output = jax.nn.relu(conv_output)
+        conv_output = nn.Conv(32, kernel_size=(3, 3), strides=(2, 2))(conv_output)
+        conv_output = jax.nn.relu(conv_output)
+        conv_output = nn.Conv(1, kernel_size=(1, 1), strides=(1, 1))(conv_output)
+        conv_output = jax.nn.relu(conv_output)
+        # Flatten the output
+        conv_output = jnp.reshape(conv_output, (observation.agents_locations.shape[0],observation.agents_locations.shape[1], -1))
+        # Pass through dense layers
+        grid_embedding = nn.Dense(8)(conv_output)
+        x =  jnp.concatenate(
+            [grid_embedding, observation.agents_locations], axis=-1
+        )
 
         if self.activation == "relu":
             activation = nn.relu
@@ -552,7 +578,8 @@ if __name__ == "__main__":
         
         action = pi.sample(seed=_rng)
 
-        env_state, timestep = jit_step(env_state, action)
+        env_state, timestep = jit_step(env_state, action[0])
+
         if timestep.last():
             episode_returns.append(current_return)
             current_return = 0
@@ -562,4 +589,4 @@ if __name__ == "__main__":
 
     print(episode_returns)
 
-    # eval_env.animate(states, interval=150, save_path="cleaner.gif")
+    eval_env.animate(states, interval=150, save_path="cleaner_small_net_with_step.gif")
