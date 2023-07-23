@@ -15,6 +15,8 @@ from jumanji.environments.routing.robot_warehouse.types import State
 from jumanji.types import TimeStep
 from jumanji.wrappers import AutoResetWrapper, Wrapper
 
+import pickle 
+
 
 class TimeIt:
     def __init__(self, tag, frames=None):
@@ -457,6 +459,17 @@ env = AutoResetWrapper(env)
 env = LogWrapper(env)
 
 output = run_experiment(env, config)
+
+print("STORING RESULTS")
+# Store the return results in a pickle file
+with open('ppo_anakin_cleaner_results.pkl', 'wb') as f:
+    pickle.dump(output['metrics']['returned_episode_returns'], f)
+
+trained_params = jax.tree_util.tree_map(lambda x: x[0, 0, ...], output['runner_state'][0])
+
+# Store the best parameters in a pickle file
+with open('ppo_anakin_cleaner_params.pkl', 'wb') as f:
+    pickle.dump(trained_params, f)
+
 print(f"MEAN RETURN: {output['metrics']['returned_episode_returns'].mean()}")
 print(f"MAX RETURN: {output['metrics']['returned_episode_returns'].max()}")
-x = 0
