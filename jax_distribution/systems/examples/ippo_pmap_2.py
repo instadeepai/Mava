@@ -229,7 +229,6 @@ def make_train(config):
         # TRAIN LOOP
         @functools.partial(jax.pmap, axis_name="devices")
         def update_loop(runner_state, unused):
-            
             def _update_step(runner_state, unused):
                 # COLLECT TRAJECTORIES
                 def _env_step(runner_state, unused):
@@ -273,9 +272,9 @@ def make_train(config):
                             "returned_episode_lengths": jnp.repeat(
                                 env_state.returned_episode_lengths, 4
                             ).reshape(config["NUM_ENVS"] // num_local_devices, -1),
-                            "returned_episode": jnp.repeat(next_timestep.last(), 4).reshape(
-                                config["NUM_ENVS"] // num_local_devices, -1
-                            ),
+                            "returned_episode": jnp.repeat(
+                                next_timestep.last(), 4
+                            ).reshape(config["NUM_ENVS"] // num_local_devices, -1),
                         },
                     )
                     runner_state = (train_state, env_state, next_timestep, rng)
@@ -301,7 +300,9 @@ def make_train(config):
                             transition.value,
                             transition.reward,
                         )
-                        delta = reward + config["GAMMA"] * next_value * (1 - done) - value
+                        delta = (
+                            reward + config["GAMMA"] * next_value * (1 - done) - value
+                        )
                         gae = (
                             delta
                             + config["GAMMA"] * config["GAE_LAMBDA"] * (1 - done) * gae
@@ -338,9 +339,12 @@ def make_train(config):
                                 value - traj_batch.value
                             ).clip(-config["CLIP_EPS"], config["CLIP_EPS"])
                             value_losses = jnp.square(value - targets)
-                            value_losses_clipped = jnp.square(value_pred_clipped - targets)
+                            value_losses_clipped = jnp.square(
+                                value_pred_clipped - targets
+                            )
                             value_loss = (
-                                0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
+                                0.5
+                                * jnp.maximum(value_losses, value_losses_clipped).mean()
                             )
 
                             # CALCULATE ACTOR LOSS
@@ -371,11 +375,11 @@ def make_train(config):
                         total_loss, grads = grad_fn(
                             train_state.params, traj_batch, advantages, targets
                         )
-                        #TODO: check why pmean make the time to run longer
+                        # TODO: check why pmean make the time to run longer
                         total_loss, grads = jax.lax.pmean(
                             (total_loss, grads), axis_name="devices"
                         )
-                        #train_state = train_state.apply_gradients(grads=grads)
+                        # train_state = train_state.apply_gradients(grads=grads)
                         return train_state, total_loss
 
                     train_state, traj_batch, advantages, targets, rng = update_state
@@ -422,8 +426,9 @@ def make_train(config):
 
                 runner_state = (train_state, env_state, last_timestep, rng)
                 return runner_state, metric
+
             runner_state, metric = jax.lax.scan(
-            _update_step, runner_state, None, config["NUM_UPDATES"]
+                _update_step, runner_state, None, config["NUM_UPDATES"]
             )
             return runner_state, metric
 
@@ -433,7 +438,7 @@ def make_train(config):
         )
         _rng = _rng[:, :, 0]
         runner_state = (train_state[jax.process_index()], env_state, timestep, _rng)
-        runner_state,metric=update_loop(runner_state, None)
+        runner_state, metric = update_loop(runner_state, None)
         jax.block_until_ready((runner_state, metric))
         return {"runner_state": runner_state, "metrics": metric}
 

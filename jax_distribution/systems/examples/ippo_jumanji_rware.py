@@ -13,19 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
+from typing import Any, NamedTuple, Sequence
+
+import distrax
+import flax.linen as nn
 import jax
 import jax.numpy as jnp
-import flax.linen as nn
+import jumanji
 import numpy as np
 import optax
 from flax.linen.initializers import constant, orthogonal
-from typing import Sequence, NamedTuple, Any
 from flax.training.train_state import TrainState
-import distrax
-import time
-import jumanji 
-from jumanji.wrappers import AutoResetWrapper
 from ippo_anakin_example import TimeIt
+from jumanji.wrappers import AutoResetWrapper
 
 
 class ActorCritic(nn.Module):
@@ -34,7 +35,7 @@ class ActorCritic(nn.Module):
 
     @nn.compact
     def __call__(self, observation):
-        
+
         x = observation.agents_view
 
         if self.activation == "relu":
@@ -90,7 +91,7 @@ def make_train(config):
     config["NUM_UPDATES"] = (
         config["TOTAL_TIMESTEPS"] // config["NUM_STEPS"] // config["NUM_ENVS"]
     )
-    
+
     config["MINIBATCH_SIZE"] = (
         config["NUM_ENVS"] * config["NUM_STEPS"] // config["NUM_MINIBATCHES"]
     )
@@ -112,18 +113,16 @@ def make_train(config):
         # network = ActorCritic(
         #     env.action_space(env_params).n, activation=config["ACTIVATION"]
         # )
-        # TODO: Get action shape for single agent from Jumanji without tracer error. 
+        # TODO: Get action shape for single agent from Jumanji without tracer error.
         # idea for doing: env.action_spec().num_values[0].tolist()
-        network = ActorCritic(
-            5, activation=config["ACTIVATION"]
-        )
+        network = ActorCritic(5, activation=config["ACTIVATION"])
         rng, _rng = jax.random.split(rng)
         # init_x = jnp.zeros(env.observation_space(env_params).shape)
 
         init_obs = env.observation_spec().generate_value()
         init_obs = jax.tree_util.tree_map(
-            lambda x: x[None, ...], 
-            init_obs, 
+            lambda x: x[None, ...],
+            init_obs,
         )
 
         # network_params = network.init(_rng, init_x)
@@ -165,24 +164,23 @@ def make_train(config):
                 # STEP ENV
                 rng, _rng = jax.random.split(rng)
                 rng_step = jax.random.split(_rng, config["NUM_ENVS"])
-                env_state, next_timestep = jax.vmap(
-                    env.step, in_axes=(0, 0)
-                )(env_state, action)
+                env_state, next_timestep = jax.vmap(env.step, in_axes=(0, 0))(
+                    env_state, action
+                )
 
-                done, reward = jax.tree_map(lambda x: 
-                    jnp.repeat(x, 4).reshape(
-                        config["NUM_ENVS"], -1
-                    ), [next_timestep.last(), next_timestep.reward]
+                done, reward = jax.tree_map(
+                    lambda x: jnp.repeat(x, 4).reshape(config["NUM_ENVS"], -1),
+                    [next_timestep.last(), next_timestep.reward],
                 )
 
                 transition = Transition(
                     done,
-                    action, 
-                    value, 
-                    reward, 
-                    log_prob, 
-                    last_timestep.observation, 
-                    {}, 
+                    action,
+                    value,
+                    reward,
+                    log_prob,
+                    last_timestep.observation,
+                    {},
                 )
                 runner_state = (train_state, env_state, next_timestep, rng)
                 return runner_state, transition
@@ -305,19 +303,29 @@ def make_train(config):
             metric = traj_batch.info
             rng = update_state[-1]
             if config.get("DEBUG"):
+
                 def callback(info):
-                    return_values = info["returned_episode_returns"][info["returned_episode"]]
-                    timesteps = info["timestep"][info["returned_episode"]] * config["NUM_ENVS"]
+                    return_values = info["returned_episode_returns"][
+                        info["returned_episode"]
+                    ]
+                    timesteps = (
+                        info["timestep"][info["returned_episode"]] * config["NUM_ENVS"]
+                    )
                     for t in range(len(timesteps)):
-                        print(f"global step={timesteps[t]}, episodic return={return_values[t]}")
+                        print(
+                            f"global step={timesteps[t]}, episodic return={return_values[t]}"
+                        )
+
                 jax.debug.callback(callback, metric)
 
             # Pmean the train state
             types = jax.tree_util.tree_map(lambda x: x.dtype, train_state)
             train_state = jax.lax.pmean(train_state, axis_name="batch")
             train_state = jax.tree_util.tree_map(
-                lambda x, t: jnp.asarray(x, dtype=t), train_state, types,
-            ) 
+                lambda x, t: jnp.asarray(x, dtype=t),
+                train_state,
+                types,
+            )
 
             runner_state = (train_state, env_state, last_timestep, rng)
             return runner_state, metric
@@ -337,7 +345,7 @@ if __name__ == "__main__":
         "LR": 2.5e-4,
         "NUM_ENVS": 4,
         "NUM_STEPS": 128,
-        "TOTAL_TIMESTEPS": 51200, #5e4, # 1e6 / 20
+        "TOTAL_TIMESTEPS": 51200,  # 5e4, # 1e6 / 20
         "UPDATE_EPOCHS": 4,
         "NUM_MINIBATCHES": 4,
         "GAMMA": 0.99,
@@ -358,13 +366,15 @@ if __name__ == "__main__":
     num_devices = jax.device_count()
 
     fn = make_train(config)
-    
+
     # Num experiments to run
     # number_envs = num_exp*config["NUM_ENVS"]
     num_exp = jax.device_count()
 
     num_per_device = num_exp // num_devices
-    assert num_exp == num_per_device * num_devices, "num_exp must be divisible by num_devices"
+    assert (
+        num_exp == num_per_device * num_devices
+    ), "num_exp must be divisible by num_devices"
 
     # Vmap over experiments
     vmap_fn = jax.vmap(fn, in_axes=(0,))
@@ -377,8 +387,8 @@ if __name__ == "__main__":
     # Reshape the keys
     rngs_reshaped = jnp.reshape(rngs, (num_devices, num_per_device, -1))
 
-    # Compile 
-    with TimeIt(tag="COMPILATION"): 
+    # Compile
+    with TimeIt(tag="COMPILATION"):
         out = pmap_fn(rngs_reshaped)
         jax.block_until_ready(out)
 

@@ -13,18 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
+from typing import Any, NamedTuple, Sequence
+
+import distrax
+import flax.linen as nn
+import gymnax
 import jax
 import jax.numpy as jnp
-import flax.linen as nn
 import numpy as np
 import optax
 from flax.linen.initializers import constant, orthogonal
-from typing import Sequence, NamedTuple, Any
 from flax.training.train_state import TrainState
-import distrax
-import gymnax
-from jax_distribution.wrappers.purejaxrl import LogWrapper, FlattenObservationWrapper
-import time
+
+from jax_distribution.wrappers.purejaxrl import FlattenObservationWrapper, LogWrapper
 
 
 class ActorCritic(nn.Module):
@@ -265,11 +267,19 @@ def make_train(config):
             metric = traj_batch.info
             rng = update_state[-1]
             if config.get("DEBUG"):
+
                 def callback(info):
-                    return_values = info["returned_episode_returns"][info["returned_episode"]]
-                    timesteps = info["timestep"][info["returned_episode"]] * config["NUM_ENVS"]
+                    return_values = info["returned_episode_returns"][
+                        info["returned_episode"]
+                    ]
+                    timesteps = (
+                        info["timestep"][info["returned_episode"]] * config["NUM_ENVS"]
+                    )
                     for t in range(len(timesteps)):
-                        print(f"global step={timesteps[t]}, episodic return={return_values[t]}")
+                        print(
+                            f"global step={timesteps[t]}, episodic return={return_values[t]}"
+                        )
+
                 jax.debug.callback(callback, metric)
 
             # Pmean the train state
@@ -277,8 +287,10 @@ def make_train(config):
             train_state = jax.lax.pmean(train_state, axis_name="batch")
             train_state = jax.lax.pmean(train_state, axis_name="device")
             train_state = jax.tree_util.tree_map(
-                lambda x, t: jnp.asarray(x, dtype=t), train_state, types,
-            ) 
+                lambda x, t: jnp.asarray(x, dtype=t),
+                train_state,
+                types,
+            )
 
             runner_state = (train_state, env_state, last_obs, rng)
             return runner_state, metric
@@ -319,12 +331,14 @@ if __name__ == "__main__":
     num_devices = jax.device_count()
 
     fn = make_train(config)
-    
+
     # Num experiments to run
     num_exp = 8
 
     num_per_device = num_exp // num_devices
-    assert num_exp == num_per_device * num_devices, "num_exp must be divisible by num_devices"
+    assert (
+        num_exp == num_per_device * num_devices
+    ), "num_exp must be divisible by num_devices"
 
     # Vmap over experiments
     vmap_fn = jax.vmap(fn, in_axes=(0,), axis_name="batch")

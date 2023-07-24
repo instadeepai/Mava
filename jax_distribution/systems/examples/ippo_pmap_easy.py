@@ -27,10 +27,9 @@ import jax
 import jax.numpy as jnp
 import jumanji
 import matplotlib.pyplot as plt
-from flax import jax_utils
 import numpy as np
 import optax
-from flax import struct
+from flax import jax_utils, struct
 from flax.linen.initializers import constant, orthogonal
 from flax.training.train_state import TrainState
 from gymnax.wrappers.purerl import FlattenObservationWrapper
@@ -205,13 +204,14 @@ def make_train(config):
         rng, _rng = jax.random.split(rng)
         reset_rng = jax.random.split(_rng, config["NUM_ENVS"])
         reset_rng = jnp.reshape(
-            reset_rng, 
-            (8, 2, -1) # Num devices, num envs per device, ...
+            reset_rng, (8, 2, -1)  # Num devices, num envs per device, ...
         )
         # env_state, timestep = env.reset(_rng)
-        env_state, timestep = jax.pmap(jax.vmap(env.reset, in_axes=(0)), axis_name="devices")(reset_rng)
+        env_state, timestep = jax.pmap(
+            jax.vmap(env.reset, in_axes=(0)), axis_name="devices"
+        )(reset_rng)
         # pi, values = network.apply(network_params, timestep.observation.agents_view, timestep.observation.action_mask)
-        x =0 
+        x = 0
         # TRAIN LOOP
         # @partial(jax.pmap, axis_name="devices")
         def _update_step(runner_state, unused):
@@ -402,16 +402,23 @@ def make_train(config):
             return runner_state, metric
 
         rng, _rng = jax.random.split(rng)
-        # Split for num envs. 
+        # Split for num envs.
         _rng = jax.random.split(_rng, 8)
-        runner_state = (jax.device_put_replicated(train_state, jax.local_devices()), env_state, timestep, _rng)
-        
+        runner_state = (
+            jax.device_put_replicated(train_state, jax.local_devices()),
+            env_state,
+            timestep,
+            _rng,
+        )
+
         @partial(jax.pmap, axis_name="devices")
-        def epoch_fn(runner_state, _): 
-            runner_state, metric = jax.lax.scan(_update_step, runner_state, None, config["NUM_UPDATES"])
+        def epoch_fn(runner_state, _):
+            runner_state, metric = jax.lax.scan(
+                _update_step, runner_state, None, config["NUM_UPDATES"]
+            )
 
             return runner_state, metric
-        
+
         # runner_state, metric = jax.lax.scan(
         #     _update_step, runner_state, None, config["NUM_UPDATES"]
         # )

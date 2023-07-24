@@ -27,10 +27,9 @@ import jax
 import jax.numpy as jnp
 import jumanji
 import matplotlib.pyplot as plt
-from flax import jax_utils
 import numpy as np
 import optax
-from flax import struct
+from flax import jax_utils, struct
 from flax.linen.initializers import constant, orthogonal
 from flax.training.train_state import TrainState
 from gymnax.wrappers.purerl import FlattenObservationWrapper
@@ -140,11 +139,13 @@ class Transition(NamedTuple):
     obs: TimeStep
     info: jnp.ndarray
 
+
 def broadcast_to(x, batch_size):
     return jnp.broadcast_to(x, (batch_size,) + x.shape)
 
+
 def make_train(config):
-    config["NUM_DEVICES"] =  jax.local_device_count()
+    config["NUM_DEVICES"] = jax.local_device_count()
 
     print("Num devices: ", config["NUM_DEVICES"])
 
@@ -217,17 +218,25 @@ def make_train(config):
         # INIT ENV
         rng, reset_rng, state_rng = jax.random.split(rng, 3)
         state_rng = jax.random.split(state_rng, config["NUM_DEVICES"])
-        train_state = jax.vmap(lambda x, _: x, in_axes=(None, 0,))(train_state, state_rng)
+        train_state = jax.vmap(
+            lambda x, _: x,
+            in_axes=(
+                None,
+                0,
+            ),
+        )(train_state, state_rng)
         reset_rng = jax.random.split(reset_rng, config["NUM_ENVS"])
         env_state, timestep = jax.vmap(env.reset, in_axes=(0))(reset_rng)
 
         env_state, timestep = jax.tree_map(
-            lambda x: jnp.reshape(x, (config["NUM_DEVICES"], config["NUM_ENVS_PER_DEVICE"]) + x.shape[1:]),
-            (env_state, timestep)
+            lambda x: jnp.reshape(
+                x, (config["NUM_DEVICES"], config["NUM_ENVS_PER_DEVICE"]) + x.shape[1:]
+            ),
+            (env_state, timestep),
         )
 
         runner_state = (train_state, env_state, timestep, state_rng)
-   
+
         # TRAIN LOOP
         def _update_step(runner_state, unused):
             # COLLECT TRAJECTORIES
@@ -255,11 +264,9 @@ def make_train(config):
 
                 # chex.assert_trees_all_equal_dtypes(env_state, old_env_state)
 
-                
                 def update_output(x, num_agents=4):
                     # TODO: Get the num_agents value from the env.
                     return broadcast_to(x, batch_size=num_agents).T
-                
 
                 transition = Transition(
                     update_output(next_timestep.last()),
@@ -269,8 +276,12 @@ def make_train(config):
                     log_prob,
                     last_timestep,
                     {
-                        "returned_episode_returns": update_output(env_state.returned_episode_returns),
-                        "returned_episode_lengths": update_output(env_state.returned_episode_lengths),
+                        "returned_episode_returns": update_output(
+                            env_state.returned_episode_returns
+                        ),
+                        "returned_episode_lengths": update_output(
+                            env_state.returned_episode_lengths
+                        ),
                         "returned_episode": update_output(next_timestep.last()),
                     },
                 )
@@ -285,7 +296,7 @@ def make_train(config):
 
             # print("It works!")
             # exit()
-             # Args shaper
+            # Args shaper
             # args = [tree1]
             # for arg in args:
             #     print(jax.tree_util.tree_map(lambda p: p.shape, arg))
@@ -329,6 +340,7 @@ def make_train(config):
             def _update_epoch(update_state, unused):
                 def _update_minbatch(train_state, batch_info):
                     traj_batch, advantages, targets = batch_info
+
                     def _loss_fn(params, traj_batch, gae, targets):
                         # RERUN NETWORK
                         pi, value = network.apply(
@@ -420,26 +432,29 @@ def make_train(config):
             metric = jax.tree_util.tree_map(
                 lambda x: x[..., 0], traj_batch.info
             )  # only the team rewards
-            
+
             runner_state = (train_state, env_state, last_timestep, rng)
             return runner_state, metric
 
-        
-        def epoch_fn(runner_state): 
-            
+        def epoch_fn(runner_state):
+
             # tree1 = runner_state
-            
+
             # TODO: Remove this
             config["NUM_UPDATES"] = 10
 
-            runner_state, metric = jax.lax.scan(_update_step, runner_state, None, config["NUM_UPDATES"])
+            runner_state, metric = jax.lax.scan(
+                _update_step, runner_state, None, config["NUM_UPDATES"]
+            )
             # runner_state = tree2
             # chex.assert_trees_all_equal_dtypes(tree1, tree2)
 
             return runner_state, metric
 
-        devices = jax.local_devices()[0:config["NUM_DEVICES"]]
-        runner_state, metric = jax.pmap(epoch_fn, in_axes=(0,), devices = devices)(runner_state)
+        devices = jax.local_devices()[0 : config["NUM_DEVICES"]]
+        runner_state, metric = jax.pmap(epoch_fn, in_axes=(0,), devices=devices)(
+            runner_state
+        )
 
         print("metric: ", metric["returned_episode_returns"].mean())
 

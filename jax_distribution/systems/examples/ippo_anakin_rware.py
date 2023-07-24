@@ -212,7 +212,7 @@ def get_learner_fn(env, forward_pass, opt_update, config):
 
             (params, opt_state), traj_batch, advantages, targets, rng = update_state
             rng, _rng = jax.random.split(rng)
-            batch_size = config['ROLLOUT_LENGTH']
+            batch_size = config["ROLLOUT_LENGTH"]
             # batch_size = config["MINIBATCH_SIZE"] * config["NUM_MINIBATCHES"]
             # assert (
             #     batch_size == config["NUM_STEPS"] * config["NUM_ENVS"]
@@ -346,18 +346,26 @@ def run_experiment(env, config):
         out = learn(params, opt_state, step_rngs, env_states, env_timesteps)  # compiles
         jax.block_until_ready(out)
 
-
     # Number of iterations
-    timesteps_per_iteration = (cores_count*config["ROLLOUT_LENGTH"]* config["BATCH_SIZE"])
-    config["ITERATIONS"] = config["TOTAL_TIMESTEPS"] // timesteps_per_iteration # Number of training updates 
+    timesteps_per_iteration = (
+        cores_count * config["ROLLOUT_LENGTH"] * config["BATCH_SIZE"]
+    )
+    config["ITERATIONS"] = (
+        config["TOTAL_TIMESTEPS"] // timesteps_per_iteration
+    )  # Number of training updates
 
     num_frames = config["TOTAL_TIMESTEPS"]
 
     with TimeIt(tag="EXECUTION", frames=num_frames):
         out = learn(  # runs compiled fn
-            params, opt_state, step_rngs, env_states, env_timesteps, 
+            params,
+            opt_state,
+            step_rngs,
+            env_states,
+            env_timesteps,
         )
         jax.block_until_ready(out)
+
 
 if __name__ == "__main__":
     config = {
@@ -372,9 +380,9 @@ if __name__ == "__main__":
         "ENT_COEF": 0.01,
         "VF_COEF": 0.5,
         "MAX_GRAD_NORM": 0.5,
-        "BATCH_SIZE": 4, # Parallel updates / environmnents
-        "ROLLOUT_LENGTH": 128, # Length of each rollout
-        "TOTAL_TIMESTEPS": 204800, # Number of training timesteps
+        "BATCH_SIZE": 4,  # Parallel updates / environmnents
+        "ROLLOUT_LENGTH": 128,  # Length of each rollout
+        "TOTAL_TIMESTEPS": 204800,  # Number of training timesteps
         "SEED": 42,
     }
 
