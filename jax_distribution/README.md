@@ -4,24 +4,21 @@
 Inside of the `jax_distribution` folder, run:
 
 ### Python virtual env
-- venv:
+- Using venv:
     ```
-    python -m venv mava_30
-    source mava_30/bin/activate
+    make venv
     ```
-- OR conda:
+- Using conda:
     ```
-    conda create -n mava_30 python=3.9
-    conda activate mava_30
+    conda create -n mava_env python=3.9
+    conda activate mava_env
+    pip install --upgrade pip setuptools
+    pip install -r requirements.txt
     ```
-Then install requirements:
-```
-pip install --upgrade pip setuptools
-pip install -r requirements.txt
-```
+
 
 ## When using accelerators
-For different accelerators you would need to install the correct version of Jax for that accelerator after following the above instructions. Please run the following command in either your python virtual environment or conda environment.
+For different accelerators it is required to install the correct version of Jax for that accelerator after following the above instructions. Please run the following command in either your python virtual environment or conda environment.
 
 ### When using a TPU
 ```
@@ -29,7 +26,7 @@ pip install jax[tpu] -f https://storage.googleapis.com/jax-releases/libtpu_relea
 ```
 
 ### When using a GPU
-Please verify your CUDA version and run the corresponding command.
+Please verify your CUDA version and run one of the following corresponding commands.
 
 ```
 # CUDA 12 installation
@@ -40,4 +37,4 @@ pip install "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax
 # Note: wheels only available on linux.
 pip install "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
-For more detailed installation instructions, please see the official [JAX repo](https://github.com/google/jax).
+For more information and more detailed JAX installation instructions, please see the official [JAX repo](https://github.com/google/jax).
