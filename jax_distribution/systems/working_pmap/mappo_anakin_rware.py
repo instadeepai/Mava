@@ -106,10 +106,12 @@ class ActorCritic(nn.Module):
         )
 
         pi = distrax.Categorical(logits=masked_logits)
+  
+        y=x.reshape(x.shape[0],-1)
 
         critic = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(x)
+        )(y)
         critic = activation(critic)
         critic = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
@@ -119,7 +121,7 @@ class ActorCritic(nn.Module):
             critic
         )
 
-        return pi, jnp.squeeze(critic, axis=-1)
+        return pi, jnp.repeat(jnp.squeeze(critic, axis=-1), x.shape[1]).reshape(x.shape[0], -1),
 
 
 class Transition(NamedTuple):
