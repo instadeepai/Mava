@@ -134,6 +134,9 @@ class Transition(NamedTuple):
     obs: jnp.ndarray
     info: dict
 
+class Obs(NamedTuple):
+    agents_view: jnp.ndarray
+    action_mask: jnp.ndarray
 
 def get_learner_fn(env, apply_fn, update_fn, config):
     def _update_step(runner_state, unused_target):
@@ -143,7 +146,8 @@ def get_learner_fn(env, apply_fn, update_fn, config):
 
             # SELECT ACTION
             rng, _rng = jax.random.split(rng)
-            pi, value = apply_fn(params, last_timestep.observation)
+            obs=Obs(last_timestep.observation.agents_view, last_timestep.observation.action_mask)
+            pi, value = apply_fn(params, obs)
             action = pi.sample(seed=_rng)
             log_prob = pi.log_prob(action)
 
@@ -172,7 +176,8 @@ def get_learner_fn(env, apply_fn, update_fn, config):
 
         # CALCULATE ADVANTAGE
         params, opt_state, rng, env_state, last_timestep = runner_state
-        _, last_val = apply_fn(params, last_timestep.observation)
+        obs=Obs(last_timestep.observation.agents_view, last_timestep.observation.action_mask)
+        _, last_val = apply_fn(params, obs)
 
         def _calculate_gae(traj_batch, last_val):
             def _get_advantages(gae_and_next_value, transition):
@@ -205,7 +210,8 @@ def get_learner_fn(env, apply_fn, update_fn, config):
 
                 def _loss_fn(params, opt_state, traj_batch, gae, targets):
                     # RERUN NETWORK
-                    pi, value = apply_fn(params, traj_batch.obs)
+                    obs=Obs(traj_batch.obs.agents_view, traj_batch.obs.action_mask)
+                    pi, value = apply_fn(params, obs)
                     log_prob = pi.log_prob(traj_batch.action)
 
                     # CALCULATE VALUE LOSS
@@ -334,7 +340,7 @@ def run_experiment(env, config):
     params = network.init(rng_p, init_x)
     opt_state = optim.init(params)  # initialise optimiser stats.
     
-    vmapped_network_apply_fn = jax.vmap(network.apply, in_axes=(None, 0))
+    vmapped_network_apply_fn = jax.vmap(network.apply, in_axes=(None, 1), out_axes=(1,1))
 
     learn = get_learner_fn(  # get batched iterated update.
         env, vmapped_network_apply_fn, optim.update, config
@@ -414,4 +420,3 @@ env = LogWrapper(env)
 output = run_experiment(env, config)
 print(f"MEAN RETURN: {output['metrics']['returned_episode_returns'].mean()}")
 print(f"MAX RETURN: {output['metrics']['returned_episode_returns'].max()}")
-x = 0
