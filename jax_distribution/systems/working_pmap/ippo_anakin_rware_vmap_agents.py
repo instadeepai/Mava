@@ -1,8 +1,8 @@
-# import os 
+# import os
 # os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=8"
 
 import timeit
-from typing import Any, NamedTuple, Sequence, Tuple
+from typing import NamedTuple, Sequence, Tuple
 
 import chex
 import distrax
@@ -14,6 +14,7 @@ import numpy as np
 import optax
 from flax import struct
 from flax.linen.initializers import constant, orthogonal
+from jumanji.environments.routing.robot_warehouse import Observation
 from jumanji.environments.routing.robot_warehouse.types import State
 from jumanji.types import TimeStep
 from jumanji.wrappers import AutoResetWrapper, Wrapper
@@ -78,6 +79,35 @@ class LogWrapper(Wrapper):
         return state, timestep
 
 
+class MultiAgentWrapper(Wrapper):
+    """Multi-agent wrapper."""
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[LogEnvState, TimeStep]:
+        """Reset the environment. Updates the step count."""
+        state, timestep = self._env.reset(key)
+        timestep.observation = Observation(
+            agents_view=timestep.observation.agents_view,
+            action_mask=timestep.observation.action_mask,
+            step_count=jnp.repeat(
+                timestep.observation.step_count, self._env.num_agents
+            ),
+        )
+
+        return state, timestep
+
+    def step(self, state: State, action: jnp.ndarray) -> Tuple[State, TimeStep]:
+        """Step the environment. Updates the step count."""
+        state, timestep = self._env.step(state, action)
+        timestep.observation = Observation(
+            agents_view=timestep.observation.agents_view,
+            action_mask=timestep.observation.action_mask,
+            step_count=jnp.repeat(
+                timestep.observation.step_count, self._env.num_agents
+            ),
+        )
+        return state, timestep
+
+
 class ActorCritic(nn.Module):
     action_dim: Sequence[int]
     activation: str = "tanh"
@@ -134,9 +164,6 @@ class Transition(NamedTuple):
     obs: jnp.ndarray
     info: dict
 
-class Obs(NamedTuple):
-    agents_view: jnp.ndarray
-    action_mask: jnp.ndarray
 
 def get_learner_fn(env, apply_fn, update_fn, config):
     def _update_step(runner_state, unused_target):
@@ -146,8 +173,7 @@ def get_learner_fn(env, apply_fn, update_fn, config):
 
             # SELECT ACTION
             rng, _rng = jax.random.split(rng)
-            obs=Obs(last_timestep.observation.agents_view, last_timestep.observation.action_mask)
-            pi, value = apply_fn(params, obs)
+            pi, value = apply_fn(params, last_timestep.observation)
             action = pi.sample(seed=_rng)
             log_prob = pi.log_prob(action)
 
@@ -176,8 +202,7 @@ def get_learner_fn(env, apply_fn, update_fn, config):
 
         # CALCULATE ADVANTAGE
         params, opt_state, rng, env_state, last_timestep = runner_state
-        obs=Obs(last_timestep.observation.agents_view, last_timestep.observation.action_mask)
-        _, last_val = apply_fn(params, obs)
+        _, last_val = apply_fn(params, last_timestep.observation)
 
         def _calculate_gae(traj_batch, last_val):
             def _get_advantages(gae_and_next_value, transition):
@@ -210,8 +235,7 @@ def get_learner_fn(env, apply_fn, update_fn, config):
 
                 def _loss_fn(params, opt_state, traj_batch, gae, targets):
                     # RERUN NETWORK
-                    obs=Obs(traj_batch.obs.agents_view, traj_batch.obs.action_mask)
-                    pi, value = apply_fn(params, obs)
+                    pi, value = apply_fn(params, traj_batch.obs)
                     log_prob = pi.log_prob(traj_batch.action)
 
                     # CALCULATE VALUE LOSS
@@ -339,8 +363,10 @@ def run_experiment(env, config):
     init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
     params = network.init(rng_p, init_x)
     opt_state = optim.init(params)  # initialise optimiser stats.
-    
-    vmapped_network_apply_fn = jax.vmap(network.apply, in_axes=(None, 1), out_axes=(1,1))
+
+    vmapped_network_apply_fn = jax.vmap(
+        network.apply, in_axes=(None, 1), out_axes=(1, 1)
+    )
 
     learn = get_learner_fn(  # get batched iterated update.
         env, vmapped_network_apply_fn, optim.update, config
@@ -414,6 +440,7 @@ config = {
 }
 
 env = jumanji.make(config["ENV_NAME"])
+env = MultiAgentWrapper(env)
 env = AutoResetWrapper(env)
 env = LogWrapper(env)
 
