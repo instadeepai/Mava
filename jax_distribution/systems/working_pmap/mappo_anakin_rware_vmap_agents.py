@@ -2,7 +2,7 @@
 # os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=8"
 
 import timeit
-from typing import Any, NamedTuple, Sequence, Tuple
+from typing import NamedTuple, Sequence, Tuple
 
 import chex
 import distrax
@@ -14,6 +14,7 @@ import numpy as np
 import optax
 from flax import struct
 from flax.linen.initializers import constant, orthogonal
+from jumanji.environments.routing.robot_warehouse import Observation
 from jumanji.environments.routing.robot_warehouse.types import State
 from jumanji.types import TimeStep
 from jumanji.wrappers import AutoResetWrapper, Wrapper
@@ -83,7 +84,7 @@ class ActorCritic(nn.Module):
     activation: str = "tanh"
 
     @nn.compact
-    def __call__(self, all_agents_obs, observation):
+    def __call__(self, global_obs, observation):
 
         x = observation.agents_view
         if self.activation == "relu":
@@ -110,7 +111,7 @@ class ActorCritic(nn.Module):
 
         pi = distrax.Categorical(logits=masked_logits)
 
-        y = all_agents_obs.agents_view
+        y = global_obs.agents_view
         y = y.reshape(y.shape[0], -1)
 
         critic = nn.Dense(
@@ -137,9 +138,33 @@ class Transition(NamedTuple):
     info: dict
 
 
-class Obs(NamedTuple):
-    agents_view: jnp.ndarray
-    action_mask: jnp.ndarray
+class MultiAgentWrapper(Wrapper):
+    """Multi-agent wrapper."""
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[LogEnvState, TimeStep]:
+        """Reset the environment. Updates the step count."""
+        state, timestep = self._env.reset(key)
+        timestep.observation = Observation(
+            agents_view=timestep.observation.agents_view,
+            action_mask=timestep.observation.action_mask,
+            step_count=jnp.repeat(
+                timestep.observation.step_count, self._env.num_agents
+            ),
+        )
+
+        return state, timestep
+
+    def step(self, state: State, action: jnp.ndarray) -> Tuple[State, TimeStep]:
+        """Step the environment. Updates the step count."""
+        state, timestep = self._env.step(state, action)
+        timestep.observation = Observation(
+            agents_view=timestep.observation.agents_view,
+            action_mask=timestep.observation.action_mask,
+            step_count=jnp.repeat(
+                timestep.observation.step_count, self._env.num_agents
+            ),
+        )
+        return state, timestep
 
 
 def get_learner_fn(env, apply_fn, update_fn, config):
@@ -150,11 +175,9 @@ def get_learner_fn(env, apply_fn, update_fn, config):
 
             # SELECT ACTION
             rng, _rng = jax.random.split(rng)
-            obs = Obs(
-                last_timestep.observation.agents_view,
-                last_timestep.observation.action_mask,
+            pi, value = apply_fn(
+                params, last_timestep.observation, last_timestep.observation
             )
-            pi, value = apply_fn(params, obs, obs)
             action = pi.sample(seed=_rng)
             log_prob = pi.log_prob(action)
 
@@ -183,10 +206,9 @@ def get_learner_fn(env, apply_fn, update_fn, config):
 
         # CALCULATE ADVANTAGE
         params, opt_state, rng, env_state, last_timestep = runner_state
-        obs = Obs(
-            last_timestep.observation.agents_view, last_timestep.observation.action_mask
+        _, last_val = apply_fn(
+            params, last_timestep.observation, last_timestep.observation
         )
-        _, last_val = apply_fn(params, obs, obs)
 
         def _calculate_gae(traj_batch, last_val):
             def _get_advantages(gae_and_next_value, transition):
@@ -219,8 +241,7 @@ def get_learner_fn(env, apply_fn, update_fn, config):
 
                 def _loss_fn(params, opt_state, traj_batch, gae, targets):
                     # RERUN NETWORK
-                    obs = Obs(traj_batch.obs.agents_view, traj_batch.obs.action_mask)
-                    pi, value = apply_fn(params, obs, obs)
+                    pi, value = apply_fn(params, traj_batch.obs, traj_batch.obs)
                     log_prob = pi.log_prob(traj_batch.action)
 
                     # CALCULATE VALUE LOSS
@@ -428,6 +449,7 @@ config = {
 }
 
 env = jumanji.make(config["ENV_NAME"])
+env = MultiAgentWrapper(env)
 env = AutoResetWrapper(env)
 env = LogWrapper(env)
 
