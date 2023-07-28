@@ -1,4 +1,4 @@
-# The beginning of Mava 3.0
+# Mava with end to end JAX training
 
 ## How to setup
 Inside of the `jax_distribution` folder, run:
@@ -18,7 +18,7 @@ Inside of the `jax_distribution` folder, run:
 
 
 ## When using accelerators
-For different accelerators it is required to install the correct version of Jax for that accelerator after following the above instructions. Please run the following command in either your python virtual environment or conda environment.
+For different accelerators it is required to install the correct version of JAX for that accelerator after following the above instructions. Please run the appropriate command in either your python virtual environment or conda environment.
 
 ### When using a TPU
 ```
