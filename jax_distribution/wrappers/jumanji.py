@@ -3,6 +3,7 @@ from typing import Tuple
 import chex
 import jax.numpy as jnp
 from flax import struct
+from jumanji import specs
 from jumanji.environments.routing.robot_warehouse import Observation, State
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
@@ -50,7 +51,7 @@ class LogWrapper(Wrapper):
         return state, timestep
 
 
-class MultiAgentWrapper(Wrapper):
+class RwareMultiAgentWrapper(Wrapper):
     """Multi-agent wrapper."""
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
@@ -76,3 +77,19 @@ class MultiAgentWrapper(Wrapper):
             ),
         )
         return state, timestep
+
+    def observation_spec(self) -> specs.Spec[Observation]:
+        """Specification of the observation of the `RobotWarehouse` environment.
+
+        Returns:
+            Spec for the `Observation`, consisting of the fields:
+                - step_count: BoundedArray (int32) of shape (num_agents, ).
+        """
+        step_count = specs.BoundedArray(
+            (4,),
+            jnp.int32,
+            [0] * self._env.num_agents,
+            [self._env.time_limit] * self._env.num_agents,
+            "step_count",
+        )
+        return self._env.observation_spec().replace(step_count=step_count)
