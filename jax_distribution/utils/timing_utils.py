@@ -5,10 +5,10 @@ from typing import Any
 class TimeIt:
     """Context manager for timing execution."""
 
-    def __init__(self, tag: str, frames=None) -> None:
+    def __init__(self, tag: str, environment_steps: int = None) -> None:
         """Initialise the context manager."""
         self.tag = tag
-        self.frames = frames
+        self.environment_steps = environment_steps
 
     def __enter__(self) -> "TimeIt":
         """Start the timer."""
@@ -19,6 +19,6 @@ class TimeIt:
         """Print the elapsed time."""
         self.elapsed_secs = timeit.default_timer() - self.start
         msg = self.tag + (": Elapsed time=%.2fs" % self.elapsed_secs)
-        if self.frames:
-            msg += ", FPS=%.2e" % (self.frames / self.elapsed_secs)
+        if self.environment_steps:
+            msg += ", SPS=%.2e" % (self.environment_steps / self.elapsed_secs)
         print(msg)
