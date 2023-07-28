@@ -3,11 +3,11 @@ from typing import Optional, Sequence, Tuple, Union
 import chex
 import jax
 import jax.numpy as jnp
-import jumanji
 from gymnax.environments import environment, spaces
-from gymnax.wrappers.purerl import FlattenObservationWrapper, LogWrapper
 from jax import lax
-from jumanji.environments.routing.robot_warehouse.types import Observation, State
+from jumanji.environments.routing.robot_warehouse import Observation, State
+from jumanji.types import TimeStep
+from jumanji.wrappers import Wrapper
 
 
 class MultiDiscrete(spaces.Space):
@@ -44,10 +44,6 @@ class JumanjiToGymnaxWrapper(environment.Environment):
     def __init__(self, jumanji_env):
         super().__init__()
         self.jumanji_env = jumanji_env
-
-    # @property
-    # def default_params(self) -> State:
-    #     return EnvParams()
 
     def step_env(
         self, key: chex.PRNGKey, state: State, action: int, params: State
@@ -115,7 +111,29 @@ class JumanjiToGymnaxWrapper(environment.Environment):
         raise NotImplementedError
 
 
-env = jumanji.make("RobotWarehouse-v0")
+class MultiAgentWrapper(Wrapper):
+    """Multi-agent wrapper."""
 
-wrapped_env = JumanjiToGymnaxWrapper(env)
-x = 0
+    def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
+        """Reset the environment. Updates the step count."""
+        state, timestep = self._env.reset(key)
+        timestep.observation = Observation(
+            agents_view=timestep.observation.agents_view,
+            action_mask=timestep.observation.action_mask,
+            step_count=jnp.repeat(
+                timestep.observation.step_count, self._env.num_agents
+            ),
+        )
+        return state, timestep
+
+    def step(self, state: State, action: jnp.ndarray) -> Tuple[State, TimeStep]:
+        """Step the environment. Updates the step count."""
+        state, timestep = self._env.step(state, action)
+        timestep.observation = Observation(
+            agents_view=timestep.observation.agents_view,
+            action_mask=timestep.observation.action_mask,
+            step_count=jnp.repeat(
+                timestep.observation.step_count, self._env.num_agents
+            ),
+        )
+        return state, timestep
