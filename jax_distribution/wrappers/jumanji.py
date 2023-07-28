@@ -1,114 +1,53 @@
-from typing import Optional, Sequence, Tuple, Union
+from typing import Tuple
 
 import chex
-import jax
 import jax.numpy as jnp
-from gymnax.environments import environment, spaces
-from jax import lax
+from flax import struct
 from jumanji.environments.routing.robot_warehouse import Observation, State
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
 
 
-class MultiDiscrete(spaces.Space):
-    def __init__(
+@struct.dataclass
+class LogEnvState:
+    env_state: State
+    episode_returns: float
+    episode_lengths: int
+    returned_episode_returns: float
+    returned_episode_lengths: int
+
+
+class LogWrapper(Wrapper):
+    """Log the episode returns and lengths."""
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[LogEnvState, TimeStep]:
+        """Reset the environment."""
+        state, timestep = self._env.reset(key)
+        state = LogEnvState(state, 0.0, 0, 0.0, 0)
+        return state, timestep
+
+    def step(
         self,
-        min_val: Union[int, Sequence[int]],
-        max_val: Union[int, Sequence[int]],
-        shape: int,
-        dtype: jnp.dtype = jnp.int32,
-    ) -> None:
-        self.min_val = min_val
-        self.max_val = max_val + 1
-        self.shape = shape
-        self.dtype = dtype
+        state: State,
+        action: jnp.ndarray,
+    ) -> Tuple[State, TimeStep]:
+        """Step the environment."""
+        env_state, timestep = self._env.step(state.env_state, action)
 
-        # TODO: Fix this. This is just a basic single agent hack
-        self.n = jnp.sum(self.max_val)
-
-    def sample(self, rng: chex.PRNGKey) -> chex.Array:
-        """Sample random action uniformly from set of categorical choices."""
-        return jax.random.randint(
-            rng, shape=self.shape, minval=self.min_val, maxval=self.max_val + 1
-        ).astype(self.dtype)
-
-    def contains(self, x: jnp.int_) -> bool:
-        """Check whether specific object is within space."""
-        # type_cond = isinstance(x, self.dtype)
-        # shape_cond = (x.shape == self.shape)
-        range_cond = jnp.logical_and(x >= 0, x < self.n)
-        return range_cond
-
-
-class JumanjiToGymnaxWrapper(environment.Environment):
-    def __init__(self, jumanji_env):
-        super().__init__()
-        self.jumanji_env = jumanji_env
-
-    def step_env(
-        self, key: chex.PRNGKey, state: State, action: int, params: State
-    ) -> Tuple[chex.Array, State, float, bool, dict]:
-        del params, key
-        state, timestep = self.jumanji_env.step(state, action)
-        observation = timestep.observation
-        reward = timestep.reward
-        done = timestep.last()
-        discount = timestep.discount
-        return (
-            lax.stop_gradient(observation),
-            lax.stop_gradient(state),
-            reward,
-            done,
-            {"discount": discount},
+        new_episode_return = state.episode_returns + jnp.mean(timestep.reward)
+        new_episode_length = state.episode_lengths + 1
+        state = LogEnvState(
+            env_state=env_state,
+            episode_returns=new_episode_return * (1 - timestep.last()),
+            episode_lengths=new_episode_length * (1 - timestep.last()),
+            returned_episode_returns=state.returned_episode_returns
+            * (1 - timestep.last())
+            + new_episode_return * timestep.last(),
+            returned_episode_lengths=state.returned_episode_lengths
+            * (1 - timestep.last())
+            + new_episode_length * timestep.last(),
         )
-
-    def reset_env(self, key: chex.PRNGKey, params: State) -> Tuple[chex.Array, State]:
-        del params
-        state, timestep = self.jumanji_env.reset(key)
-        return timestep.observation, state
-
-    @property
-    def name(self) -> str:
-        return repr(self.jumanji_env)
-
-    @property
-    def num_actions(self) -> int:
-        """Number of actions possible in environment."""
-        return self.jumanji_env.action_spec().num_actions
-
-    def action_space(self, params: Optional[State] = None) -> spaces.Discrete:
-        """Action space of the environment."""
-
-        jumanji_action_space = self.jumanji_env.action_spec()
-
-        gymnax_action_space = MultiDiscrete(
-            min_val=jumanji_action_space.minimum,
-            max_val=jumanji_action_space.maximum,
-            shape=jumanji_action_space.shape,
-            dtype=jnp.int32,
-        )
-
-        return gymnax_action_space  # need to convert to gymnax space
-
-    def observation_space(self, params: Optional[State] = None) -> spaces.Box:
-        """Observation space of the environment."""
-        jumanji_observation_space = self.jumanji_env.observation_spec()
-
-        gymnax_observation_space = spaces.Box(
-            low=-jnp.inf,
-            high=jnp.inf,
-            shape=(
-                jumanji_observation_space.agents_view.shape[0]
-                * jumanji_observation_space.agents_view.shape[1],
-            ),
-            dtype=jnp.int32,
-        )
-
-        return gymnax_observation_space
-
-    def state_space(self, params: State) -> spaces.Dict:
-        """State space of the environment."""
-        raise NotImplementedError
+        return state, timestep
 
 
 class MultiAgentWrapper(Wrapper):
