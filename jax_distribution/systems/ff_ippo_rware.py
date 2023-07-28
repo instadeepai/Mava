@@ -14,7 +14,7 @@ from jumanji.wrappers import AutoResetWrapper
 
 from jax_distribution.types import Transition
 from jax_distribution.utils.timing_utils import TimeIt
-from jax_distribution.wrappers.jumanji import LogWrapper, MultiAgentWrapper
+from jax_distribution.wrappers.jumanji import LogWrapper, RwareMultiAgentWrapper
 
 
 class ActorCritic(nn.Module):
@@ -149,7 +149,7 @@ def get_learner_fn(
         def _update_epoch(update_state: Tuple, unused: Any) -> Tuple:
             """Update the network for a single epoch."""
 
-            def _update_minbatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
+            def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
                 params, opt_state = train_state
                 traj_batch, advantages, targets = batch_info
@@ -238,7 +238,7 @@ def get_learner_fn(
 
             # UPDATE MINIBATCHES
             (params, opt_state), total_loss = jax.lax.scan(
-                _update_minbatch, (params, opt_state), minibatches
+                _update_minibatch, (params, opt_state), minibatches
             )
 
             update_state = (params, opt_state, traj_batch, advantages, targets, rng)
@@ -248,7 +248,7 @@ def get_learner_fn(
 
         # UPDATE EPOCHS
         update_state, loss_info = jax.lax.scan(
-            _update_epoch, update_state, None, config["UPDATE_EPOCHS"]
+            _update_epoch, update_state, None, config["PPO_EPOCHS"]
         )
 
         params, opt_state, traj_batch, advantages, targets, rng = update_state
@@ -288,14 +288,13 @@ def run_experiment(env: Environment, config: dict) -> dict:
         cores_count
         * config["NUM_UPDATES"]
         * config["ROLLOUT_LENGTH"]
-        * config["BATCH_SIZE"]
+        * config["UPDATE_BATCH_SIZE"]
         * config["NUM_ENVS"]
     )
 
     # INITIALISE NETWORK AND OPTIMISER PARAMS
     init_x = env.observation_spec().generate_value()
     # select only obs for a single agent.
-    init_x = init_x._replace(step_count=jnp.repeat(init_x.step_count, num_agents))
     init_x = jax.tree_util.tree_map(lambda x: x[0], init_x)
     init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
     params = network.init(rng_p, init_x)
@@ -313,28 +312,30 @@ def run_experiment(env: Environment, config: dict) -> dict:
 
     # BROADCAST PARAMS AND OPTIMISER STATE
     broadcast = lambda x: jnp.broadcast_to(
-        x, (cores_count, config["BATCH_SIZE"]) + x.shape
+        x, (cores_count, config["UPDATE_BATCH_SIZE"]) + x.shape
     )
     params = jax.tree_map(broadcast, params)  # broadcast to cores and batch.
     opt_state = jax.tree_map(broadcast, opt_state)  # broadcast to cores and batch
 
     # INITIALISE ENVIRONMENT
     rng, *env_rngs = jax.random.split(
-        rng, cores_count * config["BATCH_SIZE"] * config["NUM_ENVS"] + 1
+        rng, cores_count * config["UPDATE_BATCH_SIZE"] * config["NUM_ENVS"] + 1
     )
     env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
         jnp.stack(env_rngs),
     )
-    rng, *step_rngs = jax.random.split(rng, cores_count * config["BATCH_SIZE"] + 1)
+    rng, *step_rngs = jax.random.split(
+        rng, cores_count * config["UPDATE_BATCH_SIZE"] + 1
+    )
 
     # RESHAPE ENVIRONMENT STATES AND TIMESTEPS
     reshape_step_rngs = lambda x: x.reshape(
-        (cores_count, config["BATCH_SIZE"]) + x.shape[1:]
+        (cores_count, config["UPDATE_BATCH_SIZE"]) + x.shape[1:]
     )
     step_rngs = reshape_step_rngs(jnp.stack(step_rngs))  # add dimension to pmap over.
 
     reshape_states = lambda x: x.reshape(
-        (cores_count, config["BATCH_SIZE"], config["NUM_ENVS"]) + x.shape[1:]
+        (cores_count, config["UPDATE_BATCH_SIZE"], config["NUM_ENVS"]) + x.shape[1:]
     )
     env_states = jax.tree_util.tree_map(
         reshape_states, env_states
@@ -357,11 +358,11 @@ def run_experiment(env: Environment, config: dict) -> dict:
 if __name__ == "__main__":
     config = {
         "LR": 2.5e-4,
-        "BATCH_SIZE": 4,
+        "UPDATE_BATCH_SIZE": 4,
         "ROLLOUT_LENGTH": 128,
         "NUM_UPDATES": 10,
         "NUM_ENVS": 32,
-        "UPDATE_EPOCHS": 4,
+        "PPO_EPOCHS": 4,
         "NUM_MINIBATCHES": 8,
         "GAMMA": 0.99,
         "GAE_LAMBDA": 0.95,
@@ -375,7 +376,7 @@ if __name__ == "__main__":
     }
 
     env = jumanji.make(config["ENV_NAME"])
-    env = MultiAgentWrapper(env)
+    env = RwareMultiAgentWrapper(env)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
 
