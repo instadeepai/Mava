@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Sequence, Tuple
+from typing import Any, Callable, Sequence, Tuple
 
 import chex
 import distrax
@@ -23,10 +23,12 @@ import jax.numpy as jnp
 import jumanji
 import numpy as np
 import optax
+from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
-from jumanji.env import Environment
-from jumanji.environments.routing.robot_warehouse import Observation
+from jumanji.env import Environment, State
+from jumanji.types import Observation, TimeStep
 from jumanji.wrappers import AutoResetWrapper
+from optax._src.base import OptState
 
 from jax_distribution.types import Transition
 from jax_distribution.utils.timing_utils import TimeIt
@@ -45,10 +47,12 @@ class ActorCritic(nn.Module):
     ) -> Tuple[distrax.Categorical, chex.Array]:
         """Forward pass."""
         x = observation.agents_view
+
         if self.activation == "relu":
             activation = nn.relu
         else:
             activation = nn.tanh
+
         actor_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(x)
@@ -66,8 +70,7 @@ class ActorCritic(nn.Module):
             actor_output,
             jnp.finfo(jnp.float32).min,
         )
-
-        pi = distrax.Categorical(logits=masked_logits)
+        actor_policy = distrax.Categorical(logits=masked_logits)
 
         critic_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
@@ -81,12 +84,12 @@ class ActorCritic(nn.Module):
             1, kernel_init=orthogonal(1.0), bias_init=constant(0.0)
         )(critic_output)
 
-        return pi, jnp.squeeze(critic_output, axis=-1)
+        return actor_policy, jnp.squeeze(critic_output, axis=-1)
 
 
 def get_learner_fn(
-    env: jumanji.Environment, apply_fn: callable, update_fn: callable, config: dict
-) -> callable:
+    env: jumanji.Environment, apply_fn: Callable, update_fn: Callable, config: dict
+) -> Callable:
     """Get the learner function."""
 
     def _update_step(runner_state: Tuple, unused_target: Any) -> Tuple:
@@ -98,9 +101,9 @@ def get_learner_fn(
 
             # SELECT ACTION
             rng, _rng = jax.random.split(rng)
-            pi, value = apply_fn(params, last_timestep.observation)
-            action = pi.sample(seed=_rng)
-            log_prob = pi.log_prob(action)
+            actor_policy, value = apply_fn(params, last_timestep.observation)
+            action = actor_policy.sample(seed=_rng)
+            log_prob = actor_policy.log_prob(action)
 
             # STEP ENVIRONMENT
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
@@ -171,16 +174,16 @@ def get_learner_fn(
                 traj_batch, advantages, targets = batch_info
 
                 def _loss_fn(
-                    params,
-                    opt_state,
+                    params: FrozenDict,
+                    opt_state: OptState,
                     traj_batch: Transition,
                     gae: chex.Array,
                     targets: chex.Array,
                 ) -> Tuple:
                     """Calculate the loss."""
                     # RERUN NETWORK
-                    pi, value = apply_fn(params, traj_batch.obs)
-                    log_prob = pi.log_prob(traj_batch.action)
+                    actor_policy, value = apply_fn(params, traj_batch.obs)
+                    log_prob = actor_policy.log_prob(traj_batch.action)
 
                     # CALCULATE VALUE LOSS
                     value_pred_clipped = traj_batch.value + (
@@ -206,7 +209,7 @@ def get_learner_fn(
                     )
                     loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
                     loss_actor = loss_actor.mean()
-                    entropy = pi.entropy().mean()
+                    entropy = actor_policy.entropy().mean()
 
                     total_loss = (
                         loss_actor
@@ -272,7 +275,13 @@ def get_learner_fn(
         metric = traj_batch.info
         return runner_state, metric
 
-    def learner_fn(params, opt_state, rng, env_state, timesteps) -> dict:
+    def learner_fn(
+        params: FrozenDict,
+        opt_state: OptState,
+        rng: chex.PRNGKey,
+        env_state: State,
+        timesteps: TimeStep,
+    ) -> dict:
         """Learner function."""
         runner_state = (params, opt_state, rng, env_state, timesteps)
 
