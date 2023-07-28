@@ -79,7 +79,7 @@ class Transition(NamedTuple):
 
 def get_learner_fn(
     env: jumanji.Environment, apply_fn: callable, update_fn: callable, config: dict
-):
+)-> callable:
     """Get the learner function."""
 
     def _update_step(runner_state: Tuple, unused_target: Any) -> Tuple:
