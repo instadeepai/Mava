@@ -1,4 +1,4 @@
-from typing import Any, NamedTuple, Sequence, Tuple
+from typing import Any, Sequence, Tuple
 
 import distrax
 import flax.linen as nn
@@ -8,12 +8,13 @@ import jumanji
 import numpy as np
 import optax
 from flax.linen.initializers import constant, orthogonal
+from jumanji.env import Environment
 from jumanji.environments.routing.robot_warehouse import Observation
 from jumanji.wrappers import AutoResetWrapper
 
+from jax_distribution.types import Transition
 from jax_distribution.utils.timing_utils import TimeIt
-from jax_distribution.wrappers.gymnax import LogWrapper
-from jax_distribution.wrappers.jumanji import MultiAgentWrapper
+from jax_distribution.wrappers.jumanji import LogWrapper, MultiAgentWrapper
 
 
 class ActorCritic(nn.Module):
@@ -67,19 +68,9 @@ class ActorCritic(nn.Module):
         return pi, jnp.squeeze(critic_output, axis=-1)
 
 
-class Transition(NamedTuple):
-    done: jnp.ndarray
-    action: jnp.ndarray
-    value: jnp.ndarray
-    reward: jnp.ndarray
-    log_prob: jnp.ndarray
-    obs: jnp.ndarray
-    info: dict
-
-
 def get_learner_fn(
     env: jumanji.Environment, apply_fn: callable, update_fn: callable, config: dict
-)-> callable:
+) -> callable:
     """Get the learner function."""
 
     def _update_step(runner_state: Tuple, unused_target: Any) -> Tuple:
@@ -281,7 +272,7 @@ def get_learner_fn(
     return learner_fn
 
 
-def run_experiment(env_name: str, config: dict) -> dict:
+def run_experiment(env: Environment, config: dict) -> dict:
     """Runs experiment."""
     # INITIALISE
     cores_count = len(jax.devices())  # get available TPU cores.
@@ -293,7 +284,7 @@ def run_experiment(env_name: str, config: dict) -> dict:
     rng, rng_e, rng_p = jax.random.split(
         jax.random.PRNGKey(config["SEED"]), num=3
     )  # prng keys.
-    num_frames = (
+    total_timesteps = (
         cores_count
         * config["NUM_UPDATES"]
         * config["ROLLOUT_LENGTH"]
@@ -357,7 +348,7 @@ def run_experiment(env_name: str, config: dict) -> dict:
     with TimeIt(tag="COMPILATION"):
         learn(params, opt_state, step_rngs, env_states, timesteps)
 
-    with TimeIt(tag="EXECUTION", frames=num_frames):
+    with TimeIt(tag="EXECUTION", environment_steps=total_timesteps):
         output = learn(params, opt_state, step_rngs, env_states, timesteps)
 
     return output
@@ -389,5 +380,3 @@ if __name__ == "__main__":
     env = LogWrapper(env)
 
     output = run_experiment(env, config)
-    print(f"MEAN RETURN: {output['metrics']['returned_episode_returns'].mean()}")
-    print(f"MAX RETURN: {output['metrics']['returned_episode_returns'].max()}")
