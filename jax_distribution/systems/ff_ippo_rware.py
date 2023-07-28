@@ -1,5 +1,6 @@
 from typing import Any, Sequence, Tuple
 
+import chex
 import distrax
 import flax.linen as nn
 import jax
@@ -26,7 +27,7 @@ class ActorCritic(nn.Module):
     @nn.compact
     def __call__(
         self, observation: Observation
-    ) -> Tuple[distrax.Categorical, jnp.ndarray]:
+    ) -> Tuple[distrax.Categorical, chex.Array]:
         """Forward pass."""
         x = observation.agents_view
         if self.activation == "relu":
@@ -117,8 +118,8 @@ def get_learner_fn(
         _, last_val = apply_fn(params, last_timestep.observation)
 
         def _calculate_gae(
-            traj_batch: Transition, last_val: jnp.ndarray
-        ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+            traj_batch: Transition, last_val: chex.Array
+        ) -> Tuple[chex.Array, chex.Array]:
             """Calculate the GAE."""
 
             def _get_advantages(
@@ -158,8 +159,8 @@ def get_learner_fn(
                     params,
                     opt_state,
                     traj_batch: Transition,
-                    gae: jnp.ndarray,
-                    targets: jnp.ndarray,
+                    gae: chex.Array,
+                    targets: chex.Array,
                 ) -> Tuple:
                     """Calculate the loss."""
                     # RERUN NETWORK
