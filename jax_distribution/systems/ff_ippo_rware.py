@@ -500,20 +500,20 @@ def evaluator_setup(
     return evaluator, (trained_params, eval_rngs)
 
 
-def log(logger, metrics_info, ep_i=None):
+def log(logger, metrics_info, episode_count=0):
     """Log the episode returns and lengths."""
-    if ep_i is None:
-        ep_i = 0
+    # TODO: Check if this is the correct way to log metrics.
     episodes_return = jnp.ravel(metrics_info["episode_return"])
     episodes_length = jnp.ravel(metrics_info["episode_length"])
     print("MEAN EPISODE RETURN: ", np.mean(episodes_return))
-    for ep_i in range(ep_i, ep_i + len(episodes_return)):
+    for ep_i in range(episode_count, episode_count + len(episodes_return)):
         logger.log_stat("episode_returns", float(episodes_return[ep_i]), ep_i)
         logger.log_stat("episode_lengths", float(episodes_length[ep_i]), ep_i)
+    episode_count += len(episodes_return)
     logger.log_stat(
-        "mean_episode_returns", np.mean(episodes_return), ep_i + len(episodes_return)
+        "mean_episode_returns", float(np.mean(episodes_return)), episode_count
     )
-    return ep_i + len(episodes_return)
+    return episode_count
 
 
 # Logger setup
@@ -604,7 +604,7 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
         evaluator(trained_params, eval_rngs)
 
     # Run experiment for a total number of evaluations.
-    ep_i = None
+    episode_count = 0
     for _ in range(config["NUM_EVALUATION"]):
         # Train.
         with TimeIt(tag="EXECUTION", environment_steps=timesteps_per_training):
@@ -624,11 +624,7 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
         jax.block_until_ready(evaluator_output)
 
         # Log the results
-        ep_i = log(logger, evaluator_output["metrics"], ep_i)
-        print(
-            "EXECUTION MEAN EPISODES RETURN: ",
-            learner_output["metrics"]["episode_return_info"].mean(),
-        )
+        episode_count = log(logger, evaluator_output["metrics"], episode_count)
 
         # Update runner state to continue training.
         runner_state = learner_output["runner_state"]
