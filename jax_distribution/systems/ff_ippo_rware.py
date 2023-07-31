@@ -30,7 +30,7 @@ from jumanji.types import Observation, TimeStep
 from jumanji.wrappers import AutoResetWrapper
 from optax._src.base import OptState
 
-from jax_distribution.types import Transition
+from jax_distribution.types import PPOTransition
 from jax_distribution.utils.timing_utils import TimeIt
 from jax_distribution.wrappers.jumanji import LogWrapper, RwareMultiAgentWrapper
 
@@ -120,7 +120,7 @@ def get_learner_fn(
                 "episode_length_info": env_state.episode_length_info,
             }
 
-            transition = Transition(
+            transition = PPOTransition(
                 done, action, value, reward, log_prob, last_timestep.observation, info
             )
             runner_state = (params, opt_state, rng, env_state, timestep)
@@ -136,12 +136,12 @@ def get_learner_fn(
         _, last_val = apply_fn(params, last_timestep.observation)
 
         def _calculate_gae(
-            traj_batch: Transition, last_val: chex.Array
+            traj_batch: PPOTransition, last_val: chex.Array
         ) -> Tuple[chex.Array, chex.Array]:
             """Calculate the GAE."""
 
             def _get_advantages(
-                gae_and_next_value: Tuple, transition: Transition
+                gae_and_next_value: Tuple, transition: PPOTransition
             ) -> Tuple:
                 """Calculate the GAE for a single transition."""
                 gae, next_value = gae_and_next_value
@@ -176,7 +176,7 @@ def get_learner_fn(
                 def _loss_fn(
                     params: FrozenDict,
                     opt_state: OptState,
-                    traj_batch: Transition,
+                    traj_batch: PPOTransition,
                     gae: chex.Array,
                     targets: chex.Array,
                 ) -> Tuple:

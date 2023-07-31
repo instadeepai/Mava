@@ -18,7 +18,18 @@ from typing import Any
 
 
 class TimeIt:
-    """Context manager for timing execution."""
+    """Context manager for timing execution.
+
+    Usage:
+        Wrap a block of code with the `TimeIt` context manager to measure its execution time.
+        Optionally, you can provide the number of environment steps (`environment_steps`)
+        to calculate the steps per second (SPS) metric.
+
+    Note:
+        This implementation is a generic context manager for timing execution using Python's `timeit` module.
+        For the original implementation, please refer to the following link:
+        (https://colab.research.google.com/drive/1974D-qP17fd5mLxy6QZv-ic4yxlPJp-G?usp=sharing)
+    """
 
     def __init__(self, tag: str, environment_steps: int = None) -> None:
         """Initialise the context manager."""

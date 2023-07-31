@@ -1,13 +1,15 @@
-from typing import NamedTuple
+from typing import Dict, NamedTuple
 
 import chex
 
 
-class Transition(NamedTuple):
+class PPOTransition(NamedTuple):
+    """Transition tuple for PPO."""
+
     done: chex.Array
     action: chex.Array
     value: chex.Array
     reward: chex.Array
     log_prob: chex.Array
     obs: chex.Array
-    info: dict
+    info: Dict
