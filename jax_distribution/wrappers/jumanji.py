@@ -1,8 +1,24 @@
+# python3
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from typing import Tuple
 
 import chex
 import jax.numpy as jnp
 from flax import struct
+from jumanji import specs
 from jumanji.environments.routing.robot_warehouse import Observation, State
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
@@ -50,8 +66,8 @@ class LogWrapper(Wrapper):
         return state, timestep
 
 
-class MultiAgentWrapper(Wrapper):
-    """Multi-agent wrapper."""
+class RwareMultiAgentWrapper(Wrapper):
+    """Multi-agent wrapper for the Robotic Warehouse environment."""
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment. Updates the step count."""
@@ -76,3 +92,14 @@ class MultiAgentWrapper(Wrapper):
             ),
         )
         return state, timestep
+
+    def observation_spec(self) -> specs.Spec[Observation]:
+        """Specification of the observation of the `RobotWarehouse` environment."""
+        step_count = specs.BoundedArray(
+            (4,),
+            jnp.int32,
+            [0] * self._env.num_agents,
+            [self._env.time_limit] * self._env.num_agents,
+            "step_count",
+        )
+        return self._env.observation_spec().replace(step_count=step_count)
