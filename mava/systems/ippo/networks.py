@@ -206,6 +206,7 @@ class ValueHead(hk.Module):
 
 def make_discrete_networks(
     environment_spec: specs.EnvironmentSpec,
+    num_agents: int,
     base_key: networks_lib.PRNGKey,
     policy_layer_sizes: Sequence[int],
     critic_layer_sizes: Sequence[int],
@@ -364,13 +365,7 @@ def make_discrete_networks(
 
     # replicate obs num agents times
     dummy_concatted_obs = jnp.concatenate(
-        [dummy_obs for _ in range(environment_spec.actions.num_values)], axis=1
-    )
-    print(
-        f"Dummy obs shape: {dummy_obs.shape} | Dummy concatted obs shape: {dummy_concatted_obs.shape}"
-    )
-    jax.debug.print(
-        f"Dummy obs shape: {dummy_obs.shape} | Dummy concatted obs shape: {dummy_concatted_obs.shape}"
+        [dummy_obs for _ in range(num_agents)], axis=1
     )
 
     base_key, network_key = jax.random.split(base_key)
@@ -401,6 +396,7 @@ def make_discrete_networks(
 
 def make_networks(
     spec: specs.EnvironmentSpec,
+    num_agents: int,
     base_key: networks_lib.PRNGKey,
     policy_layer_sizes: Sequence[int],
     critic_layer_sizes: Sequence[int],
@@ -449,6 +445,7 @@ def make_networks(
     if isinstance(spec.actions, specs.DiscreteArray):
         return make_discrete_networks(
             environment_spec=spec,
+            num_agents=num_agents,
             base_key=base_key,
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
@@ -536,9 +533,11 @@ def make_default_networks(
         specs = {net_key: specs[value] for net_key, value in net_spec_keys.items()}
 
     networks: Dict[str, Any] = {}
+    num_agents = len(environment_spec.get_agent_environment_specs())
     for net_key in specs.keys():
         networks[net_key] = make_networks(
             specs[net_key],
+            num_agents=num_agents,
             base_key=base_key,
             policy_layer_sizes=policy_layer_sizes,
             critic_layer_sizes=critic_layer_sizes,
