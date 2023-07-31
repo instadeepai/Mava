@@ -26,11 +26,14 @@ from jumanji.wrappers import Wrapper
 
 @struct.dataclass
 class LogEnvState:
+    """State of the `LogWrapper`."""
+
     env_state: State
     episode_returns: float
     episode_lengths: int
-    returned_episode_returns: float
-    returned_episode_lengths: int
+    # Information about the episode return and length for logging purposes.
+    episode_return_info: float
+    episode_length_info: int
 
 
 class LogWrapper(Wrapper):
@@ -50,18 +53,24 @@ class LogWrapper(Wrapper):
         """Step the environment."""
         env_state, timestep = self._env.step(state.env_state, action)
 
+        done = timestep.last()
+        not_done = 1 - done
+
         new_episode_return = state.episode_returns + jnp.mean(timestep.reward)
         new_episode_length = state.episode_lengths + 1
+        episode_return_info = (
+            state.episode_return_info * not_done + new_episode_return * done
+        )
+        episode_length_info = (
+            state.episode_length_info * not_done + new_episode_length * done
+        )
+
         state = LogEnvState(
             env_state=env_state,
-            episode_returns=new_episode_return * (1 - timestep.last()),
-            episode_lengths=new_episode_length * (1 - timestep.last()),
-            returned_episode_returns=state.returned_episode_returns
-            * (1 - timestep.last())
-            + new_episode_return * timestep.last(),
-            returned_episode_lengths=state.returned_episode_lengths
-            * (1 - timestep.last())
-            + new_episode_length * timestep.last(),
+            episode_returns=new_episode_return * not_done,
+            episode_lengths=new_episode_length * not_done,
+            episode_return_info=episode_return_info,
+            episode_length_info=episode_length_info,
         )
         return state, timestep
 
@@ -96,7 +105,7 @@ class RwareMultiAgentWrapper(Wrapper):
     def observation_spec(self) -> specs.Spec[Observation]:
         """Specification of the observation of the `RobotWarehouse` environment."""
         step_count = specs.BoundedArray(
-            (4,),
+            (self._env.num_agents,),
             jnp.int32,
             [0] * self._env.num_agents,
             [self._env.time_limit] * self._env.num_agents,

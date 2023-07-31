@@ -116,8 +116,8 @@ def get_learner_fn(
                 (timestep.last(), timestep.reward),
             )
             info = {
-                "returned_episode_returns": env_state.returned_episode_returns,
-                "returned_episode_lengths": env_state.returned_episode_lengths,
+                "episode_return_info": env_state.episode_return_info,
+                "episode_length_info": env_state.episode_length_info,
             }
 
             transition = Transition(
