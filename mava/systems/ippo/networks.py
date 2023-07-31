@@ -362,6 +362,17 @@ def make_discrete_networks(
     dummy_obs = utils.zeros_like(environment_spec.observations.observation)
     dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
 
+    # replicate obs num agents times
+    dummy_concatted_obs = jnp.concatenate(
+        [dummy_obs for _ in range(environment_spec.actions.num_values)], axis=1
+    )
+    print(
+        f"Dummy obs shape: {dummy_obs.shape} | Dummy concatted obs shape: {dummy_concatted_obs.shape}"
+    )
+    jax.debug.print(
+        f"Dummy obs shape: {dummy_obs.shape} | Dummy concatted obs shape: {dummy_concatted_obs.shape}"
+    )
+
     base_key, network_key = jax.random.split(base_key)
 
     if len(policy_recurrent_layer_sizes) > 0:
@@ -373,7 +384,7 @@ def make_discrete_networks(
         policy_params = policy_fn.init(network_key, dummy_obs)  # type: ignore
 
     base_key, network_key = jax.random.split(base_key)
-    critic_params = critic_fn.init(network_key, dummy_obs)  # type: ignore
+    critic_params = critic_fn.init(network_key, dummy_concatted_obs)  # type: ignore
 
     # Create PPONetworks to add functionality required by the agent.
     return PPONetworks(
