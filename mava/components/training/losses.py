@@ -382,6 +382,10 @@ class MAPGWithTrustRegionClippingLoss(Loss):
 
             critic_grads = {}
             loss_info_critic = {}
+            concated_obs = jnp.concatenate(
+                [observations[agent_key].observation for agent_key in observations],
+                axis=-1,
+            )
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
                 network = trainer.store.networks[agent_net_key]
@@ -440,7 +444,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                     critic_loss_fn, has_aux=True
                 )(
                     critic_params[agent_net_key],
-                    observations[agent_key].observation,
+                    concated_obs,
                     target_values[agent_key],
                     behavior_values[agent_key],
                     masks[agent_key],

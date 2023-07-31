@@ -265,10 +265,11 @@ class MAPGWithTrustRegionStep(Step):
 
             # TODO (Ruan): Double check this
             agent_nets = trainer.store.trainer_agent_net_keys
+            concated_obs = jnp.concatenate(
+                [observations[key].observation for key in agent_nets.keys()], axis=-1
+            )
             behavior_values = {
-                key: get_behavior_values(
-                    agent_nets[key], rewards[key], observations[key].observation
-                )
+                key: get_behavior_values(agent_nets[key], rewards[key], concated_obs)
                 for key in agent_nets.keys()
             }
 
