@@ -13,8 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
-from typing import Any, Callable, Dict, Sequence, Tuple, Union
+import datetime
+import os
+from logging import Logger as SacredLogger
+from os.path import abspath, dirname
+from typing import Any, Callable, Dict, Sequence, Tuple
 
 import chex
 import distrax
@@ -27,17 +30,18 @@ import optax
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
 from jumanji.env import Environment
-from jumanji.types import Observation, TimeStep
+from jumanji.types import Observation
 from jumanji.wrappers import AutoResetWrapper
 from optax._src.base import OptState
+from sacred import Experiment
+from sacred.observers import FileStorageObserver
+from sacred.run import Run
+from sacred.utils import apply_backspaces_and_linefeeds
 
 from jax_distribution.types import Output, PPOTransition, RunnerState
+from jax_distribution.utils.logger_tools import Logger, config_copy, get_logger
 from jax_distribution.utils.timing_utils import TimeIt
-from jax_distribution.wrappers.jumanji import (
-    LogEnvState,
-    LogWrapper,
-    RwareMultiAgentWrapper,
-)
+from jax_distribution.wrappers.jumanji import LogWrapper, RwareMultiAgentWrapper
 
 
 class ActorCritic(nn.Module):
@@ -334,7 +338,11 @@ def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> call
             # SELECT ACTION
             rng, _rng = jax.random.split(rng)
             pi, _ = apply_fn(params, last_timestep.observation)
-            action = pi.sample(seed=_rng)
+
+            if config["EVALUATION_GREEDY"]:
+                action = pi.mode()
+            else:
+                action = pi.sample(seed=_rng)
 
             # STEP ENVIRONMENT
             env_state, timestep = env.step(env_state, action)
@@ -396,7 +404,9 @@ def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> call
     return evaluator_fn
 
 
-def learner_setup(env: Environment, config: Dict) -> Tuple[callable, RunnerState]:
+def learner_setup(
+    env: Environment, rngs: chex.Array, config: Dict
+) -> Tuple[callable, RunnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
     cores_count = len(jax.devices())
@@ -405,7 +415,7 @@ def learner_setup(env: Environment, config: Dict) -> Tuple[callable, RunnerState
     num_agents = env.action_spec().shape[0]
     config["NUM_AGENTS"] = num_agents
     # PRNG keys.
-    rng, rng_p = jax.random.split(jax.random.PRNGKey(config["SEED"]))
+    rng, rng_p = rngs
 
     # Define network and optimiser.
     network = ActorCritic(num_actions, config["ACTIVATION"])
@@ -462,14 +472,122 @@ def learner_setup(env: Environment, config: Dict) -> Tuple[callable, RunnerState
     return learn, (params, opt_state, step_rngs, env_states, timesteps)
 
 
-def run_experiment(env: Environment, eval_env: Environment, config: Dict) -> Output:
+def evaluator_setup(
+    eval_env: Environment, rng_e: chex.PRNGKey, params: FrozenDict, config: Dict
+) -> Tuple[callable, RunnerState]:
+    """Initialise evaluator_fn, network, optimiser, environment and states."""
+    # Get available TPU cores.
+    cores_count = len(jax.devices())
+    # Get number of actions.
+    num_actions = int(eval_env.action_spec().num_values[0])
+
+    # Define network and vmap it over number of agents.
+    eval_network = ActorCritic(num_actions, config["ACTIVATION"])
+    vmapped_eval_network_apply_fn = jax.vmap(
+        eval_network.apply,
+        in_axes=(None, 0),
+    )
+
+    # Pmap evaluator over cores.
+    evaluator = get_evaluator_fn(eval_env, vmapped_eval_network_apply_fn, config)
+    evaluator = jax.pmap(evaluator, axis_name="device")
+
+    # Broadcast trained params to cores and split rngs for each core.
+    trained_params = jax.tree_util.tree_map(lambda x: x[:, 0, ...], params)
+    rng_e, *eval_rngs = jax.random.split(rng_e, cores_count + 1)
+    eval_rngs = jnp.stack(eval_rngs).reshape(cores_count, -1)
+
+    return evaluator, (trained_params, eval_rngs)
+
+
+def log(logger, metrics_info, ep_i=None):
+    """Log the episode returns and lengths."""
+    if ep_i is None:
+        ep_i = 0
+    episodes_return = jnp.ravel(metrics_info["episode_return"])
+    episodes_length = jnp.ravel(metrics_info["episode_length"])
+    print("MEAN EPISODE RETURN: ", np.mean(episodes_return))
+    for ep_i in range(ep_i, ep_i + len(episodes_return)):
+        logger.log_stat("episode_returns", float(episodes_return[ep_i]), ep_i)
+        logger.log_stat("episode_lengths", float(episodes_length[ep_i]), ep_i)
+    logger.log_stat(
+        "mean_episode_returns", np.mean(episodes_return), ep_i + len(episodes_return)
+    )
+    return ep_i + len(episodes_return)
+
+
+# Logger setup
+logger = get_logger()
+ex = Experiment("mava", save_git_info=False)
+ex.logger = logger
+ex.captured_out_filter = apply_backspaces_and_linefeeds
+results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
+
+
+@ex.config
+def make_config() -> None:
+    """Config for the experiment."""
+    LR = 2.5e-4
+    UPDATE_BATCH_SIZE = 4
+    ROLLOUT_LENGTH = 128
+    NUM_UPDATES = 20
+    NUM_ENVS = 32
+    PPO_EPOCHS = 4
+    NUM_MINIBATCHES = 8
+    GAMMA = 0.99
+    GAE_LAMBDA = 0.95
+    CLIP_EPS = 0.2
+    ENT_COEF = 0.01
+    VF_COEF = 0.5
+    MAX_GRAD_NORM = 0.5
+    ACTIVATION = "relu"
+    ENV_NAME = "RobotWarehouse-v0"
+    SEED = 42
+    NUM_EVAL_EPISODES = 32
+    NUM_EVALUATION = 5
+    EVALUATION_GREEDY = False
+    USE_SACRED = True
+    USE_TF = True
+
+
+@ex.main
+def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
     """Runs experiment."""
+    # Logger setup
+    config = config_copy(_config)
+    logger = Logger(_log)
+    unique_token = (
+        f"{_config['ENV_NAME']}_seed{_config['SEED']}_{datetime.datetime.now()}"
+    )
+    if config["USE_SACRED"]:
+        logger.setup_sacred(_run)
+    if config["USE_TF"]:
+        tb_logs_direc = os.path.join(
+            dirname(dirname(abspath(__file__))), "results", "tb_logs"
+        )
+        tb_exp_direc = os.path.join(tb_logs_direc, "{}").format(unique_token)
+        logger.setup_tb(tb_exp_direc)
+
+    # Create envs
+    env = jumanji.make(config["ENV_NAME"])
+    env = RwareMultiAgentWrapper(env)
+    env = AutoResetWrapper(env)
+    env = LogWrapper(env)
+    eval_env = jumanji.make(config["ENV_NAME"])
+    eval_env = RwareMultiAgentWrapper(eval_env)
+
+    # PRNG keys.
+    rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["SEED"]), num=3)
     # Setup learner.
-    learn, initial_runner_state = learner_setup(env, config)
+    learn, runner_state = learner_setup(env, (rng, rng_p), config)
+
+    # Setup evaluator.
+    evaluator, (trained_params, eval_rngs) = evaluator_setup(
+        eval_env, rng_e, runner_state[0], config
+    )
 
     # Calculate total timesteps.
     cores_count = len(jax.devices())
-
     config["NUM_UPDATES_PER_EVAL"] = config["NUM_UPDATES"] // config["NUM_EVALUATION"]
     timesteps_per_training = (
         cores_count
@@ -478,82 +596,46 @@ def run_experiment(env: Environment, eval_env: Environment, config: Dict) -> Out
         * config["UPDATE_BATCH_SIZE"]
         * config["NUM_ENVS"]
     )
-    # INITIALISE EVALUATOR
-    # Get number of actions and agents.
-    rng, rng_e = jax.random.split(jax.random.PRNGKey(config["SEED"]))
-    num_actions = int(eval_env.action_spec().num_values[0])
-    eval_network = ActorCritic(num_actions, config["ACTIVATION"])
-    vmapped_eval_network_apply_fn = jax.vmap(
-        eval_network.apply,
-        in_axes=(None, 0),
-    )
-    trained_params = jax.tree_util.tree_map(
-        lambda x: x[:, 0, ...], initial_runner_state[0]
-    )
-    evaluator = get_evaluator_fn(  # get batched iterated update.
-        eval_env, vmapped_eval_network_apply_fn, config
-    )
-    evaluator = jax.pmap(
-        evaluator, axis_name="device"
-    )  # replicate over multiple cores.
-    rng_e, *eval_rngs = jax.random.split(rng_e, cores_count + 1)
-    eval_rngs = jnp.stack(eval_rngs)
-    eval_rngs = eval_rngs.reshape(cores_count, -1)
 
-    # RUN EXPERIMENT
+    # Compile learner and evaluator.
     with TimeIt(tag="COMPILATION"):
-        learn(initial_runner_state)
+        learn(runner_state)
     with TimeIt(tag="COMPILATION"):
         evaluator(trained_params, eval_rngs)
 
+    # Run experiment for a total number of evaluations.
+    ep_i = None
     for _ in range(config["NUM_EVALUATION"]):
+        # Train.
         with TimeIt(tag="EXECUTION", environment_steps=timesteps_per_training):
-            learner_output = learn(initial_runner_state)
+            learner_output = learn(runner_state)
             jax.block_until_ready(learner_output)
+
+        # Prepare for evaluation.
         trained_params = jax.tree_util.tree_map(
             lambda x: x[:, 0, ...], learner_output["runner_state"][0]
         )
         rng_e, *eval_rngs = jax.random.split(rng_e, cores_count + 1)
         eval_rngs = jnp.stack(eval_rngs)
         eval_rngs = eval_rngs.reshape(cores_count, -1)
-        start_time = time.time()
-        o = evaluator(trained_params, eval_rngs)
-        jax.block_until_ready(o)
-        elapsed_sec = time.time() - start_time
-        print(o["metrics"]["episode_return"].mean())
-        print(o["metrics"]["episode_length"].sum() / elapsed_sec)
-        initial_runner_state = learner_output["runner_state"]
-    print("FINAL", o["metrics"]["episode_return"].mean())
-    return learner_output
+
+        # Evaluate.
+        evaluator_output = evaluator(trained_params, eval_rngs)
+        jax.block_until_ready(evaluator_output)
+
+        # Log the results
+        ep_i = log(logger, evaluator_output["metrics"], ep_i)
+        print(
+            "EXECUTION MEAN EPISODES RETURN: ",
+            learner_output["metrics"]["episode_return_info"].mean(),
+        )
+
+        # Update runner state to continue training.
+        runner_state = learner_output["runner_state"]
 
 
 if __name__ == "__main__":
-    config = {
-        "LR": 2.5e-4,
-        "UPDATE_BATCH_SIZE": 4,
-        "ROLLOUT_LENGTH": 128,
-        "NUM_UPDATES": 10,
-        "NUM_ENVS": 32,
-        "PPO_EPOCHS": 4,
-        "NUM_MINIBATCHES": 8,
-        "GAMMA": 0.99,
-        "GAE_LAMBDA": 0.95,
-        "CLIP_EPS": 0.2,
-        "ENT_COEF": 0.01,
-        "VF_COEF": 0.5,
-        "MAX_GRAD_NORM": 0.5,
-        "ACTIVATION": "relu",
-        "ENV_NAME": "RobotWarehouse-v0",
-        "SEED": 42,
-        "NUM_EVAL_EPISODES": 32,
-        "NUM_EVALUATION": 5,
-    }
-
-    env = jumanji.make(config["ENV_NAME"])
-    env = RwareMultiAgentWrapper(env)
-    env = AutoResetWrapper(env)
-    env = LogWrapper(env)
-    eval_env = jumanji.make(config["ENV_NAME"])
-    eval_env = RwareMultiAgentWrapper(eval_env)
-    output = run_experiment(env, eval_env, config)
+    file_obs_path = os.path.join(results_path, f"sacred/")
+    ex.observers.append(FileStorageObserver.create(file_obs_path))
+    ex.run()
     print("IPPO experiment completed")
