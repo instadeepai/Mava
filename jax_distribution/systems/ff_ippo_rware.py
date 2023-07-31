@@ -298,13 +298,7 @@ def get_learner_fn(
         metric = traj_batch.info
         return runner_state, metric
 
-    def learner_fn(
-        params: FrozenDict,
-        opt_state: OptState,
-        rng: chex.PRNGKey,
-        env_state: LogEnvState,
-        timesteps: TimeStep,
-    ) -> Output:
+    def learner_fn(runner_state: RunnerState) -> Output:
         """Learner function.
 
         This function represents the learner, it updates the network parameters by iteratively applying the `_update_step`
@@ -317,7 +311,6 @@ def get_learner_fn(
             env_state (LogEnvState): The environment state.
             timesteps (TimeStep): The initial timestep in the initial trajectory.
         """
-        runner_state = (params, opt_state, rng, env_state, timesteps)
 
         batched_update_step = jax.vmap(
             _update_step, in_axes=(0, None), axis_name="batch"
@@ -403,19 +396,81 @@ def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> call
     return evaluator_fn
 
 
-def run_experiment(env: Environment, eval_env: Environment, config: Dict) -> Output:
-    """Runs experiment."""
-    # INITIALISE
-    cores_count = len(jax.devices())  # get available TPU cores.
+def learner_setup(env: Environment, config: Dict) -> Tuple[callable, RunnerState]:
+    """Initialise learner_fn, network, optimiser, environment and states."""
+    # Get available TPU cores.
+    cores_count = len(jax.devices())
+    # Get number of actions and agents.
     num_actions = int(env.action_spec().num_values[0])
     num_agents = env.action_spec().shape[0]
     config["NUM_AGENTS"] = num_agents
+    # PRNG keys.
+    rng, rng_p = jax.random.split(jax.random.PRNGKey(config["SEED"]))
+
+    # Define network and optimiser.
+    network = ActorCritic(num_actions, config["ACTIVATION"])
+    optim = optax.adam(config["LR"])
+
+    # Initialise observation: Select only obs for a single agent.
+    init_x = env.observation_spec().generate_value()
+    init_x = jax.tree_util.tree_map(lambda x: x[0], init_x)
+    init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
+
+    # initialise params and optimiser state.
+    params = network.init(rng_p, init_x)
+    opt_state = optim.init(params)
+
+    # Vmap network apply function over number of agents.
+    vmapped_network_apply_fn = jax.vmap(
+        network.apply, in_axes=(None, 1), out_axes=(1, 1)
+    )
+
+    # Get batched iterated update and replicate it to pmap it over cores.
+    learn = get_learner_fn(env, vmapped_network_apply_fn, optim.update, config)
+    learn = jax.pmap(learn, axis_name="device")
+
+    # Broadcast params and optimiser state to cores and batch.
+    broadcast = lambda x: jnp.broadcast_to(
+        x, (cores_count, config["UPDATE_BATCH_SIZE"]) + x.shape
+    )
+    params = jax.tree_map(broadcast, params)
+    opt_state = jax.tree_map(broadcast, opt_state)
+
+    # Initialise environment states and timesteps.
+    rng, *env_rngs = jax.random.split(
+        rng, cores_count * config["UPDATE_BATCH_SIZE"] * config["NUM_ENVS"] + 1
+    )
+    env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
+        jnp.stack(env_rngs),
+    )
+
+    # Split rngs for each core.
+    rng, *step_rngs = jax.random.split(
+        rng, cores_count * config["UPDATE_BATCH_SIZE"] + 1
+    )
+    # Add dimension to pmap over.
+    reshape_step_rngs = lambda x: x.reshape(
+        (cores_count, config["UPDATE_BATCH_SIZE"]) + x.shape[1:]
+    )
+    step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
+    reshape_states = lambda x: x.reshape(
+        (cores_count, config["UPDATE_BATCH_SIZE"], config["NUM_ENVS"]) + x.shape[1:]
+    )
+    env_states = jax.tree_util.tree_map(reshape_states, env_states)
+    timesteps = jax.tree_util.tree_map(reshape_states, timesteps)
+
+    return learn, (params, opt_state, step_rngs, env_states, timesteps)
+
+
+def run_experiment(env: Environment, eval_env: Environment, config: Dict) -> Output:
+    """Runs experiment."""
+    # Setup learner.
+    learn, initial_runner_state = learner_setup(env, config)
+
+    # Calculate total timesteps.
+    cores_count = len(jax.devices())
+
     config["NUM_UPDATES_PER_EVAL"] = config["NUM_UPDATES"] // config["NUM_EVALUATION"]
-    network = ActorCritic(num_actions, config["ACTIVATION"])  # define network.
-    optim = optax.adam(config["LR"])  # define optimiser.
-    rng, rng_e, rng_p = jax.random.split(
-        jax.random.PRNGKey(config["SEED"]), num=3
-    )  # prng keys.
     timesteps_per_training = (
         cores_count
         * config["NUM_UPDATES_PER_EVAL"]
@@ -423,63 +478,18 @@ def run_experiment(env: Environment, eval_env: Environment, config: Dict) -> Out
         * config["UPDATE_BATCH_SIZE"]
         * config["NUM_ENVS"]
     )
-
-    # INITIALISE NETWORK AND OPTIMISER PARAMS
-    init_x = env.observation_spec().generate_value()
-    # Select only obs for a single agent.
-    init_x = jax.tree_util.tree_map(lambda x: x[0], init_x)
-    init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
-    params = network.init(rng_p, init_x)
-    # initialise optimiser stats.
-    opt_state = optim.init(params)
-
-    # GET VMAPPED NETWORK APPLY FUNCTION AND LEARNER FUNCTION
-    vmapped_network_apply_fn = jax.vmap(
-        network.apply, in_axes=(None, 1), out_axes=(1, 1)
-    )
-    learn = get_learner_fn(  # get batched iterated update.
-        env, vmapped_network_apply_fn, optim.update, config
-    )
-    learn = jax.pmap(learn, axis_name="device")  # replicate over multiple cores.
-
-    # Broadcast to cores and batch.
-    broadcast = lambda x: jnp.broadcast_to(
-        x, (cores_count, config["UPDATE_BATCH_SIZE"]) + x.shape
-    )
-    params = jax.tree_map(broadcast, params)
-    opt_state = jax.tree_map(broadcast, opt_state)
-
-    # INITIALISE ENVIRONMENT
-    rng, *env_rngs = jax.random.split(
-        rng, cores_count * config["UPDATE_BATCH_SIZE"] * config["NUM_ENVS"] + 1
-    )
-    env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
-        jnp.stack(env_rngs),
-    )
-    rng, *step_rngs = jax.random.split(
-        rng, cores_count * config["UPDATE_BATCH_SIZE"] + 1
-    )
-
-    # RESHAPE ENVIRONMENT STATES AND TIMESTEPS
-    reshape_step_rngs = lambda x: x.reshape(
-        (cores_count, config["UPDATE_BATCH_SIZE"]) + x.shape[1:]
-    )
-    # Add dimension to pmap over.
-    step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
-
-    reshape_states = lambda x: x.reshape(
-        (cores_count, config["UPDATE_BATCH_SIZE"], config["NUM_ENVS"]) + x.shape[1:]
-    )
-    env_states = jax.tree_util.tree_map(reshape_states, env_states)
-    timesteps = jax.tree_util.tree_map(reshape_states, timesteps)
-
     # INITIALISE EVALUATOR
+    # Get number of actions and agents.
+    rng, rng_e = jax.random.split(jax.random.PRNGKey(config["SEED"]))
+    num_actions = int(eval_env.action_spec().num_values[0])
     eval_network = ActorCritic(num_actions, config["ACTIVATION"])
     vmapped_eval_network_apply_fn = jax.vmap(
         eval_network.apply,
         in_axes=(None, 0),
     )
-    trained_params = jax.tree_util.tree_map(lambda x: x[:, 0, ...], params)
+    trained_params = jax.tree_util.tree_map(
+        lambda x: x[:, 0, ...], initial_runner_state[0]
+    )
     evaluator = get_evaluator_fn(  # get batched iterated update.
         eval_env, vmapped_eval_network_apply_fn, config
     )
@@ -492,16 +502,16 @@ def run_experiment(env: Environment, eval_env: Environment, config: Dict) -> Out
 
     # RUN EXPERIMENT
     with TimeIt(tag="COMPILATION"):
-        learn(params, opt_state, step_rngs, env_states, timesteps)
+        learn(initial_runner_state)
     with TimeIt(tag="COMPILATION"):
         evaluator(trained_params, eval_rngs)
 
     for _ in range(config["NUM_EVALUATION"]):
         with TimeIt(tag="EXECUTION", environment_steps=timesteps_per_training):
-            output = learn(params, opt_state, step_rngs, env_states, timesteps)
-            jax.block_until_ready(output)
+            learner_output = learn(initial_runner_state)
+            jax.block_until_ready(learner_output)
         trained_params = jax.tree_util.tree_map(
-            lambda x: x[:, 0, ...], output["runner_state"][0]
+            lambda x: x[:, 0, ...], learner_output["runner_state"][0]
         )
         rng_e, *eval_rngs = jax.random.split(rng_e, cores_count + 1)
         eval_rngs = jnp.stack(eval_rngs)
@@ -512,8 +522,9 @@ def run_experiment(env: Environment, eval_env: Environment, config: Dict) -> Out
         elapsed_sec = time.time() - start_time
         print(o["metrics"]["episode_return"].mean())
         print(o["metrics"]["episode_length"].sum() / elapsed_sec)
-        (params, opt_state, step_rngs, env_states, timesteps) = output["runner_state"]
+        initial_runner_state = learner_output["runner_state"]
     print("FINAL", o["metrics"]["episode_return"].mean())
+    return learner_output
 
 
 if __name__ == "__main__":
