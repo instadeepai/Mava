@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Sequence, Tuple
 
 import chex
 import distrax
@@ -26,17 +26,13 @@ import optax
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
 from jumanji.env import Environment
-from jumanji.types import Observation, TimeStep
+from jumanji.types import Observation
 from jumanji.wrappers import AutoResetWrapper
 from optax._src.base import OptState
 
 from jax_distribution.types import Output, PPOTransition, RunnerState
 from jax_distribution.utils.timing_utils import TimeIt
-from jax_distribution.wrappers.jumanji import (
-    LogEnvState,
-    LogWrapper,
-    RwareMultiAgentWrapper,
-)
+from jax_distribution.wrappers.jumanji import LogWrapper, RwareMultiAgentWrapper
 
 
 class ActorCritic(nn.Module):
@@ -47,7 +43,7 @@ class ActorCritic(nn.Module):
 
     @nn.compact
     def __call__(
-        self, observation: Observation
+        self, gloabal_observation: Observation, observation: Observation
     ) -> Tuple[distrax.Categorical, chex.Array]:
         """Forward pass."""
         x = observation.agents_view
@@ -76,9 +72,12 @@ class ActorCritic(nn.Module):
         )
         actor_policy = distrax.Categorical(logits=masked_logits)
 
+        y = gloabal_observation.agents_view
+        y = y.reshape(y.shape[0], -1)
+
         critic_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(x)
+        )(y)
         critic_output = activation(critic_output)
         critic_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
@@ -123,7 +122,9 @@ def get_learner_fn(
 
             # SELECT ACTION
             rng, policy_rng = jax.random.split(rng)
-            actor_policy, value = apply_fn(params, last_timestep.observation)
+            actor_policy, value = apply_fn(
+                params, last_timestep.observation, last_timestep.observation
+            )
             action = actor_policy.sample(seed=policy_rng)
             log_prob = actor_policy.log_prob(action)
 
@@ -155,7 +156,9 @@ def get_learner_fn(
 
         # CALCULATE ADVANTAGE
         params, opt_state, rng, env_state, last_timestep = runner_state
-        _, last_val = apply_fn(params, last_timestep.observation)
+        _, last_val = apply_fn(
+            params, last_timestep.observation, last_timestep.observation
+        )
 
         def _calculate_gae(
             traj_batch: PPOTransition, last_val: chex.Array
@@ -204,7 +207,9 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate the loss."""
                     # RERUN NETWORK
-                    actor_policy, value = apply_fn(params, traj_batch.obs)
+                    actor_policy, value = apply_fn(
+                        params, traj_batch.obs, traj_batch.obs
+                    )
                     log_prob = actor_policy.log_prob(traj_batch.action)
 
                     # CALCULATE VALUE LOSS
@@ -339,18 +344,22 @@ def learner_setup(env: Environment, config: Dict) -> Tuple[callable, RunnerState
     network = ActorCritic(num_actions, config["ACTIVATION"])
     optim = optax.adam(config["LR"])
 
-    # Initialise observation: Select only obs for a single agent.
+    # Initialise observation.
     init_x = env.observation_spec().generate_value()
+    init_y = init_x
+    # Select only obs for a single agent.
     init_x = jax.tree_util.tree_map(lambda x: x[0], init_x)
     init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
+    # Select obs for all the agents.
+    init_y = jax.tree_util.tree_map(lambda y: y[None, ...], init_y)
 
     # initialise params and optimiser state.
-    params = network.init(rng_p, init_x)
+    params = network.init(rng_p, init_y, init_x)
     opt_state = optim.init(params)
 
     # Vmap network apply function over number of agents.
     vmapped_network_apply_fn = jax.vmap(
-        network.apply, in_axes=(None, 1), out_axes=(1, 1)
+        network.apply, in_axes=(None, None, 1), out_axes=(1, 1)
     )
 
     # Get batched iterated update and replicate it to pmap it over cores.
@@ -420,7 +429,7 @@ if __name__ == "__main__":
         "LR": 2.5e-4,
         "UPDATE_BATCH_SIZE": 4,
         "ROLLOUT_LENGTH": 128,
-        "NUM_UPDATES": 10,
+        "NUM_UPDATES": 100,
         "NUM_ENVS": 32,
         "PPO_EPOCHS": 4,
         "NUM_MINIBATCHES": 8,
@@ -441,4 +450,5 @@ if __name__ == "__main__":
     env = LogWrapper(env)
 
     learner_output = run_experiment(env, config)
+    print("EXECUTION:", learner_output["metrics"]["episode_return_info"].mean())
     print("IPPO experiment completed")
