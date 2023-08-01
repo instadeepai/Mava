@@ -365,7 +365,7 @@ def make_discrete_networks(
 
     # replicate obs num agents times
     dummy_concatted_obs = jnp.concatenate(
-        [dummy_obs for _ in range(num_agents)], axis=1
+        [dummy_obs for _ in range(num_agents)], axis=-1
     )
 
     base_key, network_key = jax.random.split(base_key)
