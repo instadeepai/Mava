@@ -499,19 +499,17 @@ def evaluator_setup(
     return evaluator, (trained_params, eval_rngs)
 
 
-def log(logger, metrics_info, episode_count=0):
+def log(logger, metrics_info, episode_count=0, t_env=0):
     """Log the episode returns and lengths."""
-    # TODO: Check if this is the correct way to log metrics.
     episodes_return = jnp.ravel(metrics_info["episode_return"])
     episodes_length = jnp.ravel(metrics_info["episode_length"])
     print("MEAN EPISODE RETURN: ", np.mean(episodes_return))
     for ep_i in range(episode_count, episode_count + len(episodes_return)):
-        logger.log_stat("episode_returns", float(episodes_return[ep_i]), ep_i)
-        logger.log_stat("episode_lengths", float(episodes_length[ep_i]), ep_i)
+        logger.log_stat("test_episode_returns", float(episodes_return[ep_i]), ep_i)
+        logger.log_stat("test_episode_lengths", float(episodes_length[ep_i]), ep_i)
     episode_count += len(episodes_return)
-    logger.log_stat(
-        "mean_episode_returns", float(np.mean(episodes_return)), episode_count
-    )
+    logger.log_stat("mean_test_episode_returns", float(np.mean(episodes_return)), t_env)
+    logger.log_stat("mean_test_episode_length", float(np.mean(episodes_length)), t_env)
     return episode_count
 
 
@@ -604,7 +602,7 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
 
     # Run experiment for a total number of evaluations.
     episode_count = 0
-    for _ in range(config["NUM_EVALUATION"]):
+    for i in range(config["NUM_EVALUATION"]):
         # Train.
         with TimeIt(tag="EXECUTION", environment_steps=timesteps_per_training):
             learner_output = learn(runner_state)
@@ -623,7 +621,12 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
         jax.block_until_ready(evaluator_output)
 
         # Log the results
-        episode_count = log(logger, evaluator_output["metrics"], episode_count)
+        episode_count = log(
+            logger=logger,
+            metrics_info=evaluator_output["metrics"],
+            episode_count=episode_count,
+            t_env=timesteps_per_training * (i + 1),
+        )
 
         # Update runner state to continue training.
         runner_state = learner_output["runner_state"]
