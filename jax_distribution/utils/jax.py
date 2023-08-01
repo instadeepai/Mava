@@ -1,3 +1,18 @@
+# python3
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -12,8 +27,10 @@ def ndim_at_least(x, num_dims):
 
 def merge_leading_dims(x, num_dims):
     """Merge leading dimensions.
+
     Note:
-        This implementation is a generic function for merging leading dimensions extracted from Haiku.
+        This implementation is a generic function for merging leading dimensions
+        extracted from Haiku.
         For the original implementation, please refer to the following link:
         (https://github.com/deepmind/dm-haiku/blob/main/haiku/_src/basic.py#L207)
     """

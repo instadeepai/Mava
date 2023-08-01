@@ -38,7 +38,7 @@ from sacred.observers import FileStorageObserver
 from sacred.run import Run
 from sacred.utils import apply_backspaces_and_linefeeds
 
-from jax_distribution.types import Output, PPOTransition, RunnerState
+from jax_distribution.types import ExperimentOutput, PPOTransition, RunnerState
 from jax_distribution.utils.jax import merge_leading_dims
 from jax_distribution.utils.logger_tools import Logger, config_copy, get_logger
 from jax_distribution.utils.timing_utils import TimeIt
@@ -110,9 +110,10 @@ def get_learner_fn(
     ) -> Tuple[RunnerState, Dict[str, chex.Array]]:
         """A single update of the network.
 
-        This function steps the environment and records the trajectory batch for training.
-        It then calculates advantages and targets based on the recorded trajectory and updates
-        the actor and critic networks based on the calculated losses.
+        This function steps the environment and records the trajectory batch for
+        training. It then calculates advantages and targets based on the recorded
+        trajectory and updates the actor and critic networks based on the calculated
+        losses.
 
         Args:
             runner_state (NamedTuple):
@@ -310,11 +311,12 @@ def get_learner_fn(
         metric = traj_batch.info
         return runner_state, metric
 
-    def learner_fn(runner_state: RunnerState) -> Output:
+    def learner_fn(runner_state: RunnerState) -> ExperimentOutput:
         """Learner function.
 
-        This function represents the learner, it updates the network parameters by iteratively applying the `_update_step`
-        function for a fixed number of updates. The `_update_step` function is vectorized over a batch of inputs.
+        This function represents the learner, it updates the network parameters
+        by iteratively applying the `_update_step` function for a fixed number of
+        updates. The `_update_step` function is vectorized over a batch of inputs.
 
         Args:
             runner_state (NamedTuple):
@@ -338,13 +340,17 @@ def get_learner_fn(
 
 
 def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> callable:
+    """Get the evaluator function."""
+
     def eval_one_episode(params, runner_state) -> Tuple:
-        """Step the environment."""
+        """Evaluate one episode. It is vectorized over the number of evaluation episodes."""
 
         def _env_step(runner_state: Tuple) -> Tuple:
             """Step the environment."""
+            # PRNG keys.
             rng, env_state, last_timestep, step_count_, return_ = runner_state
-            # SELECT ACTION
+
+            # Select action.
             rng, _rng = jax.random.split(rng)
             critic_obs = jax.tree_map(
                 lambda x: jnp.expand_dims(x, axis=0), last_timestep.observation
@@ -356,21 +362,24 @@ def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> call
             else:
                 action = pi.sample(seed=_rng)
 
-            # STEP ENVIRONMENT
+            # Step environment.
             env_state, timestep = env.step(env_state, action)
 
+            # Log episode metrics.
             return_ += timestep.reward
             step_count_ += 1
             runner_state = (rng, env_state, timestep, step_count_, return_)
             return runner_state
 
         def is_done(carry: Tuple) -> jnp.bool_:
+            """Check if the episode is done."""
             timestep = carry[2]
             return ~timestep.last()
 
         rng, env_state, timestep = runner_state
         return_ = jnp.array(0, float)
         step_count_ = jnp.array(0, int)
+
         final_runner = jax.lax.while_loop(
             is_done,
             _env_step,
@@ -384,29 +393,30 @@ def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> call
         }
         return eval_metrics
 
-    def evaluator_fn(trained_params, rng) -> dict:
-        """Learner function."""
+    def evaluator_fn(
+        trained_params: FrozenDict, rng: chex.PRNGKey
+    ) -> Dict[str, Dict[str, chex.Array]]:
+        """Evaluator function."""
 
-        # INITIALISE ENVIRONMENT
+        # Initialise environment states and timesteps.
         cores_count = len(jax.devices())
         rng, *env_rngs = jax.random.split(
             rng, config["NUM_EVAL_EPISODES"] // cores_count + 1
         )
-
         env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
             jnp.stack(env_rngs),
         )
-
+        # Split rngs for each core.
         rng, *step_rngs = jax.random.split(
             rng, config["NUM_EVAL_EPISODES"] // cores_count + 1
         )
-
+        # Add dimension to pmap over.
         reshape_step_rngs = lambda x: x.reshape(
             config["NUM_EVAL_EPISODES"] // cores_count, -1
         )
         step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
-
         runner_state = (step_rngs, env_states, timesteps)
+
         eval_metrics = jax.vmap(
             eval_one_episode, in_axes=(None, 0), axis_name="eval_batch"
         )(trained_params, runner_state)
@@ -517,10 +527,24 @@ def evaluator_setup(
     return evaluator, (trained_params, eval_rngs)
 
 
-def log(logger, metrics_info, episode_count=0, t_env=0):
-    """Log the episode returns and lengths."""
+def log(
+    logger: Logger,
+    metrics_info: Dict[str, Dict[str, chex.Array]],
+    episode_count: int = 0,
+    t_env: int = 0,
+) -> int:
+    """Log the episode returns and lengths.
+
+    Args:
+        logger (Logger): The logger.
+        metrics_info (Dict): The metrics info.
+        episode_count (int): The current episode count.
+        t_env (int): The current timestep.
+    """
+    # Flatten metrics info.
     episodes_return = jnp.ravel(metrics_info["episode_return"])
     episodes_length = jnp.ravel(metrics_info["episode_length"])
+    # Log metrics.
     print("MEAN EPISODE RETURN: ", np.mean(episodes_return))
     for ep_i in range(episode_count, episode_count + len(episodes_return)):
         logger.log_stat("test_episode_returns", float(episodes_return[ep_i]), ep_i)

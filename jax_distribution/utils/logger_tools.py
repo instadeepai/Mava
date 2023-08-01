@@ -1,13 +1,32 @@
+# python3
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import collections
 import logging
 from collections import defaultdict
 from copy import deepcopy
+from typing import Dict, List
 
 import numpy as np
 
 
 class Logger:
-    def __init__(self, console_logger):
+    """Logger class for logging to tensorboard, sacred, and hdf5."""
+
+    def __init__(self, console_logger: logging.Logger) -> None:
+        """Initialise the logger."""
         self.console_logger = console_logger
 
         self.use_tb = False
@@ -17,7 +36,8 @@ class Logger:
 
         self.stats = defaultdict(lambda: [])
 
-    def setup_tb(self, directory_name):
+    def setup_tb(self, directory_name: str) -> None:
+        """Set up tensorboard logging."""
         # Import here so it doesn't have to be installed if you don't use it
         from tensorboard_logger import configure, log_value
 
@@ -25,12 +45,14 @@ class Logger:
         self.tb_logger = log_value
         self.use_tb = True
 
-    def setup_sacred(self, sacred_run_dict):
+    def setup_sacred(self, sacred_run_dict: Dict) -> None:
+        """Set up sacred logging."""
         self._run_obj = sacred_run_dict
         self.sacred_info = sacred_run_dict.info
         self.use_sacred = True
 
-    def log_stat(self, key, value, t, to_sacred=True):
+    def log_stat(self, key: str, value: float, t: int, to_sacred: bool = True) -> None:
+        """Log a single stat."""
         self.stats[key].append((t, value))
 
         if self.use_tb:
@@ -46,7 +68,14 @@ class Logger:
 
             self._run_obj.log_scalar(key, value, t)
 
-    def log_list(self, key, values, timestamps=None, to_sacred=True):
+    def log_list(
+        self,
+        key: str,
+        values: List[float],
+        timestamps: List[int] = None,
+        to_sacred: bool = True,
+    ) -> None:
+        """Log a list of stats."""
         if values is not list:
             values = [values]
         if timestamps is None:
@@ -72,7 +101,8 @@ class Logger:
 
                 self._run_obj.log_scalar(key, value, t)
 
-    def print_recent_stats(self):
+    def print_recent_stats(self) -> None:
+        """Print the most recent stats."""
         log_str = "Recent Stats | t_env: {:>10} | Episode: {:>8}\n".format(
             *self.stats["episode"][-1]
         )
@@ -92,7 +122,7 @@ class Logger:
             log_str += "\n" if i % 4 == 0 else "\t"
         self.console_logger.info(log_str)
 
-    def log_custom_metrics(self, metric_dict, t):
+    def log_custom_metrics(self, metric_dict: Dict, t: int) -> None:
         """Made specifically for storing our custom metrics in a faster way."""
 
         # Note: Custom metrics must be a dictionary of the form {metric_name: [metric_values]}
@@ -100,8 +130,8 @@ class Logger:
         self.custom_metrics_logger.write(metric_dict, t)
 
 
-# set up a custom logger
-def get_logger():
+def get_logger() -> logging.Logger:
+    """Set up a custom logger."""
     logger = logging.getLogger()
     logger.handlers = []
     ch = logging.StreamHandler()
@@ -116,7 +146,8 @@ def get_logger():
     return logger
 
 
-def recursive_dict_update(d, u):
+def recursive_dict_update(d: Dict, u: Dict) -> Dict:
+    """Recursively update a dictionary."""
     for k, v in u.items():
         if isinstance(v, collections.Mapping):
             d[k] = recursive_dict_update(d.get(k, {}), v)
@@ -125,7 +156,8 @@ def recursive_dict_update(d, u):
     return d
 
 
-def config_copy(config):
+def config_copy(config: Dict) -> Dict:
+    """Deep copy a config."""
     if isinstance(config, dict):
         return {k: config_copy(v) for k, v in config.items()}
     elif isinstance(config, list):
