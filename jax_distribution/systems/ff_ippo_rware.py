@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Sequence, Tuple
 
 import chex
 import distrax
@@ -26,11 +26,11 @@ import optax
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
 from jumanji.env import Environment
-from jumanji.types import Observation, TimeStep
+from jumanji.types import Observation
 from jumanji.wrappers import AutoResetWrapper
 from optax._src.base import OptState
 
-from jax_distribution.types import Output, PPOTransition, RunnerState
+from jax_distribution.types import ExperimentOutput, PPOTransition, RunnerState
 from jax_distribution.utils.jax import merge_leading_dims
 from jax_distribution.utils.timing_utils import TimeIt
 from jax_distribution.wrappers.jumanji import LogWrapper, RwareMultiAgentWrapper
@@ -98,9 +98,10 @@ def get_learner_fn(
     ) -> Tuple[RunnerState, Dict[str, chex.Array]]:
         """A single update of the network.
 
-        This function steps the environment and records the trajectory batch for training.
-        It then calculates advantages and targets based on the recorded trajectory and updates
-        the actor and critic networks based on the calculated losses.
+        This function steps the environment and records the trajectory batch for
+        training. It then calculates advantages and targets based on the recorded
+        trajectory and updates the actor and critic networks based on the calculated
+        losses.
 
         Args:
             runner_state (NamedTuple):
@@ -292,11 +293,12 @@ def get_learner_fn(
         metric = traj_batch.info
         return runner_state, metric
 
-    def learner_fn(runner_state: RunnerState) -> Output:
+    def learner_fn(runner_state: RunnerState) -> ExperimentOutput:
         """Learner function.
 
-        This function represents the learner, it updates the network parameters by iteratively applying the `_update_step`
-        function for a fixed number of updates. The `_update_step` function is vectorized over a batch of inputs.
+        This function represents the learner, it updates the network parameters
+        by iteratively applying the `_update_step` function for a fixed number of
+        updates. The `_update_step` function is vectorized over a batch of inputs.
 
         Args:
             runner_state (NamedTuple):
@@ -385,7 +387,7 @@ def learner_setup(env: Environment, config: Dict) -> Tuple[callable, RunnerState
     return learn, (params, opt_state, step_rngs, env_states, timesteps)
 
 
-def run_experiment(env: Environment, config: Dict) -> Output:
+def run_experiment(env: Environment, config: Dict) -> ExperimentOutput:
     """Runs experiment."""
     # Setup learner.
     learn, initial_runner_state = learner_setup(env, config)
