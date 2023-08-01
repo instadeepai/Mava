@@ -31,12 +31,9 @@ from jumanji.wrappers import AutoResetWrapper
 from optax._src.base import OptState
 
 from jax_distribution.types import Output, PPOTransition, RunnerState
+from jax_distribution.utils.jax import merge_leading_dims
 from jax_distribution.utils.timing_utils import TimeIt
-from jax_distribution.wrappers.jumanji import (
-    LogEnvState,
-    LogWrapper,
-    RwareMultiAgentWrapper,
-)
+from jax_distribution.wrappers.jumanji import LogWrapper, RwareMultiAgentWrapper
 
 
 class ActorCritic(nn.Module):
@@ -264,9 +261,7 @@ def get_learner_fn(
             batch_size = config["ROLLOUT_LENGTH"] * config["NUM_ENVS"]
             permutation = jax.random.permutation(shuffle_rng, batch_size)
             batch = (traj_batch, advantages, targets)
-            batch = jax.tree_util.tree_map(
-                lambda x: x.reshape((batch_size,) + x.shape[2:]), batch
-            )
+            batch = jax.tree_util.tree_map(lambda x: merge_leading_dims(x, 2), batch)
             shuffled_batch = jax.tree_util.tree_map(
                 lambda x: jnp.take(x, permutation, axis=0), batch
             )
