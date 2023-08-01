@@ -42,6 +42,18 @@ class RunnerState(NamedTuple):
     timestep: TimeStep
 
 
+class RNNRunnerState(NamedTuple):
+    """State of the `Runner`."""
+
+    params: FrozenDict
+    opt_state: OptState
+    key: chex.PRNGKey
+    env_state: LogEnvState
+    timestep: TimeStep
+    dones: chex.Array
+    hstate: chex.Array
+
+
 class ExperimentOutput(NamedTuple):
     """Experiment output."""
 
