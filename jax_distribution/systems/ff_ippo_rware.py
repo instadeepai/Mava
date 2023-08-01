@@ -510,8 +510,8 @@ def evaluator_setup(
     return evaluator, (trained_params, eval_rngs)
 
 
-def _log(
-    logger: Logger,
+def log(
+    logger: SacredLogger,
     metrics_info: Dict[str, Dict[str, chex.Array]],
     episode_count: int = 0,
     t_env: int = 0,
@@ -646,7 +646,7 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
         jax.block_until_ready(evaluator_output)
 
         # Log the results
-        episode_count = _log(
+        episode_count = log(
             logger=logger,
             metrics_info=evaluator_output["metrics"],
             episode_count=episode_count,
