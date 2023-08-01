@@ -7,4 +7,6 @@ optax
 flax
 numpy
 brax
+sacred
+tensorboard_logger
 git+https://github.com/instadeepai/jumanji.git
