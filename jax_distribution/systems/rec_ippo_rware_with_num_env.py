@@ -159,7 +159,6 @@ def get_learner_fn(
                 hstate,
             ) = runner_state
 
-            # SELECT ACTION
             rng, policy_rng = jax.random.split(rng)
 
             # Add a batch dimension to the observation.
@@ -168,7 +167,10 @@ def get_learner_fn(
             )
             ac_in = (batched_observation, last_done[np.newaxis, :])
 
+            # Run the network.
             hstate, actor_policy, value = apply_fn(params, hstate, ac_in)
+
+            # Sample action from the policy and squeeze out the batch dimension.
             action = actor_policy.sample(seed=policy_rng)
             log_prob = actor_policy.log_prob(action)
             value, action, log_prob = (
@@ -177,10 +179,10 @@ def get_learner_fn(
                 log_prob.squeeze(0),
             )
 
-            # STEP ENVIRONMENT
+            # Step the environment.
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
-            # LOG EPISODE METRICS
+            # log episode return and length
             done, reward = jax.tree_util.tree_map(
                 lambda x: jnp.repeat(x, config["NUM_AGENTS"]).reshape(
                     config["NUM_ENVS"], -1
@@ -217,12 +219,14 @@ def get_learner_fn(
             hstate,
         ) = runner_state
 
+        # Add a batch dimension to the observation.
         batched_last_observation = jax.tree_util.tree_map(
             lambda x: x[np.newaxis, :], last_timestep.observation
         )
-
         ac_in = (batched_last_observation, last_done[np.newaxis, :])
+        # Run the network.
         _, _, last_val = apply_fn(params, hstate, ac_in)
+        # Squeeze out the batch dimension and mask out the value of terminal states.
         last_val = last_val.squeeze(0)
         last_val = jnp.where(last_done, jnp.zeros_like(last_val), last_val)
 
@@ -457,7 +461,6 @@ def learner_setup(env: Environment, config: Dict) -> Tuple[callable, RNNRunnerSt
         init_obs,
     )
     init_obs = jax.tree_util.tree_map(lambda x: x[None, ...], init_obs)
-
     init_done = jnp.zeros((1, config["NUM_ENVS"]), dtype=bool)
     init_x = (init_obs, init_done)
 
@@ -512,8 +515,7 @@ def learner_setup(env: Environment, config: Dict) -> Tuple[callable, RNNRunnerSt
     env_states = jax.tree_util.tree_map(reshape_states, env_states)
     timesteps = jax.tree_util.tree_map(reshape_states, timesteps)
 
-    # dones = jnp.repeat(timesteps.last(), num_agents)
-    # dones = dones.reshape((timesteps.last().shape) + (num_agents,))
+    # Initialise dones.
     dones = jnp.zeros(
         (
             cores_count,
@@ -578,11 +580,6 @@ if __name__ == "__main__":
     env = LogWrapper(env)
 
     learner_output = run_experiment(env, config)
-    print(
-        "MEAN  EPISODE RETURN: ",
-        learner_output["metrics"]["episode_return_info"].mean(),
-    )
-    print(
-        "MAX   EPISODE RETURN: ", learner_output["metrics"]["episode_return_info"].max()
-    )
+    print("MEAN  EPISODE RETURN: ", learner_output["metrics"]["episode_return_info"].mean())
+    print("MAX   EPISODE RETURN: ", learner_output["metrics"]["episode_return_info"].max())
     print("Recurrent IPPO experiment completed")

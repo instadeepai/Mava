@@ -159,7 +159,6 @@ def get_learner_fn(
                 hstate,
             ) = runner_state
 
-            # SELECT ACTION
             rng, policy_rng = jax.random.split(rng)
 
             # Add a batch dimension to the observation.
@@ -168,7 +167,10 @@ def get_learner_fn(
             )
             ac_in = (batched_observation, last_done[np.newaxis, :])
 
+            # Run the network.
             hstate, actor_policy, value = apply_fn(params, hstate, ac_in)
+
+            # Sample action from the policy and squeeze out the batch dimension.
             action = actor_policy.sample(seed=policy_rng)
             log_prob = actor_policy.log_prob(action)
             value, action, log_prob = (
@@ -177,10 +179,10 @@ def get_learner_fn(
                 log_prob.squeeze(0),
             )
 
-            # STEP ENVIRONMENT
+            # Step the environment.
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
-            # LOG EPISODE METRICS
+            # log episode return and length
             done, reward = jax.tree_util.tree_map(
                 lambda x: jnp.repeat(x, config["NUM_AGENTS"]).reshape(
                     config["NUM_ENVS"], -1
@@ -217,12 +219,14 @@ def get_learner_fn(
             hstate,
         ) = runner_state
 
+        # Add a batch dimension to the observation.
         batched_last_observation = jax.tree_util.tree_map(
             lambda x: x[np.newaxis, :], last_timestep.observation
         )
-
         ac_in = (batched_last_observation, last_done[np.newaxis, :])
+        # Run the network.
         _, _, last_val = apply_fn(params, hstate, ac_in)
+        # Squeeze out the batch dimension and mask out the value of terminal states.
         last_val = last_val.squeeze(0)
         last_val = jnp.where(last_done, jnp.zeros_like(last_val), last_val)
 
@@ -274,7 +278,9 @@ def get_learner_fn(
                     """Calculate the loss."""
                     # RERUN NETWORK
                     _, actor_policy, value = apply_fn(
-                        params, init_hstate[].squeeze(0), (traj_batch.obs, traj_batch.done)
+                        params,
+                        init_hstate.squeeze(0),
+                        (traj_batch.obs, traj_batch.done),
                     )
                     log_prob = actor_policy.log_prob(traj_batch.action)
 
@@ -452,9 +458,7 @@ def learner_setup(env: Environment, config: Dict) -> Tuple[callable, RNNRunnerSt
     init_obs = jax.tree_util.tree_map(lambda x: x[0], init_obs)
     init_obs = jax.tree_util.tree_map(lambda x: x[None, ...], init_obs)
     # Broadcast
-    batched_observation = jax.tree_util.tree_map(
-                lambda x: x[np.newaxis, :], init_obs
-    )
+    batched_observation = jax.tree_util.tree_map(lambda x: x[np.newaxis, :], init_obs)
     init_x = (batched_observation, jnp.array([[False]]))
 
     # Initialise hidden state.
