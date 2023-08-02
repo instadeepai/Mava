@@ -243,9 +243,13 @@ def get_learner_fn(
                     params, opt_state, traj_batch, advantages, targets
                 )
 
+                # Compute the parallel mean (pmean) over the batch.
+                # This calculation is inspired by the Anakin architecture demo.
+                # This pmean could be a regular mean as the batch axis is on all devices.
                 grads, total_loss = jax.lax.pmean(
                     (grads, total_loss), axis_name="batch"
                 )
+                # pmean over devices.
                 grads, total_loss = jax.lax.pmean(
                     (grads, total_loss), axis_name="device"
                 )
@@ -324,7 +328,7 @@ def get_learner_fn(
 def learner_setup(env: Environment, config: Dict) -> Tuple[callable, RunnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
-    cores_count = len(jax.devices())
+    n_devices = len(jax.devices())
     # Get number of actions and agents.
     num_actions = int(env.action_spec().num_values[0])
     num_agents = env.action_spec().shape[0]
@@ -356,30 +360,28 @@ def learner_setup(env: Environment, config: Dict) -> Tuple[callable, RunnerState
 
     # Broadcast params and optimiser state to cores and batch.
     broadcast = lambda x: jnp.broadcast_to(
-        x, (cores_count, config["UPDATE_BATCH_SIZE"]) + x.shape
+        x, (n_devices, config["UPDATE_BATCH_SIZE"]) + x.shape
     )
     params = jax.tree_map(broadcast, params)
     opt_state = jax.tree_map(broadcast, opt_state)
 
     # Initialise environment states and timesteps.
     rng, *env_rngs = jax.random.split(
-        rng, cores_count * config["UPDATE_BATCH_SIZE"] * config["NUM_ENVS"] + 1
+        rng, n_devices * config["UPDATE_BATCH_SIZE"] * config["NUM_ENVS"] + 1
     )
     env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
         jnp.stack(env_rngs),
     )
 
     # Split rngs for each core.
-    rng, *step_rngs = jax.random.split(
-        rng, cores_count * config["UPDATE_BATCH_SIZE"] + 1
-    )
+    rng, *step_rngs = jax.random.split(rng, n_devices * config["UPDATE_BATCH_SIZE"] + 1)
     # Add dimension to pmap over.
     reshape_step_rngs = lambda x: x.reshape(
-        (cores_count, config["UPDATE_BATCH_SIZE"]) + x.shape[1:]
+        (n_devices, config["UPDATE_BATCH_SIZE"]) + x.shape[1:]
     )
     step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
     reshape_states = lambda x: x.reshape(
-        (cores_count, config["UPDATE_BATCH_SIZE"], config["NUM_ENVS"]) + x.shape[1:]
+        (n_devices, config["UPDATE_BATCH_SIZE"], config["NUM_ENVS"]) + x.shape[1:]
     )
     env_states = jax.tree_util.tree_map(reshape_states, env_states)
     timesteps = jax.tree_util.tree_map(reshape_states, timesteps)
@@ -393,9 +395,9 @@ def run_experiment(env: Environment, config: Dict) -> ExperimentOutput:
     learn, initial_runner_state = learner_setup(env, config)
 
     # Calculate total timesteps.
-    cores_count = len(jax.devices())
+    n_devices = len(jax.devices())
     total_timesteps = (
-        cores_count
+        n_devices
         * config["NUM_UPDATES"]
         * config["ROLLOUT_LENGTH"]
         * config["UPDATE_BATCH_SIZE"]
