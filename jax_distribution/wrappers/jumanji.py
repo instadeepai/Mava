@@ -19,8 +19,8 @@ import chex
 import jax.numpy as jnp
 from flax import struct
 from jumanji import specs
-from jumanji.environments.routing.robot_warehouse import State
-from jumanji.types import Observation, TimeStep
+from jumanji.environments.routing.robot_warehouse import Observation, State
+from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
 
 
