@@ -346,7 +346,7 @@ def get_learner_fn(
             rng, shuffle_rng = jax.random.split(rng)
 
             # SHUFFLE MINIBATCHES
-            permutation = jax.random.permutation(rng, config["NUM_ENVS"])
+            permutation = jax.random.permutation(shuffle_rng, config["NUM_ENVS"])
             batch = (init_hstate, traj_batch, advantages, targets)
             shuffled_batch = jax.tree_util.tree_map(
                 lambda x: jnp.take(x, permutation, axis=1), batch
@@ -567,6 +567,11 @@ if __name__ == "__main__":
     env = LogWrapper(env)
 
     learner_output = run_experiment(env, config)
-    print("MEAN  EPISODE RETURN: ", learner_output["metrics"]["episode_return_info"].mean())
-    print("MAX   EPISODE RETURN: ", learner_output["metrics"]["episode_return_info"].max())
+    print(
+        "MEAN  EPISODE RETURN: ",
+        learner_output["metrics"]["episode_return_info"].mean(),
+    )
+    print(
+        "MAX   EPISODE RETURN: ", learner_output["metrics"]["episode_return_info"].max()
+    )
     print("Recurrent IPPO experiment completed")
