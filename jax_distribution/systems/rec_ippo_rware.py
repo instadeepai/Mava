@@ -38,6 +38,13 @@ from jax_distribution.wrappers.jumanji import LogWrapper, RwareMultiAgentWrapper
 
 
 class ScannedRNN(nn.Module):
+    @functools.partial(
+        nn.scan,
+        variable_broadcast="params",
+        in_axes=0,
+        out_axes=0,
+        split_rngs={"params": False},
+    )
     @nn.compact
     def __call__(
         self, carry: chex.Array, x: chex.Array
@@ -154,11 +161,21 @@ def get_learner_fn(
 
             # SELECT ACTION
             rng, policy_rng = jax.random.split(rng)
-            ac_in = (last_timestep.observation, last_done)
+
+            # Add a batch dimension to the observation.
+            batched_observation = jax.tree_util.tree_map(
+                lambda x: x[np.newaxis, :], last_timestep.observation
+            )
+            ac_in = (batched_observation, last_done[np.newaxis, :])
 
             hstate, actor_policy, value = apply_fn(params, hstate, ac_in)
             action = actor_policy.sample(seed=policy_rng)
             log_prob = actor_policy.log_prob(action)
+            value, action, log_prob = (
+                value.squeeze(0),
+                action.squeeze(0),
+                log_prob.squeeze(0),
+            )
 
             # STEP ENVIRONMENT
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
@@ -204,9 +221,9 @@ def get_learner_fn(
             lambda x: x[np.newaxis, :], last_timestep.observation
         )
 
-        ac_in = (last_timestep.observation, last_done)
+        ac_in = (batched_last_observation, last_done[np.newaxis, :])
         _, _, last_val = apply_fn(params, hstate, ac_in)
-        # TODO: check if this is correct
+        last_val = last_val.squeeze(0)
         last_val = jnp.where(last_done, jnp.zeros_like(last_val), last_val)
 
         def _calculate_gae(
@@ -257,7 +274,7 @@ def get_learner_fn(
                     """Calculate the loss."""
                     # RERUN NETWORK
                     _, actor_policy, value = apply_fn(
-                        params, init_hstate, (traj_batch.obs, traj_batch.done)
+                        params, init_hstate[].squeeze(0), (traj_batch.obs, traj_batch.done)
                     )
                     log_prob = actor_policy.log_prob(traj_batch.action)
 
@@ -323,16 +340,19 @@ def get_learner_fn(
             rng, shuffle_rng = jax.random.split(rng)
 
             # SHUFFLE MINIBATCHES
-            batch_size = config["ROLLOUT_LENGTH"] * config["NUM_ENVS"]
-            permutation = jax.random.permutation(shuffle_rng, batch_size)
+            permutation = jax.random.permutation(rng, config["NUM_ENVS"])
             batch = (init_hstate, traj_batch, advantages, targets)
-            batch = jax.tree_util.tree_map(lambda x: merge_leading_dims(x, 2), batch)
             shuffled_batch = jax.tree_util.tree_map(
-                lambda x: jnp.take(x, permutation, axis=0), batch
+                lambda x: jnp.take(x, permutation, axis=1), batch
             )
             minibatches = jax.tree_util.tree_map(
-                lambda x: jnp.reshape(
-                    x, [config["NUM_MINIBATCHES"], -1] + list(x.shape[1:])
+                lambda x: jnp.swapaxes(
+                    jnp.reshape(
+                        x,
+                        [x.shape[0], config["NUM_MINIBATCHES"], -1] + list(x.shape[2:]),
+                    ),
+                    1,
+                    0,
                 ),
                 shuffled_batch,
             )
@@ -353,7 +373,6 @@ def get_learner_fn(
             )
             return update_state, total_loss
 
-        # check if we need this
         init_hstate = initial_hstate[None, :]
         update_state = (
             params,
@@ -432,7 +451,11 @@ def learner_setup(env: Environment, config: Dict) -> Tuple[callable, RNNRunnerSt
     init_obs = env.observation_spec().generate_value()
     init_obs = jax.tree_util.tree_map(lambda x: x[0], init_obs)
     init_obs = jax.tree_util.tree_map(lambda x: x[None, ...], init_obs)
-    init_x = (init_obs, jnp.array([False]))
+    # Broadcast
+    batched_observation = jax.tree_util.tree_map(
+                lambda x: x[np.newaxis, :], init_obs
+    )
+    init_x = (batched_observation, jnp.array([[False]]))
 
     # Initialise hidden state.
     init_hstate = ScannedRNN.initialize_carry(1, 128)
@@ -443,7 +466,7 @@ def learner_setup(env: Environment, config: Dict) -> Tuple[callable, RNNRunnerSt
 
     # Vmap network apply function over number of agents.
     vmapped_network_apply_fn = jax.vmap(
-        network.apply, in_axes=(None, 1, 1), out_axes=(1, 1, 1)
+        network.apply, in_axes=(None, 1, 2), out_axes=(1, 2, 2)
     )
 
     # Get batched iterated update and replicate it to pmap it over cores.
@@ -517,12 +540,12 @@ def run_experiment(env: Environment, config: Dict) -> ExperimentOutput:
 if __name__ == "__main__":
     config = {
         "LR": 2.5e-4,
-        "UPDATE_BATCH_SIZE": 4,
+        "UPDATE_BATCH_SIZE": 2,
         "ROLLOUT_LENGTH": 128,
         "NUM_UPDATES": 10,
-        "NUM_ENVS": 32,
-        "PPO_EPOCHS": 4,
-        "NUM_MINIBATCHES": 8,
+        "NUM_ENVS": 16,
+        "PPO_EPOCHS": 8,
+        "NUM_MINIBATCHES": 2,
         "GAMMA": 0.99,
         "GAE_LAMBDA": 0.95,
         "CLIP_EPS": 0.2,
@@ -540,4 +563,6 @@ if __name__ == "__main__":
     env = LogWrapper(env)
 
     learner_output = run_experiment(env, config)
+    print("MEAN  EPISODE RETURN: ", learner_output["metrics"]["episode_return_info"].mean())
+    print("MAX   EPISODE RETURN: ", learner_output["metrics"]["episode_return_info"].max())
     print("Recurrent IPPO experiment completed")
