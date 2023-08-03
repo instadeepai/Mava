@@ -392,6 +392,7 @@ def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> call
 
         # Initialise environment states and timesteps.
         n_devices = len(jax.devices())
+        # TODO: check eval_per_device is int
         rng, *env_rngs = jax.random.split(
             rng, config["NUM_EVAL_EPISODES"] // n_devices + 1
         )
@@ -494,6 +495,7 @@ def evaluator_setup(
     num_actions = int(eval_env.action_spec().num_values[0])
 
     # Define network and vmap it over number of agents.
+    # TODO: check if this is necessary.
     eval_network = ActorCritic(num_actions, config["ACTIVATION"])
     vmapped_eval_network_apply_fn = jax.vmap(
         eval_network.apply,
@@ -515,15 +517,13 @@ def evaluator_setup(
 def log(
     logger: SacredLogger,
     metrics_info: Dict[str, Dict[str, chex.Array]],
-    episode_count: int = 0,
     t_env: int = 0,
-) -> int:
+) -> None:
     """Log the episode returns and lengths.
 
     Args:
         logger (Logger): The logger.
         metrics_info (Dict): The metrics info.
-        episode_count (int): The current episode count.
         t_env (int): The current timestep.
     """
     # Flatten metrics info.
@@ -531,13 +531,8 @@ def log(
     episodes_length = jnp.ravel(metrics_info["episode_length"])
     # Log metrics.
     print("MEAN EPISODE RETURN: ", np.mean(episodes_return))
-    for ep_i in range(episode_count, episode_count + len(episodes_return)):
-        logger.log_stat("test_episode_returns", float(episodes_return[ep_i]), ep_i)
-        logger.log_stat("test_episode_lengths", float(episodes_length[ep_i]), ep_i)
-    episode_count += len(episodes_return)
     logger.log_stat("mean_test_episode_returns", float(np.mean(episodes_return)), t_env)
     logger.log_stat("mean_test_episode_length", float(np.mean(episodes_length)), t_env)
-    return episode_count
 
 
 # Logger setup
@@ -628,7 +623,6 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
         evaluator(trained_params, eval_rngs)
 
     # Run experiment for a total number of evaluations.
-    episode_count = 0
     for i in range(config["NUM_EVALUATION"]):
         # Train.
         with TimeIt(tag="EXECUTION", environment_steps=timesteps_per_training):
@@ -648,10 +642,9 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
         jax.block_until_ready(evaluator_output)
 
         # Log the results
-        episode_count = log(
+        log(
             logger=logger,
             metrics_info=evaluator_output["metrics"],
-            episode_count=episode_count,
             t_env=timesteps_per_training * (i + 1),
         )
 
