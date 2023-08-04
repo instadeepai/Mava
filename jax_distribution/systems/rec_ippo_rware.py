@@ -812,35 +812,34 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
 
     # Run experiment for a total number of evaluations.
     episode_count = 0
-    with jax.log_compiles(True):
-        for i in range(config["NUM_EVALUATION"]):
-            # Train.
-            with TimeIt(tag="EXECUTION", environment_steps=timesteps_per_training):
-                learner_output = learn(runner_state)
-                jax.block_until_ready(learner_output)
+    for i in range(config["NUM_EVALUATION"]):
+        # Train.
+        with TimeIt(tag="EXECUTION", environment_steps=timesteps_per_training):
+            learner_output = learn(runner_state)
+            jax.block_until_ready(learner_output)
 
-            # Prepare for evaluation.
-            trained_params = jax.tree_util.tree_map(
-                lambda x: x[:, 0, ...], learner_output["runner_state"][0]
-            )
-            rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
-            eval_rngs = jnp.stack(eval_rngs)
-            eval_rngs = eval_rngs.reshape(n_devices, -1)
+        # Prepare for evaluation.
+        trained_params = jax.tree_util.tree_map(
+            lambda x: x[:, 0, ...], learner_output["runner_state"][0]
+        )
+        rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
+        eval_rngs = jnp.stack(eval_rngs)
+        eval_rngs = eval_rngs.reshape(n_devices, -1)
 
-            # Evaluate.
-            evaluator_output = evaluator(trained_params, eval_rngs)
-            jax.block_until_ready(evaluator_output)
+        # Evaluate.
+        evaluator_output = evaluator(trained_params, eval_rngs)
+        jax.block_until_ready(evaluator_output)
 
-            # Log the results
-            episode_count = log(
-                logger=logger,
-                metrics_info=evaluator_output["metrics"],
-                episode_count=episode_count,
-                t_env=timesteps_per_training * (i + 1),
-            )
+        # Log the results
+        episode_count = log(
+            logger=logger,
+            metrics_info=evaluator_output["metrics"],
+            episode_count=episode_count,
+            t_env=timesteps_per_training * (i + 1),
+        )
 
-            # Update runner state to continue training.
-            runner_state = learner_output["runner_state"]
+        # Update runner state to continue training.
+        runner_state = learner_output["runner_state"]
 
 
 if __name__ == "__main__":
