@@ -31,6 +31,7 @@ import optax
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
 from jumanji.env import Environment
+from jumanji.environments.routing.robot_warehouse.generator import RandomGenerator
 from jumanji.types import Observation
 from jumanji.wrappers import AutoResetWrapper
 from optax._src.base import OptState
@@ -453,8 +454,11 @@ def learner_setup(
     rng, rng_p = rngs
 
     # Define network and optimiser.
-    network = ActorCritic(num_actions)
-    optim = optax.adam(config["LR"])
+    network = ActorCritic(num_actions, config["ACTIVATION"])
+    optim = optax.chain(
+        optax.clip_by_global_norm(config["MAX_GRAD_NORM"]),
+        optax.adam(config["LR"], eps=1e-5),
+    )
 
     # Initialise observation: Select only obs for a single agent.
     init_x = env.observation_spec().generate_value()
@@ -573,23 +577,23 @@ def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:
                 t_env,
             )
 
-        log_string = "Timesteps {:07d}".format(t_env)
-        log_string += "| Mean Episode Returns {:.2f} ".format(
+        log_string = "Timesteps {:07d}".format(t_env) + " "
+        log_string += "| Mean Episode Returns {:.3f} ".format(
             float(np.mean(episodes_return))
         )
-        log_string += "| Std Episode Returns {:.2f} ".format(
+        log_string += "| Std Episode Returns {:.3f} ".format(
             float(np.std(episodes_return))
         )
-        log_string += "| Max Episode Returns {:.2f} ".format(
+        log_string += "| Max Episode Returns {:.3f} ".format(
             float(np.max(episodes_return))
         )
-        log_string += "| Mean Episode Length {:.2f} ".format(
+        log_string += "| Mean Episode Length {:.3f} ".format(
             float(np.mean(episodes_length))
         )
-        log_string += "| Std Episode Length {:.2f} ".format(
+        log_string += "| Std Episode Length {:.3f} ".format(
             float(np.std(episodes_length))
         )
-        log_string += "| Max Episode Length {:.2f} ".format(
+        log_string += "| Max Episode Length {:.3f} ".format(
             float(np.max(episodes_length))
         )
 
@@ -627,32 +631,6 @@ ex.captured_out_filter = apply_backspaces_and_linefeeds
 results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
 
 
-@ex.config
-def make_config() -> None:
-    """Config for the experiment."""
-    LR = 2.5e-4
-    UPDATE_BATCH_SIZE = 2
-    ROLLOUT_LENGTH = 16
-    NUM_UPDATES = 10
-    NUM_ENVS = 16
-    PPO_EPOCHS = 4
-    NUM_MINIBATCHES = 2
-    GAMMA = 0.99
-    GAE_LAMBDA = 0.95
-    CLIP_EPS = 0.2
-    ENT_COEF = 0.01
-    VF_COEF = 0.5
-    MAX_GRAD_NORM = 0.5
-    ENV_NAME = "RobotWarehouse-v0"
-    SEED = 42
-    NUM_EVAL_EPISODES = 32
-    NUM_EVALUATION = 2
-    EVALUATION_GREEDY = False
-    USE_SACRED = True
-    USE_TF = False
-    ABSOLUTE_METRIC = True
-
-
 @ex.main
 def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
     """Runs experiment."""
@@ -660,8 +638,10 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
     config = config_copy(_config)
     log = logger_setup(_run, config, _log)
 
+    scenario_name = config["ENV_SCENARIO"]
+    generator = RandomGenerator(**config["ENV_CONFIGS"][scenario_name])
     # Create envs
-    env = jumanji.make(config["ENV_NAME"])
+    env = jumanji.make(config["ENV_NAME"], generator=generator)
     env = RwareMultiAgentWrapper(env)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
@@ -741,7 +721,76 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
 
 
 if __name__ == "__main__":
-    file_obs_path = os.path.join(results_path, f"sacred/")
-    ex.observers.append(FileStorageObserver.create(file_obs_path))
-    ex.run()
+
+    rware_scenario_configs = {
+        "tiny-4ag": {
+            "column_height": 8,
+            "shelf_rows": 1,
+            "shelf_columns": 3,
+            "num_agents": 4,
+            "sensor_range": 1,
+            "request_queue_size": 4,
+        },
+        "tiny-4ag-easy": {
+            "column_height": 8,
+            "shelf_rows": 1,
+            "shelf_columns": 3,
+            "num_agents": 4,
+            "sensor_range": 1,
+            "request_queue_size": 8,
+        },
+        "tiny-2ag": {
+            "column_height": 8,
+            "shelf_rows": 1,
+            "shelf_columns": 3,
+            "num_agents": 2,
+            "sensor_range": 1,
+            "request_queue_size": 2,
+        },
+        "small-4ag": {
+            "column_height": 8,
+            "shelf_rows": 2,
+            "shelf_columns": 3,
+            "num_agents": 4,
+            "sensor_range": 1,
+            "request_queue_size": 4,
+        },
+    }
+
+    # Make initial config
+    @ex.config
+    def make_config() -> None:
+        """Config for the experiment."""
+        LR = 2.5e-4
+        UPDATE_BATCH_SIZE = 2
+        ROLLOUT_LENGTH = 16
+        NUM_UPDATES = 10
+        NUM_ENVS = 16
+        PPO_EPOCHS = 4
+        NUM_MINIBATCHES = 2
+        GAMMA = 0.99
+        GAE_LAMBDA = 0.95
+        CLIP_EPS = 0.2
+        ENT_COEF = 0.01
+        VF_COEF = 0.5
+        MAX_GRAD_NORM = 0.5
+        ENV_NAME = "RobotWarehouse-v0"
+        ENV_CONFIGS = rware_scenario_configs
+        ENV_SCENARIO = "tiny-4ag"
+        SEED = 420
+        NUM_EVAL_EPISODES = 32
+        NUM_EVALUATION = 2
+        EVALUATION_GREEDY = False
+        USE_SACRED = True
+        USE_TF = False
+        ABSOLUTE_METRIC = True
+
+    for scenario in rware_scenario_configs.keys():
+        for i in range(1):
+            exp_string = f"rware/{scenario}/seed_{i}"
+            file_obs_path = os.path.join(results_path, f"sacred/{exp_string}/")
+            ex.observers = [FileStorageObserver.create(file_obs_path)]
+
+            ex.run(config_updates={"SEED": i, "ENV_SCENARIO": scenario})
+
     print("IPPO experiment completed")
