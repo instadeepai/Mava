@@ -444,7 +444,7 @@ def get_learner_fn(
         )
 
         runner_state, metric = jax.lax.scan(
-            batched_update_step, runner_state, None, config["NUM_UPDATES"]
+            batched_update_step, runner_state, None, config["NUM_UPDATES_PER_EVAL"]
         )
         return {"runner_state": runner_state, "metrics": metric}
 
@@ -737,8 +737,8 @@ def make_config() -> None:
     LR = 2.5e-4
     UPDATE_BATCH_SIZE = 4
     ROLLOUT_LENGTH = 128
-    NUM_UPDATES = 10
-    NUM_ENVS = 32
+    NUM_UPDATES = 40
+    NUM_ENVS = 128
     PPO_EPOCHS = 4
     NUM_MINIBATCHES = 8
     GAMMA = 0.99
@@ -751,10 +751,10 @@ def make_config() -> None:
     ENV_NAME = "RobotWarehouse-v0"
     SEED = 42
     NUM_EVAL_EPISODES = 32
-    NUM_EVALUATION = 5
+    NUM_EVALUATION = 4
     EVALUATION_GREEDY = False
     USE_SACRED = True
-    USE_TF = True
+    USE_TF = False
 
 
 @ex.main
@@ -783,6 +783,7 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
     eval_env = jumanji.make(config["ENV_NAME"])
     eval_env = RwareMultiAgentWrapper(eval_env)
 
+    config["NUM_UPDATES_PER_EVAL"] = config["NUM_UPDATES"] // config["NUM_EVALUATION"]
     # PRNG keys.
     rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["SEED"]), num=3)
     # Setup learner.
@@ -795,7 +796,6 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
 
     # Calculate total timesteps.
     n_devices = len(jax.devices())
-    config["NUM_UPDATES_PER_EVAL"] = config["NUM_UPDATES"] // config["NUM_EVALUATION"]
     timesteps_per_training = (
         n_devices
         * config["NUM_UPDATES_PER_EVAL"]
@@ -812,37 +812,35 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
 
     # Run experiment for a total number of evaluations.
     episode_count = 0
-    for i in range(config["NUM_EVALUATION"]):
-        # Train.
-        with TimeIt(tag="EXECUTION", environment_steps=timesteps_per_training):
-            learner_output = learn(runner_state)
-            jax.block_until_ready(learner_output)
+    with jax.log_compiles(True):
+        for i in range(config["NUM_EVALUATION"]):
+            # Train.
+            with TimeIt(tag="EXECUTION", environment_steps=timesteps_per_training):
+                learner_output = learn(runner_state)
+                jax.block_until_ready(learner_output)
 
-        # Prepare for evaluation.
-        trained_params = jax.tree_util.tree_map(
-            lambda x: x[:, 0, ...], learner_output["runner_state"][0]
-        )
-        rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
-        eval_rngs = jnp.stack(eval_rngs)
-        eval_rngs = eval_rngs.reshape(n_devices, -1)
+            # Prepare for evaluation.
+            trained_params = jax.tree_util.tree_map(
+                lambda x: x[:, 0, ...], learner_output["runner_state"][0]
+            )
+            rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
+            eval_rngs = jnp.stack(eval_rngs)
+            eval_rngs = eval_rngs.reshape(n_devices, -1)
 
-        # Evaluator hidden state.
-        init_hstate = ScannedRNN.initialize_carry((config["NUM_ENVS"]), 128)
+            # Evaluate.
+            evaluator_output = evaluator(trained_params, eval_rngs)
+            jax.block_until_ready(evaluator_output)
 
-        # Evaluate.
-        evaluator_output = evaluator(trained_params, eval_rngs)
-        jax.block_until_ready(evaluator_output)
+            # Log the results
+            episode_count = log(
+                logger=logger,
+                metrics_info=evaluator_output["metrics"],
+                episode_count=episode_count,
+                t_env=timesteps_per_training * (i + 1),
+            )
 
-        # Log the results
-        episode_count = log(
-            logger=logger,
-            metrics_info=evaluator_output["metrics"],
-            episode_count=episode_count,
-            t_env=timesteps_per_training * (i + 1),
-        )
-
-        # Update runner state to continue training.
-        runner_state = learner_output["runner_state"]
+            # Update runner state to continue training.
+            runner_state = learner_output["runner_state"]
 
 
 if __name__ == "__main__":
