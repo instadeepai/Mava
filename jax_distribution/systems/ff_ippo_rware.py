@@ -50,7 +50,6 @@ class ActorCritic(nn.Module):
     """Actor Critic Network."""
 
     action_dim: Sequence[int]
-    activation: str = "tanh"
 
     @nn.compact
     def __call__(
@@ -59,19 +58,14 @@ class ActorCritic(nn.Module):
         """Forward pass."""
         x = observation.agents_view
 
-        if self.activation == "relu":
-            activation = nn.relu
-        else:
-            activation = nn.tanh
-
         actor_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(x)
-        actor_output = activation(actor_output)
+        actor_output = nn.relu(actor_output)
         actor_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(actor_output)
-        actor_output = activation(actor_output)
+        actor_output = nn.relu(actor_output)
         actor_output = nn.Dense(
             self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(actor_output)
@@ -86,11 +80,11 @@ class ActorCritic(nn.Module):
         critic_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(x)
-        critic_output = activation(critic_output)
+        critic_output = nn.relu(critic_output)
         critic_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(critic_output)
-        critic_output = activation(critic_output)
+        critic_output = nn.relu(critic_output)
         critic_output = nn.Dense(
             1, kernel_init=orthogonal(1.0), bias_init=constant(0.0)
         )(critic_output)
@@ -459,7 +453,7 @@ def learner_setup(
     rng, rng_p = rngs
 
     # Define network and optimiser.
-    network = ActorCritic(num_actions, config["ACTIVATION"])
+    network = ActorCritic(num_actions)
     optim = optax.adam(config["LR"])
 
     # Initialise observation: Select only obs for a single agent.
@@ -522,7 +516,7 @@ def evaluator_setup(
 
     # Define network and vmap it over number of agents.
     # TODO: check if this is necessary.
-    eval_network = ActorCritic(num_actions, config["ACTIVATION"])
+    eval_network = ActorCritic(num_actions)
     vmapped_eval_network_apply_fn = jax.vmap(
         eval_network.apply,
         in_axes=(None, 0),
@@ -543,7 +537,9 @@ def evaluator_setup(
     return evaluator, absolute_metric_evaluator, (trained_params, eval_rngs)
 
 
-def get_logger_fn(logger, config):
+def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:
+    """Get the logger function."""
+
     def log(
         metrics_info: Dict[str, Dict[str, chex.Array]],
         t_env: int = 0,
@@ -554,6 +550,7 @@ def get_logger_fn(logger, config):
         Args:
             metrics_info (Dict): The metrics info.
             t_env (int): The current timestep.
+            absolute_metric (bool): Whether to log the absolute metric.
         """
         if absolute_metric:
             suffix = "_absolute_metric"
@@ -605,7 +602,8 @@ def get_logger_fn(logger, config):
     return log
 
 
-def logger_setup(_run, config, _log):
+def logger_setup(_run: Run, config: Dict, _log: SacredLogger):
+    """Setup the logger."""
     logger = Logger(_log)
     unique_token = (
         f"{config['ENV_NAME']}_seed{config['SEED']}_{datetime.datetime.now()}"
@@ -645,7 +643,6 @@ def make_config() -> None:
     ENT_COEF = 0.01
     VF_COEF = 0.5
     MAX_GRAD_NORM = 0.5
-    ACTIVATION = "relu"
     ENV_NAME = "RobotWarehouse-v0"
     SEED = 42
     NUM_EVAL_EPISODES = 32
