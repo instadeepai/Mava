@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import datetime
 import os
 from logging import Logger as SacredLogger
@@ -49,7 +50,6 @@ class ActorCritic(nn.Module):
     """Actor Critic Network."""
 
     action_dim: Sequence[int]
-    activation: str = "tanh"
 
     @nn.compact
     def __call__(
@@ -58,19 +58,14 @@ class ActorCritic(nn.Module):
         """Forward pass."""
         x = observation.agents_view
 
-        if self.activation == "relu":
-            activation = nn.relu
-        else:
-            activation = nn.tanh
-
         actor_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(x)
-        actor_output = activation(actor_output)
+        actor_output = nn.relu(actor_output)
         actor_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(actor_output)
-        actor_output = activation(actor_output)
+        actor_output = nn.relu(actor_output)
         actor_output = nn.Dense(
             self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(actor_output)
@@ -88,11 +83,11 @@ class ActorCritic(nn.Module):
         critic_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(y)
-        critic_output = activation(critic_output)
+        critic_output = nn.relu(critic_output)
         critic_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(critic_output)
-        critic_output = activation(critic_output)
+        critic_output = nn.relu(critic_output)
         critic_output = nn.Dense(
             1, kernel_init=orthogonal(1.0), bias_init=constant(0.0)
         )(critic_output)
@@ -404,20 +399,17 @@ def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> call
 
         # Initialise environment states and timesteps.
         n_devices = len(jax.devices())
-        rng, *env_rngs = jax.random.split(
-            rng, config["NUM_EVAL_EPISODES"] // n_devices + 1
-        )
+
+        eval_batch = config["NUM_EVAL_EPISODES"] // n_devices
+
+        rng, *env_rngs = jax.random.split(rng, eval_batch + 1)
         env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
             jnp.stack(env_rngs),
         )
         # Split rngs for each core.
-        rng, *step_rngs = jax.random.split(
-            rng, config["NUM_EVAL_EPISODES"] // n_devices + 1
-        )
+        rng, *step_rngs = jax.random.split(rng, eval_batch + 1)
         # Add dimension to pmap over.
-        reshape_step_rngs = lambda x: x.reshape(
-            config["NUM_EVAL_EPISODES"] // n_devices, -1
-        )
+        reshape_step_rngs = lambda x: x.reshape(eval_batch, -1)
         step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
         runner_state = (step_rngs, env_states, timesteps)
 
@@ -427,7 +419,34 @@ def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> call
 
         return {"metrics": eval_metrics}
 
-    return evaluator_fn
+    def absolute_evaluator_fn(
+        trained_params: FrozenDict, rng: chex.PRNGKey
+    ) -> Dict[str, Dict[str, chex.Array]]:
+        """Evaluator function."""
+
+        # Initialise environment states and timesteps.
+        n_devices = len(jax.devices())
+
+        eval_batch = (config["NUM_EVAL_EPISODES"] // n_devices) * 10
+
+        rng, *env_rngs = jax.random.split(rng, eval_batch + 1)
+        env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
+            jnp.stack(env_rngs),
+        )
+        # Split rngs for each core.
+        rng, *step_rngs = jax.random.split(rng, eval_batch + 1)
+        # Add dimension to pmap over.
+        reshape_step_rngs = lambda x: x.reshape(eval_batch, -1)
+        step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
+        runner_state = (step_rngs, env_states, timesteps)
+
+        eval_metrics = jax.vmap(
+            eval_one_episode, in_axes=(None, 0), axis_name="eval_batch"
+        )(trained_params, runner_state)
+
+        return {"metrics": eval_metrics}
+
+    return evaluator_fn, absolute_evaluator_fn
 
 
 def learner_setup(
@@ -444,7 +463,7 @@ def learner_setup(
     rng, rng_p = rngs
 
     # Define network and optimiser.
-    network = ActorCritic(num_actions, config["ACTIVATION"])
+    network = ActorCritic(num_actions)
     optim = optax.adam(config["LR"])
 
     # Initialise observation.
@@ -510,7 +529,7 @@ def evaluator_setup(
     num_actions = int(eval_env.action_spec().num_values[0])
 
     # Define network and vmap it over number of agents.
-    eval_network = ActorCritic(num_actions, config["ACTIVATION"])
+    eval_network = ActorCritic(num_actions)
 
     # Vmap network apply function over number of agents.
     vmapped_eval_network_apply_fn = jax.vmap(
@@ -518,43 +537,100 @@ def evaluator_setup(
     )
 
     # Pmap evaluator over cores.
-    evaluator = get_evaluator_fn(eval_env, vmapped_eval_network_apply_fn, config)
+    evaluator, absolute_metric_evaluator = get_evaluator_fn(
+        eval_env, vmapped_eval_network_apply_fn, config
+    )
     evaluator = jax.pmap(evaluator, axis_name="device")
+    absolute_metric_evaluator = jax.pmap(absolute_metric_evaluator, axis_name="device")
 
     # Broadcast trained params to cores and split rngs for each core.
     trained_params = jax.tree_util.tree_map(lambda x: x[:, 0, ...], params)
     rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
     eval_rngs = jnp.stack(eval_rngs).reshape(n_devices, -1)
 
-    return evaluator, (trained_params, eval_rngs)
+    return evaluator, absolute_metric_evaluator, (trained_params, eval_rngs)
 
 
-def log(
-    logger: Logger,
-    metrics_info: Dict[str, Dict[str, chex.Array]],
-    episode_count: int = 0,
-    t_env: int = 0,
-) -> int:
-    """Log the episode returns and lengths.
+def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:
+    """Get the logger function."""
 
-    Args:
-        logger (Logger): The logger.
-        metrics_info (Dict): The metrics info.
-        episode_count (int): The current episode count.
-        t_env (int): The current timestep.
-    """
-    # Flatten metrics info.
-    episodes_return = jnp.ravel(metrics_info["episode_return"])
-    episodes_length = jnp.ravel(metrics_info["episode_length"])
-    # Log metrics.
-    print("MEAN EPISODE RETURN: ", np.mean(episodes_return))
-    for ep_i in range(episode_count, episode_count + len(episodes_return)):
-        logger.log_stat("test_episode_returns", float(episodes_return[ep_i]), ep_i)
-        logger.log_stat("test_episode_lengths", float(episodes_length[ep_i]), ep_i)
-    episode_count += len(episodes_return)
-    logger.log_stat("mean_test_episode_returns", float(np.mean(episodes_return)), t_env)
-    logger.log_stat("mean_test_episode_length", float(np.mean(episodes_length)), t_env)
-    return episode_count
+    def log(
+        metrics_info: Dict[str, Dict[str, chex.Array]],
+        t_env: int = 0,
+        absolute_metric: bool = False,
+    ) -> None:
+        """Log the episode returns and lengths.
+
+        Args:
+            metrics_info (Dict): The metrics info.
+            t_env (int): The current timestep.
+            absolute_metric (bool): Whether to log the absolute metric.
+        """
+        if absolute_metric:
+            suffix = "_absolute_metric"
+        else:
+            suffix = ""
+        # Flatten metrics info.
+        episodes_return = jnp.ravel(metrics_info["episode_return"])
+        episodes_length = jnp.ravel(metrics_info["episode_length"])
+
+        # Log metrics.
+        if config["USE_SACRED"] or config["USE_TF"]:
+            logger.log_stat(
+                "mean_test_episode_returns" + suffix,
+                float(np.mean(episodes_return)),
+                t_env,
+            )
+            logger.log_stat(
+                "mean_test_episode_length" + suffix,
+                float(np.mean(episodes_length)),
+                t_env,
+            )
+
+        log_string = "Timesteps {:07d}".format(t_env)
+        log_string += "| Mean Episode Returns {:.2f} ".format(
+            float(np.mean(episodes_return))
+        )
+        log_string += "| Std Episode Returns {:.2f} ".format(
+            float(np.std(episodes_return))
+        )
+        log_string += "| Max Episode Returns {:.2f} ".format(
+            float(np.max(episodes_return))
+        )
+        log_string += "| Mean Episode Length {:.2f} ".format(
+            float(np.mean(episodes_length))
+        )
+        log_string += "| Std Episode Length {:.2f} ".format(
+            float(np.std(episodes_length))
+        )
+        log_string += "| Max Episode Length {:.2f} ".format(
+            float(np.max(episodes_length))
+        )
+
+        if absolute_metric:
+            logger.console_logger.info("ABSOLUTE METRIC:")
+        logger.console_logger.info(log_string)
+
+        return float(np.mean(episodes_return))
+
+    return log
+
+
+def logger_setup(_run: Run, config: Dict, _log: SacredLogger):
+    """Setup the logger."""
+    logger = Logger(_log)
+    unique_token = (
+        f"{config['ENV_NAME']}_seed{config['SEED']}_{datetime.datetime.now()}"
+    )
+    if config["USE_SACRED"]:
+        logger.setup_sacred(_run)
+    if config["USE_TF"]:
+        tb_logs_direc = os.path.join(
+            dirname(dirname(abspath(__file__))), "results", "tb_logs"
+        )
+        tb_exp_direc = os.path.join(tb_logs_direc, "{}").format(unique_token)
+        logger.setup_tb(tb_exp_direc)
+    return get_logger_fn(logger, config)
 
 
 # Logger setup
@@ -570,8 +646,8 @@ def make_config() -> None:
     """Config for the experiment."""
     LR = 2.5e-4
     UPDATE_BATCH_SIZE = 4
-    ROLLOUT_LENGTH = 128
-    NUM_UPDATES = 20
+    ROLLOUT_LENGTH = 10
+    NUM_UPDATES = 5
     NUM_ENVS = 32
     PPO_EPOCHS = 4
     NUM_MINIBATCHES = 8
@@ -581,14 +657,14 @@ def make_config() -> None:
     ENT_COEF = 0.01
     VF_COEF = 0.5
     MAX_GRAD_NORM = 0.5
-    ACTIVATION = "relu"
     ENV_NAME = "RobotWarehouse-v0"
     SEED = 42
     NUM_EVAL_EPISODES = 32
-    NUM_EVALUATION = 5
+    NUM_EVALUATION = 2
     EVALUATION_GREEDY = False
     USE_SACRED = True
     USE_TF = True
+    ABSOLUTE_METRIC = True
 
 
 @ex.main
@@ -596,18 +672,7 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
     """Runs experiment."""
     # Logger setup
     config = config_copy(_config)
-    logger = Logger(_log)
-    unique_token = (
-        f"{_config['ENV_NAME']}_seed{_config['SEED']}_{datetime.datetime.now()}"
-    )
-    if config["USE_SACRED"]:
-        logger.setup_sacred(_run)
-    if config["USE_TF"]:
-        tb_logs_direc = os.path.join(
-            dirname(dirname(abspath(__file__))), "results", "tb_logs"
-        )
-        tb_exp_direc = os.path.join(tb_logs_direc, "{}").format(unique_token)
-        logger.setup_tb(tb_exp_direc)
+    log = logger_setup(_run, config, _log)
 
     # Create envs
     env = jumanji.make(config["ENV_NAME"])
@@ -623,7 +688,7 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
     learn, runner_state = learner_setup(env, (rng, rng_p), config)
 
     # Setup evaluator.
-    evaluator, (trained_params, eval_rngs) = evaluator_setup(
+    evaluator, absolute_metric_evaluator, (trained_params, eval_rngs) = evaluator_setup(
         eval_env, rng_e, runner_state[0], config
     )
 
@@ -645,7 +710,8 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
         evaluator(trained_params, eval_rngs)
 
     # Run experiment for a total number of evaluations.
-    episode_count = 0
+    max_episode_return = jnp.float32(0.0)
+    best_params = None
     for i in range(config["NUM_EVALUATION"]):
         # Train.
         with TimeIt(tag="EXECUTION", environment_steps=timesteps_per_training):
@@ -665,15 +731,27 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
         jax.block_until_ready(evaluator_output)
 
         # Log the results
-        episode_count = log(
-            logger=logger,
+        episode_return = log(
             metrics_info=evaluator_output["metrics"],
-            episode_count=episode_count,
             t_env=timesteps_per_training * (i + 1),
         )
+        if config["ABSOLUTE_METRIC"] and max_episode_return <= episode_return:
+            best_params = copy.deepcopy(trained_params)
+            max_episode_return = episode_return
 
         # Update runner state to continue training.
         runner_state = learner_output["runner_state"]
+
+    if config["ABSOLUTE_METRIC"]:
+        rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
+        eval_rngs = jnp.stack(eval_rngs)
+        eval_rngs = eval_rngs.reshape(n_devices, -1)
+        evaluator_output = absolute_metric_evaluator(best_params, eval_rngs)
+        log(
+            metrics_info=evaluator_output["metrics"],
+            t_env=timesteps_per_training * (i + 1),
+            absolute_metric=True,
+        )
 
 
 if __name__ == "__main__":
