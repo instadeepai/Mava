@@ -32,21 +32,34 @@ def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:
     """Get the logger function."""
 
     def log(
-        metrics_info: Dict[str, Dict[str, chex.Array]],
+        metrics: Dict[str, Dict[str, chex.Array]],
         t_env: int = 0,
+        trainer_metric: bool = False,
         absolute_metric: bool = False,
     ) -> None:
         """Log the episode returns and lengths.
 
         Args:
-            metrics_info (Dict): The metrics info.
+            metrics (Dict): The metrics info.
             t_env (int): The current timestep.
+            trainer_metric (bool): Whether to log the trainer metric.
             absolute_metric (bool): Whether to log the absolute metric.
         """
         if absolute_metric:
-            suffix = "_absolute_metric"
+            prefix = "Absolute_"
+            metrics_info = metrics
+
+        elif trainer_metric:
+            prefix = "Trainer_"
+            metrics_info = metrics["metrics"]
+            total_loss = metrics["total_loss"]
+            value_loss = metrics["value_loss"]
+            loss_actor = metrics["loss_actor"]
+            entropy = metrics["entropy"]
         else:
-            suffix = ""
+            prefix = ""
+            metrics_info = metrics
+
         # Flatten metrics info.
         episodes_return = jnp.ravel(metrics_info["episode_return"])
         episodes_length = jnp.ravel(metrics_info["episode_length"])
@@ -54,15 +67,20 @@ def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:
         # Log metrics.
         if config["USE_SACRED"] or config["USE_TF"]:
             logger.log_stat(
-                "mean_test_episode_returns" + suffix,
+                prefix.lower() + "mean_test_episode_returns",
                 float(np.mean(episodes_return)),
                 t_env,
             )
             logger.log_stat(
-                "mean_test_episode_length" + suffix,
+                prefix.lower() + "mean_test_episode_length",
                 float(np.mean(episodes_length)),
                 t_env,
             )
+            if trainer_metric:
+                logger.log_stat("total_loss", float(np.mean(total_loss)), t_env)
+                logger.log_stat("value_loss", float(np.mean(value_loss)), t_env)
+                logger.log_stat("loss_actor", float(np.mean(loss_actor)), t_env)
+                logger.log_stat("entropy", float(np.mean(entropy)), t_env)
 
         log_string = "Timesteps {:07d}".format(t_env) + " "
         log_string += "| Mean Episode Returns {:.3f} ".format(
@@ -85,8 +103,16 @@ def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:
         )
 
         if absolute_metric:
-            logger.console_logger.info("ABSOLUTE METRIC:")
-        logger.console_logger.info(log_string)
+            logger.console_logger.info("ABSOLUTE METRIC: " + log_string)
+        elif trainer_metric:
+            log_string += "| Total Loss {:.3f} ".format(float(np.mean(total_loss)))
+            log_string += "| Value Loss {:.3f} ".format(float(np.mean(value_loss)))
+            log_string += "| Loss Actor {:.3f} ".format(float(np.mean(loss_actor)))
+            log_string += "| Entropy {:.3f} ".format(float(np.mean(entropy)))
+            logger.console_logger.info("TRAINER: " + log_string)
+
+        else:
+            logger.console_logger.info("EVALUATOR: " + log_string)
 
         return float(np.mean(episodes_return))
 

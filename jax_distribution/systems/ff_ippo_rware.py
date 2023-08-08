@@ -142,8 +142,8 @@ def get_learner_fn(
                 (timestep.last(), timestep.reward),
             )
             info = {
-                "episode_return_info": env_state.episode_return_info,
-                "episode_length_info": env_state.episode_length_info,
+                "episode_return": env_state.episode_return_info,
+                "episode_length": env_state.episode_length_info,
             }
 
             transition = PPOTransition(
@@ -245,25 +245,21 @@ def get_learner_fn(
                     return total_loss, (value_loss, loss_actor, entropy)
 
                 grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
-                total_loss, grads = grad_fn(
+                loss_info, grads = grad_fn(
                     params, opt_state, traj_batch, advantages, targets
                 )
 
                 # Compute the parallel mean (pmean) over the batch.
                 # This calculation is inspired by the Anakin architecture demo.
                 # This pmean could be a regular mean as the batch axis is on all devices.
-                grads, total_loss = jax.lax.pmean(
-                    (grads, total_loss), axis_name="batch"
-                )
+                grads, loss_info = jax.lax.pmean((grads, loss_info), axis_name="batch")
                 # pmean over devices.
-                grads, total_loss = jax.lax.pmean(
-                    (grads, total_loss), axis_name="device"
-                )
+                grads, loss_info = jax.lax.pmean((grads, loss_info), axis_name="device")
 
                 updates, new_opt_state = update_fn(grads, opt_state)
                 new_params = optax.apply_updates(params, updates)
 
-                return (new_params, new_opt_state), total_loss
+                return (new_params, new_opt_state), loss_info
 
             params, opt_state, traj_batch, advantages, targets, rng = update_state
             rng, shuffle_rng = jax.random.split(rng)
@@ -284,12 +280,12 @@ def get_learner_fn(
             )
 
             # UPDATE MINIBATCHES
-            (params, opt_state), total_loss = jax.lax.scan(
+            (params, opt_state), loss_info = jax.lax.scan(
                 _update_minibatch, (params, opt_state), minibatches
             )
 
             update_state = (params, opt_state, traj_batch, advantages, targets, rng)
-            return update_state, total_loss
+            return update_state, loss_info
 
         update_state = (params, opt_state, traj_batch, advantages, targets, rng)
 
@@ -301,7 +297,7 @@ def get_learner_fn(
         params, opt_state, traj_batch, advantages, targets, rng = update_state
         runner_state = (params, opt_state, rng, env_state, last_timestep)
         metric = traj_batch.info
-        return runner_state, metric
+        return runner_state, (metric, loss_info)
 
     def learner_fn(runner_state: RunnerState) -> ExperimentOutput:
         """Learner function.
@@ -323,10 +319,18 @@ def get_learner_fn(
             _update_step, in_axes=(0, None), axis_name="batch"
         )
 
-        runner_state, metric = jax.lax.scan(
+        runner_state, (metric, loss_info) = jax.lax.scan(
             batched_update_step, runner_state, None, config["NUM_UPDATES_PER_EVAL"]
         )
-        return {"runner_state": runner_state, "metrics": metric}
+        total_loss, (value_loss, loss_actor, entropy) = loss_info
+        return {
+            "runner_state": runner_state,
+            "metrics": metric,
+            "total_loss": total_loss,
+            "value_loss": value_loss,
+            "loss_actor": loss_actor,
+            "entropy": entropy,
+        }
 
     return learner_fn
 
@@ -607,8 +611,13 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
         jax.block_until_ready(evaluator_output)
 
         # Log the results
+        log(
+            metrics=learner_output,
+            t_env=timesteps_per_training * (i + 1),
+            trainer_metric=True,
+        )
         episode_return = log(
-            metrics_info=evaluator_output["metrics"],
+            metrics=evaluator_output["metrics"],
             t_env=timesteps_per_training * (i + 1),
         )
         if config["ABSOLUTE_METRIC"] and max_episode_return <= episode_return:
@@ -624,7 +633,7 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
         eval_rngs = eval_rngs.reshape(n_devices, -1)
         evaluator_output = absolute_metric_evaluator(best_params, eval_rngs)
         log(
-            metrics_info=evaluator_output["metrics"],
+            metrics=evaluator_output["metrics"],
             t_env=timesteps_per_training * (i + 1),
             absolute_metric=True,
         )
