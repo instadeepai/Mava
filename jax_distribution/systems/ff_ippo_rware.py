@@ -396,7 +396,6 @@ def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> call
 
         eval_batch = config["NUM_EVAL_EPISODES"] // n_devices
 
-        # TODO: check eval_per_device is int
         rng, *env_rngs = jax.random.split(rng, eval_batch + 1)
         env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
             jnp.stack(env_rngs),
@@ -424,7 +423,6 @@ def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> call
 
         eval_batch = (config["NUM_EVAL_EPISODES"] // n_devices) * 10
 
-        # TODO: check eval_per_device is int
         rng, *env_rngs = jax.random.split(rng, eval_batch + 1)
         env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
             jnp.stack(env_rngs),
@@ -524,7 +522,6 @@ def evaluator_setup(
     num_actions = int(eval_env.action_spec().num_values[0])
 
     # Define network and vmap it over number of agents.
-    # TODO: check if this is necessary.
     eval_network = ActorCritic(num_actions)
     vmapped_eval_network_apply_fn = jax.vmap(
         eval_network.apply,
