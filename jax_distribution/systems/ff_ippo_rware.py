@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import copy
-import datetime
 import os
 from logging import Logger as SacredLogger
 from os.path import abspath, dirname
@@ -40,9 +39,11 @@ from sacred.observers import FileStorageObserver
 from sacred.run import Run
 from sacred.utils import apply_backspaces_and_linefeeds
 
+from jax_distribution.config.rware_env import rware_scenario_configs
+from jax_distribution.logger import logger_setup
 from jax_distribution.types import ExperimentOutput, PPOTransition, RunnerState
 from jax_distribution.utils.jax import merge_leading_dims
-from jax_distribution.utils.logger_tools import Logger, config_copy, get_logger
+from jax_distribution.utils.logger_tools import config_copy, get_logger
 from jax_distribution.utils.timing_utils import TimeIt
 from jax_distribution.wrappers.jumanji import LogWrapper, RwareMultiAgentWrapper
 
@@ -454,7 +455,7 @@ def learner_setup(
     rng, rng_p = rngs
 
     # Define network and optimiser.
-    network = ActorCritic(num_actions, config["ACTIVATION"])
+    network = ActorCritic(num_actions)
     optim = optax.chain(
         optax.clip_by_global_norm(config["MAX_GRAD_NORM"]),
         optax.adam(config["LR"], eps=1e-5),
@@ -541,97 +542,6 @@ def evaluator_setup(
     return evaluator, absolute_metric_evaluator, (trained_params, eval_rngs)
 
 
-def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:
-    """Get the logger function."""
-
-    def log(
-        metrics_info: Dict[str, Dict[str, chex.Array]],
-        t_env: int = 0,
-        absolute_metric: bool = False,
-    ) -> None:
-        """Log the episode returns and lengths.
-
-        Args:
-            metrics_info (Dict): The metrics info.
-            t_env (int): The current timestep.
-            absolute_metric (bool): Whether to log the absolute metric.
-        """
-        if absolute_metric:
-            suffix = "_absolute_metric"
-        else:
-            suffix = ""
-        # Flatten metrics info.
-        episodes_return = jnp.ravel(metrics_info["episode_return"])
-        episodes_length = jnp.ravel(metrics_info["episode_length"])
-
-        # Log metrics.
-        if config["USE_SACRED"] or config["USE_TF"]:
-            logger.log_stat(
-                "mean_test_episode_returns" + suffix,
-                float(np.mean(episodes_return)),
-                t_env,
-            )
-            logger.log_stat(
-                "mean_test_episode_length" + suffix,
-                float(np.mean(episodes_length)),
-                t_env,
-            )
-
-        log_string = "Timesteps {:07d}".format(t_env) + " "
-        log_string += "| Mean Episode Returns {:.3f} ".format(
-            float(np.mean(episodes_return))
-        )
-        log_string += "| Std Episode Returns {:.3f} ".format(
-            float(np.std(episodes_return))
-        )
-        log_string += "| Max Episode Returns {:.3f} ".format(
-            float(np.max(episodes_return))
-        )
-        log_string += "| Mean Episode Length {:.3f} ".format(
-            float(np.mean(episodes_length))
-        )
-        log_string += "| Std Episode Length {:.3f} ".format(
-            float(np.std(episodes_length))
-        )
-        log_string += "| Max Episode Length {:.3f} ".format(
-            float(np.max(episodes_length))
-        )
-
-        if absolute_metric:
-            logger.console_logger.info("ABSOLUTE METRIC:")
-        logger.console_logger.info(log_string)
-
-        return float(np.mean(episodes_return))
-
-    return log
-
-
-def logger_setup(_run: Run, config: Dict, _log: SacredLogger):
-    """Setup the logger."""
-    logger = Logger(_log)
-    unique_token = (
-        f"{config['ENV_NAME']}_seed{config['SEED']}_{datetime.datetime.now()}"
-    )
-    if config["USE_SACRED"]:
-        logger.setup_sacred(_run)
-    if config["USE_TF"]:
-        tb_logs_direc = os.path.join(
-            dirname(dirname(abspath(__file__))), "results", "tb_logs"
-        )
-        tb_exp_direc = os.path.join(tb_logs_direc, "{}").format(unique_token)
-        logger.setup_tb(tb_exp_direc)
-    return get_logger_fn(logger, config)
-
-
-# Logger setup
-logger = get_logger()
-ex = Experiment("mava", save_git_info=False)
-ex.logger = logger
-ex.captured_out_filter = apply_backspaces_and_linefeeds
-results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
-
-
-@ex.main
 def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
     """Runs experiment."""
     # Logger setup
@@ -639,7 +549,7 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
     log = logger_setup(_run, config, _log)
 
     scenario_name = config["ENV_SCENARIO"]
-    generator = RandomGenerator(**config["ENV_CONFIGS"][scenario_name])
+    generator = RandomGenerator(**rware_scenario_configs[scenario_name])
     # Create envs
     env = jumanji.make(config["ENV_NAME"], generator=generator)
     env = RwareMultiAgentWrapper(env)
@@ -722,40 +632,12 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
 
 if __name__ == "__main__":
 
-    rware_scenario_configs = {
-        "tiny-4ag": {
-            "column_height": 8,
-            "shelf_rows": 1,
-            "shelf_columns": 3,
-            "num_agents": 4,
-            "sensor_range": 1,
-            "request_queue_size": 4,
-        },
-        "tiny-4ag-easy": {
-            "column_height": 8,
-            "shelf_rows": 1,
-            "shelf_columns": 3,
-            "num_agents": 4,
-            "sensor_range": 1,
-            "request_queue_size": 8,
-        },
-        "tiny-2ag": {
-            "column_height": 8,
-            "shelf_rows": 1,
-            "shelf_columns": 3,
-            "num_agents": 2,
-            "sensor_range": 1,
-            "request_queue_size": 2,
-        },
-        "small-4ag": {
-            "column_height": 8,
-            "shelf_rows": 2,
-            "shelf_columns": 3,
-            "num_agents": 4,
-            "sensor_range": 1,
-            "request_queue_size": 4,
-        },
-    }
+    # Logger and experiment setup
+    logger = get_logger()
+    ex = Experiment("mava", save_git_info=False)
+    ex.logger = logger
+    ex.captured_out_filter = apply_backspaces_and_linefeeds
+    results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
 
     # Make initial config
     @ex.config
@@ -775,7 +657,6 @@ if __name__ == "__main__":
         VF_COEF = 0.5
         MAX_GRAD_NORM = 0.5
         ENV_NAME = "RobotWarehouse-v0"
-        ENV_CONFIGS = rware_scenario_configs
         ENV_SCENARIO = "tiny-4ag"
         SEED = 420
         NUM_EVAL_EPISODES = 32
@@ -785,12 +666,9 @@ if __name__ == "__main__":
         USE_TF = False
         ABSOLUTE_METRIC = True
 
-    for scenario in rware_scenario_configs.keys():
-        for i in range(1):
-            exp_string = f"rware/{scenario}/seed_{i}"
-            file_obs_path = os.path.join(results_path, f"sacred/{exp_string}/")
-            ex.observers = [FileStorageObserver.create(file_obs_path)]
-
-            ex.run(config_updates={"SEED": i, "ENV_SCENARIO": scenario})
+    file_obs_path = os.path.join(results_path, f"sacred/rware/")
+    ex.observers = [FileStorageObserver.create(file_obs_path)]
+    ex.main(run_experiment)
+    ex.run(config_updates={})
 
     print("IPPO experiment completed")
