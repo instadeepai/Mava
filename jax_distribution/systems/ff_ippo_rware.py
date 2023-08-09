@@ -37,10 +37,7 @@ from jumanji.types import Observation
 from jumanji.wrappers import AutoResetWrapper
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
-from sacred import Experiment
-from sacred.observers import FileStorageObserver
-from sacred.run import Run
-from sacred.utils import apply_backspaces_and_linefeeds
+from sacred import Experiment, observers, run, utils
 
 from jax_distribution.logger import logger_setup
 from jax_distribution.types import ExperimentOutput, PPOTransition, RunnerState
@@ -327,7 +324,7 @@ def get_learner_fn(
         total_loss, (value_loss, loss_actor, entropy) = loss_info
         return {
             "runner_state": runner_state,
-            "metrics": metric,
+            "episodes_info": metric,
             "total_loss": total_loss,
             "value_loss": value_loss,
             "loss_actor": loss_actor,
@@ -413,7 +410,7 @@ def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> call
             eval_one_episode, in_axes=(None, 0), axis_name="eval_batch"
         )(trained_params, runner_state)
 
-        return {"metrics": eval_metrics}
+        return {"metrics": {"episodes_info": eval_metrics}}
 
     def absolute_evaluator_fn(
         trained_params: FrozenDict, rng: chex.PRNGKey
@@ -440,7 +437,7 @@ def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> call
             eval_one_episode, in_axes=(None, 0), axis_name="eval_batch"
         )(trained_params, runner_state)
 
-        return {"metrics": eval_metrics}
+        return {"metrics": {"episodes_info": eval_metrics}}
 
     return evaluator_fn, absolute_evaluator_fn
 
@@ -545,7 +542,7 @@ def evaluator_setup(
     return evaluator, absolute_metric_evaluator, (trained_params, eval_rngs)
 
 
-def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
+def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     """Runs experiment."""
     # Logger setup
     config = config_copy(_config)
@@ -643,11 +640,11 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     logger = get_logger()
     ex = Experiment("mava", save_git_info=False)
     ex.logger = logger
-    ex.captured_out_filter = apply_backspaces_and_linefeeds
+    ex.captured_out_filter = utils.apply_backspaces_and_linefeeds
     results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
 
     file_obs_path = os.path.join(results_path, f"sacred/{cfg['ENV_NAME']}")
-    ex.observers = [FileStorageObserver.create(file_obs_path)]
+    ex.observers = [observers.FileStorageObserver.create(file_obs_path)]
     ex.add_config(OmegaConf.to_container(cfg, resolve=True))
     ex.main(run_experiment)
     ex.run(config_updates={})

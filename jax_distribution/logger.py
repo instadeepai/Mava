@@ -47,32 +47,31 @@ def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:
         """
         if absolute_metric:
             prefix = "Absolute_"
-            metrics_info = metrics
-
+            episodes_info = metrics["episodes_info"]
         elif trainer_metric:
             prefix = "Trainer_"
-            metrics_info = metrics["metrics"]
+            episodes_info = metrics["episodes_info"]
             total_loss = metrics["total_loss"]
             value_loss = metrics["value_loss"]
             loss_actor = metrics["loss_actor"]
             entropy = metrics["entropy"]
         else:
             prefix = ""
-            metrics_info = metrics
+            episodes_info = metrics["episodes_info"]
 
         # Flatten metrics info.
-        episodes_return = jnp.ravel(metrics_info["episode_return"])
-        episodes_length = jnp.ravel(metrics_info["episode_length"])
+        episodes_return = jnp.ravel(episodes_info["episode_return"])
+        episodes_length = jnp.ravel(episodes_info["episode_length"])
 
         # Log metrics.
         if config["USE_SACRED"] or config["USE_TF"]:
             logger.log_stat(
-                prefix.lower() + "mean_test_episode_returns",
+                prefix.lower() + "mean_episode_returns",
                 float(np.mean(episodes_return)),
                 t_env,
             )
             logger.log_stat(
-                prefix.lower() + "mean_test_episode_length",
+                prefix.lower() + "mean_episode_length",
                 float(np.mean(episodes_length)),
                 t_env,
             )
@@ -82,35 +81,35 @@ def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:
                 logger.log_stat("loss_actor", float(np.mean(loss_actor)), t_env)
                 logger.log_stat("entropy", float(np.mean(entropy)), t_env)
 
-        log_string = "Timesteps {:07d}".format(t_env) + " "
-        log_string += "| Mean Episode Returns {:.3f} ".format(
-            float(np.mean(episodes_return))
+        log_string = (
+            "Timesteps {:07d} | "
+            "Mean Episode Return {:.3f} | "
+            "Std Episode Return {:.3f} | "
+            "Max Episode Return {:.3f} | "
+            "Mean Episode Length {:.3f} | "
+            "Std Episode Length {:.3f} | "
+            "Max Episode Length {:.3f}"
+        ).format(
+            t_env,
+            float(np.mean(episodes_return)),
+            float(np.std(episodes_return)),
+            float(np.max(episodes_return)),
+            float(np.mean(episodes_length)),
+            float(np.std(episodes_length)),
+            float(np.max(episodes_length)),
         )
-        log_string += "| Std Episode Returns {:.3f} ".format(
-            float(np.std(episodes_return))
-        )
-        log_string += "| Max Episode Returns {:.3f} ".format(
-            float(np.max(episodes_return))
-        )
-        log_string += "| Mean Episode Length {:.3f} ".format(
-            float(np.mean(episodes_length))
-        )
-        log_string += "| Std Episode Length {:.3f} ".format(
-            float(np.std(episodes_length))
-        )
-        log_string += "| Max Episode Length {:.3f} ".format(
-            float(np.max(episodes_length))
-        )
-        if absolute_metric:
 
+        if absolute_metric:
             logger.console_logger.info(
                 f"{Fore.BLUE}{Style.BRIGHT}ABSOLUTE METRIC: {log_string}{Style.RESET_ALL}"
             )
         elif trainer_metric:
-            log_string += "| Total Loss {:.3f} ".format(float(np.mean(total_loss)))
-            log_string += "| Value Loss {:.3f} ".format(float(np.mean(value_loss)))
-            log_string += "| Loss Actor {:.3f} ".format(float(np.mean(loss_actor)))
-            log_string += "| Entropy {:.3f} ".format(float(np.mean(entropy)))
+            log_string += "| Total Loss {:.3f} | Value Loss {:.3f} | Loss Actor {:.3f} | Entropy {:.3f}".format(
+                float(np.mean(total_loss)),
+                float(np.mean(value_loss)),
+                float(np.mean(loss_actor)),
+                float(np.mean(entropy)),
+            )
             logger.console_logger.info(
                 f"{Fore.MAGENTA}{Style.BRIGHT}TRAINER: {log_string}{Style.RESET_ALL}"
             )

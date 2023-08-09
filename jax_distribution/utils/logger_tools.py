@@ -16,15 +16,18 @@ import collections
 import logging
 from collections import defaultdict
 from copy import deepcopy
-from typing import Any, Dict, List, Optional
+from typing import Dict
 
-import numpy as np
 from colorama import Fore, Style
-from neptune import new as neptune
 
 
 class Logger:
-    """Logger class for logging to tensorboard, sacred, and neptune."""
+    """Logger class for logging to tensorboard, and sacred.
+
+    Note:
+        For the original implementation, please refer to the following link:
+        (https://github.com/uoe-agents/epymarl/blob/main/src/utils/logging.py)
+    """
 
     def __init__(self, console_logger: logging.Logger) -> None:
         """Initialise the logger."""
@@ -32,8 +35,12 @@ class Logger:
 
         self.use_tb = False
         self.use_sacred = False
-        self.use_neptune = False
 
+        self.tb_logger = None
+        self.sacred_run_dict = None
+        self.sacred_info = None
+
+        # defaultdict is used to overcome the problem of missing keys when logging to sacred.
         self.stats = defaultdict(lambda: [])
 
     def setup_tb(self, directory_name: str) -> None:
@@ -47,29 +54,26 @@ class Logger:
 
     def setup_sacred(self, sacred_run_dict: Dict) -> None:
         """Set up sacred logging."""
-        self._run_obj = sacred_run_dict
+        self.sacred_run_dict = sacred_run_dict
         self.sacred_info = sacred_run_dict.info
         self.use_sacred = True
 
-    def setup_neptune(self, neptune_run_dict: Dict) -> None:
-        pass
-
-    def log_stat(self, key: str, value: float, t: int, to_sacred: bool = True) -> None:
+    def log_stat(self, key: str, value: float, t: int) -> None:
         """Log a single stat."""
         self.stats[key].append((t, value))
 
         if self.use_tb:
             self.tb_logger(key, value, t)
 
-        if self.use_sacred and to_sacred:
+        if self.use_sacred:
             if key in self.sacred_info:
-                self.sacred_info["{}_T".format(key)].append(t)
+                self.sacred_info[f"{key}_T"].append(t)
                 self.sacred_info[key].append(value)
             else:
-                self.sacred_info["{}_T".format(key)] = [t]
+                self.sacred_info[f"{key}_T"] = [t]
                 self.sacred_info[key] = [value]
 
-            self._run_obj.log_scalar(key, value, t)
+            self.sacred_run_dict.log_scalar(key, value, t)
 
 
 def get_logger() -> logging.Logger:
@@ -86,16 +90,6 @@ def get_logger() -> logging.Logger:
     logger.setLevel("INFO")
 
     return logger
-
-
-def recursive_dict_update(d: Dict, u: Dict) -> Dict:
-    """Recursively update a dictionary."""
-    for k, v in u.items():
-        if isinstance(v, collections.Mapping):
-            d[k] = recursive_dict_update(d.get(k, {}), v)
-        else:
-            d[k] = v
-    return d
 
 
 def config_copy(config: Dict) -> Dict:
