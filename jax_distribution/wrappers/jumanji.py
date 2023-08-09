@@ -30,10 +30,10 @@ class LogEnvState:
 
     env_state: State
     episode_returns: jnp.float32
-    episode_lengths: int
+    episode_lengths: jnp.int32
     # Information about the episode return and length for logging purposes.
     episode_return_info: jnp.float32
-    episode_length_info: int
+    episode_length_info: jnp.int32
 
 
 class LogWrapper(Wrapper):

@@ -12,18 +12,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import collections
 import logging
 from collections import defaultdict
 from copy import deepcopy
-from typing import Dict, List
+from typing import Dict
 
-import numpy as np
+from colorama import Fore, Style
 
 
 class Logger:
-    """Logger class for logging to tensorboard, sacred, and hdf5."""
+    """Logger class for logging to tensorboard, and sacred.
+
+    Note:
+        For the original implementation, please refer to the following link:
+        (https://github.com/uoe-agents/epymarl/blob/main/src/utils/logging.py)
+    """
 
     def __init__(self, console_logger: logging.Logger) -> None:
         """Initialise the logger."""
@@ -31,9 +34,12 @@ class Logger:
 
         self.use_tb = False
         self.use_sacred = False
-        self.use_hdf = False
-        self.use_custom_metric_logger = False
 
+        self.tb_logger = None
+        self.sacred_run_dict = None
+        self.sacred_info = None
+
+        # defaultdict is used to overcome the problem of missing keys when logging to sacred.
         self.stats = defaultdict(lambda: [])
 
     def setup_tb(self, directory_name: str) -> None:
@@ -47,87 +53,26 @@ class Logger:
 
     def setup_sacred(self, sacred_run_dict: Dict) -> None:
         """Set up sacred logging."""
-        self._run_obj = sacred_run_dict
+        self.sacred_run_dict = sacred_run_dict
         self.sacred_info = sacred_run_dict.info
         self.use_sacred = True
 
-    def log_stat(self, key: str, value: float, t: int, to_sacred: bool = True) -> None:
+    def log_stat(self, key: str, value: float, t: int) -> None:
         """Log a single stat."""
         self.stats[key].append((t, value))
 
         if self.use_tb:
             self.tb_logger(key, value, t)
 
-        if self.use_sacred and to_sacred:
+        if self.use_sacred:
             if key in self.sacred_info:
-                self.sacred_info["{}_T".format(key)].append(t)
+                self.sacred_info[f"{key}_T"].append(t)
                 self.sacred_info[key].append(value)
             else:
-                self.sacred_info["{}_T".format(key)] = [t]
+                self.sacred_info[f"{key}_T"] = [t]
                 self.sacred_info[key] = [value]
 
-            self._run_obj.log_scalar(key, value, t)
-
-    def log_list(
-        self,
-        key: str,
-        values: List[float],
-        timestamps: List[int] = None,
-        to_sacred: bool = True,
-    ) -> None:
-        """Log a list of stats."""
-        if values is not list:
-            values = [values]
-        if timestamps is None:
-            timestamps = range(1, len(values) + 1)
-        elif timestamps is not list:
-            timestamps = [timestamps]
-        elif len(values) != len(timestamps):
-            raise ValueError("Number of values and timestamps should match.")
-
-        for value, t in zip(values, timestamps):
-            self.stats[key].append((t, value))
-
-            if self.use_tb:
-                self.tb_logger(key, value, t)
-
-            if self.use_sacred and to_sacred:
-                if key in self.sacred_info:
-                    self.sacred_info["{}_T".format(key)].append(t)
-                    self.sacred_info[key].append(value)
-                else:
-                    self.sacred_info["{}_T".format(key)] = [t]
-                    self.sacred_info[key] = [value]
-
-                self._run_obj.log_scalar(key, value, t)
-
-    def print_recent_stats(self) -> None:
-        """Print the most recent stats."""
-        log_str = "Recent Stats | t_env: {:>10} | Episode: {:>8}\n".format(
-            *self.stats["episode"][-1]
-        )
-        i = 0
-        for (k, v) in sorted(self.stats.items()):
-            if k == "episode":
-                continue
-            i += 1
-            window = 5 if k != "epsilon" else 1
-            try:
-                item = "{:.4f}".format(np.mean([x[1] for x in self.stats[k][-window:]]))
-            except:
-                item = "{:.4f}".format(
-                    np.mean([x[1].item() for x in self.stats[k][-window:]])
-                )
-            log_str += "{:<25}{:>8}".format(k + ":", item)
-            log_str += "\n" if i % 4 == 0 else "\t"
-        self.console_logger.info(log_str)
-
-    def log_custom_metrics(self, metric_dict: Dict, t: int) -> None:
-        """Made specifically for storing our custom metrics in a faster way."""
-
-        # Note: Custom metrics must be a dictionary of the form {metric_name: [metric_values]}
-        # where [metric_values] is a list of metric values at each logging step.
-        self.custom_metrics_logger.write(metric_dict, t)
+            self.sacred_run_dict.log_scalar(key, value, t)
 
 
 def get_logger() -> logging.Logger:
@@ -136,7 +81,7 @@ def get_logger() -> logging.Logger:
     logger.handlers = []
     ch = logging.StreamHandler()
     formatter = logging.Formatter(
-        "[%(levelname)s %(asctime)s] %(name)s %(message)s", "%H:%M:%S"
+        f"{Fore.CYAN}{Style.BRIGHT}%(message)s{Style.RESET_ALL}", "%H:%M:%S"
     )
     ch.setFormatter(formatter)
     logger.addHandler(ch)
@@ -144,16 +89,6 @@ def get_logger() -> logging.Logger:
     logger.setLevel("INFO")
 
     return logger
-
-
-def recursive_dict_update(d: Dict, u: Dict) -> Dict:
-    """Recursively update a dictionary."""
-    for k, v in u.items():
-        if isinstance(v, collections.Mapping):
-            d[k] = recursive_dict_update(d.get(k, {}), v)
-        else:
-            d[k] = v
-    return d
 
 
 def config_copy(config: Dict) -> Dict:

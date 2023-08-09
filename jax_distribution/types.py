@@ -14,6 +14,7 @@ from typing import Dict, NamedTuple
 
 import chex
 from flax.core.frozen_dict import FrozenDict
+from jumanji.environments.routing.robot_warehouse import State
 from jumanji.types import TimeStep
 from optax._src.base import OptState
 
@@ -43,7 +44,7 @@ class RunnerState(NamedTuple):
 
 
 class RNNRunnerState(NamedTuple):
-    """State of the `Runner`."""
+    """State of the `Runner` for recurrent architectures."""
 
     params: FrozenDict
     opt_state: OptState
@@ -54,8 +55,34 @@ class RNNRunnerState(NamedTuple):
     hstate: chex.Array
 
 
+class EvalState(NamedTuple):
+    """State of the evaluator."""
+
+    key: chex.PRNGKey
+    env_state: State
+    timestep: TimeStep
+    step_count_: chex.Numeric = None
+    return_: chex.Numeric = None
+
+
+class RNNEvalState(NamedTuple):
+    """State of the evaluator for recurrent architectures."""
+
+    key: chex.PRNGKey
+    env_state: State
+    timestep: TimeStep
+    dones: chex.Array
+    init_hstate: chex.Array
+    step_count_: chex.Numeric = None
+    return_: chex.Numeric = None
+
+
 class ExperimentOutput(NamedTuple):
     """Experiment output."""
 
-    runner_state: RunnerState
-    info: Dict[str, Dict[str, chex.Array]]
+    episodes_info: Dict[str, chex.Array]
+    runner_state: RunnerState = None
+    total_loss: chex.Array = None
+    value_loss: chex.Array = None
+    loss_actor: chex.Array = None
+    entropy: chex.Array = None
