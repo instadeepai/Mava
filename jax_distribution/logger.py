@@ -47,17 +47,17 @@ def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:
         """
         if absolute_metric:
             prefix = "Absolute_"
-            episodes_info = metrics["episodes_info"]
+            episodes_info = metrics.episodes_info
         elif trainer_metric:
             prefix = "Trainer_"
-            episodes_info = metrics["episodes_info"]
-            total_loss = metrics["total_loss"]
-            value_loss = metrics["value_loss"]
-            loss_actor = metrics["loss_actor"]
-            entropy = metrics["entropy"]
+            episodes_info = metrics.episodes_info
+            total_loss = metrics.total_loss
+            value_loss = metrics.value_loss
+            loss_actor = metrics.loss_actor
+            entropy = metrics.entropy
         else:
             prefix = ""
-            episodes_info = metrics["episodes_info"]
+            episodes_info = metrics.episodes_info
 
         # Flatten metrics info.
         episodes_return = jnp.ravel(episodes_info["episode_return"])

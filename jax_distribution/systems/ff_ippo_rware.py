@@ -40,7 +40,12 @@ from optax._src.base import OptState
 from sacred import Experiment, observers, run, utils
 
 from jax_distribution.logger import logger_setup
-from jax_distribution.types import ExperimentOutput, PPOTransition, RunnerState
+from jax_distribution.types import (
+    EvalState,
+    ExperimentOutput,
+    PPOTransition,
+    RunnerState,
+)
 from jax_distribution.utils.jax import merge_leading_dims
 from jax_distribution.utils.logger_tools import config_copy, get_logger
 from jax_distribution.utils.timing_utils import TimeIt
@@ -322,14 +327,14 @@ def get_learner_fn(
             batched_update_step, runner_state, None, config["NUM_UPDATES_PER_EVAL"]
         )
         total_loss, (value_loss, loss_actor, entropy) = loss_info
-        return {
-            "runner_state": runner_state,
-            "episodes_info": metric,
-            "total_loss": total_loss,
-            "value_loss": value_loss,
-            "loss_actor": loss_actor,
-            "entropy": entropy,
-        }
+        return ExperimentOutput(
+            runner_state=runner_state,
+            episodes_info=metric,
+            total_loss=total_loss,
+            value_loss=value_loss,
+            loss_actor=loss_actor,
+            entropy=entropy,
+        )
 
     return learner_fn
 
@@ -337,13 +342,13 @@ def get_learner_fn(
 def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> callable:
     """Get the evaluator function."""
 
-    def eval_one_episode(params, runner_state) -> Tuple:
+    def eval_one_episode(params: FrozenDict, init_eval_state: EvalState) -> Tuple:
         """Evaluate one episode. It is vectorized over the number of evaluation episodes."""
 
-        def _env_step(runner_state: Tuple) -> Tuple:
+        def _env_step(eval_state: EvalState) -> EvalState:
             """Step the environment."""
             # PRNG keys.
-            rng, env_state, last_timestep, step_count_, return_ = runner_state
+            rng, env_state, last_timestep, step_count_, return_ = eval_state
 
             # Select action.
             rng, _rng = jax.random.split(rng)
@@ -360,34 +365,36 @@ def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> call
             # Log episode metrics.
             return_ += timestep.reward
             step_count_ += 1
-            runner_state = (rng, env_state, timestep, step_count_, return_)
-            return runner_state
+            eval_state = EvalState(rng, env_state, timestep, step_count_, return_)
+            return eval_state
 
-        def is_done(carry: Tuple) -> jnp.bool_:
+        def not_done(carry: Tuple) -> bool:
             """Check if the episode is done."""
             timestep = carry[2]
             return ~timestep.last()
 
-        rng, env_state, timestep = runner_state
-        return_ = jnp.array(0, float)
-        step_count_ = jnp.array(0, int)
-
-        final_runner = jax.lax.while_loop(
-            is_done,
-            _env_step,
-            (rng, env_state, timestep, step_count_, return_),
+        eval_state = EvalState(
+            init_eval_state.key,
+            init_eval_state.env_state,
+            init_eval_state.timestep,
+            0,
+            0.0,
         )
 
-        rng, env_state, timestep, step_count_, return_ = final_runner
+        final_state = jax.lax.while_loop(
+            not_done,
+            _env_step,
+            eval_state,
+        )
+
+        _, _, _, step_count_, return_ = final_state
         eval_metrics = {
             "episode_return": return_,
             "episode_length": step_count_,
         }
         return eval_metrics
 
-    def evaluator_fn(
-        trained_params: FrozenDict, rng: chex.PRNGKey
-    ) -> Dict[str, Dict[str, chex.Array]]:
+    def evaluator_fn(trained_params: FrozenDict, rng: chex.PRNGKey) -> ExperimentOutput:
         """Evaluator function."""
 
         # Initialise environment states and timesteps.
@@ -396,7 +403,7 @@ def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> call
         eval_batch = config["NUM_EVAL_EPISODES"] // n_devices
 
         rng, *env_rngs = jax.random.split(rng, eval_batch + 1)
-        env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
+        env_states, timesteps = jax.vmap(env.reset)(
             jnp.stack(env_rngs),
         )
         # Split rngs for each core.
@@ -404,18 +411,20 @@ def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> call
         # Add dimension to pmap over.
         reshape_step_rngs = lambda x: x.reshape(eval_batch, -1)
         step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
-        runner_state = (step_rngs, env_states, timesteps)
 
+        eval_state = EvalState(step_rngs, env_states, timesteps)
         eval_metrics = jax.vmap(
             eval_one_episode, in_axes=(None, 0), axis_name="eval_batch"
-        )(trained_params, runner_state)
+        )(trained_params, eval_state)
 
-        return {"metrics": {"episodes_info": eval_metrics}}
+        return ExperimentOutput(
+            episodes_info=eval_metrics,
+        )
 
     def absolute_evaluator_fn(
         trained_params: FrozenDict, rng: chex.PRNGKey
-    ) -> Dict[str, Dict[str, chex.Array]]:
-        """Evaluator function."""
+    ) -> ExperimentOutput:
+        """Absolute metric function."""
 
         # Initialise environment states and timesteps.
         n_devices = len(jax.devices())
@@ -431,13 +440,15 @@ def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> call
         # Add dimension to pmap over.
         reshape_step_rngs = lambda x: x.reshape(eval_batch, -1)
         step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
-        runner_state = (step_rngs, env_states, timesteps)
+        eval_state = EvalState(step_rngs, env_states, timesteps)
 
         eval_metrics = jax.vmap(
             eval_one_episode, in_axes=(None, 0), axis_name="eval_batch"
-        )(trained_params, runner_state)
+        )(trained_params, eval_state)
 
-        return {"metrics": {"episodes_info": eval_metrics}}
+        return ExperimentOutput(
+            episodes_info=eval_metrics,
+        )
 
     return evaluator_fn, absolute_evaluator_fn
 
@@ -595,7 +606,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
 
         # Prepare for evaluation.
         trained_params = jax.tree_util.tree_map(
-            lambda x: x[:, 0, ...], learner_output["runner_state"][0]
+            lambda x: x[:, 0, ...], learner_output.runner_state[0]
         )
         rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
         eval_rngs = jnp.stack(eval_rngs)
@@ -612,7 +623,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
             trainer_metric=True,
         )
         episode_return = log(
-            metrics=evaluator_output["metrics"],
+            metrics=evaluator_output,
             t_env=timesteps_per_training * (i + 1),
         )
         if config["ABSOLUTE_METRIC"] and max_episode_return <= episode_return:
@@ -620,7 +631,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
             max_episode_return = episode_return
 
         # Update runner state to continue training.
-        runner_state = learner_output["runner_state"]
+        runner_state = learner_output.runner_state
 
     if config["ABSOLUTE_METRIC"]:
         rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
@@ -628,7 +639,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         eval_rngs = eval_rngs.reshape(n_devices, -1)
         evaluator_output = absolute_metric_evaluator(best_params, eval_rngs)
         log(
-            metrics=evaluator_output["metrics"],
+            metrics=evaluator_output,
             t_env=timesteps_per_training * (i + 1),
             absolute_metric=True,
         )
