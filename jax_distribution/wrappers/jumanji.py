@@ -29,11 +29,11 @@ class LogEnvState:
     """State of the `LogWrapper`."""
 
     env_state: State
-    episode_returns: float
-    episode_lengths: int
+    episode_returns: jnp.float32
+    episode_lengths: jnp.int32
     # Information about the episode return and length for logging purposes.
-    episode_return_info: float
-    episode_length_info: int
+    episode_return_info: jnp.float32
+    episode_length_info: jnp.int32
 
 
 class LogWrapper(Wrapper):
@@ -42,7 +42,7 @@ class LogWrapper(Wrapper):
     def reset(self, key: chex.PRNGKey) -> Tuple[LogEnvState, TimeStep]:
         """Reset the environment."""
         state, timestep = self._env.reset(key)
-        state = LogEnvState(state, 0.0, 0, 0.0, 0)
+        state = LogEnvState(state, jnp.float32(0.0), 0, jnp.float32(0.0), 0)
         return state, timestep
 
     def step(

@@ -170,3 +170,6 @@ mava_env/
 
 # Sacred logs
 results/
+
+# Hydra logs
+outputs/
