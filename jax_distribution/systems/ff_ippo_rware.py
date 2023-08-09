@@ -22,6 +22,7 @@ from typing import Any, Callable, Dict, Sequence, Tuple
 import chex
 import distrax
 import flax.linen as nn
+import hydra
 import jax
 import jax.numpy as jnp
 import jumanji
@@ -34,13 +35,13 @@ from jumanji.env import Environment
 from jumanji.environments.routing.robot_warehouse.generator import RandomGenerator
 from jumanji.types import Observation
 from jumanji.wrappers import AutoResetWrapper
+from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from sacred import Experiment
 from sacred.observers import FileStorageObserver
 from sacred.run import Run
 from sacred.utils import apply_backspaces_and_linefeeds
 
-from jax_distribution.config.rware_env import rware_scenario_configs
 from jax_distribution.logger import logger_setup
 from jax_distribution.types import ExperimentOutput, PPOTransition, RunnerState
 from jax_distribution.utils.jax import merge_leading_dims
@@ -550,14 +551,13 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
     config = config_copy(_config)
     log = logger_setup(_run, config, _log)
 
-    scenario_name = config["ENV_SCENARIO"]
-    generator = RandomGenerator(**rware_scenario_configs[scenario_name])
+    generator = RandomGenerator(**config["rware_scenario"])
     # Create envs
     env = jumanji.make(config["ENV_NAME"], generator=generator)
     env = RwareMultiAgentWrapper(env)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
-    eval_env = jumanji.make(config["ENV_NAME"])
+    eval_env = jumanji.make(config["ENV_NAME"], generator=generator)
     eval_env = RwareMultiAgentWrapper(eval_env)
 
     # PRNG keys.
@@ -637,8 +637,8 @@ def run_experiment(_run: Run, _config: Dict, _log: SacredLogger) -> None:
         )
 
 
-if __name__ == "__main__":
-
+@hydra.main(config_path="../configs", config_name="default.yaml", version_base="1.2")
+def hydra_entry_point(cfg: DictConfig) -> None:
     # Logger and experiment setup
     logger = get_logger()
     ex = Experiment("mava", save_git_info=False)
@@ -646,36 +646,14 @@ if __name__ == "__main__":
     ex.captured_out_filter = apply_backspaces_and_linefeeds
     results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
 
-    # Make initial config
-    @ex.config
-    def make_config() -> None:
-        """Config for the experiment."""
-        LR = 2.5e-4
-        UPDATE_BATCH_SIZE = 2
-        ROLLOUT_LENGTH = 16
-        NUM_UPDATES = 10
-        NUM_ENVS = 16
-        PPO_EPOCHS = 4
-        NUM_MINIBATCHES = 2
-        GAMMA = 0.99
-        GAE_LAMBDA = 0.95
-        CLIP_EPS = 0.2
-        ENT_COEF = 0.01
-        VF_COEF = 0.5
-        MAX_GRAD_NORM = 0.5
-        ENV_NAME = "RobotWarehouse-v0"
-        ENV_SCENARIO = "tiny-4ag"
-        SEED = 420
-        NUM_EVAL_EPISODES = 32
-        NUM_EVALUATION = 2
-        EVALUATION_GREEDY = False
-        USE_SACRED = True
-        USE_TF = False
-        ABSOLUTE_METRIC = True
-
-    file_obs_path = os.path.join(results_path, f"sacred/rware/")
+    file_obs_path = os.path.join(results_path, f"sacred/{cfg['ENV_NAME']}")
     ex.observers = [FileStorageObserver.create(file_obs_path)]
+    ex.add_config(OmegaConf.to_container(cfg, resolve=True))
     ex.main(run_experiment)
     ex.run(config_updates={})
 
-    print(f"{Fore.CYAN}{Style.BRIGHT}'IPPO experiment completed'{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}IPPO experiment completed{Style.RESET_ALL}")
+
+
+if __name__ == "__main__":
+    hydra_entry_point()
