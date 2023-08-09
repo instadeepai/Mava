@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Logger setup."""
-
 import datetime
 import os
 from logging import Logger as SacredLogger
@@ -23,6 +22,7 @@ from typing import Callable, Dict
 import chex
 import jax.numpy as jnp
 import numpy as np
+from colorama import Fore, Style
 from sacred.run import Run
 
 from jax_distribution.utils.logger_tools import Logger
@@ -101,18 +101,23 @@ def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:
         log_string += "| Max Episode Length {:.3f} ".format(
             float(np.max(episodes_length))
         )
-
         if absolute_metric:
-            logger.console_logger.info("ABSOLUTE METRIC: " + log_string)
+
+            logger.console_logger.info(
+                f"{Fore.BLUE}{Style.BRIGHT}ABSOLUTE METRIC: {log_string}{Style.RESET_ALL}"
+            )
         elif trainer_metric:
             log_string += "| Total Loss {:.3f} ".format(float(np.mean(total_loss)))
             log_string += "| Value Loss {:.3f} ".format(float(np.mean(value_loss)))
             log_string += "| Loss Actor {:.3f} ".format(float(np.mean(loss_actor)))
             log_string += "| Entropy {:.3f} ".format(float(np.mean(entropy)))
-            logger.console_logger.info("TRAINER: " + log_string)
-
+            logger.console_logger.info(
+                f"{Fore.MAGENTA}{Style.BRIGHT}TRAINER: {log_string}{Style.RESET_ALL}"
+            )
         else:
-            logger.console_logger.info("EVALUATOR: " + log_string)
+            logger.console_logger.info(
+                f"{Fore.GREEN}{Style.BRIGHT}EVALUATOR: {log_string}{Style.RESET_ALL}"
+            )
 
         return float(np.mean(episodes_return))
 

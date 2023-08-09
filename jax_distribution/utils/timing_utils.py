@@ -16,6 +16,8 @@
 import timeit
 from typing import Any
 
+from colorama import Fore, Style
+
 
 class TimeIt:
     """Context manager for timing execution.
@@ -47,4 +49,4 @@ class TimeIt:
         msg = self.tag + (": Elapsed time=%.2fs" % self.elapsed_secs)
         if self.environment_steps:
             msg += ", SPS=%.2e" % (self.environment_steps / self.elapsed_secs)
-        print(msg)
+        print(f"{Fore.YELLOW}{Style.BRIGHT}{msg}{Style.RESET_ALL}")

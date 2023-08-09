@@ -27,6 +27,7 @@ import jax.numpy as jnp
 import jumanji
 import numpy as np
 import optax
+from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
 from jumanji.env import Environment
@@ -677,4 +678,4 @@ if __name__ == "__main__":
     ex.main(run_experiment)
     ex.run(config_updates={})
 
-    print("IPPO experiment completed")
+    print(f"{Fore.CYAN}{Style.BRIGHT}'IPPO experiment completed'{Style.RESET_ALL}")

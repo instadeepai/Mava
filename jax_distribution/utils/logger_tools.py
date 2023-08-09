@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import collections
 import logging
 from collections import defaultdict
@@ -20,6 +19,7 @@ from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
 import numpy as np
+from colorama import Fore, Style
 from neptune import new as neptune
 
 
@@ -78,7 +78,7 @@ def get_logger() -> logging.Logger:
     logger.handlers = []
     ch = logging.StreamHandler()
     formatter = logging.Formatter(
-        "[%(levelname)s %(asctime)s] %(name)s %(message)s", "%H:%M:%S"
+        f"{Fore.CYAN}{Style.BRIGHT}%(message)s{Style.RESET_ALL}", "%H:%M:%S"
     )
     ch.setFormatter(formatter)
     logger.addHandler(ch)
