@@ -19,43 +19,12 @@ import datetime
 import sys
 from importlib import util as import_util
 
-from setuptools import find_namespace_packages, find_packages, setup
+from setuptools import find_namespace_packages, setup
 
 spec = import_util.spec_from_file_location("_metadata", "mava/_metadata.py")
 _metadata = import_util.module_from_spec(spec)  # type: ignore
 spec.loader.exec_module(_metadata)  # type: ignore
 
-reverb_requirements = [
-    "dm-reverb~=0.7.2",
-]
-
-tf_requirements = [
-    "tensorflow~=2.8.0",
-    "tensorflow_probability~=0.15.0",
-    "dm-sonnet",
-    "trfl",
-]
-
-jax_requirements = [
-    "chex",
-    "jax==0.3.24",
-    "jaxlib==0.3.24",
-    "dm-haiku==0.0.8",
-    "flax",
-    "optax",
-    "rlax",
-    "networkx",
-] + tf_requirements
-
-pettingzoo_requirements = [
-    "pettingzoo~=1.17.0",
-    "multi_agent_ale_py",
-    "supersuit==3.3.4",
-    "pygame",
-    "pysc2",
-]
-
-smac_requirements = ["pysc2", "SMAC @ git+https://github.com/oxwhirl/smac.git"]
 testing_formatting_requirements = [
     "pytest==7.2.0",
     "pre-commit",
@@ -68,10 +37,6 @@ testing_formatting_requirements = [
     "pydocstyle",
     "types-six",
 ]
-
-record_episode_requirements = ["array2gif", "pyglet"]
-
-flatland_requirements = ["flatland-rl==3.0.1"]
 
 long_description = """Mava is a library for building multi-agent reinforcement
 learning (MARL) systems. Mava builds off of Acme and in a similar way strives
@@ -102,29 +67,18 @@ setup(
         exclude=["*.tests", "*.tests.*", "tests.*", "tests"]
     ),
     install_requires=[
-        "dm-acme~=0.4.0",
-        "absl-py",
-        "dm_env",
-        "dm-tree",
-        "numpy==1.22.4",
-        "pillow",
-        "matplotlib",
-        "dataclasses",
-        "box2d-py",
-        "gym<=0.23.0",
-        "importlib-metadata<5.0",
-        "typing-extensions",
+        "jax>=0.2.26",
+        "jaxlib>=0.1.74",
+        "distrax",
+        "optax",
+        "flax",
+        "numpy",
+        "sacred",
+        "tensorboard_logger",
+        "git+https://github.com/instadeepai/jumanji.git",
     ],
     extras_require={
-        "tf": tf_requirements,
-        "pz": pettingzoo_requirements,
-        "flatland": flatland_requirements,
-        "reverb": reverb_requirements,
         "testing_formatting": testing_formatting_requirements,
-        "record_episode": record_episode_requirements,
-        "sc2": smac_requirements,
-        "envs": pettingzoo_requirements + smac_requirements,
-        "jax": jax_requirements,
     },
     classifiers=[
         "Development Status :: 3 - Alpha",

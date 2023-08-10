@@ -18,9 +18,6 @@
 <a  href="https://github.com/instadeepai/Mava/actions/workflows/ci.yaml?query=branch%3Adevelop">
     <img src="https://github.com/instadeepai/Mava/workflows/format_and_test/badge.svg" alt="Formatting" />
 </a>
-<a  href="https://lgtm.com/projects/g/instadeepai/Mava/context:python">
-    <img src="https://img.shields.io/lgtm/grade/python/g/instadeepai/Mava.svg?logo=lgtm&logoWidth=18" alt="Quality" />
-</a>
 <a  href="https://github.com/instadeepai/Mava/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License" />
 </a>
@@ -32,31 +29,27 @@
 </a>
 </div>
 
-<p align="center">
-  <img align="center" src="docs/images/animation_quick.gif" width="70%">
-</p>
-
 ## Welcome to Mava! 🦁
 
 [**Installation**](#installation-)
 | [**Quickstart**](#quickstart-)
 | [**Documentation**](https://id-mava.readthedocs.io/)
 
-Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava provides useful components, abstractions, utilities and tools for MARL and allows for simple scaling for multi-process system training and execution while providing a high level of flexibility and composability. Originating in the Research Team at [InstaDeep](https://www.instadeep.com/), Mava is now developed jointly with the open-source community. “Mava” means experience, or wisdom, in Xhosa - one of South Africa’s eleven official languages.
+Mava is first and foremost a tool for quickly iterating on multi-agent reinforcement learning (MARL) ideas. Mava provides useful implementations of MARL algorithms that in JAX allowing for easy parallelisation across devices with JAX's `pmap`. Originating in the Research Team at [InstaDeep](https://www.instadeep.com/), Mava is now developed jointly with the open-source community. “Mava” means experience, or wisdom, in Xhosa - one of South Africa’s eleven official languages.
 
 To join us in these efforts, please feel free to reach out, raise issues or read our [contribution guidelines](#contributing-) (or just star 🌟 to stay up to date with the latest developments)!
 
 <hr>
 
-👋 **UPDATE - 01/10/2022**: In the next few weeks, we will release our first JAX system! Using a more modular and flexible build method, with many more developments to come soon. These will include more components and utilities, state-of-the-art system implementations, notebooks and tutorials as well as detailed benchmarking and performance guides. After this release, our TF2-based systems will be deprecated. To still use them please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`). Please note, we will no longer be supporting these systems after our next release (`v0.1.4`).
+👋 **UPDATE - 11/8/2023**: This is out first release of an end-to-end JAX version on Mava. Henceforth we will only be supporting JAX-based environments and systems with native support for the [Jumanji][jumanji] environment API. If you would still like to use our deprecated TF2-based systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
 
 <hr>
 
 ### Overview 🦜
 
-- 🥑 **Modular building blocks for MARL**: modular abstractions and [components](https://id-mava.readthedocs.io/en/latest/components/components/) for MARL to facilitate building multi-agent systems at scale.
-- 🍬 **Environment Wrappers**: easily connect to your favourite MARL environment including [SMAC][smac], [PettingZoo][pettingzoo], [Flatland][flatland] and more. For details on our environment wrappers and how to add your own environment, please see [here](https://github.com/instadeepai/Mava/blob/develop/mava/wrappers/README.md).
-- 🎓 **Educational Material**: [examples] and [user guides][quickstart] to facilitate Mava's adoption and highlight the added value of JAX-based MARL.
+- 🥑 **Implementations of MARL algorithms**: Implementations of multi-agent PPO systems that follow both the Centralised Training with Decentralised Execution (CTDE) and Decentralised Training with Decentralised Execution (DTDE) MARL paradigms. There are
+- 🍬 **Environment Wrappers**: Example for mapping a Jumanji environment to an environment usable by Mava.
+- 🎓 **Educational Material**:[user guides][quickstart] to facilitate Mava's adoption and highlight the added value of JAX-based MARL.
 
 ## Installation 🎬
 
@@ -87,6 +80,10 @@ Please read our [contributing docs](./CONTRIBUTING.md) for details on how to sub
 
 Please read our [troubleshooting and FAQs guide](./TROUBLESHOOTING.md).
 
+## Performance
+
+
+
 ## Citing Mava
 
 If you use Mava in your work, please cite the accompanying
@@ -112,3 +109,4 @@ If you use Mava in your work, please cite the accompanying
 [flatland]: https://gitlab.aicrowd.com/flatland/flatland
 [quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/quickstart.ipynb
 [documentation]: https://id-mava.readthedocs.io/
+[jumanji]: https://github.com/instadeepai/jumanji
