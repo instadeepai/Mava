@@ -167,3 +167,6 @@ component_dependency_map.png
 
 # Mava env
 mava_env/
+
+# act: for testing github workflows
+bin/act
