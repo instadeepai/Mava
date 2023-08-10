@@ -29,7 +29,6 @@ def get_evaluator_fn(
     env: Environment,
     apply_fn: callable,
     config: dict,
-    algorithm: str,
     eval_multiplier: int = 1,
 ) -> callable:
     """Get the evaluator function.
@@ -38,7 +37,6 @@ def get_evaluator_fn(
         env (Environment): An evironment isntance for evaluation.
         apply_fn (callable): Network forward pass method.
         config (dict): Experiment configuration.
-        algorithm (str): The algorithm name.
         eval_multiplier (int): A scalar that will increase the number of evaluation
             episodes by a fixed factor. The reason for the increase is to enable the
             computation of the `absolute metric` which is a metric computed and the end
@@ -58,13 +56,7 @@ def get_evaluator_fn(
             # Select action.
             rng, _rng = jax.random.split(rng)
 
-            if "ff_ippo" in algorithm:
-                pi, _ = apply_fn(params, last_timestep.observation)
-            elif "ff_mappo" in algorithm:
-                critic_obs = jax.tree_map(
-                    lambda x: jnp.expand_dims(x, axis=0), last_timestep.observation
-                )
-                pi, _ = apply_fn(params, critic_obs, last_timestep.observation)
+            pi, _ = apply_fn(params, last_timestep.observation)
 
             if config["evaluation_greedy"]:
                 action = pi.mode()
@@ -142,30 +134,23 @@ def evaluator_setup(
     network: Any,
     params: FrozenDict,
     config: Dict,
-    algorithm: str = "ff_ippo",
 ) -> Tuple[callable, callable, Tuple]:
     """Initialise evaluator_fn, network, environment and states."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
 
     # Vmap it over number of agents and get evaluator_fn.
-    if "ff_ippo" in algorithm:
-        vmapped_eval_network_apply_fn = jax.vmap(
-            network.apply,
-            in_axes=(None, 0),
-        )
-    elif "ff_mappo" in algorithm:
-        vmapped_eval_network_apply_fn = jax.vmap(network.apply, in_axes=(None, None, 0))
-
-    evaluator = get_evaluator_fn(
-        eval_env, vmapped_eval_network_apply_fn, config, algorithm
+    vmapped_eval_network_apply_fn = jax.vmap(
+        network.apply,
+        in_axes=(None, 0),
     )
+
+    evaluator = get_evaluator_fn(eval_env, vmapped_eval_network_apply_fn, config)
 
     absolute_metric_evaluator = get_evaluator_fn(
         eval_env,
         vmapped_eval_network_apply_fn,
         config,
-        algorithm,
         10,
     )
 

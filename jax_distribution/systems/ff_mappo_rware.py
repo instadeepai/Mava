@@ -45,7 +45,11 @@ from jax_distribution.types import ExperimentOutput, LearnerState, PPOTransition
 from jax_distribution.utils.jax import merge_leading_dims
 from jax_distribution.utils.logger_tools import config_copy, get_logger
 from jax_distribution.utils.timing_utils import TimeIt
-from jax_distribution.wrappers.jumanji import LogWrapper, RwareMultiAgentWrapper
+from jax_distribution.wrappers.jumanji import (
+    LogWrapper,
+    RwareMultiAgentWithGlobalStateWrapper,
+    RwareMultiAgentWrapper,
+)
 
 
 class ActorCritic(nn.Module):
@@ -55,7 +59,7 @@ class ActorCritic(nn.Module):
 
     @nn.compact
     def __call__(
-        self, gloabal_observation: Observation, observation: Observation
+        self, observation: Observation
     ) -> Tuple[distrax.Categorical, chex.Array]:
         """Forward pass."""
         x = observation.agents_view
@@ -79,8 +83,7 @@ class ActorCritic(nn.Module):
         )
         actor_policy = distrax.Categorical(logits=masked_logits)
 
-        y = gloabal_observation.agents_view
-        y = y.reshape(y.shape[0], -1)
+        y = observation.global_state
 
         critic_output = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
@@ -128,9 +131,7 @@ def get_learner_fn(
 
             # SELECT ACTION
             rng, policy_rng = jax.random.split(rng)
-            actor_policy, value = apply_fn(
-                params, last_timestep.observation, last_timestep.observation
-            )
+            actor_policy, value = apply_fn(params, last_timestep.observation)
             action = actor_policy.sample(seed=policy_rng)
             log_prob = actor_policy.log_prob(action)
 
@@ -162,9 +163,7 @@ def get_learner_fn(
 
         # CALCULATE ADVANTAGE
         params, opt_state, rng, env_state, last_timestep = learner_state
-        _, last_val = apply_fn(
-            params, last_timestep.observation, last_timestep.observation
-        )
+        _, last_val = apply_fn(params, last_timestep.observation)
 
         def _calculate_gae(
             traj_batch: PPOTransition, last_val: chex.Array
@@ -213,9 +212,7 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate the loss."""
                     # RERUN NETWORK
-                    actor_policy, value = apply_fn(
-                        params, traj_batch.obs, traj_batch.obs
-                    )
+                    actor_policy, value = apply_fn(params, traj_batch.obs)
                     log_prob = actor_policy.log_prob(traj_batch.action)
 
                     # CALCULATE VALUE LOSS
@@ -364,20 +361,17 @@ def learner_setup(
 
     # Initialise observation.
     init_x = env.observation_spec().generate_value()
-    init_y = init_x
     # Select only obs for a single agent.
     init_x = jax.tree_util.tree_map(lambda x: x[0], init_x)
     init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
-    # Select obs for all the agents.
-    init_y = jax.tree_util.tree_map(lambda y: y[None, ...], init_y)
 
     # initialise params and optimiser state.
-    params = network.init(rng_p, init_y, init_x)
+    params = network.init(rng_p, init_x)
     opt_state = optim.init(params)
 
     # Vmap network apply function over number of agents.
     vmapped_network_apply_fn = jax.vmap(
-        network.apply, in_axes=(None, None, 1), out_axes=(1, 1)
+        network.apply, in_axes=(None, 1), out_axes=(1, 1)
     )
 
     # Get batched iterated update and replicate it to pmap it over cores.
@@ -427,11 +421,11 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     generator = RandomGenerator(**config["rware_scenario"])
     # Create envs
     env = jumanji.make(config["env_name"], generator=generator)
-    env = RwareMultiAgentWrapper(env)
+    env = RwareMultiAgentWithGlobalStateWrapper(env)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env_name"], generator=generator)
-    eval_env = RwareMultiAgentWrapper(eval_env)
+    eval_env = RwareMultiAgentWithGlobalStateWrapper(eval_env)
 
     # PRNG keys.
     rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["seed"]), num=3)
@@ -440,7 +434,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
 
     # Setup evaluator.
     evaluator, absolute_metric_evaluator, (trained_params, eval_rngs) = evaluator_setup(
-        eval_env, rng_e, network, learner_state.params, config, "ff_mappo"
+        eval_env, rng_e, network, learner_state.params, config
     )
 
     # Calculate total timesteps.
