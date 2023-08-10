@@ -64,7 +64,7 @@ def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:
         episodes_length = jnp.ravel(episodes_info["episode_length"])
 
         # Log metrics.
-        if config["USE_SACRED"] or config["USE_TF"]:
+        if config["use_sacred"] or config["use_tf"]:
             logger.log_stat(
                 prefix.lower() + "mean_episode_returns",
                 float(np.mean(episodes_return)),
@@ -82,21 +82,13 @@ def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:
                 logger.log_stat("entropy", float(np.mean(entropy)), t_env)
 
         log_string = (
-            "Timesteps {:07d} | "
-            "Mean Episode Return {:.3f} | "
-            "Std Episode Return {:.3f} | "
-            "Max Episode Return {:.3f} | "
-            "Mean Episode Length {:.3f} | "
-            "Std Episode Length {:.3f} | "
-            "Max Episode Length {:.3f}"
-        ).format(
-            t_env,
-            float(np.mean(episodes_return)),
-            float(np.std(episodes_return)),
-            float(np.max(episodes_return)),
-            float(np.mean(episodes_length)),
-            float(np.std(episodes_length)),
-            float(np.max(episodes_length)),
+            f"Timesteps {t_env:07d} | "
+            f"Mean Episode Return {float(np.mean(episodes_return)):.3f} | "
+            f"Std Episode Return {float(np.std(episodes_return)):.3f} | "
+            f"Max Episode Return {float(np.max(episodes_return)):.3f} | "
+            f"Mean Episode Length {float(np.mean(episodes_length)):.3f} | "
+            f"Std Episode Length {float(np.std(episodes_length)):.3f} | "
+            f"Max Episode Length {float(np.max(episodes_length)):.3f}"
         )
 
         if absolute_metric:
@@ -104,11 +96,11 @@ def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:
                 f"{Fore.BLUE}{Style.BRIGHT}ABSOLUTE METRIC: {log_string}{Style.RESET_ALL}"
             )
         elif trainer_metric:
-            log_string += "| Total Loss {:.3f} | Value Loss {:.3f} | Loss Actor {:.3f} | Entropy {:.3f}".format(
-                float(np.mean(total_loss)),
-                float(np.mean(value_loss)),
-                float(np.mean(loss_actor)),
-                float(np.mean(entropy)),
+            log_string += (
+                f"| Total Loss {float(np.mean(total_loss)):.3f} | "
+                f"Value Loss {float(np.mean(value_loss)):.3f} | "
+                f"Loss Actor {float(np.mean(loss_actor)):.3f} | "
+                f"Entropy {float(np.mean(entropy)):.3f}"
             )
             logger.console_logger.info(
                 f"{Fore.MAGENTA}{Style.BRIGHT}TRAINER: {log_string}{Style.RESET_ALL}"
@@ -127,11 +119,11 @@ def logger_setup(_run: Run, config: Dict, _log: SacredLogger):
     """Setup the logger."""
     logger = Logger(_log)
     unique_token = (
-        f"{config['ENV_NAME']}_seed{config['SEED']}_{datetime.datetime.now()}"
+        f"{config['env_name']}_seed{config['seed']}_{datetime.datetime.now()}"
     )
-    if config["USE_SACRED"]:
+    if config["use_sacred"]:
         logger.setup_sacred(_run)
-    if config["USE_TF"]:
+    if config["use_tf"]:
         tb_logs_direc = os.path.join(
             dirname(dirname(abspath(__file__))), "results", "tb_logs"
         )

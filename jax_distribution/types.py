@@ -33,7 +33,7 @@ class PPOTransition(NamedTuple):
     info: Dict
 
 
-class RunnerState(NamedTuple):
+class LearnerState(NamedTuple):
     """State of the `Runner`."""
 
     params: FrozenDict
@@ -43,8 +43,8 @@ class RunnerState(NamedTuple):
     timestep: TimeStep
 
 
-class RNNRunnerState(NamedTuple):
-    """State of the `Runner` for recurrent architectures."""
+class RNNLearnerState(NamedTuple):
+    """State of the `Learner` for recurrent architectures."""
 
     params: FrozenDict
     opt_state: OptState
@@ -81,7 +81,7 @@ class ExperimentOutput(NamedTuple):
     """Experiment output."""
 
     episodes_info: Dict[str, chex.Array]
-    runner_state: RunnerState = None
+    learner_state: LearnerState = None
     total_loss: chex.Array = None
     value_loss: chex.Array = None
     loss_actor: chex.Array = None
