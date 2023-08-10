@@ -22,7 +22,7 @@ import jax.numpy as jnp
 from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
 
-from jax_distribution.types import EvalState, ExperimentOutput, LearnerState
+from jax_distribution.types import EvalState, ExperimentOutput
 
 
 def get_evaluator_fn(
