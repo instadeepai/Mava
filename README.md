@@ -57,10 +57,11 @@ At the moment Mava is not meant to be installed as a library, but rather to be u
 You can use Mava by cloning the repo and pip installing as follows:
 
 ```bash
+git clone https://github.com/instadeepai/mava.git
 pip install -e .
 ```
 
-We have tested `mava` on Python 3.9. Note that because the installation of JAX differs depending on your hardware accelerator,
+We have tested `Mava` on Python 3.9. Note that because the installation of JAX differs depending on your hardware accelerator,
 we advise users to explicitly install the correct JAX version (see the [official installation guide](https://github.com/google/jax#installation)). For more in-depth instalations guides including Docker builds and virtual environments, please see our [detailed installation guide](DETAILED_INSTALL.md).
 
 ## Quickstart ⚡
@@ -79,6 +80,15 @@ In order to show the utility of end-to-end JAX-based MARL systems and JAX-based 
 Furthermore, we illustrate the speed of JAX-based MARL by illustrating the system steps per second as the number of parallel environments are increased
 
 Here, also note the system performance on a larger set of Robotic Warehouse environments:
+
+## Roadmap
+We plan to iteratively expand Mava in the following increments:
+1. Support for more multi-agent Jumanji environments
+2. Benchmarks on a more environments
+3. Support for off-policy algorithms
+
+Please do follow along as we develop this next phase!
+
 ## Citing Mava
 
 If you use Mava in your work, please cite the accompanying
