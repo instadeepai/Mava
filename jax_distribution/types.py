@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, NamedTuple
+from typing import Dict, NamedTuple, Optional
 
 import chex
 from flax.core.frozen_dict import FrozenDict
@@ -34,7 +34,7 @@ class PPOTransition(NamedTuple):
 
 
 class LearnerState(NamedTuple):
-    """State of the `Runner`."""
+    """State of the learner."""
 
     params: FrozenDict
     opt_state: OptState
@@ -81,7 +81,7 @@ class ExperimentOutput(NamedTuple):
     """Experiment output."""
 
     episodes_info: Dict[str, chex.Array]
-    learner_state: LearnerState = None
+    learner_state: Optional[LearnerState] = None
     total_loss: chex.Array = None
     value_loss: chex.Array = None
     loss_actor: chex.Array = None
