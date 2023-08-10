@@ -1,12 +1,12 @@
-jax>=0.2.26
-jaxlib>=0.1.74
-gymnax
-evosax
+jax<=0.4.13
+jaxlib<=0.4.13
 distrax
 optax
 flax
 numpy
-brax
 sacred
 tensorboard_logger
+hydra-core==1.3.2
+omegaconf
 git+https://github.com/instadeepai/jumanji.git
+protobuf~=3.20
