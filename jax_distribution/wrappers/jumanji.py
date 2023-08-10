@@ -29,11 +29,11 @@ class LogEnvState:
     """State of the `LogWrapper`."""
 
     env_state: State
-    episode_returns: jnp.float32
-    episode_lengths: jnp.int32
+    episode_returns: chex.Numeric
+    episode_lengths: chex.Numeric
     # Information about the episode return and length for logging purposes.
-    episode_return_info: jnp.float32
-    episode_length_info: jnp.int32
+    episode_return_info: chex.Numeric
+    episode_length_info: chex.Numeric
 
 
 class LogWrapper(Wrapper):
