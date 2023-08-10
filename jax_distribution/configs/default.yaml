@@ -8,29 +8,32 @@ defaults:
 # --- Environment ---
 ENV_NAME: RobotWarehouse-v0
 
-NUM_ENVS: 16  # Parallel updates / environments
+NUM_ENVS: 16  # Number of vectorised environments per device.
 NUM_UPDATES: 10 # Number of updates
-SEED: 420
+SEED: 42
 
 # --- RL hyperparameters ---
-LR: 2.5e-4
-UPDATE_BATCH_SIZE: 2
-ROLLOUT_LENGTH: 16
+LR: 2.5e-4 # Leanring rate for network
+UPDATE_BATCH_SIZE: 2 # Number of vectorised gradient updates per device.
+ROLLOUT_LENGTH: 16 # Number of environment steps per vectorised environment.
 
-PPO_EPOCHS: 4
-NUM_MINIBATCHES: 2
-GAMMA: 0.99
-GAE_LAMBDA: 0.95
-CLIP_EPS: 0.2
-ENT_COEF: 0.01
-VF_COEF: 0.5
-MAX_GRAD_NORM: 0.5
+PPO_EPOCHS: 4 # Number of ppo epochs per training data batch.
+NUM_MINIBATCHES: 2 # Number of minibatches per ppo epoch.
+GAMMA: 0.99 # Discounting factor.
+GAE_LAMBDA: 0.95 # Lambda value for GAE computation.
+CLIP_EPS: 0.2 # Clipping value for PPO updates and value function.
+ENT_COEF: 0.01 # Entropy regularisation term for loss function.
+VF_COEF: 0.5 # Critic weight in
+MAX_GRAD_NORM: 0.5 # Maximum norm of the gradients for a weight update.
 
 # --- Evaluation ---
-NUM_EVAL_EPISODES: 32
-NUM_EVALUATION: 2
-EVALUATION_GREEDY: False
-ABSOLUTE_METRIC: True
+NUM_EVAL_EPISODES: 32 # Episodes per evaluation
+NUM_EVALUATION: 2 # Number of evaluation intervals during training.
+EVALUATION_GREEDY: False # Evaluate the policy greedily. If True the policy will select
+  # an action which corresponds to the greatest logit. If false, the policy will sample
+  # from the logits.
+ABSOLUTE_METRIC: True # Whether the absolute metric should be computed. For more details
+  # on the absolute metric please see: https://arxiv.org/abs/2209.10485
 
 # --- Logging options ---
 USE_TF: true

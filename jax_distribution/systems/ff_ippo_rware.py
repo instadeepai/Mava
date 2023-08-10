@@ -339,8 +339,22 @@ def get_learner_fn(
     return learner_fn
 
 
-def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> callable:
-    """Get the evaluator function."""
+def get_evaluator_fn(
+    env: Environment, apply_fn: callable, config: dict, eval_multiplier: int
+) -> callable:
+    """Get the evaluator function.
+
+    Args:
+        env (Environment): An evironment isntance for evaluation.
+        apply_fn (callable): Network forward pass method.
+        config (dict): Experiment configuration.
+        eval_multiplier (int): A scalar that will increase the number of evaluation
+            episodes by a fixed factor. The reason for the increase is to enable the
+            computation of the `absolute metric` which is a metric computed and the end
+            of training by rolling out the policy which obtained the greatest evaluation
+            performance during training for 10 times more episodes than were used at a
+            single evaluation step.
+    """
 
     def eval_one_episode(params: FrozenDict, init_eval_state: EvalState) -> Tuple:
         """Evaluate one episode. It is vectorized over the number of evaluation episodes."""
@@ -400,7 +414,7 @@ def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> call
         # Initialise environment states and timesteps.
         n_devices = len(jax.devices())
 
-        eval_batch = config["NUM_EVAL_EPISODES"] // n_devices
+        eval_batch = (config["NUM_EVAL_EPISODES"] // n_devices) * eval_multiplier
 
         rng, *env_rngs = jax.random.split(rng, eval_batch + 1)
         env_states, timesteps = jax.vmap(env.reset)(
@@ -421,36 +435,7 @@ def get_evaluator_fn(env: Environment, apply_fn: callable, config: dict) -> call
             episodes_info=eval_metrics,
         )
 
-    def absolute_evaluator_fn(
-        trained_params: FrozenDict, rng: chex.PRNGKey
-    ) -> ExperimentOutput:
-        """Absolute metric function."""
-
-        # Initialise environment states and timesteps.
-        n_devices = len(jax.devices())
-
-        eval_batch = (config["NUM_EVAL_EPISODES"] // n_devices) * 10
-
-        rng, *env_rngs = jax.random.split(rng, eval_batch + 1)
-        env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
-            jnp.stack(env_rngs),
-        )
-        # Split rngs for each core.
-        rng, *step_rngs = jax.random.split(rng, eval_batch + 1)
-        # Add dimension to pmap over.
-        reshape_step_rngs = lambda x: x.reshape(eval_batch, -1)
-        step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
-        eval_state = EvalState(step_rngs, env_states, timesteps)
-
-        eval_metrics = jax.vmap(
-            eval_one_episode, in_axes=(None, 0), axis_name="eval_batch"
-        )(trained_params, eval_state)
-
-        return ExperimentOutput(
-            episodes_info=eval_metrics,
-        )
-
-    return evaluator_fn, absolute_evaluator_fn
+    return evaluator_fn
 
 
 def learner_setup(
@@ -538,10 +523,20 @@ def evaluator_setup(
         in_axes=(None, 0),
     )
 
-    # Pmap evaluator over cores.
-    evaluator, absolute_metric_evaluator = get_evaluator_fn(
-        eval_env, vmapped_eval_network_apply_fn, config
+    evaluator = get_evaluator_fn(
+        eval_env,
+        vmapped_eval_network_apply_fn,
+        config,
+        1,
     )
+
+    absolute_metric_evaluator = get_evaluator_fn(
+        eval_env,
+        vmapped_eval_network_apply_fn,
+        config,
+        10,
+    )
+
     evaluator = jax.pmap(evaluator, axis_name="device")
     absolute_metric_evaluator = jax.pmap(absolute_metric_evaluator, axis_name="device")
 
