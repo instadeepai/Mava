@@ -26,7 +26,7 @@ from jax_distribution.types import EvalState, ExperimentOutput
 
 
 def get_evaluator_fn(
-    env: Environment, apply_fn: callable, config: dict, eval_multiplier: int
+    env: Environment, apply_fn: callable, config: dict, eval_multiplier: int = 1
 ) -> callable:
     """Get the evaluator function.
 
@@ -145,7 +145,6 @@ def evaluator_setup(
         eval_env,
         vmapped_eval_network_apply_fn,
         config,
-        1,
     )
 
     absolute_metric_evaluator = get_evaluator_fn(

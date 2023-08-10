@@ -28,7 +28,7 @@ max_grad_norm: 0.5 # Maximum norm of the gradients for a weight update.
 
 # --- Evaluation ---
 num_eval_episodes: 32 # Episodes per evaluation
-num_evaluation: 2 # Number of evaluation intervals during training.
+num_evaluation: 2 # Number of evenly spaced evaluations to perform during training.
 evaluation_greedy: False # Evaluate the policy greedily. If True the policy will select
   # an action which corresponds to the greatest logit. If false, the policy will sample
   # from the logits.
