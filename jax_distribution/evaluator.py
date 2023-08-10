@@ -32,12 +32,13 @@ def get_evaluator_fn(
     algorithm: str,
     eval_multiplier: int = 1,
 ) -> callable:
-    """Get the evaluator function of Feedforward IPPO.
+    """Get the evaluator function.
 
     Args:
         env (Environment): An evironment isntance for evaluation.
         apply_fn (callable): Network forward pass method.
         config (dict): Experiment configuration.
+        algorithm (str): The algorithm name.
         eval_multiplier (int): A scalar that will increase the number of evaluation
             episodes by a fixed factor. The reason for the increase is to enable the
             computation of the `absolute metric` which is a metric computed and the end
