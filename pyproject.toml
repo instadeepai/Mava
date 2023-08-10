@@ -1,13 +1,8 @@
 [tool.black]
-line-length = 88
+line-length = 100
 
 [tool.isort]
 profile = "black"
-line_length = 88
-
-[tool.flake8]
-max-line-length = 88
-exclude = [".git", "__pycache__", "dist", "setup.py"]
 
 [tool.mypy]
 python_version = 3.9

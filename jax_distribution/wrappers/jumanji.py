@@ -1,3 +1,17 @@
+# Copyright 2022 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # python3
 # Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
@@ -58,12 +72,8 @@ class LogWrapper(Wrapper):
 
         new_episode_return = state.episode_returns + jnp.mean(timestep.reward)
         new_episode_length = state.episode_lengths + 1
-        episode_return_info = (
-            state.episode_return_info * not_done + new_episode_return * done
-        )
-        episode_length_info = (
-            state.episode_length_info * not_done + new_episode_length * done
-        )
+        episode_return_info = state.episode_return_info * not_done + new_episode_return * done
+        episode_length_info = state.episode_length_info * not_done + new_episode_length * done
 
         state = LogEnvState(
             env_state=env_state,
@@ -84,9 +94,7 @@ class RwareMultiAgentWrapper(Wrapper):
         timestep.observation = Observation(
             agents_view=timestep.observation.agents_view,
             action_mask=timestep.observation.action_mask,
-            step_count=jnp.repeat(
-                timestep.observation.step_count, self._env.num_agents
-            ),
+            step_count=jnp.repeat(timestep.observation.step_count, self._env.num_agents),
         )
         return state, timestep
 
@@ -96,9 +104,7 @@ class RwareMultiAgentWrapper(Wrapper):
         timestep.observation = Observation(
             agents_view=timestep.observation.agents_view,
             action_mask=timestep.observation.action_mask,
-            step_count=jnp.repeat(
-                timestep.observation.step_count, self._env.num_agents
-            ),
+            step_count=jnp.repeat(timestep.observation.step_count, self._env.num_agents),
         )
         return state, timestep
 

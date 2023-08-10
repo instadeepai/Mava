@@ -1,10 +1,10 @@
+brax
+distrax
+evosax
+flax
+git+https://github.com/instadeepai/jumanji.git
+gymnax
 jax>=0.2.26
 jaxlib>=0.1.74
-gymnax
-evosax
-distrax
-optax
-flax
 numpy
-brax
-git+https://github.com/instadeepai/jumanji.git
+optax
