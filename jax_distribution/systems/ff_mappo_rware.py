@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import copy
 import os
 from logging import Logger as SacredLogger
@@ -44,7 +43,11 @@ from jax_distribution.types import ExperimentOutput, LearnerState, PPOTransition
 from jax_distribution.utils.jax import merge_leading_dims
 from jax_distribution.utils.logger_tools import config_copy, get_logger
 from jax_distribution.utils.timing_utils import TimeIt
-from jax_distribution.wrappers.jumanji import LogWrapper, RwareMultiAgentWrapper
+from jax_distribution.wrappers.jumanji import (
+    LogWrapper,
+    ObservationGlobalState,
+    RwareMultiAgentWithGlobalStateWrapper,
+)
 
 
 class ActorCritic(nn.Module):
@@ -74,7 +77,9 @@ class ActorCritic(nn.Module):
         )
         actor_policy = distrax.Categorical(logits=masked_logits)
 
-        critic_output = nn.Dense(64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(x)
+        y = observation.global_state
+
+        critic_output = nn.Dense(64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(y)
         critic_output = nn.relu(critic_output)
         critic_output = nn.Dense(64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
             critic_output
@@ -331,9 +336,15 @@ def learner_setup(
         optax.adam(config["lr"], eps=1e-5),
     )
 
-    # Initialise observation: Select only obs for a single agent.
-    init_x = env.observation_spec().generate_value()
-    init_x = jax.tree_util.tree_map(lambda x: x[0], init_x)
+    # Initialise observation.
+    obs = env.observation_spec().generate_value()
+    # Select only obs for a single agent.
+    init_x = ObservationGlobalState(
+        agents_view=obs.agents_view[0],
+        action_mask=obs.action_mask[0],
+        global_state=obs.global_state,
+        step_count=obs.step_count[0],
+    )
     init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
 
     # initialise params and optimiser state.
@@ -341,7 +352,11 @@ def learner_setup(
     opt_state = optim.init(params)
 
     # Vmap network apply function over number of agents.
-    vmapped_network_apply_fn = jax.vmap(network.apply, in_axes=(None, 1), out_axes=(1, 1))
+    vmapped_network_apply_fn = jax.vmap(
+        network.apply,
+        in_axes=(None, ObservationGlobalState(1, 1, None, 1)),
+        out_axes=(1, 1),
+    )
 
     # Get batched iterated update and replicate it to pmap it over cores.
     learn = get_learner_fn(env, vmapped_network_apply_fn, optim.update, config)
@@ -384,11 +399,11 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     generator = RandomGenerator(**config["rware_scenario"])
     # Create envs
     env = jumanji.make(config["env_name"], generator=generator)
-    env = RwareMultiAgentWrapper(env)
+    env = RwareMultiAgentWithGlobalStateWrapper(env)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env_name"], generator=generator)
-    eval_env = RwareMultiAgentWrapper(eval_env)
+    eval_env = RwareMultiAgentWithGlobalStateWrapper(eval_env)
 
     # PRNG keys.
     rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["seed"]), num=3)
@@ -397,7 +412,12 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
 
     # Setup evaluator.
     evaluator, absolute_metric_evaluator, (trained_params, eval_rngs) = evaluator_setup(
-        eval_env, rng_e, network, learner_state.params, config
+        eval_env=eval_env,
+        rng_e=rng_e,
+        network=network,
+        params=learner_state.params,
+        config=config,
+        centralised_critic=True,
     )
 
     # Calculate total timesteps.
@@ -481,7 +501,7 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     ex.main(run_experiment)
     ex.run(config_updates={})
 
-    print(f"{Fore.CYAN}{Style.BRIGHT}IPPO experiment completed{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}MAPPO experiment completed{Style.RESET_ALL}")
 
 
 if __name__ == "__main__":

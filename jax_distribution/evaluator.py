@@ -12,20 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
 from typing import Any, Dict, Tuple
 
@@ -143,7 +129,7 @@ def get_rnn_evaluator_fn(
     env: Environment,
     apply_fn: callable,
     config: dict,
-    ScannedRNN: nn.Module,
+    scanned_rnn: nn.Module,
     eval_multiplier: int = 1,
 ) -> callable:
     """Get the evaluator function for recurrent networks."""
@@ -244,7 +230,7 @@ def get_rnn_evaluator_fn(
         step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
 
         # Initialise hidden state.
-        init_hstate = ScannedRNN.initialize_carry(eval_batch, 128)
+        init_hstate = scanned_rnn.initialize_carry(eval_batch, 128)
         init_hstate = jnp.expand_dims(init_hstate, axis=1)
         init_hstate = jnp.expand_dims(init_hstate, axis=2)
         init_hstate = jnp.tile(init_hstate, (1, config["num_agents"], 1))
@@ -266,9 +252,9 @@ def get_rnn_evaluator_fn(
             hstates=init_hstate,
         )
 
-        eval_metrics = jax.vmap(
-            eval_one_episode, in_axes=(None, 0), axis_name="eval_batch"
-        )(trained_params, eval_state)
+        eval_metrics = jax.vmap(eval_one_episode, in_axes=(None, 0), axis_name="eval_batch")(
+            trained_params, eval_state
+        )
 
         return ExperimentOutput(
             episodes_info=eval_metrics,
@@ -284,7 +270,7 @@ def evaluator_setup(
     params: FrozenDict,
     config: Dict,
     use_recurrent_net: bool = False,
-    ScannedRNN: nn.Module = None,
+    scanned_rnn: nn.Module = None,
 ) -> Tuple[callable, callable, Tuple]:
     """Initialise evaluator_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
@@ -299,13 +285,13 @@ def evaluator_setup(
             eval_env,
             vmapped_eval_network_apply_fn,
             config,
-            ScannedRNN,
+            scanned_rnn,
         )
         absolute_metric_evaluator = get_rnn_evaluator_fn(
             eval_env,
             vmapped_eval_network_apply_fn,
             config,
-            ScannedRNN,
+            scanned_rnn,
             10,
         )
     else:
