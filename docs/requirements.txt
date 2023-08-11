@@ -1,6 +1,0 @@
-git+https://github.com/instadeepai/Mava#egg=id-mava[jax,envs,reverb]
-mkdocstrings
-mkdocstrings-python
-mkdocs-material
-pymdown-extensions
-mkdocs-git-revision-date-plugin

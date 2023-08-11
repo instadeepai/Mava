@@ -1,5 +1,4 @@
-# python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2022 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +27,8 @@ class TimeIt:
         to calculate the steps per second (SPS) metric.
 
     Note:
-        This implementation is a generic context manager for timing execution using Python's `timeit` module.
+        This implementation is a generic context manager for timing execution using Python's
+        `timeit` module.
         For the original implementation, please refer to the following link:
         (https://colab.research.google.com/drive/1974D-qP17fd5mLxy6QZv-ic4yxlPJp-G?usp=sharing)
     """
