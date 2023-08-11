@@ -151,9 +151,6 @@ Checkpoints
 .devcontainer/devcontainer.json
 3.9
 
-# smac
-3rdparty
-
 # PyCharm
 .idea/
 
