@@ -40,6 +40,17 @@ endif
 build:
 	DOCKER_BUILDKIT=1 docker build --tag $(IMAGE) --target $(DOCKER_IMAGE_TAG)  --build-arg record=$(record) .
 
+build_venv:
+	python3 -m venv mava_env
+	mava_env/bin/pip install -r jax_distribution/requirements.txt
+	echo 'export PYTHONPATH="./"' >> mava_env/bin/activate
+
+build_tpu_venv:
+	python3 -m venv mava_env
+	mava_env/bin/pip install -r jax_distribution/requirements.txt
+	mava_env/bin/pip install -U "jax[tpu]" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
+	echo 'export PYTHONPATH="./"' >> mava_env/bin/activate
+
 run:
 	$(DOCKER_RUN) python $(example) --base_dir /home/app/mava/logs/
 
