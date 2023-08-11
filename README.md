@@ -5,29 +5,32 @@
 </p>
 
 <h2 align="center">
-    <p>A framework for distributed multi-agent reinforcement learning in JAX</p>
+    <p>Distributed Multi-Agent Reinforcement Learning in JAX</p>
 </h2>
 
 <div align="center">
-<a  href="https://pypi.org/project/id-mava/">
+<!-- <a  href="https://pypi.org/project/id-mava/">
     <img src="https://img.shields.io/pypi/pyversions/id-mava" alt="Python" />
 </a>
 <a  href="https://pypi.org/project/id-mava/">
     <img src="https://badge.fury.io/py/id-mava.svg" alt="PyPi" />
-</a>
-<a  href="https://github.com/instadeepai/Mava/actions/workflows/ci.yaml?query=branch%3Adevelop">
+</a> -->
+<!-- <a  href="https://github.com/instadeepai/Mava/actions/workflows/ci.yaml?query=branch%3Adevelop">
     <img src="https://github.com/instadeepai/Mava/workflows/format_and_test/badge.svg" alt="Formatting" />
-</a>
+</a> -->
 <a  href="https://github.com/instadeepai/Mava/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License" />
 </a>
-<a  href="https://id-mava.readthedocs.io/">
-    <img src="https://readthedocs.org/projects/id-mava/badge/?version=latest" alt="Docs" />
-</a>
-<a href="https://codecov.io/gh/instadeepai/Mava">
-    <img src="https://codecov.io/gh/instadeepai/Mava/branch/develop/graph/badge.svg?token=P3HO6DLKQ3" alt="coverage" />
+<a  href="https://github.com/psf/black">
+    <img src="https://img.shields.io/badge/code%20style-black-000000.svg" alt="Code style" />
 </a>
 </div>
+
+<hr>
+
+👋 **UPDATE - 11/8/2023**: This is out first release of an end-to-end JAX version of Mava. Henceforth we will only be supporting JAX-based environments and systems with native support for the [Jumanji][jumanji] environment API. The reason for this change is to have a lightweight and easy-to-use end-to-end JAX based research tool. We are currently following a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl] where we allow for code duplication to enable readability. All algorithmic logic can be found in the file implementing a particular algorithm. If you would still like to use our deprecated TF2-based framework and systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
+
+<hr>
 
 ## Welcome to Mava! 🦁
 
@@ -37,15 +40,23 @@
 
 </div>
 
-Mava is first and foremost a tool for quickly iterating on multi-agent reinforcement learning (MARL) ideas. Mava provides useful implementations of MARL algorithms in JAX allowing for easy parallelisation across devices with JAX's `pmap`. Originating in the Research Team at [InstaDeep](https://www.instadeep.com/), Mava is now developed jointly with the open-source community. “Mava” means experience, or wisdom, in Xhosa - one of South Africa’s eleven official languages.
+Mava provides simplified code for quickly iterating on ideas in multi-agent reinforcement learning (MARL). Mava provides useful implementations of MARL algorithms in JAX allowing for easy parallelisation across devices with JAX's `pmap`. Originating in the Research Team at [InstaDeep](https://www.instadeep.com/). “Mava” means experience, or wisdom, in Xhosa - one of South Africa’s eleven official languages.
 
 To join us in these efforts, please feel free to reach out, raise issues or read our [contribution guidelines](#contributing-) (or just star 🌟 to stay up to date with the latest developments)!
 
-<hr>
+## Performance and Speed 🚀
 
-👋 **UPDATE - 11/8/2023**: This is out first release of an end-to-end JAX version of Mava. Henceforth we will only be supporting JAX-based environments and systems with native support for the [Jumanji][jumanji] environment API. The reason for this change is to have a lightweight and easy-to-use end-to-end JAX based research tool. We are currently following a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl] where we allow for code duplication to enable readability. All algorithmic logic can be found in the file implementing a particular algorithm. If you would still like to use our deprecated TF2-based framework and systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
+It should be noted that in all cases here Mava is trained using a single 6GB Nivida 3060 laptop GPU.
 
-<hr>
+In order to show the utility of end-to-end JAX-based MARL systems and JAX-based environments we compare the speed and performance of Mava against [EPyMARL][epymarl] on a simple Robotic Warehouse task with 4 agents.
+
+Furthermore, we illustrate the speed of JAX-based MARL by illustrating the system steps per second as the number of parallel environments are increased
+
+Here, also note the system performance on a larger set of Robotic Warehouse environments:
+
+## Code Philosophy
+
+PureJaxRL is inspired by [CleanRL](https://github.com/vwxyzjn/cleanrl), providing high-quality single-file implementations with research-friendly features. Like CleanRL, this is not a modular library and is not meant to be imported. The repository focuses on simplicity and clarity in its implementations, making it an excellent resource for researchers and practitioners.
 
 ### Overview 🦜
 
@@ -76,17 +87,10 @@ We have a [Quickstart notebook][quickstart] that can be used to quickly create a
 
 Please read our [contributing docs](./CONTRIBUTING.md) for details on how to submit pull requests, our Contributor License Agreement and community guidelines.
 
-## Performance and Speed 🚀
-It should be noted that in all cases here Mava is trained using a single 6GB Nivida 3060 laptop GPU.
-
-In order to show the utility of end-to-end JAX-based MARL systems and JAX-based environments we compare the speed and performance of Mava against [EPyMARL][epymarl] on a simple Robotic Warehouse task with 4 agents.
-
-Furthermore, we illustrate the speed of JAX-based MARL by illustrating the system steps per second as the number of parallel environments are increased
-
-Here, also note the system performance on a larger set of Robotic Warehouse environments:
-
 ## Roadmap 🛤️
+
 We plan to iteratively expand Mava in the following increments:
+
 - 🌴 Support for more multi-agent Jumanji environments.
 - 📊 Benchmarks on a more environments.
 - 🦾 Support for off-policy algorithms.
@@ -119,13 +123,8 @@ The current version of Mava has been based on code from the following projects:
 - 🌀 [DeepMind Anakin][anakin_notebook] provides a notebook that illustrates using the Anakin podracer architecture for training RL systems in JAX at scale.
 - 🌳 [EPyMARL][epymarl] provides a framework for training MARL systems using a PyTorch backend.
 
-[Examples]: examples
 [Paper]: https://arxiv.org/pdf/2107.01460.pdf
-[pettingzoo]: https://github.com/PettingZoo-Team/PettingZoo
-[smac]: https://github.com/oxwhirl/smac
-[flatland]: https://gitlab.aicrowd.com/flatland/flatland
 [quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/quickstart.ipynb
-[documentation]: https://id-mava.readthedocs.io/
 [jumanji]: https://github.com/instadeepai/jumanji
 [cleanrl]: https://github.com/vwxyzjn/cleanrl
 [purejaxrl]: https://github.com/luchris429/purejaxrl
