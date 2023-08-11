@@ -1,3 +1,17 @@
+# Copyright 2022 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # python3
 # Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
@@ -57,9 +71,7 @@ class ScannedRNN(nn.Module):
         split_rngs={"params": False},
     )
     @nn.compact
-    def __call__(
-        self, carry: chex.Array, x: chex.Array
-    ) -> Tuple[chex.Array, chex.Array]:
+    def __call__(self, carry: chex.Array, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
         """Applies the module."""
         rnn_state = carry
         ins, resets = x
@@ -75,9 +87,7 @@ class ScannedRNN(nn.Module):
     def initialize_carry(batch_size: int, hidden_size: int) -> chex.Array:
         """Initializes the carry state."""
         # Use a dummy key since the default state init fn is just zeros.
-        return nn.GRUCell.initialize_carry(
-            jax.random.PRNGKey(0), (batch_size,), hidden_size
-        )
+        return nn.GRUCell.initialize_carry(jax.random.PRNGKey(0), (batch_size,), hidden_size)
 
 
 class ActorCritic(nn.Module):
@@ -93,17 +103,13 @@ class ActorCritic(nn.Module):
         observation, dones = x
         obs = observation.agents_view
 
-        embedding = nn.Dense(
-            128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(obs)
+        embedding = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(obs)
         embedding = nn.relu(embedding)
 
         rnn_in = (embedding, dones)
         hidden, embedding = ScannedRNN()(hidden, rnn_in)
 
-        actor_mean = nn.Dense(128, kernel_init=orthogonal(2), bias_init=constant(0.0))(
-            embedding
-        )
+        actor_mean = nn.Dense(128, kernel_init=orthogonal(2), bias_init=constant(0.0))(embedding)
         actor_mean = nn.relu(actor_mean)
         actor_mean = nn.Dense(
             self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
@@ -117,13 +123,9 @@ class ActorCritic(nn.Module):
 
         pi = distrax.Categorical(logits=masked_logits)
 
-        critic = nn.Dense(128, kernel_init=orthogonal(2), bias_init=constant(0.0))(
-            embedding
-        )
+        critic = nn.Dense(128, kernel_init=orthogonal(2), bias_init=constant(0.0))(embedding)
         critic = nn.relu(critic)
-        critic = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
-            critic
-        )
+        critic = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(critic)
 
         return hidden, pi, jnp.squeeze(critic, axis=-1)
 
@@ -133,9 +135,7 @@ def get_learner_fn(
 ) -> Callable:
     """Get the learner function."""
 
-    def _update_step(
-        learner_state: RNNLearnerState, _: Any
-    ) -> Tuple[RNNLearnerState, Tuple]:
+    def _update_step(learner_state: RNNLearnerState, _: Any) -> Tuple[RNNLearnerState, Tuple]:
         """A single update of the network.
 
         This function steps the environment and records the trajectory batch for
@@ -192,9 +192,7 @@ def get_learner_fn(
 
             # log episode return and length
             done, reward = jax.tree_util.tree_map(
-                lambda x: jnp.repeat(x, config["num_agents"]).reshape(
-                    config["num_envs"], -1
-                ),
+                lambda x: jnp.repeat(x, config["num_agents"]).reshape(config["num_envs"], -1),
                 (timestep.last(), timestep.reward),
             )
             info = {
@@ -245,9 +243,7 @@ def get_learner_fn(
         ) -> Tuple[chex.Array, chex.Array]:
             """Calculate the GAE."""
 
-            def _get_advantages(
-                gae_and_next_value: Tuple, transition: PPOTransition
-            ) -> Tuple:
+            def _get_advantages(gae_and_next_value: Tuple, transition: PPOTransition) -> Tuple:
                 """Calculate the GAE for a single transition."""
                 gae, next_value = gae_and_next_value
                 done, value, reward = (
@@ -295,14 +291,12 @@ def get_learner_fn(
                     log_prob = actor_policy.log_prob(traj_batch.action)
 
                     # CALCULATE VALUE LOSS
-                    value_pred_clipped = traj_batch.value + (
-                        value - traj_batch.value
-                    ).clip(-config["clip_eps"], config["clip_eps"])
+                    value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
+                        -config["clip_eps"], config["clip_eps"]
+                    )
                     value_losses = jnp.square(value - targets)
                     value_losses_clipped = jnp.square(value_pred_clipped - targets)
-                    value_loss = (
-                        0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
-                    )
+                    value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
 
                     # CALCULATE ACTOR LOSS
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
@@ -321,16 +315,12 @@ def get_learner_fn(
                     entropy = actor_policy.entropy().mean()
 
                     total_loss = (
-                        loss_actor
-                        + config["vf_coef"] * value_loss
-                        - config["ent_coef"] * entropy
+                        loss_actor + config["vf_coef"] * value_loss - config["ent_coef"] * entropy
                     )
                     return total_loss, (value_loss, loss_actor, entropy)
 
                 grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
-                loss_info, grads = grad_fn(
-                    params, opt_state, traj_batch, advantages, targets
-                )
+                loss_info, grads = grad_fn(params, opt_state, traj_batch, advantages, targets)
 
                 # Compute the parallel mean (pmean) over the batch.
                 # This calculation is inspired by the Anakin architecture demo.
@@ -368,9 +358,7 @@ def get_learner_fn(
                 ),
                 shuffled_batch,
             )
-            minibatches = jax.tree_util.tree_map(
-                lambda x: jnp.swapaxes(x, 1, 0), reshaped_batch
-            )
+            minibatches = jax.tree_util.tree_map(lambda x: jnp.swapaxes(x, 1, 0), reshaped_batch)
 
             # UPDATE MINIBATCHES
             (params, opt_state), loss_info = jax.lax.scan(
@@ -435,9 +423,7 @@ def get_learner_fn(
                 - hstate (chex.Array): The initial hidden state of the RNN.
         """
 
-        batched_update_step = jax.vmap(
-            _update_step, in_axes=(0, None), axis_name="batch"
-        )
+        batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
 
         learner_state, (metric, loss_info) = jax.lax.scan(
             batched_update_step, learner_state, None, config["num_updates_per_eval"]
@@ -494,18 +480,14 @@ def learner_setup(
     opt_state = optim.init(params)
 
     # Vmap network apply function over number of agents.
-    vmapped_network_apply_fn = jax.vmap(
-        network.apply, in_axes=(None, 1, 2), out_axes=(1, 2, 2)
-    )
+    vmapped_network_apply_fn = jax.vmap(network.apply, in_axes=(None, 1, 2), out_axes=(1, 2, 2))
 
     # Get batched iterated update and replicate it to pmap it over cores.
     learn = get_learner_fn(env, vmapped_network_apply_fn, optim.update, config)
     learn = jax.pmap(learn, axis_name="device")
 
     # Broadcast params and optimiser state to cores and batch.
-    broadcast = lambda x: jnp.broadcast_to(
-        x, (n_devices, config["update_batch_size"]) + x.shape
-    )
+    broadcast = lambda x: jnp.broadcast_to(x, (n_devices, config["update_batch_size"]) + x.shape)
     params = jax.tree_map(broadcast, params)
     opt_state = jax.tree_map(broadcast, opt_state)
 
@@ -525,9 +507,7 @@ def learner_setup(
     # Split rngs for each core.
     rng, *step_rngs = jax.random.split(rng, n_devices * config["update_batch_size"] + 1)
     # Add dimension to pmap over.
-    reshape_step_rngs = lambda x: x.reshape(
-        (n_devices, config["update_batch_size"]) + x.shape[1:]
-    )
+    reshape_step_rngs = lambda x: x.reshape((n_devices, config["update_batch_size"]) + x.shape[1:])
     step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
     reshape_states = lambda x: x.reshape(
         (n_devices, config["update_batch_size"], config["num_envs"]) + x.shape[1:]
@@ -661,9 +641,7 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     ex.main(run_experiment)
     ex.run(config_updates={})
 
-    print(
-        f"{Fore.CYAN}{Style.BRIGHT} Recurrent IPPO experiment completed{Style.RESET_ALL}"
-    )
+    print(f"{Fore.CYAN}{Style.BRIGHT} Recurrent IPPO experiment completed{Style.RESET_ALL}")
 
 
 if __name__ == "__main__":
