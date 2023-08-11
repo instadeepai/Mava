@@ -37,10 +37,14 @@ from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
 
 from jax_distribution.types import EvalState, ExperimentOutput
+from jax_distribution.wrappers.jumanji import ObservationGlobalState
 
 
 def get_evaluator_fn(
-    env: Environment, apply_fn: callable, config: dict, eval_multiplier: int = 1
+    env: Environment,
+    apply_fn: callable,
+    config: dict,
+    eval_multiplier: int = 1,
 ) -> callable:
     """Get the evaluator function.
 
@@ -66,6 +70,7 @@ def get_evaluator_fn(
 
             # Select action.
             rng, _rng = jax.random.split(rng)
+
             pi, _ = apply_fn(params, last_timestep.observation)
 
             if config["evaluation_greedy"]:
@@ -144,22 +149,25 @@ def evaluator_setup(
     network: Any,
     params: FrozenDict,
     config: Dict,
+    centralised_critic: bool = False,
 ) -> Tuple[callable, callable, Tuple]:
-    """Initialise evaluator_fn, network, optimiser, environment and states."""
+    """Initialise evaluator_fn, network, environment and states."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
 
-    # Vmap it over number of agents.
-    vmapped_eval_network_apply_fn = jax.vmap(
-        network.apply,
-        in_axes=(None, 0),
-    )
+    # Vmap it over number of agents based on the type of network.
+    if centralised_critic:
+        vmapped_eval_network_apply_fn = jax.vmap(
+            network.apply,
+            in_axes=(None, ObservationGlobalState(0, 0, None, 0)),
+        )
+    else:
+        vmapped_eval_network_apply_fn = jax.vmap(
+            network.apply,
+            in_axes=(None, 0),
+        )
 
-    evaluator = get_evaluator_fn(
-        eval_env,
-        vmapped_eval_network_apply_fn,
-        config,
-    )
+    evaluator = get_evaluator_fn(eval_env, vmapped_eval_network_apply_fn, config)
 
     absolute_metric_evaluator = get_evaluator_fn(
         eval_env,
