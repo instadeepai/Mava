@@ -211,7 +211,7 @@ def get_learner_fn(
             return learner_state, transition
 
         # INITIALISE RNN STATE
-        initial_hstate = learner_state.hstate
+        initial_hstate = learner_state.hstates
 
         # STEP ENVIRONMENT FOR ROLLOUT LENGTH
         learner_state, traj_batch = jax.lax.scan(
@@ -361,16 +361,15 @@ def get_learner_fn(
             shuffled_batch = jax.tree_util.tree_map(
                 lambda x: jnp.take(x, permutation, axis=1), batch
             )
-            minibatches = jax.tree_util.tree_map(
-                lambda x: jnp.swapaxes(
-                    jnp.reshape(
-                        x,
-                        [x.shape[0], config["num_minibatches"], -1] + list(x.shape[2:]),
-                    ),
-                    1,
-                    0,
+            reshaped_batch = jax.tree_util.tree_map(
+                lambda x: jnp.reshape(
+                    x,
+                    [x.shape[0], config["num_minibatches"], -1] + list(x.shape[2:]),
                 ),
                 shuffled_batch,
+            )
+            minibatches = jax.tree_util.tree_map(
+                lambda x: jnp.swapaxes(x, 1, 0), reshaped_batch
             )
 
             # UPDATE MINIBATCHES
@@ -547,7 +546,13 @@ def learner_setup(
         dtype=bool,
     )
     init_learner_state = RNNLearnerState(
-        params, opt_state, step_rngs, env_states, timesteps, dones, hstates
+        params=params,
+        opt_state=opt_state,
+        key=step_rngs,
+        env_state=env_states,
+        timestep=timesteps,
+        dones=dones,
+        hstates=hstates,
     )
     return learn, network, init_learner_state
 

@@ -193,7 +193,7 @@ def get_rnn_evaluator_fn(
             init_eval_state.env_state,
             init_eval_state.timestep,
             init_eval_state.dones,
-            init_eval_state.init_hstate,
+            init_eval_state.hstates,
             0,
             0.0,
         )
@@ -204,7 +204,7 @@ def get_rnn_evaluator_fn(
             eval_state,
         )
 
-        _, _, _, _, _, step_count_, return_ = final_state
+        step_count_, return_ = final_state.step_count_, final_state.return_
         eval_metrics = {
             "episode_return": return_,
             "episode_length": step_count_,
@@ -244,7 +244,13 @@ def get_rnn_evaluator_fn(
             dtype=bool,
         )
 
-        eval_state = RNNEvalState(step_rngs, env_states, timesteps, dones, init_hstate)
+        eval_state = RNNEvalState(
+            key=step_rngs,
+            env_state=env_states,
+            timestep=timesteps,
+            dones=dones,
+            hstates=init_hstate,
+        )
 
         eval_metrics = jax.vmap(
             eval_one_episode, in_axes=(None, 0), axis_name="eval_batch"
@@ -263,7 +269,7 @@ def evaluator_setup(
     network: Any,
     params: FrozenDict,
     config: Dict,
-    rnn_net: bool = False,
+    use_recurrent_net: bool = False,
     ScannedRNN: nn.Module = None,
 ) -> Tuple[callable, callable, Tuple]:
     """Initialise evaluator_fn, network, optimiser, environment and states."""
@@ -271,7 +277,7 @@ def evaluator_setup(
     n_devices = len(jax.devices())
 
     # Vmap it over number of agents and create evaluator_fn.
-    if rnn_net:
+    if use_recurrent_net:
         vmapped_eval_network_apply_fn = jax.vmap(
             network.apply, in_axes=(None, 1, 2), out_axes=(1, 2, 2)
         )
