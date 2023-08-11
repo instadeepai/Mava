@@ -1,5 +1,4 @@
-# python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2022 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """Logger setup."""
 import datetime
 import os
@@ -19,24 +19,26 @@ from logging import Logger as SacredLogger
 from os.path import abspath, dirname
 from typing import Callable, Dict
 
-import chex
 import jax.numpy as jnp
 import numpy as np
 from colorama import Fore, Style
 from sacred.run import Run
 
+from jax_distribution.types import ExperimentOutput
 from jax_distribution.utils.logger_tools import Logger
 
 
-def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:
+# todo: flake is complaining, possibly split into 3 functions
+#  log_absolute, log_trainer, log_evaluator
+def get_logger_fn(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
     """Get the logger function."""
 
     def log(
-        metrics: Dict[str, Dict[str, chex.Array]],
+        metrics: ExperimentOutput,
         t_env: int = 0,
         trainer_metric: bool = False,
         absolute_metric: bool = False,
-    ) -> None:
+    ) -> float:
         """Log the episode returns and lengths.
 
         Args:
@@ -118,15 +120,11 @@ def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:
 def logger_setup(_run: Run, config: Dict, _log: SacredLogger):
     """Setup the logger."""
     logger = Logger(_log)
-    unique_token = (
-        f"{config['env_name']}_seed{config['seed']}_{datetime.datetime.now()}"
-    )
+    unique_token = f"{config['env_name']}_seed{config['seed']}_{datetime.datetime.now()}"
     if config["use_sacred"]:
         logger.setup_sacred(_run)
     if config["use_tf"]:
-        tb_logs_direc = os.path.join(
-            dirname(dirname(abspath(__file__))), "results", "tb_logs"
-        )
+        tb_logs_direc = os.path.join(dirname(dirname(abspath(__file__))), "results", "tb_logs")
         tb_exp_direc = os.path.join(tb_logs_direc, "{}").format(unique_token)
         logger.setup_tb(tb_exp_direc)
     return get_logger_fn(logger, config)

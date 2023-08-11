@@ -149,6 +149,7 @@ logs
 Checkpoints
 .DS_Store
 .devcontainer/devcontainer.json
+3.9
 
 # smac
 3rdparty
