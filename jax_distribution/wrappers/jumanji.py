@@ -127,8 +127,8 @@ class RwareMultiAgentWithGlobalStateWrapper(Wrapper):
     """Multi-agent wrapper for the Robotic Warehouse environment.
 
     The wrapper includes a global environment state to be used by the centralised critic.
-    Note here that since robotic warehouse does not have a global state, we create one by concatenating
-    the observations of all agents.
+    Note here that since robotic warehouse does not have a global state, we create one
+    by concatenating the observations of all agents.
     """
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
@@ -139,9 +139,7 @@ class RwareMultiAgentWithGlobalStateWrapper(Wrapper):
             agents_view=timestep.observation.agents_view,
             action_mask=timestep.observation.action_mask,
             global_state=global_state,
-            step_count=jnp.repeat(
-                timestep.observation.step_count, self._env.num_agents
-            ),
+            step_count=jnp.repeat(timestep.observation.step_count, self._env.num_agents),
         )
         return state, timestep
 
@@ -153,9 +151,7 @@ class RwareMultiAgentWithGlobalStateWrapper(Wrapper):
             agents_view=timestep.observation.agents_view,
             action_mask=timestep.observation.action_mask,
             global_state=global_state,
-            step_count=jnp.repeat(
-                timestep.observation.step_count, self._env.num_agents
-            ),
+            step_count=jnp.repeat(timestep.observation.step_count, self._env.num_agents),
         )
         return state, timestep
 
