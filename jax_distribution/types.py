@@ -10,10 +10,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, NamedTuple
+from typing import Dict, NamedTuple, Optional
 
 import chex
 from flax.core.frozen_dict import FrozenDict
+from jumanji.environments.routing.robot_warehouse import State
 from jumanji.types import TimeStep
 from optax._src.base import OptState
 
@@ -32,8 +33,8 @@ class PPOTransition(NamedTuple):
     info: Dict
 
 
-class RunnerState(NamedTuple):
-    """State of the `Runner`."""
+class LearnerState(NamedTuple):
+    """State of the learner."""
 
     params: FrozenDict
     opt_state: OptState
@@ -42,8 +43,46 @@ class RunnerState(NamedTuple):
     timestep: TimeStep
 
 
+class RNNLearnerState(NamedTuple):
+    """State of the `Learner` for recurrent architectures."""
+
+    params: FrozenDict
+    opt_state: OptState
+    key: chex.PRNGKey
+    env_state: LogEnvState
+    timestep: TimeStep
+    dones: chex.Array
+    hstate: chex.Array
+
+
+class EvalState(NamedTuple):
+    """State of the evaluator."""
+
+    key: chex.PRNGKey
+    env_state: State
+    timestep: TimeStep
+    step_count_: chex.Numeric = None
+    return_: chex.Numeric = None
+
+
+class RNNEvalState(NamedTuple):
+    """State of the evaluator for recurrent architectures."""
+
+    key: chex.PRNGKey
+    env_state: State
+    timestep: TimeStep
+    dones: chex.Array
+    init_hstate: chex.Array
+    step_count_: chex.Numeric = None
+    return_: chex.Numeric = None
+
+
 class ExperimentOutput(NamedTuple):
     """Experiment output."""
 
-    runner_state: RunnerState
-    info: Dict[str, Dict[str, chex.Array]]
+    episodes_info: Dict[str, chex.Array]
+    learner_state: Optional[LearnerState] = None
+    total_loss: chex.Array = None
+    value_loss: chex.Array = None
+    loss_actor: chex.Array = None
+    entropy: chex.Array = None
