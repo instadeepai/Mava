@@ -1,5 +1,4 @@
-# python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2022 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -248,8 +247,9 @@ def get_learner_fn(
                 )
 
                 # Compute the parallel mean (pmean) over the batch.
-                # This calculation is inspired by the Anakin architecture demo.
-                # This pmean could be a regular mean as the batch axis is on all devices.
+                # This calculation is inspired by the Anakin architecture demo notebook.
+                # available at https://tinyurl.com/26tdzs5x
+                # This pmean could be a regular mean as the batch axis is on the same device.
                 grads, loss_info = jax.lax.pmean((grads, loss_info), axis_name="batch")
                 # pmean over devices.
                 grads, loss_info = jax.lax.pmean((grads, loss_info), axis_name="device")
@@ -453,6 +453,13 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
             learner_output = learn(learner_state)
             jax.block_until_ready(learner_output)
 
+        # Log the results of the training.
+        log(
+            metrics=learner_output,
+            t_env=timesteps_per_training * (i + 1),
+            trainer_metric=True,
+        )
+
         # Prepare for evaluation.
         trained_params = jax.tree_util.tree_map(
             lambda x: x[:, 0, ...], learner_output.learner_state.params
@@ -465,12 +472,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         evaluator_output = evaluator(trained_params, eval_rngs)
         jax.block_until_ready(evaluator_output)
 
-        # Log the results
-        log(
-            metrics=learner_output,
-            t_env=timesteps_per_training * (i + 1),
-            trainer_metric=True,
-        )
+        # Log the results of the evaluation.
         episode_return = log(
             metrics=evaluator_output,
             t_env=timesteps_per_training * (i + 1),
