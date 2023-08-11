@@ -114,9 +114,9 @@ def get_ff_evaluator_fn(
         step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
 
         eval_state = EvalState(step_rngs, env_states, timesteps)
-        eval_metrics = jax.vmap(
-            eval_one_episode, in_axes=(None, 0), axis_name="eval_batch"
-        )(trained_params, eval_state)
+        eval_metrics = jax.vmap(eval_one_episode, in_axes=(None, 0), axis_name="eval_batch")(
+            trained_params, eval_state
+        )
 
         return ExperimentOutput(
             episodes_info=eval_metrics,
@@ -129,7 +129,7 @@ def get_rnn_evaluator_fn(
     env: Environment,
     apply_fn: callable,
     config: dict,
-    ScannedRNN: nn.Module,
+    scanned_rnn: nn.Module,
     centralised_critic: bool = False,
     eval_multiplier: int = 1,
 ) -> callable:
@@ -238,13 +238,13 @@ def get_rnn_evaluator_fn(
         step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
 
         # Initialise hidden state.
-        init_hstate = ScannedRNN.initialize_carry(eval_batch, 128)
+        init_hstate = scanned_rnn.initialize_carry(eval_batch, 128)
         init_hstate = jnp.expand_dims(init_hstate, axis=1)
         init_hstate = jnp.expand_dims(init_hstate, axis=2)
         init_hstate = jnp.tile(init_hstate, (1, config["num_agents"], 1))
 
         if centralised_critic:
-            init_critic_hstate = ScannedRNN.initialize_carry(eval_batch, 128)
+            init_critic_hstate = scanned_rnn.initialize_carry(eval_batch, 128)
             init_critic_hstate = jnp.expand_dims(init_critic_hstate, axis=1)
             init_hstate = (init_hstate, init_critic_hstate)
 
@@ -259,9 +259,9 @@ def get_rnn_evaluator_fn(
 
         eval_state = RNNEvalState(step_rngs, env_states, timesteps, dones, init_hstate)
 
-        eval_metrics = jax.vmap(
-            eval_one_episode, in_axes=(None, 0), axis_name="eval_batch"
-        )(trained_params, eval_state)
+        eval_metrics = jax.vmap(eval_one_episode, in_axes=(None, 0), axis_name="eval_batch")(
+            trained_params, eval_state
+        )
 
         return ExperimentOutput(
             episodes_info=eval_metrics,
@@ -278,7 +278,7 @@ def evaluator_setup(
     config: Dict,
     centralised_critic: bool = False,
     rnn_net: bool = False,
-    ScannedRNN: nn.Module = None,
+    scanned_rnn: nn.Module = None,
 ) -> Tuple[callable, callable, Tuple]:
     """Initialise evaluator_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
@@ -304,14 +304,14 @@ def evaluator_setup(
             eval_env,
             vmapped_eval_network_apply_fn,
             config,
-            ScannedRNN,
+            scanned_rnn,
             centralised_critic,
         )
         absolute_metric_evaluator = get_rnn_evaluator_fn(
             eval_env,
             vmapped_eval_network_apply_fn,
             config,
-            ScannedRNN,
+            scanned_rnn,
             centralised_critic,
             10,
         )

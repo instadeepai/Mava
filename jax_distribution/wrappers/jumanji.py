@@ -75,12 +75,8 @@ class LogWrapper(Wrapper):
 
         new_episode_return = state.episode_returns + jnp.mean(timestep.reward)
         new_episode_length = state.episode_lengths + 1
-        episode_return_info = (
-            state.episode_return_info * not_done + new_episode_return * done
-        )
-        episode_length_info = (
-            state.episode_length_info * not_done + new_episode_length * done
-        )
+        episode_return_info = state.episode_return_info * not_done + new_episode_return * done
+        episode_length_info = state.episode_length_info * not_done + new_episode_length * done
 
         state = LogEnvState(
             env_state=env_state,
@@ -101,9 +97,7 @@ class RwareMultiAgentWrapper(Wrapper):
         timestep.observation = Observation(
             agents_view=timestep.observation.agents_view,
             action_mask=timestep.observation.action_mask,
-            step_count=jnp.repeat(
-                timestep.observation.step_count, self._env.num_agents
-            ),
+            step_count=jnp.repeat(timestep.observation.step_count, self._env.num_agents),
         )
         return state, timestep
 
@@ -113,9 +107,7 @@ class RwareMultiAgentWrapper(Wrapper):
         timestep.observation = Observation(
             agents_view=timestep.observation.agents_view,
             action_mask=timestep.observation.action_mask,
-            step_count=jnp.repeat(
-                timestep.observation.step_count, self._env.num_agents
-            ),
+            step_count=jnp.repeat(timestep.observation.step_count, self._env.num_agents),
         )
         return state, timestep
 
@@ -147,9 +139,7 @@ class RwareMultiAgentWithGlobalStateWrapper(Wrapper):
             agents_view=timestep.observation.agents_view,
             action_mask=timestep.observation.action_mask,
             global_state=global_state,
-            step_count=jnp.repeat(
-                timestep.observation.step_count, self._env.num_agents
-            ),
+            step_count=jnp.repeat(timestep.observation.step_count, self._env.num_agents),
         )
         return state, timestep
 
@@ -161,9 +151,7 @@ class RwareMultiAgentWithGlobalStateWrapper(Wrapper):
             agents_view=timestep.observation.agents_view,
             action_mask=timestep.observation.action_mask,
             global_state=global_state,
-            step_count=jnp.repeat(
-                timestep.observation.step_count, self._env.num_agents
-            ),
+            step_count=jnp.repeat(timestep.observation.step_count, self._env.num_agents),
         )
         return state, timestep
 

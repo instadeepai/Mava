@@ -28,7 +28,7 @@ from sacred.run import Run
 from jax_distribution.utils.logger_tools import Logger
 
 
-def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:
+def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:  # noqa: CCR001
     """Get the logger function."""
 
     def log(
@@ -118,15 +118,11 @@ def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:
 def logger_setup(_run: Run, config: Dict, _log: SacredLogger):
     """Setup the logger."""
     logger = Logger(_log)
-    unique_token = (
-        f"{config['env_name']}_seed{config['seed']}_{datetime.datetime.now()}"
-    )
+    unique_token = f"{config['env_name']}_seed{config['seed']}_{datetime.datetime.now()}"
     if config["use_sacred"]:
         logger.setup_sacred(_run)
     if config["use_tf"]:
-        tb_logs_direc = os.path.join(
-            dirname(dirname(abspath(__file__))), "results", "tb_logs"
-        )
+        tb_logs_direc = os.path.join(dirname(dirname(abspath(__file__))), "results", "tb_logs")
         tb_exp_direc = os.path.join(tb_logs_direc, "{}").format(unique_token)
         logger.setup_tb(tb_exp_direc)
     return get_logger_fn(logger, config)
