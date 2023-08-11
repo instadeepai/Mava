@@ -149,14 +149,14 @@ def evaluator_setup(
     network: Any,
     params: FrozenDict,
     config: Dict,
-    centralised: bool = False,
+    centralised_critic: bool = False,
 ) -> Tuple[callable, callable, Tuple]:
     """Initialise evaluator_fn, network, environment and states."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
 
     # Vmap it over number of agents based on the type of network.
-    if centralised:
+    if centralised_critic:
         vmapped_eval_network_apply_fn = jax.vmap(
             network.apply,
             in_axes=(None, ObservationGlobalState(0, 0, None, 0)),

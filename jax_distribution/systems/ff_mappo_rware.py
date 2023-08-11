@@ -235,6 +235,7 @@ def get_learner_fn(
 
                 # Compute the parallel mean (pmean) over the batch.
                 # This calculation is inspired by the Anakin architecture demo notebook.
+                # available at https://tinyurl.com/26tdzs5x
                 # This pmean could be a regular mean as the batch axis is on the same device.
                 grads, loss_info = jax.lax.pmean((grads, loss_info), axis_name="batch")
                 # pmean over devices.
@@ -416,7 +417,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         network=network,
         params=learner_state.params,
         config=config,
-        centralised=True,
+        centralised_critic=True,
     )
 
     # Calculate total timesteps.
