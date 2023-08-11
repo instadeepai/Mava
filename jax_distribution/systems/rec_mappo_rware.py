@@ -59,9 +59,7 @@ class ScannedRNN(nn.Module):
         split_rngs={"params": False},
     )
     @nn.compact
-    def __call__(
-        self, carry: chex.Array, x: chex.Array
-    ) -> Tuple[chex.Array, chex.Array]:
+    def __call__(self, carry: chex.Array, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
         """Applies the module."""
         rnn_state = carry
         ins, resets = x
@@ -77,9 +75,7 @@ class ScannedRNN(nn.Module):
     def initialize_carry(batch_size: int, hidden_size: int) -> chex.Array:
         """Initializes the carry state."""
         # Use a dummy key since the default state init fn is just zeros.
-        return nn.GRUCell.initialize_carry(
-            jax.random.PRNGKey(0), (batch_size,), hidden_size
-        )
+        return nn.GRUCell.initialize_carry(jax.random.PRNGKey(0), (batch_size,), hidden_size)
 
 
 class ActorCritic(nn.Module):
@@ -103,13 +99,11 @@ class ActorCritic(nn.Module):
         policy_embedding = nn.relu(policy_embedding)
 
         policy_rnn_in = (policy_embedding, done)
-        policy_hidden_state, policy_embedding = ScannedRNN()(
-            policy_hidden_state, policy_rnn_in
-        )
+        policy_hidden_state, policy_embedding = ScannedRNN()(policy_hidden_state, policy_rnn_in)
 
-        actor_output = nn.Dense(
-            128, kernel_init=orthogonal(2), bias_init=constant(0.0)
-        )(policy_embedding)
+        actor_output = nn.Dense(128, kernel_init=orthogonal(2), bias_init=constant(0.0))(
+            policy_embedding
+        )
         actor_output = nn.relu(actor_output)
         actor_output = nn.Dense(
             self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
@@ -129,17 +123,11 @@ class ActorCritic(nn.Module):
         critic_embedding = nn.relu(critic_embedding)
 
         critic_rnn_in = (critic_embedding, done)
-        critic_hidden_state, critic_embedding = ScannedRNN()(
-            critic_hidden_state, critic_rnn_in
-        )
+        critic_hidden_state, critic_embedding = ScannedRNN()(critic_hidden_state, critic_rnn_in)
 
-        critic = nn.Dense(128, kernel_init=orthogonal(2), bias_init=constant(0.0))(
-            critic_embedding
-        )
+        critic = nn.Dense(128, kernel_init=orthogonal(2), bias_init=constant(0.0))(critic_embedding)
         critic = nn.relu(critic)
-        critic = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
-            critic
-        )
+        critic = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(critic)
 
         hiddens = (policy_hidden_state, critic_hidden_state)
 
@@ -151,9 +139,7 @@ def get_learner_fn(
 ) -> Callable:
     """Get the learner function."""
 
-    def _update_step(
-        learner_state: RNNLearnerState, _: Any
-    ) -> Tuple[RNNLearnerState, Tuple]:
+    def _update_step(learner_state: RNNLearnerState, _: Any) -> Tuple[RNNLearnerState, Tuple]:
         """A single update of the network.
 
         This function steps the environment and records the trajectory batch for
@@ -216,9 +202,7 @@ def get_learner_fn(
 
             # log episode return and length
             done, reward = jax.tree_util.tree_map(
-                lambda x: jnp.repeat(x, config["num_agents"]).reshape(
-                    config["num_envs"], -1
-                ),
+                lambda x: jnp.repeat(x, config["num_agents"]).reshape(config["num_envs"], -1),
                 (timestep.last(), timestep.reward),
             )
             info = {
@@ -261,10 +245,6 @@ def get_learner_fn(
             batched_last_observation,
             last_done[:, 0][np.newaxis, :],
         )
-        critic_in = (
-            batched_last_observation.global_state,
-            last_done[:, 0][np.newaxis, :],
-        )
 
         # Run the network.
         _, _, last_val = apply_fn(params, hstates, ac_in)
@@ -277,9 +257,7 @@ def get_learner_fn(
         ) -> Tuple[chex.Array, chex.Array]:
             """Calculate the GAE."""
 
-            def _get_advantages(
-                gae_and_next_value: Tuple, transition: PPOTransition
-            ) -> Tuple:
+            def _get_advantages(gae_and_next_value: Tuple, transition: PPOTransition) -> Tuple:
                 """Calculate the GAE for a single transition."""
                 gae, next_value = gae_and_next_value
                 done, value, reward = (
@@ -336,14 +314,12 @@ def get_learner_fn(
                     log_prob = actor_policy.log_prob(traj_batch.action)
 
                     # CALCULATE VALUE LOSS
-                    value_pred_clipped = traj_batch.value + (
-                        value - traj_batch.value
-                    ).clip(-config["clip_eps"], config["clip_eps"])
+                    value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
+                        -config["clip_eps"], config["clip_eps"]
+                    )
                     value_losses = jnp.square(value - targets)
                     value_losses_clipped = jnp.square(value_pred_clipped - targets)
-                    value_loss = (
-                        0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
-                    )
+                    value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
 
                     # CALCULATE ACTOR LOSS
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
@@ -362,16 +338,12 @@ def get_learner_fn(
                     entropy = actor_policy.entropy().mean()
 
                     total_loss = (
-                        loss_actor
-                        + config["vf_coef"] * value_loss
-                        - config["ent_coef"] * entropy
+                        loss_actor + config["vf_coef"] * value_loss - config["ent_coef"] * entropy
                     )
                     return total_loss, (value_loss, loss_actor, entropy)
 
                 grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
-                loss_info, grads = grad_fn(
-                    params, opt_state, traj_batch, advantages, targets
-                )
+                loss_info, grads = grad_fn(params, opt_state, traj_batch, advantages, targets)
 
                 # Compute the parallel mean (pmean) over the batch.
                 # This calculation is inspired by the Anakin architecture demo.
@@ -484,9 +456,7 @@ def get_learner_fn(
                 - hstates (chex.Array): The initial hidden state of the policy and critic RNN.
         """
 
-        batched_update_step = jax.vmap(
-            _update_step, in_axes=(0, None), axis_name="batch"
-        )
+        batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
 
         learner_state, (metric, loss_info) = jax.lax.scan(
             batched_update_step, learner_state, None, config["num_updates_per_eval"]
@@ -543,7 +513,7 @@ def learner_setup(
     )
 
     init_single = (init_obs_single, init_done)
-    init_team = (init_obs.global_state, init_done)
+
     # Initialise hidden state.
     init_policy_hstate = ScannedRNN.initialize_carry((config["num_envs"]), 128)
     init_critic_hstate = ScannedRNN.initialize_carry((config["num_envs"]), 128)
@@ -566,9 +536,7 @@ def learner_setup(
     learn = jax.pmap(learn, axis_name="device")
 
     # Broadcast params and optimiser state to cores and batch.
-    broadcast = lambda x: jnp.broadcast_to(
-        x, (n_devices, config["update_batch_size"]) + x.shape
-    )
+    broadcast = lambda x: jnp.broadcast_to(x, (n_devices, config["update_batch_size"]) + x.shape)
     params = jax.tree_map(broadcast, params)
     opt_state = jax.tree_map(broadcast, opt_state)
 
@@ -589,9 +557,7 @@ def learner_setup(
     # Split rngs for each core.
     rng, *step_rngs = jax.random.split(rng, n_devices * config["update_batch_size"] + 1)
     # Add dimension to pmap over.
-    reshape_step_rngs = lambda x: x.reshape(
-        (n_devices, config["update_batch_size"]) + x.shape[1:]
-    )
+    reshape_step_rngs = lambda x: x.reshape((n_devices, config["update_batch_size"]) + x.shape[1:])
     step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
     reshape_states = lambda x: x.reshape(
         (n_devices, config["update_batch_size"], config["num_envs"]) + x.shape[1:]
@@ -728,9 +694,7 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     ex.main(run_experiment)
     ex.run(config_updates={})
 
-    print(
-        f"{Fore.CYAN}{Style.BRIGHT} Recurrent MAPPO experiment completed{Style.RESET_ALL}"
-    )
+    print(f"{Fore.CYAN}{Style.BRIGHT} Recurrent MAPPO experiment completed{Style.RESET_ALL}")
 
 
 if __name__ == "__main__":
