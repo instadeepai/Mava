@@ -19,24 +19,24 @@ from logging import Logger as SacredLogger
 from os.path import abspath, dirname
 from typing import Callable, Dict
 
-import chex
 import jax.numpy as jnp
 import numpy as np
 from colorama import Fore, Style
 from sacred.run import Run
 
+from jax_distribution.types import ExperimentOutput
 from jax_distribution.utils.logger_tools import Logger
 
 
-def get_logger_fn(logger: SacredLogger, config: Dict) -> Callable:  # noqa: CCR001
+def get_logger_fn(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
     """Get the logger function."""
 
     def log(
-        metrics: Dict[str, Dict[str, chex.Array]],
+        metrics: ExperimentOutput,
         t_env: int = 0,
         trainer_metric: bool = False,
         absolute_metric: bool = False,
-    ) -> None:
+    ) -> float:
         """Log the episode returns and lengths.
 
         Args:

@@ -64,7 +64,7 @@ class ScannedRNN(nn.Module):
         rnn_state = carry
         ins, resets = x
         rnn_state = jnp.where(
-            resets[:, np.newaxis],
+            resets[:, jnp.newaxis],
             self.initialize_carry(ins.shape[0], ins.shape[1]),
             rnn_state,
         )
@@ -177,11 +177,11 @@ def get_learner_fn(
 
             # Add a batch dimension to the observation.
             batched_observation = jax.tree_util.tree_map(
-                lambda x: x[np.newaxis, :], last_timestep.observation
+                lambda x: x[jnp.newaxis, :], last_timestep.observation
             )
             ac_in = (
                 batched_observation,
-                last_done[:, 0][np.newaxis, :],
+                last_done[:, 0][jnp.newaxis, :],
             )
 
             # Run the network.
@@ -239,11 +239,11 @@ def get_learner_fn(
 
         # Add a batch dimension to the observation.
         batched_last_observation = jax.tree_util.tree_map(
-            lambda x: x[np.newaxis, :], last_timestep.observation
+            lambda x: x[jnp.newaxis, :], last_timestep.observation
         )
         ac_in = (
             batched_last_observation,
-            last_done[:, 0][np.newaxis, :],
+            last_done[:, 0][jnp.newaxis, :],
         )
 
         # Run the network.
@@ -346,7 +346,8 @@ def get_learner_fn(
                 loss_info, grads = grad_fn(params, opt_state, traj_batch, advantages, targets)
 
                 # Compute the parallel mean (pmean) over the batch.
-                # This calculation is inspired by the Anakin architecture demo.
+                # This calculation is inspired by the Anakin architecture demo notebook.
+                # available at https://tinyurl.com/26tdzs5x
                 # This pmean could be a regular mean as the batch axis is on all devices.
                 grads, loss_info = jax.lax.pmean((grads, loss_info), axis_name="batch")
                 # pmean over devices.
@@ -381,17 +382,14 @@ def get_learner_fn(
             shuffled_batch = jax.tree_util.tree_map(
                 lambda x: jnp.take(x, permutation, axis=1), batch
             )
-            minibatches = jax.tree_util.tree_map(
-                lambda x: jnp.swapaxes(
-                    jnp.reshape(
-                        x,
-                        [x.shape[0], config["num_minibatches"], -1] + list(x.shape[2:]),
-                    ),
-                    1,
-                    0,
+            reshaped_batch = jax.tree_util.tree_map(
+                lambda x: jnp.reshape(
+                    x,
+                    [x.shape[0], config["num_minibatches"], -1] + list(x.shape[2:]),
                 ),
                 shuffled_batch,
             )
+            minibatches = jax.tree_util.tree_map(lambda x: jnp.swapaxes(x, 1, 0), reshaped_batch)
 
             # UPDATE MINIBATCHES
             (params, opt_state), loss_info = jax.lax.scan(
@@ -612,7 +610,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         config=config,
         centralised_critic=True,
         rnn_net=True,
-        ScannedRNN=ScannedRNN,
+        scanned_rnn=ScannedRNN,
     )
 
     # Calculate total timesteps.
@@ -638,6 +636,13 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
             learner_output = learn(learner_state)
             jax.block_until_ready(learner_output)
 
+        # Log the results of the training.
+        log(
+            metrics=learner_output,
+            t_env=timesteps_per_training * (i + 1),
+            trainer_metric=True,
+        )
+
         # Prepare for evaluation.
         trained_params = jax.tree_util.tree_map(
             lambda x: x[:, 0, ...], learner_output.learner_state.params
@@ -650,12 +655,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         evaluator_output = evaluator(trained_params, eval_rngs)
         jax.block_until_ready(evaluator_output)
 
-        # Log the results
-        log(
-            metrics=learner_output,
-            t_env=timesteps_per_training * (i + 1),
-            trainer_metric=True,
-        )
+        # Log the results of the evaluation.
         episode_return = log(
             metrics=evaluator_output,
             t_env=timesteps_per_training * (i + 1),

@@ -18,7 +18,6 @@ import chex
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
-import numpy as np
 from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
 
@@ -155,16 +154,16 @@ def get_rnn_evaluator_fn(
 
             # Add a batch dimension and env dimension to the observation.
             batched_observation = jax.tree_util.tree_map(
-                lambda x: x[np.newaxis, np.newaxis, :], last_timestep.observation
+                lambda x: x[jnp.newaxis, jnp.newaxis, :], last_timestep.observation
             )
 
             if centralised_critic:
                 ac_in = (
                     batched_observation,
-                    last_done[np.newaxis, np.newaxis, :][..., 0],
+                    last_done[jnp.newaxis, jnp.newaxis, :][..., 0],
                 )
             else:
-                ac_in = (batched_observation, last_done[np.newaxis, np.newaxis, :])
+                ac_in = (batched_observation, last_done[jnp.newaxis, jnp.newaxis, :])
 
             # Run the network.
             hstate, pi, _ = apply_fn(params, hstate, ac_in)
@@ -316,10 +315,16 @@ def evaluator_setup(
             10,
         )
     else:
-        vmapped_eval_network_apply_fn = jax.vmap(
-            network.apply,
-            in_axes=(None, 0),
-        )
+        if centralised_critic:
+            vmapped_eval_network_apply_fn = jax.vmap(
+                network.apply,
+                in_axes=(None, ObservationGlobalState(0, 0, None, 0)),
+            )
+        else:
+            vmapped_eval_network_apply_fn = jax.vmap(
+                network.apply,
+                in_axes=(None, 0),
+            )
         evaluator = get_ff_evaluator_fn(
             eval_env,
             vmapped_eval_network_apply_fn,
