@@ -31,24 +31,27 @@
 
 ## Welcome to Mava! 🦁
 
-[**Installation**](#installation-)
-| [**Quickstart**](#quickstart-)
+<div align="center">
 
-Mava is first and foremost a tool for quickly iterating on multi-agent reinforcement learning (MARL) ideas. Mava provides useful implementations of MARL algorithms that in JAX allowing for easy parallelisation across devices with JAX's `pmap`. Originating in the Research Team at [InstaDeep](https://www.instadeep.com/), Mava is now developed jointly with the open-source community. “Mava” means experience, or wisdom, in Xhosa - one of South Africa’s eleven official languages.
+[**Installation**](#installation-) | [**Quickstart**](#quickstart-)
+
+</div>
+
+Mava is first and foremost a tool for quickly iterating on multi-agent reinforcement learning (MARL) ideas. Mava provides useful implementations of MARL algorithms in JAX allowing for easy parallelisation across devices with JAX's `pmap`. Originating in the Research Team at [InstaDeep](https://www.instadeep.com/), Mava is now developed jointly with the open-source community. “Mava” means experience, or wisdom, in Xhosa - one of South Africa’s eleven official languages.
 
 To join us in these efforts, please feel free to reach out, raise issues or read our [contribution guidelines](#contributing-) (or just star 🌟 to stay up to date with the latest developments)!
 
 <hr>
 
-👋 **UPDATE - 11/8/2023**: This is out first release of an end-to-end JAX version on Mava. Henceforth we will only be supporting JAX-based environments and systems with native support for the [Jumanji][jumanji] environment API. The reason for this change is to have a lightweight and easy-to-use end-to-end JAX based research tool. We are currently following a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl] where we allow for code duplication to enable readability. All algorithmic logic can be found in the file implementing a particular algorithm. If you would still like to use our deprecated TF2-based systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
+👋 **UPDATE - 11/8/2023**: This is out first release of an end-to-end JAX version of Mava. Henceforth we will only be supporting JAX-based environments and systems with native support for the [Jumanji][jumanji] environment API. The reason for this change is to have a lightweight and easy-to-use end-to-end JAX based research tool. We are currently following a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl] where we allow for code duplication to enable readability. All algorithmic logic can be found in the file implementing a particular algorithm. If you would still like to use our deprecated TF2-based framework and systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
 
 <hr>
 
 ### Overview 🦜
 
-- 🥑 **Implementations of MARL algorithms**: Implementations of multi-agent PPO systems that follow both the Centralised Training with Decentralised Execution (CTDE) and Decentralised Training with Decentralised Execution (DTDE) MARL paradigms. There are
+- 🥑 **Implementations of MARL algorithms**: Implementations of multi-agent PPO systems that follow both the Centralised Training with Decentralised Execution (CTDE) and Decentralised Training with Decentralised Execution (DTDE) MARL paradigms.
 - 🍬 **Environment Wrappers**: Example wrapper for mapping a Jumanji environment to an environment usable by Mava. At the moment we only support [Robotic Warehouse][jumanji_rware] but plan to support more environments soon.
-- 🎓 **Educational Material**:[user guides][quickstart] to facilitate Mava's adoption and highlight the added value of JAX-based MARL.
+- 🎓 **Educational Material**: [Quickstart notebook][quickstart] to facilitate Mava's adoption and highlight the added value of JAX-based MARL.
 
 ## Installation 🎬
 
@@ -58,6 +61,7 @@ You can use Mava by cloning the repo and pip installing as follows:
 
 ```bash
 git clone https://github.com/instadeepai/mava.git
+cd mava
 pip install -e .
 ```
 
@@ -66,30 +70,30 @@ we advise users to explicitly install the correct JAX version (see the [official
 
 ## Quickstart ⚡
 
-We have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-Agent System. For more on Mava's implementation details, please visit our [documentation].
+We have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-Agent System.
 
 ## Contributing 🤝
 
 Please read our [contributing docs](./CONTRIBUTING.md) for details on how to submit pull requests, our Contributor License Agreement and community guidelines.
 
-## Performance and Speed
+## Performance and Speed 🚀
 It should be noted that in all cases here Mava is trained using a single 6GB Nivida 3060 laptop GPU.
 
-In order to show the utility of end-to-end JAX-based MARL systems and JAX-based environments we compare the speed and performance of Mava against EPyMARL on a simple Robotic Warehouse task with 4 agents.
+In order to show the utility of end-to-end JAX-based MARL systems and JAX-based environments we compare the speed and performance of Mava against [EPyMARL][epymarl] on a simple Robotic Warehouse task with 4 agents.
 
 Furthermore, we illustrate the speed of JAX-based MARL by illustrating the system steps per second as the number of parallel environments are increased
 
 Here, also note the system performance on a larger set of Robotic Warehouse environments:
 
-## Roadmap
+## Roadmap 🛤️
 We plan to iteratively expand Mava in the following increments:
-1. Support for more multi-agent Jumanji environments
-2. Benchmarks on a more environments
-3. Support for off-policy algorithms
+- 🌴 Support for more multi-agent Jumanji environments.
+- 📊 Benchmarks on a more environments.
+- 🦾 Support for off-policy algorithms.
 
 Please do follow along as we develop this next phase!
 
-## Citing Mava
+## Citing Mava 📚
 
 If you use Mava in your work, please cite the accompanying
 [technical report][Paper] (to be updated soon to reflect our transition to JAX):
@@ -112,8 +116,8 @@ If you use Mava in your work, please cite the accompanying
 The current version of Mava has been based on code from the following projects:
 
 - 🤖 [PureJaxRL][purejaxrl] provides simple code implementations for end-to-end RL training in JAX.
+- 🌀 [DeepMind Anakin][anakin_notebook] provides a notebook that illustrates using the Anakin podracer architecture for training RL systems in JAX at scale.
 - 🌳 [EPyMARL][epymarl] provides a framework for training MARL systems using a PyTorch backend.
-- 🦾 [DeepMind Anakin][anakin_notebook] provides a notebook that illustrates using the Anakin podracer architecture for training RL systems in JAX at scale.
 
 [Examples]: examples
 [Paper]: https://arxiv.org/pdf/2107.01460.pdf
