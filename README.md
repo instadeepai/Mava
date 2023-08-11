@@ -1,6 +1,6 @@
 <p align="center">
-    <a href="docs/images/new_logo_name.png">
-        <img src="docs/images/new_logo_name.png" alt="Mava logo" width="50%"/>
+    <a href="docs/images/mava_full_logo.png">
+        <img src="docs/images/mava_full_logo.png" alt="Mava logo" width="50%"/>
     </a>
 </p>
 
