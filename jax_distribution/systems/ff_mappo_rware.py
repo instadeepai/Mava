@@ -47,8 +47,8 @@ from jax_distribution.utils.logger_tools import config_copy, get_logger
 from jax_distribution.utils.timing_utils import TimeIt
 from jax_distribution.wrappers.jumanji import (
     LogWrapper,
+    ObservationGlobalState,
     RwareMultiAgentWithGlobalStateWrapper,
-    RwareMultiAgentWrapper,
 )
 
 
@@ -254,8 +254,8 @@ def get_learner_fn(
                 )
 
                 # Compute the parallel mean (pmean) over the batch.
-                # This calculation is inspired by the Anakin architecture demo.
-                # This pmean could be a regular mean as the batch axis is on all devices.
+                # This calculation is inspired by the Anakin architecture demo notebook.
+                # This pmean could be a regular mean as the batch axis is on the same device.
                 grads, loss_info = jax.lax.pmean((grads, loss_info), axis_name="batch")
                 # pmean over devices.
                 grads, loss_info = jax.lax.pmean((grads, loss_info), axis_name="device")
@@ -360,9 +360,14 @@ def learner_setup(
     )
 
     # Initialise observation.
-    init_x = env.observation_spec().generate_value()
+    obs = env.observation_spec().generate_value()
     # Select only obs for a single agent.
-    init_x = jax.tree_util.tree_map(lambda x: x[0], init_x)
+    init_x = ObservationGlobalState(
+        agents_view=obs.agents_view[0],
+        action_mask=obs.action_mask[0],
+        global_state=obs.global_state,
+        step_count=obs.step_count[0],
+    )
     init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
 
     # initialise params and optimiser state.
@@ -371,7 +376,9 @@ def learner_setup(
 
     # Vmap network apply function over number of agents.
     vmapped_network_apply_fn = jax.vmap(
-        network.apply, in_axes=(None, 1), out_axes=(1, 1)
+        network.apply,
+        in_axes=(None, ObservationGlobalState(1, 1, None, 1)),
+        out_axes=(1, 1),
     )
 
     # Get batched iterated update and replicate it to pmap it over cores.
@@ -434,7 +441,12 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
 
     # Setup evaluator.
     evaluator, absolute_metric_evaluator, (trained_params, eval_rngs) = evaluator_setup(
-        eval_env, rng_e, network, learner_state.params, config
+        eval_env=eval_env,
+        rng_e=rng_e,
+        network=network,
+        params=learner_state.params,
+        config=config,
+        centralised=True,
     )
 
     # Calculate total timesteps.
@@ -460,6 +472,13 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
             learner_output = learn(learner_state)
             jax.block_until_ready(learner_output)
 
+        # Log the results of the training.
+        log(
+            metrics=learner_output,
+            t_env=timesteps_per_training * (i + 1),
+            trainer_metric=True,
+        )
+
         # Prepare for evaluation.
         trained_params = jax.tree_util.tree_map(
             lambda x: x[:, 0, ...], learner_output.learner_state.params
@@ -472,12 +491,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         evaluator_output = evaluator(trained_params, eval_rngs)
         jax.block_until_ready(evaluator_output)
 
-        # Log the results
-        log(
-            metrics=learner_output,
-            t_env=timesteps_per_training * (i + 1),
-            trainer_metric=True,
-        )
+        # Log the results of the evaluation.
         episode_return = log(
             metrics=evaluator_output,
             t_env=timesteps_per_training * (i + 1),

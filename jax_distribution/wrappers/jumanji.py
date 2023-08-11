@@ -38,8 +38,8 @@ class ObservationGlobalState(NamedTuple):
 
     agents_view: chex.Array  # (num_agents, num_obs_features)
     action_mask: chex.Array  # (num_agents, 5)
-    global_state: chex.Array  # (num_agents * num_obs_features,)
-    step_count: chex.Array  # ()
+    global_state: chex.Array  # (num_agents * num_obs_features, )
+    step_count: chex.Array  # (num_agents, )
 
 
 @struct.dataclass
@@ -133,15 +133,17 @@ class RwareMultiAgentWrapper(Wrapper):
 
 
 class RwareMultiAgentWithGlobalStateWrapper(Wrapper):
-    """Multi-agent wrapper for the Robotic Warehouse environment."""
+    """Multi-agent wrapper for the Robotic Warehouse environment.
+
+    The wrapper includes a global environment state to be used by the centralised critic.
+    Note here that since robotic warehouse does not have a global state, we create one by concatenating
+    the observations of all agents.
+    """
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment. Updates the step count."""
         state, timestep = self._env.reset(key)
-        global_state = jnp.repeat(
-            jnp.concatenate(timestep.observation.agents_view, axis=0),
-            self._env.num_agents,
-        ).reshape(self._env.num_agents, -1)
+        global_state = jnp.concatenate(timestep.observation.agents_view, axis=0)
         timestep.observation = ObservationGlobalState(
             agents_view=timestep.observation.agents_view,
             action_mask=timestep.observation.action_mask,
@@ -155,10 +157,7 @@ class RwareMultiAgentWithGlobalStateWrapper(Wrapper):
     def step(self, state: State, action: jnp.ndarray) -> Tuple[State, TimeStep]:
         """Step the environment. Updates the step count."""
         state, timestep = self._env.step(state, action)
-        global_state = jnp.repeat(
-            jnp.concatenate(timestep.observation.agents_view, axis=0),
-            self._env.num_agents,
-        ).reshape(self._env.num_agents, -1)
+        global_state = jnp.concatenate(timestep.observation.agents_view, axis=0)
         timestep.observation = ObservationGlobalState(
             agents_view=timestep.observation.agents_view,
             action_mask=timestep.observation.action_mask,
@@ -179,9 +178,7 @@ class RwareMultiAgentWithGlobalStateWrapper(Wrapper):
             (self._env.num_agents, 5), bool, False, True, "action_mask"
         )
         global_state = specs.Array(
-            (self._env.num_agents, self._env.num_agents * self.num_obs_features),
-            jnp.int32,
-            "global_state",
+            (self._env.num_agents * self.num_obs_features,), jnp.int32, "global_state"
         )
         step_count = specs.BoundedArray(
             (self._env.num_agents,),

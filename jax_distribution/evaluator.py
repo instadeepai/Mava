@@ -23,6 +23,7 @@ from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
 
 from jax_distribution.types import EvalState, ExperimentOutput
+from jax_distribution.wrappers.jumanji import ObservationGlobalState
 
 
 def get_evaluator_fn(
@@ -134,16 +135,23 @@ def evaluator_setup(
     network: Any,
     params: FrozenDict,
     config: Dict,
+    centralised: bool = False,
 ) -> Tuple[callable, callable, Tuple]:
     """Initialise evaluator_fn, network, environment and states."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
 
-    # Vmap it over number of agents and get evaluator_fn.
-    vmapped_eval_network_apply_fn = jax.vmap(
-        network.apply,
-        in_axes=(None, 0),
-    )
+    # Vmap it over number of agents based on the type of network.
+    if centralised:
+        vmapped_eval_network_apply_fn = jax.vmap(
+            network.apply,
+            in_axes=(None, ObservationGlobalState(0, 0, None, 0)),
+        )
+    else:
+        vmapped_eval_network_apply_fn = jax.vmap(
+            network.apply,
+            in_axes=(None, 0),
+        )
 
     evaluator = get_evaluator_fn(eval_env, vmapped_eval_network_apply_fn, config)
 
