@@ -211,7 +211,7 @@ def get_rnn_evaluator_fn(
             eval_state,
         )
 
-        _, _, _, _, _, step_count_, return_ = final_state
+        step_count_, return_ = final_state.step_count_, final_state.return_
         eval_metrics = {
             "episode_return": return_,
             "episode_length": step_count_,
