@@ -606,7 +606,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         params=learner_state.params,
         config=config,
         centralised_critic=True,
-        rnn_net=True,
+        use_recurrent_net=True,
         scanned_rnn=ScannedRNN,
     )
 
