@@ -400,13 +400,13 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     generator = RandomGenerator(**config["rware_scenario"])
     # Create envs
     env = jumanji.make(config["env_name"], generator=generator)
-    env = AgentIDWrapper(env)
     env = RwareMultiAgentWithGlobalStateWrapper(env)
+    env = AgentIDWrapper(env, True)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env_name"], generator=generator)
-    eval_env = AgentIDWrapper(eval_env)
     eval_env = RwareMultiAgentWithGlobalStateWrapper(eval_env)
+    eval_env = AgentIDWrapper(eval_env, True)
 
     # PRNG keys.
     rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["seed"]), num=3)

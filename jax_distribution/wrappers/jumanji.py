@@ -92,9 +92,10 @@ class LogWrapper(Wrapper):
 class AgentIDWrapper(Wrapper):
     """Add onehot agent IDs to observation."""
 
-    def __init__(self, env: Environment):
+    def __init__(self, env: Environment, has_global_state: bool = False):
         super().__init__(env)
         self.num_obs_features = self._env.num_obs_features + self._env.num_agents
+        self.has_global_state = has_global_state
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment."""
@@ -103,11 +104,20 @@ class AgentIDWrapper(Wrapper):
         agent_ids = jnp.eye(self._env.num_agents)
         new_agents_view = jnp.concatenate([agent_ids, timestep.observation.agents_view], axis=-1)
 
-        timestep.observation = Observation(
-            agents_view=new_agents_view,
-            action_mask=timestep.observation.action_mask,
-            step_count=timestep.observation.step_count,
-        )
+        if self.has_global_state:
+            timestep.observation = ObservationGlobalState(
+                agents_view=new_agents_view,
+                action_mask=timestep.observation.action_mask,
+                step_count=timestep.observation.step_count,
+                global_state=timestep.observation.global_state,
+            )
+
+        else:
+            timestep.observation = Observation(
+                agents_view=new_agents_view,
+                action_mask=timestep.observation.action_mask,
+                step_count=timestep.observation.step_count,
+            )
         return state, timestep
 
     def step(
@@ -120,11 +130,20 @@ class AgentIDWrapper(Wrapper):
         agent_ids = jnp.eye(self._env.num_agents)
         new_agents_view = jnp.concatenate([agent_ids, timestep.observation.agents_view], axis=-1)
 
-        timestep.observation = Observation(
-            agents_view=new_agents_view,
-            action_mask=timestep.observation.action_mask,
-            step_count=timestep.observation.step_count,
-        )
+        if self.has_global_state:
+            timestep.observation = ObservationGlobalState(
+                agents_view=new_agents_view,
+                action_mask=timestep.observation.action_mask,
+                step_count=timestep.observation.step_count,
+                global_state=timestep.observation.global_state,
+            )
+
+        else:
+            timestep.observation = Observation(
+                agents_view=new_agents_view,
+                action_mask=timestep.observation.action_mask,
+                step_count=timestep.observation.step_count,
+            )
         return state, timestep
 
     def observation_spec(self) -> specs.Spec[Observation]:
