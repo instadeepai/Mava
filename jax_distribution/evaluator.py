@@ -285,7 +285,7 @@ def evaluator_setup(
     use_recurrent_net: bool = False,
     scanned_rnn: nn.Module = None,
 ) -> Tuple[callable, callable, Tuple]:
-    """Initialise evaluator_fn, network, optimiser, environment and states."""
+    """Initialise evaluator_fn."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
 
