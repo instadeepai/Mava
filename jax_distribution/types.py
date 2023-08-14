@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, NamedTuple, Optional
+from typing import Dict, NamedTuple, Optional, Tuple, Union
 
 import chex
 from flax.core.frozen_dict import FrozenDict
@@ -45,12 +45,36 @@ class LearnerState(NamedTuple):
     timestep: TimeStep
 
 
+class RNNLearnerState(NamedTuple):
+    """State of the `Learner` for recurrent architectures."""
+
+    params: FrozenDict
+    opt_state: OptState
+    key: chex.PRNGKey
+    env_state: LogEnvState
+    timestep: TimeStep
+    dones: chex.Array
+    hstates: Union[chex.Array, Tuple[chex.Array, chex.Array]]
+
+
 class EvalState(NamedTuple):
     """State of the evaluator."""
 
     key: chex.PRNGKey
     env_state: State
     timestep: TimeStep
+    step_count_: chex.Numeric = None
+    return_: chex.Numeric = None
+
+
+class RNNEvalState(NamedTuple):
+    """State of the evaluator for recurrent architectures."""
+
+    key: chex.PRNGKey
+    env_state: State
+    timestep: TimeStep
+    dones: chex.Array
+    hstates: Union[chex.Array, Tuple[chex.Array, chex.Array]]
     step_count_: chex.Numeric = None
     return_: chex.Numeric = None
 
