@@ -200,7 +200,7 @@ def get_rnn_evaluator_fn(
             init_eval_state.env_state,
             init_eval_state.timestep,
             init_eval_state.dones,
-            init_eval_state.init_hstate,
+            init_eval_state.hstates,
             0,
             0.0,
         )

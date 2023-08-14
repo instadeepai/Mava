@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, NamedTuple, Optional
+from typing import Dict, NamedTuple, Optional, Tuple, Union
 
 import chex
 from flax.core.frozen_dict import FrozenDict
@@ -54,7 +54,7 @@ class RNNLearnerState(NamedTuple):
     env_state: LogEnvState
     timestep: TimeStep
     dones: chex.Array
-    hstate: chex.Array
+    hstates: Union[chex.Array, Tuple[chex.Array, chex.Array]]
 
 
 class EvalState(NamedTuple):
@@ -74,7 +74,7 @@ class RNNEvalState(NamedTuple):
     env_state: State
     timestep: TimeStep
     dones: chex.Array
-    init_hstate: chex.Array
+    hstates: Union[chex.Array, Tuple[chex.Array, chex.Array]]
     step_count_: chex.Numeric = None
     return_: chex.Numeric = None
 
