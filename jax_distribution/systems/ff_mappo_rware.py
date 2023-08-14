@@ -44,6 +44,7 @@ from jax_distribution.utils.jax import merge_leading_dims
 from jax_distribution.utils.logger_tools import config_copy, get_logger
 from jax_distribution.utils.timing_utils import TimeIt
 from jax_distribution.wrappers.jumanji import (
+    AgentIDWrapper,
     LogWrapper,
     ObservationGlobalState,
     RwareMultiAgentWithGlobalStateWrapper,
@@ -399,10 +400,12 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     generator = RandomGenerator(**config["rware_scenario"])
     # Create envs
     env = jumanji.make(config["env_name"], generator=generator)
+    env = AgentIDWrapper(env)
     env = RwareMultiAgentWithGlobalStateWrapper(env)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env_name"], generator=generator)
+    eval_env = AgentIDWrapper(eval_env)
     eval_env = RwareMultiAgentWithGlobalStateWrapper(eval_env)
 
     # PRNG keys.
