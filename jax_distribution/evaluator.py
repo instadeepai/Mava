@@ -12,18 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from typing import Any, Dict, Tuple
 
 import chex
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
-import numpy as np
 from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
 
 from jax_distribution.types import EvalState, ExperimentOutput, RNNEvalState
+from jax_distribution.wrappers.jumanji import ObservationGlobalState
 
 
 def get_ff_evaluator_fn(
@@ -88,7 +87,7 @@ def get_ff_evaluator_fn(
             eval_state,
         )
 
-        _, _, _, step_count_, return_ = final_state
+        step_count_, return_ = final_state.step_count_, final_state.return_
         eval_metrics = {
             "episode_return": return_,
             "episode_length": step_count_,
@@ -130,6 +129,7 @@ def get_rnn_evaluator_fn(
     apply_fn: callable,
     config: dict,
     scanned_rnn: nn.Module,
+    centralised_critic: bool = False,
     eval_multiplier: int = 1,
 ) -> callable:
     """Get the evaluator function for recurrent networks."""
@@ -154,9 +154,16 @@ def get_rnn_evaluator_fn(
 
             # Add a batch dimension and env dimension to the observation.
             batched_observation = jax.tree_util.tree_map(
-                lambda x: x[np.newaxis, np.newaxis, :], last_timestep.observation
+                lambda x: x[jnp.newaxis, jnp.newaxis, :], last_timestep.observation
             )
-            ac_in = (batched_observation, last_done[np.newaxis, np.newaxis, :])
+
+            if centralised_critic:
+                ac_in = (
+                    batched_observation,
+                    last_done[jnp.newaxis, jnp.newaxis, :][..., 0],
+                )
+            else:
+                ac_in = (batched_observation, last_done[jnp.newaxis, jnp.newaxis, :])
 
             # Run the network.
             hstate, pi, _ = apply_fn(params, hstate, ac_in)
@@ -235,6 +242,11 @@ def get_rnn_evaluator_fn(
         init_hstate = jnp.expand_dims(init_hstate, axis=2)
         init_hstate = jnp.tile(init_hstate, (1, config["num_agents"], 1))
 
+        if centralised_critic:
+            init_critic_hstate = scanned_rnn.initialize_carry(eval_batch, 128)
+            init_critic_hstate = jnp.expand_dims(init_critic_hstate, axis=1)
+            init_hstate = (init_hstate, init_critic_hstate)
+
         # Initialise dones.
         dones = jnp.zeros(
             (
@@ -269,36 +281,56 @@ def evaluator_setup(
     network: Any,
     params: FrozenDict,
     config: Dict,
+    centralised_critic: bool = False,
     use_recurrent_net: bool = False,
     scanned_rnn: nn.Module = None,
 ) -> Tuple[callable, callable, Tuple]:
-    """Initialise evaluator_fn, network, optimiser, environment and states."""
+    """Initialise evaluator_fn."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
 
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
-        vmapped_eval_network_apply_fn = jax.vmap(
-            network.apply, in_axes=(None, 1, 2), out_axes=(1, 2, 2)
-        )
+        if centralised_critic:
+            vmapped_eval_network_apply_fn = jax.vmap(
+                network.apply,
+                in_axes=(
+                    None,
+                    (1, None),
+                    (ObservationGlobalState(2, 2, None, 2), None),
+                ),
+                out_axes=((1, None), 2, 2),
+            )
+        else:
+            vmapped_eval_network_apply_fn = jax.vmap(
+                network.apply, in_axes=(None, 1, 2), out_axes=(1, 2, 2)
+            )
         evaluator = get_rnn_evaluator_fn(
             eval_env,
             vmapped_eval_network_apply_fn,
             config,
             scanned_rnn,
+            centralised_critic,
         )
         absolute_metric_evaluator = get_rnn_evaluator_fn(
             eval_env,
             vmapped_eval_network_apply_fn,
             config,
             scanned_rnn,
+            centralised_critic,
             10,
         )
     else:
-        vmapped_eval_network_apply_fn = jax.vmap(
-            network.apply,
-            in_axes=(None, 0),
-        )
+        if centralised_critic:
+            vmapped_eval_network_apply_fn = jax.vmap(
+                network.apply,
+                in_axes=(None, ObservationGlobalState(0, 0, None, 0)),
+            )
+        else:
+            vmapped_eval_network_apply_fn = jax.vmap(
+                network.apply,
+                in_axes=(None, 0),
+            )
         evaluator = get_ff_evaluator_fn(
             eval_env,
             vmapped_eval_network_apply_fn,

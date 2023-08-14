@@ -397,7 +397,11 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
 
     # Setup evaluator.
     evaluator, absolute_metric_evaluator, (trained_params, eval_rngs) = evaluator_setup(
-        eval_env, rng_e, network, learner_state.params, config
+        eval_env=eval_env,
+        rng_e=rng_e,
+        network=network,
+        params=learner_state.params,
+        config=config,
     )
 
     # Calculate total timesteps.

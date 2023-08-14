@@ -28,8 +28,6 @@ from jax_distribution.types import ExperimentOutput
 from jax_distribution.utils.logger_tools import Logger
 
 
-# todo: flake is complaining, possibly split into 3 functions
-#  log_absolute, log_trainer, log_evaluator
 def get_logger_fn(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
     """Get the logger function."""
 
