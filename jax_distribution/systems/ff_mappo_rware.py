@@ -41,7 +41,11 @@ from jax_distribution.evaluator import evaluator_setup
 from jax_distribution.logger import logger_setup
 from jax_distribution.types import ExperimentOutput, LearnerState, PPOTransition
 from jax_distribution.utils.jax import merge_leading_dims
-from jax_distribution.utils.logger_tools import config_copy, get_logger
+from jax_distribution.utils.logger_tools import (
+    config_copy,
+    get_experiment_path,
+    get_logger,
+)
 from jax_distribution.utils.timing_utils import TimeIt
 from jax_distribution.wrappers.jumanji import (
     AgentIDWrapper,
@@ -397,7 +401,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     config = config_copy(_config)
     log = logger_setup(_run, config, _log)
 
-    generator = RandomGenerator(**config["rware_scenario"])
+    generator = RandomGenerator(**config["rware_scenario"]["task_config"])
     # Create envs
     env = jumanji.make(config["env_name"], generator=generator)
     env = RwareMultiAgentWithGlobalStateWrapper(env)
@@ -500,7 +504,8 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     ex.captured_out_filter = utils.apply_backspaces_and_linefeeds
     results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
 
-    file_obs_path = os.path.join(results_path, f"sacred/{cfg['env_name']}")
+    exp_path = get_experiment_path(cfg, "ff_mappo")
+    file_obs_path = os.path.join(results_path, exp_path)
     ex.observers = [observers.FileStorageObserver.create(file_obs_path)]
     ex.add_config(OmegaConf.to_container(cfg, resolve=True))
     ex.main(run_experiment)
