@@ -584,7 +584,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     config = config_copy(_config)
     log = logger_setup(_run, config, _log)
 
-    generator = RandomGenerator(**config["rware_scenario"])
+    generator = RandomGenerator(**config["rware_scenario"]["task_config"])
     # Create envs
     env = jumanji.make(config["env_name"], generator=generator)
     env = RwareMultiAgentWithGlobalStateWrapper(env)
@@ -685,7 +685,12 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     ex.captured_out_filter = utils.apply_backspaces_and_linefeeds
     results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
 
-    file_obs_path = os.path.join(results_path, f"sacred/{cfg['env_name']}")
+    exp_path = (
+        f"{cfg['base_exp_path']}/rec_mappo/{cfg['env_name']}/"
+        + f"{cfg['rware_scenario']['task_name']}/envs_{cfg['num_envs']}/"
+        + f"seed_{cfg['seed']}"
+    )
+    file_obs_path = os.path.join(results_path, exp_path)
     ex.observers = [observers.FileStorageObserver.create(file_obs_path)]
     ex.add_config(OmegaConf.to_container(cfg, resolve=True))
     ex.main(run_experiment)

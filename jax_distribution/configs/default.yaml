@@ -38,3 +38,4 @@ absolute_metric: True # Whether the absolute metric should be computed. For more
 # --- Logging options ---
 use_tf: true
 use_sacred: true
+base_exp_path: sacred
