@@ -65,9 +65,9 @@ class LogWrapper(Wrapper):
 
     def step(
         self,
-        state: State,
-        action: jnp.ndarray,
-    ) -> Tuple[State, TimeStep]:
+        state: LogEnvState,
+        action: chex.Array,
+    ) -> Tuple[LogEnvState, TimeStep]:
         """Step the environment."""
         env_state, timestep = self._env.step(state.env_state, action)
 
@@ -104,6 +104,9 @@ class AgentIDWrapper(Wrapper):
         agent_ids = jnp.eye(self._env.num_agents)
         new_agents_view = jnp.concatenate([agent_ids, timestep.observation.agents_view], axis=-1)
 
+        # we really should rather do this:
+        # timestep.observation = timestep.observation._replace(agents_view=new_agents_view)
+        # just need to check that this doesn't affect timing
         if self.has_global_state:
             timestep.observation = ObservationGlobalState(
                 agents_view=new_agents_view,
@@ -123,7 +126,7 @@ class AgentIDWrapper(Wrapper):
     def step(
         self,
         state: State,
-        action: jnp.ndarray,
+        action: chex.Array,
     ) -> Tuple[State, TimeStep]:
         """Step the environment."""
         state, timestep = self._env.step(state, action)
@@ -168,7 +171,7 @@ class RwareMultiAgentWrapper(Wrapper):
         )
         return state, timestep
 
-    def step(self, state: State, action: jnp.ndarray) -> Tuple[State, TimeStep]:
+    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
         """Step the environment. Updates the step count."""
         state, timestep = self._env.step(state, action)
         timestep.observation = Observation(
@@ -210,7 +213,7 @@ class RwareMultiAgentWithGlobalStateWrapper(Wrapper):
         )
         return state, timestep
 
-    def step(self, state: State, action: jnp.ndarray) -> Tuple[State, TimeStep]:
+    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
         """Step the environment. Updates the step count."""
         state, timestep = self._env.step(state, action)
         global_state = jnp.concatenate(timestep.observation.agents_view, axis=0)
@@ -222,7 +225,7 @@ class RwareMultiAgentWithGlobalStateWrapper(Wrapper):
         )
         return state, timestep
 
-    def observation_spec(self) -> specs.Spec[Observation]:
+    def observation_spec(self) -> specs.Spec[ObservationGlobalState]:
         """Specification of the observation of the `RobotWarehouse` environment."""
 
         agents_view = specs.Array(
