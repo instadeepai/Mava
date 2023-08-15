@@ -44,7 +44,11 @@ from jax_distribution.types import ExperimentOutput, LearnerState, PPOTransition
 from jax_distribution.utils.jax import merge_leading_dims
 from jax_distribution.utils.logger_tools import config_copy, get_logger
 from jax_distribution.utils.timing_utils import TimeIt
-from jax_distribution.wrappers.jumanji import LogWrapper, RwareMultiAgentWrapper
+from jax_distribution.wrappers.jumanji import (
+    AgentIDWrapper,
+    LogWrapper,
+    RwareMultiAgentWrapper,
+)
 
 
 class ActorCritic(nn.Module):
@@ -385,10 +389,14 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     # Create envs
     env = jumanji.make(config["env_name"], generator=generator)
     env = RwareMultiAgentWrapper(env)
+    if config["add_agent_id"]:
+        env = AgentIDWrapper(env)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env_name"], generator=generator)
     eval_env = RwareMultiAgentWrapper(eval_env)
+    if config["add_agent_id"]:
+        eval_env = AgentIDWrapper(eval_env)
 
     # PRNG keys.
     rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["seed"]), num=3)
