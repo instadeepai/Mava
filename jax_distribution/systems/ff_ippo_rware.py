@@ -42,7 +42,11 @@ from jax_distribution.evaluator import evaluator_setup
 from jax_distribution.logger import logger_setup
 from jax_distribution.types import ExperimentOutput, LearnerState, PPOTransition
 from jax_distribution.utils.jax import merge_leading_dims
-from jax_distribution.utils.logger_tools import config_copy, get_logger
+from jax_distribution.utils.logger_tools import (
+    config_copy,
+    get_experiment_path,
+    get_logger,
+)
 from jax_distribution.utils.timing_utils import TimeIt
 from jax_distribution.wrappers.jumanji import LogWrapper, RwareMultiAgentWrapper
 
@@ -479,11 +483,7 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     ex.captured_out_filter = utils.apply_backspaces_and_linefeeds
     results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
 
-    exp_path = (
-        f"{cfg['base_exp_path']}/ff_ippo/{cfg['env_name']}/"
-        + f"{cfg['rware_scenario']['task_name']}/envs_{cfg['num_envs']}/"
-        + f"seed_{cfg['seed']}"
-    )
+    exp_path = get_experiment_path(cfg, "ff_ippo")
     file_obs_path = os.path.join(results_path, exp_path)
     ex.observers = [observers.FileStorageObserver.create(file_obs_path)]
     ex.add_config(OmegaConf.to_container(cfg, resolve=True))
