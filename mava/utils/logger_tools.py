@@ -15,7 +15,7 @@
 import logging
 from collections import defaultdict
 from copy import deepcopy
-from typing import Dict
+from typing import Dict, List, Tuple
 
 from colorama import Fore, Style
 from omegaconf import DictConfig
@@ -38,7 +38,7 @@ class Logger:
         self.use_sacred = False
 
         # defaultdict is used to overcome the problem of missing keys when logging to sacred.
-        self.stats: Dict = defaultdict(lambda: [])
+        self.stats: Dict[str, List[Tuple[int, float]]] = defaultdict(lambda: [])
 
     def setup_tb(self, directory_name: str) -> None:
         """Set up tensorboard logging."""
