@@ -20,7 +20,7 @@ from jumanji.environments.routing.robot_warehouse import State
 from jumanji.types import TimeStep
 from optax._src.base import OptState
 
-from jax_distribution.wrappers.jumanji import LogEnvState
+from mava.wrappers.jumanji import LogEnvState
 
 
 class PPOTransition(NamedTuple):

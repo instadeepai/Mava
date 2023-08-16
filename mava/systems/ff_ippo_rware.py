@@ -38,21 +38,13 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from sacred import Experiment, observers, run, utils
 
-from jax_distribution.evaluator import evaluator_setup
-from jax_distribution.logger import logger_setup
-from jax_distribution.types import ExperimentOutput, LearnerState, PPOTransition
-from jax_distribution.utils.jax import merge_leading_dims
-from jax_distribution.utils.logger_tools import (
-    config_copy,
-    get_experiment_path,
-    get_logger,
-)
-from jax_distribution.utils.timing_utils import TimeIt
-from jax_distribution.wrappers.jumanji import (
-    AgentIDWrapper,
-    LogWrapper,
-    RwareMultiAgentWrapper,
-)
+from mava.evaluator import evaluator_setup
+from mava.logger import logger_setup
+from mava.types import ExperimentOutput, LearnerState, PPOTransition
+from mava.utils.jax import merge_leading_dims
+from mava.utils.logger_tools import config_copy, get_experiment_path, get_logger
+from mava.utils.timing_utils import TimeIt
+from mava.wrappers.jumanji import AgentIDWrapper, LogWrapper, RwareMultiAgentWrapper
 
 
 class ActorCritic(nn.Module):
@@ -321,7 +313,7 @@ def get_learner_fn(
 
 def learner_setup(
     env: Environment, rngs: chex.Array, config: Dict
-) -> Tuple[callable, ActorCritic, LearnerState]:
+) -> Tuple[Callable, ActorCritic, LearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
     n_devices = len(jax.devices())

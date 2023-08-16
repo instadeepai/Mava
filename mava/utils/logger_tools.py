@@ -19,6 +19,7 @@ from typing import Dict
 
 from colorama import Fore, Style
 from omegaconf import DictConfig
+from sacred.run import Run
 
 
 class Logger:
@@ -36,12 +37,8 @@ class Logger:
         self.use_tb = False
         self.use_sacred = False
 
-        self.tb_logger = None
-        self.sacred_run_dict = None
-        self.sacred_info = None
-
         # defaultdict is used to overcome the problem of missing keys when logging to sacred.
-        self.stats = defaultdict(lambda: [])
+        self.stats: Dict = defaultdict(lambda: [])
 
     def setup_tb(self, directory_name: str) -> None:
         """Set up tensorboard logging."""
@@ -52,7 +49,7 @@ class Logger:
         self.tb_logger = log_value
         self.use_tb = True
 
-    def setup_sacred(self, sacred_run_dict: Dict) -> None:
+    def setup_sacred(self, sacred_run_dict: Run) -> None:
         """Set up sacred logging."""
         self.sacred_run_dict = sacred_run_dict
         self.sacred_info = sacred_run_dict.info
