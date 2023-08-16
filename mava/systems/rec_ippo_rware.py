@@ -39,20 +39,12 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from sacred import Experiment, observers, run, utils
 
-from jax_distribution.evaluator import evaluator_setup
-from jax_distribution.logger import logger_setup
-from jax_distribution.types import ExperimentOutput, PPOTransition, RNNLearnerState
-from jax_distribution.utils.logger_tools import (
-    config_copy,
-    get_experiment_path,
-    get_logger,
-)
-from jax_distribution.utils.timing_utils import TimeIt
-from jax_distribution.wrappers.jumanji import (
-    AgentIDWrapper,
-    LogWrapper,
-    RwareMultiAgentWrapper,
-)
+from mava.evaluator import evaluator_setup
+from mava.logger import logger_setup
+from mava.types import ExperimentOutput, PPOTransition, RNNLearnerState
+from mava.utils.logger_tools import config_copy, get_experiment_path, get_logger
+from mava.utils.timing_utils import TimeIt
+from mava.wrappers.jumanji import AgentIDWrapper, LogWrapper, RwareMultiAgentWrapper
 
 
 class ScannedRNN(nn.Module):
@@ -91,7 +83,7 @@ class ActorCritic(nn.Module):
     @nn.compact
     def __call__(
         self, hidden: chex.Array, x: Observation
-    ) -> Tuple[distrax.Categorical, chex.Array]:
+    ) -> Tuple[chex.Array, distrax.Categorical, chex.Array]:
         """Forward pass."""
         observation, dones = x
         obs = observation.agents_view
@@ -367,7 +359,7 @@ def get_learner_fn(
             )
             return update_state, loss_info
 
-        init_hstate = initial_hstate[None, :]
+        init_hstate = initial_hstate[jnp.newaxis, :]  # type: ignore
         update_state = (
             params,
             opt_state,
@@ -434,7 +426,7 @@ def get_learner_fn(
 
 def learner_setup(
     env: Environment, rngs: chex.Array, config: Dict
-) -> Tuple[callable, ActorCritic, RNNLearnerState]:
+) -> Tuple[Callable, ActorCritic, RNNLearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
     n_devices = len(jax.devices())

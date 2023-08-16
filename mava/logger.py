@@ -24,8 +24,8 @@ import numpy as np
 from colorama import Fore, Style
 from sacred.run import Run
 
-from jax_distribution.types import ExperimentOutput
-from jax_distribution.utils.logger_tools import Logger
+from mava.types import ExperimentOutput
+from mava.utils.logger_tools import Logger
 
 
 def get_logger_fn(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
@@ -115,7 +115,7 @@ def get_logger_fn(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
     return log
 
 
-def logger_setup(_run: Run, config: Dict, _log: SacredLogger):
+def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> Callable:
     """Setup the logger."""
     logger = Logger(_log)
     unique_token = f"{config['env_name']}_seed{config['seed']}_{datetime.datetime.now()}"

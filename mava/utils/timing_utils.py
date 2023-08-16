@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import timeit
-from typing import Any
+from typing import Any, Optional
 
 from colorama import Fore, Style
 
@@ -33,7 +33,7 @@ class TimeIt:
         (https://colab.research.google.com/drive/1974D-qP17fd5mLxy6QZv-ic4yxlPJp-G?usp=sharing)
     """
 
-    def __init__(self, tag: str, environment_steps: int = None) -> None:
+    def __init__(self, tag: str, environment_steps: Optional[int] = None) -> None:
         """Initialise the context manager."""
         self.tag = tag
         self.environment_steps = environment_steps

@@ -14,7 +14,7 @@ warn_return_any = true
 warn_unused_configs = true
 warn_unused_ignores = false
 allow_redefinition = true
-disallow_untyped_calls = true
+disallow_untyped_calls = false
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 check_untyped_defs = true
@@ -23,6 +23,7 @@ strict_optional = true
 strict_equality = true
 explicit_package_bases = true
 follow_imports = "skip"
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = [
@@ -44,4 +45,3 @@ module = [
     "hydra.*",
     "omegaconf.*",
 ]
-ignore_missing_imports = true

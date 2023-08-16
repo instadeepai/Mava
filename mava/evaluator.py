@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, Tuple
+from typing import Any, Callable, Dict, Tuple
 
 import chex
 import flax.linen as nn
@@ -21,13 +21,13 @@ import jax.numpy as jnp
 from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
 
-from jax_distribution.types import EvalState, ExperimentOutput, RNNEvalState
-from jax_distribution.wrappers.jumanji import ObservationGlobalState
+from mava.types import EvalState, ExperimentOutput, RNNEvalState
+from mava.wrappers.jumanji import ObservationGlobalState
 
 
 def get_ff_evaluator_fn(
-    env: Environment, apply_fn: callable, config: dict, eval_multiplier: int = 1
-) -> callable:
+    env: Environment, apply_fn: Callable, config: dict, eval_multiplier: int = 1
+) -> Callable:
     """Get the evaluator function for feedforward networks.
 
     Args:
@@ -42,7 +42,7 @@ def get_ff_evaluator_fn(
             single evaluation step.
     """
 
-    def eval_one_episode(params: FrozenDict, init_eval_state: EvalState) -> Tuple:
+    def eval_one_episode(params: FrozenDict, init_eval_state: EvalState) -> Dict:
         """Evaluate one episode. It is vectorized over the number of evaluation episodes."""
 
         def _env_step(eval_state: EvalState) -> EvalState:
@@ -71,7 +71,8 @@ def get_ff_evaluator_fn(
         def not_done(carry: Tuple) -> bool:
             """Check if the episode is done."""
             timestep = carry[2]
-            return ~timestep.last()
+            is_not_done: bool = ~timestep.last()
+            return is_not_done
 
         eval_state = EvalState(
             init_eval_state.key,
@@ -126,15 +127,15 @@ def get_ff_evaluator_fn(
 
 def get_rnn_evaluator_fn(
     env: Environment,
-    apply_fn: callable,
+    apply_fn: Callable,
     config: dict,
     scanned_rnn: nn.Module,
     centralised_critic: bool = False,
     eval_multiplier: int = 1,
-) -> callable:
+) -> Callable:
     """Get the evaluator function for recurrent networks."""
 
-    def eval_one_episode(params: FrozenDict, init_eval_state: RNNEvalState) -> Tuple:
+    def eval_one_episode(params: FrozenDict, init_eval_state: RNNEvalState) -> Dict:
         """Evaluate one episode. It is vectorized over the number of evaluation episodes."""
 
         def _env_step(eval_state: RNNEvalState) -> RNNEvalState:
@@ -193,7 +194,8 @@ def get_rnn_evaluator_fn(
         def not_done(carry: Tuple) -> bool:
             """Check if the episode is done."""
             timestep = carry[2]
-            return ~timestep.last()
+            is_not_done: bool = ~timestep.last()
+            return is_not_done
 
         eval_state = RNNEvalState(
             init_eval_state.key,
@@ -284,7 +286,7 @@ def evaluator_setup(
     centralised_critic: bool = False,
     use_recurrent_net: bool = False,
     scanned_rnn: nn.Module = None,
-) -> Tuple[callable, callable, Tuple]:
+) -> Tuple[Callable, Callable, Tuple]:
     """Initialise evaluator_fn."""
     # Get available TPU cores.
     n_devices = len(jax.devices())

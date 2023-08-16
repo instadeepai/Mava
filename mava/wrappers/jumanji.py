@@ -12,16 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import NamedTuple, Tuple
+from typing import TYPE_CHECKING, NamedTuple, Tuple
 
 import chex
 import jax.numpy as jnp
-from flax import struct
 from jumanji import specs
 from jumanji.env import Environment
 from jumanji.environments.routing.robot_warehouse import Observation, State
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
+
+if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
+    from dataclasses import dataclass
+else:
+    from flax.struct import dataclass
 
 
 class ObservationGlobalState(NamedTuple):
@@ -42,7 +46,7 @@ class ObservationGlobalState(NamedTuple):
     step_count: chex.Array  # (num_agents, )
 
 
-@struct.dataclass
+@dataclass
 class LogEnvState:
     """State of the `LogWrapper`."""
 
