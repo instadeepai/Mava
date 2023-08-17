@@ -24,12 +24,14 @@ ARG folder=/home/app/mava
 WORKDIR ${folder}
 
 # Copy all code needed to install dependencies
-COPY ./requirements/requirements.txt /tmp/
+COPY ./requirements ./requirements
+COPY setup.py .
+COPY README.md .
+COPY mava/version.py mava/version.py
 
 RUN echo "Installing requirements..."
 RUN pip install --quiet --upgrade pip setuptools wheel &&  \
-    pip install --quiet -r /tmp/requirements.txt && \
-    rm -rf /tmp/*
+    pip install -e .
 
 # Need to use specific cuda versions for jax
 ARG USE_CUDA=true
@@ -41,4 +43,3 @@ RUN if [ "$USE_CUDA" = true ] ; \
 COPY . .
 
 EXPOSE 6006
-ENTRYPOINT [ "bash" ]
