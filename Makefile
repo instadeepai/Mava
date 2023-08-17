@@ -16,14 +16,13 @@ endif
 BASE_FLAGS=-it --rm  -v ${PWD}:/home/app/mava -w /home/app/mava
 RUN_FLAGS=$(GPUS) $(BASE_FLAGS)
 
-# Default version is jax-core
 DOCKER_IMAGE_NAME = mava
 IMAGE = $(DOCKER_IMAGE_NAME):latest
 DOCKER_RUN=docker run $(RUN_FLAGS) $(IMAGE)
 
 # make file commands
 build:
-	DOCKER_BUILDKIT=1 docker build --tag $(IMAGE) --target $(DOCKER_IMAGE_TAG) .
+	DOCKER_BUILDKIT=1 docker build --tag $(IMAGE) .
 
 run:
 	$(DOCKER_RUN) python $(example)
