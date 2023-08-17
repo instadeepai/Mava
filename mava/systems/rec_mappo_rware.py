@@ -16,7 +16,6 @@ import copy
 import functools
 import os
 from logging import Logger as SacredLogger
-from os.path import abspath, dirname
 from typing import Any, Callable, Dict, Sequence, Tuple
 
 import chex
@@ -688,10 +687,10 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     ex = Experiment("mava", save_git_info=False)
     ex.logger = logger
     ex.captured_out_filter = utils.apply_backspaces_and_linefeeds
-    results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
 
-    exp_path = get_experiment_path(cfg, "rec_mappo")
-    file_obs_path = os.path.join(results_path, exp_path)
+    cfg["system_name"] = "rec_mappo"
+    exp_path = get_experiment_path(cfg, "sacred")
+    file_obs_path = os.path.join(cfg["base_exp_path"], exp_path)
     ex.observers = [observers.FileStorageObserver.create(file_obs_path)]
     ex.add_config(OmegaConf.to_container(cfg, resolve=True))
     ex.main(run_experiment)

@@ -16,7 +16,6 @@
 import datetime
 import os
 from logging import Logger as SacredLogger
-from os.path import abspath, dirname
 from typing import Callable, Dict
 
 import jax.numpy as jnp
@@ -25,7 +24,7 @@ from colorama import Fore, Style
 from sacred.run import Run
 
 from mava.types import ExperimentOutput
-from mava.utils.logger_tools import Logger
+from mava.utils.logger_tools import Logger, get_experiment_path
 
 
 def get_logger_fn(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
@@ -118,11 +117,11 @@ def get_logger_fn(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
 def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> Callable:
     """Setup the logger."""
     logger = Logger(_log)
-    unique_token = f"{config['env_name']}_seed{config['seed']}_{datetime.datetime.now()}"
+    unique_token = f"{datetime.datetime.now()}"
     if config["use_sacred"]:
         logger.setup_sacred(_run)
     if config["use_tf"]:
-        tb_logs_direc = os.path.join(dirname(dirname(abspath(__file__))), "results", "tb_logs")
-        tb_exp_direc = os.path.join(tb_logs_direc, "{}").format(unique_token)
-        logger.setup_tb(tb_exp_direc)
+        exp_path = get_experiment_path(config, "tensorboard")
+        tb_logs_path = os.path.join(config["base_exp_path"], f"{exp_path}/{unique_token}")
+        logger.setup_tb(tb_logs_path)
     return get_logger_fn(logger, config)
