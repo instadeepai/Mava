@@ -42,4 +42,4 @@ absolute_metric: True # Whether the absolute metric should be computed. For more
 use_tf: True
 use_sacred: True
 base_exp_path: results
-system_name: replace
+system_name: ~  # this is manually set inside each file depending on which system is run
