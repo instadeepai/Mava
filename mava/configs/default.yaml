@@ -39,6 +39,7 @@ absolute_metric: True # Whether the absolute metric should be computed. For more
   # on the absolute metric please see: https://arxiv.org/abs/2209.10485
 
 # --- Logging options ---
-use_tf: False
+use_tf: True
 use_sacred: True
-base_exp_path: sacred
+base_exp_path: results
+system_name: ~  # this is manually set inside each file depending on which system is run

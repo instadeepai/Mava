@@ -99,10 +99,10 @@ def config_copy(config: Dict) -> Dict:
         return deepcopy(config)
 
 
-def get_experiment_path(config: DictConfig, system_name: str) -> str:
+def get_experiment_path(config: DictConfig, logger_type: str) -> str:
     """Helper function to create the experiment path."""
     exp_path = (
-        f"{config['base_exp_path']}/{system_name}/{config['env_name']}/"
+        f"{logger_type}/{config['system_name']}/{config['env_name']}/"
         + f"{config['rware_scenario']['task_name']}/envs_{config['num_envs']}/"
         + f"seed_{config['seed']}"
     )
