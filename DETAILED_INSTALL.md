@@ -32,7 +32,7 @@
 
 1. If not using docker, we strongly recommend using a
     [Python virtual environment](https://docs.python.org/3/tutorial/venv.html)
-    to manage your dependencies in order to avoid version conflicts.
+    to manage your dependencies in order to avoid version conflicts. To install Mava in the virtual environment, run:
 
     ```bash
     python3 -m venv mava
@@ -40,13 +40,6 @@
     pip install --upgrade pip setuptools
     git clone https://github.com/instadeepai/Mava.git
     cd mava
-    ```
-
-    1.1  To install the core libraries, please run:
-
-    * Install core dependencies:
-
-    ```bash
     pip install .
     ```
 
