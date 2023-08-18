@@ -463,7 +463,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:  #
         trained_params = jax.tree_util.tree_map(
             lambda x: x[:, :, 0, ...], learner_output.learner_state.params
         )
-        split_and_reshape = lambda key: jnp.stack(jax.random.split(key, n_devices + 1)[1]).reshape(
+        split_and_reshape = lambda key: jnp.stack(jax.random.split(key, n_devices + 1)[1:]).reshape(
             n_devices, -1
         )
         eval_rngs = jax.vmap(split_and_reshape, out_axes=1)(rng_e)
@@ -490,7 +490,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:  #
         learner_state = learner_output.learner_state
 
     if config["absolute_metric"]:
-        split_and_reshape = lambda key: jnp.stack(jax.random.split(key, n_devices + 1)[1]).reshape(
+        split_and_reshape = lambda key: jnp.stack(jax.random.split(key, n_devices + 1)[1:]).reshape(
             n_devices, -1
         )
         eval_rngs = jax.vmap(split_and_reshape, out_axes=1)(rng_e)

@@ -357,7 +357,7 @@ def evaluator_setup(
     trained_params = jax.tree_util.tree_map(lambda x: x[:, :, 0, ...], params)
 
     # Split rngs for each core.
-    split_and_reshape = lambda key: jnp.stack(jax.random.split(key, n_devices + 1)[1]).reshape(
+    split_and_reshape = lambda key: jnp.stack(jax.random.split(key, n_devices + 1)[1:]).reshape(
         n_devices, -1
     )
     eval_rngs = jax.vmap(split_and_reshape, out_axes=1)(rng_e)
