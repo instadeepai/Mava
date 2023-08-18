@@ -104,7 +104,7 @@ def get_experiment_path(config: DictConfig, logger_type: str) -> str:
     exp_path = (
         f"{logger_type}/{config['system_name']}/{config['env_name']}/"
         + f"{config['rware_scenario']['task_name']}/envs_{config['num_envs']}/"
-        + f"seed_{config['seed']}"
+        + f"seed_{config['seeds']}"
     )
 
     return exp_path

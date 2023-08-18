@@ -35,6 +35,7 @@ def get_logger_fn(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
         t_env: int = 0,
         trainer_metric: bool = False,
         absolute_metric: bool = False,
+        seed: int = 0,
     ) -> float:
         """Log the episode returns and lengths.
 
@@ -43,6 +44,7 @@ def get_logger_fn(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
             t_env (int): The current timestep.
             trainer_metric (bool): Whether to log the trainer metric.
             absolute_metric (bool): Whether to log the absolute metric.
+            seed (int): The random seed of the current run.
         """
         if absolute_metric:
             prefix = "Absolute_"
@@ -65,20 +67,20 @@ def get_logger_fn(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
         # Log metrics.
         if config["use_sacred"] or config["use_tf"]:
             logger.log_stat(
-                prefix.lower() + "mean_episode_returns",
+                prefix.lower() + f"mean_episode_returns_seed_{seed}",
                 float(np.mean(episodes_return)),
                 t_env,
             )
             logger.log_stat(
-                prefix.lower() + "mean_episode_length",
+                prefix.lower() + f"mean_episode_length_seed_{seed}",
                 float(np.mean(episodes_length)),
                 t_env,
             )
             if trainer_metric:
-                logger.log_stat("total_loss", float(np.mean(total_loss)), t_env)
-                logger.log_stat("value_loss", float(np.mean(value_loss)), t_env)
-                logger.log_stat("loss_actor", float(np.mean(loss_actor)), t_env)
-                logger.log_stat("entropy", float(np.mean(entropy)), t_env)
+                logger.log_stat(f"total_loss_seed_{seed}", float(np.mean(total_loss)), t_env)
+                logger.log_stat(f"value_loss_seed_{seed}", float(np.mean(value_loss)), t_env)
+                logger.log_stat(f"loss_acto_seed_{seed}", float(np.mean(loss_actor)), t_env)
+                logger.log_stat(f"entropy_seed_{seed}", float(np.mean(entropy)), t_env)
 
         log_string = (
             f"Timesteps {t_env:07d} | "
@@ -92,7 +94,9 @@ def get_logger_fn(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
 
         if absolute_metric:
             logger.console_logger.info(
-                f"{Fore.BLUE}{Style.BRIGHT}ABSOLUTE METRIC: {log_string}{Style.RESET_ALL}"
+                f"{Fore.BLUE}{Style.BRIGHT}"
+                f"ABSOLUTE METRIC (SEED {seed}): {log_string}"
+                f"{Style.RESET_ALL}"
             )
         elif trainer_metric:
             log_string += (
@@ -102,11 +106,11 @@ def get_logger_fn(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
                 f"Entropy {float(np.mean(entropy)):.3f}"
             )
             logger.console_logger.info(
-                f"{Fore.MAGENTA}{Style.BRIGHT}TRAINER: {log_string}{Style.RESET_ALL}"
+                f"{Fore.MAGENTA}{Style.BRIGHT}TRAINER (SEED {seed}): {log_string}{Style.RESET_ALL}"
             )
         else:
             logger.console_logger.info(
-                f"{Fore.GREEN}{Style.BRIGHT}EVALUATOR: {log_string}{Style.RESET_ALL}"
+                f"{Fore.GREEN}{Style.BRIGHT}EVALUATOR (SEED {seed}): {log_string}{Style.RESET_ALL}"
             )
 
         return float(np.mean(episodes_return))

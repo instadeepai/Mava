@@ -345,12 +345,21 @@ def evaluator_setup(
             10,
         )
 
+    # Vmap evaluator over the experiment seeds and pmap over device.
+    evaluator = jax.vmap(evaluator, axis_name="eval_seed")
     evaluator = jax.pmap(evaluator, axis_name="device")
+
+    # Vmap absolute_metric_evaluator over the experiment seeds and pmap over device.
+    absolute_metric_evaluator = jax.vmap(absolute_metric_evaluator, axis_name="eval_seed")
     absolute_metric_evaluator = jax.pmap(absolute_metric_evaluator, axis_name="device")
 
-    # Broadcast trained params to cores and split rngs for each core.
-    trained_params = jax.tree_util.tree_map(lambda x: x[:, 0, ...], params)
-    rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
-    eval_rngs = jnp.stack(eval_rngs).reshape(n_devices, -1)
+    # Broadcast trained params to cores and split rngs for each core and seed.
+    trained_params = jax.tree_util.tree_map(lambda x: x[:, :, 0, ...], params)
+
+    # Split rngs for each core.
+    split_and_reshape = lambda key: jnp.stack(jax.random.split(key, n_devices + 1)[1]).reshape(
+        n_devices, -1
+    )
+    eval_rngs = jax.vmap(split_and_reshape, out_axes=1)(rng_e)
 
     return evaluator, absolute_metric_evaluator, (trained_params, eval_rngs)
