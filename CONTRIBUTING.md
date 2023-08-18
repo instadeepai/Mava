@@ -17,18 +17,18 @@ again.
 
 ## Installing MAVA for developement
 
-To develop features for mava, clone the repository and install all the dependencies as follows:
+To develop features for mava, clone the repository and install the core and development dependencies as follows:
 
 ```bash
 git clone https://github.com/instadeepai/mava.git
-pip install -e "mava[reverb,jax]"
+cd mava
+pip install -e .[dev]
 ```
 
-## Installing Pre-Commit Hooks and Testing Dependencies
+## Installing Pre-Commit Hooks
 
-Install the pre-commit hooks and testing dependencies:
+Install the pre-commit hooks:
 ```bash
-pip install .[testing_formatting]
 pre-commit install
 pre-commit install -t commit-msg
 ```
