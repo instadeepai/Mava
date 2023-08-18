@@ -10,7 +10,7 @@ env_name: RobotWarehouse-v0
 
 num_envs: 16  # Number of vectorised environments per device.
 num_updates: 10 # Number of updates
-seeds: [42, 10] # List of the different seeds to run.
+seeds: [42] # List of the different seeds to run.
 
 # --- Agent observations ---
 add_agent_id: True
