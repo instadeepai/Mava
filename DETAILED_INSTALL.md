@@ -2,23 +2,9 @@
 
 ### Docker
 
-#### Using pre-built images
+#### Building the image
 
-You can pull & run the latest pre-built images from our [DockerHub](https://hub.docker.com/r/instadeepct/mava) by specifying the docker image and example/file you want to run.
-
-For example, this will pull the latest mava jax core image and run the `examples/debugging/simple_spread/feedforward/decentralised/run_ippo.py` example:
-
-```
-docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava instadeepct/mava:jax-core-latest python examples/debugging/simple_spread/feedforward/decentralised/run_ippo.py --base_dir /home/app/mava/logs/
-```
-
-* For windows, replace `$(pwd)` with `$(curdir)`.
-
-* You can replace the example with your custom python file.
-
-#### Building the image yourself
-
-1. Build the correct docker image using the `make` command:
+1. Build the docker image using the `make` command:
 
     For Windows, before the docker image build, we recommend to first install the package manager [chocolatey](https://chocolatey.org/install) and run (to install make):
 
@@ -26,144 +12,47 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
     choco install make
     ```
 
-    1.1 Only Mava core:
-
-    Jax version:
+    To then build the docker image run
 
     ```bash
-    make build version=jax-core
+    make build
     ```
 
-    1.2 For **optional** environments:
-
-    * PettingZoo:
-
-        ```
-        make build version=pz
-        ```
-
-    * SMAC: The StarCraft Multi-Agent Challenge Environments :
-
-        Install StarCraft II using a bash script, which is a slightly modified version of the script found [here][pymarl]:
-
-        ```
-        ./bash_scripts/install_sc2.sh
-        ```
-
-        Build Image
-
-        ```
-        make build version=sc2
-        ```
-
-    * Flatland:
-
-        ```
-        make build version=flatland
-        ```
-
-    To allow for agent recordings, where agents evaluations are recorded and these recordings are stored in a `/recordings` folder:
-
-    ```
-    make build version=[] record=true
-    ```
-
-2. Run an example:
+2. Run a system:
 
     ```bash
-    make run example=dir/to/example/example.py
+    make run example=dir/to/system.py
     ```
 
-    For example, `make run example=examples/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg.py`.
+    For example, `make run example=mava/systems/ff_ippo_rware.py`.
 
-    Alternatively, run bash inside a docker container with mava installed, `make bash`, and from there examples can be run as follows: `python dir/to/example/example.py`.
-
-    To run an example with tensorboard viewing enabled, you can run
-
-    ```bash
-    make run-tensorboard example=dir/to/example/example.py
-    ```
-
-    and navigate to `http://127.0.0.1:6006/`.
-
-    To run an example where agents are recorded (**ensure you built the image with `record=true`**):
-
-    ```
-    make run-record example=dir/to/example/example.py
-    ```
-
-    Where example, is an example with recording available e.g. `examples/debugging/simple_spread/feedforward/decentralised/run_maddpg_record.py`.
+    Alternatively, run bash inside a docker container with mava installed by running `make bash`, and from there systems can be run as follows: `python dir/to/system.py`.
 
 ### Python virtual environment
 
 1. If not using docker, we strongly recommend using a
     [Python virtual environment](https://docs.python.org/3/tutorial/venv.html)
-    to manage your dependencies in order to avoid version conflicts. Please note that since Launchpad only supports Linux based OSes, using a python virtual environment will only work in these cases:
+    to manage your dependencies in order to avoid version conflicts.
 
     ```bash
     python3 -m venv mava
     source mava/bin/activate
     pip install --upgrade pip setuptools
+    git clone https://github.com/instadeepai/Mava.git
+    cd mava
     ```
 
-    1.1  To install the core libraries, including [Reverb](https://github.com/deepmind/reverb) - our storage dataset , Tensorflow and [Launchpad](https://github.com/deepmind/launchpad) - for distributed agent support :
-
-    * Install swig for box2d:
-
-    ```bash
-    sudo apt-get install swig -y
-    ```
+    1.1  To install the core libraries, please run:
 
     * Install core dependencies:
 
     ```bash
-    pip install id-mava[jax,reverb]
+    pip install .
     ```
 
-    * Or for the latest version of mava from source (**you can do this for all pip install commands below for the latest depedencies**):
+    **If you plan on using `JAX` along with a GPU or TPU:**
 
-    ```bash
-    pip install git+https://github.com/instadeepai/Mava#egg=id-mava[reverb,jax]
-    ```
-
-    **If you are using `jax` and `CUDA`, you also need to run the following:**
-
-    ```bash
-    pip install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-    ```
-
-    1.2 For **optional** environments:
-    * PettingZoo:
-
-        ```
-        pip install id-mava[pz]
-        ```
-
-    * Flatland:
-
-        ```
-        pip install id-mava[flatland]
-        ```
-
-    * StarCraft II:
-
-        First install StarCraft II
-
-        ```bash
-        ./bash_scripts/install_sc2.sh
-        ```
-
-        Then set SC2PATH to the location of 3rdparty/StarCraftII, e.g. :
-
-        ```
-        export SC2PATH="/home/Documents/Code/Mava/3rdparty/StarCraftII"
-        ```
-
-        Then install the environment wrapper
-
-        ```bash
-        pip install id-mava[sc2]
-        ```
+    Please follow the instruction on the official [`JAX`](https://github.com/google/jax) project repository.
 
 3. Developing features for mava
 
