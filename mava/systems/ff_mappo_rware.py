@@ -320,14 +320,67 @@ def learner_setup(
     env: Environment, rngs: chex.Array, config: Dict
 ) -> Tuple[Callable, ActorCritic, LearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
-    # Get available TPU cores.
-    n_devices = len(jax.devices())
+
+    def get_learner_state(
+        rngs: chex.Array, network: ActorCritic, optim: optax.GradientTransformation
+    ) -> LearnerState:
+        """Get initial learner state."""
+        # Get available TPU cores.
+        n_devices = len(jax.devices())
+
+        # PRNG keys.
+        rng, rng_p = rngs
+
+        # Initialise observation.
+        obs = env.observation_spec().generate_value()
+        # Select only obs for a single agent.
+        init_x = ObservationGlobalState(
+            agents_view=obs.agents_view[0],
+            action_mask=obs.action_mask[0],
+            global_state=obs.global_state,
+            step_count=obs.step_count[0],
+        )
+        init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
+
+        # initialise params and optimiser state.
+        params = network.init(rng_p, init_x)
+        opt_state = optim.init(params)
+
+        # Broadcast params and optimiser state to cores and batch.
+        broadcast = lambda x: jnp.broadcast_to(
+            x, (n_devices, config["update_batch_size"]) + x.shape
+        )
+        params = jax.tree_map(broadcast, params)
+        opt_state = jax.tree_map(broadcast, opt_state)
+
+        # Initialise environment states and timesteps.
+        rng, *env_rngs = jax.random.split(
+            rng, n_devices * config["update_batch_size"] * config["num_envs"] + 1
+        )
+        env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
+            jnp.stack(env_rngs),
+        )
+
+        # Split rngs for each core.
+        rng, *step_rngs = jax.random.split(rng, n_devices * config["update_batch_size"] + 1)
+        # Add dimension to pmap over.
+        reshape_step_rngs = lambda x: x.reshape(
+            (n_devices, config["update_batch_size"]) + x.shape[1:]
+        )
+        step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
+        reshape_states = lambda x: x.reshape(
+            (n_devices, config["update_batch_size"], config["num_envs"]) + x.shape[1:]
+        )
+        env_states = jax.tree_util.tree_map(reshape_states, env_states)
+        timesteps = jax.tree_util.tree_map(reshape_states, timesteps)
+
+        init_learner_state = LearnerState(params, opt_state, step_rngs, env_states, timesteps)
+        return init_learner_state
+
     # Get number of actions and agents.
     num_actions = int(env.action_spec().num_values[0])
     num_agents = env.action_spec().shape[0]
     config["num_agents"] = num_agents
-    # PRNG keys.
-    rng, rng_p = rngs
 
     # Define network and optimiser.
     network = ActorCritic(num_actions)
@@ -336,20 +389,10 @@ def learner_setup(
         optax.adam(config["lr"], eps=1e-5),
     )
 
-    # Initialise observation.
-    obs = env.observation_spec().generate_value()
-    # Select only obs for a single agent.
-    init_x = ObservationGlobalState(
-        agents_view=obs.agents_view[0],
-        action_mask=obs.action_mask[0],
-        global_state=obs.global_state,
-        step_count=obs.step_count[0],
+    # Initialise learner state.
+    init_learner_state = jax.vmap(get_learner_state, in_axes=(0, None, None), out_axes=1)(
+        rngs, network, optim
     )
-    init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
-
-    # initialise params and optimiser state.
-    params = network.init(rng_p, init_x)
-    opt_state = optim.init(params)
 
     # Vmap network apply function over number of agents.
     vmapped_network_apply_fn = jax.vmap(
@@ -359,38 +402,12 @@ def learner_setup(
     )
 
     # Get batched iterated update and replicate it to pmap it over cores.
-    learn = get_learner_fn(env, vmapped_network_apply_fn, optim.update, config)
-    learn = jax.pmap(learn, axis_name="device")
-
-    # Broadcast params and optimiser state to cores and batch.
-    broadcast = lambda x: jnp.broadcast_to(x, (n_devices, config["update_batch_size"]) + x.shape)
-    params = jax.tree_map(broadcast, params)
-    opt_state = jax.tree_map(broadcast, opt_state)
-
-    # Initialise environment states and timesteps.
-    rng, *env_rngs = jax.random.split(
-        rng, n_devices * config["update_batch_size"] * config["num_envs"] + 1
-    )
-    env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
-        jnp.stack(env_rngs),
-    )
-
-    # Split rngs for each core.
-    rng, *step_rngs = jax.random.split(rng, n_devices * config["update_batch_size"] + 1)
-    # Add dimension to pmap over.
-    reshape_step_rngs = lambda x: x.reshape((n_devices, config["update_batch_size"]) + x.shape[1:])
-    step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
-    reshape_states = lambda x: x.reshape(
-        (n_devices, config["update_batch_size"], config["num_envs"]) + x.shape[1:]
-    )
-    env_states = jax.tree_util.tree_map(reshape_states, env_states)
-    timesteps = jax.tree_util.tree_map(reshape_states, timesteps)
-
-    init_learner_state = LearnerState(params, opt_state, step_rngs, env_states, timesteps)
+    learn_fn = get_learner_fn(env, vmapped_network_apply_fn, optim.update, config)
+    learn = jax.pmap(lambda x: jax.vmap(learn_fn, axis_name="train_seed")(x), axis_name="device")
     return learn, network, init_learner_state
 
 
-def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
+def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:  # noqa: CCR001
     """Runs experiment."""
     # Logger setup
     config = config_copy(_config)
@@ -410,7 +427,9 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         eval_env = AgentIDWrapper(env=eval_env, has_global_state=True)
 
     # PRNG keys.
-    rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["seed"]), num=3)
+    seeds_array = jnp.array(config["seeds"])
+    random_keys = jax.vmap(jax.random.PRNGKey)(seeds_array)
+    rng, rng_e, rng_p = jax.vmap(jax.random.split, in_axes=(0, None), out_axes=1)(random_keys, 3)
     # Setup learner.
     learn, network, learner_state = learner_setup(env, (rng, rng_p), config)
 
@@ -436,8 +455,8 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     )
 
     # Run experiment for a total number of evaluations.
-    max_episode_return = jnp.float32(0.0)
-    best_params = None
+    max_episode_return = jnp.zeros(len(config["seeds"]))
+    best_params = copy.deepcopy(trained_params)
     for i in range(config["num_evaluation"]):
         # Train.
         with TimeIt(
@@ -448,46 +467,60 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
             jax.block_until_ready(learner_output)
 
         # Log the results of the training.
-        log(
-            metrics=learner_output,
-            t_env=timesteps_per_training * (i + 1),
-            trainer_metric=True,
-        )
+        for seed_id, seed in enumerate(config["seeds"]):
+            output = jax.tree_map(lambda x: x[:, seed_id], learner_output)  # noqa: B023
+            log(
+                metrics=output,
+                t_env=timesteps_per_training * (i + 1),
+                trainer_metric=True,
+                seed=seed,
+            )
 
         # Prepare for evaluation.
         trained_params = jax.tree_util.tree_map(
-            lambda x: x[:, 0, ...], learner_output.learner_state.params
+            lambda x: x[:, :, 0, ...], learner_output.learner_state.params
         )
-        rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
-        eval_rngs = jnp.stack(eval_rngs)
-        eval_rngs = eval_rngs.reshape(n_devices, -1)
+        split_and_reshape = lambda key: jnp.stack(jax.random.split(key, n_devices + 1)[1]).reshape(
+            n_devices, -1
+        )
+        eval_rngs = jax.vmap(split_and_reshape, out_axes=1)(rng_e)
 
         # Evaluate.
         evaluator_output = evaluator(trained_params, eval_rngs)
         jax.block_until_ready(evaluator_output)
 
-        # Log the results of the evaluation.
-        episode_return = log(
-            metrics=evaluator_output,
-            t_env=timesteps_per_training * (i + 1),
-        )
-        if config["absolute_metric"] and max_episode_return <= episode_return:
-            best_params = copy.deepcopy(trained_params)
-            max_episode_return = episode_return
+        for seed_id, seed in enumerate(config["seeds"]):
+            output = jax.tree_map(lambda x: x[:, seed_id], evaluator_output)  # noqa: B023
+            episode_return = log(metrics=output, t_env=timesteps_per_training * (i + 1), seed=seed)
+            # Assess whether the present evaluator episode return outperforms
+            # the best recorded return for the current seed.
+            if config["absolute_metric"] and max_episode_return[seed_id] <= episode_return:
+                # Update best params for only the current seed.
+                best_params = jax.tree_util.tree_map(
+                    lambda new, old: old.at[:, seed_id].set(new[:, seed_id]),  # noqa: B023
+                    trained_params,
+                    best_params,
+                )
+                max_episode_return = max_episode_return.at[seed_id].set(episode_return)
 
         # Update runner state to continue training.
         learner_state = learner_output.learner_state
 
     if config["absolute_metric"]:
-        rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
-        eval_rngs = jnp.stack(eval_rngs)
-        eval_rngs = eval_rngs.reshape(n_devices, -1)
-        evaluator_output = absolute_metric_evaluator(best_params, eval_rngs)
-        log(
-            metrics=evaluator_output,
-            t_env=timesteps_per_training * (i + 1),
-            absolute_metric=True,
+        split_and_reshape = lambda key: jnp.stack(jax.random.split(key, n_devices + 1)[1]).reshape(
+            n_devices, -1
         )
+        eval_rngs = jax.vmap(split_and_reshape, out_axes=1)(rng_e)
+
+        evaluator_output = absolute_metric_evaluator(best_params, eval_rngs)
+        for seed_id, seed in enumerate(config["seeds"]):
+            output = jax.tree_map(lambda x: x[:, seed_id], evaluator_output)  # noqa: B023
+            log(
+                metrics=output,
+                t_env=timesteps_per_training * (i + 1),
+                absolute_metric=True,
+                seed=seed,
+            )
 
 
 @hydra.main(config_path="../configs", config_name="default.yaml", version_base="1.2")
