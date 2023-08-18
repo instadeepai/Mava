@@ -19,10 +19,11 @@ RUN_FLAGS=$(GPUS) $(BASE_FLAGS)
 DOCKER_IMAGE_NAME = mava
 IMAGE = $(DOCKER_IMAGE_NAME):latest
 DOCKER_RUN=docker run $(RUN_FLAGS) $(IMAGE)
+USE_CUDA = $(if $(GPUS),true,false)
 
 # make file commands
 build:
-	DOCKER_BUILDKIT=1 docker build --tag $(IMAGE) .
+	DOCKER_BUILDKIT=1 docker build --build-arg USE_CUDA=$(USE_CUDA) --tag $(IMAGE) .
 
 run:
 	$(DOCKER_RUN) python $(example)
