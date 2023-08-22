@@ -6,12 +6,6 @@
 
 1. Build the docker image using the `make` command:
 
-    For Windows, before the docker image build, we recommend to first install the package manager [chocolatey](https://chocolatey.org/install) and run (to install make):
-
-    ```bash
-    choco install make
-    ```
-
     To then build the docker image run
 
     ```bash
