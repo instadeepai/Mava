@@ -5,7 +5,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 # Update packages and install python3.9 and other dependencies
 RUN apt-get update -y && \
-    apt-get install -y software-properties-common && \
+    apt-get install -y software-properties-common git && \
     add-apt-repository -y ppa:deadsnakes/ppa && \
     apt-get install -y python3.9 python3.9-dev python3-pip python3.9-venv && \
     update-alternatives --install /usr/bin/python python /usr/bin/python3.9 10 && \
