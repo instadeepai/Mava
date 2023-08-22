@@ -6,7 +6,7 @@
 
 1. Build the docker image using the `make` command:
 
-    To then build the docker image run
+    To build the docker image run
 
     ```bash
     make build
