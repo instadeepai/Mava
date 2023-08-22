@@ -11,11 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import copy
 import os
 from logging import Logger as SacredLogger
-from os.path import abspath, dirname
 from typing import Any, Callable, Dict, Sequence, Tuple
 
 import chex
@@ -38,13 +36,18 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from sacred import Experiment, observers, run, utils
 
-from jax_distribution.evaluator import evaluator_setup
-from jax_distribution.logger import logger_setup
-from jax_distribution.types import ExperimentOutput, LearnerState, PPOTransition
-from jax_distribution.utils.jax import merge_leading_dims
-from jax_distribution.utils.logger_tools import config_copy, get_logger
-from jax_distribution.utils.timing_utils import TimeIt
-from jax_distribution.wrappers.jumanji import LogWrapper, RwareMultiAgentWrapper
+from mava.evaluator import evaluator_setup
+from mava.logger import logger_setup
+from mava.types import ExperimentOutput, LearnerState, PPOTransition
+from mava.utils.jax import merge_leading_dims
+from mava.utils.logger_tools import config_copy, get_experiment_path, get_logger
+from mava.utils.timing_utils import TimeIt
+from mava.wrappers.jumanji import (
+    AgentIDWrapper,
+    LogWrapper,
+    ObservationGlobalState,
+    RwareMultiAgentWithGlobalStateWrapper,
+)
 
 
 class ActorCritic(nn.Module):
@@ -74,7 +77,9 @@ class ActorCritic(nn.Module):
         )
         actor_policy = distrax.Categorical(logits=masked_logits)
 
-        critic_output = nn.Dense(64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(x)
+        y = observation.global_state
+
+        critic_output = nn.Dense(64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(y)
         critic_output = nn.relu(critic_output)
         critic_output = nn.Dense(64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
             critic_output
@@ -229,8 +234,9 @@ def get_learner_fn(
                 loss_info, grads = grad_fn(params, opt_state, traj_batch, advantages, targets)
 
                 # Compute the parallel mean (pmean) over the batch.
-                # This calculation is inspired by the Anakin architecture demo.
-                # This pmean could be a regular mean as the batch axis is on all devices.
+                # This calculation is inspired by the Anakin architecture demo notebook.
+                # available at https://tinyurl.com/26tdzs5x
+                # This pmean could be a regular mean as the batch axis is on the same device.
                 grads, loss_info = jax.lax.pmean((grads, loss_info), axis_name="batch")
                 # pmean over devices.
                 grads, loss_info = jax.lax.pmean((grads, loss_info), axis_name="device")
@@ -312,7 +318,7 @@ def get_learner_fn(
 
 def learner_setup(
     env: Environment, rngs: chex.Array, config: Dict
-) -> Tuple[callable, ActorCritic, LearnerState]:
+) -> Tuple[Callable, ActorCritic, LearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
@@ -330,9 +336,15 @@ def learner_setup(
         optax.adam(config["lr"], eps=1e-5),
     )
 
-    # Initialise observation: Select only obs for a single agent.
-    init_x = env.observation_spec().generate_value()
-    init_x = jax.tree_util.tree_map(lambda x: x[0], init_x)
+    # Initialise observation.
+    obs = env.observation_spec().generate_value()
+    # Select only obs for a single agent.
+    init_x = ObservationGlobalState(
+        agents_view=obs.agents_view[0],
+        action_mask=obs.action_mask[0],
+        global_state=obs.global_state,
+        step_count=obs.step_count[0],
+    )
     init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
 
     # initialise params and optimiser state.
@@ -340,7 +352,11 @@ def learner_setup(
     opt_state = optim.init(params)
 
     # Vmap network apply function over number of agents.
-    vmapped_network_apply_fn = jax.vmap(network.apply, in_axes=(None, 1), out_axes=(1, 1))
+    vmapped_network_apply_fn = jax.vmap(
+        network.apply,
+        in_axes=(None, ObservationGlobalState(1, 1, None, 1)),
+        out_axes=(1, 1),
+    )
 
     # Get batched iterated update and replicate it to pmap it over cores.
     learn = get_learner_fn(env, vmapped_network_apply_fn, optim.update, config)
@@ -380,14 +396,18 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     config = config_copy(_config)
     log = logger_setup(_run, config, _log)
 
-    generator = RandomGenerator(**config["rware_scenario"])
+    generator = RandomGenerator(**config["rware_scenario"]["task_config"])
     # Create envs
     env = jumanji.make(config["env_name"], generator=generator)
-    env = RwareMultiAgentWrapper(env)
+    env = RwareMultiAgentWithGlobalStateWrapper(env)
+    if config["add_agent_id"]:
+        env = AgentIDWrapper(env=env, has_global_state=True)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env_name"], generator=generator)
-    eval_env = RwareMultiAgentWrapper(eval_env)
+    eval_env = RwareMultiAgentWithGlobalStateWrapper(eval_env)
+    if config["add_agent_id"]:
+        eval_env = AgentIDWrapper(env=eval_env, has_global_state=True)
 
     # PRNG keys.
     rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["seed"]), num=3)
@@ -396,7 +416,12 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
 
     # Setup evaluator.
     evaluator, absolute_metric_evaluator, (trained_params, eval_rngs) = evaluator_setup(
-        eval_env, rng_e, network, learner_state.params, config
+        eval_env=eval_env,
+        rng_e=rng_e,
+        network=network,
+        params=learner_state.params,
+        config=config,
+        centralised_critic=True,
     )
 
     # Calculate total timesteps.
@@ -422,6 +447,13 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
             learner_output = learn(learner_state)
             jax.block_until_ready(learner_output)
 
+        # Log the results of the training.
+        log(
+            metrics=learner_output,
+            t_env=timesteps_per_training * (i + 1),
+            trainer_metric=True,
+        )
+
         # Prepare for evaluation.
         trained_params = jax.tree_util.tree_map(
             lambda x: x[:, 0, ...], learner_output.learner_state.params
@@ -434,12 +466,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         evaluator_output = evaluator(trained_params, eval_rngs)
         jax.block_until_ready(evaluator_output)
 
-        # Log the results
-        log(
-            metrics=learner_output,
-            t_env=timesteps_per_training * (i + 1),
-            trainer_metric=True,
-        )
+        # Log the results of the evaluation.
         episode_return = log(
             metrics=evaluator_output,
             t_env=timesteps_per_training * (i + 1),
@@ -470,15 +497,16 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     ex = Experiment("mava", save_git_info=False)
     ex.logger = logger
     ex.captured_out_filter = utils.apply_backspaces_and_linefeeds
-    results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
 
-    file_obs_path = os.path.join(results_path, f"sacred/{cfg['env_name']}")
+    cfg["system_name"] = "ff_mappo"
+    exp_path = get_experiment_path(cfg, "sacred")
+    file_obs_path = os.path.join(cfg["base_exp_path"], exp_path)
     ex.observers = [observers.FileStorageObserver.create(file_obs_path)]
     ex.add_config(OmegaConf.to_container(cfg, resolve=True))
     ex.main(run_experiment)
     ex.run(config_updates={})
 
-    print(f"{Fore.CYAN}{Style.BRIGHT}IPPO experiment completed{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}MAPPO experiment completed{Style.RESET_ALL}")
 
 
 if __name__ == "__main__":

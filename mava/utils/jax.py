@@ -12,19 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO: Rewrite this file to handle only JAX arrays.
+
+import chex
 import jax
 import jax.numpy as jnp
 import numpy as np
 
 
-def ndim_at_least(x, num_dims):
+def ndim_at_least(x: chex.Array, num_dims: chex.Numeric) -> chex.Array:
     """Check if the number of dimensions of `x` is at least `num_dims`."""
     if not (isinstance(x, jax.Array) or isinstance(x, np.ndarray)):
         x = jnp.asarray(x)
     return x.ndim >= num_dims
 
 
-def merge_leading_dims(x, num_dims):
+def merge_leading_dims(x: chex.Array, num_dims: chex.Numeric) -> chex.Array:
     """Merge leading dimensions.
 
     Note:

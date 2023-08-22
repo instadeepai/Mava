@@ -1,0 +1,10 @@
+# The config of the small-4ag environment
+task_name: small-4ag
+
+task_config:
+  column_height: 8
+  shelf_rows: 2
+  shelf_columns: 3
+  num_agents: 4
+  sensor_range: 1
+  request_queue_size: 4

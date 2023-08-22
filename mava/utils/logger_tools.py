@@ -11,12 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import logging
 from collections import defaultdict
 from copy import deepcopy
-from typing import Dict
+from typing import Dict, List, Tuple
 
 from colorama import Fore, Style
+from omegaconf import DictConfig
+from sacred.run import Run
 
 
 class Logger:
@@ -34,12 +37,8 @@ class Logger:
         self.use_tb = False
         self.use_sacred = False
 
-        self.tb_logger = None
-        self.sacred_run_dict = None
-        self.sacred_info = None
-
         # defaultdict is used to overcome the problem of missing keys when logging to sacred.
-        self.stats = defaultdict(lambda: [])
+        self.stats: Dict[str, List[Tuple[int, float]]] = defaultdict(lambda: [])
 
     def setup_tb(self, directory_name: str) -> None:
         """Set up tensorboard logging."""
@@ -50,7 +49,7 @@ class Logger:
         self.tb_logger = log_value
         self.use_tb = True
 
-    def setup_sacred(self, sacred_run_dict: Dict) -> None:
+    def setup_sacred(self, sacred_run_dict: Run) -> None:
         """Set up sacred logging."""
         self.sacred_run_dict = sacred_run_dict
         self.sacred_info = sacred_run_dict.info
@@ -98,3 +97,14 @@ def config_copy(config: Dict) -> Dict:
         return [config_copy(v) for v in config]
     else:
         return deepcopy(config)
+
+
+def get_experiment_path(config: DictConfig, logger_type: str) -> str:
+    """Helper function to create the experiment path."""
+    exp_path = (
+        f"{logger_type}/{config['system_name']}/{config['env_name']}/"
+        + f"{config['rware_scenario']['task_name']}/envs_{config['num_envs']}/"
+        + f"seed_{config['seed']}"
+    )
+
+    return exp_path
