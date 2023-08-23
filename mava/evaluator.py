@@ -52,7 +52,7 @@ def get_ff_evaluator_fn(
 
             # Select action.
             rng, _rng = jax.random.split(rng)
-            pi, _ = apply_fn(params, last_timestep.observation)
+            pi = apply_fn(params, last_timestep.observation)
 
             if config["evaluation_greedy"]:
                 action = pi.mode()
@@ -167,7 +167,7 @@ def get_rnn_evaluator_fn(
                 ac_in = (batched_observation, last_done[jnp.newaxis, jnp.newaxis, :])
 
             # Run the network.
-            hstate, pi, _ = apply_fn(params, hstate, ac_in)
+            hstate, pi = apply_fn(params, hstate, ac_in)
 
             if config["evaluation_greedy"]:
                 action = pi.mode()
@@ -244,11 +244,6 @@ def get_rnn_evaluator_fn(
         init_hstate = jnp.expand_dims(init_hstate, axis=2)
         init_hstate = jnp.tile(init_hstate, (1, config["num_agents"], 1))
 
-        if centralised_critic:
-            init_critic_hstate = scanned_rnn.initialize_carry(eval_batch, 128)
-            init_critic_hstate = jnp.expand_dims(init_critic_hstate, axis=1)
-            init_hstate = (init_hstate, init_critic_hstate)
-
         # Initialise dones.
         dones = jnp.zeros(
             (
@@ -298,10 +293,10 @@ def evaluator_setup(
                 network.apply,
                 in_axes=(
                     None,
-                    (1, None),
-                    (ObservationGlobalState(2, 2, None, 2), None),
+                    1,
+                    (ObservationGlobalState(2, 2, 2, 2), None),
                 ),
-                out_axes=((1, None), 2, 2),
+                out_axes=(1, 2),
             )
         else:
             vmapped_eval_network_apply_fn = jax.vmap(
@@ -326,7 +321,7 @@ def evaluator_setup(
         if centralised_critic:
             vmapped_eval_network_apply_fn = jax.vmap(
                 network.apply,
-                in_axes=(None, ObservationGlobalState(0, 0, None, 0)),
+                in_axes=(None, ObservationGlobalState(0, 0, 0, 0)),
             )
         else:
             vmapped_eval_network_apply_fn = jax.vmap(
