@@ -191,11 +191,11 @@ def get_learner_fn(
 
             # Add a batch dimension to the observation.
             batched_observation = jax.tree_util.tree_map(
-                lambda x: x[np.newaxis, :], last_timestep.observation
+                lambda x: x[jnp.newaxis, :], last_timestep.observation
             )
             ac_in = (
                 batched_observation,
-                last_done[jnp.newaxis, :],
+                last_done[:, 0][jnp.newaxis, :],
             )
 
             # Run the network.
@@ -256,11 +256,11 @@ def get_learner_fn(
 
         # Add a batch dimension to the observation.
         batched_last_observation = jax.tree_util.tree_map(
-            lambda x: x[np.newaxis, :], last_timestep.observation
+            lambda x: x[jnp.newaxis, :], last_timestep.observation
         )
         ac_in = (
             batched_last_observation,
-            last_done[jnp.newaxis, :],
+            last_done[:, 0][jnp.newaxis, :],
         )
 
         _, critic_params = params
@@ -330,7 +330,7 @@ def get_learner_fn(
                         init_policy_hstate.squeeze(0),
                         (
                             traj_batch.obs,
-                            traj_batch.done,
+                            traj_batch.done[:, :, 0],
                         ),
                     )
                     log_prob = actor_policy.log_prob(traj_batch.action)
@@ -366,7 +366,7 @@ def get_learner_fn(
                         init_critic_hstate.squeeze(0),
                         (
                             traj_batch.obs,
-                            traj_batch.done,
+                            traj_batch.done[:, :, 0],
                         ),
                     )
 
@@ -583,11 +583,11 @@ def learner_setup(
 
     # Vmap network apply function over number of agents.
     vmapped_actor_network_apply_fn = jax.vmap(
-        actor_network.apply, in_axes=(None, 1, 2), out_axes=(1, 2)
+        actor_network.apply, in_axes=(None, 1, (2, None)), out_axes=(1, 2)
     )
     # Vmap network apply function over number of agents.
     vmapped_critic_network_apply_fn = jax.vmap(
-        critic_network.apply, in_axes=(None, 1, 2), out_axes=(1, 2)
+        critic_network.apply, in_axes=(None, 1, (2, None)), out_axes=(1, 2)
     )
 
     apply_fns = (vmapped_actor_network_apply_fn, vmapped_critic_network_apply_fn)
