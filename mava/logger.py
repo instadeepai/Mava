@@ -14,9 +14,11 @@
 
 """Logger setup."""
 import datetime
+import json
 import os
+import time
 from logging import Logger as SacredLogger
-from typing import Callable, Dict
+from typing import Callable, Dict, Tuple
 
 import jax.numpy as jnp
 import numpy as np
@@ -27,7 +29,9 @@ from mava.types import ExperimentOutput
 from mava.utils.logger_tools import Logger, get_experiment_path
 
 
-def get_logger_fn(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
+def get_logger_fn(  # noqa: CCR001
+    logger: Logger, _run: Run, config: Dict
+) -> Tuple[Callable, Callable]:
     """Get the logger function."""
 
     def log(
@@ -79,7 +83,7 @@ def get_logger_fn(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
             if trainer_metric:
                 logger.log_stat(f"total_loss_seed_{seed}", float(np.mean(total_loss)), t_env)
                 logger.log_stat(f"value_loss_seed_{seed}", float(np.mean(value_loss)), t_env)
-                logger.log_stat(f"loss_acto_seed_{seed}", float(np.mean(loss_actor)), t_env)
+                logger.log_stat(f"loss_actor_seed_{seed}", float(np.mean(loss_actor)), t_env)
                 logger.log_stat(f"entropy_seed_{seed}", float(np.mean(entropy)), t_env)
 
         log_string = (
@@ -115,10 +119,36 @@ def get_logger_fn(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
 
         return float(np.mean(episodes_return))
 
-    return log
+    def save_json_by_seed() -> None:
+        """Split the current json file by seed into separate files."""
+        # Make sure the full values are recorded in the JSON file.
+        time.sleep(5)
+        # Load JSON data from a file
+        input_file_path = f"{_run.observers[0].dir}/metrics.json"
+        with open(input_file_path, "r") as input_file:
+            data = json.load(input_file)
+
+        # Splitting the data and creating separate JSON files for each seed
+        seed_data: dict = {}
+        for key, value in data.items():
+            metric_name_parts = key.split("_seed_")
+            if len(metric_name_parts) == 2:
+                seed_num = metric_name_parts[1]
+                if seed_num not in seed_data:
+                    seed_data[seed_num] = {}
+                metric_name = metric_name_parts[0]
+                seed_data[seed_num][metric_name] = value
+
+        # Create separate JSON files for each seed's metrics
+        for seed_num, metrics in seed_data.items():
+            output_file_path = f"{_run.observers[0].dir}/metrics_seed_{seed_num}.json"
+            with open(output_file_path, "w") as output_file:
+                json.dump(metrics, output_file, indent=2)
+
+    return log, save_json_by_seed
 
 
-def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> Callable:
+def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> Tuple[Callable, Callable]:
     """Setup the logger."""
     logger = Logger(_log)
     unique_token = f"{datetime.datetime.now()}"
@@ -128,4 +158,4 @@ def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> Callable:
         exp_path = get_experiment_path(config, "tensorboard")
         tb_logs_path = os.path.join(config["base_exp_path"], f"{exp_path}/{unique_token}")
         logger.setup_tb(tb_logs_path)
-    return get_logger_fn(logger, config)
+    return get_logger_fn(logger, _run, config)

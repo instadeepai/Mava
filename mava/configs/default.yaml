@@ -11,6 +11,7 @@ env_name: RobotWarehouse-v0
 num_envs: 16  # Number of vectorised environments per device.
 num_updates: 10 # Number of updates
 seeds: [42] # List of the different seeds to run.
+  # Warning: the more seeds you run, the more slow the speed of the experiment will be.
 
 # --- Agent observations ---
 add_agent_id: True
@@ -41,5 +42,6 @@ absolute_metric: True # Whether the absolute metric should be computed. For more
 # --- Logging options ---
 use_tf: True
 use_sacred: True
+split_json_by_seed: True # Split JSON logs by seed after the full experiment has run.
 base_exp_path: results
 system_name: ~  # this is manually set inside each file depending on which system is run

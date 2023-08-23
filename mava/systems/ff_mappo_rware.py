@@ -411,10 +411,10 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:  #
     """Runs experiment."""
     # Logger setup
     config = config_copy(_config)
-    log = logger_setup(_run, config, _log)
+    log, save_json_by_seed = logger_setup(_run, config, _log)
 
-    generator = RandomGenerator(**config["rware_scenario"]["task_config"])
     # Create envs
+    generator = RandomGenerator(**config["rware_scenario"]["task_config"])
     env = jumanji.make(config["env_name"], generator=generator)
     env = RwareMultiAgentWithGlobalStateWrapper(env)
     if config["add_agent_id"]:
@@ -427,6 +427,18 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:  #
         eval_env = AgentIDWrapper(env=eval_env, has_global_state=True)
 
     # PRNG keys.
+    if len(config["seeds"]) > 1:
+        print(
+            f"{Fore.RED}{Style.BRIGHT}",
+            "Warning: Using multiple seeds may significantly increase experiment runtime",
+            f"{Style.RESET_ALL}",
+        )
+        if not config["split_json_by_seed"]:
+            print(
+                f"{Fore.RED}{Style.BRIGHT}",
+                "Warning: All metrics will be saved in a single JSON file with seed number suffix.",
+                f"{Style.RESET_ALL}",
+            )
     seeds_array = jnp.array(config["seeds"])
     random_keys = jax.vmap(jax.random.PRNGKey)(seeds_array)
     rng, rng_e, rng_p = jax.vmap(jax.random.split, in_axes=(0, None), out_axes=1)(random_keys, 3)
@@ -521,6 +533,10 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:  #
                 absolute_metric=True,
                 seed=seed,
             )
+
+    # Split metrics by seed in different JSON files.
+    if (len(config["seeds"]) > 1) and config["split_json_by_seed"]:
+        save_json_by_seed()
 
 
 @hydra.main(config_path="../configs", config_name="default.yaml", version_base="1.2")
