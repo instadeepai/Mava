@@ -484,7 +484,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     """Runs experiment."""
     # Logger setup
     config = config_copy(_config)
-    log = logger_setup(_run, config, _log)
+    log, logger = logger_setup(_run, config, _log)
 
     generator = RandomGenerator(**config["rware_scenario"]["task_config"])
     # Create envs
@@ -579,6 +579,9 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
             t_env=timesteps_per_training * (i + 1),
             absolute_metric=True,
         )
+
+    if config["use_neptune"]:
+        logger.neptune_logger.stop()
 
 
 @hydra.main(config_path="../configs", config_name="default.yaml", version_base="1.2")

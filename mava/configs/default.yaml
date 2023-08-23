@@ -45,4 +45,4 @@ use_sacred: True
 use_neptune: True
 base_exp_path: results
 system_name: ~  # this is manually set inside each file depending on which system is run
-neptune_tag: mappo_split_net_sweep_128
+neptune_tag: test_mava_neptune_new
