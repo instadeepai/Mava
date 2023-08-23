@@ -618,7 +618,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:  #
     if len(config["seeds"]) > 1:
         print(
             f"{Fore.RED}{Style.BRIGHT}",
-            "Warning: Using multiple seeds may significantly increase experiment runtime",
+            "Warning: Using multiple seeds may significantly increase experiment runtime.",
             f"{Style.RESET_ALL}",
         )
         if not config["split_json_by_seed"]:

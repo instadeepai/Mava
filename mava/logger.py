@@ -34,7 +34,7 @@ def get_logger_fn(  # noqa: CCR001
 ) -> Tuple[Callable, Callable]:
     """Get the logger function."""
 
-    def log(
+    def log(  # noqa: CCR001
         metrics: ExperimentOutput,
         t_env: int = 0,
         trainer_metric: bool = False,
@@ -96,10 +96,15 @@ def get_logger_fn(  # noqa: CCR001
             f"Max Episode Length {float(np.max(episodes_length)):.3f}"
         )
 
+        if len(config["seeds"]) > 1:
+            suffix = f" (SEED {seed})"
+        else:
+            suffix = ""
+
         if absolute_metric:
             logger.console_logger.info(
                 f"{Fore.BLUE}{Style.BRIGHT}"
-                f"ABSOLUTE METRIC (SEED {seed}): {log_string}"
+                f"ABSOLUTE METRIC{suffix}: {log_string}"
                 f"{Style.RESET_ALL}"
             )
         elif trainer_metric:
@@ -110,11 +115,11 @@ def get_logger_fn(  # noqa: CCR001
                 f"Entropy {float(np.mean(entropy)):.3f}"
             )
             logger.console_logger.info(
-                f"{Fore.MAGENTA}{Style.BRIGHT}TRAINER (SEED {seed}): {log_string}{Style.RESET_ALL}"
+                f"{Fore.MAGENTA}{Style.BRIGHT}TRAINER{suffix}: {log_string}{Style.RESET_ALL}"
             )
         else:
             logger.console_logger.info(
-                f"{Fore.GREEN}{Style.BRIGHT}EVALUATOR (SEED {seed}): {log_string}{Style.RESET_ALL}"
+                f"{Fore.GREEN}{Style.BRIGHT}EVALUATOR{suffix}: {log_string}{Style.RESET_ALL}"
             )
 
         return float(np.mean(episodes_return))
