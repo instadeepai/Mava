@@ -300,7 +300,7 @@ def evaluator_setup(
             )
         else:
             vmapped_eval_network_apply_fn = jax.vmap(
-                network.apply, in_axes=(None, 1, 2), out_axes=(1, 2, 2)
+                network.apply, in_axes=(None, 1, 2), out_axes=(1, 2)
             )
         evaluator = get_rnn_evaluator_fn(
             eval_env,
