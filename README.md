@@ -28,7 +28,7 @@
 
 <hr>
 
-👋 **UPDATE - 11/8/2023**: This is out first release of an end-to-end JAX version of Mava. Henceforth we will only be supporting JAX-based environments and systems with native support for the [Jumanji][jumanji] environment API. The reason for this change is to have a lightweight and easy-to-use end-to-end JAX based research tool. We are currently following a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl] where we allow for code duplication to enable readability. All algorithmic logic can be found in the file implementing a particular algorithm. If you would still like to use our deprecated TF2-based framework and systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
+👋 **UPDATE - 23/8/2023**: This is out first release of an end-to-end JAX version of Mava. Henceforth we will only be supporting JAX-based environments and systems with native support for the [Jumanji][jumanji] environment API. The reason for this change is to have a lightweight and easy-to-use end-to-end JAX based research tool. We are currently following a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl] where we allow for code duplication to enable readability. All algorithmic logic can be found in the file implementing a particular algorithm. If you would still like to use our deprecated TF2-based framework and systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
 
 <hr>
 
@@ -48,17 +48,27 @@ To join us in these efforts, please feel free to reach out, raise issues or read
 
 It should be noted that in all cases here Mava is trained using a single 6GB Nivida 3060 laptop GPU.
 
-In order to show the utility of end-to-end JAX-based MARL systems and JAX-based environments we compare the speed and performance of Mava against [EPyMARL][epymarl] on a simple Robotic Warehouse task with 4 agents.
+In order to show the utility of end-to-end JAX-based MARL systems and JAX-based environments we compare the speed of Mava against [EPyMARL][epymarl] on a simple Robotic Warehouse task with 4 agents. **It should be noted in this case that we are not trying to achieve optimal performance on EPyMARL** but using the framework as a means to illustrate the speed increases that are possible with using end-to-end Jax based systems.
+
+
 
 Furthermore, we illustrate the speed of JAX-based MARL by illustrating the system steps per second as the number of parallel environments are increased
 
-Here, also note the system performance on a larger set of Robotic Warehouse environments:
+<p align="center">
+    <a href="docs/images/mava_sps_results.png">
+        <img src="docs/images/mava_sps_results.png" alt="Mava sps" width="40%"/>
+    </a>
+</p>
+
+Here, also note the system performance on a larger set of Robotic Warehouse environments. In all cases systems were trained up to 200 million environment timesteps with 512 vectorised environments. We give the average experiment wall clock time on the x-axis.
+
+
 
 ## Code Philosophy
 
-PureJaxRL is inspired by [CleanRL](https://github.com/vwxyzjn/cleanrl), providing high-quality single-file implementations with research-friendly features. Like CleanRL, this is not a modular library and is not meant to be imported. The repository focuses on simplicity and clarity in its implementations, making it an excellent resource for researchers and practitioners.
+The current code in Mava is adapted from [PureJaxRL](https://github.com/luchris429/purejaxrl/), providing high-quality single-file implementations with research-friendly features. Similar to PureJaxRL, Mava is not a modular library and is not meant to be imported. The repository focuses on simplicity and clarity in its implementations, while utilising advantages offered by JAX such as `pmap`, making it an excellent resource for researchers and practitioners.
 
-### Overview 🦜
+## Overview 🦜
 
 - 🥑 **Implementations of MARL algorithms**: Implementations of multi-agent PPO systems that follow both the Centralised Training with Decentralised Execution (CTDE) and Decentralised Training with Decentralised Execution (DTDE) MARL paradigms.
 - 🍬 **Environment Wrappers**: Example wrapper for mapping a Jumanji environment to an environment usable by Mava. At the moment we only support [Robotic Warehouse][jumanji_rware] but plan to support more environments soon.
@@ -124,7 +134,7 @@ The current version of Mava has been based on code from the following projects:
 - 🌳 [EPyMARL][epymarl] provides a framework for training MARL systems using a PyTorch backend.
 
 [Paper]: https://arxiv.org/pdf/2107.01460.pdf
-[quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/quickstart.ipynb
+[quickstart]: https://github.com/instadeepai/Mava/blob/develop/quickstart.ipynb
 [jumanji]: https://github.com/instadeepai/jumanji
 [cleanrl]: https://github.com/vwxyzjn/cleanrl
 [purejaxrl]: https://github.com/luchris429/purejaxrl
