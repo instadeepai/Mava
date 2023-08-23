@@ -112,11 +112,18 @@ class AgentIDWrapper(Wrapper):
         # timestep.observation = timestep.observation._replace(agents_view=new_agents_view)
         # just need to check that this doesn't affect timing
         if self.has_global_state:
+
+            # Add the agent IDs to the global state
+            replicated_global_state = jnp.tile(
+                timestep.observation.global_state, (self._env.num_agents, 1)
+            )
+            new_global_state = jnp.concatenate([agent_ids, replicated_global_state], axis=-1)
+
             timestep.observation = ObservationGlobalState(
                 agents_view=new_agents_view,
                 action_mask=timestep.observation.action_mask,
                 step_count=timestep.observation.step_count,
-                global_state=timestep.observation.global_state,
+                global_state=new_global_state,
             )
 
         else:
@@ -138,11 +145,18 @@ class AgentIDWrapper(Wrapper):
         new_agents_view = jnp.concatenate([agent_ids, timestep.observation.agents_view], axis=-1)
 
         if self.has_global_state:
+
+            # Add the agent IDs to the global state
+            replicated_global_state = jnp.tile(
+                timestep.observation.global_state, (self._env.num_agents, 1)
+            )
+            new_global_state = jnp.concatenate([agent_ids, replicated_global_state], axis=-1)
+
             timestep.observation = ObservationGlobalState(
                 agents_view=new_agents_view,
                 action_mask=timestep.observation.action_mask,
                 step_count=timestep.observation.step_count,
-                global_state=timestep.observation.global_state,
+                global_state=new_global_state,
             )
 
         else:
@@ -158,8 +172,23 @@ class AgentIDWrapper(Wrapper):
         agents_view = specs.Array(
             (self._env.num_agents, self.num_obs_features), jnp.int32, "agents_view"
         )
+        global_state = specs.Array(
+            (
+                self._env.num_agents,
+                self._env.num_obs_features * self._env.num_agents + self._env.num_agents,
+            ),
+            jnp.int32,
+            "global_state",
+        )
 
-        return self._env.observation_spec().replace(agents_view=agents_view)
+        if self.has_global_state:
+            return self._env.observation_spec().replace(
+                agents_view=agents_view,
+                global_state=global_state,
+            )
+        return self._env.observation_spec().replace(
+            agents_view=agents_view,
+        )
 
 
 class RwareMultiAgentWrapper(Wrapper):
