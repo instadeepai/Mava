@@ -143,7 +143,7 @@ class NeptuneLogger(Logger):
         )
         self._run.params = self._exp_params
 
-    def write(self, values: Any) -> None:  # noqa: CCR001
+    def write(self, values: Any) -> None:  # noqa: CCR001 B028
         """Write values to the logger."""
         try:
             if isinstance(values, dict):
@@ -172,10 +172,13 @@ class NeptuneLogger(Logger):
                 for elements in values:
                     self.write(elements)
             else:
-                warnings.warn(f"Unable to log: {values}, unknown type: {type(values)}")
+                warnings.warn(
+                    f"Unable to log: {values}, unknown type: {type(values)}", stacklevel=2
+                )
         except Exception as ex:
             warnings.warn(
-                f"Unable to log: {key}, type: {type(value)} , value: {value}" + f" ex: {ex}"
+                f"Unable to log: {key}, type: {type(value)} , value: {value}" + f" ex: {ex}",
+                stacklevel=2,
             )
 
     def scalar_summary(self, key: str, value: Any) -> None:
