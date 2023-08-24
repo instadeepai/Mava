@@ -46,13 +46,29 @@ To join us in these efforts, please feel free to reach out, raise issues or read
 
 ## Performance and Speed 🚀
 
-It should be noted that in all cases here Mava is trained using a single 6GB Nivida 3060 laptop GPU.
+It should be noted that in all cases Mava is trained using a NVIDIA Quadro RTX 4000 with 8GB Memory.
 
-In order to show the utility of end-to-end JAX-based MARL systems and JAX-based environments we compare the speed of Mava against [EPyMARL][epymarl] on a simple Robotic Warehouse task with 4 agents. **It should be noted in this case that we are not trying to achieve optimal performance on EPyMARL** but using the framework as a means to illustrate the speed increases that are possible with using end-to-end Jax based systems.
+In order to show the utility of end-to-end JAX-based MARL systems and JAX-based environments we compare the _speed_ in total training wallclock time of Mava against [EPyMARL][epymarl] on a simple Robotic Warehouse tasks with 2 and 4 agents. **It should be noted in this case that we are not trying to achieve optimal performance on EPyMARL** but using the framework as a means to illustrate the speed increases that are possible with using end-to-end Jax-based systems.
 
+<p align="center">
+    <a href="docs/images/ff_mappo_tiny2ag.png">
+        <img src="docs/images/ff_mappo_tiny2ag.png" alt="Mava ff mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+    <a href="docs/images/ff_mappo_tiny4ag.png">
+        <img src="docs/images/ff_mappo_tiny4ag.png" alt="Mava ff mappo tiny 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+    <a href="docs/images/ff_mappo_small4ag.png">
+        <img src="docs/images/ff_mappo_small4ag.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+</p>
 
+### 📌 An important note on performance differences
 
-Furthermore, we illustrate the speed of JAX-based MARL by illustrating the system steps per second as the number of parallel environments are increased
+In order to gain the wallclock speeds afforded by JAX-based systems it is required that environments be stateless. It is for this reason that Mava does not use the exact same version of the RWARE environment as the EPyMARL systems were trained on but instead uses a JAX-based implementation of RWARE found in [Jumanji][jumanji_rware]. One of the noteable difference in the underlying environment logic is that the RWARE version in Jumanji will not attempt to handle agent collisions in the environment but will instead terminate an episode upon agent collision. In our experiments, this appeared to make the environment more challenging. For a more detailed discussion, please see the following [page](docs/detailed_comparison.md).
+
+### 🧨 Vectorised environments
+
+Furthermore, we illustrate the speed of JAX-based MARL by illustrating the system steps per second as the number of parallel environments are increased. These steps per secondscaling plots were computed using a RTX-3060 Mobile GPU with 6GB memory.
 
 <p align="center">
     <a href="docs/images/mava_sps_results.png">
