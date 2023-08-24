@@ -27,7 +27,7 @@ from mava.types import ExperimentOutput
 from mava.utils.logger_tools import Logger, get_experiment_path
 
 
-def get_logger_fn(logger: Logger, config: Dict) -> Tuple[Callable, Logger]:  # noqa: CCR001
+def get_logger_tools(logger: Logger, config: Dict) -> Tuple[Callable, Callable]:  # noqa: CCR001
     """Get the logger function."""
 
     def log(
@@ -111,10 +111,15 @@ def get_logger_fn(logger: Logger, config: Dict) -> Tuple[Callable, Logger]:  # n
 
         return float(np.mean(episodes_return))
 
-    return log, logger
+    def stop_logger() -> None:
+        """Stop the logger."""
+        if logger.use_neptune:
+            logger.neptune_logger.stop()
+
+    return log, stop_logger
 
 
-def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> Tuple[Callable, Logger]:
+def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> Tuple[Callable, Callable]:
     """Setup the logger."""
     logger = Logger(_log)
     unique_token = f"{datetime.datetime.now()}"
@@ -126,4 +131,4 @@ def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> Tuple[Callable,
         logger.setup_tb(tb_logs_path)
     if config["use_neptune"]:
         logger.setup_neptune(config)
-    return get_logger_fn(logger, config)
+    return get_logger_tools(logger, config)

@@ -42,7 +42,9 @@ absolute_metric: True # Whether the absolute metric should be computed. For more
 # --- Logging options ---
 use_tf: False
 use_sacred: True
-use_neptune: True
 base_exp_path: results
 system_name: ~  # this is manually set inside each file depending on which system is run
-neptune_tag: test_mava_neptune_new
+# Neptune logging
+use_neptune: False
+neptune_tag: test_mava
+name: None # Unique ID from logging.

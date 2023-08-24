@@ -18,7 +18,7 @@ import warnings
 from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 
 import neptune.new as neptune
 import numpy as np
@@ -41,6 +41,7 @@ class Logger:
 
         self.use_tb = False
         self.use_sacred = False
+        self.use_neptune = False
 
         # defaultdict is used to overcome the problem of missing keys when logging to sacred.
         self.stats: Dict[str, List[Tuple[int, float]]] = defaultdict(lambda: [])
@@ -61,8 +62,12 @@ class Logger:
         self.use_sacred = True
 
     def setup_neptune(self, exp_params: Dict) -> None:
+        """Set up neptune logging."""
         self.neptune_logger = NeptuneLogger(
-            label="logger", tag=exp_params["neptune_tag"], exp_params=exp_params
+            label="logger",
+            tag=exp_params["neptune_tag"],
+            name=exp_params["name"],
+            exp_params=exp_params,
         )
         self.use_neptune = True
 
@@ -88,20 +93,22 @@ class Logger:
             self.sacred_run_dict.log_scalar(key, value, t)
 
 
-class NeptuneLogger:
+class NeptuneLogger(Logger):
+    """Logs to the [neptune.ai](https://app.neptune.ai/) platform. The user is expected to have
+    their NEPTUNE_API_TOKEN set as an environment variable. This can be done from the Neptune GUI.
+    """
+
     def __init__(
         self,
         label: str,
         tag: str,
-        name: str = str(datetime.now()),  # noqa: B008
-        exp_params: Dict = {},  # noqa: B006
+        name: Union[str, None] = None,
+        exp_params: Union[Dict, None] = None,
         project: str = "InstaDeep/Mava",
         # Logging hardware metrics fails with nvidia migs
         capture_hardware_metrics: bool = True,
     ):
-
-        """Initialise a logger for logging experiment metrics
-            to Neptune.
+        """Initialise a logger for logging experiment metrics to Neptune.
 
         Args:
             label: identifier indicating what process the logger was created for.
@@ -116,9 +123,11 @@ class NeptuneLogger:
             capture_hardware_metrics: whether machine hardware metrics should be
                 logged to Neptune.
         """
-
         self._label = label
-        self._name = name
+        if name:
+            self._name = name
+        else:
+            self._name = str(datetime.now())
         self._exp_params = exp_params
         self._api_token = os.getenv("NEPTUNE_API_TOKEN")
         self._project = project
@@ -132,9 +141,10 @@ class NeptuneLogger:
             tags=self._tag,
             capture_hardware_metrics=capture_hardware_metrics,
         )
-        self._run["params"] = self._exp_params  # type: ignore
+        self._run.params = self._exp_params
 
     def write(self, values: Any) -> None:  # noqa: CCR001
+        """Write values to the logger."""
         try:
             if isinstance(values, dict):
                 for key, value in values.items():
@@ -169,22 +179,28 @@ class NeptuneLogger:
             )
 
     def scalar_summary(self, key: str, value: Any) -> None:
+        """Log a scalar variable."""
         if self._run:
             self._run[f"{self._label}/{format_key(key)}"].log(value)
 
     def dict_summary(self, key: str, value: Dict) -> None:
+        """Log a dictionary of values."""
         dict_info = self._flatten_dict(parent_key=key, dict_info=value)
         for (k, v) in dict_info.items():
             self.scalar_summary(k, v)
 
     def histogram_summary(self, key: str, value: np.ndarray) -> None:
+        """Log a histogram of the tensor of values."""
         return
 
-    # Flatten dict, adapted from
-    # https://stackoverflow.com/questions/6027558/flatten-nested-dictionaries-compressing-keys
-    # Converts {'agent_0': {'critic_loss': 0.1, 'policy_loss': 0.2},...}
-    #   to  {'agent_0_critic_loss':0.1,'agent_0_policy_loss':0.1 ,...}
     def _flatten_dict(self, parent_key: str, dict_info: Dict, sep: str = "_") -> Dict[str, float]:
+        """Flatten a nested dictionary.
+        Note:
+            Flatten dict, adapted from
+            https://stackoverflow.com/questions/6027558/flatten-nested-dictionaries-compressing-keys
+            Converts {'agent_0': {'critic_loss': 0.1, 'policy_loss': 0.2},...}
+            to  {'agent_0_critic_loss':0.1,'agent_0_policy_loss':0.1 ,...}
+        """
         items: List = []
         for k, v in dict_info.items():
             k = str(k)
@@ -199,9 +215,11 @@ class NeptuneLogger:
         return dict(items)
 
     def close(self) -> None:
+        """Close the logger."""
         self._run = None
 
     def stop(self) -> None:
+        """Stop the logger."""
         self._run.stop()
 
 
