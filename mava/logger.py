@@ -29,7 +29,7 @@ from mava.types import ExperimentOutput
 from mava.utils.logger_tools import Logger, get_experiment_path
 
 
-def get_logger_fn(  # noqa: CCR001
+def get_logger_tools(  # noqa: CCR001
     logger: Logger, _run: Run, config: Dict
 ) -> Tuple[Callable, Callable]:
     """Get the logger function."""
@@ -69,7 +69,7 @@ def get_logger_fn(  # noqa: CCR001
         episodes_length = jnp.ravel(episodes_info["episode_length"])
 
         # Log metrics.
-        if config["use_sacred"] or config["use_tf"]:
+        if config["use_sacred"] or config["use_tf"] or config["use_neptune"]:
             logger.log_stat(
                 prefix.lower() + f"mean_episode_returns_seed_{seed}",
                 float(np.mean(episodes_return)),
@@ -127,7 +127,7 @@ def get_logger_fn(  # noqa: CCR001
     def save_json_by_seed() -> None:
         """Split the current json file by seed into separate files."""
         # Make sure the full values are recorded in the JSON file.
-        time.sleep(5)
+        time.sleep(10)
         # Load JSON data from a file
         input_file_path = f"{_run.observers[0].dir}/metrics.json"
         with open(input_file_path, "r") as input_file:
@@ -150,7 +150,14 @@ def get_logger_fn(  # noqa: CCR001
             with open(output_file_path, "w") as output_file:
                 json.dump(metrics, output_file, indent=2)
 
-    return log, save_json_by_seed
+    def stop_logger() -> None:
+        """Stop the logger and save the metrics for different seeds."""
+        if logger.use_neptune:
+            logger.neptune_logger.stop()
+        if (len(config["seeds"]) > 1) and config["split_json_by_seed"]:
+            save_json_by_seed()
+
+    return log, stop_logger
 
 
 def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> Tuple[Callable, Callable]:
@@ -163,4 +170,4 @@ def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> Tuple[Callable,
         exp_path = get_experiment_path(config, "tensorboard")
         tb_logs_path = os.path.join(config["base_exp_path"], f"{exp_path}/{unique_token}")
         logger.setup_tb(tb_logs_path)
-    return get_logger_fn(logger, _run, config)
+    return get_logger_tools(logger, _run, config)
