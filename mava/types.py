@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, NamedTuple, Optional, Tuple, Union
+from typing import Dict, NamedTuple, Optional
 
 import chex
 from flax.core.frozen_dict import FrozenDict
@@ -38,8 +38,10 @@ class PPOTransition(NamedTuple):
 class LearnerState(NamedTuple):
     """State of the learner."""
 
-    params: FrozenDict
-    opt_state: OptState
+    actor_params: FrozenDict
+    critic_params: FrozenDict
+    actor_opt_state: OptState
+    critic_opt_state: OptState
     key: chex.PRNGKey
     env_state: LogEnvState
     timestep: TimeStep
@@ -48,13 +50,16 @@ class LearnerState(NamedTuple):
 class RNNLearnerState(NamedTuple):
     """State of the `Learner` for recurrent architectures."""
 
-    params: FrozenDict
-    opt_state: OptState
+    actor_params: FrozenDict
+    critic_params: FrozenDict
+    actor_opt_state: OptState
+    critic_opt_state: OptState
     key: chex.PRNGKey
     env_state: LogEnvState
     timestep: TimeStep
     dones: chex.Array
-    hstates: Union[chex.Array, Tuple[chex.Array, chex.Array]]
+    policy_hstate: chex.Array
+    critic_hstate: chex.Array
 
 
 class EvalState(NamedTuple):
@@ -74,7 +79,7 @@ class RNNEvalState(NamedTuple):
     env_state: State
     timestep: TimeStep
     dones: chex.Array
-    hstates: Union[chex.Array, Tuple[chex.Array, chex.Array]]
+    hstate: chex.Array
     step_count_: chex.Numeric = None
     return_: chex.Numeric = None
 

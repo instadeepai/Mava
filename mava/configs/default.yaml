@@ -3,7 +3,7 @@
 # --- Experiment params ---
 defaults:
   - _self_
-  - rware_scenario: tiny-4ag-easy
+  - rware_scenario: tiny-2ag
 
 # --- Environment ---
 env_name: RobotWarehouse-v0
@@ -17,9 +17,10 @@ seeds: [42] # List of the different seeds to run.
 add_agent_id: True
 
 # --- RL hyperparameters ---
-lr: 2.5e-4 # Leanring rate for network
+actor_lr: 2.5e-4 # Learning rate for actor network
+critic_lr: 2.5e-4 # Learning rate for critic network
 update_batch_size: 2 # Number of vectorised gradient updates per device.
-rollout_length: 16 # Number of environment steps per vectorised environment.
+rollout_length: 128 # Number of environment steps per vectorised environment.
 
 ppo_epochs: 4 # Number of ppo epochs per training data batch.
 num_minibatches: 2 # Number of minibatches per ppo epoch.
@@ -40,8 +41,12 @@ absolute_metric: True # Whether the absolute metric should be computed. For more
   # on the absolute metric please see: https://arxiv.org/abs/2209.10485
 
 # --- Logging options ---
-use_tf: True
+use_tf: False
 use_sacred: True
 split_json_by_seed: True # Split JSON logs by seed after the full experiment has run.
 base_exp_path: results
 system_name: ~  # this is manually set inside each file depending on which system is run
+# Neptune logging
+use_neptune: False
+neptune_tag: test_mava
+name: None # Unique ID from logging.
