@@ -167,7 +167,9 @@ class NeptuneLogger(Logger):
                         for index, elements in enumerate(value):
                             self.write({f"{key}_info_{index}": elements})
                     else:
-                        warnings.warn(f"Unable to log: {key}, unknown type: {type(value)}")
+                        warnings.warn(
+                            f"Unable to log: {key}, unknown type: {type(value)}", stacklevel=2
+                        )
             elif isinstance(values, tuple) or isinstance(value, list):
                 for elements in values:
                     self.write(elements)
