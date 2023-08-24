@@ -1,6 +1,6 @@
 <p align="center">
-    <a href="docs/images/mava_full_logo.png">
-        <img src="docs/images/mava_full_logo.png" alt="Mava logo" width="50%"/>
+    <a href="docs/images/mava_logos/mava_full_logo.png">
+        <img src="docs/images/mava_logos/mava_full_logo.png" alt="Mava logo" width="50%"/>
     </a>
 </p>
 
@@ -51,14 +51,14 @@ It should be noted that in all cases Mava is trained using a NVIDIA Quadro RTX 4
 In order to show the utility of end-to-end JAX-based MARL systems and JAX-based environments we compare the _speed_ in total training wallclock time of Mava against [EPyMARL][epymarl] on a simple Robotic Warehouse tasks with 2 and 4 agents. **It should be noted in this case that we are not trying to achieve optimal performance on EPyMARL** but using the framework as a means to illustrate the speed increases that are possible with using end-to-end Jax-based systems.
 
 <p align="center">
-    <a href="docs/images/ff_mappo_tiny2ag.png">
-        <img src="docs/images/ff_mappo_tiny2ag.png" alt="Mava ff mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    <a href="docs/images/rware_results/ff_mappo_tiny2ag.png">
+        <img src="docs/images/rware_results/ff_mappo_tiny2ag.png" alt="Mava ff mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
-    <a href="docs/images/ff_mappo_tiny4ag.png">
-        <img src="docs/images/ff_mappo_tiny4ag.png" alt="Mava ff mappo tiny 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    <a href="docs/images/rware_results/ff_mappo_tiny4ag.png">
+        <img src="docs/images/rware_results/ff_mappo_tiny4ag.png" alt="Mava ff mappo tiny 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
-    <a href="docs/images/ff_mappo_small4ag.png">
-        <img src="docs/images/ff_mappo_small4ag.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    <a href="docs/images/rware_results/ff_mappo_small4ag.png">
+        <img src="docs/images/rware_results/ff_mappo_small4ag.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
 </p>
 
