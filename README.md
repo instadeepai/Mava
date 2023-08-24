@@ -60,6 +60,8 @@ In order to show the utility of end-to-end JAX-based MARL systems and JAX-based 
     <a href="docs/images/rware_results/ff_mappo_small4ag.png">
         <img src="docs/images/rware_results/ff_mappo_small4ag.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
+    <br>
+    <div style="text-align:center; margin-top: 10px;"> Mava MAPPO performance on the tiny-2ag, tiny-4ag and small-4ag RWARE tasks.</div>
 </p>
 
 ### 📌 An important note on performance differences
@@ -74,6 +76,8 @@ Furthermore, we illustrate the speed of JAX-based MARL by illustrating the syste
     <a href="docs/images/mava_sps_results.png">
         <img src="docs/images/mava_sps_results.png" alt="Mava sps" width="40%"/>
     </a>
+    <br>
+    <div style="text-align:center; margin-top: 10px;"> Mava environment steps per second scaling with increased vectorised environments.</div>
 </p>
 
 Here, also note the system performance on a larger set of Robotic Warehouse environments. In all cases systems were trained up to 200 million environment timesteps with 512 vectorised environments. We give the average experiment wall clock time on the x-axis.
@@ -88,7 +92,7 @@ The current code in Mava is adapted from [PureJaxRL](https://github.com/luchris4
 
 - 🥑 **Implementations of MARL algorithms**: Implementations of multi-agent PPO systems that follow both the Centralised Training with Decentralised Execution (CTDE) and Decentralised Training with Decentralised Execution (DTDE) MARL paradigms.
 - 🍬 **Environment Wrappers**: Example wrapper for mapping a Jumanji environment to an environment usable by Mava. At the moment we only support [Robotic Warehouse][jumanji_rware] but plan to support more environments soon.
-- 🎓 **Educational Material**: [Quickstart notebook][quickstart] to facilitate Mava's adoption and highlight the added value of JAX-based MARL.
+- 🎓 **Educational Material**: [Quickstart notebook][quickstart] to demonstrate how Mava can be used and to highlight the added value of JAX-based MARL.
 
 ## Installation 🎬
 

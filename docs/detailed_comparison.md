@@ -11,7 +11,6 @@ The current version of the Jumanji implementation will not handle collisions dym
 
 To investigate this, we also run our algorithms on a version of Jumanji's RWARE where the episode does not terminate upon agent collisions.
 
-
 <p align="center">
     <a href="images/jumanji_vs_rware/ff_mappo_tiny2ag.png">
         <img src="images/jumanji_vs_rware/ff_mappo_tiny2ag.png" alt="Mava ff mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
@@ -22,9 +21,23 @@ To investigate this, we also run our algorithms on a version of Jumanji's RWARE 
     <a href="images/jumanji_vs_rware/ff_mappo_small4ag.png">
         <img src="images/jumanji_vs_rware/ff_mappo_small4ag.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
+    <br>
+    <div style="text-align:center; margin-top: 10px;"> Mava MAPPO performance on Jumanji Rware with and without collision termination on tiny-2ag, tiny-4ag and small-4ag.</div>
 </p>
 
-
+<p align="center">
+    <a href="images/jumanji_vs_rware/ff_ippo_tiny2ag.png">
+        <img src="images/jumanji_vs_rware/ff_ippo_tiny2ag.png" alt="Mava ff mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+    <a href="images/jumanji_vs_rware/ff_ippo_tiny4ag.png">
+        <img src="images/jumanji_vs_rware/ff_ippo_tiny4ag.png" alt="Mava ff mappo tiny 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+    <a href="images/jumanji_vs_rware/ff_ippo_small4ag.png">
+        <img src="images/jumanji_vs_rware/ff_ippo_small4ag.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+    <br>
+    <div style="text-align:center; margin-top: 10px;"> Mava IPPO performance on Jumanji Rware with and without collision termination on tiny-2ag, tiny-4ag and small-4ag.</div>
+</p>
 
 
 [jumanji_rware]: https://instadeepai.github.io/jumanji/environments/robot_warehouse/
