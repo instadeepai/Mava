@@ -27,6 +27,9 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# mac
+__MACOSX
+
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -127,3 +130,43 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# vscode
+.vscode
+.history
+
+# mava
+mava/bin
+mava/lib64
+mava/pyvenv.cfg
+mava/share
+mava/include
+mava/workspace.code-workspace
+
+# misc
+NULL
+logs
+Checkpoints
+.DS_Store
+.devcontainer/devcontainer.json
+3.9
+
+# PyCharm
+.idea/
+
+# act: for testing github workflows
+bin/act
+
+# Created by debugging component
+component_dependency_map.png
+
+# Mava env
+mava_env/
+
+# Sacred logs
+results/
+
+# Hydra logs
+outputs/
+multirun/
+.neptune
