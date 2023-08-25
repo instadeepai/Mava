@@ -63,13 +63,13 @@ In order to show the utility of end-to-end JAX-based MARL systems and JAX-based 
 
 <p align="center">
     <a href="docs/images/rware_results/ff_mappo/tiny-2ag.png">
-        <img src="docs/images/rware_results/ff_mappo/tiny-2ag.png" alt="Mava ff mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+        <img src="docs/images/rware_results/ff_mappo/tiny-2ag.png" alt="Mava ff mappo tiny 2ag" width="80%" style="display:inline-block; margin-right: 10px;"/>
     </a>
     <a href="docs/images/rware_results/ff_mappo/tiny-4ag.png">
-        <img src="docs/images/rware_results/ff_mappo/tiny-4ag.png" alt="Mava ff mappo tiny 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+        <img src="docs/images/rware_results/ff_mappo/tiny-4ag.png" alt="Mava ff mappo tiny 4ag" width="40%" style="display:inline-block; margin-right: 10px;"/>
     </a>
     <a href="docs/images/rware_results/ff_mappo/small-4ag.png">
-        <img src="docs/images/rware_results/ff_mappo/small-4ag.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+        <img src="docs/images/rware_results/ff_mappo/small-4ag.png" alt="Mava ff mappo small 4ag" width="40%" style="display:inline-block; margin-right: 10px;"/>
     </a>
     <br>
     <div style="text-align:center; margin-top: 10px;"> Mava feedforward MAPPO performance on the <code>tiny-2ag</code>, <code>tiny-4ag</code> and <code>small-4ag</code> RWARE tasks.</div>
