@@ -63,9 +63,11 @@ class Logger:
 
     def setup_neptune(self, exp_params: Dict) -> None:
         """Set up neptune logging."""
+        tag = exp_params["neptune_tag"]
+        
         self.neptune_logger = NeptuneLogger(
             label="logger",
-            tag=exp_params["neptune_tag"],
+            tag=tag if isinstance(tag, str) else list(tag),
             name=exp_params["name"],
             exp_params=exp_params,
         )
