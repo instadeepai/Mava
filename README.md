@@ -77,18 +77,21 @@ In order to show the utility of end-to-end JAX-based MARL systems and JAX-based 
 
 ### 📌 An important note on the differences in converged performance
 
-In order to benefit from the wallclock speed-ups afforded by JAX-based systems it is required that environments also be written in JAX. It is for this reason that Mava does not use the exact same version of the RWARE environment as EPyMARL but instead uses a JAX-based implementation of RWARE found in [Jumanji][jumanji_rware], under the name RobotWarehouse. One of the notable differences in the underlying environment logic is that RobotWarehouse (the RWARE version in Jumanji) will not attempt to handle agent collisions in the environment but will instead terminate an episode upon agent collision. In our experiments, this appeared to make the environment more challenging. For a more detailed discussion, please see the following [page](docs/jumanji_rware_comparison.md).
+In order to benefit from the wallclock speed-ups afforded by JAX-based systems it is required that environments also be written in JAX. It is for this reason that Mava does not use the exact same version of the RWARE environment as EPyMARL but instead uses a JAX-based implementation of RWARE found in [Jumanji][jumanji_rware], under the name RobotWarehouse. One of the notable differences in the underlying environment logic is that RobotWarehouse (the RWARE version in Jumanji) will not attempt to handle agent collisions in the environment but will instead terminate an episode upon agent collision. In our experiments, this appeared to make the environment more challenging. For this reason we show the performance of Mava on Jumanji with and without termination upon collision indicated with `w/o collision` in the figure legends. For a more detailed discussion, please see the following [page](docs/jumanji_rware_comparison.md).
 
 ### 🧨 Steps per second experiments using vectorised environments
 
 Furthermore, we illustrate the speed of Mava by showing the steps per second as the number of parallel environments is increased. These steps per second scaling plots were computed using a standard laptop GPU, specifically an RTX-3060 GPU with 6GB memory.
 
 <p align="center">
-    <a href="docs/images/mava_sps_results.png">
-        <img src="docs/images/mava_sps_results.png" alt="Mava sps" width="45%"/>
+    <a href="docs/images/speed_results/ff_mappo_speed_comparison.png">
+        <img src="docs/images/speed_results/ff_mappo_speed_comparison.png" alt="Mava ff mappo speed comparison" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+    <a href="docs/images/speed_results/mava_sps_results.png">
+        <img src="docs/images/speed_results/mava_sps_results.png" alt="Mava sps" width="42.5%"/>
     </a>
     <br>
-    <div style="text-align:center; margin-top: 10px;"> Mava environment steps per second scaling with increased vectorised environments.</div>
+    <div style="text-align:center; margin-top: 10px;"> Mava total training run time of 20M environment steps and steps per second scaling with increased vectorised environments.</div>
 </p>
 
 
