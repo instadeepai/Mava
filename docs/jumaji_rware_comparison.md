@@ -11,6 +11,8 @@ In contrast to the collision resolution strategy above, the current version of t
 
 To investigate this, we ran our algorithms on a version of Jumanji's RWARE where episodes do not terminate upon agent collision, but rather multiple agents are allowed to occupy the same grid position. This setup is not identical to that of the original environment but represents a closer version to its dynamics, allowing agents to easily reach the end of an episode.
 
+Please see below for Mava's recurrent and feedforward implementations of IPPO and MAPPO on the regular version of Jumanji as well as the adapted version of Jumanji without termination upon agent collision.
+
 <p align="center">
     <a href="images/rware_results/ff_mappo/tiny-2ag.png">
         <img src="images/rware_results/ff_mappo/tiny-2ag.png" alt="Mava ff mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
