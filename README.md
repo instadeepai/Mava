@@ -85,7 +85,7 @@ Furthermore, we illustrate the speed of Mava by showing the steps per second as 
 
 <p align="center">
     <a href="docs/images/mava_sps_results.png">
-        <img src="docs/images/mava_sps_results.png" alt="Mava sps" width="40%"/>
+        <img src="docs/images/mava_sps_results.png" alt="Mava sps" width="45%"/>
     </a>
     <br>
     <div style="text-align:center; margin-top: 10px;"> Mava environment steps per second scaling with increased vectorised environments.</div>
