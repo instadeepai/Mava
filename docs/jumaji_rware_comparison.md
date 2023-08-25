@@ -22,7 +22,7 @@ To investigate this, we ran our algorithms on a version of Jumanji's RWARE where
         <img src="images/rware_results/ff_mappo/small-4ag.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
     <br>
-    <div style="text-align:center; margin-top: 10px;"> Mava feedforward MAPPO performance on the `tiny-2ag`, `tiny-4ag` and `small-4ag` RWARE tasks.</div>
+    <div style="text-align:center; margin-top: 10px;"> Mava feedforward MAPPO performance on the <code>tiny-2ag</code>, <code>tiny-4ag</code> and <code>small-4ag</code> RWARE tasks.</div>
 </p>
 
 <p align="center">
@@ -36,7 +36,7 @@ To investigate this, we ran our algorithms on a version of Jumanji's RWARE where
         <img src="images/rware_results/ff_ippo/small-4ag.png" alt="Mava ff ippo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
     <br>
-    <div style="text-align:center; margin-top: 10px;"> Mava feedforward IPPO performance on the `tiny-2ag`, `tiny-4ag` and `small-4ag` RWARE tasks.</div>
+    <div style="text-align:center; margin-top: 10px;"> Mava feedforward IPPO performance on the <code>tiny-2ag</code>, <code>tiny-4ag</code> and <code>small-4ag</code> RWARE tasks.</div>
 </p>
 
 <p align="center">
@@ -50,7 +50,7 @@ To investigate this, we ran our algorithms on a version of Jumanji's RWARE where
         <img src="images/rware_results/rec_ippo/small-4ag.png" alt="Mava rec ippo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
     <br>
-    <div style="text-align:center; margin-top: 10px;"> Mava recurrent IPPO performance on the `tiny-2ag`, `tiny-4ag` and `small-4ag` RWARE tasks.</div>
+    <div style="text-align:center; margin-top: 10px;"> Mava recurrent IPPO performance on the <code>tiny-2ag</code>, <code>tiny-4ag</code> and <code>small-4ag</code> RWARE tasks.</div>
 </p>
 
 <p align="center">
@@ -64,7 +64,7 @@ To investigate this, we ran our algorithms on a version of Jumanji's RWARE where
         <img src="images/rware_results/rec_mappo/small-4ag.png" alt="Mava rec mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
     <br>
-    <div style="text-align:center; margin-top: 10px;"> Mava recurrent IPPO performance on the `tiny-2ag`, `tiny-4ag` and `small-4ag` RWARE tasks.</div>
+    <div style="text-align:center; margin-top: 10px;"> Mava recurrent IPPO performance on the <code>tiny-2ag</code>, <code>tiny-4ag</code> and <code>small-4ag</code> RWARE tasks.</div>
 </p>
 
 
