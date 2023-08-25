@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, NamedTuple, Tuple
+from typing import TYPE_CHECKING, NamedTuple, Tuple, Union
 
 import chex
 import jax.numpy as jnp
@@ -101,30 +101,39 @@ class AgentIDWrapper(Wrapper):
         self.num_obs_features = self._env.num_obs_features + self._env.num_agents
         self.has_global_state = has_global_state
 
-    def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
-        """Reset the environment."""
-        state, timestep = self._env.reset(key)
-
-        agent_ids = jnp.eye(self._env.num_agents)
+    def _add_agent_ids(
+        self, timestep: TimeStep, num_agents: int
+    ) -> Union[Observation, ObservationGlobalState]:
+        agent_ids = jnp.eye(num_agents)
         new_agents_view = jnp.concatenate([agent_ids, timestep.observation.agents_view], axis=-1)
 
         # we really should rather do this:
         # timestep.observation = timestep.observation._replace(agents_view=new_agents_view)
         # just need to check that this doesn't affect timing
         if self.has_global_state:
-            timestep.observation = ObservationGlobalState(
+            # Add the agent IDs to the global state
+            replicated_global_state = jnp.tile(timestep.observation.global_state, (num_agents, 1))
+            new_global_state = jnp.concatenate([agent_ids, replicated_global_state], axis=-1)
+
+            return ObservationGlobalState(
                 agents_view=new_agents_view,
                 action_mask=timestep.observation.action_mask,
                 step_count=timestep.observation.step_count,
-                global_state=timestep.observation.global_state,
+                global_state=new_global_state,
             )
 
         else:
-            timestep.observation = Observation(
+            return Observation(
                 agents_view=new_agents_view,
                 action_mask=timestep.observation.action_mask,
                 step_count=timestep.observation.step_count,
             )
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
+        """Reset the environment."""
+        state, timestep = self._env.reset(key)
+        timestep.observation = self._add_agent_ids(timestep, self._env.num_agents)
+
         return state, timestep
 
     def step(
@@ -134,23 +143,8 @@ class AgentIDWrapper(Wrapper):
     ) -> Tuple[State, TimeStep]:
         """Step the environment."""
         state, timestep = self._env.step(state, action)
-        agent_ids = jnp.eye(self._env.num_agents)
-        new_agents_view = jnp.concatenate([agent_ids, timestep.observation.agents_view], axis=-1)
+        timestep.observation = self._add_agent_ids(timestep, self._env.num_agents)
 
-        if self.has_global_state:
-            timestep.observation = ObservationGlobalState(
-                agents_view=new_agents_view,
-                action_mask=timestep.observation.action_mask,
-                step_count=timestep.observation.step_count,
-                global_state=timestep.observation.global_state,
-            )
-
-        else:
-            timestep.observation = Observation(
-                agents_view=new_agents_view,
-                action_mask=timestep.observation.action_mask,
-                step_count=timestep.observation.step_count,
-            )
         return state, timestep
 
     def observation_spec(self) -> specs.Spec[Observation]:
@@ -158,8 +152,23 @@ class AgentIDWrapper(Wrapper):
         agents_view = specs.Array(
             (self._env.num_agents, self.num_obs_features), jnp.int32, "agents_view"
         )
+        global_state = specs.Array(
+            (
+                self._env.num_agents,
+                self._env.num_obs_features * self._env.num_agents + self._env.num_agents,
+            ),
+            jnp.int32,
+            "global_state",
+        )
 
-        return self._env.observation_spec().replace(agents_view=agents_view)
+        if self.has_global_state:
+            return self._env.observation_spec().replace(
+                agents_view=agents_view,
+                global_state=global_state,
+            )
+        return self._env.observation_spec().replace(
+            agents_view=agents_view,
+        )
 
 
 class RwareMultiAgentWrapper(Wrapper):
