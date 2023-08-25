@@ -135,32 +135,38 @@ dmypy.json
 .vscode
 .history
 
-# custom
-# Dockerfile
-# makefile
+# mava
 mava/bin
 mava/lib64
 mava/pyvenv.cfg
 mava/share
 mava/include
-mava_edu/bin
-mava_edu/lib64
-mava_edu/pyvenv.cfg
-mava_edu/share
-mava_edu/include
-train_loop
-eval_loop
+mava/workspace.code-workspace
+
+# misc
 NULL
 logs
 Checkpoints
-mava/workspace.code-workspace
 .DS_Store
-mava_testing
 .devcontainer/devcontainer.json
-3rdparty
+3.9
 
 # PyCharm
 .idea/
 
+# act: for testing github workflows
+bin/act
+
 # Created by debugging component
 component_dependency_map.png
+
+# Mava env
+mava_env/
+
+# Sacred logs
+results/
+
+# Hydra logs
+outputs/
+multirun/
+.neptune
