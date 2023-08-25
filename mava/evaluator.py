@@ -52,7 +52,7 @@ def get_ff_evaluator_fn(
 
             # Select action.
             rng, _rng = jax.random.split(rng)
-            pi, _ = apply_fn(params, last_timestep.observation)
+            pi = apply_fn(params, last_timestep.observation)
 
             if config["evaluation_greedy"]:
                 action = pi.mode()
@@ -326,7 +326,7 @@ def evaluator_setup(
         if centralised_critic:
             vmapped_eval_network_apply_fn = jax.vmap(
                 network.apply,
-                in_axes=(None, ObservationGlobalState(0, 0, None, 0)),
+                in_axes=(None, ObservationGlobalState(0, 0, 0, 0)),
             )
         else:
             vmapped_eval_network_apply_fn = jax.vmap(
