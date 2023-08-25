@@ -64,10 +64,10 @@ class Logger:
     def setup_neptune(self, exp_params: Dict) -> None:
         """Set up neptune logging."""
         tag = exp_params["neptune_tag"]
-        
+
         self.neptune_logger = NeptuneLogger(
             label="logger",
-            tag=tag if isinstance(tag, str) else list(tag),
+            tag=tag if isinstance(tag, str) else list(tag),  # type: ignore
             name=exp_params["name"],
             exp_params=exp_params,
         )
@@ -192,7 +192,7 @@ class NeptuneLogger(Logger):
     def dict_summary(self, key: str, value: Dict) -> None:
         """Log a dictionary of values."""
         dict_info = self._flatten_dict(parent_key=key, dict_info=value)
-        for (k, v) in dict_info.items():
+        for k, v in dict_info.items():
             self.scalar_summary(k, v)
 
     def histogram_summary(self, key: str, value: np.ndarray) -> None:
@@ -232,6 +232,11 @@ class NeptuneLogger(Logger):
 def format_key(key: str) -> str:
     """Internal function for formatting keys in Tensorboard format."""
     return key.title().replace("_", "")
+
+
+def should_log(config: Dict) -> bool:
+    """Check if the logger should log."""
+    return bool(config["use_sacred"] or config["use_tf"] or config["use_neptune"])
 
 
 def get_logger() -> logging.Logger:

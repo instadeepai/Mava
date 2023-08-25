@@ -24,7 +24,7 @@ from colorama import Fore, Style
 from sacred.run import Run
 
 from mava.types import ExperimentOutput
-from mava.utils.logger_tools import Logger, get_experiment_path
+from mava.utils.logger_tools import Logger, get_experiment_path, should_log
 
 
 def get_logger_tools(logger: Logger, config: Dict) -> Tuple[Callable, Callable]:  # noqa: CCR001
@@ -63,7 +63,7 @@ def get_logger_tools(logger: Logger, config: Dict) -> Tuple[Callable, Callable]:
         episodes_length = jnp.ravel(episodes_info["episode_length"])
 
         # Log metrics.
-        if config["use_sacred"] or config["use_tf"] or config["use_neptune"]:
+        if should_log(config):
             logger.log_stat(
                 prefix.lower() + "mean_episode_returns",
                 float(np.mean(episodes_return)),
