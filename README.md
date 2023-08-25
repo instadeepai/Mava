@@ -154,6 +154,7 @@ The current version of Mava has been based on code from the following projects:
 - 🤖 [PureJaxRL][purejaxrl] provides simple code implementations for end-to-end RL training in JAX.
 - 🌀 [DeepMind Anakin][anakin_notebook] provides a notebook that illustrates using the Anakin podracer architecture for training RL systems in JAX at scale.
 - 🌳 [EPyMARL][epymarl] provides a framework for training MARL systems using a PyTorch backend.
+- 🌴 [Jumanji][jumanji] a diverse suite of scalable RL environments written in JAX, including multi-agent environments.
 
 [Paper]: https://arxiv.org/pdf/2107.01460.pdf
 [quickstart]: https://github.com/instadeepai/Mava/blob/develop/quickstart.ipynb
