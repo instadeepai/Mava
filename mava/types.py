@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, NamedTuple, Optional, Tuple
+from typing import Dict, NamedTuple, Optional
 
 import chex
 from flax.core.frozen_dict import FrozenDict
@@ -35,11 +35,32 @@ class PPOTransition(NamedTuple):
     info: Dict
 
 
+class Params(NamedTuple):
+    """Parameters for the learner."""
+
+    actor_params: FrozenDict
+    critic_params: FrozenDict
+
+
+class OptStates(NamedTuple):
+    """OptStates for the learner."""
+
+    actor_opt_state: OptState
+    critic_opt_state: OptState
+
+
+class HiddenStates(NamedTuple):
+    """Hidden states for the learner."""
+
+    policy_hidden_state: chex.Array
+    critic_hidden_state: chex.Array
+
+
 class LearnerState(NamedTuple):
     """State of the learner."""
 
-    params: Tuple[FrozenDict, FrozenDict]
-    opt_states: Tuple[OptState, OptState]
+    params: Params
+    opt_states: OptStates
     key: chex.PRNGKey
     env_state: LogEnvState
     timestep: TimeStep
@@ -48,13 +69,13 @@ class LearnerState(NamedTuple):
 class RNNLearnerState(NamedTuple):
     """State of the `Learner` for recurrent architectures."""
 
-    params: Tuple[FrozenDict, FrozenDict]
-    opt_states: Tuple[OptState, OptState]
+    params: Params
+    opt_states: OptStates
     key: chex.PRNGKey
     env_state: LogEnvState
     timestep: TimeStep
     dones: chex.Array
-    hstates: Tuple[chex.Array, chex.Array]
+    hstates: HiddenStates
 
 
 class EvalState(NamedTuple):

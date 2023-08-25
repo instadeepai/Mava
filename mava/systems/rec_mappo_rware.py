@@ -39,7 +39,14 @@ from sacred import Experiment, observers, run, utils
 
 from mava.evaluator import evaluator_setup
 from mava.logger import logger_setup
-from mava.types import ExperimentOutput, PPOTransition, RNNLearnerState
+from mava.types import (
+    ExperimentOutput,
+    HiddenStates,
+    OptStates,
+    Params,
+    PPOTransition,
+    RNNLearnerState,
+)
 from mava.utils.logger_tools import config_copy, get_experiment_path, get_logger
 from mava.utils.timing_utils import TimeIt
 from mava.wrappers.jumanji import (
@@ -167,13 +174,13 @@ def get_learner_fn(
 
         Args:
             learner_state (NamedTuple):
-                - params (FrozenDict): The current model parameters.
-                - opt_states (OptState): The current optimizer states.
+                - params (Params): The current model parameters.
+                - opt_states (OptStates): The current optimizer states.
                 - rng (PRNGKey): The random number generator state.
                 - env_state (State): The environment state.
                 - last_timestep (TimeStep): The last timestep in the current trajectory.
                 - last_done (bool): Whether the last timestep was a terminal state.
-                - hstates (chex.Array): The hidden states of the RNN.
+                - hstates (HiddenStates): The hidden state of the policy and critic RNN.
             _ (Any): The current metrics info.
         """
 
@@ -191,9 +198,6 @@ def get_learner_fn(
                 hstates,
             ) = learner_state
 
-            actor_params, critic_params = params
-            policy_hidden_state, critic_hidden_state = hstates
-
             rng, policy_rng = jax.random.split(rng)
 
             # Add a batch dimension to the observation.
@@ -207,9 +211,11 @@ def get_learner_fn(
 
             # Run the network.
             policy_hidden_state, actor_policy = actor_apply_fn(
-                actor_params, policy_hidden_state, ac_in
+                params.actor_params, hstates.policy_hidden_state, ac_in
             )
-            critic_hidden_state, value = critic_apply_fn(critic_params, critic_hidden_state, ac_in)
+            critic_hidden_state, value = critic_apply_fn(
+                params.critic_params, hstates.critic_hidden_state, ac_in
+            )
 
             # Sample action from the policy and squeeze out the batch dimension.
             action = actor_policy.sample(seed=policy_rng)
@@ -237,7 +243,7 @@ def get_learner_fn(
             transition = PPOTransition(
                 done, action, value, reward, log_prob, last_timestep.observation, info
             )
-            hstates = (policy_hidden_state, critic_hidden_state)
+            hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
             learner_state = RNNLearnerState(
                 params, opt_states, rng, env_state, timestep, done, hstates
             )
@@ -271,11 +277,8 @@ def get_learner_fn(
             last_done[:, 0][jnp.newaxis, :],
         )
 
-        critic_params = params[1]
-        critic_hidden_state = hstates[1]
-
         # Run the network.
-        _, last_val = critic_apply_fn(critic_params, critic_hidden_state, ac_in)
+        _, last_val = critic_apply_fn(params.critic_params, hstates.critic_hidden_state, ac_in)
 
         # Squeeze out the batch dimension and mask out the value of terminal states.
         last_val = last_val.squeeze(0)
@@ -316,8 +319,6 @@ def get_learner_fn(
                 """Update the network for a single minibatch."""
 
                 params, opt_states = train_state
-                actor_params, critic_params = params
-                actor_opt_state, critic_opt_state = opt_states
                 (
                     init_policy_hstate,
                     init_critic_hstate,
@@ -393,13 +394,13 @@ def get_learner_fn(
                 # CALCULATE ACTOR LOSS
                 actor_grad_fn = jax.value_and_grad(_actor_loss_fn, has_aux=True)
                 actor_loss_info, actor_grads = actor_grad_fn(
-                    actor_params, actor_opt_state, traj_batch, advantages
+                    params.actor_params, opt_states.actor_opt_state, traj_batch, advantages
                 )
 
                 # CALCULATE CRITIC LOSS
                 critic_grad_fn = jax.value_and_grad(_critic_loss_fn, has_aux=True)
                 critic_loss_info, critic_grads = critic_grad_fn(
-                    critic_params, critic_opt_state, traj_batch, targets
+                    params.critic_params, opt_states.critic_opt_state, traj_batch, targets
                 )
 
                 # Compute the parallel mean (pmean) over the batch.
@@ -423,17 +424,19 @@ def get_learner_fn(
                 )
 
                 # UPDATE ACTOR PARAMS AND OPTIMISER STATE
-                actor_updates, actor_new_opt_state = actor_update_fn(actor_grads, actor_opt_state)
-                actor_new_params = optax.apply_updates(actor_params, actor_updates)
+                actor_updates, actor_new_opt_state = actor_update_fn(
+                    actor_grads, opt_states.actor_opt_state
+                )
+                actor_new_params = optax.apply_updates(params.actor_params, actor_updates)
 
                 # UPDATE CRITIC PARAMS AND OPTIMISER STATE
                 critic_updates, critic_new_opt_state = critic_update_fn(
-                    critic_grads, critic_opt_state
+                    critic_grads, opt_states.critic_opt_state
                 )
-                critic_new_params = optax.apply_updates(critic_params, critic_updates)
+                critic_new_params = optax.apply_updates(params.critic_params, critic_updates)
 
-                new_params = (actor_new_params, critic_new_params)
-                new_opt_state = (actor_new_opt_state, critic_new_opt_state)
+                new_params = Params(actor_new_params, critic_new_params)
+                new_opt_state = OptStates(actor_new_opt_state, critic_new_opt_state)
 
                 # PACK LOSS INFO
                 total_loss = actor_loss_info[0] + critic_loss_info[0]
@@ -531,13 +534,13 @@ def get_learner_fn(
 
         Args:
             learner_state (NamedTuple):
-                - params (FrozenDict): The initial model parameters.
-                - opt_states (OptState): The initial optimizer states.
+                - params (Params): The initial model parameters.
+                - opt_states (OptStates): The initial optimizer states.
                 - rng (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
                 - dones (bool): Whether the initial timestep was a terminal state.
-                - hstates (chex.Array): The initial hidden state of the policy and critic RNN.
+                - hstates (HiddenStates): The hidden state of the policy and critic RNN.
         """
 
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
@@ -681,9 +684,9 @@ def learner_setup(
         ),
         dtype=bool,
     )
-    hstates = (policy_hstates, critic_hstates)
-    params = (actor_params, critic_params)
-    opt_states = (actor_opt_state, critic_opt_state)
+    hstates = HiddenStates(policy_hstates, critic_hstates)
+    params = Params(actor_params, critic_params)
+    opt_states = OptStates(actor_opt_state, critic_opt_state)
     init_learner_state = RNNLearnerState(
         params, opt_states, step_rngs, env_states, timesteps, dones, hstates
     )
@@ -721,7 +724,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         eval_env=eval_env,
         rng_e=rng_e,
         network=actor_network,
-        params=learner_state.params[0],
+        params=learner_state.params.actor_params,
         config=config,
         use_recurrent_net=True,
         scanned_rnn=ScannedRNN,
@@ -760,7 +763,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         # Prepare for evaluation.
         trained_params = jax.tree_util.tree_map(
             lambda x: x[:, 0, ...],
-            learner_output.learner_state.params[0],  # Select only actor params
+            learner_output.learner_state.params.actor_params,  # Select only actor params
         )
         rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
         eval_rngs = jnp.stack(eval_rngs)
