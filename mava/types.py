@@ -38,8 +38,8 @@ class PPOTransition(NamedTuple):
 class LearnerState(NamedTuple):
     """State of the learner."""
 
-    params: Tuple[FrozenDict, FrozenDict]
-    opt_state: Tuple[OptState, OptState]
+    params: FrozenDict
+    opt_state: OptState
     key: chex.PRNGKey
     env_state: LogEnvState
     timestep: TimeStep

@@ -3,7 +3,7 @@
 # --- Experiment params ---
 defaults:
   - _self_
-  - rware_scenario: tiny-2ag
+  - rware_scenario: tiny-4ag-easy
 
 # --- Environment ---
 env_name: RobotWarehouse-v0
@@ -16,10 +16,9 @@ seed: 42
 add_agent_id: True
 
 # --- RL hyperparameters ---
-actor_lr: 2.5e-4 # Learning rate for actor network
-critic_lr: 2.5e-4 # Learning rate for critic network
+lr: 2.5e-4 # Leanring rate for network
 update_batch_size: 2 # Number of vectorised gradient updates per device.
-rollout_length: 128 # Number of environment steps per vectorised environment.
+rollout_length: 16 # Number of environment steps per vectorised environment.
 
 ppo_epochs: 4 # Number of ppo epochs per training data batch.
 num_minibatches: 2 # Number of minibatches per ppo epoch.
@@ -32,7 +31,7 @@ max_grad_norm: 0.5 # Maximum norm of the gradients for a weight update.
 
 # --- Evaluation ---
 num_eval_episodes: 32 # Episodes per evaluation
-num_evaluation: 5 # Number of evenly spaced evaluations to perform during training.
+num_evaluation: 2 # Number of evenly spaced evaluations to perform during training.
 evaluation_greedy: False # Evaluate the policy greedily. If True the policy will select
   # an action which corresponds to the greatest logit. If false, the policy will sample
   # from the logits.
@@ -40,9 +39,7 @@ absolute_metric: True # Whether the absolute metric should be computed. For more
   # on the absolute metric please see: https://arxiv.org/abs/2209.10485
 
 # --- Logging options ---
-use_tf: False
+use_tf: True
 use_sacred: True
-use_neptune: True
 base_exp_path: results
 system_name: ~  # this is manually set inside each file depending on which system is run
-neptune_tag: mappo_split_net_sweep_128

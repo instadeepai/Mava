@@ -14,7 +14,6 @@
 import copy
 import os
 from logging import Logger as SacredLogger
-from os.path import abspath, dirname
 from typing import Any, Callable, Dict, Sequence, Tuple
 
 import chex
@@ -51,19 +50,19 @@ from mava.wrappers.jumanji import (
 )
 
 
-class Actor(nn.Module):
+class ActorCritic(nn.Module):
     """Actor Critic Network."""
 
     action_dim: Sequence[int]
 
     @nn.compact
-    def __call__(self, observation: Observation) -> distrax.Categorical:
+    def __call__(self, observation: Observation) -> Tuple[distrax.Categorical, chex.Array]:
         """Forward pass."""
         x = observation.agents_view
 
-        actor_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(x)
+        actor_output = nn.Dense(64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(x)
         actor_output = nn.relu(actor_output)
-        actor_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
+        actor_output = nn.Dense(64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
             actor_output
         )
         actor_output = nn.relu(actor_output)
@@ -78,23 +77,11 @@ class Actor(nn.Module):
         )
         actor_policy = distrax.Categorical(logits=masked_logits)
 
-        return actor_policy
-
-
-class Critic(nn.Module):
-    """Actor Critic Network."""
-
-    @nn.compact
-    def __call__(self, observation: Observation) -> chex.Array:
-        """Forward pass."""
-
         y = observation.global_state
 
-        critic_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
-            y
-        )
+        critic_output = nn.Dense(64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(y)
         critic_output = nn.relu(critic_output)
-        critic_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
+        critic_output = nn.Dense(64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
             critic_output
         )
         critic_output = nn.relu(critic_output)
@@ -102,19 +89,13 @@ class Critic(nn.Module):
             critic_output
         )
 
-        return jnp.squeeze(critic_output, axis=-1)
+        return actor_policy, jnp.squeeze(critic_output, axis=-1)
 
 
 def get_learner_fn(
-    env: jumanji.Environment,
-    apply_fn_: Tuple[Callable, Callable],
-    update_fn_: Tuple[Callable, Callable],
-    config: Dict,
+    env: jumanji.Environment, apply_fn: Callable, update_fn: Callable, config: Dict
 ) -> Callable:
     """Get the learner function."""
-
-    actor_apply_fn, critic_apply_fn = apply_fn_
-    actor_update_fn, critic_update_fn = update_fn_
 
     def _update_step(learner_state: LearnerState, _: Any) -> Tuple[LearnerState, Tuple]:
         """A single update of the network.
@@ -136,14 +117,11 @@ def get_learner_fn(
 
         def _env_step(learner_state: LearnerState, _: Any) -> Tuple[LearnerState, PPOTransition]:
             """Step the environment."""
-            params_, opt_state, rng, env_state, last_timestep = learner_state
-
-            actor_params, critic_params = params_
+            params, opt_state, rng, env_state, last_timestep = learner_state
 
             # SELECT ACTION
             rng, policy_rng = jax.random.split(rng)
-            actor_policy = actor_apply_fn(actor_params, last_timestep.observation)
-            value = critic_apply_fn(critic_params, last_timestep.observation)
+            actor_policy, value = apply_fn(params, last_timestep.observation)
             action = actor_policy.sample(seed=policy_rng)
             log_prob = actor_policy.log_prob(action)
 
@@ -163,7 +141,7 @@ def get_learner_fn(
             transition = PPOTransition(
                 done, action, value, reward, log_prob, last_timestep.observation, info
             )
-            learner_state = LearnerState(params_, opt_state, rng, env_state, timestep)
+            learner_state = LearnerState(params, opt_state, rng, env_state, timestep)
             return learner_state, transition
 
         # STEP ENVIRONMENT FOR ROLLOUT LENGTH
@@ -173,8 +151,7 @@ def get_learner_fn(
 
         # CALCULATE ADVANTAGE
         params, opt_state, rng, env_state, last_timestep = learner_state
-        _, critic_params = params
-        last_val = critic_apply_fn(critic_params, last_timestep.observation)
+        _, last_val = apply_fn(params, last_timestep.observation)
 
         def _calculate_gae(
             traj_batch: PPOTransition, last_val: chex.Array
@@ -202,7 +179,6 @@ def get_learner_fn(
             )
             return advantages, advantages + traj_batch.value
 
-        # TODO: Maybe stop gradient here
         advantages, targets = _calculate_gae(traj_batch, last_val)
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
@@ -211,20 +187,27 @@ def get_learner_fn(
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
                 params, opt_state = train_state
-                actor_params, critic_params = params
-                actor_opt_state, critic_opt_state = opt_state
                 traj_batch, advantages, targets = batch_info
 
-                def _actor_loss_fn(
-                    actor_params: FrozenDict,
-                    actor_opt_state: OptState,
+                def _loss_fn(
+                    params: FrozenDict,
+                    opt_state: OptState,
                     traj_batch: PPOTransition,
                     gae: chex.Array,
+                    targets: chex.Array,
                 ) -> Tuple:
                     """Calculate the loss."""
                     # RERUN NETWORK
-                    actor_policy = actor_apply_fn(actor_params, traj_batch.obs)
+                    actor_policy, value = apply_fn(params, traj_batch.obs)
                     log_prob = actor_policy.log_prob(traj_batch.action)
+
+                    # CALCULATE VALUE LOSS
+                    value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
+                        -config["clip_eps"], config["clip_eps"]
+                    )
+                    value_losses = jnp.square(value - targets)
+                    value_losses_clipped = jnp.square(value_pred_clipped - targets)
+                    value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
 
                     # CALCULATE ACTOR LOSS
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
@@ -242,76 +225,24 @@ def get_learner_fn(
                     loss_actor = loss_actor.mean()
                     entropy = actor_policy.entropy().mean()
 
-                    total_loss_actor = loss_actor - config["ent_coef"] * entropy
-                    return total_loss_actor, (loss_actor, entropy)
-
-                def _critic_loss_fn(
-                    critic_params: FrozenDict,
-                    critic_opt_state: OptState,
-                    traj_batch: PPOTransition,
-                    targets: chex.Array,
-                ) -> Tuple:
-                    """Calculate the loss."""
-                    # RERUN NETWORK
-                    value = critic_apply_fn(critic_params, traj_batch.obs)
-
-                    # CALCULATE VALUE LOSS
-                    value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
-                        -config["clip_eps"], config["clip_eps"]
+                    total_loss = (
+                        loss_actor + config["vf_coef"] * value_loss - config["ent_coef"] * entropy
                     )
-                    value_losses = jnp.square(value - targets)
-                    value_losses_clipped = jnp.square(value_pred_clipped - targets)
-                    value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
+                    return total_loss, (value_loss, loss_actor, entropy)
 
-                    critic_total_loss = config["vf_coef"] * value_loss
-                    return critic_total_loss, (value_loss)
-
-                actor_grad_fn = jax.value_and_grad(_actor_loss_fn, has_aux=True)
-                actor_loss_info, actor_grads = actor_grad_fn(
-                    actor_params, actor_opt_state, traj_batch, advantages
-                )
-
-                critic_grad_fn = jax.value_and_grad(_critic_loss_fn, has_aux=True)
-                critic_loss_info, critic_grads = critic_grad_fn(
-                    critic_params, critic_opt_state, traj_batch, targets
-                )
+                grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
+                loss_info, grads = grad_fn(params, opt_state, traj_batch, advantages, targets)
 
                 # Compute the parallel mean (pmean) over the batch.
                 # This calculation is inspired by the Anakin architecture demo notebook.
                 # available at https://tinyurl.com/26tdzs5x
                 # This pmean could be a regular mean as the batch axis is on the same device.
-                actor_grads, actor_loss_info = jax.lax.pmean(
-                    (actor_grads, actor_loss_info), axis_name="batch"
-                )
+                grads, loss_info = jax.lax.pmean((grads, loss_info), axis_name="batch")
                 # pmean over devices.
-                actor_grads, actor_loss_info = jax.lax.pmean(
-                    (actor_grads, actor_loss_info), axis_name="device"
-                )
+                grads, loss_info = jax.lax.pmean((grads, loss_info), axis_name="device")
 
-                critic_grads, critic_loss_info = jax.lax.pmean(
-                    (critic_grads, critic_loss_info), axis_name="batch"
-                )
-                # pmean over devices.
-                critic_grads, critic_loss_info = jax.lax.pmean(
-                    (critic_grads, critic_loss_info), axis_name="device"
-                )
-
-                actor_updates, actor_new_opt_state = actor_update_fn(actor_grads, actor_opt_state)
-                actor_new_params = optax.apply_updates(actor_params, actor_updates)
-
-                critic_updates, critic_new_opt_state = critic_update_fn(
-                    critic_grads, critic_opt_state
-                )
-                critic_new_params = optax.apply_updates(critic_params, critic_updates)
-
-                new_params = (actor_new_params, critic_new_params)
-                new_opt_state = (actor_new_opt_state, critic_new_opt_state)
-
-                # TODO: Can also unpack and repack more explicitly
-                loss_info = (
-                    actor_loss_info[0] + critic_loss_info[0],
-                    (critic_loss_info[1], actor_loss_info[1][0], actor_loss_info[1][1]),
-                )
+                updates, new_opt_state = update_fn(grads, opt_state)
+                new_params = optax.apply_updates(params, updates)
 
                 return (new_params, new_opt_state), loss_info
 
@@ -387,7 +318,7 @@ def get_learner_fn(
 
 def learner_setup(
     env: Environment, rngs: chex.Array, config: Dict
-) -> Tuple[Callable, Actor, Critic, LearnerState]:
+) -> Tuple[Callable, ActorCritic, LearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
@@ -399,15 +330,10 @@ def learner_setup(
     rng, rng_p = rngs
 
     # Define network and optimiser.
-    actor_network = Actor(num_actions)
-    critic_network = Critic()
-    actor_optim = optax.chain(
+    network = ActorCritic(num_actions)
+    optim = optax.chain(
         optax.clip_by_global_norm(config["max_grad_norm"]),
-        optax.adam(config["actor_lr"], eps=1e-5),
-    )
-    critic_optim = optax.chain(
-        optax.clip_by_global_norm(config["max_grad_norm"]),
-        optax.adam(config["critic_lr"], eps=1e-5),
+        optax.adam(config["lr"], eps=1e-5),
     )
 
     # Initialise observation.
@@ -416,43 +342,30 @@ def learner_setup(
     init_x = ObservationGlobalState(
         agents_view=obs.agents_view[0],
         action_mask=obs.action_mask[0],
-        global_state=obs.global_state[0],
+        global_state=obs.global_state,
         step_count=obs.step_count[0],
     )
     init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
 
     # initialise params and optimiser state.
-    actor_params = actor_network.init(rng_p, init_x)
-    actor_opt_state = actor_optim.init(actor_params)
-
-    critic_params = critic_network.init(rng_p, init_x)
-    critic_opt_state = critic_optim.init(critic_params)
+    params = network.init(rng_p, init_x)
+    opt_state = optim.init(params)
 
     # Vmap network apply function over number of agents.
-    vmapped_actor_network_apply_fn = jax.vmap(
-        actor_network.apply,
-        in_axes=(None, ObservationGlobalState(1, 1, 1, 1)),
-        out_axes=(1),
+    vmapped_network_apply_fn = jax.vmap(
+        network.apply,
+        in_axes=(None, ObservationGlobalState(1, 1, None, 1)),
+        out_axes=(1, 1),
     )
-    vmapped_critic_network_apply_fn = jax.vmap(
-        critic_network.apply,
-        in_axes=(None, ObservationGlobalState(1, 1, 1, 1)),
-        out_axes=(1),
-    )
-
-    apply_fns = (vmapped_actor_network_apply_fn, vmapped_critic_network_apply_fn)
-    update_fns = (actor_optim.update, critic_optim.update)
 
     # Get batched iterated update and replicate it to pmap it over cores.
-    learn = get_learner_fn(env, apply_fns, update_fns, config)
+    learn = get_learner_fn(env, vmapped_network_apply_fn, optim.update, config)
     learn = jax.pmap(learn, axis_name="device")
 
     # Broadcast params and optimiser state to cores and batch.
     broadcast = lambda x: jnp.broadcast_to(x, (n_devices, config["update_batch_size"]) + x.shape)
-    actor_params = jax.tree_map(broadcast, actor_params)
-    actor_opt_state = jax.tree_map(broadcast, actor_opt_state)
-    critic_params = jax.tree_map(broadcast, critic_params)
-    critic_opt_state = jax.tree_map(broadcast, critic_opt_state)
+    params = jax.tree_map(broadcast, params)
+    opt_state = jax.tree_map(broadcast, opt_state)
 
     # Initialise environment states and timesteps.
     rng, *env_rngs = jax.random.split(
@@ -473,11 +386,8 @@ def learner_setup(
     env_states = jax.tree_util.tree_map(reshape_states, env_states)
     timesteps = jax.tree_util.tree_map(reshape_states, timesteps)
 
-    params = (actor_params, critic_params)
-    opt_states = (actor_opt_state, critic_opt_state)
-
-    init_learner_state = LearnerState(params, opt_states, step_rngs, env_states, timesteps)
-    return learn, actor_network, critic_network, init_learner_state
+    init_learner_state = LearnerState(params, opt_state, step_rngs, env_states, timesteps)
+    return learn, network, init_learner_state
 
 
 def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
@@ -502,14 +412,14 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     # PRNG keys.
     rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["seed"]), num=3)
     # Setup learner.
-    learn, actor_network, critic_network, learner_state = learner_setup(env, (rng, rng_p), config)
+    learn, network, learner_state = learner_setup(env, (rng, rng_p), config)
 
     # Setup evaluator.
     evaluator, absolute_metric_evaluator, (trained_params, eval_rngs) = evaluator_setup(
         eval_env=eval_env,
         rng_e=rng_e,
-        network=actor_network,
-        params=learner_state.params[0],
+        network=network,
+        params=learner_state.params,
         config=config,
         centralised_critic=True,
     )
@@ -546,8 +456,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
 
         # Prepare for evaluation.
         trained_params = jax.tree_util.tree_map(
-            lambda x: x[:, 0, ...],
-            learner_output.learner_state.params[0],  # Select only actor params
+            lambda x: x[:, 0, ...], learner_output.learner_state.params
         )
         rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
         eval_rngs = jnp.stack(eval_rngs)
@@ -588,12 +497,10 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     ex = Experiment("mava", save_git_info=False)
     ex.logger = logger
     ex.captured_out_filter = utils.apply_backspaces_and_linefeeds
-    results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
 
     cfg["system_name"] = "ff_mappo"
     exp_path = get_experiment_path(cfg, "sacred")
     file_obs_path = os.path.join(cfg["base_exp_path"], exp_path)
-    file_obs_path = os.path.join(results_path, exp_path)
     ex.observers = [observers.FileStorageObserver.create(file_obs_path)]
     ex.add_config(OmegaConf.to_container(cfg, resolve=True))
     ex.main(run_experiment)
