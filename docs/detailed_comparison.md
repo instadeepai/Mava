@@ -1,4 +1,4 @@
-# Jumanji RWARE Performance
+# Differences in performance using Jumanji's version of RWARE
 
 There is a core difference in the way collisions are handled in the stateless JAX-based implementation of RWARE (called RobotWarehouse) found in [Jumanji][jumanji_rware] and the [original RWARE][original_rware] environment.
 
