@@ -122,10 +122,8 @@ def get_learner_fn(
 
         Args:
             learner_state (NamedTuple):
-                - actor_params (FrozenDict): The current actor parameters.
-                - critic_params (FrozenDict): The current critic parameters.
-                - actor_opt_state (OptState): The current actor optimizer state.
-                - critic_opt_state (OptState): The current critic optimizer state.
+                - params (FrozenDict): The current model parameters.
+                - opt_states (OptState): The current optimizer states.
                 - rng (PRNGKey): The random number generator state.
                 - env_state (State): The environment state.
                 - last_timestep (TimeStep): The last timestep in the current trajectory.
@@ -134,15 +132,9 @@ def get_learner_fn(
 
         def _env_step(learner_state: LearnerState, _: Any) -> Tuple[LearnerState, PPOTransition]:
             """Step the environment."""
-            (
-                actor_params,
-                critic_params,
-                actor_opt_state,
-                critic_opt_state,
-                rng,
-                env_state,
-                last_timestep,
-            ) = learner_state
+            params, opt_states, rng, env_state, last_timestep = learner_state
+
+            actor_params, critic_params = params
 
             # SELECT ACTION
             rng, policy_rng = jax.random.split(rng)
@@ -167,15 +159,7 @@ def get_learner_fn(
             transition = PPOTransition(
                 done, action, value, reward, log_prob, last_timestep.observation, info
             )
-            learner_state = LearnerState(
-                actor_params,
-                critic_params,
-                actor_opt_state,
-                critic_opt_state,
-                rng,
-                env_state,
-                timestep,
-            )
+            learner_state = LearnerState(params, opt_states, rng, env_state, timestep)
             return learner_state, transition
 
         # STEP ENVIRONMENT FOR ROLLOUT LENGTH
@@ -184,15 +168,8 @@ def get_learner_fn(
         )
 
         # CALCULATE ADVANTAGE
-        (
-            actor_params,
-            critic_params,
-            actor_opt_state,
-            critic_opt_state,
-            rng,
-            env_state,
-            last_timestep,
-        ) = learner_state
+        params, opt_states, rng, env_state, last_timestep = learner_state
+        critic_params = params[1]
         last_val = critic_apply_fn(critic_params, last_timestep.observation)
 
         def _calculate_gae(
@@ -230,7 +207,9 @@ def get_learner_fn(
                 """Update the network for a single minibatch."""
 
                 # UNPACK TRAIN STATE AND BATCH INFO
-                actor_params, critic_params, actor_opt_state, critic_opt_state = train_state
+                params, opt_states = train_state
+                actor_params, critic_params = params
+                actor_opt_state, critic_opt_state = opt_states
                 traj_batch, advantages, targets = batch_info
 
                 def _actor_loss_fn(
@@ -326,6 +305,10 @@ def get_learner_fn(
                 )
                 critic_new_params = optax.apply_updates(critic_params, critic_updates)
 
+                # PACK NEW PARAMS AND OPTIMISER STATE
+                new_params = (actor_new_params, critic_new_params)
+                new_opt_state = (actor_new_opt_state, critic_new_opt_state)
+
                 # PACK LOSS INFO
                 total_loss = actor_loss_info[0] + critic_loss_info[0]
                 value_loss = critic_loss_info[1]
@@ -336,23 +319,9 @@ def get_learner_fn(
                     (value_loss, actor_loss, entropy),
                 )
 
-                return (
-                    actor_new_params,
-                    critic_new_params,
-                    actor_new_opt_state,
-                    critic_new_opt_state,
-                ), loss_info
+                return (new_params, new_opt_state), loss_info
 
-            (
-                actor_params,
-                critic_params,
-                actor_opt_state,
-                critic_opt_state,
-                traj_batch,
-                advantages,
-                targets,
-                rng,
-            ) = update_state
+            params, opt_states, traj_batch, advantages, targets, rng = update_state
             rng, shuffle_rng = jax.random.split(rng)
 
             # SHUFFLE MINIBATCHES
@@ -369,64 +338,22 @@ def get_learner_fn(
             )
 
             # UPDATE MINIBATCHES
-            (
-                actor_params,
-                critic_params,
-                actor_opt_state,
-                critic_opt_state,
-            ), loss_info = jax.lax.scan(
-                _update_minibatch,
-                (actor_params, critic_params, actor_opt_state, critic_opt_state),
-                minibatches,
+            (params, opt_states), loss_info = jax.lax.scan(
+                _update_minibatch, (params, opt_states), minibatches
             )
 
-            update_state = (
-                actor_params,
-                critic_params,
-                actor_opt_state,
-                critic_opt_state,
-                traj_batch,
-                advantages,
-                targets,
-                rng,
-            )
+            update_state = (params, opt_states, traj_batch, advantages, targets, rng)
             return update_state, loss_info
 
-        update_state = (
-            actor_params,
-            critic_params,
-            actor_opt_state,
-            critic_opt_state,
-            traj_batch,
-            advantages,
-            targets,
-            rng,
-        )
+        update_state = (params, opt_states, traj_batch, advantages, targets, rng)
 
         # UPDATE EPOCHS
         update_state, loss_info = jax.lax.scan(
             _update_epoch, update_state, None, config["ppo_epochs"]
         )
 
-        (
-            actor_params,
-            critic_params,
-            actor_opt_state,
-            critic_opt_state,
-            traj_batch,
-            advantages,
-            targets,
-            rng,
-        ) = update_state
-        learner_state = LearnerState(
-            actor_params,
-            critic_params,
-            actor_opt_state,
-            critic_opt_state,
-            rng,
-            env_state,
-            last_timestep,
-        )
+        params, opt_states, traj_batch, advantages, targets, rng = update_state
+        learner_state = LearnerState(params, opt_states, rng, env_state, last_timestep)
         metric = traj_batch.info
         return learner_state, (metric, loss_info)
 
@@ -439,10 +366,8 @@ def get_learner_fn(
 
         Args:
             learner_state (NamedTuple):
-                - actor_params (FrozenDict): The current actor parameters.
-                - critic_params (FrozenDict): The current critic parameters.
-                - actor_opt_state (OptState): The current actor optimizer state.
-                - critic_opt_state (OptState): The current critic optimizer state.
+                - params (FrozenDict): The initial model parameters.
+                - opt_states (OptState): The initial optimizer state.
                 - rng (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
@@ -553,15 +478,10 @@ def learner_setup(
     env_states = jax.tree_util.tree_map(reshape_states, env_states)
     timesteps = jax.tree_util.tree_map(reshape_states, timesteps)
 
-    init_learner_state = LearnerState(
-        actor_params,
-        critic_params,
-        actor_opt_state,
-        critic_opt_state,
-        step_rngs,
-        env_states,
-        timesteps,
-    )
+    params = (actor_params, critic_params)
+    opt_states = (actor_opt_state, critic_opt_state)
+
+    init_learner_state = LearnerState(params, opt_states, step_rngs, env_states, timesteps)
     return learn, actor_network, init_learner_state
 
 
@@ -596,7 +516,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         eval_env=eval_env,
         rng_e=rng_e,
         network=actor_network,
-        params=learner_state.actor_params,
+        params=learner_state.params[0],
         config=config,
     )
 
@@ -633,7 +553,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         # Prepare for evaluation.
         trained_params = jax.tree_util.tree_map(
             lambda x: x[:, 0, ...],
-            learner_output.learner_state.actor_params,  # Select only actor params
+            learner_output.learner_state.params[0],  # Select only actor params
         )
         rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
         eval_rngs = jnp.stack(eval_rngs)
