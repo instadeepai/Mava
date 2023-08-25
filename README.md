@@ -88,7 +88,7 @@ Furthermore, we illustrate the speed of Mava by showing the steps per second as 
         <img src="docs/images/speed_results/mava_sps_results.png" alt="Mava sps" width="55%"/>
     </a>
     <a href="docs/images/speed_results/ff_mappo_speed_comparison.png">
-        <img src="docs/images/speed_results/ff_mappo_speed_comparison.png" alt="Mava ff mappo speed comparison" width="40%" style="display:inline-block; margin-right: 10px;"/>
+        <img src="docs/images/speed_results/ff_mappo_speed_comparison.png" alt="Mava ff mappo speed comparison" width="39.33%" style="display:inline-block; margin-right: 10px;"/>
     </a>
     <br>
     <div style="text-align:center; margin-top: 10px;"> Mava total training run time of 20M environment steps and steps per second scaling with increased vectorised environments.</div>
