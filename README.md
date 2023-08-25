@@ -48,7 +48,7 @@ To join us in these efforts, please feel free to reach out, raise issues or read
 
 All of the experiments below were performed using an NVIDIA Quadro RTX 4000 GPU with 8GB Memory.
 
-In order to show the utility of end-to-end JAX-based MARL systems and JAX-based environments we compare the _speed_ in total training wallclock time of Mava against [EPyMARL][epymarl] on simple [Robotic Warehouse][rware] (RWARE) tasks with 2 and 4 agents. Our aim is to illustrate the speed increases that are possible with using end-to-end Jax-based systems and we do not necessarily make an effort to achieve optimal performance. For EPyMARL, we use the hyperparameters as recommended by [Papoudakis et al. (2020)](https://arxiv.org/pdf/2006.07869.pdf) and for Mava we performed a basic grid search. In both cases, systems were trained up to 20 million total environment steps using 16 vectorised environments.
+In order to show the utility of end-to-end JAX-based MARL systems and JAX-based environments we compare the speed of Mava against [EPyMARL][epymarl] as measured in total training wallclock time on simple [Robotic Warehouse][rware] (RWARE) tasks with 2 and 4 agents. Our aim is to illustrate the speed increases that are possible with using end-to-end Jax-based systems and we do not necessarily make an effort to achieve optimal performance. For EPyMARL, we use the hyperparameters as recommended by [Papoudakis et al. (2020)](https://arxiv.org/pdf/2006.07869.pdf) and for Mava we performed a basic grid search. In both cases, systems were trained up to 20 million total environment steps using 16 vectorised environments.
 
 <p align="center">
     <a href="docs/images/rware_results/ff_mappo_tiny2ag.png">
