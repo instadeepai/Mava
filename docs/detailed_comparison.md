@@ -12,31 +12,59 @@ In contrast to the collision resolution strategy above, the current version of t
 To investigate this, we ran our algorithms on a version of Jumanji's RWARE where episodes do not terminate upon agent collision, but rather multiple agents are allowed to occupy the same grid position. This setup is not identical to that of the original environment but represents a closer version to its dynamics, allowing agents to easily reach the end of an episode.
 
 <p align="center">
-    <a href="images/jumanji_vs_rware/ff_mappo_tiny2ag.png">
-        <img src="images/jumanji_vs_rware/ff_mappo_tiny2ag.png" alt="Mava ff mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    <a href="images/rware_results/ff_mappo/tiny-2ag.png">
+        <img src="images/rware_results/ff_mappo/tiny-2ag.png" alt="Mava ff mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
-    <a href="images/jumanji_vs_rware/ff_mappo_tiny4ag.png">
-        <img src="images/jumanji_vs_rware/ff_mappo_tiny4ag.png" alt="Mava ff mappo tiny 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    <a href="images/rware_results/ff_mappo/tiny-4ag.png">
+        <img src="images/rware_results/ff_mappo/tiny-4ag.png" alt="Mava ff mappo tiny 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
-    <a href="images/jumanji_vs_rware/ff_mappo_small4ag.png">
-        <img src="images/jumanji_vs_rware/ff_mappo_small4ag.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    <a href="images/rware_results/ff_mappo/small-4ag.png">
+        <img src="images/rware_results/ff_mappo/small-4ag.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
     <br>
-    <div style="text-align:center; margin-top: 10px;"> Mava MAPPO performance on Jumanji Rware with and without collision termination on tiny-2ag, tiny-4ag and small-4ag.</div>
+    <div style="text-align:center; margin-top: 10px;"> Mava feedforward MAPPO performance on the `tiny-2ag`, `tiny-4ag` and `small-4ag` RWARE tasks.</div>
 </p>
 
 <p align="center">
-    <a href="images/jumanji_vs_rware/ff_ippo_tiny2ag.png">
-        <img src="images/jumanji_vs_rware/ff_ippo_tiny2ag.png" alt="Mava ff mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    <a href="images/rware_results/ff_ippo/tiny-2ag.png">
+        <img src="images/rware_results/ff_ippo/tiny-2ag.png" alt="Mava ff ippo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
-    <a href="images/jumanji_vs_rware/ff_ippo_tiny4ag.png">
-        <img src="images/jumanji_vs_rware/ff_ippo_tiny4ag.png" alt="Mava ff mappo tiny 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    <a href="images/rware_results/ff_ippo/tiny-4ag.png">
+        <img src="images/rware_results/ff_ippo/tiny-4ag.png" alt="Mava ff ippo tiny 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
-    <a href="images/jumanji_vs_rware/ff_ippo_small4ag.png">
-        <img src="images/jumanji_vs_rware/ff_ippo_small4ag.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    <a href="images/rware_results/ff_ippo/small-4ag.png">
+        <img src="images/rware_results/ff_ippo/small-4ag.png" alt="Mava ff ippo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
     <br>
-    <div style="text-align:center; margin-top: 10px;"> Mava IPPO performance on Jumanji Rware with and without collision termination on tiny-2ag, tiny-4ag and small-4ag.</div>
+    <div style="text-align:center; margin-top: 10px;"> Mava feedforward IPPO performance on the `tiny-2ag`, `tiny-4ag` and `small-4ag` RWARE tasks.</div>
+</p>
+
+<p align="center">
+    <a href="images/rware_results/rec_ippo/tiny-2ag.png">
+        <img src="images/rware_results/rec_ippo/tiny-2ag.png" alt="Mava rec ippo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+    <a href="images/rware_results/rec_ippo/tiny-4ag.png">
+        <img src="images/rware_results/rec_ippo/tiny-4ag.png" alt="Mava rec ippo tiny 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+    <a href="images/rware_results/rec_ippo/small-4ag.png">
+        <img src="images/rware_results/rec_ippo/small-4ag.png" alt="Mava rec ippo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+    <br>
+    <div style="text-align:center; margin-top: 10px;"> Mava recurrent IPPO performance on the `tiny-2ag`, `tiny-4ag` and `small-4ag` RWARE tasks.</div>
+</p>
+
+<p align="center">
+    <a href="images/rware_results/rec_mappo/tiny-2ag.png">
+        <img src="images/rware_results/rec_mappo/tiny-2ag.png" alt="Mava rec mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+    <a href="images/rware_results/rec_mappo/tiny-4ag.png">
+        <img src="images/rware_results/rec_mappo/tiny-4ag.png" alt="Mava rec mappo tiny 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+    <a href="images/rware_results/rec_mappo/small-4ag.png">
+        <img src="images/rware_results/rec_mappo/small-4ag.png" alt="Mava rec mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+    <br>
+    <div style="text-align:center; margin-top: 10px;"> Mava recurrent IPPO performance on the `tiny-2ag`, `tiny-4ag` and `small-4ag` RWARE tasks.</div>
 </p>
 
 

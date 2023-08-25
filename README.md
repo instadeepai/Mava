@@ -51,14 +51,14 @@ All of the experiments below were performed using an NVIDIA Quadro RTX 4000 GPU 
 In order to show the utility of end-to-end JAX-based MARL systems and JAX-based environments we compare the speed of Mava against [EPyMARL][epymarl] as measured in total training wallclock time on simple [Robotic Warehouse][rware] (RWARE) tasks with 2 and 4 agents. Our aim is to illustrate the speed increases that are possible with using end-to-end Jax-based systems and we do not necessarily make an effort to achieve optimal performance. For EPyMARL, we use the hyperparameters as recommended by [Papoudakis et al. (2020)](https://arxiv.org/pdf/2006.07869.pdf) and for Mava we performed a basic grid search. In both cases, systems were trained up to 20 million total environment steps using 16 vectorised environments.
 
 <p align="center">
-    <a href="docs/images/rware_results/ff_mappo_tiny2ag.png">
-        <img src="docs/images/rware_results/ff_mappo_tiny2ag.png" alt="Mava ff mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    <a href="docs/images/rware_results/ff_mappo/tiny-2ag.png">
+        <img src="docs/images/rware_results/ff_mappo/tiny-2ag.png" alt="Mava ff mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
-    <a href="docs/images/rware_results/ff_mappo_tiny4ag.png">
-        <img src="docs/images/rware_results/ff_mappo_tiny4ag.png" alt="Mava ff mappo tiny 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    <a href="docs/images/rware_results/ff_mappo/tiny-4ag.png">
+        <img src="docs/images/rware_results/ff_mappo/tiny-4ag.png" alt="Mava ff mappo tiny 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
-    <a href="docs/images/rware_results/ff_mappo_small4ag.png">
-        <img src="docs/images/rware_results/ff_mappo_small4ag.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    <a href="docs/images/rware_results/ff_mappo/small-4ag.png">
+        <img src="docs/images/rware_results/ff_mappo/small-4ag.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
     <br>
     <div style="text-align:center; margin-top: 10px;"> Mava MAPPO performance on the `tiny-2ag`, `tiny-4ag` and `small-4ag` RWARE tasks.</div>
