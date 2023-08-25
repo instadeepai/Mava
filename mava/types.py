@@ -36,21 +36,21 @@ class PPOTransition(NamedTuple):
 
 
 class Params(NamedTuple):
-    """Parameters for the learner."""
+    """Parameters of an actor critic network."""
 
     actor_params: FrozenDict
     critic_params: FrozenDict
 
 
 class OptStates(NamedTuple):
-    """OptStates for the learner."""
+    """OptStates of actor critic learner."""
 
     actor_opt_state: OptState
     critic_opt_state: OptState
 
 
 class HiddenStates(NamedTuple):
-    """Hidden states for the learner."""
+    """Hidden states for an actor critic learner."""
 
     policy_hidden_state: chex.Array
     critic_hidden_state: chex.Array
