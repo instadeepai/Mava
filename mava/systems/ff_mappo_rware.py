@@ -87,10 +87,8 @@ class Critic(nn.Module):
     def __call__(self, observation: Observation) -> chex.Array:
         """Forward pass."""
 
-        y = observation.global_state
-
         critic_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
-            y
+            observation.global_state
         )
         critic_output = nn.relu(critic_output)
         critic_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
