@@ -28,7 +28,7 @@
 
 <hr>
 
-👋 **UPDATE - 25/8/2023**: We have changed the focus of Mava away from a framework and more towards a lightweight and easy-to-use codebase for MARL. Mava is also now end-to-end JAX-based and henceforth we will only be supporting JAX-based environments. We currently provide native support for the [Jumanji][jumanji] environment API. Mava now follows a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl], where we allow for code duplication to enable readability and easy reuse. All algorithmic logic can be found in the file implementing a particular algorithm. If you would still like to use our deprecated TF2-based framework and systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
+👋 **UPDATE - 25/8/2023**: _We have changed the focus of Mava away from a framework and more towards a lightweight and easy-to-use codebase for MARL._ Mava is also now end-to-end JAX-based and henceforth we will only be supporting JAX-based environments. We currently provide native support for the [Jumanji][jumanji] environment API. Mava now follows a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl], where we allow for code duplication to enable readability and easy reuse. All algorithmic logic can be found in the file implementing a particular algorithm. If you would still like to use our deprecated TF2-based framework and systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
 
 <hr>
 
@@ -61,7 +61,7 @@ In order to show the utility of end-to-end JAX-based MARL systems and JAX-based 
         <img src="docs/images/rware_results/ff_mappo_small4ag.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
     <br>
-    <div style="text-align:center; margin-top: 10px;"> Mava MAPPO performance on the tiny-2ag, tiny-4ag and small-4ag RWARE tasks.</div>
+    <div style="text-align:center; margin-top: 10px;"> Mava MAPPO performance on the `tiny-2ag`, `tiny-4ag` and `small-4ag` RWARE tasks.</div>
 </p>
 
 ### 📌 An important note on the differences in converged performance
