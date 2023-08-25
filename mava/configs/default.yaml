@@ -3,7 +3,7 @@
 # --- Experiment params ---
 defaults:
   - _self_
-  - rware_scenario: tiny-2ag
+  - rware_scenario: tiny-4ag-easy
 
 # --- Environment ---
 env_name: RobotWarehouse-v0

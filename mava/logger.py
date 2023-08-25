@@ -126,8 +126,6 @@ def get_logger_tools(  # noqa: CCR001
 
     def save_json_by_seed() -> None:
         """Split the current json file by seed into separate files."""
-        # Make sure the full values are recorded in the JSON file.
-        time.sleep(10)
         # Load JSON data from a file
         input_file_path = f"{_run.observers[0].dir}/metrics.json"
         with open(input_file_path, "r") as input_file:
@@ -151,10 +149,17 @@ def get_logger_tools(  # noqa: CCR001
                 json.dump(metrics, output_file, indent=2)
 
     def stop_logger() -> None:
-        """Stop the logger and save the metrics for different seeds."""
+        """Stop the logger and save the metrics for different seeds.
+
+        Note:
+            This method waits for 10 seconds to be sure all logging has been written to disk.
+        """
+
         if logger.use_neptune:
             logger.neptune_logger.stop()
         if (len(config["seeds"]) > 1) and config["split_json_by_seed"]:
+            # Make sure the full values are recorded in the JSON file.
+            time.sleep(10)
             save_json_by_seed()
 
     return log, stop_logger
