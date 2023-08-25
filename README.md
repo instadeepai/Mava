@@ -28,7 +28,7 @@
 
 <hr>
 
-👋 **UPDATE - 24/8/2023**: We have changed the focus of Mava away from a framework and more towards a lightweight and easy-to-use codebase for MARL. Mava is also now end-to-end JAX-based and henceforth we will only be supporting JAX-based environments. We currently provide native support for the [Jumanji][jumanji] environment API. Mava now follows a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl], where we allow for code duplication to enable readability and easy reuse. All algorithmic logic can be found in the file implementing a particular algorithm. If you would still like to use our deprecated TF2-based framework and systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
+👋 **UPDATE - 25/8/2023**: We have changed the focus of Mava away from a framework and more towards a lightweight and easy-to-use codebase for MARL. Mava is also now end-to-end JAX-based and henceforth we will only be supporting JAX-based environments. We currently provide native support for the [Jumanji][jumanji] environment API. Mava now follows a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl], where we allow for code duplication to enable readability and easy reuse. All algorithmic logic can be found in the file implementing a particular algorithm. If you would still like to use our deprecated TF2-based framework and systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
 
 <hr>
 
@@ -40,7 +40,7 @@
 
 </div>
 
-Mava provides simplified code for quickly iterating on ideas in multi-agent reinforcement learning (MARL) with useful implementations of MARL algorithms in JAX allowing for easy parallelisation across devices with JAX's `pmap`. Originating in the Research Team at [InstaDeep](https://www.instadeep.com/). “Mava” means experience, or wisdom, in Xhosa - one of South Africa’s eleven official languages.
+Mava provides simplified code for quickly iterating on ideas in multi-agent reinforcement learning (MARL) with useful implementations of MARL algorithms in JAX allowing for easy parallelisation across devices with JAX's `pmap`. Mava is a project originating in the Research Team at [InstaDeep](https://www.instadeep.com/).
 
 To join us in these efforts, please feel free to reach out, raise issues or read our [contribution guidelines](#contributing-) (or just star 🌟 to stay up to date with the latest developments)!
 
@@ -64,11 +64,11 @@ In order to show the utility of end-to-end JAX-based MARL systems and JAX-based 
     <div style="text-align:center; margin-top: 10px;"> Mava MAPPO performance on the tiny-2ag, tiny-4ag and small-4ag RWARE tasks.</div>
 </p>
 
-### 📌 An important note on converged performance differences
+### 📌 An important note on the differences in converged performance
 
 In order to benefit from the wallclock speed-ups afforded by JAX-based systems it is required that environments also be written in JAX. It is for this reason that Mava does not use the exact same version of the RWARE environment as EPyMARL but instead uses a JAX-based implementation of RWARE found in [Jumanji][jumanji_rware], under the name of RobotWarehouse. One of the notable differences in the underlying environment logic is that RobotWarehouse (the RWARE version in Jumanji) will not attempt to handle agent collisions in the environment but will instead terminate an episode upon agent collision. In our experiments, this appeared to make the environment more challenging. For a more detailed discussion, please see the following [page](docs/detailed_comparison.md).
 
-### 🧨 Vectorised environments
+### 🧨 Steps per second experiments using vectorised environments
 
 Furthermore, we illustrate the speed of Mava by showing the steps per second as the number of parallel environments is increased. These steps per second scaling plots were computed using a standard laptop GPU, specifically an RTX-3060 GPU with 6GB memory.
 
