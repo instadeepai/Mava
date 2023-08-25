@@ -40,7 +40,7 @@
 
 </div>
 
-Mava provides simplified code for quickly iterating on ideas in multi-agent reinforcement learning (MARL). Mava provides useful implementations of MARL algorithms in JAX allowing for easy parallelisation across devices with JAX's `pmap`. Originating in the Research Team at [InstaDeep](https://www.instadeep.com/). “Mava” means experience, or wisdom, in Xhosa - one of South Africa’s eleven official languages.
+Mava provides simplified code for quickly iterating on ideas in multi-agent reinforcement learning (MARL) with useful implementations of MARL algorithms in JAX allowing for easy parallelisation across devices with JAX's `pmap`. Originating in the Research Team at [InstaDeep](https://www.instadeep.com/). “Mava” means experience, or wisdom, in Xhosa - one of South Africa’s eleven official languages.
 
 To join us in these efforts, please feel free to reach out, raise issues or read our [contribution guidelines](#contributing-) (or just star 🌟 to stay up to date with the latest developments)!
 
