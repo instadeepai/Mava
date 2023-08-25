@@ -28,7 +28,7 @@
 
 <hr>
 
-👋 **UPDATE - 24/8/2023**: We have changed the focus of Mava away from a framework and more towards a lightweight and easy-to-use codebase for MARL. Mava is also now end-to-end JAX-based and henceforth we will only be supporting JAX-based environments and systems with native support for the [Jumanji][jumanji] environment API. We are currently following a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl] where we allow for code duplication to enable readability. All algorithmic logic can be found in the file implementing a particular algorithm. If you would still like to use our deprecated TF2-based framework and systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
+👋 **UPDATE - 24/8/2023**: We have changed the focus of Mava away from a framework and more towards a lightweight and easy-to-use codebase for MARL. Mava is also now end-to-end JAX-based and henceforth we will only be supporting JAX-based environments. We currently provide native support for the [Jumanji][jumanji] environment API. Mava now follows a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl], where we allow for code duplication to enable readability and easy reuse. All algorithmic logic can be found in the file implementing a particular algorithm. If you would still like to use our deprecated TF2-based framework and systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
 
 <hr>
 
