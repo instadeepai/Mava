@@ -24,7 +24,7 @@
 <a  href="https://github.com/psf/black">
     <img src="https://img.shields.io/badge/code%20style-black-000000.svg" alt="Code style" />
 </a>
-<a href="https://colab.research.google.com/github/instadeepai/Mava/blob/feat/pure-jax-mava/quickstart.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+<a href="https://colab.research.google.com/github/instadeepai/Mava/blob/develop/Quickstart.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 </div>
 
 <hr>
@@ -161,7 +161,7 @@ If you use Mava in your work, please cite the accompanying
 ```
 
 [Paper]: https://arxiv.org/pdf/2107.01460.pdf
-[quickstart]: https://github.com/instadeepai/Mava/blob/develop/quickstart.ipynb
+[quickstart]: https://github.com/instadeepai/Mava/blob/develop/Quickstart.ipynb
 [jumanji]: https://github.com/instadeepai/jumanji
 [cleanrl]: https://github.com/vwxyzjn/cleanrl
 [purejaxrl]: https://github.com/luchris429/purejaxrl
