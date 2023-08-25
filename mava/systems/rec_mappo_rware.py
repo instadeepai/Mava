@@ -335,13 +335,9 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate the actor loss."""
                     # RERUN NETWORK
+                    obs_and_done = (traj_batch.obs, traj_batch.done[:, :, 0])
                     _, actor_policy = actor_apply_fn(
-                        actor_params,
-                        init_policy_hstate.squeeze(0),
-                        (
-                            traj_batch.obs,
-                            traj_batch.done[:, :, 0],
-                        ),
+                        actor_params, init_policy_hstate.squeeze(0), obs_and_done
                     )
                     log_prob = actor_policy.log_prob(traj_batch.action)
 
@@ -371,13 +367,9 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate the critic loss."""
                     # RERUN NETWORK
+                    obs_and_done = (traj_batch.obs, traj_batch.done[:, :, 0])
                     _, value = critic_apply_fn(
-                        critic_params,
-                        init_critic_hstate.squeeze(0),
-                        (
-                            traj_batch.obs,
-                            traj_batch.done[:, :, 0],
-                        ),
+                        critic_params, init_critic_hstate.squeeze(0), obs_and_done
                     )
 
                     # CALCULATE VALUE LOSS
