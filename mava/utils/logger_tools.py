@@ -81,8 +81,7 @@ class Logger:
             self.tb_logger(key, value, t)
 
         if self.use_neptune:
-            neptune_dict = {key: value}
-            self.neptune_logger.write(neptune_dict)
+            self.neptune_logger.write({key: value})
 
         if self.use_sacred:
             if key in self.sacred_info:
