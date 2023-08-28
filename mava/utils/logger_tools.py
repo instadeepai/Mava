@@ -81,7 +81,7 @@ class Logger:
             self.tb_logger(key, value, t)
 
         if self.use_neptune:
-            self.neptune_logger.write({key: value})
+            self.neptune_logger.write({key: value}, t)
 
         if self.use_sacred:
             if key in self.sacred_info:
@@ -144,7 +144,7 @@ class NeptuneLogger(Logger):
         )
         self._run["params"] = self._exp_params
 
-    def write(self, values: Any) -> None:  # noqa: CCR001 B028
+    def write(self, values: Any, t_env: float) -> None:  # noqa: CCR001 B028
         """Write values to the logger."""
         try:
             if isinstance(values, dict):
@@ -153,27 +153,25 @@ class NeptuneLogger(Logger):
                         value.shape == [1] or value.shape == 1 or value.shape == ()
                     )
                     if np.isscalar(value):
-                        self.scalar_summary(key, value)
+                        self.scalar_summary(key, value, t_env)
                     elif is_scalar_array:
                         if hasattr(value, "item"):
-                            self.scalar_summary(key, value.item())
+                            self.scalar_summary(key, value.item(), t_env)
                         else:
-                            self.scalar_summary(key, value)
-                    elif hasattr(value, "shape"):
-                        self.histogram_summary(key, value)
+                            self.scalar_summary(key, value, t_env)
                     elif isinstance(value, dict):
                         flatten_dict = self._flatten_dict(parent_key=key, dict_info=value)
-                        self.write(flatten_dict)
+                        self.write(flatten_dict, t_env)
                     elif isinstance(value, tuple) or isinstance(value, list):
                         for index, elements in enumerate(value):
-                            self.write({f"{key}_info_{index}": elements})
+                            self.write({f"{key}_info_{index}": elements}, t_env)
                     else:
                         warnings.warn(
                             f"Unable to log: {key}, unknown type: {type(value)}", stacklevel=2
                         )
             elif isinstance(values, tuple) or isinstance(value, list):
                 for elements in values:
-                    self.write(elements)
+                    self.write(elements, t_env)
             else:
                 warnings.warn(
                     f"Unable to log: {values}, unknown type: {type(values)}", stacklevel=2
@@ -184,20 +182,16 @@ class NeptuneLogger(Logger):
                 stacklevel=2,
             )
 
-    def scalar_summary(self, key: str, value: Any) -> None:
+    def scalar_summary(self, key: str, value: Any, t_env: float) -> None:
         """Log a scalar variable."""
         if self._run:
-            self._run[f"{self._label}/{format_key(key)}"].log(value)
+            self._run[f"{self._label}/{format_key(key)}"].log(value=value, step=t_env)
 
-    def dict_summary(self, key: str, value: Dict) -> None:
+    def dict_summary(self, key: str, value: Dict, t_env: float) -> None:
         """Log a dictionary of values."""
         dict_info = self._flatten_dict(parent_key=key, dict_info=value)
         for k, v in dict_info.items():
-            self.scalar_summary(k, v)
-
-    def histogram_summary(self, key: str, value: np.ndarray) -> None:
-        """Log a histogram of the tensor of values."""
-        return
+            self.scalar_summary(k, v, t_env)
 
     def _flatten_dict(self, parent_key: str, dict_info: Dict, sep: str = "_") -> Dict[str, float]:
         """Flatten a nested dictionary.
