@@ -142,7 +142,7 @@ class NeptuneLogger(Logger):
             tags=self._tag,
             capture_hardware_metrics=capture_hardware_metrics,
         )
-        self._run.params = self._exp_params
+        self._run["params"] = self._exp_params
 
     def write(self, values: Any) -> None:  # noqa: CCR001 B028
         """Write values to the logger."""
