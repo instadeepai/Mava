@@ -107,9 +107,6 @@ class AgentIDWrapper(Wrapper):
         agent_ids = jnp.eye(num_agents)
         new_agents_view = jnp.concatenate([agent_ids, timestep.observation.agents_view], axis=-1)
 
-        # we really should rather do this:
-        # timestep.observation = timestep.observation._replace(agents_view=new_agents_view)
-        # just need to check that this doesn't affect timing
         if self.has_global_state:
             # Add the agent IDs to the global state
             new_global_state = jnp.concatenate(
