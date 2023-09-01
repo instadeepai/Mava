@@ -3,14 +3,14 @@
 # --- Experiment params ---
 defaults:
   - _self_
-  - rware_scenario: tiny-2ag
+  - rware_scenario: small-4ag
 
 # --- Environment ---
 env_name: RobotWarehouse-v0
 
-num_envs: 16  # Number of vectorised environments per device.
-num_updates: 1000 # Number of updates
-seed: 42
+num_envs: 256  # Number of vectorised environments per device.
+num_updates: 305 # Number of updates
+seed: 0
 
 # --- Agent observations ---
 add_agent_id: True
@@ -21,8 +21,8 @@ critic_lr: 2.5e-4 # Learning rate for critic network
 update_batch_size: 2 # Number of vectorised gradient updates per device.
 rollout_length: 128 # Number of environment steps per vectorised environment.
 
-ppo_epochs: 4 # Number of ppo epochs per training data batch.
-num_minibatches: 2 # Number of minibatches per ppo epoch.
+ppo_epochs: 32 # Number of ppo epochs per training data batch.
+num_minibatches: 32 # Number of minibatches per ppo epoch.
 gamma: 0.99 # Discounting factor.
 gae_lambda: 0.95 # Lambda value for GAE computation.
 clip_eps: 0.2 # Clipping value for PPO updates and value function.
@@ -32,7 +32,7 @@ max_grad_norm: 0.5 # Maximum norm of the gradients for a weight update.
 
 # --- Evaluation ---
 num_eval_episodes: 32 # Episodes per evaluation
-num_evaluation: 200 # Number of evenly spaced evaluations to perform during training.
+num_evaluation: 61 # Number of evenly spaced evaluations to perform during training.
 evaluation_greedy: False # Evaluate the policy greedily. If True the policy will select
   # an action which corresponds to the greatest logit. If false, the policy will sample
   # from the logits.
@@ -45,6 +45,6 @@ use_sacred: True
 base_exp_path: results
 system_name: ~  # this is manually set inside each file depending on which system is run
 # Neptune logging
-use_neptune: False
-neptune_tag: [rware]
+use_neptune: True
+neptune_tag: [rware,rlax-bench,loss+gae]
 name: None # Unique ID from logging.
