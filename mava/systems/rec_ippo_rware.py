@@ -26,6 +26,7 @@ import jax.numpy as jnp
 import jumanji
 import numpy as np
 import optax
+import rlax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
@@ -158,6 +159,15 @@ def get_learner_fn(
     actor_apply_fn, critic_apply_fn = apply_fns
     actor_update_fn, critic_update_fn = update_fns
 
+    # `vmap` the gae function to work over the batch that mava has: (n_rollouts, n_agents, n_envs)
+    calc_gae = jax.vmap(
+        jax.vmap(
+            rlax.truncated_generalized_advantage_estimation, in_axes=(1, 1, None, 1), out_axes=1
+        ),
+        in_axes=(1, 1, None, 1),
+        out_axes=1,
+    )
+
     def _update_step(learner_state: RNNLearnerState, _: Any) -> Tuple[RNNLearnerState, Tuple]:
         """A single update of the network.
 
@@ -275,34 +285,13 @@ def get_learner_fn(
         # Squeeze out the batch dimension and mask out the value of terminal states.
         last_val = last_val.squeeze(0)
         last_val = jnp.where(last_done, jnp.zeros_like(last_val), last_val)
+        vals = jnp.concatenate([traj_batch.value, last_val[jnp.newaxis, ...]], axis=0)
 
-        def _calculate_gae(
-            traj_batch: PPOTransition, last_val: chex.Array
-        ) -> Tuple[chex.Array, chex.Array]:
-            """Calculate the GAE."""
+        advantages = calc_gae(
+            traj_batch.reward, (1 - traj_batch.done) * config["gamma"], config["gae_lambda"], vals
+        )
 
-            def _get_advantages(gae_and_next_value: Tuple, transition: PPOTransition) -> Tuple:
-                """Calculate the GAE for a single transition."""
-                gae, next_value = gae_and_next_value
-                done, value, reward = (
-                    transition.done,
-                    transition.value,
-                    transition.reward,
-                )
-                delta = reward + config["gamma"] * next_value * (1 - done) - value
-                gae = delta + config["gamma"] * config["gae_lambda"] * (1 - done) * gae
-                return (gae, value), gae
-
-            _, advantages = jax.lax.scan(
-                _get_advantages,
-                (jnp.zeros_like(last_val), last_val),
-                traj_batch,
-                reverse=True,
-                unroll=16,
-            )
-            return advantages, advantages + traj_batch.value
-
-        advantages, targets = _calculate_gae(traj_batch, last_val)
+        targets = advantages + traj_batch.value
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""
@@ -336,17 +325,11 @@ def get_learner_fn(
 
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
                     gae = (gae - gae.mean()) / (gae.std() + 1e-8)
-                    loss_actor1 = ratio * gae
-                    loss_actor2 = (
-                        jnp.clip(
-                            ratio,
-                            1.0 - config["clip_eps"],
-                            1.0 + config["clip_eps"],
-                        )
-                        * gae
+                    # Takes the minimum of the clipped and unclipped loss.
+                    # Can ravel the batch here since the loss is meaned anyways.
+                    loss_actor = rlax.clipped_surrogate_pg_loss(
+                        jnp.ravel(ratio), jnp.ravel(gae), config["clip_eps"]
                     )
-                    loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
-                    loss_actor = loss_actor.mean()
                     entropy = actor_policy.entropy().mean()
 
                     total_loss = loss_actor - config["ent_coef"] * entropy
