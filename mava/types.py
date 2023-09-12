@@ -12,23 +12,38 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, NamedTuple, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, NamedTuple, Optional, Tuple
 
 import chex
+from distrax import Distribution
 from flax.core.frozen_dict import FrozenDict
-from jumanji.environments.routing.robot_warehouse import State
 from jumanji.types import TimeStep
 from optax._src.base import OptState
+from typing_extensions import TypeAlias
 
 from mava.wrappers.jumanji import LogEnvState
+
+if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
+    from dataclasses import dataclass
+else:
+    from flax.struct import dataclass
+
+# Can't know the exact type of State or Timestep.
+# Is there a better way to do this?
+State: TypeAlias = Any
+Observation: TypeAlias = Any
+
+Action: TypeAlias = chex.Array
+Value: TypeAlias = chex.Array
+HiddenState: TypeAlias = chex.Array
 
 
 class PPOTransition(NamedTuple):
     """Transition tuple for PPO."""
 
     done: chex.Array
-    action: chex.Array
-    value: chex.Array
+    action: Action
+    value: Value
     reward: chex.Array
     log_prob: chex.Array
     obs: chex.Array
@@ -52,11 +67,14 @@ class OptStates(NamedTuple):
 class HiddenStates(NamedTuple):
     """Hidden states for an actor critic learner."""
 
-    policy_hidden_state: chex.Array
-    critic_hidden_state: chex.Array
+    policy_hidden_state: HiddenState
+    critic_hidden_state: HiddenState
 
 
-class LearnerState(NamedTuple):
+# Question: we need this to be a dataclass because you can't
+# subclass NamedTuple so should we make everything a dataclass?
+@dataclass
+class LearnerState:
     """State of the learner."""
 
     params: Params
@@ -66,19 +84,16 @@ class LearnerState(NamedTuple):
     timestep: TimeStep
 
 
-class RNNLearnerState(NamedTuple):
+@dataclass
+class RNNLearnerState(LearnerState):
     """State of the `Learner` for recurrent architectures."""
 
-    params: Params
-    opt_states: OptStates
-    key: chex.PRNGKey
-    env_state: LogEnvState
-    timestep: TimeStep
     dones: chex.Array
     hstates: HiddenStates
 
 
-class EvalState(NamedTuple):
+@dataclass
+class EvalState(State):
     """State of the evaluator."""
 
     key: chex.PRNGKey
@@ -88,16 +103,12 @@ class EvalState(NamedTuple):
     return_: chex.Numeric = None
 
 
-class RNNEvalState(NamedTuple):
+@dataclass
+class RNNEvalState(EvalState):
     """State of the evaluator for recurrent architectures."""
 
-    key: chex.PRNGKey
-    env_state: State
-    timestep: TimeStep
     dones: chex.Array
-    hstate: chex.Array
-    step_count_: chex.Numeric = None
-    return_: chex.Numeric = None
+    hstate: HiddenState
 
 
 class ExperimentOutput(NamedTuple):
@@ -109,3 +120,11 @@ class ExperimentOutput(NamedTuple):
     value_loss: chex.Array = None
     loss_actor: chex.Array = None
     entropy: chex.Array = None
+
+
+LearnerFn = Callable[[LearnerState], ExperimentOutput]
+
+ActorApply = Callable[[FrozenDict, Observation], Distribution]
+CriticApply = Callable[[FrozenDict, Observation], Value]
+RecActorApply = Callable[[FrozenDict, HiddenState, Observation], Tuple[HiddenState, Action]]
+RecCriticApply = Callable[[FrozenDict, HiddenState, Observation], Tuple[HiddenState, Value]]

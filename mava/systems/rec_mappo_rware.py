@@ -16,7 +16,7 @@ import copy
 import functools
 import os
 from logging import Logger as SacredLogger
-from typing import Any, Callable, Dict, Sequence, Tuple
+from typing import Any, Dict, Sequence, Tuple
 
 import chex
 import distrax
@@ -42,9 +42,12 @@ from mava.logger import logger_setup
 from mava.types import (
     ExperimentOutput,
     HiddenStates,
+    LearnerFn,
     OptStates,
     Params,
     PPOTransition,
+    RecActorApply,
+    RecCriticApply,
     RNNLearnerState,
 )
 from mava.utils.logger_tools import config_copy, get_experiment_path, get_logger
@@ -155,10 +158,10 @@ class Critic(nn.Module):
 
 def get_learner_fn(
     env: jumanji.Environment,
-    apply_fns: Tuple[Callable, Callable],
-    update_fns: Tuple[Callable, Callable],
+    apply_fns: Tuple[RecActorApply, RecCriticApply],
+    update_fns: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
     config: Dict,
-) -> Callable:
+) -> LearnerFn:
     """Get the learner function."""
 
     actor_apply_fn, critic_apply_fn = apply_fns
@@ -188,17 +191,7 @@ def get_learner_fn(
             learner_state: RNNLearnerState, _: Any
         ) -> Tuple[RNNLearnerState, PPOTransition]:
             """Step the environment."""
-            (
-                params,
-                opt_states,
-                rng,
-                env_state,
-                last_timestep,
-                last_done,
-                hstates,
-            ) = learner_state
-
-            rng, policy_rng = jax.random.split(rng)
+            rng, policy_rng = jax.random.split(learner_state.key)
 
             # Add a batch dimension to the observation.
             batched_observation = jax.tree_util.tree_map(
@@ -211,10 +204,10 @@ def get_learner_fn(
 
             # Run the network.
             policy_hidden_state, actor_policy = actor_apply_fn(
-                params.actor_params, hstates.policy_hidden_state, ac_in
+                params.actor_params, learner_state.hstates.policy_hidden_state, ac_in
             )
             critic_hidden_state, value = critic_apply_fn(
-                params.critic_params, hstates.critic_hidden_state, ac_in
+                params.critic_params, learner_state.hstates.critic_hidden_state, ac_in
             )
 
             # Sample action from the policy and squeeze out the batch dimension.
@@ -228,7 +221,9 @@ def get_learner_fn(
             )
 
             # Step the environment.
-            env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
+            env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(
+                learner_state.env_state, action
+            )
 
             # log episode return and length
             done, reward = jax.tree_util.tree_map(
@@ -257,6 +252,7 @@ def get_learner_fn(
             _env_step, learner_state, None, config["rollout_length"]
         )
 
+        # todo: change once rlax changes merged in
         # CALCULATE ADVANTAGE
         (
             params,
@@ -555,7 +551,7 @@ def get_learner_fn(
 
 def learner_setup(
     env: Environment, rngs: chex.Array, config: Dict
-) -> Tuple[Callable, Actor, RNNLearnerState]:
+) -> Tuple[LearnerFn, Actor, RNNLearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
