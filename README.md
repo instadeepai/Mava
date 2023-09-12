@@ -54,7 +54,6 @@ Mava currently offers the following building blocks for MARL research:
 - 🍬 **Environment Wrappers**: Example wrapper for mapping a Jumanji environment to an environment usable in Mava. At the moment, we only support [Robotic Warehouse][jumanji_rware] but plan to support more environments soon.
 - 🎓 **Educational Material**: [Quickstart notebook][quickstart] to demonstrate how Mava can be used and to highlight the added value of JAX-based MARL.
 
-
 ## Performance and Speed 🚀
 
 All of the experiments below were performed using an NVIDIA Quadro RTX 4000 GPU with 8GB Memory.
@@ -94,8 +93,6 @@ Furthermore, we illustrate the speed of Mava by showing the steps per second as 
     <div style="text-align:center; margin-top: 10px;"> Mava steps per second scaling with increased vectorised environments and total training run time for 20M environment steps.</div>
 </p>
 
-
-
 ## Code Philosophy 🧘
 
 The current code in Mava is adapted from [PureJaxRL](purejaxrl) which provides high-quality single-file implementations with research-friendly features. In turn, PureJaxRL is inspired by the code philosophy from [CleanRL][cleanrl]. Along this vein of easy-to-use and understandable RL codebases, Mava is not designed to be a modular library and is not meant to be imported. Our repository focuses on simplicity and clarity in its implementations while utilising the advantages offered by JAX such as `pmap` and `vmap`, making it an excellent resource for researchers and practitioners to build upon.
@@ -113,7 +110,7 @@ pip install -e .
 ```
 
 We have tested `Mava` on Python 3.9. Note that because the installation of JAX differs depending on your hardware accelerator,
-we advise users to explicitly install the correct JAX version (see the [official installation guide](https://github.com/google/jax#installation)). For more in-depth installation guides including Docker builds and virtual environments, please see our [detailed installation guide](DETAILED_INSTALL.md).
+we advise users to explicitly install the correct JAX version (see the [official installation guide](https://github.com/google/jax#installation)). For more in-depth installation guides including Docker builds and virtual environments, please see our [detailed installation guide](docs/DETAILED_INSTALL.md).
 
 ## Quickstart ⚡
 
@@ -121,7 +118,7 @@ We have a [Quickstart notebook][quickstart] that can be used to quickly create a
 
 ## Contributing 🤝
 
-Please read our [contributing docs](./CONTRIBUTING.md) for details on how to submit pull requests, our Contributor License Agreement and community guidelines.
+Please read our [contributing docs](docs/CONTRIBUTING.md) for details on how to submit pull requests, our Contributor License Agreement and community guidelines.
 
 ## Roadmap 🛤️
 
@@ -161,7 +158,7 @@ If you use Mava in your work, please cite the accompanying
 ```
 
 [Paper]: https://arxiv.org/pdf/2107.01460.pdf
-[quickstart]: https://github.com/instadeepai/Mava/blob/develop/Quickstart.ipynb
+[quickstart]: https://github.com/instadeepai/Mava/blob/develop//examples/Quickstart.ipynb
 [jumanji]: https://github.com/instadeepai/jumanji
 [cleanrl]: https://github.com/vwxyzjn/cleanrl
 [purejaxrl]: https://github.com/luchris429/purejaxrl

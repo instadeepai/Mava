@@ -72,6 +72,6 @@ repos:
         name: "License inserter"
         files: .*py$
         args:
-          - --license-filepath=license_header.txt
+          - --license-filepath=docs/license_header.txt
           - --comment-style=#
         exclude: .npy$  # Do not add license to .npy files (the standard binary file format in NumPy)
