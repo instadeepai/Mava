@@ -195,12 +195,9 @@ def get_learner_fn(
 
             # Add a batch dimension to the observation.
             batched_observation = jax.tree_util.tree_map(
-                lambda x: x[jnp.newaxis, :], last_timestep.observation
+                lambda x: x[jnp.newaxis, :], learner_state.timestep.observation
             )
-            ac_in = (
-                batched_observation,
-                last_done[:, 0][jnp.newaxis, :],
-            )
+            ac_in = (batched_observation, learner_state.dones[:, 0][jnp.newaxis, :])
 
             # Run the network.
             policy_hidden_state, actor_policy = actor_apply_fn(
@@ -236,7 +233,7 @@ def get_learner_fn(
             }
 
             transition = PPOTransition(
-                done, action, value, reward, log_prob, last_timestep.observation, info
+                done, action, value, reward, log_prob, learner_state.timestep.observation, info
             )
             hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
             learner_state = RNNLearnerState(
@@ -252,29 +249,17 @@ def get_learner_fn(
             _env_step, learner_state, None, config["rollout_length"]
         )
 
-        # todo: change once rlax changes merged in
         # CALCULATE ADVANTAGE
-        (
-            params,
-            opt_states,
-            rng,
-            env_state,
-            last_timestep,
-            last_done,
-            hstates,
-        ) = learner_state
-
         # Add a batch dimension to the observation.
         batched_last_observation = jax.tree_util.tree_map(
-            lambda x: x[jnp.newaxis, :], last_timestep.observation
+            lambda x: x[jnp.newaxis, :], learner_state.timestep.observation
         )
-        ac_in = (
-            batched_last_observation,
-            last_done[:, 0][jnp.newaxis, :],
-        )
+        ac_in = (batched_last_observation, learner_state.dones[:, 0][jnp.newaxis, :])
 
         # Run the network.
-        _, last_val = critic_apply_fn(params.critic_params, hstates.critic_hidden_state, ac_in)
+        _, last_val = critic_apply_fn(
+            learner_state.params.critic_params, learner_state.hstates.critic_hidden_state, ac_in
+        )
 
         # Squeeze out the batch dimension and mask out the value of terminal states.
         last_val = last_val.squeeze(0)
@@ -308,6 +293,7 @@ def get_learner_fn(
 
         advantages, targets = _calculate_gae(traj_batch, last_val)
 
+        # todo: empty Tuple
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""
 
@@ -486,13 +472,13 @@ def get_learner_fn(
 
         init_hstates = jax.tree_util.tree_map(lambda x: x[None, :], initial_hstates)
         update_state = (
-            params,
-            opt_states,
+            learner_state.params,
+            learner_state.opt_states,
             init_hstates,
             traj_batch,
             advantages,
             targets,
-            rng,
+            learner_state.key,
         )
 
         # UPDATE EPOCHS
@@ -505,10 +491,10 @@ def get_learner_fn(
             params,
             opt_states,
             rng,
-            env_state,
-            last_timestep,
-            last_done,
-            hstates,
+            learner_state.env_state,
+            learner_state.timestep,
+            learner_state.dones,
+            learner_state.hstates,
         )
         metric = traj_batch.info
         return learner_state, (metric, loss_info)
@@ -646,9 +632,7 @@ def learner_setup(
     rng, *env_rngs = jax.random.split(
         rng, n_devices * config["update_batch_size"] * config["num_envs"] + 1
     )
-    env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
-        jnp.stack(env_rngs),
-    )
+    env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(jnp.stack(env_rngs))
 
     # Split rngs for each core.
     rng, *step_rngs = jax.random.split(rng, n_devices * config["update_batch_size"] + 1)

@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Any, Callable, Dict, NamedTuple, Optional, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    NamedTuple,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 
 import chex
 from distrax import Distribution
@@ -73,6 +83,7 @@ class HiddenStates(NamedTuple):
 
 # Question: we need this to be a dataclass because you can't
 # subclass NamedTuple so should we make everything a dataclass?
+# Could do unions of NamedTuples?
 @dataclass
 class LearnerState:
     """State of the learner."""
@@ -115,7 +126,7 @@ class ExperimentOutput(NamedTuple):
     """Experiment output."""
 
     episodes_info: Dict[str, chex.Array]
-    learner_state: Optional[LearnerState] = None
+    learner_state: Optional[LearnerState] = None  # todo: why is this optional?
     total_loss: chex.Array = None
     value_loss: chex.Array = None
     loss_actor: chex.Array = None
@@ -126,5 +137,5 @@ LearnerFn = Callable[[LearnerState], ExperimentOutput]
 
 ActorApply = Callable[[FrozenDict, Observation], Distribution]
 CriticApply = Callable[[FrozenDict, Observation], Value]
-RecActorApply = Callable[[FrozenDict, HiddenState, Observation], Tuple[HiddenState, Action]]
+RecActorApply = Callable[[FrozenDict, HiddenState, Observation], Tuple[HiddenState, Distribution]]
 RecCriticApply = Callable[[FrozenDict, HiddenState, Observation], Tuple[HiddenState, Value]]
