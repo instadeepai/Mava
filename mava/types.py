@@ -23,6 +23,13 @@ from optax._src.base import OptState
 from mava.wrappers.jumanji import LogEnvState
 
 
+class HiddenStates(NamedTuple):
+    """Hidden states for an actor critic learner."""
+
+    policy_hidden_state: chex.Array
+    critic_hidden_state: chex.Array
+
+
 class PPOTransition(NamedTuple):
     """Transition tuple for PPO."""
 
@@ -32,6 +39,8 @@ class PPOTransition(NamedTuple):
     reward: chex.Array
     log_prob: chex.Array
     obs: chex.Array
+    policy_hidden_state: chex.Array
+    critic_hidden_state: chex.Array
     info: Dict
 
 
@@ -47,13 +56,6 @@ class OptStates(NamedTuple):
 
     actor_opt_state: OptState
     critic_opt_state: OptState
-
-
-class HiddenStates(NamedTuple):
-    """Hidden states for an actor critic learner."""
-
-    policy_hidden_state: chex.Array
-    critic_hidden_state: chex.Array
 
 
 class LearnerState(NamedTuple):

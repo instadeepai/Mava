@@ -16,7 +16,7 @@ import copy
 import functools
 import os
 from logging import Logger as SacredLogger
-from typing import Any, Callable, Dict, Sequence, Tuple
+from typing import Any, Callable, Dict, NamedTuple, Sequence, Tuple
 
 import chex
 import distrax
@@ -44,12 +44,25 @@ from mava.types import (
     HiddenStates,
     OptStates,
     Params,
-    PPOTransition,
     RNNLearnerState,
 )
 from mava.utils.logger_tools import config_copy, get_experiment_path, get_logger
 from mava.utils.timing_utils import TimeIt
 from mava.wrappers.jumanji import AgentIDWrapper, LogWrapper, RwareMultiAgentWrapper
+
+
+class PPOTransition(NamedTuple):
+    """Transition tuple for PPO."""
+
+    done: chex.Array
+    action: chex.Array
+    value: chex.Array
+    reward: chex.Array
+    log_prob: chex.Array
+    obs: chex.Array
+    policy_hidden_state: chex.Array
+    critic_hidden_state: chex.Array
+    info: Dict
 
 
 class ScannedRNN(nn.Module):
@@ -235,8 +248,17 @@ def get_learner_fn(
             }
 
             transition = PPOTransition(
-                done, action, value, reward, log_prob, last_timestep.observation, info
+                done,
+                action,
+                value,
+                reward,
+                log_prob,
+                last_timestep.observation,
+                policy_hidden_state,
+                critic_hidden_state,
+                info,
             )
+
             hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
             learner_state = RNNLearnerState(
                 params, opt_states, rng, env_state, timestep, done, hstates
@@ -331,7 +353,7 @@ def get_learner_fn(
 
                     obs_and_done = (traj_batch.obs, traj_batch.done[:, :, 0])
                     _, actor_policy = actor_apply_fn(
-                        actor_params, init_policy_hstate.squeeze(0), obs_and_done
+                        actor_params, init_policy_hstate[0], obs_and_done
                     )
                     log_prob = actor_policy.log_prob(traj_batch.action)
 
@@ -362,9 +384,7 @@ def get_learner_fn(
                     """Calculate the critic loss."""
                     # RERUN NETWORK
                     obs_and_done = (traj_batch.obs, traj_batch.done[:, :, 0])
-                    _, value = critic_apply_fn(
-                        critic_params, init_critic_hstate.squeeze(0), obs_and_done
-                    )
+                    _, value = critic_apply_fn(critic_params, init_critic_hstate[0], obs_and_done)
 
                     # CALCULATE VALUE LOSS
                     value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
@@ -449,8 +469,23 @@ def get_learner_fn(
             rng, shuffle_rng = jax.random.split(rng)
 
             # SHUFFLE MINIBATCHES
-            permutation = jax.random.permutation(shuffle_rng, config["num_envs"])
-            batch = (init_policy_hstate, init_critic_hstate, traj_batch, advantages, targets)
+            batch = (
+                traj_batch.policy_hidden_state,
+                traj_batch.critic_hidden_state,
+                traj_batch,
+                advantages,
+                targets,
+            )
+            batch = jax.tree_util.tree_map(
+                lambda x: x.reshape(x.shape[0] // 10, 10, -1, *x.shape[2:]).reshape(
+                    10, -1, *x.shape[2:]
+                ),
+                batch,
+            )
+            num_recurrent_chunks = config["rollout_length"] // config["recurrent_chunk_size"]
+            permutation = jax.random.permutation(
+                shuffle_rng, config["num_envs"] * num_recurrent_chunks
+            )
             shuffled_batch = jax.tree_util.tree_map(
                 lambda x: jnp.take(x, permutation, axis=1), batch
             )
