@@ -39,8 +39,6 @@ class PPOTransition(NamedTuple):
     reward: chex.Array
     log_prob: chex.Array
     obs: chex.Array
-    policy_hidden_state: chex.Array
-    critic_hidden_state: chex.Array
     info: Dict
 
 
