@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import chex
 import flax.linen as nn
@@ -283,14 +283,16 @@ def evaluator_setup(
     params: FrozenDict,
     config: Dict,
     use_recurrent_net: bool = False,
-    scanned_rnn: nn.Module = None,
-) -> Tuple[Callable, Callable, Tuple]:
+    scanned_rnn: Optional[nn.Module] = None,
+) -> Tuple[EvalFn, EvalFn, Tuple[FrozenDict, chex.Array]]:
     """Initialise evaluator_fn."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
 
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
+        assert scanned_rnn is not None
+
         vmapped_eval_network_apply_fn = jax.vmap(
             network.apply, in_axes=(None, 1, (2, None)), out_axes=(1, 2)
         )
