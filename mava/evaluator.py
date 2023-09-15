@@ -21,12 +21,19 @@ import jax.numpy as jnp
 from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
 
-from mava.types import EvalState, ExperimentOutput, RNNEvalState
+from mava.types import (
+    ActorApply,
+    EvalFn,
+    EvalState,
+    ExperimentOutput,
+    RecActorApply,
+    RNNEvalState,
+)
 
 
 def get_ff_evaluator_fn(
-    env: Environment, apply_fn: Callable, config: dict, eval_multiplier: int = 1
-) -> Callable:
+    env: Environment, apply_fn: ActorApply, config: dict, eval_multiplier: int = 1
+) -> EvalFn:
     """Get the evaluator function for feedforward networks.
 
     Args:
@@ -94,7 +101,7 @@ def get_ff_evaluator_fn(
         }
         return eval_metrics
 
-    def evaluator_fn(trained_params: FrozenDict, rng: chex.PRNGKey) -> ExperimentOutput:
+    def evaluator_fn(trained_params: FrozenDict, rng: chex.PRNGKey) -> ExperimentOutput[EvalState]:
         """Evaluator function."""
 
         # Initialise environment states and timesteps.
@@ -112,25 +119,23 @@ def get_ff_evaluator_fn(
         reshape_step_rngs = lambda x: x.reshape(eval_batch, -1)
         step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
 
-        eval_state = EvalState(step_rngs, env_states, timesteps)
+        eval_state = EvalState(step_rngs, env_states, timesteps, 0, 0.0)
         eval_metrics = jax.vmap(eval_one_episode, in_axes=(None, 0), axis_name="eval_batch")(
             trained_params, eval_state
         )
 
-        return ExperimentOutput(
-            episodes_info=eval_metrics,
-        )
+        return ExperimentOutput(episodes_info=eval_metrics, learner_state=eval_state)
 
     return evaluator_fn
 
 
 def get_rnn_evaluator_fn(
     env: Environment,
-    apply_fn: Callable,
+    apply_fn: RecActorApply,
     config: dict,
     scanned_rnn: nn.Module,
     eval_multiplier: int = 1,
-) -> Callable:
+) -> EvalFn:
     """Get the evaluator function for recurrent networks."""
 
     def eval_one_episode(params: FrozenDict, init_eval_state: RNNEvalState) -> Dict:
@@ -214,7 +219,9 @@ def get_rnn_evaluator_fn(
         }
         return eval_metrics
 
-    def evaluator_fn(trained_params: FrozenDict, rng: chex.PRNGKey) -> ExperimentOutput:
+    def evaluator_fn(
+        trained_params: FrozenDict, rng: chex.PRNGKey
+    ) -> ExperimentOutput[RNNEvalState]:
         """Evaluator function."""
 
         # Initialise environment states and timesteps.
@@ -253,6 +260,8 @@ def get_rnn_evaluator_fn(
             timestep=timesteps,
             dones=dones,
             hstate=init_hstate,
+            step_count_=0,
+            return_=0.0,
         )
 
         eval_metrics = jax.vmap(eval_one_episode, in_axes=(None, 0), axis_name="eval_batch")(
@@ -261,6 +270,7 @@ def get_rnn_evaluator_fn(
 
         return ExperimentOutput(
             episodes_info=eval_metrics,
+            learner_state=eval_state,
         )
 
     return evaluator_fn

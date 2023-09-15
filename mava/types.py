@@ -12,17 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Dict,
-    NamedTuple,
-    Optional,
-    Tuple,
-    Type,
-    Union,
-)
+from typing import Any, Callable, Dict, Generic, NamedTuple, Optional, Tuple, TypeVar
 
 import chex
 from distrax import Distribution
@@ -33,25 +23,22 @@ from typing_extensions import TypeAlias
 
 from mava.wrappers.jumanji import LogEnvState
 
-if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
-    from dataclasses import dataclass
-else:
-    from flax.struct import dataclass
+Action: TypeAlias = chex.Array
+Value: TypeAlias = chex.Array
+Done: TypeAlias = chex.Array
+HiddenState: TypeAlias = chex.Array
 
 # Can't know the exact type of State or Timestep.
 # Is there a better way to do this?
 State: TypeAlias = Any
 Observation: TypeAlias = Any
-
-Action: TypeAlias = chex.Array
-Value: TypeAlias = chex.Array
-HiddenState: TypeAlias = chex.Array
+RnnObservation: TypeAlias = Tuple[Observation, Done]
 
 
 class PPOTransition(NamedTuple):
     """Transition tuple for PPO."""
 
-    done: chex.Array
+    done: Done
     action: Action
     value: Value
     reward: chex.Array
@@ -81,11 +68,7 @@ class HiddenStates(NamedTuple):
     critic_hidden_state: HiddenState
 
 
-# Question: we need this to be a dataclass because you can't
-# subclass NamedTuple so should we make everything a dataclass?
-# Could do unions of NamedTuples?
-@dataclass
-class LearnerState:
+class LearnerState(NamedTuple):
     """State of the learner."""
 
     params: Params
@@ -95,47 +78,62 @@ class LearnerState:
     timestep: TimeStep
 
 
-@dataclass
-class RNNLearnerState(LearnerState):
+class RNNLearnerState(NamedTuple):
     """State of the `Learner` for recurrent architectures."""
 
-    dones: chex.Array
+    params: Params
+    opt_states: OptStates
+    key: chex.PRNGKey
+    env_state: LogEnvState
+    timestep: TimeStep
+    dones: Done
     hstates: HiddenStates
 
 
-@dataclass
-class EvalState(State):
+class EvalState(NamedTuple):
     """State of the evaluator."""
 
     key: chex.PRNGKey
     env_state: State
     timestep: TimeStep
-    step_count_: chex.Numeric = None
-    return_: chex.Numeric = None
+    step_count_: chex.Numeric
+    return_: chex.Numeric
 
 
-@dataclass
-class RNNEvalState(EvalState):
+class RNNEvalState(NamedTuple):
     """State of the evaluator for recurrent architectures."""
 
+    key: chex.PRNGKey
+    env_state: State
+    timestep: TimeStep
+    step_count_: chex.Numeric
+    return_: chex.Numeric
     dones: chex.Array
     hstate: HiddenState
 
 
-class ExperimentOutput(NamedTuple):
+MavaState = TypeVar("MavaState", LearnerState, RNNLearnerState, EvalState, RNNEvalState)
+
+
+class ExperimentOutput(NamedTuple, Generic[MavaState]):
     """Experiment output."""
 
     episodes_info: Dict[str, chex.Array]
-    learner_state: Optional[LearnerState] = None  # todo: why is this optional?
-    total_loss: chex.Array = None
-    value_loss: chex.Array = None
-    loss_actor: chex.Array = None
-    entropy: chex.Array = None
+    learner_state: MavaState
+    # these aren't common between value and policy methods
+    # should likely just be a dict of metrics
+    total_loss: Optional[chex.Array] = None
+    value_loss: Optional[chex.Array] = None
+    loss_actor: Optional[chex.Array] = None
+    entropy: Optional[chex.Array] = None
 
 
-LearnerFn = Callable[[LearnerState], ExperimentOutput]
+LearnerFn = Callable[[MavaState], ExperimentOutput[MavaState]]
+EvalFn = Callable[[FrozenDict, chex.PRNGKey], ExperimentOutput[MavaState]]
 
 ActorApply = Callable[[FrozenDict, Observation], Distribution]
 CriticApply = Callable[[FrozenDict, Observation], Value]
-RecActorApply = Callable[[FrozenDict, HiddenState, Observation], Tuple[HiddenState, Distribution]]
-RecCriticApply = Callable[[FrozenDict, HiddenState, Observation], Tuple[HiddenState, Value]]
+RecActorApply = Callable[
+    [FrozenDict, HiddenState, RnnObservation], Tuple[HiddenState, Distribution]
+]
+RecCriticApply = Callable[[FrozenDict, HiddenState, RnnObservation], Tuple[HiddenState, Value]]

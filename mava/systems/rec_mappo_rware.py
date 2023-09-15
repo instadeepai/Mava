@@ -161,7 +161,7 @@ def get_learner_fn(
     apply_fns: Tuple[RecActorApply, RecCriticApply],
     update_fns: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
     config: Dict,
-) -> LearnerFn:
+) -> LearnerFn[RNNLearnerState]:
     """Get the learner function."""
 
     actor_apply_fn, critic_apply_fn = apply_fns
@@ -191,36 +191,40 @@ def get_learner_fn(
             learner_state: RNNLearnerState, _: Any
         ) -> Tuple[RNNLearnerState, PPOTransition]:
             """Step the environment."""
-            rng, policy_rng = jax.random.split(learner_state.key)
+            (
+                params,
+                opt_states,
+                rng,
+                env_state,
+                last_timestep,
+                last_done,
+                hstates,
+            ) = learner_state
+
+            rng, policy_rng = jax.random.split(rng)
 
             # Add a batch dimension to the observation.
             batched_observation = jax.tree_util.tree_map(
-                lambda x: x[jnp.newaxis, :], learner_state.timestep.observation
+                lambda x: x[jnp.newaxis, :], last_timestep.observation
             )
-            ac_in = (batched_observation, learner_state.dones[:, 0][jnp.newaxis, :])
+            ac_in = (batched_observation, last_done[:, 0][jnp.newaxis, :])
 
             # Run the network.
             policy_hidden_state, actor_policy = actor_apply_fn(
-                params.actor_params, learner_state.hstates.policy_hidden_state, ac_in
+                params.actor_params, hstates.policy_hidden_state, ac_in
             )
             critic_hidden_state, value = critic_apply_fn(
-                params.critic_params, learner_state.hstates.critic_hidden_state, ac_in
+                params.critic_params, hstates.critic_hidden_state, ac_in
             )
 
             # Sample action from the policy and squeeze out the batch dimension.
             action = actor_policy.sample(seed=policy_rng)
             log_prob = actor_policy.log_prob(action)
 
-            action, log_prob, value = (
-                action.squeeze(0),
-                log_prob.squeeze(0),
-                value.squeeze(0),
-            )
+            action, log_prob, value = (action.squeeze(0), log_prob.squeeze(0), value.squeeze(0))
 
             # Step the environment.
-            env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(
-                learner_state.env_state, action
-            )
+            env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             # log episode return and length
             done, reward = jax.tree_util.tree_map(
@@ -233,7 +237,7 @@ def get_learner_fn(
             }
 
             transition = PPOTransition(
-                done, action, value, reward, log_prob, learner_state.timestep.observation, info
+                done, action, value, reward, log_prob, last_timestep.observation, info
             )
             hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
             learner_state = RNNLearnerState(
@@ -250,16 +254,24 @@ def get_learner_fn(
         )
 
         # CALCULATE ADVANTAGE
+        (
+            params,
+            opt_states,
+            rng,
+            env_state,
+            last_timestep,
+            last_done,
+            hstates,
+        ) = learner_state
+
         # Add a batch dimension to the observation.
         batched_last_observation = jax.tree_util.tree_map(
-            lambda x: x[jnp.newaxis, :], learner_state.timestep.observation
+            lambda x: x[jnp.newaxis, :], last_timestep.observation
         )
-        ac_in = (batched_last_observation, learner_state.dones[:, 0][jnp.newaxis, :])
+        ac_in = (batched_last_observation, last_done[:, 0][jnp.newaxis, :])
 
         # Run the network.
-        _, last_val = critic_apply_fn(
-            learner_state.params.critic_params, learner_state.hstates.critic_hidden_state, ac_in
-        )
+        _, last_val = critic_apply_fn(params.critic_params, hstates.critic_hidden_state, ac_in)
 
         # Squeeze out the batch dimension and mask out the value of terminal states.
         last_val = last_val.squeeze(0)
@@ -293,7 +305,6 @@ def get_learner_fn(
 
         advantages, targets = _calculate_gae(traj_batch, last_val)
 
-        # todo: empty Tuple
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""
 
@@ -472,13 +483,13 @@ def get_learner_fn(
 
         init_hstates = jax.tree_util.tree_map(lambda x: x[None, :], initial_hstates)
         update_state = (
-            learner_state.params,
-            learner_state.opt_states,
+            params,
+            opt_states,
             init_hstates,
             traj_batch,
             advantages,
             targets,
-            learner_state.key,
+            rng,
         )
 
         # UPDATE EPOCHS
@@ -491,15 +502,15 @@ def get_learner_fn(
             params,
             opt_states,
             rng,
-            learner_state.env_state,
-            learner_state.timestep,
-            learner_state.dones,
-            learner_state.hstates,
+            env_state,
+            last_timestep,
+            last_done,
+            hstates,
         )
         metric = traj_batch.info
         return learner_state, (metric, loss_info)
 
-    def learner_fn(learner_state: RNNLearnerState) -> ExperimentOutput:
+    def learner_fn(learner_state: RNNLearnerState) -> ExperimentOutput[RNNLearnerState]:
         """Learner function.
 
         This function represents the learner, it updates the network parameters
@@ -537,7 +548,7 @@ def get_learner_fn(
 
 def learner_setup(
     env: Environment, rngs: chex.Array, config: Dict
-) -> Tuple[LearnerFn, Actor, RNNLearnerState]:
+) -> Tuple[LearnerFn[RNNLearnerState], Actor, RNNLearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
@@ -632,7 +643,9 @@ def learner_setup(
     rng, *env_rngs = jax.random.split(
         rng, n_devices * config["update_batch_size"] * config["num_envs"] + 1
     )
-    env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(jnp.stack(env_rngs))
+    env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
+        jnp.stack(env_rngs),
+    )
 
     # Split rngs for each core.
     rng, *step_rngs = jax.random.split(rng, n_devices * config["update_batch_size"] + 1)
