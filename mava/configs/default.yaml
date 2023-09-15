@@ -29,7 +29,7 @@ clip_eps: 0.2 # Clipping value for PPO updates and value function.
 ent_coef: 0.01 # Entropy regularisation term for loss function.
 vf_coef: 0.5 # Critic weight in
 max_grad_norm: 0.5 # Maximum norm of the gradients for a weight update.
-recurrent_chunk_size: 10 
+recurrent_chunk_size: 10
 
 # --- Evaluation ---
 num_eval_episodes: 32 # Episodes per evaluation
