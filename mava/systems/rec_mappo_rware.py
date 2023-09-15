@@ -16,7 +16,7 @@ import copy
 import functools
 import os
 from logging import Logger as SacredLogger
-from typing import Any, Callable, Dict, NamedTuple, Sequence, Tuple
+from typing import Any, Callable, Dict, Sequence, Tuple
 
 import chex
 import distrax
@@ -45,6 +45,7 @@ from mava.types import (
     OptStates,
     Params,
     RNNLearnerState,
+    RNNPPOTransition,
 )
 from mava.utils.logger_tools import config_copy, get_experiment_path, get_logger
 from mava.utils.timing_utils import TimeIt
@@ -54,20 +55,6 @@ from mava.wrappers.jumanji import (
     ObservationGlobalState,
     RwareMultiAgentWithGlobalStateWrapper,
 )
-
-
-class PPOTransition(NamedTuple):
-    """Transition tuple for PPO."""
-
-    done: chex.Array
-    action: chex.Array
-    value: chex.Array
-    reward: chex.Array
-    log_prob: chex.Array
-    obs: chex.Array
-    policy_hidden_state: chex.Array
-    critic_hidden_state: chex.Array
-    info: Dict
 
 
 class ScannedRNN(nn.Module):
@@ -199,7 +186,7 @@ def get_learner_fn(
 
         def _env_step(
             learner_state: RNNLearnerState, _: Any
-        ) -> Tuple[RNNLearnerState, PPOTransition]:
+        ) -> Tuple[RNNLearnerState, RNNPPOTransition]:
             """Step the environment."""
             (
                 params,
@@ -253,7 +240,7 @@ def get_learner_fn(
                 "episode_length": env_state.episode_length_info,
             }
 
-            transition = PPOTransition(
+            transition = RNNPPOTransition(
                 done,
                 action,
                 value,
@@ -306,11 +293,11 @@ def get_learner_fn(
         last_val = jnp.where(last_done, jnp.zeros_like(last_val), last_val)
 
         def _calculate_gae(
-            traj_batch: PPOTransition, last_val: chex.Array
+            traj_batch: RNNPPOTransition, last_val: chex.Array
         ) -> Tuple[chex.Array, chex.Array]:
             """Calculate the GAE."""
 
-            def _get_advantages(gae_and_next_value: Tuple, transition: PPOTransition) -> Tuple:
+            def _get_advantages(gae_and_next_value: Tuple, transition: RNNPPOTransition) -> Tuple:
                 """Calculate the GAE for a single transition."""
                 gae, next_value = gae_and_next_value
                 done, value, reward = (
@@ -341,8 +328,6 @@ def get_learner_fn(
 
                 params, opt_states = train_state
                 (
-                    init_policy_hstate,
-                    init_critic_hstate,
                     traj_batch,
                     advantages,
                     targets,
@@ -351,14 +336,14 @@ def get_learner_fn(
                 def _actor_loss_fn(
                     actor_params: FrozenDict,
                     actor_opt_state: OptState,
-                    traj_batch: PPOTransition,
+                    traj_batch: RNNPPOTransition,
                     gae: chex.Array,
                 ) -> Tuple:
                     """Calculate the actor loss."""
                     # RERUN NETWORK
                     obs_and_done = (traj_batch.obs, traj_batch.done[:, :, 0])
                     _, actor_policy = actor_apply_fn(
-                        actor_params, init_policy_hstate[0], obs_and_done
+                        actor_params, traj_batch.policy_hidden_state[0], obs_and_done
                     )
                     log_prob = actor_policy.log_prob(traj_batch.action)
 
@@ -383,13 +368,15 @@ def get_learner_fn(
                 def _critic_loss_fn(
                     critic_params: FrozenDict,
                     critic_opt_state: OptState,
-                    traj_batch: PPOTransition,
+                    traj_batch: RNNPPOTransition,
                     targets: chex.Array,
                 ) -> Tuple:
                     """Calculate the critic loss."""
                     # RERUN NETWORK
                     obs_and_done = (traj_batch.obs, traj_batch.done[:, :, 0])
-                    _, value = critic_apply_fn(critic_params, init_critic_hstate[0], obs_and_done)
+                    _, value = critic_apply_fn(
+                        critic_params, traj_batch.critic_hidden_state[0], obs_and_done
+                    )
 
                     # CALCULATE VALUE LOSS
                     value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
@@ -470,13 +457,10 @@ def get_learner_fn(
                 targets,
                 rng,
             ) = update_state
-            init_policy_hstate, init_critic_hstate = init_hstates
             rng, shuffle_rng = jax.random.split(rng)
 
             # SHUFFLE MINIBATCHES
             batch = (
-                traj_batch.policy_hidden_state,
-                traj_batch.critic_hidden_state,
                 traj_batch,
                 advantages,
                 targets,
@@ -487,7 +471,7 @@ def get_learner_fn(
                     config["recurrent_chunk_size"],
                     -1,
                     *x.shape[2:],
-                ).reshape(10, -1, *x.shape[2:]),
+                ).reshape(config["recurrent_chunk_size"], -1, *x.shape[2:]),
                 batch,
             )
             num_recurrent_chunks = config["rollout_length"] // config["recurrent_chunk_size"]
