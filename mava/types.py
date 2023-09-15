@@ -42,6 +42,20 @@ class PPOTransition(NamedTuple):
     info: Dict
 
 
+class RNNPPOTransition(NamedTuple):
+    """Transition tuple for PPO."""
+
+    done: chex.Array
+    action: chex.Array
+    value: chex.Array
+    reward: chex.Array
+    log_prob: chex.Array
+    obs: chex.Array
+    policy_hidden_state: chex.Array
+    critic_hidden_state: chex.Array
+    info: Dict
+
+
 class Params(NamedTuple):
     """Parameters of an actor critic network."""
 
