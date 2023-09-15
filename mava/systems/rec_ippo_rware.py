@@ -156,7 +156,7 @@ def get_learner_fn(
     apply_fns: Tuple[RecActorApply, RecCriticApply],
     update_fns: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
     config: Dict,
-) -> LearnerFn:
+) -> LearnerFn[RNNLearnerState]:
     """Get the learner function."""
 
     actor_apply_fn, critic_apply_fn = apply_fns
@@ -508,7 +508,7 @@ def get_learner_fn(
         metric = traj_batch.info
         return learner_state, (metric, loss_info)
 
-    def learner_fn(learner_state: RNNLearnerState) -> ExperimentOutput:
+    def learner_fn(learner_state: RNNLearnerState) -> ExperimentOutput[RNNLearnerState]:
         """Learner function.
 
         This function represents the learner, it updates the network parameters
@@ -546,7 +546,7 @@ def get_learner_fn(
 
 def learner_setup(
     env: Environment, rngs: chex.Array, config: Dict
-) -> Tuple[LearnerFn, Actor, RNNLearnerState]:
+) -> Tuple[LearnerFn[RNNLearnerState], Actor, RNNLearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
