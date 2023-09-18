@@ -461,12 +461,7 @@ def get_learner_fn(
                 targets,
             )
             batch = jax.tree_util.tree_map(
-                lambda x: x.reshape(
-                    x.shape[0] // config["recurrent_chunk_size"],
-                    config["recurrent_chunk_size"],
-                    -1,
-                    *x.shape[2:],
-                ).reshape(config["recurrent_chunk_size"], -1, *x.shape[2:]),
+                lambda x: x.reshape(config["recurrent_chunk_size"], (x.shape[0] // config["recurrent_chunk_size"])*x.shape[1], *x.shape[2:]),
                 batch,
             )
             num_recurrent_chunks = config["rollout_length"] // config["recurrent_chunk_size"]
