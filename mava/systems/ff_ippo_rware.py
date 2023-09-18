@@ -586,7 +586,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
     # Convert config to python dict.
-    cfg: Dict = OmegaConf.to_container(cfg, resolve=True)  # type: ignore
+    cfg: Dict = OmegaConf.to_container(cfg, resolve=True)
 
     ex = get_sacred_exp(cfg, "ff_ippo_rware")
 
