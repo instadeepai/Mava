@@ -111,7 +111,13 @@ def get_neptune_logger(cfg: Dict) -> neptune.Run:
 
 
 def get_sacred_exp(cfg: Dict, system_name: str) -> Experiment:
-    """Get sacred experiment and set up sacred logging."""
+    """Get sacred experiment and set up sacred logging.
+
+    This sets up terminal logging, adds the file observer (to log configs as json files)
+    and neptune logging (to save logs online) if required.
+
+    Stores files at: base_exp_path/system_name/env_name/task_name/envs_num_envs/seed_seed.
+    """
     logger = get_python_logger()
     ex = Experiment("mava", save_git_info=False)
     ex.logger = logger
