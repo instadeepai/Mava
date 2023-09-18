@@ -1,6 +1,6 @@
 black==22.3.0
 coverage
-flake8==3.9.2
+flake8==6.1.0
 importlib-metadata<5.0
 isort==5.11.5
 livereload

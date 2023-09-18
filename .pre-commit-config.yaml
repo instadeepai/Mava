@@ -33,12 +33,10 @@ repos:
         name: "Trailing whitespace fixer"
 
   - repo: https://github.com/PyCQA/flake8
-    rev: 3.9.2
+    rev: 6.1.0
     hooks:
       - id: flake8
         name: "Linter"
-        args:
-          - --config=setup.cfg
         additional_dependencies:
           - pep8-naming
           - flake8-builtins
@@ -46,6 +44,7 @@ repos:
           - flake8-bugbear
           - flake8-pytest-style
           - flake8-cognitive-complexity
+          - flake8-pyproject
           - importlib-metadata<5.0
 
   - repo: local
