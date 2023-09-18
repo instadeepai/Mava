@@ -16,7 +16,7 @@
 import datetime
 import os
 from logging import Logger as SacredLogger
-from typing import Callable, Dict, Tuple
+from typing import Callable, Dict
 
 import jax.numpy as jnp
 import numpy as np
@@ -27,7 +27,7 @@ from mava.types import ExperimentOutput
 from mava.utils.logger_tools import Logger, get_experiment_path, should_log
 
 
-def get_logger_tools(logger: Logger, config: Dict) -> Tuple[Callable, Callable]:  # noqa: CCR001
+def get_logger_tools(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
     """Get the logger function."""
 
     def log(
@@ -111,15 +111,10 @@ def get_logger_tools(logger: Logger, config: Dict) -> Tuple[Callable, Callable]:
 
         return float(np.mean(episodes_return))
 
-    def stop_logger() -> None:
-        """Stop the logger."""
-        if logger.use_neptune:
-            logger.neptune_logger.stop()
-
-    return log, stop_logger
+    return log
 
 
-def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> Tuple[Callable, Callable]:
+def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> Callable:
     """Setup the logger."""
     logger = Logger(_log)
     unique_token = f"{datetime.datetime.now()}"
@@ -129,6 +124,4 @@ def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> Tuple[Callable,
         exp_path = get_experiment_path(config, "tensorboard")
         tb_logs_path = os.path.join(config["base_exp_path"], f"{exp_path}/{unique_token}")
         logger.setup_tb(tb_logs_path)
-    if config["use_neptune"]:
-        logger.setup_neptune(config)
     return get_logger_tools(logger, config)

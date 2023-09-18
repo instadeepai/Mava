@@ -4,7 +4,7 @@ hydra-core==1.3.2
 jax<=0.4.13
 jaxlib<=0.4.13
 jumanji @ git+https://github.com/instadeepai/jumanji@main#egg=jumanji
-neptune-client==0.15.1
+neptune[sacred]
 numpy
 omegaconf
 optax
