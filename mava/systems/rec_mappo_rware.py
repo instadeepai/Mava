@@ -14,7 +14,6 @@
 
 import copy
 import functools
-import os
 from logging import Logger as SacredLogger
 from typing import Any, Dict, Sequence, Tuple
 
@@ -35,7 +34,7 @@ from jumanji.environments.routing.robot_warehouse.generator import RandomGenerat
 from jumanji.wrappers import AutoResetWrapper
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
-from sacred import Experiment, observers, run, utils
+from sacred import run
 
 from mava.evaluator import evaluator_setup
 from mava.logger import logger_setup
@@ -50,7 +49,7 @@ from mava.types import (
     RecCriticApply,
     RNNLearnerState,
 )
-from mava.utils.logger_tools import config_copy, get_experiment_path, get_logger
+from mava.utils.logger_tools import get_sacred_exp
 from mava.utils.timing_utils import TimeIt
 from mava.wrappers.jumanji import (
     AgentIDWrapper,
@@ -681,8 +680,8 @@ def learner_setup(
 def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     """Runs experiment."""
     # Logger setup
-    config = config_copy(_config)
-    log, stop_logger = logger_setup(_run, config, _log)
+    config = copy.deepcopy(_config)
+    log = logger_setup(_run, config, _log)
 
     # Create envs
     generator = RandomGenerator(**config["rware_scenario"]["task_config"])
@@ -782,27 +781,14 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
             absolute_metric=True,
         )
 
-    # Close logger in case of neptune.
-    stop_logger()
-
 
 @hydra.main(config_path="../configs", config_name="default.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
-    # Logger setup.
-    logger = get_logger()
-    ex = Experiment("mava", save_git_info=False)
-    ex.logger = logger
-    ex.captured_out_filter = utils.apply_backspaces_and_linefeeds
+    # Convert config to python dict.
+    cfg: Dict = OmegaConf.to_container(cfg, resolve=True)
 
-    # Set the base path for the experiment.
-    cfg["system_name"] = "rec_mappo"
-    exp_path = get_experiment_path(cfg, "sacred")
-    file_obs_path = os.path.join(cfg["base_exp_path"], exp_path)
-    ex.observers = [observers.FileStorageObserver.create(file_obs_path)]
-
-    # Add configuration to the experiment.
-    ex.add_config(OmegaConf.to_container(cfg, resolve=True))
+    ex = get_sacred_exp(cfg, "rec_mappo_rware")
 
     # Run experiment.
     ex.main(run_experiment)

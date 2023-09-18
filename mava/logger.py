@@ -123,13 +123,7 @@ def get_logger_tools(logger: Logger, config: Dict) -> LogFn:  # noqa: CCR001
 
         return float(np.mean(episodes_return))
 
-    def stop_logger() -> None:
-        """Stop the logger."""
-        if logger.use_neptune:
-            logger.neptune_logger.stop()
-
-    return log, stop_logger
-
+    return log
 
 def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> LogFn:
     """Setup the logger."""
@@ -141,6 +135,4 @@ def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> LogFn:
         exp_path = get_experiment_path(config, "tensorboard")
         tb_logs_path = os.path.join(config["base_exp_path"], f"{exp_path}/{unique_token}")
         logger.setup_tb(tb_logs_path)
-    if config["use_neptune"]:
-        logger.setup_neptune(config)
     return get_logger_tools(logger, config)
