@@ -158,7 +158,7 @@ If you use Mava in your work, please cite the accompanying
 ```
 
 [Paper]: https://arxiv.org/pdf/2107.01460.pdf
-[quickstart]: https://github.com/instadeepai/Mava/blob/develop//examples/Quickstart.ipynb
+[quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/Quickstart.ipynb
 [jumanji]: https://github.com/instadeepai/jumanji
 [cleanrl]: https://github.com/vwxyzjn/cleanrl
 [purejaxrl]: https://github.com/luchris429/purejaxrl
