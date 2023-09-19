@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, Generic, NamedTuple, Optional, Tuple, TypeVar
+from typing import Any, Callable, Dict, Generic, Optional, Tuple, TypeVar
 
 import chex
 from distrax import Distribution
 from flax.core.frozen_dict import FrozenDict
 from jumanji.types import TimeStep
 from optax._src.base import OptState
-from typing_extensions import TypeAlias
+from typing_extensions import NamedTuple, TypeAlias
 
 from mava.wrappers.jumanji import LogEnvState
 
