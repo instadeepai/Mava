@@ -80,24 +80,11 @@ def get_ff_evaluator_fn(
             is_not_done: bool = ~timestep.last()
             return is_not_done
 
-        eval_state = EvalState(
-            init_eval_state.key,
-            init_eval_state.env_state,
-            init_eval_state.timestep,
-            0,
-            0.0,
-        )
+        final_state = jax.lax.while_loop(not_done, _env_step, init_eval_state)
 
-        final_state = jax.lax.while_loop(
-            not_done,
-            _env_step,
-            eval_state,
-        )
-
-        step_count_, return_ = final_state.step_count_, final_state.return_
         eval_metrics = {
-            "episode_return": return_,
-            "episode_length": step_count_,
+            "episode_return": final_state.return_,
+            "episode_length": final_state.step_count_,
         }
         return eval_metrics
 
@@ -116,13 +103,14 @@ def get_ff_evaluator_fn(
         # Split rngs for each core.
         rng, *step_rngs = jax.random.split(rng, eval_batch + 1)
         # Add dimension to pmap over.
-        reshape_step_rngs = lambda x: x.reshape(eval_batch, -1)
-        step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
+        step_rngs = jnp.stack(step_rngs).reshape(eval_batch, -1)
 
         eval_state = EvalState(step_rngs, env_states, timesteps, 0, 0.0)
-        eval_metrics = jax.vmap(eval_one_episode, in_axes=(None, 0), axis_name="eval_batch")(
-            trained_params, eval_state
-        )
+        eval_metrics = jax.vmap(
+            eval_one_episode,
+            in_axes=(None, EvalState(0, 0, 0, None, None)),
+            axis_name="eval_batch",
+        )(trained_params, eval_state)
 
         return ExperimentOutput(episodes_info=eval_metrics, learner_state=eval_state)
 
@@ -196,26 +184,11 @@ def get_rnn_evaluator_fn(
             is_not_done: bool = ~timestep.last()
             return is_not_done
 
-        eval_state = RNNEvalState(
-            init_eval_state.key,
-            init_eval_state.env_state,
-            init_eval_state.timestep,
-            init_eval_state.dones,
-            init_eval_state.hstate,
-            0,
-            0.0,
-        )
+        final_state = jax.lax.while_loop(not_done, _env_step, init_eval_state)
 
-        final_state = jax.lax.while_loop(
-            not_done,
-            _env_step,
-            eval_state,
-        )
-
-        step_count_, return_ = final_state.step_count_, final_state.return_
         eval_metrics = {
-            "episode_return": return_,
-            "episode_length": step_count_,
+            "episode_return": final_state.return_,
+            "episode_length": final_state.step_count_,
         }
         return eval_metrics
 
@@ -230,14 +203,11 @@ def get_rnn_evaluator_fn(
         eval_batch = config["num_eval_episodes"] // n_devices * eval_multiplier
 
         rng, *env_rngs = jax.random.split(rng, eval_batch + 1)
-        env_states, timesteps = jax.vmap(env.reset)(
-            jnp.stack(env_rngs),
-        )
+        env_states, timesteps = jax.vmap(env.reset)(jnp.stack(env_rngs))
         # Split rngs for each core.
         rng, *step_rngs = jax.random.split(rng, eval_batch + 1)
         # Add dimension to pmap over.
-        reshape_step_rngs = lambda x: x.reshape(eval_batch, -1)
-        step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
+        step_rngs = jnp.stack(step_rngs).reshape(eval_batch, -1)
 
         # Initialise hidden state.
         init_hstate = scanned_rnn.initialize_carry(eval_batch, 128)
@@ -264,9 +234,11 @@ def get_rnn_evaluator_fn(
             return_=0.0,
         )
 
-        eval_metrics = jax.vmap(eval_one_episode, in_axes=(None, 0), axis_name="eval_batch")(
-            trained_params, eval_state
-        )
+        eval_metrics = jax.vmap(
+            eval_one_episode,
+            in_axes=(None, RNNEvalState(0, 0, 0, 0, 0, None, None)),
+            axis_name="eval_batch",
+        )(trained_params, eval_state)
 
         return ExperimentOutput(
             episodes_info=eval_metrics,
