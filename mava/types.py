@@ -29,7 +29,6 @@ Done: TypeAlias = chex.Array
 HiddenState: TypeAlias = chex.Array
 
 # Can't know the exact type of State or Timestep.
-# Is there a better way to do this?
 State: TypeAlias = Any
 Observation: TypeAlias = Any
 RnnObservation: TypeAlias = Tuple[Observation, Done]
