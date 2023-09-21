@@ -574,10 +574,17 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
 
     # Measure absolute metric.
     if config["absolute_metric"]:
+        start_time = time.time()
+
         rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
         eval_rngs = jnp.stack(eval_rngs)
         eval_rngs = eval_rngs.reshape(n_devices, -1)
+
         evaluator_output = absolute_metric_evaluator(best_params, eval_rngs)
+        jax.block_until_ready(evaluator_output)
+
+        elapsed_time = time.time() - start_time
+        evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
         log(
             metrics=evaluator_output,
             t_env=steps_per_rollout * (i + 1),
