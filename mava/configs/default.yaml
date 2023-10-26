@@ -3,10 +3,12 @@
 # --- Experiment params ---
 defaults:
   - _self_
+# Select the wanted scenario for the corresponding environment.
   - rware_scenario: tiny-2ag
+  - lbf_scenario: Foraging-10x10-3p-3f # [Foraging-10x10-3p-3f, Foraging-grid-10x10-3p-3f, Foraging-8x8-2p-2f-coop]
 
 # --- Environment ---
-env_name: RobotWarehouse-v0
+env_name: RobotWarehouse-v0  # [RobotWarehouse-v0, LevelBasedForaging-v0]
 
 num_envs: 16  # Number of vectorised environments per device.
 num_updates: 1000 # Number of updates
@@ -46,6 +48,6 @@ base_exp_path: results
 system_name: ~  # this is manually set inside each file depending on which system is run
 # Neptune logging
 use_neptune: False
-neptune_project: Instadeep/Mava
-neptune_tag: [rware]
+neptune_project: InstaDeep/Mava
+neptune_tag: [Foraging-10x10-3p-3f, ff_ippo, 16_envs]
 name: None # Unique ID from logging.

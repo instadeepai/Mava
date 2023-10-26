@@ -42,7 +42,7 @@ from mava.types import ExperimentOutput, LearnerState, OptStates, Params, PPOTra
 from mava.utils.jax import merge_leading_dims
 from mava.utils.logger_tools import get_sacred_exp
 from mava.utils.timing_utils import TimeIt
-from mava.wrappers.jumanji import AgentIDWrapper, LogWrapper, RwareMultiAgentWrapper
+from mava.wrappers.jumanji import AgentIDWrapper, LogWrapper, MultiAgentWrapper
 
 
 class Actor(nn.Module):
@@ -488,14 +488,14 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     # Create envs
     generator = RandomGenerator(**config["rware_scenario"]["task_config"])
     env = jumanji.make(config["env_name"], generator=generator)
-    env = RwareMultiAgentWrapper(env)
+    env = MultiAgentWrapper(env)
     # Add agent id to observation.
     if config["add_agent_id"]:
         env = AgentIDWrapper(env)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env_name"], generator=generator)
-    eval_env = RwareMultiAgentWrapper(eval_env)
+    eval_env = MultiAgentWrapper(eval_env)
     if config["add_agent_id"]:
         eval_env = AgentIDWrapper(eval_env)
 

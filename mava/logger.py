@@ -90,6 +90,18 @@ def get_logger_tools(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
             f"Max Episode Length {float(np.max(episodes_length)):.3f}"
         )
 
+        # Added for LBF:
+        if trainer_metric and "LevelBasedForaging" in config["env_name"]:
+            num_eaten = jnp.ravel(episodes_info["num_eaten"])
+            percent_eaten = jnp.ravel(episodes_info["percent_eaten"])
+            logger.log_stat("mean_num_eaten", float(np.mean(num_eaten)), t_env)
+            logger.log_stat("mean_percent_eaten", float(np.mean(percent_eaten)), t_env)
+            log_string = (
+                log_string
+                + f" | Num Eaten {float(np.mean(num_eaten)):.3f} | "
+                + f"Percent Eaten {float(np.mean(percent_eaten)):.3f}"
+            )
+
         if absolute_metric:
             logger.console_logger.info(
                 f"{Fore.BLUE}{Style.BRIGHT}ABSOLUTE METRIC: {log_string}{Style.RESET_ALL}"

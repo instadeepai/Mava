@@ -18,7 +18,8 @@ import chex
 import jax.numpy as jnp
 from jumanji import specs
 from jumanji.env import Environment
-from jumanji.environments.routing.robot_warehouse import Observation, State
+from jumanji.environments.routing.lbf import State as LbfState
+from jumanji.environments.routing.robot_warehouse import State as RwareState
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
 
@@ -26,6 +27,24 @@ if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
     from dataclasses import dataclass
 else:
     from flax.struct import dataclass
+
+
+State = Union[RwareState, LbfState]
+
+# We can't define the observation like the "State" because it's callable. In this case we'll use a lot ifs to check "if isinstance(timestep.observation, RwareObs)" then call the RwareObs() ect...
+# If there is a better solution please ping me :D
+class Observation(NamedTuple):
+    """
+    The observation returned by the LBF environment.
+    agents_view: (num_agents, grid_size, grid_size) int32 array
+        representing the view of each agent.
+    action_mask: boolean array representing which action is legal, for each agent.
+    step_count: (int32) the current episode step.
+    """
+
+    agents_view: chex.Array  # (num_agents, num_obs_features)
+    action_mask: chex.Array  # (num_agents, num_actions) num_actions = 5 in RWARE and num_actions = 6 in LBF
+    step_count: chex.Array  # (num_agents, )
 
 
 class ObservationGlobalState(NamedTuple):
@@ -41,7 +60,7 @@ class ObservationGlobalState(NamedTuple):
     """
 
     agents_view: chex.Array  # (num_agents, num_obs_features)
-    action_mask: chex.Array  # (num_agents, 5)
+    action_mask: chex.Array  # (num_agents, num_actions)
     global_state: chex.Array  # (num_agents * num_obs_features, )
     step_count: chex.Array  # (num_agents, )
 
@@ -169,7 +188,7 @@ class AgentIDWrapper(Wrapper):
         )
 
 
-class RwareMultiAgentWrapper(Wrapper):
+class MultiAgentWrapper(Wrapper):
     """Multi-agent wrapper for the Robotic Warehouse environment."""
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
@@ -180,6 +199,8 @@ class RwareMultiAgentWrapper(Wrapper):
             action_mask=timestep.observation.action_mask,
             step_count=jnp.repeat(timestep.observation.step_count, self._env.num_agents),
         )
+        timestep.reward = jnp.sum(timestep.reward)
+
         return state, timestep
 
     def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
@@ -190,6 +211,8 @@ class RwareMultiAgentWrapper(Wrapper):
             action_mask=timestep.observation.action_mask,
             step_count=jnp.repeat(timestep.observation.step_count, self._env.num_agents),
         )
+        timestep.reward = jnp.sum(timestep.reward)
+
         return state, timestep
 
     def observation_spec(self) -> specs.Spec[Observation]:
@@ -204,7 +227,7 @@ class RwareMultiAgentWrapper(Wrapper):
         return self._env.observation_spec().replace(step_count=step_count)
 
 
-class RwareMultiAgentWithGlobalStateWrapper(Wrapper):
+class MultiAgentWithGlobalStateWrapper(Wrapper):
     """Multi-agent wrapper for the Robotic Warehouse environment.
 
     The wrapper includes a global environment state to be used by the centralised critic.
@@ -223,6 +246,8 @@ class RwareMultiAgentWithGlobalStateWrapper(Wrapper):
             global_state=global_state,
             step_count=jnp.repeat(timestep.observation.step_count, self._env.num_agents),
         )
+        timestep.reward = jnp.sum(timestep.reward)
+
         return state, timestep
 
     def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
@@ -236,16 +261,19 @@ class RwareMultiAgentWithGlobalStateWrapper(Wrapper):
             global_state=global_state,
             step_count=jnp.repeat(timestep.observation.step_count, self._env.num_agents),
         )
+        timestep.reward = jnp.sum(timestep.reward)
+
         return state, timestep
 
     def observation_spec(self) -> specs.Spec[ObservationGlobalState]:
         """Specification of the observation of the `RobotWarehouse` environment."""
+        num_actions = int(self._env.action_spec().num_values[0])
 
         agents_view = specs.Array(
             (self._env.num_agents, self._env.num_obs_features), jnp.int32, "agents_view"
         )
         action_mask = specs.BoundedArray(
-            (self._env.num_agents, 5), bool, False, True, "action_mask"
+            (self._env.num_agents, num_actions), bool, False, True, "action_mask"
         )
         global_state = specs.Array(
             (self._env.num_agents, self._env.num_agents * self._env.num_obs_features),

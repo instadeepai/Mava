@@ -51,8 +51,8 @@ from mava.utils.timing_utils import TimeIt
 from mava.wrappers.jumanji import (
     AgentIDWrapper,
     LogWrapper,
+    MultiAgentWithGlobalStateWrapper,
     ObservationGlobalState,
-    RwareMultiAgentWithGlobalStateWrapper,
 )
 
 
@@ -693,14 +693,14 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     # Create envs
     generator = RandomGenerator(**config["rware_scenario"]["task_config"])
     env = jumanji.make(config["env_name"], generator=generator)
-    env = RwareMultiAgentWithGlobalStateWrapper(env)
+    env = MultiAgentWithGlobalStateWrapper(env)
     # Add agent id to observation.
     if config["add_agent_id"]:
         env = AgentIDWrapper(env=env, has_global_state=True)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env_name"], generator=generator)
-    eval_env = RwareMultiAgentWithGlobalStateWrapper(eval_env)
+    eval_env = MultiAgentWithGlobalStateWrapper(eval_env)
     if config["add_agent_id"]:
         eval_env = AgentIDWrapper(env=eval_env, has_global_state=True)
 
