@@ -31,8 +31,11 @@ else:
 
 State = Union[RwareState, LbfState]
 
-# We can't define the observation like the "State" because it's callable. In this case we'll use a lot ifs to check "if isinstance(timestep.observation, RwareObs)" then call the RwareObs() ect...
-# If there is a better solution please ping me :D
+# We can't define the observation like the "State" because it's callable. 
+# In this case we'll use a lot ifs to check "if isinstance(timestep.observation, RwareObs)" 
+# then call the RwareObs() ect... If there is a better solution please ping me :D
+
+
 class Observation(NamedTuple):
     """
     The observation returned by the LBF environment.
@@ -43,7 +46,8 @@ class Observation(NamedTuple):
     """
 
     agents_view: chex.Array  # (num_agents, num_obs_features)
-    action_mask: chex.Array  # (num_agents, num_actions) num_actions = 5 in RWARE and num_actions = 6 in LBF
+    action_mask: chex.Array  # (num_agents, num_actions)
+    # num_actions = 5 in RWARE and num_actions = 6 in LBF
     step_count: chex.Array  # (num_agents, )
 
 
@@ -165,7 +169,7 @@ class AgentIDWrapper(Wrapper):
         return state, timestep
 
     def observation_spec(self) -> specs.Spec[Observation]:
-        """Specification of the observation of the `RobotWarehouse` environment."""
+        """Specification of the observation of the environment."""
         agents_view = specs.Array(
             (self._env.num_agents, self.num_obs_features), jnp.int32, "agents_view"
         )
@@ -189,7 +193,7 @@ class AgentIDWrapper(Wrapper):
 
 
 class MultiAgentWrapper(Wrapper):
-    """Multi-agent wrapper for the Robotic Warehouse environment."""
+    """Multi-agent wrapper for the environment."""
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment. Updates the step count."""
@@ -216,7 +220,7 @@ class MultiAgentWrapper(Wrapper):
         return state, timestep
 
     def observation_spec(self) -> specs.Spec[Observation]:
-        """Specification of the observation of the `RobotWarehouse` environment."""
+        """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
             (self._env.num_agents,),
             jnp.int32,
@@ -228,11 +232,10 @@ class MultiAgentWrapper(Wrapper):
 
 
 class MultiAgentWithGlobalStateWrapper(Wrapper):
-    """Multi-agent wrapper for the Robotic Warehouse environment.
+    """Multi-agent wrapper for the environment.
 
     The wrapper includes a global environment state to be used by the centralised critic.
-    Note here that since robotic warehouse does not have a global state, we create one
-    by concatenating the observations of all agents.
+    Note: Here we create one by concatenating the observations of all agents.
     """
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
@@ -266,7 +269,7 @@ class MultiAgentWithGlobalStateWrapper(Wrapper):
         return state, timestep
 
     def observation_spec(self) -> specs.Spec[ObservationGlobalState]:
-        """Specification of the observation of the `RobotWarehouse` environment."""
+        """Specification of the observation of the environment."""
         num_actions = int(self._env.action_spec().num_values[0])
 
         agents_view = specs.Array(

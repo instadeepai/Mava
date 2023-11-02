@@ -143,17 +143,10 @@ def get_sacred_exp(cfg: Dict, system_name: str) -> Experiment:
 # TODO: generalize this.
 def get_experiment_path(config: Dict, logger_type: str) -> str:
     """Helper function to create the experiment path."""
-    if "RobotWarehouse" in config["env_name"]:
-        exp_path = (
-            f"{logger_type}/{config['system_name']}/{config['env_name']}/"
-            + f"{config['rware_scenario']['task_name']}/envs_{config['num_envs']}/"
-            + f"seed_{config['seed']}"
-        )
-    else:
-        exp_path = (
-            f"{logger_type}/{config['system_name']}/{config['env_name']}/"
-            + f"{config['lbf_scenario']['task_name']}/envs_{config['num_envs']}/"
-            + f"seed_{config['seed']}"
-        )
+    exp_path = (
+        f"{logger_type}/{config['system_name']}/{config['env_name']}/"
+        + f"{config['scenario']['task_name']}/envs_{config['num_envs']}/"
+        + f"seed_{config['seed']}"
+    )
 
     return exp_path

@@ -486,7 +486,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     log = logger_setup(_run, config, _log)
 
     # Create envs
-    generator = RandomGenerator(**config["rware_scenario"]["task_config"])
+    generator = RandomGenerator(**config["scenario"]["task_config"])
     env = jumanji.make(config["env_name"], generator=generator)
     env = MultiAgentWrapper(env)
     # Add agent id to observation.
