@@ -364,7 +364,7 @@ def get_learner_fn(
                 - opt_states (OptStates): The initial optimizer state.
                 - rng (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
-                - timesteps (TimeStep): The initial timestep in the initial trajectory.
+                - timestep (TimeStep): The initial timestep in the initial trajectory.
         """
 
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")

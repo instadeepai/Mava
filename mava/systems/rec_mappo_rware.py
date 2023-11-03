@@ -529,7 +529,7 @@ def get_learner_fn(
                 - opt_states (OptStates): The initial optimizer states.
                 - rng (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
-                - timesteps (TimeStep): The initial timestep in the initial trajectory.
+                - timestep (TimeStep): The initial timestep in the initial trajectory.
                 - dones (bool): Whether the initial timestep was a terminal state.
                 - hstates (HiddenStates): The hidden state of the policy and critic RNN.
         """

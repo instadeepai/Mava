@@ -89,19 +89,7 @@ def get_logger_tools(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
             f"Std Episode Length {float(np.std(episodes_length)):.3f} | "
             f"Max Episode Length {float(np.max(episodes_length)):.3f}"
         )
-
-        # Added for LBF:
-        if trainer_metric and "LevelBasedForaging" in config["env_name"]:
-            num_eaten = jnp.ravel(episodes_info["num_eaten"])
-            percent_eaten = jnp.ravel(episodes_info["percent_eaten"])
-            logger.log_stat("mean_num_eaten", float(np.mean(num_eaten)), t_env)
-            logger.log_stat("mean_percent_eaten", float(np.mean(percent_eaten)), t_env)
-            log_string = (
-                log_string
-                + f" | Num Eaten {float(np.mean(num_eaten)):.3f} | "
-                + f"Percent Eaten {float(np.mean(percent_eaten)):.3f}"
-            )
-
+      
         if absolute_metric:
             logger.console_logger.info(
                 f"{Fore.BLUE}{Style.BRIGHT}ABSOLUTE METRIC: {log_string}{Style.RESET_ALL}"
@@ -113,6 +101,16 @@ def get_logger_tools(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
                 f"Loss Actor {float(np.mean(loss_actor)):.3f} | "
                 f"Entropy {float(np.mean(entropy)):.3f}"
             )
+           # Extract the environment's extra information from metrics.
+            extras_info = metrics.learner_state.timestep.extras
+
+            if extras_info:
+                for key, value in extras_info.items():
+                    value = jnp.ravel(value)
+                    mean_value = float(np.mean(value))
+                    logger.log_stat(f'{prefix.lower()}mean_{key}', mean_value, t_env)
+                    log_string += f" | {' '.join(key.upper().split('_'))} {mean_value:.3f}"
+
             logger.console_logger.info(
                 f"{Fore.MAGENTA}{Style.BRIGHT}TRAINER: {log_string}{Style.RESET_ALL}"
             )
