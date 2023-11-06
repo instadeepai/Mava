@@ -31,11 +31,6 @@ else:
 
 State = Union[RwareState, LbfState]
 
-# We can't define the observation like the "State" because it's callable. 
-# In this case we'll use a lot ifs to check "if isinstance(timestep.observation, RwareObs)" 
-# then call the RwareObs() ect... If there is a better solution please ping me :D
-
-
 class Observation(NamedTuple):
     """
     The observation returned by the LBF environment.
@@ -47,7 +42,6 @@ class Observation(NamedTuple):
 
     agents_view: chex.Array  # (num_agents, num_obs_features)
     action_mask: chex.Array  # (num_agents, num_actions)
-    # num_actions = 5 in RWARE and num_actions = 6 in LBF
     step_count: chex.Array  # (num_agents, )
 
 
@@ -65,7 +59,7 @@ class ObservationGlobalState(NamedTuple):
 
     agents_view: chex.Array  # (num_agents, num_obs_features)
     action_mask: chex.Array  # (num_agents, num_actions)
-    global_state: chex.Array  # (num_agents * num_obs_features, )
+    global_state: chex.Array  # (num_agents, num_agents * num_obs_features)
     step_count: chex.Array  # (num_agents, )
 
 
