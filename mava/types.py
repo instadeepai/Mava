@@ -12,16 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, Generic, Optional, Tuple, TypeVar
 
 import chex
+import jax.numpy as jnp
 from distrax import Distribution
 from flax.core.frozen_dict import FrozenDict
 from jumanji.types import TimeStep
 from optax._src.base import OptState
 from typing_extensions import NamedTuple, TypeAlias
-
-from mava.wrappers.jumanji import LogEnvState
 
 Action: TypeAlias = chex.Array
 Value: TypeAlias = chex.Array
@@ -32,6 +32,17 @@ HiddenState: TypeAlias = chex.Array
 State: TypeAlias = Any
 Observation: TypeAlias = Any
 RnnObservation: TypeAlias = Tuple[Observation, Done]
+
+
+@dataclass
+class LogEnvState:
+    """LogEnvState class for logging environment states."""
+
+    episode_returns: chex.Numeric = jnp.float32(0.0)
+    episode_lengths: chex.Numeric = 0
+    # Information about the episode return and length for logging purposes.
+    episode_return_info: chex.Numeric = jnp.float32(0.0)
+    episode_length_info: chex.Numeric = 0
 
 
 class PPOTransition(NamedTuple):
@@ -73,8 +84,9 @@ class LearnerState(NamedTuple):
     params: Params
     opt_states: OptStates
     key: chex.PRNGKey
-    env_state: LogEnvState
+    env_state: State
     timestep: TimeStep
+    log_env_states: LogEnvState
 
 
 class RNNLearnerState(NamedTuple):
@@ -83,7 +95,7 @@ class RNNLearnerState(NamedTuple):
     params: Params
     opt_states: OptStates
     key: chex.PRNGKey
-    env_state: LogEnvState
+    env_state: State
     timestep: TimeStep
     dones: Done
     hstates: HiddenStates

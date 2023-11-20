@@ -37,13 +37,14 @@ from optax._src.base import OptState
 from sacred import run
 
 from mava.evaluator import evaluator_setup
-from mava.logger import logger_setup
+from mava.logger import init_log_env_state, logger_setup, update_log_env_state
 from mava.types import (
     ActorApply,
     CriticApply,
     ExperimentOutput,
     LearnerFn,
     LearnerState,
+    LogEnvState,
     OptStates,
     Params,
     PPOTransition,
@@ -51,7 +52,7 @@ from mava.types import (
 from mava.utils.jax import merge_leading_dims
 from mava.utils.logger_tools import get_sacred_exp
 from mava.utils.timing_utils import TimeIt
-from mava.wrappers.jumanji import AgentIDWrapper, LogWrapper, RwareMultiAgentWrapper
+from mava.wrappers.jumanji import AgentIDWrapper, RwareMultiAgentWrapper
 
 
 class Actor(nn.Module):
@@ -138,7 +139,7 @@ def get_learner_fn(
 
         def _env_step(learner_state: LearnerState, _: Any) -> Tuple[LearnerState, PPOTransition]:
             """Step the environment."""
-            params, opt_states, rng, env_state, last_timestep = learner_state
+            params, opt_states, rng, env_state, last_timestep, log_env_state = learner_state
 
             # SELECT ACTION
             rng, policy_rng = jax.random.split(rng)
@@ -149,21 +150,20 @@ def get_learner_fn(
 
             # STEP ENVIRONMENT
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
+            info = jax.vmap(log_env_state.log_step_state, in_axes=(0))(timestep)
 
             # LOG EPISODE METRICS
             done, reward = jax.tree_util.tree_map(
                 lambda x: jnp.repeat(x, config["num_agents"]).reshape(config["num_envs"], -1),
                 (timestep.last(), timestep.reward),
             )
-            info = {
-                "episode_return": env_state.episode_return_info,
-                "episode_length": env_state.episode_length_info,
-            }
 
             transition = PPOTransition(
                 done, action, value, reward, log_prob, last_timestep.observation, info
             )
-            learner_state = LearnerState(params, opt_states, rng, env_state, timestep)
+            learner_state = LearnerState(
+                params, opt_states, rng, env_state, timestep, log_env_state
+            )
             return learner_state, transition
 
         # STEP ENVIRONMENT FOR ROLLOUT LENGTH
@@ -469,6 +469,9 @@ def learner_setup(
         jnp.stack(env_rngs),
     )
 
+    # Initialise logger env state.
+    log_env_states = jax.vmap(init_log_env_state, in_axes=(0))(timesteps)
+
     # Split rngs for each core.
     rng, *step_rngs = jax.random.split(rng, n_devices * config["update_batch_size"] + 1)
 
@@ -479,12 +482,15 @@ def learner_setup(
         (n_devices, config["update_batch_size"], config["num_envs"]) + x.shape[1:]
     )
     env_states = jax.tree_util.tree_map(reshape_states, env_states)
+    log_env_states = jax.tree_util.tree_map(reshape_states, log_env_states)
     timesteps = jax.tree_util.tree_map(reshape_states, timesteps)
 
     params = Params(actor_params, critic_params)
     opt_states = OptStates(actor_opt_state, critic_opt_state)
 
-    init_learner_state = LearnerState(params, opt_states, step_rngs, env_states, timesteps)
+    init_learner_state = LearnerState(
+        params, opt_states, step_rngs, env_states, timesteps, log_env_states
+    )
     return learn, actor_network, init_learner_state
 
 
@@ -502,7 +508,6 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     if config["add_agent_id"]:
         env = AgentIDWrapper(env)
     env = AutoResetWrapper(env)
-    env = LogWrapper(env)
     eval_env = jumanji.make(config["env_name"], generator=generator)
     eval_env = RwareMultiAgentWrapper(eval_env)
     if config["add_agent_id"]:

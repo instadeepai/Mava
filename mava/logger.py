@@ -21,9 +21,10 @@ from typing import Dict, Protocol
 import jax.numpy as jnp
 import numpy as np
 from colorama import Fore, Style
+from jumanji.types import TimeStep
 from sacred.run import Run
 
-from mava.types import ExperimentOutput
+from mava.types import ExperimentOutput, LogEnvState
 from mava.utils.logger_tools import Logger, get_experiment_path, should_log
 
 
@@ -37,6 +38,37 @@ class LogFn(Protocol):
         absolute_metric: bool = False,
     ) -> float:
         ...
+
+
+def init_log_env_state(_: TimeStep) -> LogEnvState:
+    """Initialise the log env state."""
+    return LogEnvState(
+        episode_returns=jnp.float32(0.0),
+        episode_lengths=0,
+        episode_return_info=jnp.float32(0.0),
+        episode_length_info=0,
+    )
+
+
+def update_log_env_state(
+    timestep: TimeStep,
+    log_env_state: LogEnvState,
+) -> LogEnvState:
+    """Get the episode returns and lengths."""
+    done = timestep.last()
+    not_done = 1 - done
+
+    new_episode_return = log_env_state.episode_returns + jnp.mean(timestep.reward)
+    new_episode_length = log_env_state.episode_lengths + 1
+    episode_return_info = log_env_state.episode_return_info * not_done + new_episode_return * done
+    episode_length_info = log_env_state.episode_length_info * not_done + new_episode_length * done
+
+    return LogEnvState(
+        episode_returns=new_episode_return * not_done,
+        episode_lengths=new_episode_length * not_done,
+        episode_return_info=episode_return_info,
+        episode_length_info=episode_length_info,
+    )
 
 
 def get_logger_tools(logger: Logger, config: Dict) -> LogFn:  # noqa: CCR001
