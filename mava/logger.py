@@ -30,7 +30,28 @@ from mava.utils.logger_tools import Logger, get_experiment_path, should_log
 def get_logger_tools(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
     """Get the logger function."""
 
-    def log(
+    def log_extra_info(prefix: str, extras_info: Dict, t_env: int) -> str:
+        """
+        Log mean values of extra information and return a formatted string.
+
+        Args:
+            prefix (str): Prefix for log keys.
+            extras_info (Dict): Dictionary containing extra environment information.
+            t_env (int): Current timestep.
+
+        Returns:
+            str: Formatted string with logged mean values.
+        """
+        log_string = ""
+        for key, value in extras_info.items():
+            value = jnp.ravel(value)
+            mean_value = float(np.mean(value))
+            logger.log_stat(f"{prefix.lower()}mean_{key}", mean_value, t_env)
+            log_string += f" | {' '.join(key.upper().split('_'))} {mean_value:.3f}"
+
+        return log_string
+
+    def log(  # noqa: CCR001
         metrics: ExperimentOutput,
         t_env: int = 0,
         trainer_metric: bool = False,
@@ -89,7 +110,7 @@ def get_logger_tools(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
             f"Std Episode Length {float(np.std(episodes_length)):.3f} | "
             f"Max Episode Length {float(np.max(episodes_length)):.3f}"
         )
-      
+
         if absolute_metric:
             logger.console_logger.info(
                 f"{Fore.BLUE}{Style.BRIGHT}ABSOLUTE METRIC: {log_string}{Style.RESET_ALL}"
@@ -101,15 +122,11 @@ def get_logger_tools(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
                 f"Loss Actor {float(np.mean(loss_actor)):.3f} | "
                 f"Entropy {float(np.mean(entropy)):.3f}"
             )
-           # Extract the environment's extra information from metrics.
+            # Extract the environment's extra information from metrics.
             extras_info = metrics.learner_state.timestep.extras
 
             if extras_info:
-                for key, value in extras_info.items():
-                    value = jnp.ravel(value)
-                    mean_value = float(np.mean(value))
-                    logger.log_stat(f'{prefix.lower()}mean_{key}', mean_value, t_env)
-                    log_string += f" | {' '.join(key.upper().split('_'))} {mean_value:.3f}"
+                log_string += log_extra_info(prefix, extras_info, t_env)
 
             logger.console_logger.info(
                 f"{Fore.MAGENTA}{Style.BRIGHT}TRAINER: {log_string}{Style.RESET_ALL}"

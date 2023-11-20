@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, NamedTuple, Optional
+from typing import Dict, Generic, NamedTuple, TypeVar
 
 import chex
 from flax.core.frozen_dict import FrozenDict
@@ -100,11 +100,14 @@ class RNNEvalState(NamedTuple):
     return_: chex.Numeric = None
 
 
-class ExperimentOutput(NamedTuple):
+MavaState = TypeVar("MavaState", LearnerState, RNNLearnerState, EvalState, RNNEvalState)
+
+
+class ExperimentOutput(NamedTuple, Generic[MavaState]):
     """Experiment output."""
 
     episodes_info: Dict[str, chex.Array]
-    learner_state: Optional[LearnerState] = None
+    learner_state: MavaState
     total_loss: chex.Array = None
     value_loss: chex.Array = None
     loss_actor: chex.Array = None

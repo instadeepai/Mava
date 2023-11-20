@@ -119,6 +119,7 @@ def get_ff_evaluator_fn(
 
         return ExperimentOutput(
             episodes_info=eval_metrics,
+            learner_state=eval_state,
         )
 
     return evaluator_fn
@@ -261,6 +262,7 @@ def get_rnn_evaluator_fn(
 
         return ExperimentOutput(
             episodes_info=eval_metrics,
+            learner_state=eval_state,
         )
 
     return evaluator_fn
