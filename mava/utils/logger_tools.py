@@ -89,9 +89,7 @@ def get_python_logger() -> logging.Logger:
     logger = logging.getLogger()
     logger.handlers = []
     ch = logging.StreamHandler()
-    formatter = logging.Formatter(
-        f"{Fore.CYAN}{Style.BRIGHT}%(message)s{Style.RESET_ALL}", "%H:%M:%S"
-    )
+    formatter = logging.Formatter(f"{Fore.CYAN}{Style.BRIGHT}%(message)s", "%H:%M:%S")
     ch.setFormatter(formatter)
     logger.addHandler(ch)
     # Set to info to suppress debug outputs.

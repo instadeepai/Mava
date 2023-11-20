@@ -34,6 +34,7 @@ from jumanji.environments.routing.robot_warehouse.generator import RandomGenerat
 from jumanji.wrappers import AutoResetWrapper
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
+from rich.pretty import pprint
 from sacred import run
 
 from mava.evaluator import evaluator_setup
@@ -569,12 +570,13 @@ def learner_setup(
     num_actions = int(env.action_spec().num_values[0])
     num_agents = env.action_spec().shape[0]
     config["system"]["num_agents"] = num_agents
+    config["system"]["num_actions"] = num_actions
 
     # PRNG keys.
     rng, rng_p = rngs
 
     # Define network and optimiser.
-    actor_network = Actor(num_actions)
+    actor_network = Actor(config["system"]["num_actions"])
     critic_network = Critic()
     actor_optim = optax.chain(
         optax.clip_by_global_norm(config["system"]["max_grad_norm"]),
@@ -734,6 +736,8 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
 
     # Calculate total timesteps.
     n_devices = len(jax.devices())
+    config["system"]["devices"] = jax.devices()
+
     config["system"]["num_updates_per_eval"] = (
         config["system"]["num_updates"] // config["arch"]["num_evaluation"]
     )
@@ -744,6 +748,15 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         * config["system"]["update_batch_size"]
         * config["arch"]["num_envs"]
     )
+    # Get total_timesteps
+    config["system"]["total_timesteps"] = (
+        n_devices
+        * config["system"]["num_updates"]
+        * config["system"]["rollout_length"]
+        * config["system"]["update_batch_size"]
+        * config["arch"]["num_envs"]
+    )
+    pprint(config)
 
     # Run experiment for a total number of evaluations.
     max_episode_return = jnp.float32(0.0)
@@ -782,7 +795,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
             metrics=evaluator_output,
             t_env=timesteps_per_training * (i + 1),
         )
-        if config["system"]["absolute_metric"] and max_episode_return <= episode_return:
+        if config["arch"]["absolute_metric"] and max_episode_return <= episode_return:
             best_params = copy.deepcopy(trained_params)
             max_episode_return = episode_return
 
@@ -790,7 +803,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         learner_state = learner_output.learner_state
 
     # Measure absolute metric.
-    if config["system"]["absolute_metric"]:
+    if config["arch"]["absolute_metric"]:
         rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
         eval_rngs = jnp.stack(eval_rngs)
         eval_rngs = eval_rngs.reshape(n_devices, -1)

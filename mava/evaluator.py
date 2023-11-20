@@ -53,7 +53,7 @@ def get_ff_evaluator_fn(
             rng, _rng = jax.random.split(rng)
             pi = apply_fn(params, last_timestep.observation)
 
-            if config["system"]["evaluation_greedy"]:
+            if config["arch"]["evaluation_greedy"]:
                 action = pi.mode()
             else:
                 action = pi.sample(seed=_rng)
@@ -163,7 +163,7 @@ def get_rnn_evaluator_fn(
             # Run the network.
             hstate, pi = apply_fn(params, hstate, ac_in)
 
-            if config["system"]["evaluation_greedy"]:
+            if config["arch"]["evaluation_greedy"]:
                 action = pi.mode()
             else:
                 action = pi.sample(seed=policy_rng)

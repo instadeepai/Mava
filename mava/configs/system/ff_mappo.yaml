@@ -20,9 +20,8 @@ ent_coef: 0.01 # Entropy regularisation term for loss function.
 vf_coef: 0.5 # Critic weight in
 max_grad_norm: 0.5 # Maximum norm of the gradients for a weight update.
 
-# --- Evaluation ---
-evaluation_greedy: False # Evaluate the policy greedily. If True the policy will select
-  # an action which corresponds to the greatest logit. If false, the policy will sample
-  # from the logits.
-absolute_metric: True # Whether the absolute metric should be computed. For more details
-  # on the absolute metric please see: https://arxiv.org/abs/2209.10485
+# runtime arguments to be filled in
+num_agents: ~
+num_actions: ~
+total_timesteps: ~
+devices: ~
