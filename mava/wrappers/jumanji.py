@@ -31,6 +31,7 @@ else:
 
 State = Union[RwareState, LbfState]
 
+
 class Observation(NamedTuple):
     """
     The observation returned by the LBF environment.
