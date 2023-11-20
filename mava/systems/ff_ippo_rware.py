@@ -30,7 +30,6 @@ from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
 from jumanji.env import Environment
 from jumanji.environments.routing.robot_warehouse.generator import RandomGenerator
-from jumanji.types import Observation
 from jumanji.wrappers import AutoResetWrapper
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
@@ -44,6 +43,7 @@ from mava.types import (
     ExperimentOutput,
     LearnerFn,
     LearnerState,
+    Observation,
     OptStates,
     Params,
     PPOTransition,
@@ -51,7 +51,7 @@ from mava.types import (
 from mava.utils.jax import merge_leading_dims
 from mava.utils.logger_tools import get_sacred_exp
 from mava.utils.timing_utils import TimeIt
-from mava.wrappers.jumanji import AgentIDWrapper, LogWrapper, RwareMultiAgentWrapper
+from mava.wrappers.jumanji import AgentIDWrapper, LogWrapper, RwareWrapper
 
 
 class Actor(nn.Module):
@@ -497,14 +497,14 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     # Create envs
     generator = RandomGenerator(**config["rware_scenario"]["task_config"])
     env = jumanji.make(config["env_name"], generator=generator)
-    env = RwareMultiAgentWrapper(env)
+    env = RwareWrapper(env)
     # Add agent id to observation.
     if config["add_agent_id"]:
         env = AgentIDWrapper(env)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env_name"], generator=generator)
-    eval_env = RwareMultiAgentWrapper(eval_env)
+    eval_env = RwareWrapper(eval_env)
     if config["add_agent_id"]:
         eval_env = AgentIDWrapper(eval_env)
 

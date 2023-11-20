@@ -21,16 +21,21 @@ from jumanji.types import TimeStep
 from optax._src.base import OptState
 from typing_extensions import NamedTuple, TypeAlias
 
-from mava.wrappers.jumanji import LogEnvState
-
 Action: TypeAlias = chex.Array
 Value: TypeAlias = chex.Array
 Done: TypeAlias = chex.Array
 HiddenState: TypeAlias = chex.Array
 
-# Can't know the exact type of State or Timestep.
+# Can't know the exact type of State.
 State: TypeAlias = Any
-Observation: TypeAlias = Any
+
+
+class Observation(NamedTuple):
+    agents_view: chex.Array
+    action_mask: chex.Array
+    step_count: chex.Numeric
+
+
 RnnObservation: TypeAlias = Tuple[Observation, Done]
 
 
@@ -73,7 +78,7 @@ class LearnerState(NamedTuple):
     params: Params
     opt_states: OptStates
     key: chex.PRNGKey
-    env_state: LogEnvState
+    env_state: State
     timestep: TimeStep
 
 
@@ -83,7 +88,7 @@ class RNNLearnerState(NamedTuple):
     params: Params
     opt_states: OptStates
     key: chex.PRNGKey
-    env_state: LogEnvState
+    env_state: State
     timestep: TimeStep
     dones: Done
     hstates: HiddenStates

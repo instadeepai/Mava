@@ -48,14 +48,16 @@ from mava.types import (
     RecActorApply,
     RecCriticApply,
     RNNLearnerState,
+    RnnObservation,
 )
 from mava.utils.logger_tools import get_sacred_exp
 from mava.utils.timing_utils import TimeIt
 from mava.wrappers.jumanji import (
     AgentIDWrapper,
+    GlobalStateWrapper,
     LogWrapper,
     ObservationGlobalState,
-    RwareMultiAgentWithGlobalStateWrapper,
+    RwareWrapper,
 )
 
 
@@ -96,7 +98,7 @@ class Actor(nn.Module):
     def __call__(
         self,
         policy_hidden_state: chex.Array,
-        observation_done: Tuple[chex.Array, chex.Array],
+        observation_done: RnnObservation,
     ) -> Tuple[chex.Array, distrax.Categorical]:
         """Forward pass."""
         observation, done = observation_done
@@ -135,7 +137,7 @@ class Critic(nn.Module):
     def __call__(
         self,
         critic_hidden_state: Tuple[chex.Array, chex.Array],
-        observation_done: Tuple[chex.Array, chex.Array],
+        observation_done: RnnObservation,
     ) -> Tuple[chex.Array, chex.Array]:
         """Forward pass."""
         observation, done = observation_done
@@ -686,14 +688,14 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     # Create envs
     generator = RandomGenerator(**config["rware_scenario"]["task_config"])
     env = jumanji.make(config["env_name"], generator=generator)
-    env = RwareMultiAgentWithGlobalStateWrapper(env)
+    env = GlobalStateWrapper(RwareWrapper(env))
     # Add agent id to observation.
     if config["add_agent_id"]:
         env = AgentIDWrapper(env=env, has_global_state=True)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env_name"], generator=generator)
-    eval_env = RwareMultiAgentWithGlobalStateWrapper(eval_env)
+    eval_env = GlobalStateWrapper(RwareWrapper(env))
     if config["add_agent_id"]:
         eval_env = AgentIDWrapper(env=eval_env, has_global_state=True)
 

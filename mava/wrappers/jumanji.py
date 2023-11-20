@@ -18,9 +18,11 @@ import chex
 import jax.numpy as jnp
 from jumanji import specs
 from jumanji.env import Environment
-from jumanji.environments.routing.robot_warehouse import Observation, State
+from jumanji.environments.routing.robot_warehouse import RobotWarehouse, State
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
+
+from mava.types import Observation
 
 if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
     from dataclasses import dataclass
@@ -169,28 +171,31 @@ class AgentIDWrapper(Wrapper):
         )
 
 
-class RwareMultiAgentWrapper(Wrapper):
+class RwareWrapper(Wrapper):
     """Multi-agent wrapper for the Robotic Warehouse environment."""
+
+    def __init__(self, env: RobotWarehouse):
+        super().__init__(env)
+        self._env: RobotWarehouse
+
+    def convert_timstep(self, timestep: TimeStep) -> TimeStep[Observation]:
+        observation = Observation(
+            agents_view=timestep.observation.agents_view,
+            action_mask=timestep.observation.action_mask,
+            step_count=jnp.repeat(timestep.observation.step_count, self._env.num_agents),
+        )
+
+        return timestep.replace(observation=observation)
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment. Updates the step count."""
         state, timestep = self._env.reset(key)
-        timestep.observation = Observation(
-            agents_view=timestep.observation.agents_view,
-            action_mask=timestep.observation.action_mask,
-            step_count=jnp.repeat(timestep.observation.step_count, self._env.num_agents),
-        )
-        return state, timestep
+        return state, self.convert_timstep(timestep)
 
     def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
         """Step the environment. Updates the step count."""
         state, timestep = self._env.step(state, action)
-        timestep.observation = Observation(
-            agents_view=timestep.observation.agents_view,
-            action_mask=timestep.observation.action_mask,
-            step_count=jnp.repeat(timestep.observation.step_count, self._env.num_agents),
-        )
-        return state, timestep
+        return state, self.convert_timstep(timestep)
 
     def observation_spec(self) -> specs.Spec[Observation]:
         """Specification of the observation of the `RobotWarehouse` environment."""
@@ -204,67 +209,52 @@ class RwareMultiAgentWrapper(Wrapper):
         return self._env.observation_spec().replace(step_count=step_count)
 
 
-class RwareMultiAgentWithGlobalStateWrapper(Wrapper):
-    """Multi-agent wrapper for the Robotic Warehouse environment.
+class GlobalStateWrapper(Wrapper):
+    """Wrapper for adding global state to an environment that follows the mava API.
 
     The wrapper includes a global environment state to be used by the centralised critic.
     Note here that since robotic warehouse does not have a global state, we create one
     by concatenating the observations of all agents.
     """
 
+    def convert_timstep(self, timestep: TimeStep) -> TimeStep[Observation]:
+        global_state = jnp.concatenate(timestep.observation.agents_view, axis=0)
+        global_state = jnp.tile(global_state, (self._env.num_agents, 1))
+
+        observation = ObservationGlobalState(
+            global_state=global_state,
+            agents_view=timestep.observation.agents_view,
+            action_mask=timestep.observation.action_mask,
+            step_count=timestep.observation.step_count,
+        )
+
+        return timestep.replace(observation=observation)
+
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment. Updates the step count."""
         state, timestep = self._env.reset(key)
-        global_state = jnp.concatenate(timestep.observation.agents_view, axis=0)
-        global_state = jnp.tile(global_state, (self._env.num_agents, 1))
-        timestep.observation = ObservationGlobalState(
-            agents_view=timestep.observation.agents_view,
-            action_mask=timestep.observation.action_mask,
-            global_state=global_state,
-            step_count=jnp.repeat(timestep.observation.step_count, self._env.num_agents),
-        )
-        return state, timestep
+        return state, self.convert_timstep(timestep)
 
     def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
         """Step the environment. Updates the step count."""
         state, timestep = self._env.step(state, action)
-        global_state = jnp.concatenate(timestep.observation.agents_view, axis=0)
-        global_state = jnp.tile(global_state, (self._env.num_agents, 1))
-        timestep.observation = ObservationGlobalState(
-            agents_view=timestep.observation.agents_view,
-            action_mask=timestep.observation.action_mask,
-            global_state=global_state,
-            step_count=jnp.repeat(timestep.observation.step_count, self._env.num_agents),
-        )
-        return state, timestep
+        return state, self.convert_timstep(timestep)
 
     def observation_spec(self) -> specs.Spec[ObservationGlobalState]:
         """Specification of the observation of the `RobotWarehouse` environment."""
 
-        agents_view = specs.Array(
-            (self._env.num_agents, self._env.num_obs_features), jnp.int32, "agents_view"
-        )
-        action_mask = specs.BoundedArray(
-            (self._env.num_agents, 5), bool, False, True, "action_mask"
-        )
+        obs_spec = self._env.observation_spec()
         global_state = specs.Array(
             (self._env.num_agents, self._env.num_agents * self._env.num_obs_features),
             jnp.int32,
             "global_state",
         )
-        step_count = specs.BoundedArray(
-            (self._env.num_agents,),
-            jnp.int32,
-            [0] * self._env.num_agents,
-            [self._env.time_limit] * self._env.num_agents,
-            "step_count",
-        )
 
         return specs.Spec(
             ObservationGlobalState,
             "ObservationSpec",
-            agents_view=agents_view,
-            action_mask=action_mask,
+            agents_view=obs_spec.agents_view,
+            action_mask=obs_spec.action_mask,
             global_state=global_state,
-            step_count=step_count,
+            step_count=obs_spec.step_count,
         )
