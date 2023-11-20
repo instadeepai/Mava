@@ -2,4 +2,4 @@ defaults:
   - logger: ff_mappo
   - arch: anakin
   - system: ff_mappo
-  - environment: rware
+  - env: rware

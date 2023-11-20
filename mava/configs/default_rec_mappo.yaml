@@ -2,4 +2,4 @@ defaults:
   - logger: rec_mappo
   - arch: anakin
   - system: rec_mappo
-  - environment: rware
+  - env: rware

@@ -292,11 +292,9 @@ def get_learner_fn(
                     transition.value,
                     transition.reward,
                 )
-                delta = reward + config["system"]["gamma"] * next_value * (1 - done) - value
-                gae = (
-                    delta
-                    + config["system"]["gamma"] * config["system"]["gae_lambda"] * (1 - done) * gae
-                )
+                gamma = config["system"]["gamma"]
+                delta = reward + gamma * next_value * (1 - done) - value
+                gae = delta + gamma * config["system"]["gae_lambda"] * (1 - done) * gae
                 return (gae, value), gae
 
             _, advantages = jax.lax.scan(
@@ -697,15 +695,15 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     log = logger_setup(_run, config, _log)
 
     # Create envs
-    generator = RandomGenerator(**config["environment"]["rware_scenario"]["task_config"])
-    env = jumanji.make(config["environment"]["env_name"], generator=generator)
+    generator = RandomGenerator(**config["env"]["rware_scenario"]["task_config"])
+    env = jumanji.make(config["env"]["env_name"], generator=generator)
     env = RwareMultiAgentWithGlobalStateWrapper(env)
     # Add agent id to observation.
     if config["system"]["add_agent_id"]:
         env = AgentIDWrapper(env=env, has_global_state=True)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
-    eval_env = jumanji.make(config["environment"]["env_name"], generator=generator)
+    eval_env = jumanji.make(config["env"]["env_name"], generator=generator)
     eval_env = RwareMultiAgentWithGlobalStateWrapper(eval_env)
     if config["system"]["add_agent_id"]:
         eval_env = AgentIDWrapper(env=eval_env, has_global_state=True)
@@ -729,7 +727,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
 
     # Calculate total timesteps.
     n_devices = len(jax.devices())
-    config["system"]["devices"] = jax.devices()
+    config["arch"]["devices"] = jax.devices()
 
     config["system"]["num_updates_per_eval"] = (
         config["system"]["num_updates"] // config["arch"]["num_evaluation"]

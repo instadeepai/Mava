@@ -145,8 +145,8 @@ def get_sacred_exp(cfg: Dict, system_name: str) -> Experiment:
 def get_experiment_path(config: Dict, logger_type: str) -> str:
     """Helper function to create the experiment path."""
     exp_path = (
-        f"{logger_type}/{config['logger']['system_name']}/{config['environment']['env_name']}/"
-        + f"{config['environment']['rware_scenario']['task_name']}"
+        f"{logger_type}/{config['logger']['system_name']}/{config['env']['env_name']}/"
+        + f"{config['env']['rware_scenario']['task_name']}"
         + f"/envs_{config['arch']['num_envs']}/seed_{config['system']['seed']}"
     )
 
