@@ -15,13 +15,11 @@
 """Logger setup."""
 import datetime
 import os
-from logging import Logger as SacredLogger
 from typing import Dict, Protocol
 
 import jax.numpy as jnp
 import numpy as np
 from colorama import Fore, Style
-from sacred.run import Run
 
 from mava.types import ExperimentOutput
 from mava.utils.logger_tools import Logger, get_experiment_path, should_log
@@ -126,14 +124,16 @@ def get_logger_tools(logger: Logger, config: Dict) -> LogFn:  # noqa: CCR001
     return log
 
 
-def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> LogFn:
+def logger_setup(
+    config: Dict,
+) -> LogFn:
     """Setup the logger."""
-    logger = Logger(_log)
+    logger = Logger(config)
     unique_token = f"{datetime.datetime.now()}"
-    if config["use_sacred"]:
-        logger.setup_sacred(_run)
     if config["use_tf"]:
         exp_path = get_experiment_path(config, "tensorboard")
         tb_logs_path = os.path.join(config["base_exp_path"], f"{exp_path}/{unique_token}")
         logger.setup_tb(tb_logs_path)
+    if config["use_neptune"]:
+        logger.setup_neptune()
     return get_logger_tools(logger, config)

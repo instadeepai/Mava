@@ -13,15 +13,12 @@
 # limitations under the License.
 
 import logging
-import os
 from collections import defaultdict
 from typing import Dict, List, Tuple
 
 import neptune
 from colorama import Fore, Style
-from neptune.integrations.sacred import NeptuneObserver
-from sacred import Experiment, observers, utils
-from sacred.run import Run
+from neptune.utils import stringify_unsupported
 
 
 class Logger:
@@ -32,12 +29,12 @@ class Logger:
         (https://github.com/uoe-agents/epymarl/blob/main/src/utils/logging.py)
     """
 
-    def __init__(self, console_logger: logging.Logger) -> None:
+    def __init__(self, cfg: Dict) -> None:
         """Initialise the logger."""
-        self.console_logger = console_logger
+        self.cfg = cfg
+        self.console_logger = get_python_logger()
 
         self.use_tb = False
-        self.use_sacred = False
 
         # defaultdict is used to overcome the problem of missing keys when logging to sacred.
         self.stats: Dict[str, List[Tuple[int, float]]] = defaultdict(lambda: [])
@@ -51,11 +48,10 @@ class Logger:
         self.tb_logger = log_value
         self.use_tb = True
 
-    def setup_sacred(self, sacred_run_dict: Run) -> None:
-        """Set up sacred logging."""
-        self.sacred_run_dict = sacred_run_dict
-        self.sacred_info = sacred_run_dict.info
-        self.use_sacred = True
+    def setup_neptune(self) -> None:
+        """Set up neptune logging."""
+        self.use_neptune = True
+        self.neptune_logger = get_neptune_logger(self.cfg)
 
     def log_stat(self, key: str, value: float, t: int) -> None:
         """Log a single stat."""
@@ -64,20 +60,13 @@ class Logger:
         if self.use_tb:
             self.tb_logger(key, value, t)
 
-        if self.use_sacred:
-            if key in self.sacred_info:
-                self.sacred_info[f"{key}_T"].append(t)
-                self.sacred_info[key].append(value)
-            else:
-                self.sacred_info[f"{key}_T"] = [t]
-                self.sacred_info[key] = [value]
-
-            self.sacred_run_dict.log_scalar(key, value, t)
+        if self.use_neptune:
+            self.neptune_logger[key].log(value, step=t, wait=True)
 
 
 def should_log(config: Dict) -> bool:
     """Check if the logger should log."""
-    return bool(config["use_sacred"] or config["use_tf"] or config["use_neptune"])
+    return bool(config["use_tf"] or config["use_neptune"])
 
 
 def get_python_logger() -> logging.Logger:
@@ -105,39 +94,9 @@ def get_neptune_logger(cfg: Dict) -> neptune.Run:
     run = neptune.init_run(name=name, project=project, tags=tags)
 
     del cfg["neptune_tag"]  # neptune doesn't want lists in run params
-    run["params"] = cfg
+    run["params"] = stringify_unsupported(cfg)
 
     return run
-
-
-def get_sacred_exp(cfg: Dict, system_name: str) -> Experiment:
-    """Get sacred experiment and set up sacred logging.
-
-    This sets up terminal logging, adds the file observer (to log configs and results as json files)
-    and neptune logging (to save logs online) if required.
-
-    Stores files at: base_exp_path/system_name/env_name/task_name/num_envs/seed.
-    """
-    logger = get_python_logger()
-    ex = Experiment("mava", save_git_info=False)
-    ex.logger = logger
-    ex.captured_out_filter = utils.apply_backspaces_and_linefeeds
-
-    # Set the base path for the experiment.
-    cfg["system_name"] = system_name
-    exp_path = get_experiment_path(cfg, "sacred")
-    file_obs_path = os.path.join(cfg["base_exp_path"], exp_path)
-
-    # add sacred observers
-    ex.observers.append(observers.FileStorageObserver.create(file_obs_path))
-    if cfg["use_neptune"]:
-        run = get_neptune_logger(cfg)
-        ex.observers.append(NeptuneObserver(run=run))
-
-    # Add configuration to the experiment.
-    ex.add_config(cfg)
-
-    return ex
 
 
 def get_experiment_path(config: Dict, logger_type: str) -> str:

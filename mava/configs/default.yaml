@@ -41,7 +41,6 @@ absolute_metric: True # Whether the absolute metric should be computed. For more
 
 # --- Logging options ---
 use_tf: False
-use_sacred: True
 base_exp_path: results
 system_name: ~  # this is manually set inside each file depending on which system is run
 # Neptune logging
