@@ -1,0 +1,6 @@
+# --- Anakin config ---
+
+num_envs: 16  # Number of vectorised environments per device.
+
+num_eval_episodes: 32 # Number of episodes to evaluate per evaluation.
+num_evaluation: 200 # Number of evenly spaced evaluations to perform during training.
