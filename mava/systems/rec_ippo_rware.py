@@ -16,7 +16,7 @@ import copy
 import functools
 import time
 from logging import Logger as SacredLogger
-from typing import Any, Callable, Dict, Sequence, Tuple
+from typing import Any, Dict, Sequence, Tuple
 
 import chex
 import distrax
@@ -42,9 +42,12 @@ from mava.logger import logger_setup
 from mava.types import (
     ExperimentOutput,
     HiddenStates,
+    LearnerFn,
     OptStates,
     Params,
     PPOTransition,
+    RecActorApply,
+    RecCriticApply,
     RNNLearnerState,
 )
 from mava.utils.logger_tools import get_sacred_exp
@@ -149,10 +152,10 @@ class Critic(nn.Module):
 
 def get_learner_fn(
     env: jumanji.Environment,
-    apply_fns: Tuple[Callable, Callable],
-    update_fns: Tuple[Callable, Callable],
+    apply_fns: Tuple[RecActorApply, RecCriticApply],
+    update_fns: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
     config: Dict,
-) -> Callable:
+) -> LearnerFn[RNNLearnerState]:
     """Get the learner function."""
 
     actor_apply_fn, critic_apply_fn = apply_fns
@@ -504,7 +507,7 @@ def get_learner_fn(
         metric = traj_batch.info
         return learner_state, (metric, loss_info)
 
-    def learner_fn(learner_state: RNNLearnerState) -> ExperimentOutput:
+    def learner_fn(learner_state: RNNLearnerState) -> ExperimentOutput[RNNLearnerState]:
         """Learner function.
 
         This function represents the learner, it updates the network parameters
@@ -542,7 +545,7 @@ def get_learner_fn(
 
 def learner_setup(
     env: Environment, rngs: chex.Array, config: Dict
-) -> Tuple[Callable, Actor, RNNLearnerState]:
+) -> Tuple[LearnerFn[RNNLearnerState], Actor, RNNLearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
