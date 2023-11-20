@@ -12,23 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, NamedTuple, Optional
+from typing import Any, Callable, Dict, Generic, Optional, Tuple, TypeVar
 
 import chex
+from distrax import Distribution
 from flax.core.frozen_dict import FrozenDict
-from jumanji.environments.routing.robot_warehouse import State
 from jumanji.types import TimeStep
 from optax._src.base import OptState
+from typing_extensions import NamedTuple, TypeAlias
 
 from mava.wrappers.jumanji import LogEnvState
+
+Action: TypeAlias = chex.Array
+Value: TypeAlias = chex.Array
+Done: TypeAlias = chex.Array
+HiddenState: TypeAlias = chex.Array
+
+# Can't know the exact type of State or Timestep.
+State: TypeAlias = Any
+Observation: TypeAlias = Any
+RnnObservation: TypeAlias = Tuple[Observation, Done]
 
 
 class PPOTransition(NamedTuple):
     """Transition tuple for PPO."""
 
-    done: chex.Array
-    action: chex.Array
-    value: chex.Array
+    done: Done
+    action: Action
+    value: Value
     reward: chex.Array
     log_prob: chex.Array
     obs: chex.Array
@@ -52,8 +63,8 @@ class OptStates(NamedTuple):
 class HiddenStates(NamedTuple):
     """Hidden states for an actor critic learner."""
 
-    policy_hidden_state: chex.Array
-    critic_hidden_state: chex.Array
+    policy_hidden_state: HiddenState
+    critic_hidden_state: HiddenState
 
 
 class LearnerState(NamedTuple):
@@ -74,7 +85,7 @@ class RNNLearnerState(NamedTuple):
     key: chex.PRNGKey
     env_state: LogEnvState
     timestep: TimeStep
-    dones: chex.Array
+    dones: Done
     hstates: HiddenStates
 
 
@@ -84,8 +95,8 @@ class EvalState(NamedTuple):
     key: chex.PRNGKey
     env_state: State
     timestep: TimeStep
-    step_count_: chex.Numeric = None
-    return_: chex.Numeric = None
+    step_count_: chex.Numeric
+    return_: chex.Numeric
 
 
 class RNNEvalState(NamedTuple):
@@ -95,17 +106,33 @@ class RNNEvalState(NamedTuple):
     env_state: State
     timestep: TimeStep
     dones: chex.Array
-    hstate: chex.Array
-    step_count_: chex.Numeric = None
-    return_: chex.Numeric = None
+    hstate: HiddenState
+    step_count_: chex.Numeric
+    return_: chex.Numeric
 
 
-class ExperimentOutput(NamedTuple):
+MavaState = TypeVar("MavaState", LearnerState, RNNLearnerState, EvalState, RNNEvalState)
+
+
+class ExperimentOutput(NamedTuple, Generic[MavaState]):
     """Experiment output."""
 
     episodes_info: Dict[str, chex.Array]
-    learner_state: Optional[LearnerState] = None
-    total_loss: chex.Array = None
-    value_loss: chex.Array = None
-    loss_actor: chex.Array = None
-    entropy: chex.Array = None
+    learner_state: MavaState
+    # these aren't common between value and policy methods
+    # should likely just be a dict of metrics
+    total_loss: Optional[chex.Array] = None
+    value_loss: Optional[chex.Array] = None
+    loss_actor: Optional[chex.Array] = None
+    entropy: Optional[chex.Array] = None
+
+
+LearnerFn = Callable[[MavaState], ExperimentOutput[MavaState]]
+EvalFn = Callable[[FrozenDict, chex.PRNGKey], ExperimentOutput[MavaState]]
+
+ActorApply = Callable[[FrozenDict, Observation], Distribution]
+CriticApply = Callable[[FrozenDict, Observation], Value]
+RecActorApply = Callable[
+    [FrozenDict, HiddenState, RnnObservation], Tuple[HiddenState, Distribution]
+]
+RecCriticApply = Callable[[FrozenDict, HiddenState, RnnObservation], Tuple[HiddenState, Value]]
