@@ -731,6 +731,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         * config["update_batch_size"]
         * config["num_envs"]
     )
+    print(f"Training for {steps_per_rollout * config['num_evaluation']} timesteps...")
 
     # Run experiment for a total number of evaluations.
     max_episode_return = jnp.float32(0.0)
