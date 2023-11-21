@@ -77,7 +77,11 @@ class Logger:
 
 def should_log(config: Dict) -> bool:
     """Check if the logger should log."""
-    return bool(config["use_sacred"] or config["use_tf"] or config["use_neptune"])
+    return bool(
+        config["logger"]["use_sacred"]
+        or config["logger"]["use_tf"]
+        or config["logger"]["use_neptune"]
+    )
 
 
 def get_python_logger() -> logging.Logger:
@@ -85,9 +89,7 @@ def get_python_logger() -> logging.Logger:
     logger = logging.getLogger()
     logger.handlers = []
     ch = logging.StreamHandler()
-    formatter = logging.Formatter(
-        f"{Fore.CYAN}{Style.BRIGHT}%(message)s{Style.RESET_ALL}", "%H:%M:%S"
-    )
+    formatter = logging.Formatter(f"{Fore.CYAN}{Style.BRIGHT}%(message)s", "%H:%M:%S")
     ch.setFormatter(formatter)
     logger.addHandler(ch)
     # Set to info to suppress debug outputs.
@@ -98,13 +100,13 @@ def get_python_logger() -> logging.Logger:
 
 def get_neptune_logger(cfg: Dict) -> neptune.Run:
     """Set up neptune logging."""
-    name = cfg["name"]
-    tags = cfg["neptune_tag"]
-    project = cfg["neptune_project"]
+    name = cfg["logger"]["kwargs"]["name"]
+    tags = cfg["logger"]["kwargs"]["neptune_tag"]
+    project = cfg["logger"]["kwargs"]["neptune_project"]
 
     run = neptune.init_run(name=name, project=project, tags=tags)
 
-    del cfg["neptune_tag"]  # neptune doesn't want lists in run params
+    del cfg["logger"]["kwargs"]["neptune_tag"]  # neptune doesn't want lists in run params
     run["params"] = cfg
 
     return run
@@ -124,13 +126,13 @@ def get_sacred_exp(cfg: Dict, system_name: str) -> Experiment:
     ex.captured_out_filter = utils.apply_backspaces_and_linefeeds
 
     # Set the base path for the experiment.
-    cfg["system_name"] = system_name
+    cfg["logger"]["system_name"] = system_name
     exp_path = get_experiment_path(cfg, "sacred")
-    file_obs_path = os.path.join(cfg["base_exp_path"], exp_path)
+    file_obs_path = os.path.join(cfg["logger"]["base_exp_path"], exp_path)
 
     # add sacred observers
     ex.observers.append(observers.FileStorageObserver.create(file_obs_path))
-    if cfg["use_neptune"]:
+    if cfg["logger"]["use_neptune"]:
         run = get_neptune_logger(cfg)
         ex.observers.append(NeptuneObserver(run=run))
 
@@ -143,9 +145,9 @@ def get_sacred_exp(cfg: Dict, system_name: str) -> Experiment:
 def get_experiment_path(config: Dict, logger_type: str) -> str:
     """Helper function to create the experiment path."""
     exp_path = (
-        f"{logger_type}/{config['system_name']}/{config['env_name']}/"
-        + f"{config['rware_scenario']['task_name']}/envs_{config['num_envs']}/"
-        + f"seed_{config['seed']}"
+        f"{logger_type}/{config['logger']['system_name']}/{config['env']['env_name']}/"
+        + f"{config['env']['rware_scenario']['task_name']}"
+        + f"/envs_{config['arch']['num_envs']}/seed_{config['system']['seed']}"
     )
 
     return exp_path

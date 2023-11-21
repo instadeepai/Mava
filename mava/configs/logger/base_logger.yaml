@@ -1,0 +1,14 @@
+# --- Logging options ---
+
+use_tf: False # Whether to use tensorboard logging.
+use_sacred: True # Whether to use sacred logging.
+base_exp_path: results # Base path for sacred logging.
+system_name: ~
+
+# --- Neptune logging ---
+use_neptune: False
+
+kwargs:
+  neptune_project: Instadeep/Mava
+  neptune_tag: [rware]
+  name: None # Unique ID from logging.
