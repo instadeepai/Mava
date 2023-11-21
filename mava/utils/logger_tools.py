@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
 import logging
+import os
 from typing import Dict
 
 import neptune
 from colorama import Fore, Style
 from neptune.utils import stringify_unsupported
+from tensorboard_logger import configure, log_value
 
 
 class Logger:
@@ -30,25 +33,29 @@ class Logger:
 
     def __init__(self, cfg: Dict) -> None:
         """Initialise the logger."""
-        self.cfg = cfg
         self.console_logger = get_python_logger()
 
-        self.use_tb = False
-        self.use_neptune = False
+        if cfg["use_tf"]:
+            self._setup_tb(cfg)
+        if cfg["use_neptune"]:
+            self._setup_neptune(cfg)
 
-    def setup_tb(self, directory_name: str) -> None:
+        self.use_tb = cfg["use_tf"]
+        self.use_neptune = cfg["use_neptune"]
+        self.should_log = bool(cfg["use_tf"] or cfg["use_neptune"])
+
+    def _setup_tb(self, cfg: Dict) -> None:
         """Set up tensorboard logging."""
-        # Import here so it doesn't have to be installed if you don't use it
-        from tensorboard_logger import configure, log_value
+        unique_token = f"{datetime.datetime.now()}"
+        exp_path = get_experiment_path(cfg, "tensorboard")
+        tb_logs_path = os.path.join(cfg["base_exp_path"], f"{exp_path}/{unique_token}")
 
-        configure(directory_name)
+        configure(tb_logs_path)
         self.tb_logger = log_value
-        self.use_tb = True
 
-    def setup_neptune(self) -> None:
+    def _setup_neptune(self, cfg: Dict) -> None:
         """Set up neptune logging."""
-        self.use_neptune = True
-        self.neptune_logger = get_neptune_logger(self.cfg)
+        self.neptune_logger = get_neptune_logger(cfg)
 
     def log_stat(self, key: str, value: float, t: int) -> None:
         """Log a single stat."""
@@ -58,11 +65,6 @@ class Logger:
 
         if self.use_neptune:
             self.neptune_logger[key].log(value, step=t, wait=True)
-
-
-def should_log(config: Dict) -> bool:
-    """Check if the logger should log."""
-    return bool(config["use_tf"] or config["use_neptune"])
 
 
 def get_python_logger() -> logging.Logger:
@@ -89,7 +91,6 @@ def get_neptune_logger(cfg: Dict) -> neptune.Run:
 
     run = neptune.init_run(name=name, project=project, tags=tags)
 
-    del cfg["neptune_tag"]  # neptune doesn't want lists in run params
     run["params"] = stringify_unsupported(cfg)
 
     return run

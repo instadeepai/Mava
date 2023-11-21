@@ -13,8 +13,6 @@
 # limitations under the License.
 
 """Logger setup."""
-import datetime
-import os
 from typing import Dict, Protocol
 
 import jax.numpy as jnp
@@ -22,7 +20,7 @@ import numpy as np
 from colorama import Fore, Style
 
 from mava.types import ExperimentOutput
-from mava.utils.logger_tools import Logger, get_experiment_path, should_log
+from mava.utils.logger_tools import Logger
 
 
 # Not in types.py because we only use it here.
@@ -37,7 +35,7 @@ class LogFn(Protocol):
         ...
 
 
-def get_logger_tools(logger: Logger, config: Dict) -> LogFn:  # noqa: CCR001
+def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
     """Get the logger function."""
 
     def log(
@@ -73,7 +71,7 @@ def get_logger_tools(logger: Logger, config: Dict) -> LogFn:  # noqa: CCR001
         episodes_length = jnp.ravel(episodes_info["episode_length"])
 
         # Log metrics.
-        if should_log(config):
+        if logger.should_log:
             logger.log_stat(
                 prefix.lower() + "mean_episode_returns",
                 float(np.mean(episodes_return)),
@@ -129,11 +127,4 @@ def logger_setup(
 ) -> LogFn:
     """Setup the logger."""
     logger = Logger(config)
-    unique_token = f"{datetime.datetime.now()}"
-    if config["use_tf"]:
-        exp_path = get_experiment_path(config, "tensorboard")
-        tb_logs_path = os.path.join(config["base_exp_path"], f"{exp_path}/{unique_token}")
-        logger.setup_tb(tb_logs_path)
-    if config["use_neptune"]:
-        logger.setup_neptune()
-    return get_logger_tools(logger, config)
+    return get_logger_tools(logger)
