@@ -77,23 +77,15 @@ def get_logger_tools(logger: Logger, config: Dict) -> LogFn:  # noqa: CCR001
 
         # Log metrics.
         if should_log(config):
-            logger.log_stat(
-                prefix.lower() + "mean_episode_returns",
-                float(np.mean(episodes_return)),
-                t_env,
-            )
-            logger.log_stat(
-                prefix.lower() + "mean_episode_length",
-                float(np.mean(episodes_length)),
-                t_env,
-            )
-            logger.log_stat(prefix.lower() + "steps_per_second", steps_per_second, t_env)
+            logger.log_stat(f"{prefix}mean_episode_returns", float(np.mean(episodes_return)), t_env)
+            logger.log_stat(f"{prefix}mean_episode_length", float(np.mean(episodes_length)), t_env)
+            logger.log_stat(f"{prefix}steps_per_second", steps_per_second, t_env)
 
             if trainer_metric:
-                logger.log_stat("total_loss", float(np.mean(total_loss)), t_env)
-                logger.log_stat("value_loss", float(np.mean(value_loss)), t_env)
-                logger.log_stat("loss_actor", float(np.mean(loss_actor)), t_env)
-                logger.log_stat("entropy", float(np.mean(entropy)), t_env)
+                logger.log_stat(f"{prefix}total_loss", float(np.mean(total_loss)), t_env)
+                logger.log_stat(f"{prefix}value_loss", float(np.mean(value_loss)), t_env)
+                logger.log_stat(f"{prefix}loss_actor", float(np.mean(loss_actor)), t_env)
+                logger.log_stat(f"{prefix}entropy", float(np.mean(entropy)), t_env)
 
         log_string = (
             f"Timesteps {t_env:07d} | "
