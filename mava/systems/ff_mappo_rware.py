@@ -514,7 +514,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env_name"], generator=generator)
-    eval_env = GlobalStateWrapper(RwareWrapper(env))
+    eval_env = GlobalStateWrapper(RwareWrapper(eval_env))
     if config["add_agent_id"]:
         eval_env = AgentIDWrapper(env=eval_env, has_global_state=True)
 

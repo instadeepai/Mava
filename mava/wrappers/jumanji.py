@@ -178,24 +178,29 @@ class RwareWrapper(Wrapper):
         super().__init__(env)
         self._env: RobotWarehouse
 
-    def convert_timstep(self, timestep: TimeStep) -> TimeStep[Observation]:
+    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
+        n_agents = self._env.num_agents
         observation = Observation(
             agents_view=timestep.observation.agents_view,
             action_mask=timestep.observation.action_mask,
-            step_count=jnp.repeat(timestep.observation.step_count, self._env.num_agents),
+            step_count=jnp.repeat(timestep.observation.step_count, n_agents),
         )
+        # todo (weim): get this working so that ppo always expects (n_agents,) size for reward and discount
+        # reward = jnp.repeat(timestep.reward, n_agents)
+        # discount = jnp.repeat(timestep.discount, n_agents)
+        # return timestep.replace(observation=observation, reward=reward, discount=discount)
 
         return timestep.replace(observation=observation)
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment. Updates the step count."""
         state, timestep = self._env.reset(key)
-        return state, self.convert_timstep(timestep)
+        return state, self.modify_timestep(timestep)
 
     def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
         """Step the environment. Updates the step count."""
         state, timestep = self._env.step(state, action)
-        return state, self.convert_timstep(timestep)
+        return state, self.modify_timestep(timestep)
 
     def observation_spec(self) -> specs.Spec[Observation]:
         """Specification of the observation of the `RobotWarehouse` environment."""
@@ -213,11 +218,11 @@ class GlobalStateWrapper(Wrapper):
     """Wrapper for adding global state to an environment that follows the mava API.
 
     The wrapper includes a global environment state to be used by the centralised critic.
-    Note here that since robotic warehouse does not have a global state, we create one
+    Note here that since most environments do not have a global state, we create one
     by concatenating the observations of all agents.
     """
 
-    def convert_timstep(self, timestep: TimeStep) -> TimeStep[Observation]:
+    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         global_state = jnp.concatenate(timestep.observation.agents_view, axis=0)
         global_state = jnp.tile(global_state, (self._env.num_agents, 1))
 
@@ -233,12 +238,12 @@ class GlobalStateWrapper(Wrapper):
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment. Updates the step count."""
         state, timestep = self._env.reset(key)
-        return state, self.convert_timstep(timestep)
+        return state, self.modify_timestep(timestep)
 
     def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
         """Step the environment. Updates the step count."""
         state, timestep = self._env.step(state, action)
-        return state, self.convert_timstep(timestep)
+        return state, self.modify_timestep(timestep)
 
     def observation_spec(self) -> specs.Spec[ObservationGlobalState]:
         """Specification of the observation of the `RobotWarehouse` environment."""
