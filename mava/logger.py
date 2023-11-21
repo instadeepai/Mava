@@ -15,7 +15,7 @@
 """Logger setup."""
 import datetime
 import os
-from typing import Dict, Protocol
+from typing import Dict, Optional, Protocol
 
 import jax.numpy as jnp
 import numpy as np
@@ -33,6 +33,7 @@ class LogFn(Protocol):
         t_env: int = 0,
         trainer_metric: bool = False,
         absolute_metric: bool = False,
+        eval_step: Optional[int] = None,
     ) -> float:
         ...
 
@@ -45,6 +46,7 @@ def get_logger_tools(logger: Logger, config: Dict) -> LogFn:  # noqa: CCR001
         t_env: int = 0,
         trainer_metric: bool = False,
         absolute_metric: bool = False,
+        eval_step: Optional[int] = None,
     ) -> float:
         """Log the episode returns and lengths.
 
@@ -78,11 +80,13 @@ def get_logger_tools(logger: Logger, config: Dict) -> LogFn:  # noqa: CCR001
                 prefix.lower() + "mean_episode_returns",
                 float(np.mean(episodes_return)),
                 t_env,
+                eval_step,
             )
             logger.log_stat(
                 prefix.lower() + "mean_episode_length",
                 float(np.mean(episodes_length)),
                 t_env,
+                eval_step,
             )
             if trainer_metric:
                 logger.log_stat("total_loss", float(np.mean(total_loss)), t_env)
@@ -136,4 +140,7 @@ def logger_setup(
         logger.setup_tb(tb_logs_path)
     if config["use_neptune"]:
         logger.setup_neptune()
+    if config["use_json"]:
+        json_exp_path = get_experiment_path(config, "json")
+        logger.setup_json(os.path.join(config["base_exp_path"], json_exp_path))
     return get_logger_tools(logger, config)

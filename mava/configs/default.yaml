@@ -48,3 +48,4 @@ use_neptune: False
 neptune_project: Instadeep/Mava
 neptune_tag: [rware]
 name: None # Unique ID from logging.
+use_json: True
