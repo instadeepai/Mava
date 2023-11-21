@@ -97,7 +97,7 @@ def get_logger_tools(logger: Logger, config: Dict) -> LogFn:  # noqa: CCR001
             f"Max Episode Return {float(np.max(episodes_return)):.3f} | "
             f"Mean Episode Length {float(np.mean(episodes_length)):.3f} | "
             f"Std Episode Length {float(np.std(episodes_length)):.3f} | "
-            f"Max Episode Length {float(np.max(episodes_length)):.3f}"
+            f"Max Episode Length {float(np.max(episodes_length)):.3f} "
         )
 
         if absolute_metric:

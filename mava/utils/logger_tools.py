@@ -13,8 +13,7 @@
 # limitations under the License.
 
 import logging
-from collections import defaultdict
-from typing import Dict, List, Tuple
+from typing import Dict
 
 import neptune
 from colorama import Fore, Style
@@ -22,7 +21,7 @@ from neptune.utils import stringify_unsupported
 
 
 class Logger:
-    """Logger class for logging to tensorboard, and sacred.
+    """Logger class for logging to tensorboard, and neptune.
 
     Note:
         For the original implementation, please refer to the following link:
@@ -35,9 +34,7 @@ class Logger:
         self.console_logger = get_python_logger()
 
         self.use_tb = False
-
-        # defaultdict is used to overcome the problem of missing keys when logging to sacred.
-        self.stats: Dict[str, List[Tuple[int, float]]] = defaultdict(lambda: [])
+        self.use_neptune = False
 
     def setup_tb(self, directory_name: str) -> None:
         """Set up tensorboard logging."""
@@ -55,7 +52,6 @@ class Logger:
 
     def log_stat(self, key: str, value: float, t: int) -> None:
         """Log a single stat."""
-        self.stats[key].append((t, value))
 
         if self.use_tb:
             self.tb_logger(key, value, t)
