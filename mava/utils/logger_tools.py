@@ -83,11 +83,10 @@ def get_python_logger() -> logging.Logger:
 
 def get_neptune_logger(cfg: Dict) -> neptune.Run:
     """Set up neptune logging."""
-    name = cfg["logger"]["kwargs"]["name"]
     tags = cfg["logger"]["kwargs"]["neptune_tag"]
     project = cfg["logger"]["kwargs"]["neptune_project"]
 
-    run = neptune.init_run(name=name, project=project, tags=tags)
+    run = neptune.init_run(project=project, tags=tags)
 
     run["params"] = stringify_unsupported(cfg)
 
