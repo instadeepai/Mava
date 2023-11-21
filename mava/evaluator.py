@@ -105,7 +105,9 @@ def get_ff_evaluator_fn(
         # Add dimension to pmap over.
         step_rngs = jnp.stack(step_rngs).reshape(eval_batch, -1)
 
-        eval_state = EvalState(step_rngs, env_states, timesteps, 0, 0.0)
+        eval_state = EvalState(
+            step_rngs, env_states, timesteps, 0, jnp.zeros_like(timesteps.reward)
+        )
         eval_metrics = jax.vmap(
             eval_one_episode,
             in_axes=(None, EvalState(0, 0, 0, None, None)),

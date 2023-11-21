@@ -185,12 +185,9 @@ class RwareWrapper(Wrapper):
             action_mask=timestep.observation.action_mask,
             step_count=jnp.repeat(timestep.observation.step_count, n_agents),
         )
-        # todo (weim): get this working so that ppo always expects (n_agents,) size for reward and discount
-        # reward = jnp.repeat(timestep.reward, n_agents)
-        # discount = jnp.repeat(timestep.discount, n_agents)
-        # return timestep.replace(observation=observation, reward=reward, discount=discount)
-
-        return timestep.replace(observation=observation)
+        reward = jnp.repeat(timestep.reward, n_agents)
+        discount = jnp.repeat(timestep.discount, n_agents)
+        return timestep.replace(observation=observation, reward=reward, discount=discount)
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment. Updates the step count."""
