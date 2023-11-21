@@ -35,20 +35,20 @@ class Logger:
         """Initialise the logger."""
         self.console_logger = get_python_logger()
 
-        if cfg["use_tf"]:
+        if cfg["logger"]["use_tf"]:
             self._setup_tb(cfg)
-        if cfg["use_neptune"]:
+        if cfg["logger"]["use_neptune"]:
             self._setup_neptune(cfg)
 
-        self.use_tb = cfg["use_tf"]
-        self.use_neptune = cfg["use_neptune"]
-        self.should_log = bool(cfg["use_tf"] or cfg["use_neptune"])
+        self.use_tb = cfg["logger"]["use_tf"]
+        self.use_neptune = cfg["logger"]["use_neptune"]
+        self.should_log = bool(cfg["logger"]["use_tf"] or cfg["logger"]["use_neptune"])
 
     def _setup_tb(self, cfg: Dict) -> None:
         """Set up tensorboard logging."""
         unique_token = f"{datetime.datetime.now()}"
         exp_path = get_experiment_path(cfg, "tensorboard")
-        tb_logs_path = os.path.join(cfg["base_exp_path"], f"{exp_path}/{unique_token}")
+        tb_logs_path = os.path.join(cfg["logger"]["base_exp_path"], f"{exp_path}/{unique_token}")
 
         configure(tb_logs_path)
         self.tb_logger = log_value
@@ -72,9 +72,7 @@ def get_python_logger() -> logging.Logger:
     logger = logging.getLogger()
     logger.handlers = []
     ch = logging.StreamHandler()
-    formatter = logging.Formatter(
-        f"{Fore.CYAN}{Style.BRIGHT}%(message)s{Style.RESET_ALL}", "%H:%M:%S"
-    )
+    formatter = logging.Formatter(f"{Fore.CYAN}{Style.BRIGHT}%(message)s", "%H:%M:%S")
     ch.setFormatter(formatter)
     logger.addHandler(ch)
     # Set to info to suppress debug outputs.
@@ -85,9 +83,9 @@ def get_python_logger() -> logging.Logger:
 
 def get_neptune_logger(cfg: Dict) -> neptune.Run:
     """Set up neptune logging."""
-    name = cfg["name"]
-    tags = cfg["neptune_tag"]
-    project = cfg["neptune_project"]
+    name = cfg["logger"]["kwargs"]["name"]
+    tags = cfg["logger"]["kwargs"]["neptune_tag"]
+    project = cfg["logger"]["kwargs"]["neptune_project"]
 
     run = neptune.init_run(name=name, project=project, tags=tags)
 
@@ -99,9 +97,9 @@ def get_neptune_logger(cfg: Dict) -> neptune.Run:
 def get_experiment_path(config: Dict, logger_type: str) -> str:
     """Helper function to create the experiment path."""
     exp_path = (
-        f"{logger_type}/{config['system_name']}/{config['env_name']}/"
-        + f"{config['rware_scenario']['task_name']}/envs_{config['num_envs']}/"
-        + f"seed_{config['seed']}"
+        f"{logger_type}/{config['logger']['system_name']}/{config['env']['env_name']}/"
+        + f"{config['env']['rware_scenario']['task_name']}"
+        + f"/envs_{config['arch']['num_envs']}/seed_{config['system']['seed']}"
     )
 
     return exp_path
