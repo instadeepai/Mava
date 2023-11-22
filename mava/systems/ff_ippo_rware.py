@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import copy
+import time
 from logging import Logger as SacredLogger
 from typing import Any, Dict, Sequence, Tuple
 
@@ -51,7 +52,6 @@ from mava.types import (
 )
 from mava.utils.jax import merge_leading_dims
 from mava.utils.logger_tools import get_sacred_exp
-from mava.utils.timing_utils import TimeIt
 from mava.wrappers.jumanji import AgentIDWrapper, LogWrapper, RwareMultiAgentWrapper
 
 
@@ -541,7 +541,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     config["system"]["num_updates_per_eval"] = (
         config["system"]["num_updates"] // config["arch"]["num_evaluation"]
     )
-    timesteps_per_training = (
+    steps_per_rollout = (
         n_devices
         * config["system"]["num_updates_per_eval"]
         * config["system"]["rollout_length"]
@@ -563,21 +563,22 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     best_params = None
     for i in range(config["arch"]["num_evaluation"]):
         # Train.
-        with TimeIt(
-            tag=("COMPILATION" if i == 0 else "EXECUTION"),
-            environment_steps=timesteps_per_training,
-        ):
-            learner_output = learn(learner_state)
-            jax.block_until_ready(learner_output)
+        start_time = time.time()
+
+        learner_output = learn(learner_state)
+        jax.block_until_ready(learner_output)
 
         # Log the results of the training.
+        elapsed_time = time.time() - start_time
+        learner_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
         log(
             metrics=learner_output,
-            t_env=timesteps_per_training * (i + 1),
+            t_env=steps_per_rollout * (i + 1),
             trainer_metric=True,
         )
 
         # Prepare for evaluation.
+        start_time = time.time()
         trained_params = jax.tree_util.tree_map(
             lambda x: x[:, 0, ...],
             learner_output.learner_state.params.actor_params,  # Select only actor params
@@ -591,9 +592,11 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         jax.block_until_ready(evaluator_output)
 
         # Log the results of the evaluation.
+        elapsed_time = time.time() - start_time
+        evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
         episode_return = log(
             metrics=evaluator_output,
-            t_env=timesteps_per_training * (i + 1),
+            t_env=steps_per_rollout * (i + 1),
         )
         if config["arch"]["absolute_metric"] and max_episode_return <= episode_return:
             best_params = copy.deepcopy(trained_params)
@@ -604,13 +607,20 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
 
     # Measure absolute metric.
     if config["arch"]["absolute_metric"]:
+        start_time = time.time()
+
         rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
         eval_rngs = jnp.stack(eval_rngs)
         eval_rngs = eval_rngs.reshape(n_devices, -1)
+
         evaluator_output = absolute_metric_evaluator(best_params, eval_rngs)
+        jax.block_until_ready(evaluator_output)
+
+        elapsed_time = time.time() - start_time
+        evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
         log(
             metrics=evaluator_output,
-            t_env=timesteps_per_training * (i + 1),
+            t_env=steps_per_rollout * (i + 1),
             absolute_metric=True,
         )
 
