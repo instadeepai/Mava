@@ -1,7 +1,19 @@
-from functools import partial
+# Copyright 2022 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from typing import Callable, Dict, NamedTuple, Sequence, Tuple
 
-import chex
 import distrax
 import flashbax as fbx
 import flax.linen as nn
@@ -10,8 +22,9 @@ import jax.numpy as jnp
 import jumanji
 import optax
 from chex import Array, Numeric, PRNGKey
+from flashbax.buffers.trajectory_buffer import TrajectoryBuffer
+from flashbax.buffers.trajectory_buffer import TrajectoryBufferSample as BufferSample
 from flashbax.buffers.trajectory_buffer import TrajectoryBufferState as BufferState
-from flax.linen.initializers import constant, orthogonal
 from jumanji.wrappers import AutoResetWrapper
 
 from mava.types import ActorApply, CriticApply, LearnerState, Observation
@@ -74,37 +87,28 @@ class OptStates(NamedTuple):
 State = Tuple[LearnerState, BufferState[Transition]]
 
 
-# def critic_loss(critic_params: CriticParams, critic_input: Array, target: Array):
-#     q1 = vmapped_critic(critic_params.first, critic_input).squeeze(axis=-1)
-#     q2 = vmapped_critic(critic_params.second, critic_input).squeeze(axis=-1)
-#     return jnp.mean((target - q1) ** 2) + jnp.mean((target - q2) ** 2)
-#
-#
-# def policy_loss(
-#     policy_params: nn.FrozenDict,
-#     critic_params: CriticParams,
-#     log_alpha: Numeric,
-#     obs: Array,
-#     key: PRNGKey,
-# ):
-#     mean, log_std = vmapped_actor(policy_params, obs)
-#     act, log_prob = sample_action(mean, log_std, key)
-#
-#     critic_input = jnp.concatenate([obs, act], axis=-1)
-#
-#     q1 = vmapped_critic(critic_params.first, critic_input).squeeze(axis=-1)
-#     q2 = vmapped_critic(critic_params.second, critic_input).squeeze(axis=-1)
-#
-#     q = jnp.minimum(q1, q2)
-#
-#     return jnp.mean(jnp.exp(log_alpha) * log_prob.squeeze(axis=-1) - q)
-#
-#
-# def alpha_loss(log_alpha: Numeric, actor_params: nn.FrozenDict, obs: Array, key: PRNGKey):
-#     # todo: do this once! (double work here and in policy_loss)
-#     mean, log_std = vmapped_actor(actor_params, obs)
-#     _, log_prob = sample_action(mean, log_std, key)
-#     return -jnp.exp(log_alpha) * jnp.mean((log_prob + target_entropy))
+class Actor(nn.Module):
+    """Actor Network."""
+
+    action_dim: Sequence[int]
+
+    @nn.compact
+    def __call__(self, observation: Observation) -> distrax.Categorical:
+        """Forward pass."""
+        x = observation.agents_view
+
+        actor_output = nn.Dense(128)(x)
+        actor_output = nn.relu(actor_output)
+        actor_output = nn.Dense(128)(actor_output)
+        actor_output = nn.relu(actor_output)
+        actor_output = nn.Dense(self.action_dim)(actor_output)
+
+        masked_logits = jnp.where(observation.action_mask, actor_output, jnp.finfo(jnp.float32).min)
+        actor_policy = distrax.Categorical(logits=masked_logits)
+
+        return actor_policy
+
+
 #
 #
 # @partial(jax.pmap, axis_name="learner_devices", devices=learner_devices)
@@ -217,17 +221,52 @@ State = Tuple[LearnerState, BufferState[Transition]]
 def get_learner_fn(
     env: jumanji.Environment,
     apply_fns: Tuple[ActorApply, CriticApply],
-    update_fns: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
-    buffer_add: Callable[[BufferState[Transition], Transition], BufferState[Transition]],
+    update_fn: optax.TransformUpdateFn,  # todo: update fn per param?
+    buffer: TrajectoryBuffer,
     config: Dict,
-) -> Callable[[BufferState[Transition], LearnerState], State]:
+) -> Callable[[LearnerState, BufferState[Transition]], State]:
     # Get apply and update functions for actor and critic networks.
     actor_apply_fn, critic_apply_fn = apply_fns
-    actor_update_fn, critic_update_fn = update_fns
 
-    def update(_: int, carry: State) -> LearnerState:
-        learner_state, buffer_state = carry
-        return learner_state, buffer_state
+    n_rollouts = config["rollout_length"]
+    target_entropy = env.action_spec().num_values[0]
+
+    def critic_loss(critic_params: CriticParams, critic_input: Array, target: Array) -> Numeric:
+        q1 = critic_apply_fn(critic_params.first, critic_input).squeeze(axis=-1)
+        q2 = critic_apply_fn(critic_params.second, critic_input).squeeze(axis=-1)
+        return jnp.mean((target - q1) ** 2) + jnp.mean((target - q2) ** 2)
+
+    def policy_loss(
+        policy_params: nn.FrozenDict,
+        critic_params: CriticParams,
+        log_alpha: Numeric,
+        obs: Array,
+        key: PRNGKey,
+    ) -> Numeric:
+        mean, log_std = actor_apply_fn(policy_params, obs)
+        act, log_prob = sample_action(mean, log_std, key)
+
+        critic_input = jnp.concatenate([obs, act], axis=-1)
+
+        q1 = critic_apply_fn(critic_params.first, critic_input).squeeze(axis=-1)
+        q2 = critic_apply_fn(critic_params.second, critic_input).squeeze(axis=-1)
+
+        q = jnp.minimum(q1, q2)
+
+        return jnp.mean(jnp.exp(log_alpha) * log_prob.squeeze(axis=-1) - q)
+
+    def alpha_loss(
+        log_alpha: Numeric, actor_params: nn.FrozenDict, obs: Array, key: PRNGKey
+    ) -> Numeric:
+        # todo: do this once! (double work here and in policy_loss)
+        mean, log_std = actor_apply_fn(actor_params, obs)
+        _, log_prob = sample_action(mean, log_std, key)
+        return -jnp.exp(log_alpha) * jnp.mean((log_prob + target_entropy))
+
+    def update(
+        learner_state: LearnerState, batch: BufferSample[Transition]
+    ) -> Tuple[LearnerState, Dict[str, Array]]:
+        return learner_state, {}
 
     def act(_: int, carry: State) -> State:
         learner_state, buffer_state = carry
@@ -235,11 +274,8 @@ def get_learner_fn(
 
         # SELECT ACTION
         key, policy_key = jax.random.split(learner_state.key)
-        actor_policy = actor_apply_fn(actor_params, learner_state.timestep.observation.agents_view)
-        # todo...
-        # action = actor_policy.sample(seed=policy_key)
-        # log_prob = actor_policy.log_prob(action)
-        action = jnp.zeros((2, 4), dtype=int)
+        actor_policy = actor_apply_fn(actor_params, learner_state.timestep.observation)
+        action = actor_policy.sample(seed=policy_key)
 
         # STEP ENVIRONMENT
         env_state, timestep = jax.vmap(env.step)(learner_state.env_state, action)
@@ -255,32 +291,32 @@ def get_learner_fn(
         transition = Transition(obs=obs, action=action, reward=reward, done=done)
         learner_state = learner_state._replace(env_state=env_state, timestep=timestep, key=key)
         # todo: check if the donate_argnums is preserved here
-        buffer_state = buffer_add(buffer_state, transition)
+        buffer_state = buffer.add(buffer_state, transition)
 
         return learner_state, buffer_state
 
     def act_and_learn(learner_state: LearnerState, buffer_state: BufferState[Transition]) -> State:
         def _act_and_log(_: int, carry: State) -> State:
-            buffer_state, learner_state = carry
-            n_rollouts = config["rollout_length"]
+            learner_state, buffer_state = carry
 
-            learner_state, buffer_state = jax.lax.fori_loop(
-                0, n_rollouts, act, (learner_state, buffer_state)
-            )
-            learner_state, buffer_state = jax.lax.fori_loop(
-                0, n_rollouts, update, (learner_state, buffer_state)
-            )
+            key, sample_key = jax.random.split(learner_state.key)
+            learner_state = learner_state._replace(key=key)
 
-            return buffer_state, learner_state
+            learner_state, buffer_state = jax.lax.fori_loop(0, n_rollouts, act, carry)
+            batches = buffer.sample(buffer_state, sample_key)
+            # todo treemap -> reshape(num_minibatches, ...)
+            learner_state, metrics = jax.lax.scan(update, learner_state, batches)
+
+            return learner_state, buffer_state
 
         return jax.lax.fori_loop(
-            0, config["num_updates"], _act_and_log, (buffer_state, learner_state)
+            0, config["num_updates"], _act_and_log, (learner_state, buffer_state)
         )
 
     return act_and_learn
 
 
-def main():
+def main() -> None:
     key = jax.random.PRNGKey(0)
 
     env = jumanji.make("RobotWarehouse-v0")
@@ -295,10 +331,10 @@ def main():
         "num_envs": 2,
     }
 
-    actor = nn.Dense(env.action_spec().num_values[0])
+    actor = Actor(env.action_spec().num_values[0])
     critic = nn.Dense(1)
     opt = optax.adam(1e-3)
-    buffer = fbx.make_flat_buffer(100_000, 0, 64, add_batch_size=config["num_envs"])
+    buffer = fbx.make_flat_buffer(1_000_000, 0, 64, add_batch_size=config["num_envs"])
 
     dummy_act = env.action_spec().generate_value()
     dummy_obs = env.observation_spec().generate_value()
@@ -311,17 +347,20 @@ def main():
     )
 
     params = Params(
-        actor=actor.init(key, dummy_obs_array),
+        actor=actor.init(key, dummy_obs),
         critic=CriticParams(
             first=critic.init(key, jnp.concatenate([dummy_obs_array, dummy_act], axis=-1)),
             second=critic.init(key, jnp.concatenate([dummy_obs_array, dummy_act], axis=-1)),
         ),
         log_alpha=jnp.zeros(1),
     )
-    opt_states = None
+    opt_states = OptStates(
+        # todo: allow for different optimizers and different learning rates.
+        actor=opt.init(params.actor),
+        critic=opt.init(params.critic.first),
+        alpha=opt.init(params.log_alpha),
+    )
     buffer_state = buffer.init(dummy_transition)
-
-    buffer_add = buffer.add  # jax.jit(buffer.add, donate_argnums=0)
 
     reset_keys = jax.random.split(key)  # todo: num_envs
     state, timestep = jax.vmap(env.reset)(reset_keys)
@@ -333,7 +372,7 @@ def main():
         timestep=timestep,
     )
 
-    learner_fn = get_learner_fn(env, (actor.apply, critic.apply), (None, None), buffer_add, config)
+    learner_fn = get_learner_fn(env, (actor.apply, critic.apply), opt.update, buffer, config)
     learner_fn(learner_state, buffer_state)
 
 
