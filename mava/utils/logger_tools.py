@@ -64,7 +64,7 @@ class Logger:
             self.tb_logger(key, value, t)
 
         if self.use_neptune:
-            self.neptune_logger[key].log(value, step=t, wait=True)
+            self.neptune_logger[key].log(value, step=t)
 
 
 def get_python_logger() -> logging.Logger:
