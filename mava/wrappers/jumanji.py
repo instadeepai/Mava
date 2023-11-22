@@ -43,8 +43,8 @@ class ObservationGlobalState(NamedTuple):
     """
 
     agents_view: chex.Array  # (num_agents, num_obs_features)
-    action_mask: chex.Array  # (num_agents, 5)
-    global_state: chex.Array  # (num_agents * num_obs_features, )
+    action_mask: chex.Array  # (num_agents, num_actions)
+    global_state: chex.Array  # (num_agents, num_agents * num_obs_features, )
     step_count: chex.Array  # (num_agents, )
 
 

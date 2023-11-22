@@ -21,6 +21,8 @@ from jumanji.types import TimeStep
 from optax._src.base import OptState
 from typing_extensions import NamedTuple, TypeAlias
 
+from mava.wrappers.jumanji import LogEnvState
+
 Action: TypeAlias = chex.Array
 Value: TypeAlias = chex.Array
 Done: TypeAlias = chex.Array
@@ -78,7 +80,7 @@ class LearnerState(NamedTuple):
     params: Params
     opt_states: OptStates
     key: chex.PRNGKey
-    env_state: State
+    env_state: LogEnvState
     timestep: TimeStep
 
 
@@ -88,7 +90,7 @@ class RNNLearnerState(NamedTuple):
     params: Params
     opt_states: OptStates
     key: chex.PRNGKey
-    env_state: State
+    env_state: LogEnvState
     timestep: TimeStep
     dones: Done
     hstates: HiddenStates
