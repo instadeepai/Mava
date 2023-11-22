@@ -461,17 +461,16 @@ def get_learner_fn(
                 advantages,
                 targets,
             )
-            batch = jax.tree_util.tree_map(
-                lambda x: x.reshape(
-                    x.shape[0] // config["system"]["recurrent_chunk_size"],
-                    config["system"]["recurrent_chunk_size"],
-                    -1,
-                    *x.shape[2:],
-                ).reshape(config["system"]["recurrent_chunk_size"], -1, *x.shape[2:]),
-                batch,
-            )
             num_recurrent_chunks = (
                 config["system"]["rollout_length"] // config["system"]["recurrent_chunk_size"]
+            )
+            batch = jax.tree_util.tree_map(
+                lambda x: x.reshape(
+                    config["system"]["recurrent_chunk_size"],
+                    config["arch"]["num_envs"] * num_recurrent_chunks,
+                    *x.shape[2:],
+                ),
+                batch,
             )
             permutation = jax.random.permutation(
                 shuffle_rng, config["arch"]["num_envs"] * num_recurrent_chunks
@@ -705,11 +704,19 @@ def learner_setup(
     return learn, actor_network, init_learner_state
 
 
-def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
+def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:  # noqa: CCR001
     """Runs experiment."""
     # Logger setup
     config = copy.deepcopy(_config)
     log = logger_setup(_run, config, _log)
+
+    # Set recurrent chunk size.
+    if config["system"]["recurrent_chunk_size"] is None:
+        config["system"]["recurrent_chunk_size"] = config["system"]["rollout_length"]
+    else:
+        assert (
+            config["system"]["rollout_length"] // config["system"]["recurrent_chunk_size"] == 0
+        ), "Rollout length must be divisible by recurrent chunk size."
 
     # Create envs
     generator = RandomGenerator(**config["env"]["rware_scenario"]["task_config"])
