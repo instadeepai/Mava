@@ -88,7 +88,7 @@ def get_neptune_logger(cfg: Dict) -> neptune.Run:
 
     run = neptune.init_run(project=project, tags=tags)
 
-    run["params"] = stringify_unsupported(cfg)
+    run["config"] = stringify_unsupported(cfg)
 
     return run
 
