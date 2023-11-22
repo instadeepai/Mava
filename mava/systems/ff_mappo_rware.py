@@ -157,11 +157,11 @@ def get_learner_fn(
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             # LOG EPISODE METRICS
-            done, reward = jax.tree_util.tree_map(
+            done = jax.tree_util.tree_map(
                 lambda x: jnp.repeat(x, config["system"]["num_agents"]).reshape(
                     config["arch"]["num_envs"], -1
                 ),
-                (timestep.last(), timestep.reward),
+                timestep.last(),
             )
             info = {
                 "episode_return": env_state.episode_return_info,
@@ -169,7 +169,7 @@ def get_learner_fn(
             }
 
             transition = PPOTransition(
-                done, action, value, reward, log_prob, last_timestep.observation, info
+                done, action, value, timestep.reward, log_prob, last_timestep.observation, info
             )
             learner_state = LearnerState(params, opt_states, rng, env_state, timestep)
             return learner_state, transition
@@ -526,7 +526,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env"]["env_name"], generator=generator)
     eval_env = GlobalStateWrapper(RwareWrapper(eval_env))
-    if config["add_agent_id"]:
+    if config["system"]["add_agent_id"]:
         eval_env = AgentIDWrapper(env=eval_env, has_global_state=True)
 
     # PRNG keys.

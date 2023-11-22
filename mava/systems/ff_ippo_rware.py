@@ -157,7 +157,13 @@ def get_learner_fn(
                 "episode_length": env_state.episode_length_info,
             }
 
-            done = 1 - timestep.discount
+            # done = 1 - timestep.discount
+            done = jax.tree_util.tree_map(
+                lambda x: jnp.repeat(x, config["system"]["num_agents"]).reshape(
+                    config["arch"]["num_envs"], -1
+                ),
+                timestep.last(),
+            )
             transition = PPOTransition(
                 done, action, value, timestep.reward, log_prob, last_timestep.observation, info
             )

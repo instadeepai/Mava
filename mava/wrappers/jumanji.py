@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, NamedTuple, Tuple, Union
+from typing import Tuple, Union
 
 import chex
 import jax.numpy as jnp
@@ -22,42 +22,7 @@ from jumanji.environments.routing.robot_warehouse import RobotWarehouse, State
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
 
-from mava.types import Observation
-
-if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
-    from dataclasses import dataclass
-else:
-    from flax.struct import dataclass
-
-
-class ObservationGlobalState(NamedTuple):
-    """The observation that the agent sees.
-    agents_view: the agents' view of other agents and shelves within their
-        sensor range. The number of features in the observation array
-        depends on the sensor range of the agent.
-    action_mask: boolean array specifying, for each agent, which action
-        (up, right, down, left) is legal.
-    global_state: the global state of the environment, which is the
-        concatenation of the agents' views.
-    step_count: the number of steps elapsed since the beginning of the episode.
-    """
-
-    agents_view: chex.Array  # (num_agents, num_obs_features)
-    action_mask: chex.Array  # (num_agents, num_actions)
-    global_state: chex.Array  # (num_agents, num_agents * num_obs_features, )
-    step_count: chex.Array  # (num_agents, )
-
-
-@dataclass
-class LogEnvState:
-    """State of the `LogWrapper`."""
-
-    env_state: State
-    episode_returns: chex.Numeric
-    episode_lengths: chex.Numeric
-    # Information about the episode return and length for logging purposes.
-    episode_return_info: chex.Numeric
-    episode_length_info: chex.Numeric
+from mava.types import LogEnvState, Observation, ObservationGlobalState
 
 
 class LogWrapper(Wrapper):
@@ -186,8 +151,10 @@ class RwareWrapper(Wrapper):
             step_count=jnp.repeat(timestep.observation.step_count, n_agents),
         )
         reward = jnp.repeat(timestep.reward, n_agents)
-        discount = jnp.repeat(timestep.discount, n_agents)
-        return timestep.replace(observation=observation, reward=reward, discount=discount)
+        # discount = jnp.repeat(timestep.discount, n_agents)
+        # -> we won't need this if we'll use the timestep.last() for the 'done'
+        # variable during training.
+        return timestep.replace(observation=observation, reward=reward)
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment. Updates the step count."""

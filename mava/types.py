@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, Generic, Optional, Tuple, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Optional, Tuple, TypeVar
 
 import chex
 from distrax import Distribution
@@ -21,13 +21,16 @@ from jumanji.types import TimeStep
 from optax._src.base import OptState
 from typing_extensions import NamedTuple, TypeAlias
 
-from mava.wrappers.jumanji import LogEnvState
+if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
+    from dataclasses import dataclass
+else:
+    from flax.struct import dataclass
+
 
 Action: TypeAlias = chex.Array
 Value: TypeAlias = chex.Array
 Done: TypeAlias = chex.Array
 HiddenState: TypeAlias = chex.Array
-
 # Can't know the exact type of State.
 State: TypeAlias = Any
 
@@ -38,7 +41,37 @@ class Observation(NamedTuple):
     step_count: chex.Numeric
 
 
-RnnObservation: TypeAlias = Tuple[Observation, Done]
+class ObservationGlobalState(NamedTuple):
+    """The observation that the agent sees.
+    agents_view: the agents' view of other agents and shelves within their
+        sensor range. The number of features in the observation array
+        depends on the sensor range of the agent.
+    action_mask: boolean array specifying, for each agent, which action
+        (up, right, down, left) is legal.
+    global_state: the global state of the environment, which is the
+        concatenation of the agents' views.
+    step_count: the number of steps elapsed since the beginning of the episode.
+    """
+
+    agents_view: chex.Array  # (num_agents, num_obs_features)
+    action_mask: chex.Array  # (num_agents, num_actions)
+    global_state: chex.Array  # (num_agents, num_agents * num_obs_features, )
+    step_count: chex.Array  # (num_agents, )
+
+
+@dataclass
+class LogEnvState:
+    """State of the `LogWrapper`."""
+
+    env_state: State
+    episode_returns: chex.Numeric
+    episode_lengths: chex.Numeric
+    # Information about the episode return and length for logging purposes.
+    episode_return_info: chex.Numeric
+    episode_length_info: chex.Numeric
+
+
+RnnObservation: TypeAlias = Tuple[ObservationGlobalState, Done]
 
 
 class PPOTransition(NamedTuple):

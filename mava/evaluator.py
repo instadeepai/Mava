@@ -233,7 +233,7 @@ def get_rnn_evaluator_fn(
             dones=dones,
             hstate=init_hstate,
             step_count_=0,
-            return_=0.0,
+            return_=jnp.zeros_like(timesteps.reward),
         )
 
         eval_metrics = jax.vmap(

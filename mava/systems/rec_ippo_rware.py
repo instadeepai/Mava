@@ -229,11 +229,11 @@ def get_learner_fn(
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             # log episode return and length
-            done, reward = jax.tree_util.tree_map(
+            done = jax.tree_util.tree_map(
                 lambda x: jnp.repeat(x, config["system"]["num_agents"]).reshape(
                     config["arch"]["num_envs"], -1
                 ),
-                (timestep.last(), timestep.reward),
+                timestep.last(),
             )
             info = {
                 "episode_return": env_state.episode_return_info,
@@ -241,7 +241,7 @@ def get_learner_fn(
             }
 
             transition = PPOTransition(
-                done, action, value, reward, log_prob, last_timestep.observation, info
+                done, action, value, timestep.reward, log_prob, last_timestep.observation, info
             )
             hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
             learner_state = RNNLearnerState(
