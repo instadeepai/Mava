@@ -118,9 +118,7 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
     return log
 
 
-def logger_setup(
-    config: Dict,
-) -> LogFn:
+def logger_setup(config: Dict) -> LogFn:
     """Setup the logger."""
     logger = Logger(config)
     return get_logger_tools(logger)
