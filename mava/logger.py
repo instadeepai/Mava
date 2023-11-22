@@ -126,10 +126,10 @@ def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> LogFn:
     """Setup the logger."""
     logger = Logger(_log)
     unique_token = f"{datetime.datetime.now()}"
-    if config["use_sacred"]:
+    if config["logger"]["use_sacred"]:
         logger.setup_sacred(_run)
-    if config["use_tf"]:
+    if config["logger"]["use_tf"]:
         exp_path = get_experiment_path(config, "tensorboard")
-        tb_logs_path = os.path.join(config["base_exp_path"], f"{exp_path}/{unique_token}")
+        tb_logs_path = os.path.join(config["logger"]["base_exp_path"], f"{exp_path}/{unique_token}")
         logger.setup_tb(tb_logs_path)
     return get_logger_tools(logger, config)

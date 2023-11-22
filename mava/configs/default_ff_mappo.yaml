@@ -1,0 +1,5 @@
+defaults:
+  - logger: ff_mappo
+  - arch: anakin
+  - system: ff_mappo
+  - env: rware
