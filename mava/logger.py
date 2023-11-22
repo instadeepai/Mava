@@ -16,7 +16,7 @@
 import datetime
 import os
 from logging import Logger as SacredLogger
-from typing import Callable, Dict
+from typing import Dict, Protocol
 
 import jax.numpy as jnp
 import numpy as np
@@ -27,7 +27,19 @@ from mava.types import ExperimentOutput
 from mava.utils.logger_tools import Logger, get_experiment_path, should_log
 
 
-def get_logger_tools(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
+# Not in types.py because we only use it here.
+class LogFn(Protocol):
+    def __call__(
+        self,
+        metrics: ExperimentOutput,
+        t_env: int = 0,
+        trainer_metric: bool = False,
+        absolute_metric: bool = False,
+    ) -> float:
+        ...
+
+
+def get_logger_tools(logger: Logger, config: Dict) -> LogFn:  # noqa: CCR001
     """Get the logger function."""
 
     def log(
@@ -114,14 +126,14 @@ def get_logger_tools(logger: Logger, config: Dict) -> Callable:  # noqa: CCR001
     return log
 
 
-def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> Callable:
+def logger_setup(_run: Run, config: Dict, _log: SacredLogger) -> LogFn:
     """Setup the logger."""
     logger = Logger(_log)
     unique_token = f"{datetime.datetime.now()}"
-    if config["use_sacred"]:
+    if config["logger"]["use_sacred"]:
         logger.setup_sacred(_run)
-    if config["use_tf"]:
+    if config["logger"]["use_tf"]:
         exp_path = get_experiment_path(config, "tensorboard")
-        tb_logs_path = os.path.join(config["base_exp_path"], f"{exp_path}/{unique_token}")
+        tb_logs_path = os.path.join(config["logger"]["base_exp_path"], f"{exp_path}/{unique_token}")
         logger.setup_tb(tb_logs_path)
     return get_logger_tools(logger, config)

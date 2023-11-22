@@ -1,0 +1,5 @@
+defaults:
+  - logger: rec_ippo
+  - arch: anakin
+  - system: rec_ippo
+  - env: rware

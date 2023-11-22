@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import chex
 import flax.linen as nn
@@ -21,12 +21,19 @@ import jax.numpy as jnp
 from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
 
-from mava.types import EvalState, ExperimentOutput, RNNEvalState
+from mava.types import (
+    ActorApply,
+    EvalFn,
+    EvalState,
+    ExperimentOutput,
+    RecActorApply,
+    RNNEvalState,
+)
 
 
 def get_ff_evaluator_fn(
-    env: Environment, apply_fn: Callable, config: dict, eval_multiplier: int = 1
-) -> Callable:
+    env: Environment, apply_fn: ActorApply, config: dict, eval_multiplier: int = 1
+) -> EvalFn:
     """Get the evaluator function for feedforward networks.
 
     Args:
@@ -53,7 +60,7 @@ def get_ff_evaluator_fn(
             rng, _rng = jax.random.split(rng)
             pi = apply_fn(params, last_timestep.observation)
 
-            if config["evaluation_greedy"]:
+            if config["arch"]["evaluation_greedy"]:
                 action = pi.mode()
             else:
                 action = pi.sample(seed=_rng)
@@ -73,34 +80,21 @@ def get_ff_evaluator_fn(
             is_not_done: bool = ~timestep.last()
             return is_not_done
 
-        eval_state = EvalState(
-            init_eval_state.key,
-            init_eval_state.env_state,
-            init_eval_state.timestep,
-            0,
-            0.0,
-        )
+        final_state = jax.lax.while_loop(not_done, _env_step, init_eval_state)
 
-        final_state = jax.lax.while_loop(
-            not_done,
-            _env_step,
-            eval_state,
-        )
-
-        step_count_, return_ = final_state.step_count_, final_state.return_
         eval_metrics = {
-            "episode_return": return_,
-            "episode_length": step_count_,
+            "episode_return": final_state.return_,
+            "episode_length": final_state.step_count_,
         }
         return eval_metrics
 
-    def evaluator_fn(trained_params: FrozenDict, rng: chex.PRNGKey) -> ExperimentOutput:
+    def evaluator_fn(trained_params: FrozenDict, rng: chex.PRNGKey) -> ExperimentOutput[EvalState]:
         """Evaluator function."""
 
         # Initialise environment states and timesteps.
         n_devices = len(jax.devices())
 
-        eval_batch = (config["num_eval_episodes"] // n_devices) * eval_multiplier
+        eval_batch = (config["arch"]["num_eval_episodes"] // n_devices) * eval_multiplier
 
         rng, *env_rngs = jax.random.split(rng, eval_batch + 1)
         env_states, timesteps = jax.vmap(env.reset)(
@@ -109,28 +103,27 @@ def get_ff_evaluator_fn(
         # Split rngs for each core.
         rng, *step_rngs = jax.random.split(rng, eval_batch + 1)
         # Add dimension to pmap over.
-        reshape_step_rngs = lambda x: x.reshape(eval_batch, -1)
-        step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
+        step_rngs = jnp.stack(step_rngs).reshape(eval_batch, -1)
 
-        eval_state = EvalState(step_rngs, env_states, timesteps)
-        eval_metrics = jax.vmap(eval_one_episode, in_axes=(None, 0), axis_name="eval_batch")(
-            trained_params, eval_state
-        )
+        eval_state = EvalState(step_rngs, env_states, timesteps, 0, 0.0)
+        eval_metrics = jax.vmap(
+            eval_one_episode,
+            in_axes=(None, EvalState(0, 0, 0, None, None)),
+            axis_name="eval_batch",
+        )(trained_params, eval_state)
 
-        return ExperimentOutput(
-            episodes_info=eval_metrics,
-        )
+        return ExperimentOutput(episodes_info=eval_metrics, learner_state=eval_state)
 
     return evaluator_fn
 
 
 def get_rnn_evaluator_fn(
     env: Environment,
-    apply_fn: Callable,
+    apply_fn: RecActorApply,
     config: dict,
     scanned_rnn: nn.Module,
     eval_multiplier: int = 1,
-) -> Callable:
+) -> EvalFn:
     """Get the evaluator function for recurrent networks."""
 
     def eval_one_episode(params: FrozenDict, init_eval_state: RNNEvalState) -> Dict:
@@ -163,7 +156,7 @@ def get_rnn_evaluator_fn(
             # Run the network.
             hstate, pi = apply_fn(params, hstate, ac_in)
 
-            if config["evaluation_greedy"]:
+            if config["arch"]["evaluation_greedy"]:
                 action = pi.mode()
             else:
                 action = pi.sample(seed=policy_rng)
@@ -178,7 +171,7 @@ def get_rnn_evaluator_fn(
                 rng,
                 env_state,
                 timestep,
-                jnp.repeat(timestep.last(), config["num_agents"]),
+                jnp.repeat(timestep.last(), config["system"]["num_agents"]),
                 hstate,
                 step_count_,
                 return_,
@@ -191,58 +184,42 @@ def get_rnn_evaluator_fn(
             is_not_done: bool = ~timestep.last()
             return is_not_done
 
-        eval_state = RNNEvalState(
-            init_eval_state.key,
-            init_eval_state.env_state,
-            init_eval_state.timestep,
-            init_eval_state.dones,
-            init_eval_state.hstate,
-            0,
-            0.0,
-        )
+        final_state = jax.lax.while_loop(not_done, _env_step, init_eval_state)
 
-        final_state = jax.lax.while_loop(
-            not_done,
-            _env_step,
-            eval_state,
-        )
-
-        step_count_, return_ = final_state.step_count_, final_state.return_
         eval_metrics = {
-            "episode_return": return_,
-            "episode_length": step_count_,
+            "episode_return": final_state.return_,
+            "episode_length": final_state.step_count_,
         }
         return eval_metrics
 
-    def evaluator_fn(trained_params: FrozenDict, rng: chex.PRNGKey) -> ExperimentOutput:
+    def evaluator_fn(
+        trained_params: FrozenDict, rng: chex.PRNGKey
+    ) -> ExperimentOutput[RNNEvalState]:
         """Evaluator function."""
 
         # Initialise environment states and timesteps.
         n_devices = len(jax.devices())
 
-        eval_batch = config["num_eval_episodes"] // n_devices * eval_multiplier
+        eval_batch = config["arch"]["num_eval_episodes"] // n_devices * eval_multiplier
 
         rng, *env_rngs = jax.random.split(rng, eval_batch + 1)
-        env_states, timesteps = jax.vmap(env.reset)(
-            jnp.stack(env_rngs),
-        )
+        env_states, timesteps = jax.vmap(env.reset)(jnp.stack(env_rngs))
         # Split rngs for each core.
         rng, *step_rngs = jax.random.split(rng, eval_batch + 1)
         # Add dimension to pmap over.
-        reshape_step_rngs = lambda x: x.reshape(eval_batch, -1)
-        step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
+        step_rngs = jnp.stack(step_rngs).reshape(eval_batch, -1)
 
         # Initialise hidden state.
         init_hstate = scanned_rnn.initialize_carry(eval_batch, 128)
         init_hstate = jnp.expand_dims(init_hstate, axis=1)
         init_hstate = jnp.expand_dims(init_hstate, axis=2)
-        init_hstate = jnp.tile(init_hstate, (1, config["num_agents"], 1))
+        init_hstate = jnp.tile(init_hstate, (1, config["system"]["num_agents"], 1))
 
         # Initialise dones.
         dones = jnp.zeros(
             (
                 eval_batch,
-                config["num_agents"],
+                config["system"]["num_agents"],
             ),
             dtype=bool,
         )
@@ -253,14 +230,19 @@ def get_rnn_evaluator_fn(
             timestep=timesteps,
             dones=dones,
             hstate=init_hstate,
+            step_count_=0,
+            return_=0.0,
         )
 
-        eval_metrics = jax.vmap(eval_one_episode, in_axes=(None, 0), axis_name="eval_batch")(
-            trained_params, eval_state
-        )
+        eval_metrics = jax.vmap(
+            eval_one_episode,
+            in_axes=(None, RNNEvalState(0, 0, 0, 0, 0, None, None)),
+            axis_name="eval_batch",
+        )(trained_params, eval_state)
 
         return ExperimentOutput(
             episodes_info=eval_metrics,
+            learner_state=eval_state,
         )
 
     return evaluator_fn
@@ -273,14 +255,16 @@ def evaluator_setup(
     params: FrozenDict,
     config: Dict,
     use_recurrent_net: bool = False,
-    scanned_rnn: nn.Module = None,
-) -> Tuple[Callable, Callable, Tuple]:
+    scanned_rnn: Optional[nn.Module] = None,
+) -> Tuple[EvalFn, EvalFn, Tuple[FrozenDict, chex.Array]]:
     """Initialise evaluator_fn."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
 
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
+        assert scanned_rnn is not None
+
         vmapped_eval_network_apply_fn = jax.vmap(
             network.apply, in_axes=(None, 1, (2, None)), out_axes=(1, 2)
         )
