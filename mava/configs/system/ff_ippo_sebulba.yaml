@@ -1,0 +1,35 @@
+seed: 1
+
+env_id: "rware" # the id of the environment
+total_timesteps: 3000000 # total timesteps of the experiments
+num_steps: 128 # the number of steps to run in each environment per policy rollout
+anneal_lr: True # Toggle learning rate annealing for policy and value networks
+gamma: 0.99 # the discount factor gamma
+gae_lambda: 0.95 # the lambda for the general advantage estimation
+num_minibatches:  4 # the number of mini-batches
+gradient_accumulation_steps:  1 # the number of gradient accumulation steps
+  # before performing an optimization step
+update_epochs: 4 # the k epochs to update the policy
+norm_adv: True # toggles advantages normalization
+clip_coef: 0.1 # the surrogate clipping coefficient
+ent_coef: 0.01 # coefficient of the entropy in the ppo loss
+vf_coef: 0.5 # coefficient of the value function in the ppo loss
+max_grad_norm: 5.0 # the maximum norm for the gradient clipping
+actor_lr: 0.0001414213562373095 # the learning rate of the actor optimizer
+critic_lr: 0.0001414213562373095 # the learning rate of the critic optimizer
+use_team_reward: True
+# runtime arguments to be filled in
+num_agents: ~ # num agents in the env
+num_actions: ~ # num actions per agent
+single_obs_dim: ~ # obs dim per agent
+local_batch_size: ~ # the size of the full batch per learner device
+local_minibatch_size: ~ # the size of each minibatch per learner device
+num_envs: ~ # number of envs across the world
+  # (local_n_envs * len(actor_device_ids) * n_threads_per_actor * world_size)
+batch_size: ~ # batch size across the world
+minibatch_size: ~ # minibatch size across the world
+num_updates: ~ # total number of learner steps to do
+  # eg. each update in ppo will be num_epochs * num_minibatches
+global_learner_devices: ~ # all learner devices across the world
+actor_devices: ~ # all actor devices
+learner_devices: ~ # all learner devices

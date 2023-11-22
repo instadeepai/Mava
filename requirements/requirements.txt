@@ -10,4 +10,5 @@ numpy
 omegaconf
 optax
 protobuf~=3.20
+rware @ git+https://github.com/RuanJohn/robotic-warehouse
 tensorboard_logger

@@ -1,0 +1,5 @@
+defaults:
+  - logger: ff_ippo_sebulba
+  - arch: sebulba
+  - system: ff_ippo_sebulba
+  - env: rware_gym
