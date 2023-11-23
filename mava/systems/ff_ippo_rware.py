@@ -14,7 +14,6 @@
 
 import copy
 import time
-from logging import Logger as SacredLogger
 from typing import Any, Dict, Sequence, Tuple
 
 import chex
@@ -35,7 +34,6 @@ from jumanji.wrappers import AutoResetWrapper
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
-from sacred import run
 
 from mava.evaluator import evaluator_setup
 from mava.logger import logger_setup
@@ -51,7 +49,6 @@ from mava.types import (
     PPOTransition,
 )
 from mava.utils.jax import merge_leading_dims
-from mava.utils.logger_tools import get_sacred_exp
 from mava.wrappers.jumanji import AgentIDWrapper, LogWrapper, RwareWrapper
 
 
@@ -499,11 +496,11 @@ def learner_setup(
     return learn, actor_network, init_learner_state
 
 
-def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
+def run_experiment(_config: Dict) -> None:
     """Runs experiment."""
     # Logger setup
     config = copy.deepcopy(_config)
-    log = logger_setup(_run, config, _log)
+    log = logger_setup(config)
 
     # Create envs
     generator = RandomGenerator(**config["env"]["rware_scenario"]["task_config"])
@@ -631,11 +628,8 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     # Convert config to python dict.
     cfg: Dict = OmegaConf.to_container(cfg, resolve=True)
 
-    ex = get_sacred_exp(cfg, "ff_ippo_rware")
-
     # Run experiment.
-    ex.main(run_experiment)
-    ex.run(config_updates={})
+    run_experiment(cfg)
 
     print(f"{Fore.CYAN}{Style.BRIGHT}IPPO experiment completed{Style.RESET_ALL}")
 

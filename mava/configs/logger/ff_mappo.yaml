@@ -7,4 +7,3 @@ system_name: ff_mappo
 kwargs:
   neptune_project: Instadeep/Mava
   neptune_tag: [ff-mappo, rware]
-  name: ff-mappo
