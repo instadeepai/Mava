@@ -7,4 +7,3 @@ system_name: rec_ippo
 kwargs:
   neptune_project: Instadeep/Mava
   neptune_tag: [rec-ippo, rware]
-  name: rec-ippo
