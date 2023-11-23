@@ -152,7 +152,12 @@ def get_learner_fn(
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             # LOG EPISODE METRICS
-            done = 1 - timestep.discount
+            done = jax.tree_util.tree_map(
+                lambda x: jnp.repeat(x, config["system"]["num_agents"]).reshape(
+                    config["arch"]["num_envs"], -1
+                ),
+                timestep.last(),
+            )
             info = {
                 "episode_return": env_state.episode_return_info,
                 "episode_length": env_state.episode_length_info,

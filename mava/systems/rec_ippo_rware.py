@@ -229,7 +229,12 @@ def get_learner_fn(
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             # log episode return and length
-            done = 1 - timestep.discount
+            done = jax.tree_util.tree_map(
+                lambda x: jnp.repeat(x, config["system"]["num_agents"]).reshape(
+                    config["arch"]["num_envs"], -1
+                ),
+                timestep.last(),
+            )
             info = {
                 "episode_return": env_state.episode_return_info,
                 "episode_length": env_state.episode_length_info,
@@ -581,7 +586,7 @@ def learner_setup(
         init_obs,
     )
     init_obs = jax.tree_util.tree_map(lambda x: x[None, ...], init_obs)
-    init_done = jnp.zeros((1, config["arch"]["num_envs"]), dtype=float)
+    init_done = jnp.zeros((1, config["arch"]["num_envs"]), dtype=bool)
     init_x = (init_obs, init_done)
 
     # Initialise hidden states.
@@ -658,7 +663,7 @@ def learner_setup(
             config["arch"]["num_envs"],
             config["system"]["num_agents"],
         ),
-        dtype=float,
+        dtype=bool,
     )
     hstates = HiddenStates(policy_hstates, critic_hstates)
     params = Params(actor_params, critic_params)
