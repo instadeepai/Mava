@@ -135,23 +135,19 @@ def get_experiment_path(config: Dict, logger_type: str) -> str:
 
 class JsonWriter:
     """
-    Writer to create json files for reporting according to marl-eval
+    Writer to create json files for reporting experiment results according to marl-eval
 
     Follows conventions from https://github.com/instadeepai/marl-eval/tree/main#usage-
+    This writer was adapted from the implementation found in BenchMARL. For the original
+    implementation please see https://tinyurl.com/2t6fy548
 
     Args:
         path (str): where to write the file
         algorithm_name (str): algorithm name
         task_name (str): task name
         environment_name (str): environment name
-        seed (int): seed of the experiment
-
+        seed (int): random seed of the experiment
     """
-
-    # TODO(Ruan): Works at the moment and pipes through. But some fixes are still needed. The
-    # algorithm name needs to be properly set and the json logger needs a different path so that
-    # all seeds from the same exp will log to the same json file. Might be worth keeping this
-    # sepearate for now for incase we have distributed experiments.
 
     def __init__(
         self,
@@ -167,7 +163,7 @@ class JsonWriter:
         self.data = {
             environment_name: {task_name: {algorithm_name: {f"seed_{seed}": self.run_data}}}
         }
-        # Create the direcotry if it doesn't exist
+        # Create the logging directory if it doesn't exist
         os.makedirs(self.path, exist_ok=True)
 
         # Create the file if it doesn't exist
@@ -182,15 +178,13 @@ class JsonWriter:
         evaluation_step: Optional[int],
     ) -> None:
         """
-        Writes a step into the json reporting file
+        Writes a step to the json reporting file
 
         Args:
-            total_frames (int): total frames collected so far in the experiment
-            metrics (dictionary mapping str to tensor): each value is a 1-dim tensor for the metric
-                in key of len equal to the number of evaluation episodes for this step.
+            timestep (int): the current environment timestep
+            key (str): the metric that should be logged
+            value (str): the value of the metric that should be logged
             evaluation_step (int): the evaluation step
-            is_absolute_metric (bool): whether the metric is an absolute metric.
-
         """
 
         logging_prefix, *metric_key = key.split("/")
@@ -200,7 +194,6 @@ class JsonWriter:
 
         if logging_prefix == "evaluator":
             step_metrics = {"step_count": timestep}
-            # TODO(Ruan): fix the ignore here
             step_metrics.update(metrics)  # type: ignore
             step_str = f"step_{evaluation_step}"
             if step_str in self.run_data:
