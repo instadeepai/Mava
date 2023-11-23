@@ -53,8 +53,8 @@ class Logger:
     def _setup_tb(self, cfg: Dict) -> None:
         """Set up tensorboard logging."""
         unique_token = f"{datetime.datetime.now()}"
-        exp_path = get_experiment_path(cfg, "tensorboard")
-        tb_logs_path = os.path.join(cfg["logger"]["base_exp_path"], f"{exp_path}/{unique_token}")
+        tb_exp_path = get_experiment_path(cfg, "tensorboard")
+        tb_logs_path = os.path.join(cfg["logger"]["base_exp_path"], f"{tb_exp_path}/{unique_token}")
 
         configure(tb_logs_path)
         self.tb_logger = log_value
@@ -64,14 +64,17 @@ class Logger:
         self.neptune_logger = get_neptune_logger(cfg)
 
     def _setup_json(self, cfg: Dict) -> None:
+        unique_token = f"{datetime.datetime.now()}"
         json_exp_path = get_experiment_path(cfg, "json")
-        json_logs_path = os.path.join(cfg["base_exp_path"], json_exp_path)
+        json_logs_path = os.path.join(
+            cfg["logger"]["base_exp_path"], f"{json_exp_path}/{unique_token}"
+        )
         self.json_logger = JsonWriter(
             path=json_logs_path,
-            algorithm_name=cfg["name"],
-            task_name=cfg["rware_scenario"]["task_name"],
-            environment_name=cfg["env_name"],
-            seed=cfg["seed"],
+            algorithm_name=cfg["logger"]["system_name"],
+            task_name=cfg["env"]["rware_scenario"]["task_name"],
+            environment_name=cfg["env"]["env_name"],
+            seed=cfg["system"]["seed"],
         )
 
     def log_stat(self, key: str, value: float, t: int, eval_step: Optional[int] = None) -> None:
