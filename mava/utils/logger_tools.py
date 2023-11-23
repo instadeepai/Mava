@@ -84,7 +84,14 @@ class Logger:
         t: int,
         eval_step: Optional[int] = None,
     ) -> None:
-        """Log a single stat."""
+        """Log a single stat.
+
+        Args:
+            key (str): the metric that should be logged
+            value (str): the value of the metric that should be logged
+            t (int): the current environment timestep
+            eval_step (int): the count of the current evaluation.
+        """
 
         if self.use_tb:
             self.tb_logger(key, value, t)

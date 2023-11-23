@@ -50,9 +50,10 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
 
         Args:
             metrics (Dict): The metrics info.
-            t_env (int): The current timestep.
+            t_env (int): The current environment timestep.
             trainer_metric (bool): Whether to log the trainer metric.
             absolute_metric (bool): Whether to log the absolute metric.
+            eval_step (int): The count of the current evaluation.
         """
         if absolute_metric:
             prefix = "absolute/"
