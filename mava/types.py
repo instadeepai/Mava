@@ -55,8 +55,8 @@ class RNNPPOTransition(NamedTuple):
     reward: chex.Array
     log_prob: chex.Array
     obs: chex.Array
-    policy_hidden_state: chex.Array
-    critic_hidden_state: chex.Array
+    policy_hidden_state: HiddenState
+    critic_hidden_state: HiddenState
     info: Dict
 
 
