@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
 import json
 import logging
 import os
@@ -20,6 +21,7 @@ from typing import Dict, Optional
 import neptune
 from colorama import Fore, Style
 from neptune.utils import stringify_unsupported
+from tensorboard_logger import configure, log_value
 
 
 class Logger:
@@ -32,34 +34,44 @@ class Logger:
 
     def __init__(self, cfg: Dict) -> None:
         """Initialise the logger."""
-        self.cfg = cfg
         self.console_logger = get_python_logger()
 
-        self.use_tb = False
-        self.use_neptune = False
+        if cfg["logger"]["use_tf"]:
+            self._setup_tb(cfg)
+        if cfg["logger"]["use_neptune"]:
+            self._setup_neptune(cfg)
+        if cfg["logger"]["use_json"]:
+            self._setup_json(cfg)
 
-    def setup_tb(self, directory_name: str) -> None:
+        self.use_tb = cfg["logger"]["use_tf"]
+        self.use_neptune = cfg["logger"]["use_neptune"]
+        self.use_json = cfg["logger"]["use_json"]
+        self.should_log = bool(
+            cfg["logger"]["use_json"] or cfg["logger"]["use_tf"] or cfg["logger"]["use_neptune"]
+        )
+
+    def _setup_tb(self, cfg: Dict) -> None:
         """Set up tensorboard logging."""
-        # Import here so it doesn't have to be installed if you don't use it
-        from tensorboard_logger import configure, log_value
+        unique_token = f"{datetime.datetime.now()}"
+        exp_path = get_experiment_path(cfg, "tensorboard")
+        tb_logs_path = os.path.join(cfg["logger"]["base_exp_path"], f"{exp_path}/{unique_token}")
 
-        configure(directory_name)
+        configure(tb_logs_path)
         self.tb_logger = log_value
-        self.use_tb = True
 
-    def setup_neptune(self) -> None:
+    def _setup_neptune(self, cfg: Dict) -> None:
         """Set up neptune logging."""
-        self.use_neptune = True
-        self.neptune_logger = get_neptune_logger(self.cfg)
+        self.neptune_logger = get_neptune_logger(cfg)
 
-    def setup_json(self, directory_name: str) -> None:
-        self.use_json = True
+    def _setup_json(self, cfg: Dict) -> None:
+        json_exp_path = get_experiment_path(cfg, "json")
+        json_logs_path = os.path.join(cfg["base_exp_path"], json_exp_path)
         self.json_logger = JsonWriter(
-            path=directory_name,
-            algorithm_name=self.cfg["name"],
-            task_name=self.cfg["rware_scenario"]["task_name"],
-            environment_name=self.cfg["env_name"],
-            seed=self.cfg["seed"],
+            path=json_logs_path,
+            algorithm_name=cfg["name"],
+            task_name=cfg["rware_scenario"]["task_name"],
+            environment_name=cfg["env_name"],
+            seed=cfg["seed"],
         )
 
     def log_stat(self, key: str, value: float, t: int, eval_step: Optional[int] = None) -> None:
@@ -69,15 +81,10 @@ class Logger:
             self.tb_logger(key, value, t)
 
         if self.use_neptune:
-            self.neptune_logger[key].log(value, step=t, wait=True)
+            self.neptune_logger[key].log(value, step=t)
 
         if self.use_json and (eval_step is not None):
             self.json_logger.write(t, key, value, eval_step)
-
-
-def should_log(config: Dict) -> bool:
-    """Check if the logger should log."""
-    return bool(config["use_tf"] or config["use_neptune"] or config["use_json"])
 
 
 def get_python_logger() -> logging.Logger:
@@ -85,9 +92,7 @@ def get_python_logger() -> logging.Logger:
     logger = logging.getLogger()
     logger.handlers = []
     ch = logging.StreamHandler()
-    formatter = logging.Formatter(
-        f"{Fore.CYAN}{Style.BRIGHT}%(message)s{Style.RESET_ALL}", "%H:%M:%S"
-    )
+    formatter = logging.Formatter(f"{Fore.CYAN}{Style.BRIGHT}%(message)s", "%H:%M:%S")
     ch.setFormatter(formatter)
     logger.addHandler(ch)
     # Set to info to suppress debug outputs.
@@ -98,14 +103,12 @@ def get_python_logger() -> logging.Logger:
 
 def get_neptune_logger(cfg: Dict) -> neptune.Run:
     """Set up neptune logging."""
-    name = cfg["name"]
-    tags = cfg["neptune_tag"]
-    project = cfg["neptune_project"]
+    tags = cfg["logger"]["kwargs"]["neptune_tag"]
+    project = cfg["logger"]["kwargs"]["neptune_project"]
 
-    run = neptune.init_run(name=name, project=project, tags=tags)
+    run = neptune.init_run(project=project, tags=tags)
 
-    del cfg["neptune_tag"]  # neptune doesn't want lists in run params
-    run["params"] = stringify_unsupported(cfg)
+    run["config"] = stringify_unsupported(cfg)
 
     return run
 
@@ -113,9 +116,9 @@ def get_neptune_logger(cfg: Dict) -> neptune.Run:
 def get_experiment_path(config: Dict, logger_type: str) -> str:
     """Helper function to create the experiment path."""
     exp_path = (
-        f"{logger_type}/{config['system_name']}/{config['env_name']}/"
-        + f"{config['rware_scenario']['task_name']}/envs_{config['num_envs']}/"
-        + f"seed_{config['seed']}"
+        f"{logger_type}/{config['logger']['system_name']}/{config['env']['env_name']}/"
+        + f"{config['env']['rware_scenario']['task_name']}"
+        + f"/envs_{config['arch']['num_envs']}/seed_{config['system']['seed']}"
     )
 
     return exp_path
