@@ -45,6 +45,7 @@ from mava.types import (
     LearnerFn,
     LearnerState,
     Observation,
+    ObservationGlobalState,
     OptStates,
     Params,
     PPOTransition,
@@ -55,7 +56,6 @@ from mava.wrappers.jumanji import (
     AgentIDWrapper,
     GlobalStateWrapper,
     LogWrapper,
-    ObservationGlobalState,
     RwareWrapper,
 )
 
@@ -157,12 +157,7 @@ def get_learner_fn(
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             # LOG EPISODE METRICS
-            done = jax.tree_util.tree_map(
-                lambda x: jnp.repeat(x, config["system"]["num_agents"]).reshape(
-                    config["arch"]["num_envs"], -1
-                ),
-                timestep.last(),
-            )
+            done = 1 - timestep.discount
             info = {
                 "episode_return": env_state.episode_return_info,
                 "episode_length": env_state.episode_length_info,

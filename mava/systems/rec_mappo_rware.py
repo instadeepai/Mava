@@ -44,20 +44,20 @@ from mava.types import (
     ExperimentOutput,
     HiddenStates,
     LearnerFn,
+    ObservationGlobalState,
     OptStates,
     Params,
     PPOTransition,
     RecActorApply,
     RecCriticApply,
+    RnnGlobalObservation,
     RNNLearnerState,
-    RnnObservation,
 )
 from mava.utils.logger_tools import get_sacred_exp
 from mava.wrappers.jumanji import (
     AgentIDWrapper,
     GlobalStateWrapper,
     LogWrapper,
-    ObservationGlobalState,
     RwareWrapper,
 )
 
@@ -99,7 +99,7 @@ class Actor(nn.Module):
     def __call__(
         self,
         policy_hidden_state: chex.Array,
-        observation_done: RnnObservation,
+        observation_done: RnnGlobalObservation,
     ) -> Tuple[chex.Array, distrax.Categorical]:
         """Forward pass."""
         observation, done = observation_done
@@ -138,7 +138,7 @@ class Critic(nn.Module):
     def __call__(
         self,
         critic_hidden_state: Tuple[chex.Array, chex.Array],
-        observation_done: RnnObservation,
+        observation_done: RnnGlobalObservation,
     ) -> Tuple[chex.Array, chex.Array]:
         """Forward pass."""
         observation, done = observation_done
@@ -229,12 +229,7 @@ def get_learner_fn(
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             # log episode return and length
-            done = jax.tree_util.tree_map(
-                lambda x: jnp.repeat(x, config["system"]["num_agents"]).reshape(
-                    config["arch"]["num_envs"], -1
-                ),
-                timestep.last(),
-            )
+            done = 1 - timestep.discount
             info = {
                 "episode_return": env_state.episode_return_info,
                 "episode_length": env_state.episode_length_info,
@@ -590,7 +585,7 @@ def learner_setup(
     init_obs = jax.tree_util.tree_map(lambda x: x[None, ...], init_obs)
 
     # Select only a single agent
-    init_done = jnp.zeros((1, config["arch"]["num_envs"]), dtype=bool)
+    init_done = jnp.zeros((1, config["arch"]["num_envs"]), dtype=float)
     init_obs_single = ObservationGlobalState(
         agents_view=init_obs.agents_view[:, :, 0, :],
         action_mask=init_obs.action_mask[:, :, 0, :],
@@ -679,7 +674,7 @@ def learner_setup(
             config["arch"]["num_envs"],
             config["system"]["num_agents"],
         ),
-        dtype=bool,
+        dtype=float,
     )
     hstates = HiddenStates(policy_hstates, critic_hstates)
     params = Params(actor_params, critic_params)

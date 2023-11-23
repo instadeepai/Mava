@@ -71,7 +71,8 @@ class LogEnvState:
     episode_length_info: chex.Numeric
 
 
-RnnObservation: TypeAlias = Tuple[ObservationGlobalState, Done]
+RnnObservation: TypeAlias = Tuple[Observation, Done]
+RnnGlobalObservation: TypeAlias = Tuple[ObservationGlobalState, Done]
 
 
 class PPOTransition(NamedTuple):

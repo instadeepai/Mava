@@ -150,11 +150,10 @@ class RwareWrapper(Wrapper):
             action_mask=timestep.observation.action_mask,
             step_count=jnp.repeat(timestep.observation.step_count, n_agents),
         )
-        reward = jnp.repeat(timestep.reward, n_agents)
-        # discount = jnp.repeat(timestep.discount, n_agents)
-        # -> we won't need this if we'll use the timestep.last() for the 'done'
-        # variable during training.
-        return timestep.replace(observation=observation, reward=reward)
+        shared_reward = jnp.sum(timestep.reward)
+        reward = jnp.repeat(shared_reward, n_agents)
+        discount = jnp.repeat(timestep.discount, n_agents)
+        return timestep.replace(observation=observation, reward=reward, discount=discount)
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment. Updates the step count."""
