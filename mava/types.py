@@ -67,11 +67,15 @@ class HiddenStates(NamedTuple):
     critic_hidden_state: HiddenState
 
 
-class LearnerState(NamedTuple):
+TParams = TypeVar("TParams")
+TOptStates = TypeVar("TOptStates")
+
+
+class LearnerState(NamedTuple, Generic[TParams, TOptStates]):
     """State of the learner."""
 
-    params: Params
-    opt_states: OptStates
+    params: TParams
+    opt_states: TOptStates
     key: chex.PRNGKey
     env_state: LogEnvState
     timestep: TimeStep

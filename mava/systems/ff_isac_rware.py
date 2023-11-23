@@ -22,35 +22,13 @@ import jax.numpy as jnp
 import jumanji
 import optax
 from chex import Array, Numeric, PRNGKey
+from flashbax.buffers.flat_buffer import TransitionSample as BufferSample
 from flashbax.buffers.trajectory_buffer import TrajectoryBuffer
-from flashbax.buffers.trajectory_buffer import TrajectoryBufferSample as BufferSample
 from flashbax.buffers.trajectory_buffer import TrajectoryBufferState as BufferState
 from jumanji.wrappers import AutoResetWrapper
 
 from mava.types import ActorApply, CriticApply, LearnerState, Observation
 from mava.wrappers.jumanji import RwareMultiAgentWrapper
-
-
-def sample_action(mean: Array, log_std: Array, key: PRNGKey) -> Tuple[Array, Array]:
-    std = jnp.exp(log_std)
-    normal = distrax.Normal(mean, std)
-    x_t = normal.sample(seed=key)
-    y_t = jnp.tanh(x_t)
-    # action = 2 * y_t  # actions [-2,2]
-    action = (y_t * 0.5) + 0.5  # enforce actions between [0, 1]
-    log_prob = normal.log_prob(x_t)
-    log_prob -= jnp.log(0.5 * (1 - y_t**2) + 1e-6)
-    log_prob = jnp.sum(log_prob, axis=-1, keepdims=True)
-
-    return action, log_prob
-
-
-def select_actions_sac(
-    apply_fn: Callable, params: nn.FrozenDict, obs: Array, key: PRNGKey
-) -> Array:
-    mean, log_std = apply_fn(params, obs)
-    actions, _ = sample_action(mean, log_std, key)
-    return actions
 
 
 class Transition(NamedTuple):
@@ -74,7 +52,7 @@ class CriticAndTarget(NamedTuple):
 
 class Params(NamedTuple):
     actor: nn.FrozenDict
-    critic: CriticParams
+    critic: CriticAndTarget
     log_alpha: Numeric
 
 
@@ -90,27 +68,21 @@ State = Tuple[LearnerState, BufferState[Transition]]
 class Actor(nn.Module):
     """Actor Network."""
 
-    action_dim: Sequence[int]
+    action_dim: int
 
     @nn.compact
     def __call__(self, observation: Observation) -> distrax.Categorical:
         """Forward pass."""
         x = observation.agents_view
 
-        actor_output = nn.Dense(128)(x)
-        actor_output = nn.relu(actor_output)
-        actor_output = nn.Dense(128)(actor_output)
-        actor_output = nn.relu(actor_output)
-        actor_output = nn.Dense(self.action_dim)(actor_output)
+        x = nn.relu(nn.Dense(128)(x))
+        x = nn.relu(nn.Dense(128)(x))
+        logits = nn.Dense(self.action_dim)(x)
 
-        masked_logits = jnp.where(observation.action_mask, actor_output, jnp.finfo(jnp.float32).min)
-        actor_policy = distrax.Categorical(logits=masked_logits)
-
-        return actor_policy
+        masked_logits = jnp.where(observation.action_mask, logits, jnp.finfo(jnp.float32).min)
+        return distrax.Categorical(logits=masked_logits)
 
 
-#
-#
 # @partial(jax.pmap, axis_name="learner_devices", devices=learner_devices)
 # def update(
 #     sample: fbx.flat_buffer.TransitionSample[Transition],
@@ -220,52 +192,123 @@ class Actor(nn.Module):
 
 def get_learner_fn(
     env: jumanji.Environment,
-    apply_fns: Tuple[ActorApply, CriticApply],
-    update_fn: optax.TransformUpdateFn,  # todo: update fn per param?
+    # todo: just pass in actor and opt
+    actor: Actor,
+    critic: nn.Module,  # todo
+    opt: optax.GradientTransformation,
     buffer: TrajectoryBuffer,
     config: Dict,
 ) -> Callable[[LearnerState, BufferState[Transition]], State]:
-    # Get apply and update functions for actor and critic networks.
-    actor_apply_fn, critic_apply_fn = apply_fns
-
     n_rollouts = config["rollout_length"]
     target_entropy = env.action_spec().num_values[0]
 
     def critic_loss(critic_params: CriticParams, critic_input: Array, target: Array) -> Numeric:
-        q1 = critic_apply_fn(critic_params.first, critic_input).squeeze(axis=-1)
-        q2 = critic_apply_fn(critic_params.second, critic_input).squeeze(axis=-1)
+        q1 = critic.apply(critic_params.first, critic_input).squeeze(axis=-1)
+        q2 = critic.apply(critic_params.second, critic_input).squeeze(axis=-1)
         return jnp.mean((target - q1) ** 2) + jnp.mean((target - q2) ** 2)
 
     def policy_loss(
         policy_params: nn.FrozenDict,
         critic_params: CriticParams,
         log_alpha: Numeric,
-        obs: Array,
+        obs: Observation,
         key: PRNGKey,
     ) -> Numeric:
-        mean, log_std = actor_apply_fn(policy_params, obs)
-        act, log_prob = sample_action(mean, log_std, key)
+        policy = actor.apply(policy_params, obs)
+        act, log_prob = policy.sample_and_log_prob(seed=key)
 
-        critic_input = jnp.concatenate([obs, act], axis=-1)
+        critic_input = jnp.concatenate([obs.agents_view, act], axis=-1)
 
-        q1 = critic_apply_fn(critic_params.first, critic_input).squeeze(axis=-1)
-        q2 = critic_apply_fn(critic_params.second, critic_input).squeeze(axis=-1)
+        q1 = critic.apply(critic_params.first, critic_input).squeeze(axis=-1)
+        q2 = critic.apply(critic_params.second, critic_input).squeeze(axis=-1)
 
         q = jnp.minimum(q1, q2)
 
+        # todo sac discrete does another sum here - I assume we need this for discrete?
         return jnp.mean(jnp.exp(log_alpha) * log_prob.squeeze(axis=-1) - q)
 
     def alpha_loss(
         log_alpha: Numeric, actor_params: nn.FrozenDict, obs: Array, key: PRNGKey
     ) -> Numeric:
         # todo: do this once! (double work here and in policy_loss)
-        mean, log_std = actor_apply_fn(actor_params, obs)
-        _, log_prob = sample_action(mean, log_std, key)
+        policy = actor.apply(actor_params, obs)
+        log_prob = policy.log_prob(seed=key)
         return -jnp.exp(log_alpha) * jnp.mean((log_prob + target_entropy))
 
     def update(
-        learner_state: LearnerState, batch: BufferSample[Transition]
+        learner_state: LearnerState[Params, OptStates], batch: BufferSample[Transition]
     ) -> Tuple[LearnerState, Dict[str, Array]]:
+        obs = batch.experience.first.obs
+        next_obs = batch.experience.second.obs
+        act = batch.experience.first.action
+        rew = batch.experience.first.reward
+        done = batch.experience.first.done
+
+        key, next_act_key, policy_loss_key, alpha_loss_key = jax.random.split(learner_state.key, 4)
+        learner_state = learner_state._replace(key=key)
+
+        next_policy = actor.apply(learner_state.params.actor, next_obs)
+        next_act, next_act_log_prob = next_policy.sample_and_log_prob(seed=next_act_key)
+
+        critic_input = jnp.concatenate([next_obs, next_act], axis=-1)
+
+        next_q1 = critic.apply(learner_state.critic.targets.first, critic_input)
+        next_q2 = critic.apply(learner_state.critic.targets.second, critic_input)
+        next_q = jnp.minimum(next_q1, next_q2).squeeze(axis=-1)
+
+        # (B, N)
+        # rew = jnp.expand_dims(rew, -1)
+        # done = jnp.expand_dims(done, -1)
+        target = rew + config["gamma"] * (1 - done) * (
+            next_q - jnp.exp(learner_state.params.log_alpha) * next_act_log_prob.squeeze(axis=-1)
+        )
+
+        c_loss, critic_grads = jax.value_and_grad(critic_loss)(
+            learner_state.params.critic, jnp.concatenate([obs, act], axis=-1), target
+        )
+        a_loss, actor_grads = jax.value_and_grad(policy_loss)(
+            learner_state.params.actor,
+            learner_state.params.critic,
+            learner_state.params.log_alpha,
+            obs,
+            policy_loss_key,
+        )
+        alp_loss, alpha_grads = jax.value_and_grad(alpha_loss)(
+            learner_state.params.log_alpha, learner_state.params.actor, obs, alpha_loss_key
+        )
+
+        # todo: do a single pmean over a tuple of these?
+        # is that more performant?
+        actor_grads = jax.lax.pmean(actor_grads, "learner_devices")
+        critic_grads = jax.lax.pmean(critic_grads, "learner_devices")
+        alpha_grads = jax.lax.pmean(alpha_grads, "learner_devices")
+        a_loss, c_loss, alp_loss = jax.lax.pmean((a_loss, c_loss, alp_loss), "learner_devices")
+
+        # todo: join these updates into a single update
+        actor_updates, actor_opt_state = opt.update(
+            actor_grads, learner_state.opt_states.actor, learner_state.params.actor
+        )
+        critic_updates, critic_opt_state = opt.update(
+            critic_grads, learner_state.opt_states.critic, learner_state.params.critic.critics
+        )
+        alpha_updates, alpha_opt_state = opt.update(
+            alpha_grads, learner_state.opt_states.alpha, learner_state.params.log_alpha
+            pt_states
+        )
+
+        actor_params = optax.apply_updates(learner_state.params.actor, actor_updates)
+        new_critic_params = optax.apply_updates(learner_state.params.critic.critics, critic_updates)
+        log_alpha = optax.apply_updates(log_alpha, alpha_updates)
+
+        new_target_params = optax.incremental_update(
+            learner_state.params.critic.critics, learner_state.params.critic.targets, config["tau"]
+        )
+
+        critic_params = CriticAndTarget(new_critic_params, new_target_params)
+
+        new_opt_states = (actor_opt_state, critic_opt_state, alpha_opt_state)
+        losses = (a_loss, c_loss, alp_loss)
+        return exp, actor_params, critic_params, log_alpha, new_opt_states, losses
         return learner_state, {}
 
     def act(_: int, carry: State) -> State:
@@ -274,7 +317,7 @@ def get_learner_fn(
 
         # SELECT ACTION
         key, policy_key = jax.random.split(learner_state.key)
-        actor_policy = actor_apply_fn(actor_params, learner_state.timestep.observation)
+        actor_policy = actor.apply(actor_params, learner_state.timestep.observation)
         action = actor_policy.sample(seed=policy_key)
 
         # STEP ENVIRONMENT
@@ -372,7 +415,7 @@ def main() -> None:
         timestep=timestep,
     )
 
-    learner_fn = get_learner_fn(env, (actor.apply, critic.apply), opt.update, buffer, config)
+    learner_fn = get_learner_fn(env, actor, critic, opt, buffer, config)
     learner_fn(learner_state, buffer_state)
 
 
