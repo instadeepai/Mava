@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import copy
-from logging import Logger as SacredLogger
+import time
 from typing import Any, Dict, Sequence, Tuple
 
 import chex
@@ -34,7 +34,6 @@ from jumanji.wrappers import AutoResetWrapper
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
-from sacred import run
 
 from mava.evaluator import evaluator_setup
 from mava.logger import logger_setup
@@ -49,8 +48,6 @@ from mava.types import (
     PPOTransition,
 )
 from mava.utils.jax import merge_leading_dims
-from mava.utils.logger_tools import get_sacred_exp
-from mava.utils.timing_utils import TimeIt
 from mava.wrappers.jumanji import (
     AgentIDWrapper,
     LogWrapper,
@@ -508,11 +505,11 @@ def learner_setup(
     return learn, actor_network, init_learner_state
 
 
-def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
+def run_experiment(_config: Dict) -> None:
     """Runs experiment."""
     # Logger setup
     config = copy.deepcopy(_config)
-    log = logger_setup(_run, config, _log)
+    log = logger_setup(config)
 
     # Create envs
     generator = RandomGenerator(**config["env"]["rware_scenario"]["task_config"])
@@ -549,7 +546,7 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     config["system"]["num_updates_per_eval"] = (
         config["system"]["num_updates"] // config["arch"]["num_evaluation"]
     )
-    timesteps_per_training = (
+    steps_per_rollout = (
         n_devices
         * config["system"]["num_updates_per_eval"]
         * config["system"]["rollout_length"]
@@ -571,21 +568,21 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
     best_params = None
     for i in range(config["arch"]["num_evaluation"]):
         # Train.
-        with TimeIt(
-            tag=("COMPILATION" if i == 0 else "EXECUTION"),
-            environment_steps=timesteps_per_training,
-        ):
-            learner_output = learn(learner_state)
-            jax.block_until_ready(learner_output)
+        start_time = time.time()
+        learner_output = learn(learner_state)
+        jax.block_until_ready(learner_output)
 
         # Log the results of the training.
+        elapsed_time = time.time() - start_time
+        learner_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
         log(
             metrics=learner_output,
-            t_env=timesteps_per_training * (i + 1),
+            t_env=steps_per_rollout * (i + 1),
             trainer_metric=True,
         )
 
         # Prepare for evaluation.
+        start_time = time.time()
         trained_params = jax.tree_util.tree_map(
             lambda x: x[:, 0, ...],
             learner_output.learner_state.params.actor_params,  # Select only actor params
@@ -599,9 +596,11 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         jax.block_until_ready(evaluator_output)
 
         # Log the results of the evaluation.
+        elapsed_time = time.time() - start_time
+        evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
         episode_return = log(
             metrics=evaluator_output,
-            t_env=timesteps_per_training * (i + 1),
+            t_env=steps_per_rollout * (i + 1),
         )
         if config["arch"]["absolute_metric"] and max_episode_return <= episode_return:
             best_params = copy.deepcopy(trained_params)
@@ -612,13 +611,20 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
 
     # Measure absolute metric.
     if config["arch"]["absolute_metric"]:
+        start_time = time.time()
+
         rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
         eval_rngs = jnp.stack(eval_rngs)
         eval_rngs = eval_rngs.reshape(n_devices, -1)
+
         evaluator_output = absolute_metric_evaluator(best_params, eval_rngs)
+        jax.block_until_ready(evaluator_output)
+
+        elapsed_time = time.time() - start_time
+        evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
         log(
             metrics=evaluator_output,
-            t_env=timesteps_per_training * (i + 1),
+            t_env=steps_per_rollout * (i + 1),
             absolute_metric=True,
         )
 
@@ -629,11 +635,8 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     # Convert config to python dict.
     cfg: Dict = OmegaConf.to_container(cfg, resolve=True)
 
-    ex = get_sacred_exp(cfg, "ff_mappo_rware")
-
     # Run experiment.
-    ex.main(run_experiment)
-    ex.run(config_updates={})
+    run_experiment(cfg)
 
     print(f"{Fore.CYAN}{Style.BRIGHT}MAPPO experiment completed{Style.RESET_ALL}")
 
