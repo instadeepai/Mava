@@ -81,7 +81,7 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
             logger.log_stat(
                 f"{prefix}mean_episode_length", float(np.mean(episodes_length)), t_env, eval_step
             )
-            logger.log_stat(f"{prefix}steps_per_second", steps_per_second, t_env)
+            logger.log_stat(f"{prefix}steps_per_second", steps_per_second, t_env, eval_step)
 
             if trainer_metric:
                 logger.log_stat(f"{prefix}total_loss", float(np.mean(total_loss)), t_env)

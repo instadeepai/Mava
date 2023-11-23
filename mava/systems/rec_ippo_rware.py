@@ -774,6 +774,7 @@ def run_experiment(_config: Dict) -> None:
         episode_return = log(
             metrics=evaluator_output,
             t_env=steps_per_rollout * (i + 1),
+            eval_step=i,
         )
         if config["arch"]["absolute_metric"] and max_episode_return <= episode_return:
             best_params = copy.deepcopy(trained_params)

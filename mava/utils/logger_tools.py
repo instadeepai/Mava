@@ -77,7 +77,13 @@ class Logger:
             seed=cfg["system"]["seed"],
         )
 
-    def log_stat(self, key: str, value: float, t: int, eval_step: Optional[int] = None) -> None:
+    def log_stat(
+        self,
+        key: str,
+        value: float,
+        t: int,
+        eval_step: Optional[int] = None,
+    ) -> None:
         """Log a single stat."""
 
         if self.use_tb:
@@ -86,7 +92,7 @@ class Logger:
         if self.use_neptune:
             self.neptune_logger[key].log(value, step=t)
 
-        if self.use_json and (eval_step is not None):
+        if self.use_json:
             self.json_logger.write(t, key, value, eval_step)
 
 
@@ -168,7 +174,13 @@ class JsonWriter:
         with open(f"{self.path}/{self.file_name}", "w+") as f:
             json.dump(self.data, f, indent=4)
 
-    def write(self, timestep: int, key: str, value: float, evaluation_step: int) -> None:
+    def write(
+        self,
+        timestep: int,
+        key: str,
+        value: float,
+        evaluation_step: Optional[int],
+    ) -> None:
         """
         Writes a step into the json reporting file
 
@@ -177,26 +189,28 @@ class JsonWriter:
             metrics (dictionary mapping str to tensor): each value is a 1-dim tensor for the metric
                 in key of len equal to the number of evaluation episodes for this step.
             evaluation_step (int): the evaluation step
+            is_absolute_metric (bool): whether the metric is an absolute metric.
 
         """
-        metrics = {key: [value]}
-        step_metrics = {"step_count": timestep}
-        # TODO(Ruan): fix the ignore here
-        step_metrics.update(metrics)  # type: ignore
-        step_str = f"step_{evaluation_step}"
-        if step_str in self.run_data:
-            self.run_data[step_str].update(step_metrics)
-        else:
-            self.run_data[step_str] = step_metrics
 
-        # Store the maximum of each metric
-        for metric_name in metrics.keys():
-            if len(metrics[metric_name]):
-                max_metric = max(metrics[metric_name])
-                if metric_name in self.run_data["absolute_metrics"]:
-                    prev_max_metric = self.run_data["absolute_metrics"][metric_name][0]
-                    max_metric = max(max_metric, prev_max_metric)
-                self.run_data["absolute_metrics"][metric_name] = [max_metric]
+        logging_prefix, *metric_key = key.split("/")
+        metric_key = "/".join(metric_key)
+
+        metrics = {metric_key: [value]}
+
+        if logging_prefix == "evaluator":
+            step_metrics = {"step_count": timestep}
+            # TODO(Ruan): fix the ignore here
+            step_metrics.update(metrics)  # type: ignore
+            step_str = f"step_{evaluation_step}"
+            if step_str in self.run_data:
+                self.run_data[step_str].update(step_metrics)
+            else:
+                self.run_data[step_str] = step_metrics
+
+        # Store the absolute metrics
+        if logging_prefix == "absolute":
+            self.run_data["absolute_metrics"].update(metrics)
 
         with open(f"{self.path}/{self.file_name}", "w+") as f:
             json.dump(self.data, f, indent=4)
