@@ -326,6 +326,14 @@ def get_learner_fn(
                     targets,
                 ) = batch_info
 
+                if config["system"]["skip_hstates_update"]:
+                    traj_batch = traj_batch._replace(
+                        policy_hidden_state=jnp.zeros_like(traj_batch.policy_hidden_state)
+                    )
+                    traj_batch = traj_batch._replace(
+                        critic_hidden_state=jnp.zeros_like(traj_batch.critic_hidden_state)
+                    )
+
                 def _actor_loss_fn(
                     actor_params: FrozenDict,
                     actor_opt_state: OptState,
