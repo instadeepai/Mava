@@ -36,21 +36,23 @@ State: TypeAlias = Any
 
 
 class Observation(NamedTuple):
+    """The observation that the agent sees.
+    agents_view: the agents' view of other agents and shelves within their
+        sensor range. The number of features in the observation array
+        depends on the sensor range of the agent.
+    action_mask: boolean array specifying, for each agent, which action is legal.
+    step_count: the number of steps elapsed since the beginning of the episode.
+    """
+
     agents_view: chex.Array
     action_mask: chex.Array
     step_count: chex.Numeric
 
 
 class ObservationGlobalState(NamedTuple):
-    """The observation that the agent sees.
-    agents_view: the agents' view of other agents and shelves within their
-        sensor range. The number of features in the observation array
-        depends on the sensor range of the agent.
-    action_mask: boolean array specifying, for each agent, which action
-        (up, right, down, left) is legal.
-    global_state: the global state of the environment, which is the
-        concatenation of the agents' views.
-    step_count: the number of steps elapsed since the beginning of the episode.
+    """The observation seen by agents in centralized systems.
+    Extends `Observation` by adding a `global_state` attribute for centralized training.
+    global_state: The global state of the environment, often a concatenation of agents' views.
     """
 
     agents_view: chex.Array  # (num_agents, num_obs_features)

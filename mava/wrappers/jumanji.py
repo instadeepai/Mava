@@ -150,8 +150,7 @@ class RwareWrapper(Wrapper):
             action_mask=timestep.observation.action_mask,
             step_count=jnp.repeat(timestep.observation.step_count, n_agents),
         )
-        shared_reward = jnp.sum(timestep.reward)
-        reward = jnp.repeat(shared_reward, n_agents)
+        reward = jnp.repeat(timestep.reward, n_agents)
         discount = jnp.repeat(timestep.discount, n_agents)
         return timestep.replace(observation=observation, reward=reward, discount=discount)
 
