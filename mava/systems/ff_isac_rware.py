@@ -14,6 +14,7 @@
 
 from typing import Callable, Dict, NamedTuple, Sequence, Tuple
 
+from jumanji.environments.routing.robot_warehouse.generator import RandomGenerator
 import distrax
 import flashbax as fbx
 import flax.linen as nn
@@ -27,8 +28,9 @@ from flashbax.buffers.trajectory_buffer import TrajectoryBuffer
 from flashbax.buffers.trajectory_buffer import TrajectoryBufferState as BufferState
 from jumanji.wrappers import AutoResetWrapper
 
+from mava.evaluator import evaluator_setup
 from mava.types import ActorApply, CriticApply, LearnerState, Observation
-from mava.wrappers.jumanji import RwareMultiAgentWrapper
+from mava.wrappers.jumanji import LogEnvState, LogWrapper, RwareMultiAgentWrapper
 
 
 class Transition(NamedTuple):
@@ -238,30 +240,42 @@ def get_learner_fn(
         obs: Observation,
         key: PRNGKey,
     ) -> Numeric:
-        policy = actor.apply(policy_params, obs)
+        policy: distrax.Categorical = actor.apply(policy_params, obs)
         act, log_prob = policy.sample_and_log_prob(seed=key)
+
+        all_probs = policy.probs
+        z = (all_probs == 0.0) * 1e-8
+        log_all_probs = jnp.log(all_probs + z)
 
         act_one_hot = jax.nn.one_hot(act, act_dim)
 
         q1 = critic.apply(critic_params.first, obs)
-        q1 = (q1 * act_one_hot).sum(axis=-1)  # todo: method
+        # q1 = (q1 * act_one_hot).sum(axis=-1)  # todo: method
         q2 = critic.apply(critic_params.second, obs)
-        q2 = (q2 * act_one_hot).sum(axis=-1)
+        # q2 = (q2 * act_one_hot).sum(axis=-1)
 
         q = jnp.minimum(q1, q2)
 
         # todo sac discrete does sum and then mean, we should test this
         # https://github.com/BY571/SAC_discrete/blob/main/agent.py#L80C79-L80C79
-        return jnp.mean(jnp.exp(log_alpha) * log_prob)
+        actor_loss = (
+            (all_probs * (jnp.exp(log_alpha) * log_all_probs - q)).sum(1).mean()
+        )
+        return actor_loss  # jnp.mean(jnp.exp(log_alpha) * log_prob - q)
 
     def alpha_loss(
         log_alpha: Numeric, actor_params: nn.FrozenDict, obs: Array, key: PRNGKey
     ) -> Numeric:
         # todo: do this once! (double work here and in policy_loss)
         policy: distrax.Categorical = actor.apply(actor_params, obs)
-        action = policy.sample(seed=key)
-        log_prob = policy.log_prob(action)
-        return -jnp.exp(log_alpha) * jnp.mean((log_prob + target_entropy))
+
+        all_probs = policy.probs
+        z = (all_probs == 0.0) * 1e-8
+        log_all_probs = jnp.log(all_probs + z)
+
+        # act, log_prob = policy.sample_and_log_prob(seed=key)
+
+        return -jnp.exp(log_alpha) * jnp.mean((log_all_probs + target_entropy))
 
     def update(
         learner_state: LearnerState[Params, OptStates], batch: BufferSample[Transition]
@@ -276,21 +290,27 @@ def get_learner_fn(
         learner_state = learner_state._replace(key=key)
 
         next_policy = actor.apply(learner_state.params.actor, next_obs)
-        next_act, next_act_log_prob = next_policy.sample_and_log_prob(seed=next_act_key)
-        next_act_one_hot = jax.nn.one_hot(next_act, act_dim)
+        next_probs = next_policy.probs
+        z = (next_probs == 0) * 1e-8
+        next_log_probs = jnp.log(next_probs + z)
+
+        # next_act, next_act_log_prob = next_policy.sample_and_log_prob(seed=next_act_key)
+        # next_act_one_hot = jax.nn.one_hot(next_act, act_dim)
 
         next_q1 = critic.apply(learner_state.params.critic.targets.first, next_obs)
-        next_q1 = (next_q1 * next_act_one_hot).sum(axis=-1)
+        # next_q1 = (next_q1 * next_act_one_hot).sum(axis=-1)
         next_q2 = critic.apply(learner_state.params.critic.targets.second, next_obs)
-        next_q2 = (next_q2 * next_act_one_hot).sum(axis=-1)
+        # next_q2 = (next_q2 * next_act_one_hot).sum(axis=-1)
         next_q = jnp.minimum(next_q1, next_q2)
 
+        q_target_next = next_probs * (next_q - jnp.exp(learner_state.params.log_alpha) * next_log_probs)
+        target = rew + (config["gamma"] * (1 - done) * q_target_next.sum(-1))
         # (B, N)
         # rew = jnp.expand_dims(rew, -1)
         # done = jnp.expand_dims(done, -1)
-        target = rew + config["gamma"] * (1 - done) * (
-            next_q - jnp.exp(learner_state.params.log_alpha) * next_act_log_prob
-        )
+        # target = rew[..., jnp.newaxis] + config["gamma"] * (1 - done[..., jnp.newaxis]) * (
+        #     next_q - jnp.exp(learner_state.params.log_alpha) * next_act_log_prob
+        # )
 
         c_loss, critic_grads = jax.value_and_grad(critic_loss)(
             learner_state.params.critic.critics, obs, target, act
@@ -375,6 +395,8 @@ def get_learner_fn(
         # todo: check if the donate_argnums is preserved here
         buffer_state = buffer.add(buffer_state, transition)
 
+        # jax.debug.print("reward: {r} | done: {d}", r=reward, d=done)
+
         return learner_state, buffer_state
 
     def act_and_learn(learner_state: LearnerState, buffer_state: BufferState[Transition]) -> State:
@@ -386,8 +408,13 @@ def get_learner_fn(
 
             learner_state, buffer_state = jax.lax.fori_loop(0, n_rollouts, act, carry)
             batches = buffer.sample(buffer_state, sample_key)
+            minibatch_size = int(config["batch_size"] / config["num_minibatches"])
+            batches = jax.tree_util.tree_map(
+                lambda x: jnp.reshape(x, (-1, minibatch_size, *x.shape[1:])), batches
+            )
             # todo treemap -> reshape(num_minibatches, ...)
             # todo: get metrics/losses from here
+
             learner_state, metrics = jax.lax.scan(update, learner_state, batches)
 
             return learner_state, buffer_state
@@ -402,28 +429,84 @@ def get_learner_fn(
     return act_and_learn
 
 
+from mava.types import EvalState
+
+
+def eval_one_episode(env, params, apply_fn, init_eval_state) -> Dict:
+    """Evaluate one episode. It is vectorized over the number of evaluation episodes."""
+
+    def _env_step(eval_state):
+        """Step the environment."""
+        # PRNG keys.
+        rng, env_state, last_timestep, step_count_, return_ = eval_state
+
+        # Select action.
+        rng, _rng = jax.random.split(rng)
+        pi = apply_fn(params, last_timestep.observation)
+
+        action = pi.sample(seed=_rng)
+
+        # Step environment.
+        env_state, timestep = env.step(env_state, action)
+
+        # Log episode metrics.
+        return_ += timestep.reward
+        step_count_ += 1
+        eval_state = EvalState(rng, env_state, timestep, step_count_, return_)
+        return eval_state
+
+    def not_done(carry: Tuple) -> bool:
+        """Check if the episode is done."""
+        timestep = carry[2]
+        is_not_done: bool = ~timestep.last()
+        return is_not_done
+
+    final_state = jax.lax.while_loop(not_done, _env_step, init_eval_state)
+
+    eval_metrics = {
+        "episode_return": final_state.return_,
+        "episode_length": final_state.step_count_,
+    }
+    print(eval_metrics)
+    return
+
+
 def main() -> None:
     key = jax.random.PRNGKey(0)
 
-    env = jumanji.make("RobotWarehouse-v0")
+    env_config = {
+      "column_height": 8,
+      "shelf_rows": 1,
+      "shelf_columns": 3,
+      "num_agents": 4,
+      "sensor_range": 1,
+      "request_queue_size": 8,
+    }
+
+    generator = RandomGenerator(**env_config)
+    env = jumanji.make("RobotWarehouse-v0", generator=generator)
     env = RwareMultiAgentWrapper(env)
     env = AutoResetWrapper(env)
+    env = LogWrapper(env)
 
     config = {
         "tau": 0.005,
         "gamma": 0.95,
-        "num_updates": 20,
-        "num_minibatches": 3,
-        "rollout_length": 10,
+        "num_updates": 1000,
+        "batch_size": 1024,
+        "num_minibatches": 16,
+        "rollout_length": 128,
         "num_agents": env.num_agents,
-        "num_envs": 2,
-        "num_evals": 10,
+        "num_envs": 16,
+        "num_evals": 200,
     }
 
     actor = Actor(env.action_spec().num_values[0])
     critic = Critic(env.action_spec().num_values[0])  # todo: better critic
     opt = optax.adam(1e-3)
-    buffer = fbx.make_flat_buffer(1_000_000, 0, 64, add_batch_size=config["num_envs"])
+    buffer = fbx.make_flat_buffer(
+        1_000_000, 0, config["batch_size"], add_batch_size=config["num_envs"]
+    )
 
     dummy_act = env.action_spec().generate_value()
     dummy_obs = env.observation_spec().generate_value()
@@ -434,19 +517,19 @@ def main() -> None:
         done=jnp.zeros(env.num_agents, dtype=bool),
     )
 
+    key, critic_1_key, critic_2_key, critic_3_key, critic_4_key = jax.random.split(key, 5)
     params = Params(
         actor=actor.init(key, dummy_obs),
         # todo better names, this is confusing
         # critics -> online
         critic=CriticAndTarget(
             critics=CriticParams(
-                # todo: keys!
-                first=critic.init(key, dummy_obs),
-                second=critic.init(key, dummy_obs),
+                first=critic.init(critic_1_key, dummy_obs),
+                second=critic.init(critic_2_key, dummy_obs),
             ),
             targets=CriticParams(
-                first=critic.init(key, dummy_obs),
-                second=critic.init(key, dummy_obs),
+                first=critic.init(critic_3_key, dummy_obs),
+                second=critic.init(critic_4_key, dummy_obs),
             ),
         ),
         # todo: separate log alphas
@@ -460,7 +543,7 @@ def main() -> None:
     )
     buffer_state = buffer.init(dummy_transition)
 
-    reset_keys = jax.random.split(key)  # todo: num_envs
+    reset_keys = jax.random.split(key, num=config["num_envs"])  # todo: num_envs
     state, timestep = jax.vmap(env.reset)(reset_keys)
     learner_state = LearnerState(
         params=params,
@@ -470,8 +553,14 @@ def main() -> None:
         timestep=timestep,
     )
 
+    # evaluator, *_ = evaluator_setup(key, actor.apply, )
     learner_fn = get_learner_fn(env, actor, critic, opt, buffer, config)
-    learner_fn(learner_state, buffer_state)
+    for eval_i in range(config["num_evals"]):
+        key, eval_key = jax.random.split(key)
+        learner_state, buffer_state = learner_fn(learner_state, buffer_state)
+        env_states, timesteps = env.reset(eval_key)
+        init_eval_state = EvalState(key, env_states, timesteps, 0, 0.0)
+        eval_one_episode(env, learner_state.params.actor, actor.apply, init_eval_state)
 
 
 if __name__ == "__main__":
