@@ -505,14 +505,14 @@ def run_experiment(_config: Dict) -> None:
     # Create envs
     generator = RandomGenerator(**config["env"]["lbf_scenario"]["task_config"])
     env = jumanji.make(config["env"]["env_name"], generator=generator)
-    env = LbfWrapper(env)
+    env = LbfWrapper(env, config["env"]["use_idividual_reward"])
     # Add agent id to observation.
     if config["system"]["add_agent_id"]:
         env = AgentIDWrapper(env)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env"]["env_name"], generator=generator)
-    eval_env = LbfWrapper(eval_env)
+    eval_env = LbfWrapper(eval_env, config["env"]["use_idividual_reward"])
     if config["system"]["add_agent_id"]:
         eval_env = AgentIDWrapper(eval_env)
 

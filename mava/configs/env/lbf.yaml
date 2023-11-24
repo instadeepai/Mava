@@ -5,3 +5,4 @@ defaults:
 
 env_name: LevelBasedForaging-v0
 task_name: Foraging-2s-8x8-2p-2f-coop
+use_idividual_reward: False

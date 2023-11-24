@@ -231,9 +231,10 @@ class RwareWrapper(Wrapper):
 class LbfWrapper(Wrapper):
     """Multi-agent wrapper for the Level-Based Foraging environment."""
 
-    def __init__(self, env: LevelBasedForaging):
+    def __init__(self, env: LevelBasedForaging, use_idividual_reward: bool):
         super().__init__(env)
         self._env: LevelBasedForaging
+        self._use_idividual_reward = use_idividual_reward
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         n_agents = self._env.num_agents
@@ -242,12 +243,12 @@ class LbfWrapper(Wrapper):
             action_mask=timestep.observation.action_mask,
             step_count=jnp.repeat(timestep.observation.step_count, n_agents),
         )
-        # TODO: add sort of flag or condition to choose whether use
-        # sum of rewards or individual rewards.
+        if self._use_idividual_reward:
+            return timestep.replace(observation=observation)
+
         shared_reward = jnp.sum(timestep.reward)
         reward = jnp.repeat(shared_reward, n_agents)
-        discount = jnp.repeat(timestep.discount, n_agents)
-        return timestep.replace(observation=observation, reward=reward, discount=discount)
+        return timestep.replace(observation=observation, reward=reward)
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment. Updates the step count."""
