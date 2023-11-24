@@ -1,0 +1,9 @@
+# The config of the Foraging-15x15-4p-3f scenario
+
+task_config_gen:
+  grid_size: 15
+  fov : 15
+  num_agents: 4
+  num_food: 3
+  max_agent_level: 2
+  force_coop: False

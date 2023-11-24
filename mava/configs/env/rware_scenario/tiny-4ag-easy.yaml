@@ -1,5 +1,4 @@
 # The config of the tiny-4ag-easy environment
-task_name: tiny-4ag-easy
 
 task_config:
   column_height: 8

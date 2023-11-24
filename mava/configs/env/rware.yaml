@@ -4,3 +4,4 @@ defaults:
   - rware_scenario: tiny-2ag # [tiny-2ag, tiny-4ag, tiny-4ag-easy, small-4ag]
 
 env_name: RobotWarehouse-v0
+task_name: tiny-2ag
