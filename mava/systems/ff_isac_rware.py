@@ -83,6 +83,24 @@ class Actor(nn.Module):
         return distrax.Categorical(logits=masked_logits)
 
 
+class Critic(nn.Module):
+    """Actor Network."""
+
+    action_dim: int
+
+    @nn.compact
+    def __call__(self, observation: Observation) -> distrax.Categorical:
+        """Forward pass."""
+        x = observation.agents_view
+
+        x = nn.relu(nn.Dense(128)(x))
+        x = nn.relu(nn.Dense(128)(x))
+        qs = nn.Dense(self.action_dim)(x)
+
+        masked_qs = jnp.where(observation.action_mask, qs, -jnp.inf)
+        return masked_qs
+
+
 # @partial(jax.pmap, axis_name="learner_devices", devices=learner_devices)
 # def update(
 #     sample: fbx.flat_buffer.TransitionSample[Transition],
@@ -201,10 +219,16 @@ def get_learner_fn(
 ) -> Callable[[LearnerState, BufferState[Transition]], State]:
     n_rollouts = config["rollout_length"]
     target_entropy = env.action_spec().num_values[0]
+    act_dim = int(env.action_spec().num_values[0])
 
-    def critic_loss(critic_params: CriticParams, critic_input: Array, target: Array) -> Numeric:
-        q1 = critic.apply(critic_params.first, critic_input).squeeze(axis=-1)
-        q2 = critic.apply(critic_params.second, critic_input).squeeze(axis=-1)
+    def critic_loss(critic_params: CriticParams, obs: Array, target: Array, act: Array) -> Numeric:
+        act_one_hot = jax.nn.one_hot(act, act_dim)
+
+        q1 = critic.apply(critic_params.first, obs)
+        q1 = (q1 * act_one_hot).sum(axis=-1)
+        q2 = critic.apply(critic_params.second, obs)
+        q2 = (q2 * act_one_hot).sum(axis=-1)
+
         return jnp.mean((target - q1) ** 2) + jnp.mean((target - q2) ** 2)
 
     def policy_loss(
@@ -217,22 +241,26 @@ def get_learner_fn(
         policy = actor.apply(policy_params, obs)
         act, log_prob = policy.sample_and_log_prob(seed=key)
 
-        critic_input = jnp.concatenate([obs.agents_view, act], axis=-1)
+        act_one_hot = jax.nn.one_hot(act, act_dim)
 
-        q1 = critic.apply(critic_params.first, critic_input).squeeze(axis=-1)
-        q2 = critic.apply(critic_params.second, critic_input).squeeze(axis=-1)
+        q1 = critic.apply(critic_params.first, obs)
+        q1 = (q1 * act_one_hot).sum(axis=-1)  # todo: method
+        q2 = critic.apply(critic_params.second, obs)
+        q2 = (q2 * act_one_hot).sum(axis=-1)
 
         q = jnp.minimum(q1, q2)
 
-        # todo sac discrete does another sum here - I assume we need this for discrete?
-        return jnp.mean(jnp.exp(log_alpha) * log_prob.squeeze(axis=-1) - q)
+        # todo sac discrete does sum and then mean, we should test this
+        # https://github.com/BY571/SAC_discrete/blob/main/agent.py#L80C79-L80C79
+        return jnp.mean(jnp.exp(log_alpha) * log_prob)
 
     def alpha_loss(
         log_alpha: Numeric, actor_params: nn.FrozenDict, obs: Array, key: PRNGKey
     ) -> Numeric:
         # todo: do this once! (double work here and in policy_loss)
-        policy = actor.apply(actor_params, obs)
-        log_prob = policy.log_prob(seed=key)
+        policy: distrax.Categorical = actor.apply(actor_params, obs)
+        action = policy.sample(seed=key)
+        log_prob = policy.log_prob(action)
         return -jnp.exp(log_alpha) * jnp.mean((log_prob + target_entropy))
 
     def update(
@@ -249,26 +277,27 @@ def get_learner_fn(
 
         next_policy = actor.apply(learner_state.params.actor, next_obs)
         next_act, next_act_log_prob = next_policy.sample_and_log_prob(seed=next_act_key)
+        next_act_one_hot = jax.nn.one_hot(next_act, act_dim)
 
-        critic_input = jnp.concatenate([next_obs, next_act], axis=-1)
-
-        next_q1 = critic.apply(learner_state.critic.targets.first, critic_input)
-        next_q2 = critic.apply(learner_state.critic.targets.second, critic_input)
-        next_q = jnp.minimum(next_q1, next_q2).squeeze(axis=-1)
+        next_q1 = critic.apply(learner_state.params.critic.targets.first, next_obs)
+        next_q1 = (next_q1 * next_act_one_hot).sum(axis=-1)
+        next_q2 = critic.apply(learner_state.params.critic.targets.second, next_obs)
+        next_q2 = (next_q2 * next_act_one_hot).sum(axis=-1)
+        next_q = jnp.minimum(next_q1, next_q2)
 
         # (B, N)
         # rew = jnp.expand_dims(rew, -1)
         # done = jnp.expand_dims(done, -1)
         target = rew + config["gamma"] * (1 - done) * (
-            next_q - jnp.exp(learner_state.params.log_alpha) * next_act_log_prob.squeeze(axis=-1)
+            next_q - jnp.exp(learner_state.params.log_alpha) * next_act_log_prob
         )
 
         c_loss, critic_grads = jax.value_and_grad(critic_loss)(
-            learner_state.params.critic, jnp.concatenate([obs, act], axis=-1), target
+            learner_state.params.critic.critics, obs, target, act
         )
         a_loss, actor_grads = jax.value_and_grad(policy_loss)(
             learner_state.params.actor,
-            learner_state.params.critic,
+            learner_state.params.critic.critics,
             learner_state.params.log_alpha,
             obs,
             policy_loss_key,
@@ -279,10 +308,11 @@ def get_learner_fn(
 
         # todo: do a single pmean over a tuple of these?
         # is that more performant?
-        actor_grads = jax.lax.pmean(actor_grads, "learner_devices")
-        critic_grads = jax.lax.pmean(critic_grads, "learner_devices")
-        alpha_grads = jax.lax.pmean(alpha_grads, "learner_devices")
-        a_loss, c_loss, alp_loss = jax.lax.pmean((a_loss, c_loss, alp_loss), "learner_devices")
+        # todo: add this back in when pmapping
+        # actor_grads = jax.lax.pmean(actor_grads, "learner_devices")
+        # critic_grads = jax.lax.pmean(critic_grads, "learner_devices")
+        # alpha_grads = jax.lax.pmean(alpha_grads, "learner_devices")
+        # a_loss, c_loss, alp_loss = jax.lax.pmean((a_loss, c_loss, alp_loss), "learner_devices")
 
         # todo: join these updates into a single update
         actor_updates, actor_opt_state = opt.update(
@@ -293,12 +323,11 @@ def get_learner_fn(
         )
         alpha_updates, alpha_opt_state = opt.update(
             alpha_grads, learner_state.opt_states.alpha, learner_state.params.log_alpha
-            pt_states
         )
 
         actor_params = optax.apply_updates(learner_state.params.actor, actor_updates)
         new_critic_params = optax.apply_updates(learner_state.params.critic.critics, critic_updates)
-        log_alpha = optax.apply_updates(log_alpha, alpha_updates)
+        log_alpha = optax.apply_updates(learner_state.params.log_alpha, alpha_updates)
 
         new_target_params = optax.incremental_update(
             learner_state.params.critic.critics, learner_state.params.critic.targets, config["tau"]
@@ -306,10 +335,20 @@ def get_learner_fn(
 
         critic_params = CriticAndTarget(new_critic_params, new_target_params)
 
-        new_opt_states = (actor_opt_state, critic_opt_state, alpha_opt_state)
+        new_opt_states = OptStates(
+            actor=actor_opt_state, critic=critic_opt_state, alpha=alpha_opt_state
+        )
+
+        # todo: return these!
         losses = (a_loss, c_loss, alp_loss)
-        return exp, actor_params, critic_params, log_alpha, new_opt_states, losses
-        return learner_state, {}
+        learner_state = LearnerState(
+            params=Params(actor=actor_params, critic=critic_params, log_alpha=log_alpha),
+            opt_states=new_opt_states,
+            key=key,
+            env_state=learner_state.env_state,
+            timestep=learner_state.timestep,
+        )
+        return learner_state, losses
 
     def act(_: int, carry: State) -> State:
         learner_state, buffer_state = carry
@@ -348,12 +387,16 @@ def get_learner_fn(
             learner_state, buffer_state = jax.lax.fori_loop(0, n_rollouts, act, carry)
             batches = buffer.sample(buffer_state, sample_key)
             # todo treemap -> reshape(num_minibatches, ...)
+            # todo: get metrics/losses from here
             learner_state, metrics = jax.lax.scan(update, learner_state, batches)
 
             return learner_state, buffer_state
 
         return jax.lax.fori_loop(
-            0, config["num_updates"], _act_and_log, (learner_state, buffer_state)
+            0,
+            int(config["num_updates"] / config["num_evals"]),
+            _act_and_log,
+            (learner_state, buffer_state),
         )
 
     return act_and_learn
@@ -367,21 +410,23 @@ def main() -> None:
     env = AutoResetWrapper(env)
 
     config = {
-        "num_updates": 2,
+        "tau": 0.005,
+        "gamma": 0.95,
+        "num_updates": 20,
         "num_minibatches": 3,
         "rollout_length": 10,
         "num_agents": env.num_agents,
         "num_envs": 2,
+        "num_evals": 10,
     }
 
     actor = Actor(env.action_spec().num_values[0])
-    critic = nn.Dense(1)
+    critic = Critic(env.action_spec().num_values[0])  # todo: better critic
     opt = optax.adam(1e-3)
     buffer = fbx.make_flat_buffer(1_000_000, 0, 64, add_batch_size=config["num_envs"])
 
     dummy_act = env.action_spec().generate_value()
     dummy_obs = env.observation_spec().generate_value()
-    dummy_obs_array = dummy_obs.agents_view[0]
     dummy_transition = Transition(
         obs=dummy_obs,
         action=dummy_act,
@@ -391,16 +436,26 @@ def main() -> None:
 
     params = Params(
         actor=actor.init(key, dummy_obs),
-        critic=CriticParams(
-            first=critic.init(key, jnp.concatenate([dummy_obs_array, dummy_act], axis=-1)),
-            second=critic.init(key, jnp.concatenate([dummy_obs_array, dummy_act], axis=-1)),
+        # todo better names, this is confusing
+        # critics -> online
+        critic=CriticAndTarget(
+            critics=CriticParams(
+                # todo: keys!
+                first=critic.init(key, dummy_obs),
+                second=critic.init(key, dummy_obs),
+            ),
+            targets=CriticParams(
+                first=critic.init(key, dummy_obs),
+                second=critic.init(key, dummy_obs),
+            ),
         ),
-        log_alpha=jnp.zeros(1),
+        # todo: separate log alphas
+        log_alpha=jnp.asarray(0.0),
     )
     opt_states = OptStates(
         # todo: allow for different optimizers and different learning rates.
         actor=opt.init(params.actor),
-        critic=opt.init(params.critic.first),
+        critic=opt.init(params.critic.critics),
         alpha=opt.init(params.log_alpha),
     )
     buffer_state = buffer.init(dummy_transition)
