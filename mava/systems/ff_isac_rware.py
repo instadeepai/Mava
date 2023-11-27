@@ -12,66 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mava.types import EvalState
+import copy
+import time
 from typing import Any, Callable, Dict, NamedTuple, Tuple
 
 import distrax
 import flashbax as fbx
 import flax.linen as nn
+import hydra
 import jax
 import jax.numpy as jnp
 import jumanji
 import optax
 from chex import Array, Numeric, PRNGKey
+from colorama import Fore, Style
 from flashbax.buffers.flat_buffer import TransitionSample as BufferSample
 from flashbax.buffers.trajectory_buffer import TrajectoryBuffer
 from flashbax.buffers.trajectory_buffer import TrajectoryBufferState as BufferState
 from jumanji.environments.routing.robot_warehouse.generator import RandomGenerator
-from jumanji.wrappers import AutoResetWrapper
-
-from mava.evaluator import evaluator_setup
-from mava.types import ActorApply, CriticApply, LearnerState, Observation
-from mava.wrappers.jumanji import LogEnvState, LogWrapper, RwareMultiAgentWrapper
-
-
-import copy
-import time
-from typing import Any, Dict, Sequence, Tuple
-
-import chex
-import distrax
-import flax.linen as nn
-import hydra
-import jax
-import jax.numpy as jnp
-import jumanji
-import numpy as np
-import optax
-from colorama import Fore, Style
-from flax.core.frozen_dict import FrozenDict
-from flax.linen.initializers import constant, orthogonal
-from jumanji.env import Environment
-from jumanji.environments.routing.robot_warehouse.generator import RandomGenerator
 from jumanji.types import Observation
 from jumanji.wrappers import AutoResetWrapper
 from omegaconf import DictConfig, OmegaConf
-from optax._src.base import OptState
 from rich.pretty import pprint
 
 from mava.evaluator import sac_evaluator_setup
 from mava.logger import logger_setup
-from mava.types import (
-    ActorApply,
-    CriticApply,
-    ExperimentOutput,
-    LearnerFn,
-    LearnerState,
-    OptStates,
-    Params,
-    PPOTransition,
-)
-from mava.utils.jax import merge_leading_dims
-from mava.wrappers.jumanji import AgentIDWrapper, LogWrapper, RwareMultiAgentWrapper
+from mava.types import ActorApply, CriticApply, EvalState, LearnerState, Observation
+from mava.wrappers.jumanji import LogWrapper, RwareMultiAgentWrapper
 
 
 class Transition(NamedTuple):
@@ -261,7 +228,7 @@ def get_learner_fn(
     buffer: TrajectoryBuffer,
     config: Dict,
 ) -> Callable[[LearnerState, BufferState[Transition]], State]:
-    n_rollouts = config["rollout_length"]
+    n_rollouts = config["system"]["rollout_length"]
     target_entropy = env.action_spec().num_values[0]
     act_dim = int(env.action_spec().num_values[0])
 
@@ -273,7 +240,7 @@ def get_learner_fn(
         q2 = critic.apply(critic_params.second, obs)
         q2 = (q2 * act_one_hot).sum(axis=-1)
 
-        return jnp.nanmean((target - q1) ** 2) + jnp.nanmean((target - q2) ** 2)
+        return jnp.mean((target - q1) ** 2) + jnp.mean((target - q2) ** 2)
 
     def policy_loss(
         policy_params: nn.FrozenDict,
@@ -295,7 +262,7 @@ def get_learner_fn(
 
         # todo sac discrete does sum and then mean, we should test this
         # https://github.com/BY571/SAC_discrete/blob/main/agent.py#L80C79-L80C79
-        actor_loss = jnp.nanmean((all_probs * (jnp.exp(log_alpha) * log_all_probs - q)).sum(1))
+        actor_loss = jnp.mean((all_probs * (jnp.exp(log_alpha) * log_all_probs - q)).sum(1))
         return actor_loss  # jnp.mean(jnp.exp(log_alpha) * log_prob - q)
 
     def alpha_loss(
@@ -308,7 +275,7 @@ def get_learner_fn(
         z = (all_probs == 0.0) * 1e-8
         log_all_probs = jnp.log(all_probs + z)
 
-        return -jnp.exp(log_alpha) * jnp.nanmean((log_all_probs + target_entropy))
+        return -jnp.exp(log_alpha) * jnp.mean((log_all_probs + target_entropy))
 
     def update(
         learner_state: LearnerState[Params, OptStates], batch: BufferSample[Transition]
@@ -337,7 +304,7 @@ def get_learner_fn(
         q_target_next = next_probs * (
             next_q - jnp.exp(learner_state.params.log_alpha) * next_log_probs
         )
-        target = rew + (config["gamma"] * (1 - done) * q_target_next.sum(-1))
+        target = rew + (config["system"]["gamma"] * (1 - done) * q_target_next.sum(-1))
         # (B, N)
         # rew = jnp.expand_dims(rew, -1)
         # done = jnp.expand_dims(done, -1)
@@ -383,7 +350,9 @@ def get_learner_fn(
         log_alpha = optax.apply_updates(learner_state.params.log_alpha, alpha_updates)
 
         new_target_params = optax.incremental_update(
-            learner_state.params.critic.critics, learner_state.params.critic.targets, config["tau"]
+            learner_state.params.critic.critics,
+            learner_state.params.critic.targets,
+            config["system"]["tau"],
         )
 
         critic_params = CriticAndTarget(new_critic_params, new_target_params)
@@ -420,7 +389,9 @@ def get_learner_fn(
 
         # LOG EPISODE METRICS
         done, reward = jax.tree_util.tree_map(
-            lambda x: jnp.repeat(x, config["num_agents"]).reshape(config["num_envs"], -1),
+            lambda x: jnp.repeat(x, config["system"]["num_agents"]).reshape(
+                config["arch"]["num_envs"], -1
+            ),
             (timestep.last(), timestep.reward),
         )
 
@@ -448,7 +419,9 @@ def get_learner_fn(
                 act, (learner_state, buffer_state), None, n_rollouts
             )
             batches = buffer.sample(buffer_state, sample_key)
-            minibatch_size = int(config["batch_size"] / config["num_minibatches"])
+            minibatch_size = int(
+                config["system"]["batch_size"] / config["system"]["num_minibatches"]
+            )
             batches = jax.tree_util.tree_map(
                 lambda x: jnp.reshape(x, (-1, minibatch_size, *x.shape[1:])), batches
             )
@@ -463,12 +436,13 @@ def get_learner_fn(
             _act_and_log,
             (learner_state, buffer_state),
             None,
-            (config["num_updates"] // config["num_evals"]),
+            (config["system"]["num_updates"] // config["arch"]["num_evaluation"]),
         )
 
     return act_and_learn
 
-#TODO: remove this function
+
+# TODO: remove this function
 def eval_one_episode(env, params, apply_fn, init_eval_state) -> Dict:
     """Evaluate one episode. It is vectorized over the number of evaluation episodes."""
 
@@ -510,35 +484,27 @@ def eval_one_episode(env, params, apply_fn, init_eval_state) -> Dict:
 
 def main(_config) -> None:
 
-    _config = copy.deepcopy(_config)
-    log = logger_setup(_config, system="sac")
+    config = copy.deepcopy(_config)
+    log = logger_setup(config, system="sac")
 
-    key = jax.random.PRNGKey(0)
+    key = jax.random.PRNGKey(config["system"]["seed"])
 
-    generator = RandomGenerator(
-        **_config["env"]["rware_scenario"]["task_config"])
+    generator = RandomGenerator(**_config["env"]["rware_scenario"]["task_config"])
     env = jumanji.make("RobotWarehouse-v0", generator=generator)
     env = RwareMultiAgentWrapper(env)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
 
-    config = {
-        "tau": 0.005,
-        "gamma": 0.95,
-        "num_updates": 1000,
-        "batch_size": 1024,
-        "num_minibatches": 16,
-        "rollout_length": 128,
-        "num_agents": env.num_agents,
-        "num_envs": 64,
-        "num_evals": 200,
-    }
+    config["system"]["num_agents"] = env.action_spec().shape[0]
 
     actor = Actor(env.action_spec().num_values[0])
     critic = Critic(env.action_spec().num_values[0])  # todo: better critic
     opt = optax.adam(1e-3)
     buffer = fbx.make_flat_buffer(
-        1_000_000, 0, config["batch_size"], add_batch_size=config["num_envs"]
+        config["system"]["rb_size"],
+        0,
+        config["system"]["batch_size"],
+        add_batch_size=config["arch"]["num_envs"],
     )
 
     dummy_act = env.action_spec().generate_value()
@@ -576,7 +542,7 @@ def main(_config) -> None:
     )
     buffer_state = buffer.init(dummy_transition)
 
-    reset_keys = jax.random.split(key, num=config["num_envs"])  # todo: num_envs
+    reset_keys = jax.random.split(key, num=config["arch"]["num_envs"])  # todo: num_envs
     state, timestep = jax.vmap(env.reset)(reset_keys)
     learner_state = LearnerState(
         params=params,
@@ -586,35 +552,37 @@ def main(_config) -> None:
         timestep=timestep,
     )
 
+    config["arch"]["devices"] = len(jax.devices())
     steps_per_rollout = (
-        (config["num_updates"] // config["num_evals"])
-        * config["rollout_length"]
-        * config["num_envs"]
+        (config["system"]["num_updates"] // config["arch"]["num_evaluation"])
+        * config["system"]["rollout_length"]
+        * config["arch"]["num_envs"]
     )
+    pprint(config)
 
+    # Get learner and evaluator functions.
     learner_fn = get_learner_fn(env, actor, critic, opt, buffer, config)
-    _config["system"]["num_agents"] = env.action_spec().shape[0]
-    evaluator, absolute_metric_evaluator = sac_evaluator_setup(
+    evaluator, _ = sac_evaluator_setup(
         eval_env=env,
         rng_e=key,
         network=actor,
         params=params.actor,
-        config=_config,
+        config=config,
     )
-    for eval_i in range(config["num_evals"]):
+
+    for eval_i in range(config["arch"]["num_evaluation"]):
         start_time = time.time()
         key, eval_key = jax.random.split(key)
-        learner_output= learner_fn(
-            learner_state, buffer_state
-        )
-        jax.block_until_ready(learner_output)
-        (learner_state, buffer_state), metrics = learner_output
 
+        learner_output = learner_fn(learner_state, buffer_state)
+        jax.block_until_ready(learner_output)
+
+        (learner_state, buffer_state), metrics = learner_output
         elapsed_time = time.time() - start_time
         metrics[0]["steps_per_second"] = steps_per_rollout / elapsed_time
         log(
             metrics,
-            t_env=(eval_i+1) * steps_per_rollout,
+            t_env=(eval_i + 1) * steps_per_rollout,
             trainer_metric=True,
         )
 
@@ -622,14 +590,10 @@ def main(_config) -> None:
         evaluator_output = evaluator(learner_state.params.actor, eval_key)
         elapsed_time = time.time() - start_time
         evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
-        log(
-            evaluator_output, 
-            t_env=(eval_i+1) * steps_per_rollout, 
-            trainer_metric=False
-        )
+        log(evaluator_output, t_env=(eval_i + 1) * steps_per_rollout, trainer_metric=False)
 
 
-@hydra.main(config_path="../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
+@hydra.main(config_path="../configs", config_name="default_ff_isac.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
     # Convert config to python dict.
