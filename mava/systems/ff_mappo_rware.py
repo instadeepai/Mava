@@ -25,6 +25,7 @@ import jumanji
 import numpy as np
 import optax
 from colorama import Fore, Style
+from flax import jax_utils
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
 from jumanji.env import Environment
@@ -47,6 +48,7 @@ from mava.types import (
     Params,
     PPOTransition,
 )
+from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import merge_leading_dims
 from mava.utils.logger_tools import get_sacred_exp
 from mava.utils.timing_utils import TimeIt
@@ -543,6 +545,12 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         * config["num_envs"]
     )
 
+    # Set up checkpointer
+    checkpointer = Checkpointer(
+        model_name="ff_mappo_rware",
+        config=config,
+    )
+
     # Run experiment for a total number of evaluations.
     max_episode_return = jnp.float32(0.0)
     best_params = None
@@ -580,6 +588,14 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
             metrics=evaluator_output,
             t_env=timesteps_per_training * (i + 1),
         )
+
+        # Save checkpoint of learner state
+        checkpointer.save(
+            timestep=timesteps_per_training * (i + 1),
+            unreplicated_learner_state=jax_utils.unreplicate(learner_output.learner_state),
+            episode_return=episode_return,
+        )
+
         if config["absolute_metric"] and max_episode_return <= episode_return:
             best_params = copy.deepcopy(trained_params)
             max_episode_return = episode_return
