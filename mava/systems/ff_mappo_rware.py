@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import copy
-from logging import Logger as SacredLogger
+import time
 from typing import Any, Dict, Sequence, Tuple
 
 import chex
@@ -33,7 +33,7 @@ from jumanji.types import Observation
 from jumanji.wrappers import AutoResetWrapper
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
-from sacred import run
+from rich.pretty import pprint
 
 from mava.evaluator import evaluator_setup
 from mava.logger import logger_setup
@@ -48,8 +48,6 @@ from mava.types import (
     PPOTransition,
 )
 from mava.utils.jax import merge_leading_dims
-from mava.utils.logger_tools import get_sacred_exp
-from mava.utils.timing_utils import TimeIt
 from mava.wrappers.jumanji import (
     AgentIDWrapper,
     LogWrapper,
@@ -156,7 +154,9 @@ def get_learner_fn(
 
             # LOG EPISODE METRICS
             done, reward = jax.tree_util.tree_map(
-                lambda x: jnp.repeat(x, config["num_agents"]).reshape(config["num_envs"], -1),
+                lambda x: jnp.repeat(x, config["system"]["num_agents"]).reshape(
+                    config["arch"]["num_envs"], -1
+                ),
                 (timestep.last(), timestep.reward),
             )
             info = {
@@ -172,7 +172,7 @@ def get_learner_fn(
 
         # STEP ENVIRONMENT FOR ROLLOUT LENGTH
         learner_state, traj_batch = jax.lax.scan(
-            _env_step, learner_state, None, config["rollout_length"]
+            _env_step, learner_state, None, config["system"]["rollout_length"]
         )
 
         # CALCULATE ADVANTAGE
@@ -192,8 +192,9 @@ def get_learner_fn(
                     transition.value,
                     transition.reward,
                 )
-                delta = reward + config["gamma"] * next_value * (1 - done) - value
-                gae = delta + config["gamma"] * config["gae_lambda"] * (1 - done) * gae
+                gamma = config["system"]["gamma"]
+                delta = reward + gamma * next_value * (1 - done) - value
+                gae = delta + gamma * config["system"]["gae_lambda"] * (1 - done) * gae
                 return (gae, value), gae
 
             _, advantages = jax.lax.scan(
@@ -235,8 +236,8 @@ def get_learner_fn(
                     loss_actor2 = (
                         jnp.clip(
                             ratio,
-                            1.0 - config["clip_eps"],
-                            1.0 + config["clip_eps"],
+                            1.0 - config["system"]["clip_eps"],
+                            1.0 + config["system"]["clip_eps"],
                         )
                         * gae
                     )
@@ -244,7 +245,7 @@ def get_learner_fn(
                     loss_actor = loss_actor.mean()
                     entropy = actor_policy.entropy().mean()
 
-                    total_loss_actor = loss_actor - config["ent_coef"] * entropy
+                    total_loss_actor = loss_actor - config["system"]["ent_coef"] * entropy
                     return total_loss_actor, (loss_actor, entropy)
 
                 def _critic_loss_fn(
@@ -259,13 +260,13 @@ def get_learner_fn(
 
                     # CALCULATE VALUE LOSS
                     value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
-                        -config["clip_eps"], config["clip_eps"]
+                        -config["system"]["clip_eps"], config["system"]["clip_eps"]
                     )
                     value_losses = jnp.square(value - targets)
                     value_losses_clipped = jnp.square(value_pred_clipped - targets)
                     value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
 
-                    critic_total_loss = config["vf_coef"] * value_loss
+                    critic_total_loss = config["system"]["vf_coef"] * value_loss
                     return critic_total_loss, (value_loss)
 
                 # CALCULATE ACTOR LOSS
@@ -331,7 +332,7 @@ def get_learner_fn(
             rng, shuffle_rng = jax.random.split(rng)
 
             # SHUFFLE MINIBATCHES
-            batch_size = config["rollout_length"] * config["num_envs"]
+            batch_size = config["system"]["rollout_length"] * config["arch"]["num_envs"]
             permutation = jax.random.permutation(shuffle_rng, batch_size)
             batch = (traj_batch, advantages, targets)
             batch = jax.tree_util.tree_map(lambda x: merge_leading_dims(x, 2), batch)
@@ -339,7 +340,9 @@ def get_learner_fn(
                 lambda x: jnp.take(x, permutation, axis=0), batch
             )
             minibatches = jax.tree_util.tree_map(
-                lambda x: jnp.reshape(x, [config["num_minibatches"], -1] + list(x.shape[1:])),
+                lambda x: jnp.reshape(
+                    x, [config["system"]["num_minibatches"], -1] + list(x.shape[1:])
+                ),
                 shuffled_batch,
             )
 
@@ -355,7 +358,7 @@ def get_learner_fn(
 
         # UPDATE EPOCHS
         update_state, loss_info = jax.lax.scan(
-            _update_epoch, update_state, None, config["ppo_epochs"]
+            _update_epoch, update_state, None, config["system"]["ppo_epochs"]
         )
 
         params, opt_states, traj_batch, advantages, targets, rng = update_state
@@ -382,7 +385,7 @@ def get_learner_fn(
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
 
         learner_state, (metric, loss_info) = jax.lax.scan(
-            batched_update_step, learner_state, None, config["num_updates_per_eval"]
+            batched_update_step, learner_state, None, config["system"]["num_updates_per_eval"]
         )
         total_loss, (value_loss, loss_actor, entropy) = loss_info
         return ExperimentOutput(
@@ -407,21 +410,22 @@ def learner_setup(
     # Get number of actions and agents.
     num_actions = int(env.action_spec().num_values[0])
     num_agents = env.action_spec().shape[0]
-    config["num_agents"] = num_agents
+    config["system"]["num_agents"] = num_agents
+    config["system"]["num_actions"] = num_actions
 
     # PRNG keys.
     rng, rng_p = rngs
 
     # Define network and optimiser.
-    actor_network = Actor(num_actions)
+    actor_network = Actor(config["system"]["num_actions"])
     critic_network = Critic()
     actor_optim = optax.chain(
-        optax.clip_by_global_norm(config["max_grad_norm"]),
-        optax.adam(config["actor_lr"], eps=1e-5),
+        optax.clip_by_global_norm(config["system"]["max_grad_norm"]),
+        optax.adam(config["system"]["actor_lr"], eps=1e-5),
     )
     critic_optim = optax.chain(
-        optax.clip_by_global_norm(config["max_grad_norm"]),
-        optax.adam(config["critic_lr"], eps=1e-5),
+        optax.clip_by_global_norm(config["system"]["max_grad_norm"]),
+        optax.adam(config["system"]["critic_lr"], eps=1e-5),
     )
 
     # Initialise observation.
@@ -464,7 +468,9 @@ def learner_setup(
     learn = jax.pmap(learn, axis_name="device")
 
     # Broadcast params and optimiser state to cores and batch.
-    broadcast = lambda x: jnp.broadcast_to(x, (n_devices, config["update_batch_size"]) + x.shape)
+    broadcast = lambda x: jnp.broadcast_to(
+        x, (n_devices, config["system"]["update_batch_size"]) + x.shape
+    )
     actor_params = jax.tree_map(broadcast, actor_params)
     actor_opt_state = jax.tree_map(broadcast, actor_opt_state)
     critic_params = jax.tree_map(broadcast, critic_params)
@@ -472,20 +478,22 @@ def learner_setup(
 
     # Initialise environment states and timesteps.
     rng, *env_rngs = jax.random.split(
-        rng, n_devices * config["update_batch_size"] * config["num_envs"] + 1
+        rng, n_devices * config["system"]["update_batch_size"] * config["arch"]["num_envs"] + 1
     )
     env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
         jnp.stack(env_rngs),
     )
 
     # Split rngs for each core.
-    rng, *step_rngs = jax.random.split(rng, n_devices * config["update_batch_size"] + 1)
+    rng, *step_rngs = jax.random.split(rng, n_devices * config["system"]["update_batch_size"] + 1)
 
     # Add dimension to pmap over.
-    reshape_step_rngs = lambda x: x.reshape((n_devices, config["update_batch_size"]) + x.shape[1:])
+    reshape_step_rngs = lambda x: x.reshape(
+        (n_devices, config["system"]["update_batch_size"]) + x.shape[1:]
+    )
     step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
     reshape_states = lambda x: x.reshape(
-        (n_devices, config["update_batch_size"], config["num_envs"]) + x.shape[1:]
+        (n_devices, config["system"]["update_batch_size"], config["arch"]["num_envs"]) + x.shape[1:]
     )
     env_states = jax.tree_util.tree_map(reshape_states, env_states)
     timesteps = jax.tree_util.tree_map(reshape_states, timesteps)
@@ -497,28 +505,28 @@ def learner_setup(
     return learn, actor_network, init_learner_state
 
 
-def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
+def run_experiment(_config: Dict) -> None:
     """Runs experiment."""
     # Logger setup
     config = copy.deepcopy(_config)
-    log = logger_setup(_run, config, _log)
+    log = logger_setup(config)
 
     # Create envs
-    generator = RandomGenerator(**config["rware_scenario"]["task_config"])
-    env = jumanji.make(config["env_name"], generator=generator)
+    generator = RandomGenerator(**config["env"]["rware_scenario"]["task_config"])
+    env = jumanji.make(config["env"]["env_name"], generator=generator)
     env = RwareMultiAgentWithGlobalStateWrapper(env)
     # Add agent id to observation.
-    if config["add_agent_id"]:
+    if config["system"]["add_agent_id"]:
         env = AgentIDWrapper(env=env, has_global_state=True)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
-    eval_env = jumanji.make(config["env_name"], generator=generator)
+    eval_env = jumanji.make(config["env"]["env_name"], generator=generator)
     eval_env = RwareMultiAgentWithGlobalStateWrapper(eval_env)
-    if config["add_agent_id"]:
+    if config["system"]["add_agent_id"]:
         eval_env = AgentIDWrapper(env=eval_env, has_global_state=True)
 
     # PRNG keys.
-    rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["seed"]), num=3)
+    rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["system"]["seed"]), num=3)
 
     # Setup learner.
     learn, actor_network, learner_state = learner_setup(env, (rng, rng_p), config)
@@ -534,35 +542,47 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
 
     # Calculate total timesteps.
     n_devices = len(jax.devices())
-    config["num_updates_per_eval"] = config["num_updates"] // config["num_evaluation"]
-    timesteps_per_training = (
-        n_devices
-        * config["num_updates_per_eval"]
-        * config["rollout_length"]
-        * config["update_batch_size"]
-        * config["num_envs"]
+    config["arch"]["devices"] = jax.devices()
+    config["system"]["num_updates_per_eval"] = (
+        config["system"]["num_updates"] // config["arch"]["num_evaluation"]
     )
+    steps_per_rollout = (
+        n_devices
+        * config["system"]["num_updates_per_eval"]
+        * config["system"]["rollout_length"]
+        * config["system"]["update_batch_size"]
+        * config["arch"]["num_envs"]
+    )
+    # Get total_timesteps
+    config["system"]["total_timesteps"] = (
+        n_devices
+        * config["system"]["num_updates"]
+        * config["system"]["rollout_length"]
+        * config["system"]["update_batch_size"]
+        * config["arch"]["num_envs"]
+    )
+    pprint(config)
 
     # Run experiment for a total number of evaluations.
     max_episode_return = jnp.float32(0.0)
     best_params = None
-    for i in range(config["num_evaluation"]):
+    for i in range(config["arch"]["num_evaluation"]):
         # Train.
-        with TimeIt(
-            tag=("COMPILATION" if i == 0 else "EXECUTION"),
-            environment_steps=timesteps_per_training,
-        ):
-            learner_output = learn(learner_state)
-            jax.block_until_ready(learner_output)
+        start_time = time.time()
+        learner_output = learn(learner_state)
+        jax.block_until_ready(learner_output)
 
         # Log the results of the training.
+        elapsed_time = time.time() - start_time
+        learner_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
         log(
             metrics=learner_output,
-            t_env=timesteps_per_training * (i + 1),
+            t_env=steps_per_rollout * (i + 1),
             trainer_metric=True,
         )
 
         # Prepare for evaluation.
+        start_time = time.time()
         trained_params = jax.tree_util.tree_map(
             lambda x: x[:, 0, ...],
             learner_output.learner_state.params.actor_params,  # Select only actor params
@@ -576,11 +596,13 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         jax.block_until_ready(evaluator_output)
 
         # Log the results of the evaluation.
+        elapsed_time = time.time() - start_time
+        evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
         episode_return = log(
             metrics=evaluator_output,
-            t_env=timesteps_per_training * (i + 1),
+            t_env=steps_per_rollout * (i + 1),
         )
-        if config["absolute_metric"] and max_episode_return <= episode_return:
+        if config["arch"]["absolute_metric"] and max_episode_return <= episode_return:
             best_params = copy.deepcopy(trained_params)
             max_episode_return = episode_return
 
@@ -588,29 +610,33 @@ def run_experiment(_run: run.Run, _config: Dict, _log: SacredLogger) -> None:
         learner_state = learner_output.learner_state
 
     # Measure absolute metric.
-    if config["absolute_metric"]:
+    if config["arch"]["absolute_metric"]:
+        start_time = time.time()
+
         rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
         eval_rngs = jnp.stack(eval_rngs)
         eval_rngs = eval_rngs.reshape(n_devices, -1)
+
         evaluator_output = absolute_metric_evaluator(best_params, eval_rngs)
+        jax.block_until_ready(evaluator_output)
+
+        elapsed_time = time.time() - start_time
+        evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
         log(
             metrics=evaluator_output,
-            t_env=timesteps_per_training * (i + 1),
+            t_env=steps_per_rollout * (i + 1),
             absolute_metric=True,
         )
 
 
-@hydra.main(config_path="../configs", config_name="default.yaml", version_base="1.2")
+@hydra.main(config_path="../configs", config_name="default_ff_mappo.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
     # Convert config to python dict.
     cfg: Dict = OmegaConf.to_container(cfg, resolve=True)
 
-    ex = get_sacred_exp(cfg, "ff_mappo_rware")
-
     # Run experiment.
-    ex.main(run_experiment)
-    ex.run(config_updates={})
+    run_experiment(cfg)
 
     print(f"{Fore.CYAN}{Style.BRIGHT}MAPPO experiment completed{Style.RESET_ALL}")
 

@@ -1,0 +1,9 @@
+defaults:
+    - base_logger
+
+system_name: rec_mappo
+
+# --- Neptune options ---
+kwargs:
+  neptune_project: Instadeep/Mava
+  neptune_tag: [rec-mappo, rware]
