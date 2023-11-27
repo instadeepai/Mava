@@ -55,7 +55,7 @@ from mava.wrappers.jumanji import (
     AgentIDWrapper,
     GlobalStateWrapper,
     LogWrapper,
-    RwareWrapper,
+    MultiAgentWrapper,
 )
 
 
@@ -696,14 +696,14 @@ def run_experiment(_config: Dict) -> None:
     # Create envs
     generator = RandomGenerator(**config["env"]["rware_scenario"]["task_config"])
     env = jumanji.make(config["env"]["env_name"], generator=generator)
-    env = GlobalStateWrapper(RwareWrapper(env))
+    env = GlobalStateWrapper(MultiAgentWrapper(env))
     # Add agent id to observation.
     if config["system"]["add_agent_id"]:
         env = AgentIDWrapper(env=env, has_global_state=True)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env"]["env_name"], generator=generator)
-    eval_env = GlobalStateWrapper(RwareWrapper(eval_env))
+    eval_env = GlobalStateWrapper(MultiAgentWrapper(eval_env))
     if config["system"]["add_agent_id"]:
         eval_env = AgentIDWrapper(env=eval_env, has_global_state=True)
 
