@@ -60,6 +60,46 @@ class LogWrapper(Wrapper):
         return state, timestep
 
 
+class RwareWrapper(Wrapper):
+    """Multi-agent wrapper for the Robotic Warehouse environment."""
+
+    def __init__(self, env: RobotWarehouse):
+        super().__init__(env)
+        self._env: RobotWarehouse
+
+    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
+        n_agents = self._env.num_agents
+        observation = Observation(
+            agents_view=timestep.observation.agents_view,
+            action_mask=timestep.observation.action_mask,
+            step_count=jnp.repeat(timestep.observation.step_count, n_agents),
+        )
+        reward = jnp.repeat(timestep.reward, n_agents)
+        discount = jnp.repeat(timestep.discount, n_agents)
+        return timestep.replace(observation=observation, reward=reward, discount=discount)
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
+        """Reset the environment. Updates the step count."""
+        state, timestep = self._env.reset(key)
+        return state, self.modify_timestep(timestep)
+
+    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
+        """Step the environment. Updates the step count."""
+        state, timestep = self._env.step(state, action)
+        return state, self.modify_timestep(timestep)
+
+    def observation_spec(self) -> specs.Spec[Observation]:
+        """Specification of the observation of the `RobotWarehouse` environment."""
+        step_count = specs.BoundedArray(
+            (self._env.num_agents,),
+            jnp.int32,
+            [0] * self._env.num_agents,
+            [self._env.time_limit] * self._env.num_agents,
+            "step_count",
+        )
+        return self._env.observation_spec().replace(step_count=step_count)
+
+
 class AgentIDWrapper(Wrapper):
     """Add onehot agent IDs to observation."""
 
@@ -112,7 +152,9 @@ class AgentIDWrapper(Wrapper):
 
         return state, timestep
 
-    def observation_spec(self) -> specs.Spec[Observation]:
+    def observation_spec(
+        self,
+    ) -> Union[specs.Spec[Observation], specs.Spec[ObservationGlobalState]]:
         """Specification of the observation of the `RobotWarehouse` environment."""
         agents_view = specs.Array(
             (self._env.num_agents, self.num_obs_features), jnp.int32, "agents_view"
@@ -136,46 +178,6 @@ class AgentIDWrapper(Wrapper):
         )
 
 
-class RwareWrapper(Wrapper):
-    """Multi-agent wrapper for the Robotic Warehouse environment."""
-
-    def __init__(self, env: RobotWarehouse):
-        super().__init__(env)
-        self._env: RobotWarehouse
-
-    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
-        n_agents = self._env.num_agents
-        observation = Observation(
-            agents_view=timestep.observation.agents_view,
-            action_mask=timestep.observation.action_mask,
-            step_count=jnp.repeat(timestep.observation.step_count, n_agents),
-        )
-        reward = jnp.repeat(timestep.reward, n_agents)
-        discount = jnp.repeat(timestep.discount, n_agents)
-        return timestep.replace(observation=observation, reward=reward, discount=discount)
-
-    def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
-        """Reset the environment. Updates the step count."""
-        state, timestep = self._env.reset(key)
-        return state, self.modify_timestep(timestep)
-
-    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
-        """Step the environment. Updates the step count."""
-        state, timestep = self._env.step(state, action)
-        return state, self.modify_timestep(timestep)
-
-    def observation_spec(self) -> specs.Spec[Observation]:
-        """Specification of the observation of the `RobotWarehouse` environment."""
-        step_count = specs.BoundedArray(
-            (self._env.num_agents,),
-            jnp.int32,
-            [0] * self._env.num_agents,
-            [self._env.time_limit] * self._env.num_agents,
-            "step_count",
-        )
-        return self._env.observation_spec().replace(step_count=step_count)
-
-
 class GlobalStateWrapper(Wrapper):
     """Wrapper for adding global state to an environment that follows the mava API.
 
@@ -184,7 +186,7 @@ class GlobalStateWrapper(Wrapper):
     by concatenating the observations of all agents.
     """
 
-    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
+    def modify_timestep(self, timestep: TimeStep) -> TimeStep[ObservationGlobalState]:
         global_state = jnp.concatenate(timestep.observation.agents_view, axis=0)
         global_state = jnp.tile(global_state, (self._env.num_agents, 1))
 
