@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from mava.types import EvalState
 from typing import Any, Callable, Dict, NamedTuple, Tuple
 
 import distrax
@@ -31,6 +32,46 @@ from jumanji.wrappers import AutoResetWrapper
 from mava.evaluator import evaluator_setup
 from mava.types import ActorApply, CriticApply, LearnerState, Observation
 from mava.wrappers.jumanji import LogEnvState, LogWrapper, RwareMultiAgentWrapper
+
+
+import copy
+import time
+from typing import Any, Dict, Sequence, Tuple
+
+import chex
+import distrax
+import flax.linen as nn
+import hydra
+import jax
+import jax.numpy as jnp
+import jumanji
+import numpy as np
+import optax
+from colorama import Fore, Style
+from flax.core.frozen_dict import FrozenDict
+from flax.linen.initializers import constant, orthogonal
+from jumanji.env import Environment
+from jumanji.environments.routing.robot_warehouse.generator import RandomGenerator
+from jumanji.types import Observation
+from jumanji.wrappers import AutoResetWrapper
+from omegaconf import DictConfig, OmegaConf
+from optax._src.base import OptState
+from rich.pretty import pprint
+
+from mava.evaluator import sac_evaluator_setup
+from mava.logger import logger_setup
+from mava.types import (
+    ActorApply,
+    CriticApply,
+    ExperimentOutput,
+    LearnerFn,
+    LearnerState,
+    OptStates,
+    Params,
+    PPOTransition,
+)
+from mava.utils.jax import merge_leading_dims
+from mava.wrappers.jumanji import AgentIDWrapper, LogWrapper, RwareMultiAgentWrapper
 
 
 class Transition(NamedTuple):
@@ -427,10 +468,7 @@ def get_learner_fn(
 
     return act_and_learn
 
-
-from mava.types import EvalState
-
-
+#TODO: remove this function
 def eval_one_episode(env, params, apply_fn, init_eval_state) -> Dict:
     """Evaluate one episode. It is vectorized over the number of evaluation episodes."""
 
@@ -470,19 +508,15 @@ def eval_one_episode(env, params, apply_fn, init_eval_state) -> Dict:
     return
 
 
-def main() -> None:
+def main(_config) -> None:
+
+    _config = copy.deepcopy(_config)
+    log = logger_setup(_config, system="sac")
+
     key = jax.random.PRNGKey(0)
 
-    env_config = {
-        "column_height": 8,
-        "shelf_rows": 1,
-        "shelf_columns": 3,
-        "num_agents": 4,
-        "sensor_range": 1,
-        "request_queue_size": 8,
-    }
-
-    generator = RandomGenerator(**env_config)
+    generator = RandomGenerator(
+        **_config["env"]["rware_scenario"]["task_config"])
     env = jumanji.make("RobotWarehouse-v0", generator=generator)
     env = RwareMultiAgentWrapper(env)
     env = AutoResetWrapper(env)
@@ -496,7 +530,7 @@ def main() -> None:
         "num_minibatches": 16,
         "rollout_length": 128,
         "num_agents": env.num_agents,
-        "num_envs": 16,
+        "num_envs": 64,
         "num_evals": 200,
     }
 
@@ -552,25 +586,60 @@ def main() -> None:
         timestep=timestep,
     )
 
-    rollout_per_training = (
+    steps_per_rollout = (
         (config["num_updates"] // config["num_evals"])
         * config["rollout_length"]
         * config["num_envs"]
     )
 
-    # evaluator, *_ = evaluator_setup(key, actor.apply, )
     learner_fn = get_learner_fn(env, actor, critic, opt, buffer, config)
+    _config["system"]["num_agents"] = env.action_spec().shape[0]
+    evaluator, absolute_metric_evaluator = sac_evaluator_setup(
+        eval_env=env,
+        rng_e=key,
+        network=actor,
+        params=params.actor,
+        config=_config,
+    )
     for eval_i in range(config["num_evals"]):
+        start_time = time.time()
         key, eval_key = jax.random.split(key)
-        (learner_state, buffer_state), (metrics, loss_info) = learner_fn(
+        learner_output= learner_fn(
             learner_state, buffer_state
         )
-        print("Metrics: ", metrics)
-        print("Losses: ", loss_info)
-        env_states, timesteps = env.reset(eval_key)
-        init_eval_state = EvalState(key, env_states, timesteps, 0, 0.0)
-        eval_one_episode(env, learner_state.params.actor, actor.apply, init_eval_state)
+        jax.block_until_ready(learner_output)
+        (learner_state, buffer_state), metrics = learner_output
+
+        elapsed_time = time.time() - start_time
+        metrics[0]["steps_per_second"] = steps_per_rollout / elapsed_time
+        log(
+            metrics,
+            t_env=(eval_i+1) * steps_per_rollout,
+            trainer_metric=True,
+        )
+
+        start_time = time.time()
+        evaluator_output = evaluator(learner_state.params.actor, eval_key)
+        elapsed_time = time.time() - start_time
+        evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
+        log(
+            evaluator_output, 
+            t_env=(eval_i+1) * steps_per_rollout, 
+            trainer_metric=False
+        )
+
+
+@hydra.main(config_path="../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
+def hydra_entry_point(cfg: DictConfig) -> None:
+    """Experiment entry point."""
+    # Convert config to python dict.
+    cfg: Dict = OmegaConf.to_container(cfg, resolve=True)
+
+    # Run experiment.
+    main(cfg)
+
+    print(f"{Fore.CYAN}{Style.BRIGHT}ISAC experiment completed{Style.RESET_ALL}")
 
 
 if __name__ == "__main__":
-    main()
+    hydra_entry_point()

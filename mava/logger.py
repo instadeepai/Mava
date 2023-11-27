@@ -35,7 +35,7 @@ class LogFn(Protocol):
         ...
 
 
-def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
+def get_ppo_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
     """Get the logger function."""
 
     def log(
@@ -117,8 +117,91 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
 
     return log
 
+def get_sac_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
+    """Get the logger function."""
 
-def logger_setup(config: Dict) -> LogFn:
+    def log(
+        metrics: ExperimentOutput,
+        t_env: int = 0,
+        trainer_metric: bool = False,
+        absolute_metric: bool = False,
+    ) -> float:
+        """Log the episode returns and lengths.
+
+        Args:
+            metrics (Dict): The metrics info.
+            t_env (int): The current timestep.
+            trainer_metric (bool): Whether to log the trainer metric.
+            absolute_metric (bool): Whether to log the absolute metric.
+        """
+        if absolute_metric:
+            prefix = "absolute/"
+            episodes_info = metrics.episodes_info
+        elif trainer_metric:
+            prefix = "trainer/"
+            episodes_info = metrics[0]
+            actor_loss = metrics[1]["actor_loss"]
+            critic_loss = metrics[1]["critic_loss"]
+            alpha_loss = metrics[1]["alpha_loss"]
+        else:
+            prefix = "evaluator/"
+            episodes_info = metrics.episodes_info
+
+        # Flatten metrics info.
+        episodes_return = jnp.ravel(episodes_info["episode_return"])
+        episodes_length = jnp.ravel(episodes_info["episode_length"])
+        steps_per_second = episodes_info["steps_per_second"]
+
+        # Log metrics.
+        if logger.should_log:
+            logger.log_stat(f"{prefix}mean_episode_returns", float(np.mean(episodes_return)), t_env)
+            logger.log_stat(f"{prefix}mean_episode_length", float(np.mean(episodes_length)), t_env)
+            logger.log_stat(f"{prefix}steps_per_second", steps_per_second, t_env)
+
+            if trainer_metric:
+                logger.log_stat(f"{prefix}actor_loss", float(np.mean(actor_loss)), t_env)
+                logger.log_stat(f"{prefix}critic_loss", float(np.mean(critic_loss)), t_env)
+                logger.log_stat(f"{prefix}alpha_loss", float(np.mean(alpha_loss)), t_env)
+
+        log_string = (
+            f"Timesteps {t_env:07d} | "
+            f"Mean Episode Return {float(np.mean(episodes_return)):.3f} | "
+            f"Std Episode Return {float(np.std(episodes_return)):.3f} | "
+            f"Max Episode Return {float(np.max(episodes_return)):.3f} | "
+            f"Mean Episode Length {float(np.mean(episodes_length)):.3f} | "
+            f"Std Episode Length {float(np.std(episodes_length)):.3f} | "
+            f"Max Episode Length {float(np.max(episodes_length)):.3f} | "
+            f"Steps Per Second {steps_per_second:.2e} "
+        )
+
+        if absolute_metric:
+            logger.console_logger.info(
+                f"{Fore.BLUE}{Style.BRIGHT}ABSOLUTE METRIC: {log_string}{Style.RESET_ALL}"
+            )
+        elif trainer_metric:
+            log_string += (
+                f"| Actor Loss {float(np.mean(actor_loss)):.3f} | "
+                f"Critic Loss {float(np.mean(critic_loss)):.3f} | "
+                f"Alpha Loss {float(np.mean(alpha_loss)):.3f} "
+            )
+            logger.console_logger.info(
+                f"{Fore.MAGENTA}{Style.BRIGHT}TRAINER: {log_string}{Style.RESET_ALL}"
+            )
+        else:
+            logger.console_logger.info(
+                f"{Fore.GREEN}{Style.BRIGHT}EVALUATOR: {log_string}{Style.RESET_ALL}"
+            )
+
+        return float(np.mean(episodes_return))
+
+    return log
+
+
+def logger_setup(config: Dict, system: str="ppo") -> LogFn:
     """Setup the logger."""
     logger = Logger(config)
-    return get_logger_tools(logger)
+    if system=="ppo":
+        log=get_ppo_logger_tools(logger)
+    else:
+        log=get_sac_logger_tools(logger)
+    return log

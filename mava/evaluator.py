@@ -307,3 +307,35 @@ def evaluator_setup(
     eval_rngs = jnp.stack(eval_rngs).reshape(n_devices, -1)
 
     return evaluator, absolute_metric_evaluator, (trained_params, eval_rngs)
+
+def sac_evaluator_setup(
+    eval_env: Environment,
+    rng_e: chex.PRNGKey,
+    network: Any,
+    params: FrozenDict,
+    config: Dict,
+) -> Tuple[EvalFn, EvalFn, Tuple[FrozenDict, chex.Array]]:
+    """Initialise evaluator_fn."""
+    # Get available TPU cores.
+    n_devices = len(jax.devices())
+    vmapped_eval_network_apply_fn = jax.vmap(
+        network.apply,
+        in_axes=(None, 0),
+    )
+    evaluator = get_ff_evaluator_fn(
+        eval_env,
+        vmapped_eval_network_apply_fn,
+        config,
+    )
+    absolute_metric_evaluator = get_ff_evaluator_fn(
+        eval_env,
+        vmapped_eval_network_apply_fn,
+        config,
+        10,
+    )
+
+    #TODO: bring back the pmapping
+    #evaluator = jax.pmap(evaluator, axis_name="device")
+    #absolute_metric_evaluator = jax.pmap(absolute_metric_evaluator, axis_name="device")
+
+    return evaluator, absolute_metric_evaluator
