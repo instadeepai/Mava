@@ -442,46 +442,6 @@ def get_learner_fn(
     return act_and_learn
 
 
-# TODO: remove this function
-def eval_one_episode(env, params, apply_fn, init_eval_state) -> Dict:
-    """Evaluate one episode. It is vectorized over the number of evaluation episodes."""
-
-    def _env_step(eval_state):
-        """Step the environment."""
-        # PRNG keys.
-        rng, env_state, last_timestep, step_count_, return_ = eval_state
-
-        # Select action.
-        rng, _rng = jax.random.split(rng)
-        pi = apply_fn(params, last_timestep.observation)
-
-        action = pi.sample(seed=_rng)
-
-        # Step environment.
-        env_state, timestep = env.step(env_state, action)
-
-        # Log episode metrics.
-        return_ += timestep.reward
-        step_count_ += 1
-        eval_state = EvalState(rng, env_state, timestep, step_count_, return_)
-        return eval_state
-
-    def not_done(carry: Tuple) -> bool:
-        """Check if the episode is done."""
-        timestep = carry[2]
-        is_not_done: bool = ~timestep.last()
-        return is_not_done
-
-    final_state = jax.lax.while_loop(not_done, _env_step, init_eval_state)
-
-    eval_metrics = {
-        "episode_return": final_state.return_,
-        "episode_length": final_state.step_count_,
-    }
-    print(eval_metrics)
-    return
-
-
 def main(_config) -> None:
 
     config = copy.deepcopy(_config)
