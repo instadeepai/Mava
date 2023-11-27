@@ -1,0 +1,11 @@
+# --- Logging options ---
+
+use_tf: True # Whether to use tensorboard logging.
+base_exp_path: results # Base path for logging.
+
+# --- Neptune logging ---
+use_neptune: True
+
+kwargs:
+  neptune_project: Instadeep/Mava
+  neptune_tag: [rware]
