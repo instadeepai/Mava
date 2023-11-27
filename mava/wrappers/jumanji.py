@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, Tuple, Union
+from typing import Tuple, Union
 
 import chex
 import jax.numpy as jnp
@@ -88,9 +88,9 @@ class MultiAgentWrapper(Wrapper):
             "mean": jnp.mean,
             # Add more functions as needed
         }
-        self.aggregate_function: Callable = self.aggregation_functions.get(
+        self.aggregate_function = self.aggregation_functions.get(
             aggregate_rewards_with, jnp.sum
-        )
+        )  # No error!
 
     def aggregate_rewards(
         self, timestep: TimeStep, observation: Observation
