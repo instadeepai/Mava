@@ -15,11 +15,12 @@
 import os
 import warnings
 from datetime import datetime
-from typing import Dict, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import absl.logging as absl_logging
 import orbax.checkpoint
 from chex import Numeric
+from jax.tree_util import tree_map
 from omegaconf import DictConfig
 
 from mava.types import LearnerState, RNNLearnerState
@@ -80,13 +81,22 @@ class Checkpointer:
             max_to_keep=max_to_keep,
             keep_period=keep_period,
         )
+
+        def get_json_ready(obj: Any) -> Any:
+            if not isinstance(obj, (bool, str, int, float, type(None))):
+                return str(obj)
+            else:
+                return obj
+
+        config_json_ready = tree_map(get_json_ready, config)
+
         self._manager = orbax.checkpoint.CheckpointManager(
             directory=os.path.join(os.getcwd(), rel_dir, model_name, timestamp_str),
             checkpointers=orbax_checkpointer,
             options=options,
             metadata={
                 "checkpointer_version": CHECKPOINTER_VERSION,
-                **(config if config is not None else {}),
+                **(config_json_ready if config_json_ready is not None else {}),
             },
         )
 
