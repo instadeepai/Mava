@@ -1,6 +1,6 @@
-# --- Defaults FF-IPPO ---
+# --- Defaults FF-ISAC ---
 
-num_updates: 1000 # Number of updates
+num_updates: 5000 # Number of updates
 seed: 1
 
 # --- Agent observations ---
@@ -11,6 +11,6 @@ tau: 0.005
 gamma: 0.95
 batch_size: 1024
 num_minibatches: 16
-rollout_length: 128
+rollout_length: 4
 rb_size: 1_000_000 # size of the replay buffer. Note: total size is this * num_learners
 lr: 3e-4

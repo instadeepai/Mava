@@ -263,7 +263,8 @@ def get_learner_fn(
         # todo sac discrete does sum and then mean, we should test this
         # https://github.com/BY571/SAC_discrete/blob/main/agent.py#L80C79-L80C79
         # TODO: double check the sum dim
-        actor_loss = jnp.mean((all_probs * (jnp.exp(log_alpha) * log_all_probs - q)).sum(-1))
+        # TODO: do we need sum(-1), cleanrl doesn't have it
+        actor_loss = jnp.mean((all_probs * ((jnp.exp(log_alpha) * log_all_probs) - q)).sum(-1))
         return actor_loss  # jnp.mean(jnp.exp(log_alpha) * log_prob - q)
 
     def alpha_loss(
@@ -428,17 +429,35 @@ def get_learner_fn(
             (learner_state, buffer_state), metrics = jax.lax.scan(
                 act, (learner_state, buffer_state), None, n_rollouts
             )
-            batches = buffer.sample(buffer_state, sample_key)
-            minibatch_size = int(
-                config["system"]["batch_size"] / config["system"]["num_minibatches"]
-            )
-            batches = jax.tree_util.tree_map(
-                lambda x: jnp.reshape(x, (-1, minibatch_size, *x.shape[1:])), batches
-            )
-            # todo treemap -> reshape(num_minibatches, ...)
-            # todo: get metrics/losses from here
 
-            learner_state, loss_info = jax.lax.scan(update, learner_state, batches)
+            # todo: clean this up a bit :)
+            def learn(learner_state):
+                batches = buffer.sample(buffer_state, sample_key)
+                minibatch_size = int(
+                    config["system"]["batch_size"] / config["system"]["num_minibatches"]
+                )
+                batches = jax.tree_util.tree_map(
+                    lambda x: jnp.reshape(x, (-1, minibatch_size, *x.shape[1:])), batches
+                )
+                # todo treemap -> reshape(num_minibatches, ...)
+                # todo: get metrics/losses from here
+
+                learner_state, loss_info = jax.lax.scan(update, learner_state, batches)
+                return learner_state, loss_info
+
+            def noop(learner_state):
+                return learner_state, {
+                    # todo: make sure its num_minibatches and not num_envs 
+                    "actor_loss": jnp.zeros(config["system"]["num_minibatches"]),
+                    "critic_loss": jnp.zeros(config["system"]["num_minibatches"]),
+                    "alpha_loss": jnp.zeros(config["system"]["num_minibatches"]),
+                    "alpha": jnp.zeros(config["system"]["num_minibatches"]),
+                    "mean_q": jnp.zeros(config["system"]["num_minibatches"]),
+                }
+            
+            learner_state, loss_info = jax.lax.cond(
+                buffer.can_sample(buffer_state), learn, noop, learner_state
+            )
 
             return (learner_state, buffer_state), (metrics, loss_info)
 
@@ -453,7 +472,6 @@ def get_learner_fn(
 
 
 def main(_config) -> None:
-
     config = copy.deepcopy(_config)
     log = logger_setup(config, system="sac")
 
