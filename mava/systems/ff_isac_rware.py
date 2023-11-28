@@ -229,7 +229,7 @@ def get_learner_fn(
     config: Dict,
 ) -> Callable[[LearnerState, BufferState[Transition]], State]:
     n_rollouts = config["system"]["rollout_length"]
-    target_entropy = env.action_spec().num_values[0]
+    target_entropy = -env.action_spec().num_values[0]
     act_dim = int(env.action_spec().num_values[0])
 
     def critic_loss(critic_params: CriticParams, obs: Array, target: Array, act: Array) -> Numeric:
@@ -262,7 +262,8 @@ def get_learner_fn(
 
         # todo sac discrete does sum and then mean, we should test this
         # https://github.com/BY571/SAC_discrete/blob/main/agent.py#L80C79-L80C79
-        actor_loss = jnp.mean((all_probs * (jnp.exp(log_alpha) * log_all_probs - q)).sum(1))
+        # TODO: double check the sum dim
+        actor_loss = jnp.mean((all_probs * (jnp.exp(log_alpha) * log_all_probs - q)).sum(-1))
         return actor_loss  # jnp.mean(jnp.exp(log_alpha) * log_prob - q)
 
     def alpha_loss(
@@ -361,10 +362,19 @@ def get_learner_fn(
             actor=actor_opt_state, critic=critic_opt_state, alpha=alpha_opt_state
         )
 
+        # Log mean_q
+        q1 = critic.apply(new_critic_params.first, obs)
+        q2 = critic.apply(new_critic_params.second, obs)
+
+        q = jnp.minimum(q1, q2)
+        mean_q = jnp.mean(q)
+
         losses = {
             "actor_loss": a_loss,
             "critic_loss": c_loss,
             "alpha_loss": alp_loss,
+            "alpha": jnp.exp(log_alpha),
+            "mean_q": mean_q,
         }
         learner_state = LearnerState(
             params=Params(actor=actor_params, critic=critic_params, log_alpha=log_alpha),

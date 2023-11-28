@@ -117,6 +117,7 @@ def get_ppo_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
 
     return log
 
+
 def get_sac_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
     """Get the logger function."""
 
@@ -143,6 +144,8 @@ def get_sac_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
             actor_loss = metrics[1]["actor_loss"]
             critic_loss = metrics[1]["critic_loss"]
             alpha_loss = metrics[1]["alpha_loss"]
+            alpha = metrics[1]["alpha"]
+            mean_q = metrics[1]["mean_q"]
         else:
             prefix = "evaluator/"
             episodes_info = metrics.episodes_info
@@ -162,6 +165,8 @@ def get_sac_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
                 logger.log_stat(f"{prefix}actor_loss", float(np.mean(actor_loss)), t_env)
                 logger.log_stat(f"{prefix}critic_loss", float(np.mean(critic_loss)), t_env)
                 logger.log_stat(f"{prefix}alpha_loss", float(np.mean(alpha_loss)), t_env)
+                logger.log_stat(f"{prefix}alpha", float(np.mean(alpha)), t_env)
+                logger.log_stat(f"{prefix}mean_q", float(np.mean(mean_q)), t_env)
 
         log_string = (
             f"Timesteps {t_env:07d} | "
@@ -182,7 +187,9 @@ def get_sac_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
             log_string += (
                 f"| Actor Loss {float(np.mean(actor_loss)):.3f} | "
                 f"Critic Loss {float(np.mean(critic_loss)):.3f} | "
-                f"Alpha Loss {float(np.mean(alpha_loss)):.3f} "
+                f"Alpha Loss {float(np.mean(alpha_loss)):.3f} | "
+                f"Alpha {float(np.mean(alpha)):.3f} | "
+                f"Mean Q {float(np.mean(mean_q)):.3f}"
             )
             logger.console_logger.info(
                 f"{Fore.MAGENTA}{Style.BRIGHT}TRAINER: {log_string}{Style.RESET_ALL}"
@@ -197,11 +204,11 @@ def get_sac_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
     return log
 
 
-def logger_setup(config: Dict, system: str="ppo") -> LogFn:
+def logger_setup(config: Dict, system: str = "ppo") -> LogFn:
     """Setup the logger."""
     logger = Logger(config)
-    if system=="ppo":
-        log=get_ppo_logger_tools(logger)
+    if system == "ppo":
+        log = get_ppo_logger_tools(logger)
     else:
-        log=get_sac_logger_tools(logger)
+        log = get_sac_logger_tools(logger)
     return log
