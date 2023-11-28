@@ -232,8 +232,8 @@ def get_learner_fn(
     target_entropy = -env.action_spec().num_values[0]
     act_dim = int(env.action_spec().num_values[0])
 
-    def critic_loss(critic_params: CriticParams, obs: Array, target: Array, act: Array) -> Numeric:
-        act_one_hot = jax.nn.one_hot(act, act_dim)
+    def critic_loss(critic_params: CriticParams, obs: Array, target: Array, acts: Array) -> Numeric:
+        act_one_hot = jax.nn.one_hot(acts, act_dim)
 
         q1 = critic.apply(critic_params.first, obs)
         q1 = (q1 * act_one_hot).sum(axis=-1)
@@ -275,15 +275,15 @@ def get_learner_fn(
         all_probs = policy.probs
         z = (all_probs == 0.0) * 1e-8
         log_all_probs = jnp.log(all_probs + z)
-
-        return -jnp.exp(log_alpha) * jnp.mean((log_all_probs + target_entropy))
+        # -jnp.exp(log_alpha) * jnp.mean((log_all_probs + target_entropy))
+        return jnp.mean(all_probs * (-jnp.exp(log_alpha) * (log_all_probs + target_entropy)))
 
     def update(
         learner_state: LearnerState[Params, OptStates], batch: BufferSample[Transition]
     ) -> Tuple[LearnerState, Dict[str, Array]]:
         obs = batch.experience.first.obs
         next_obs = batch.experience.second.obs
-        act = batch.experience.first.action
+        acts = batch.experience.first.action
         rew = batch.experience.first.reward
         done = batch.experience.first.done
 
@@ -314,7 +314,7 @@ def get_learner_fn(
         # )
 
         c_loss, critic_grads = jax.value_and_grad(critic_loss)(
-            learner_state.params.critic.critics, obs, target, act
+            learner_state.params.critic.critics, obs, target, acts
         )
         a_loss, actor_grads = jax.value_and_grad(policy_loss)(
             learner_state.params.actor,
@@ -469,7 +469,7 @@ def main(_config) -> None:
 
     actor = Actor(env.action_spec().num_values[0])
     critic = Critic(env.action_spec().num_values[0])  # todo: better critic
-    opt = optax.adam(1e-3)
+    opt = optax.adam(config["system"]["lr"])
     buffer = fbx.make_flat_buffer(
         config["system"]["rb_size"],
         0,

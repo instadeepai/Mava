@@ -1,7 +1,7 @@
 # --- Defaults FF-IPPO ---
 
 num_updates: 1000 # Number of updates
-seed: 42
+seed: 1
 
 # --- Agent observations ---
 add_agent_id: True
@@ -13,3 +13,4 @@ batch_size: 1024
 num_minibatches: 16
 rollout_length: 128
 rb_size: 1_000_000 # size of the replay buffer. Note: total size is this * num_learners
+lr: 3e-4
