@@ -13,17 +13,20 @@
 # limitations under the License.
 
 import os
+import typing
 import warnings
 from datetime import datetime
+from pydoc import locate
 from typing import Any, Dict, Optional, Union
 
 import absl.logging as absl_logging
 import orbax.checkpoint
 from chex import Numeric
+from flax.core.frozen_dict import FrozenDict
 from jax.tree_util import tree_map
 from omegaconf import DictConfig
 
-from mava.types import LearnerState, RNNLearnerState
+from mava.types import HiddenStates, LearnerState, Params, RNNLearnerState
 
 CHECKPOINTER_VERSION = 0.1
 
@@ -125,7 +128,10 @@ class Checkpointer:
         """
         model_save_success: bool = self._manager.save(
             step=timestep,
-            items=unreplicated_learner_state,
+            items={
+                "learner_state": unreplicated_learner_state,
+                "type": str(type(unreplicated_learner_state)),
+            },
             # TODO: Currently we only log the episode return,
             #       but perhaps we should log other metrics.
             metrics={"episode_return": episode_return},
@@ -133,7 +139,11 @@ class Checkpointer:
         return model_save_success
 
     def restore_learner_state(
-        self, n: Optional[int] = None
+        self,
+        unreplicated_input_learner_state: Union[LearnerState, RNNLearnerState],
+        n: Optional[int] = None,
+        restore_params: bool = True,
+        restore_hstates: bool = True,
     ) -> Union[LearnerState, RNNLearnerState]:
         """Restore the learner state.
 
@@ -145,10 +155,30 @@ class Checkpointer:
         Returns:
             Union[LearnerState, RNNLearnerState]: the restored learner state
         """
-        restored_learner_state: Union[LearnerState, RNNLearnerState] = self._manager.restore(
-            n if n else self._manager.latest_step()
-        )
-        return restored_learner_state
+        # Restore the checkpoint
+        restored_checkpoint = self._manager.restore(n if n else self._manager.latest_step())
+
+        # Dictionary of the restored learner state
+        restored_learner_state_raw = restored_checkpoint["learner_state"]
+
+        # Restore the learner state type and check it matches the input type
+        restored_learner_state_type = locate(restored_checkpoint["type"])
+        assert restored_learner_state_type == type(unreplicated_input_learner_state)
+
+        # We base the new learner state on the input learner state
+        new_learner_state = unreplicated_input_learner_state
+
+        if restore_params:
+            new_learner_state = new_learner_state._replace(
+                params=Params(**FrozenDict(restored_learner_state_raw["params"])),
+            )
+
+        if restore_hstates and restored_learner_state_type == RNNLearnerState:
+            new_learner_state = typing.cast(RNNLearnerState, new_learner_state)  # for mypy
+            new_learner_state = new_learner_state._replace(
+                hstates=HiddenStates(**FrozenDict(restored_learner_state_raw["hstates"])),
+            )
+        return new_learner_state
 
     def get_cfg(self) -> DictConfig:
         """Return the metadata of the checkpoint.
