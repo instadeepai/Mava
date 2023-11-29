@@ -48,7 +48,7 @@ from mava.types import (
     RecActorApply,
     RecCriticApply,
     RNNLearnerState,
-    RnnObservation,
+    RNNObservation,
 )
 from mava.wrappers.jumanji import AgentIDWrapper, LogWrapper, RwareWrapper
 
@@ -90,7 +90,7 @@ class Actor(nn.Module):
     def __call__(
         self,
         policy_hidden_state: chex.Array,
-        observation_done: RnnObservation,
+        observation_done: RNNObservation,
     ) -> Tuple[chex.Array, distrax.Categorical]:
         """Forward pass."""
         observation, done = observation_done
@@ -129,7 +129,7 @@ class Critic(nn.Module):
     def __call__(
         self,
         critic_hidden_state: Tuple[chex.Array, chex.Array],
-        observation_done: RnnObservation,
+        observation_done: RNNObservation,
     ) -> Tuple[chex.Array, chex.Array]:
         """Forward pass."""
         observation, done = observation_done

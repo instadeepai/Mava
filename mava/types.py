@@ -37,27 +37,27 @@ State: TypeAlias = Any
 
 class Observation(NamedTuple):
     """The observation that the agent sees.
-    agents_view: the agents' view of other agents and shelves within their
-        sensor range. The number of features in the observation array
-        depends on the sensor range of the agent.
+    agents_view: the agents' view of other agents and items within their
+        field of view (fov). The number of features in the observation array
+        depends on the number of elemnts that can be seen in the fov of the agent.
     action_mask: boolean array specifying, for each agent, which action is legal.
     step_count: the number of steps elapsed since the beginning of the episode.
     """
 
-    agents_view: chex.Array
-    action_mask: chex.Array
-    step_count: chex.Numeric
+    agents_view: chex.Array  # (num_agents, num_obs_features)
+    action_mask: chex.Array  # (num_agents, num_actions)
+    step_count: chex.Array  # (num_agents, )
 
 
 class ObservationGlobalState(NamedTuple):
-    """The observation seen by agents in centralized systems.
-    Extends `Observation` by adding a `global_state` attribute for centralized training.
+    """The observation seen by agents in centralised systems.
+    Extends `Observation` by adding a `global_state` attribute for centralised training.
     global_state: The global state of the environment, often a concatenation of agents' views.
     """
 
     agents_view: chex.Array  # (num_agents, num_obs_features)
     action_mask: chex.Array  # (num_agents, num_actions)
-    global_state: chex.Array  # (num_agents, num_agents * num_obs_features, )
+    global_state: chex.Array  # (num_agents, num_agents * num_obs_features)
     step_count: chex.Array  # (num_agents, )
 
 
@@ -73,8 +73,8 @@ class LogEnvState:
     episode_length_info: chex.Numeric
 
 
-RnnObservation: TypeAlias = Tuple[Observation, Done]
-RnnGlobalObservation: TypeAlias = Tuple[ObservationGlobalState, Done]
+RNNObservation: TypeAlias = Tuple[Observation, Done]
+RNNGlobalObservation: TypeAlias = Tuple[ObservationGlobalState, Done]
 
 
 class PPOTransition(NamedTuple):
@@ -176,6 +176,6 @@ EvalFn = Callable[[FrozenDict, chex.PRNGKey], ExperimentOutput[MavaState]]
 ActorApply = Callable[[FrozenDict, Observation], Distribution]
 CriticApply = Callable[[FrozenDict, Observation], Value]
 RecActorApply = Callable[
-    [FrozenDict, HiddenState, RnnObservation], Tuple[HiddenState, Distribution]
+    [FrozenDict, HiddenState, RNNObservation], Tuple[HiddenState, Distribution]
 ]
-RecCriticApply = Callable[[FrozenDict, HiddenState, RnnObservation], Tuple[HiddenState, Value]]
+RecCriticApply = Callable[[FrozenDict, HiddenState, RNNObservation], Tuple[HiddenState, Value]]
