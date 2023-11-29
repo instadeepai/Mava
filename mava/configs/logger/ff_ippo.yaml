@@ -7,5 +7,5 @@ system_name: ff_ippo
 kwargs:
   neptune_project: Instadeep/Mava
   neptune_tag: [ff-ippo, rware]
-  json_path: ~ # If set json files will be logged to a set path so that multiple experiments can
+  json_path: ~ # If set, json files will be logged to a set path so that multiple experiments can
     # write to the same json file for easy downstream aggregation and plotting with marl-eval.
