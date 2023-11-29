@@ -3,8 +3,9 @@ defaults:
 
 system_name: ff_mappo
 
-# --- Neptune options ---
+# --- Other logger kwargs ---
 kwargs:
   neptune_project: Instadeep/Mava
   neptune_tag: [ff-mappo, rware]
-  json_path: test_joint_json
+  json_path: ~ # If set json files will be logged to a set path so that multiple experiments can
+    # write to the same json file for easy downstream aggregation and plotting with marl-eval.
