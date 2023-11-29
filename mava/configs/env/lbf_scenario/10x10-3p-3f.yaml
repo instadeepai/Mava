@@ -1,8 +1,8 @@
-# The config of the Foraging-10x10-3p-3f scenario
+# The config of the 10x10-3p-3f scenario
 
 task_config:
   grid_size: 10
-  fov : 2
+  fov : 10
   num_agents: 3
   num_food: 3
   max_agent_level: 2

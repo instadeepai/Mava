@@ -1,4 +1,4 @@
-# The config of the Foraging-8x8-2p-2f-coop scenario
+# The config of the 8x8-2p-2f-coop scenario
 
 task_config:
   grid_size: 8
