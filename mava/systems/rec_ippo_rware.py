@@ -50,7 +50,8 @@ from mava.types import (
     RNNLearnerState,
     RNNObservation,
 )
-from mava.wrappers.jumanji import AgentIDWrapper, LogWrapper, RwareWrapper
+from mava.wrappers.jumanji import RwareWrapper
+from mava.wrappers.shared import AgentIDWrapper, LogWrapper
 
 
 class ScannedRNN(nn.Module):

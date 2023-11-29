@@ -51,12 +51,8 @@ from mava.types import (
     RNNGlobalObservation,
     RNNLearnerState,
 )
-from mava.wrappers.jumanji import (
-    AgentIDWrapper,
-    GlobalStateWrapper,
-    LogWrapper,
-    RwareWrapper,
-)
+from mava.wrappers.jumanji import RwareWrapper
+from mava.wrappers.shared import AgentIDWrapper, GlobalStateWrapper, LogWrapper
 
 
 class ScannedRNN(nn.Module):
