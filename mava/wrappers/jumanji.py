@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple, Union
+from typing import Callable, Dict, Tuple, Union
 
 import chex
 import jax.numpy as jnp
@@ -67,7 +67,7 @@ class MultiAgentWrapper(Wrapper):
         env (Environment): The base environment.
         use_individual_reward (bool): If True, the network uses the list of different rewards given.
         aggregate_rewards (bool): If True, aggregates rewards across agents.
-        aggregate_rewards_with (str): The function for aggregating rewards ("sum" or "mean").
+        reward_aggregation_function (str): The function for aggregating rewards ("sum" or "mean").
     """
 
     def __init__(
@@ -75,45 +75,59 @@ class MultiAgentWrapper(Wrapper):
         env: Environment,
         use_individual_reward: bool = False,
         aggregate_rewards: bool = False,
-        aggregate_rewards_with: str = "sum",
+        reward_aggregation_function: str = "sum",
     ):
         super().__init__(env)
         self._use_individual_reward = use_individual_reward
         self._aggregate_rewards = aggregate_rewards
-        self.aggregate_rewards_with = aggregate_rewards_with
+        self.reward_aggregation_function = reward_aggregation_function
         self._num_agents = self._env.num_agents
         # Mapping aggregation functions
-        self.aggregation_functions = {
+        self.aggregation_functions: Dict[str, Callable] = {
             "sum": jnp.sum,
             "mean": jnp.mean,
             # Add more functions as needed
         }
-        self.aggregate_function = self.aggregation_functions.get(
-            aggregate_rewards_with, jnp.sum
-        )  # No error!
+        self.aggregate_function: Callable = self.aggregation_functions.get(
+            reward_aggregation_function, jnp.sum
+        )
 
     def aggregate_rewards(
         self, timestep: TimeStep, observation: Observation
     ) -> TimeStep[Observation]:
-        """Aggregate rewards across agents using the specified function."""
-        reward = jnp.repeat(self.aggregate_function(timestep.reward), self._num_agents)
+        """
+        Aggregate individual rewards across agents using the specified function.
+        This method is designed for environments that return a list of individual rewards
+        for each agent.
+        """
+        # Aggregate individual rewards across agents using the specified aggregation function.
+        team_reward = self.aggregate_function(timestep.reward)
+
+        # Repeat the aggregated reward for each agent.
+        reward = jnp.repeat(team_reward, self._num_agents)
         return timestep.replace(observation=observation, reward=reward)
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
-        """Modify the timestep based on the specified reward handling strategy."""
-        observation = Observation(
+        """Modify the timestep and update the reward based on the specified reward
+        handling strategy."""
+
+        # Create a new observation with adjusted step count
+        modified_observation = Observation(
             agents_view=timestep.observation.agents_view,
             action_mask=timestep.observation.action_mask,
             step_count=jnp.repeat(timestep.observation.step_count, self._num_agents),
         )
-
         if self._use_individual_reward:
-            return timestep.replace(observation=observation)
+            # If the environment returns a list of individual rewards and these are used as is:
+            return timestep.replace(observation=modified_observation)
         elif self._aggregate_rewards:
-            return self.aggregate_rewards(timestep, observation)
+            # If the environment returns a list of individual rewards and rewards needs
+            # to be aggregated to use a single team_reward:
+            return self.aggregate_rewards(timestep, modified_observation)
         else:
-            reward = jnp.repeat(timestep.reward, self._num_agents)
-            return timestep.replace(observation=observation, reward=reward)
+            # If the environment returns a single reward, repeat the original reward for each agent
+            modified_reward = jnp.repeat(timestep.reward, self._num_agents)
+            return timestep.replace(observation=modified_observation, reward=modified_reward)
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment. Updates the step count."""

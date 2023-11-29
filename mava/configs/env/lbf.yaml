@@ -8,4 +8,4 @@ task_name: Foraging-2s-8x8-2p-2f-coop
 # Choose whether to use the use_idividual_reward = True OR aggregate_rewards=True.
 use_idividual_reward: False # If True, the network uses the list of different rewards given.
 aggregate_rewards : True  # If True, aggregates rewards across agents using the specified function.
-aggregate_rewards_with: sum # The function for aggregating rewards ("sum" or "mean").
+reward_aggregation_function: sum # The function for aggregating rewards ("sum" or "mean").
