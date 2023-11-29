@@ -69,6 +69,13 @@ class Logger:
         json_logs_path = os.path.join(
             cfg["logger"]["base_exp_path"], f"{json_exp_path}/{unique_token}"
         )
+
+        # if a custom path is specified, use that instead
+        if cfg["logger"]["kwargs"]["json_path"] is not None:
+            json_logs_path = os.path.join(
+                cfg["logger"]["base_exp_path"], "json", cfg["logger"]["kwargs"]["json_path"]
+            )
+
         self.json_logger = JsonWriter(
             path=json_logs_path,
             algorithm_name=cfg["logger"]["system_name"],
@@ -143,17 +150,6 @@ def get_experiment_path(config: Dict, logger_type: str) -> str:
 class JsonWriter:
     """
     Writer to create json files for reporting experiment results according to marl-eval
-
-    Follows conventions from https://github.com/instadeepai/marl-eval/tree/main#usage-
-    This writer was adapted from the implementation found in BenchMARL. For the original
-    implementation please see https://tinyurl.com/2t6fy548
-
-    Args:
-        path (str): where to write the file
-        algorithm_name (str): algorithm name
-        task_name (str): task name
-        environment_name (str): environment name
-        seed (int): random seed of the experiment
     """
 
     def __init__(
@@ -167,14 +163,28 @@ class JsonWriter:
         self.path = path
         self.file_name = "metrics.json"
         self.run_data: Dict = {"absolute_metrics": {}}
-        self.data = {
-            environment_name: {task_name: {algorithm_name: {f"seed_{seed}": self.run_data}}}
-        }
-        # Create the logging directory if it doesn't exist
-        os.makedirs(self.path, exist_ok=True)
 
-        # Create the file if it doesn't exist
-        with open(f"{self.path}/{self.file_name}", "w+") as f:
+        # if the file already exists, load it
+        if os.path.isfile(f"{self.path}/{self.file_name}"):
+            with open(f"{self.path}/{self.file_name}", "r") as f:
+                data = json.load(f)
+
+        else:
+            # Create the logging directory if it doesn't exist
+            os.makedirs(self.path, exist_ok=True)
+            data = {}
+
+        # Merge the existing data with the new data
+        self.data = data
+        if environment_name not in self.data:
+            self.data[environment_name] = {}
+        if task_name not in self.data[environment_name]:
+            self.data[environment_name][task_name] = {}
+        if algorithm_name not in self.data[environment_name][task_name]:
+            self.data[environment_name][task_name][algorithm_name] = {}
+        self.data[environment_name][task_name][algorithm_name][f"seed_{seed}"] = self.run_data
+
+        with open(f"{self.path}/{self.file_name}", "w") as f:
             json.dump(self.data, f, indent=4)
 
     def write(
@@ -182,16 +192,10 @@ class JsonWriter:
         timestep: int,
         key: str,
         value: float,
-        evaluation_step: Optional[int],
+        evaluation_step: Optional[int] = None,
     ) -> None:
         """
         Writes a step to the json reporting file
-
-        Args:
-            timestep (int): the current environment timestep
-            key (str): the metric that should be logged
-            value (str): the value of the metric that should be logged
-            evaluation_step (int): the evaluation step
         """
 
         logging_prefix, *metric_key = key.split("/")
@@ -212,5 +216,5 @@ class JsonWriter:
         if logging_prefix == "absolute":
             self.run_data["absolute_metrics"].update(metrics)
 
-        with open(f"{self.path}/{self.file_name}", "w+") as f:
+        with open(f"{self.path}/{self.file_name}", "w") as f:
             json.dump(self.data, f, indent=4)

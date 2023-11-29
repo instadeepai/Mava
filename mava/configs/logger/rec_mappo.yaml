@@ -7,3 +7,4 @@ system_name: rec_mappo
 kwargs:
   neptune_project: Instadeep/Mava
   neptune_tag: [rec-mappo, rware]
+  json_path: test_joint_json

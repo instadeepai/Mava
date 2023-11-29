@@ -7,3 +7,4 @@ system_name: ff_ippo
 kwargs:
   neptune_project: Instadeep/Mava
   neptune_tag: [ff-ippo, rware]
+  json_path: test_joint_json

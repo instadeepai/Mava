@@ -1,11 +1,11 @@
 # --- Logging options ---
 
-use_tf: True # Whether to use tensorboard logging.
+use_tf: False # Whether to use tensorboard logging.
 base_exp_path: results # Base path for logging.
 use_json: True # Whether to log marl-eval style to json.
 
 # --- Neptune logging ---
-use_neptune: True
+use_neptune: False
 
 kwargs:
   neptune_project: Instadeep/Mava
