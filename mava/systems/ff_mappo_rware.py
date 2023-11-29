@@ -566,10 +566,25 @@ def run_experiment(_config: Dict) -> None:
     pprint(config)
 
     # Set up checkpointer
-    checkpointer = Checkpointer(
-        model_name="ff_mappo_rware",
-        config=config,
-    )
+    save_checkpoint = config["logger"]["checkpointing"]["save_model"]
+    if save_checkpoint:
+        checkpointer = Checkpointer(
+            metadata=config,  # Save all config as metadata in the checkpoint
+            model_name=config["logger"]["system_name"],
+            **config["logger"]["checkpointing"]["save_args"],  # Checkpoint args
+        )
+
+    if config["logger"]["checkpointing"]["load_model"]:
+        loaded_checkpoint = Checkpointer(
+            model_name=config["logger"]["system_name"],
+            **config["logger"]["checkpointing"]["load_args"],  # Other checkpoint args
+        )
+        # Restore the learner state from the checkpoint
+        learner_state_reloaded = loaded_checkpoint.restore_learner_state(
+            unreplicated_input_learner_state=jax_utils.unreplicate(learner_state)
+        )
+        # Overwrite learner state with reloaded state, and replicate across devices.
+        learner_state = jax.device_put_replicated(learner_state_reloaded, jax.devices())
 
     # Run experiment for a total number of evaluations.
     max_episode_return = jnp.float32(0.0)
@@ -611,12 +626,13 @@ def run_experiment(_config: Dict) -> None:
             t_env=steps_per_rollout * (i + 1),
         )
 
-        # Save checkpoint of learner state
-        checkpointer.save(
-            timestep=steps_per_rollout * (i + 1),
-            unreplicated_learner_state=jax_utils.unreplicate(learner_output.learner_state),
-            episode_return=episode_return,
-        )
+        if save_checkpoint:
+            # Save checkpoint of learner state
+            checkpointer.save(
+                timestep=steps_per_rollout * (i + 1),
+                unreplicated_learner_state=jax_utils.unreplicate(learner_output.learner_state),
+                episode_return=episode_return,
+            )
 
         if config["arch"]["absolute_metric"] and max_episode_return <= episode_return:
             best_params = copy.deepcopy(trained_params)

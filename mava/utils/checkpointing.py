@@ -13,8 +13,10 @@
 # limitations under the License.
 
 import os
+import re
 import typing
 import warnings
+from copy import copy
 from datetime import datetime
 from pydoc import locate
 from typing import Any, Dict, Optional, Union
@@ -37,7 +39,7 @@ class Checkpointer:
     def __init__(
         self,
         model_name: str,
-        config: Optional[Dict] = None,
+        metadata: Optional[Dict] = None,
         rel_dir: str = "checkpoints",
         timestamp_override: Optional[str] = None,
         save_interval_steps: int = 1,
@@ -48,7 +50,7 @@ class Checkpointer:
 
         Args:
             model_name (str): Name of the model to be saved.
-            config (Optional[Dict], optional):
+            metadata (Optional[Dict], optional):
                 For storing model metadata. Defaults to None.
             rel_dir (str, optional):
                 Relative directory of checkpoints. Defaults to "checkpoints".
@@ -91,7 +93,7 @@ class Checkpointer:
             else:
                 return obj
 
-        config_json_ready = tree_map(get_json_ready, config)
+        metadata_json_ready = tree_map(get_json_ready, metadata)
 
         self._manager = orbax.checkpoint.CheckpointManager(
             directory=os.path.join(os.getcwd(), rel_dir, model_name, timestamp_str),
@@ -99,7 +101,7 @@ class Checkpointer:
             options=options,
             metadata={
                 "checkpointer_version": CHECKPOINTER_VERSION,
-                **(config_json_ready if config_json_ready is not None else {}),
+                **(metadata_json_ready if metadata_json_ready is not None else {}),
             },
         )
 
@@ -130,7 +132,10 @@ class Checkpointer:
             step=timestep,
             items={
                 "learner_state": unreplicated_learner_state,
-                "type": str(type(unreplicated_learner_state)),
+                "type": re.findall(
+                    "\<class '(.*)'\>",  # noqa: W605
+                    str(type(unreplicated_learner_state)),
+                )[0],
             },
             # TODO: Currently we only log the episode return,
             #       but perhaps we should log other metrics.
@@ -155,7 +160,12 @@ class Checkpointer:
         Returns:
             Union[LearnerState, RNNLearnerState]: the restored learner state
         """
-        # Restore the checkpoint
+        # Simple check if we're using the same version of the checkpointer
+        assert (
+            self._manager.metadata()["checkpointer_version"] == CHECKPOINTER_VERSION
+        ), "Loaded checkpoint was created with a different version of the checkpointer."
+
+        # Restore the checkpoint, either the n-th (if specified) or just the latest
         restored_checkpoint = self._manager.restore(n if n else self._manager.latest_step())
 
         # Dictionary of the restored learner state
@@ -166,7 +176,7 @@ class Checkpointer:
         assert restored_learner_state_type == type(unreplicated_input_learner_state)
 
         # We base the new learner state on the input learner state
-        new_learner_state = unreplicated_input_learner_state
+        new_learner_state = copy(unreplicated_input_learner_state)
 
         if restore_params:
             new_learner_state = new_learner_state._replace(
@@ -178,6 +188,7 @@ class Checkpointer:
             new_learner_state = new_learner_state._replace(
                 hstates=HiddenStates(**FrozenDict(restored_learner_state_raw["hstates"])),
             )
+
         return new_learner_state
 
     def get_cfg(self) -> DictConfig:
