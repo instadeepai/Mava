@@ -150,6 +150,17 @@ def get_experiment_path(config: Dict, logger_type: str) -> str:
 class JsonWriter:
     """
     Writer to create json files for reporting experiment results according to marl-eval
+
+    Follows conventions from https://github.com/instadeepai/marl-eval/tree/main#usage-
+    This writer was adapted from the implementation found in BenchMARL. For the original
+    implementation please see https://tinyurl.com/2t6fy548
+
+    Args:
+        path (str): where to write the file
+        algorithm_name (str): algorithm name
+        task_name (str): task name
+        environment_name (str): environment name
+        seed (int): random seed of the experiment
     """
 
     def __init__(
@@ -164,7 +175,7 @@ class JsonWriter:
         self.file_name = "metrics.json"
         self.run_data: Dict = {"absolute_metrics": {}}
 
-        # if the file already exists, load it
+        # If the file already exists, load it
         if os.path.isfile(f"{self.path}/{self.file_name}"):
             with open(f"{self.path}/{self.file_name}", "r") as f:
                 data = json.load(f)
@@ -196,6 +207,12 @@ class JsonWriter:
     ) -> None:
         """
         Writes a step to the json reporting file
+
+        Args:
+            timestep (int): the current environment timestep
+            key (str): the metric that should be logged
+            value (str): the value of the metric that should be logged
+            evaluation_step (int): the evaluation step
         """
 
         logging_prefix, *metric_key = key.split("/")
