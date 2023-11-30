@@ -13,3 +13,16 @@ kwargs:
   neptune_tag: [rware]
   json_path: ~ # If set, json files will be logged to a set path so that multiple experiments can
     # write to the same json file for easy downstream aggregation and plotting with marl-eval.
+
+# --- Checkpointing ---
+checkpointing:
+  save_model: True # Whether to save model checkpoints.
+  save_args:
+    save_interval_steps: 1 # Number of steps between saving checkpoints.
+    max_to_keep: 1 # Maximum number of checkpoints to keep.
+    keep_period: ~ # Don't delete any checkpoint where step % keep_period == 0
+    checkpoint_uid: ~ # Unique identifier for checkpoint to save. Defaults to timestamp
+
+  load_model: False # Whether to load model checkpoints.
+  load_args:
+    checkpoint_uid: "" # Unique identifier for checkpoint to load.

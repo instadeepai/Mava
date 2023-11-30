@@ -142,10 +142,12 @@ mava/share
 mava/include
 mava/workspace.code-workspace
 
+# learner_state checkpoints
+checkpoints
+
 # misc
 NULL
 logs
-Checkpoints
 .DS_Store
 .devcontainer/devcontainer.json
 3.9
