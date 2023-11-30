@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import datetime
 import json
 import logging
 import os
+from datetime import datetime
 from typing import Dict, Optional
 
 import neptune
@@ -35,6 +35,7 @@ class Logger:
     def __init__(self, cfg: Dict) -> None:
         """Initialise the logger."""
         self.console_logger = get_python_logger()
+        self.unique_token = datetime.now().strftime("%Y%m%d%H%M%S")
 
         if cfg["logger"]["use_tf"]:
             self._setup_tb(cfg)
@@ -52,9 +53,10 @@ class Logger:
 
     def _setup_tb(self, cfg: Dict) -> None:
         """Set up tensorboard logging."""
-        unique_token = f"{datetime.datetime.now()}"
         tb_exp_path = get_experiment_path(cfg, "tensorboard")
-        tb_logs_path = os.path.join(cfg["logger"]["base_exp_path"], f"{tb_exp_path}/{unique_token}")
+        tb_logs_path = os.path.join(
+            cfg["logger"]["base_exp_path"], f"{tb_exp_path}/{self.unique_token}"
+        )
 
         configure(tb_logs_path)
         self.tb_logger = log_value
@@ -64,10 +66,9 @@ class Logger:
         self.neptune_logger = get_neptune_logger(cfg)
 
     def _setup_json(self, cfg: Dict) -> None:
-        unique_token = f"{datetime.datetime.now()}"
         json_exp_path = get_experiment_path(cfg, "json")
         json_logs_path = os.path.join(
-            cfg["logger"]["base_exp_path"], f"{json_exp_path}/{unique_token}"
+            cfg["logger"]["base_exp_path"], f"{json_exp_path}/{self.unique_token}"
         )
 
         # if a custom path is specified, use that instead
