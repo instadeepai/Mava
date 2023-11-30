@@ -805,6 +805,7 @@ def run_experiment(_config: Dict) -> None:
         episode_return = log(
             metrics=evaluator_output,
             t_env=steps_per_rollout * (i + 1),
+            eval_step=i,
         )
 
         if save_checkpoint:
