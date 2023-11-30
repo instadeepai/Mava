@@ -131,7 +131,7 @@ class Checkpointer:
                 # str(type(...)) returns something like "<class 'mava.types.LearnerState'>"
                 # so we use regex to extract just the class name
                 "type": re.findall(
-                    "\<class '(.*)'\>",  # noqa: W605
+                    r"<class '(.*)'>",
                     str(type(unreplicated_learner_state)),
                 )[0],
             },
