@@ -127,6 +127,9 @@ class Checkpointer:
             step=timestep,
             items={
                 "learner_state": unreplicated_learner_state,
+                # We want to store the type of the learner state so we can restore it later
+                # str(type(...)) returns something like "<class 'mava.types.LearnerState'>"
+                # so we use regex to extract just the class name
                 "type": re.findall(
                     "\<class '(.*)'\>",  # noqa: W605
                     str(type(unreplicated_learner_state)),
