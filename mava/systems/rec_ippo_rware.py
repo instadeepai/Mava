@@ -52,7 +52,7 @@ from mava.types import (
     RNNObservation,
 )
 from mava.utils.checkpointing import Checkpointer
-from mava.wrappers.jumanji import MultiAgentWrapper
+from mava.wrappers.jumanji import RwareWrapper
 from mava.wrappers.shared import AgentIDWrapper, LogWrapper
 
 
