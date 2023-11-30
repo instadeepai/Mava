@@ -30,6 +30,9 @@ from omegaconf import DictConfig
 
 from mava.types import HiddenStates, LearnerState, Params, RNNLearnerState
 
+# Keep track of the version of the checkpointer
+# Any breaking API changes should be reflected in the major version (e.g. v0.1 -> v1.0)
+# whereas minor versions (e.g. v0.1 -> v0.2) indicate backwards compatibility
 CHECKPOINTER_VERSION = 0.1
 
 
@@ -160,10 +163,12 @@ class Checkpointer:
         Returns:
             Union[LearnerState, RNNLearnerState]: the restored learner state
         """
-        # Simple check if we're using the same version of the checkpointer
-        assert (
-            self._manager.metadata()["checkpointer_version"] == CHECKPOINTER_VERSION
-        ), "Loaded checkpoint was created with a different version of the checkpointer."
+        # We want to ensure `major` versions match, but allow `minor` versions to differ
+        # i.e. v0.1 and 0.2 are compatible, but v1.0 and v2.0 are not
+        # Any breaking API changes should be reflected in the major version
+        assert (self._manager.metadata()["checkpointer_version"] // 1) == (
+            CHECKPOINTER_VERSION // 1
+        ), "Loaded checkpoint was created with a different major version of the checkpointer."
 
         # Restore the checkpoint, either the n-th (if specified) or just the latest
         restored_checkpoint = self._manager.restore(n if n else self._manager.latest_step())
