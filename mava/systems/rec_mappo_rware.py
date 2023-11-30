@@ -42,19 +42,17 @@ from mava.types import (
     ExperimentOutput,
     HiddenStates,
     LearnerFn,
+    ObservationGlobalState,
     OptStates,
     Params,
     PPOTransition,
     RecActorApply,
     RecCriticApply,
+    RNNGlobalObservation,
     RNNLearnerState,
 )
-from mava.wrappers.jumanji import (
-    AgentIDWrapper,
-    LogWrapper,
-    ObservationGlobalState,
-    RwareMultiAgentWithGlobalStateWrapper,
-)
+from mava.wrappers.jumanji import RwareWrapper
+from mava.wrappers.shared import AgentIDWrapper, GlobalStateWrapper, LogWrapper
 
 
 class ScannedRNN(nn.Module):
@@ -94,7 +92,7 @@ class Actor(nn.Module):
     def __call__(
         self,
         policy_hidden_state: chex.Array,
-        observation_done: Tuple[chex.Array, chex.Array],
+        observation_done: RNNGlobalObservation,
     ) -> Tuple[chex.Array, distrax.Categorical]:
         """Forward pass."""
         observation, done = observation_done
@@ -133,7 +131,7 @@ class Critic(nn.Module):
     def __call__(
         self,
         critic_hidden_state: Tuple[chex.Array, chex.Array],
-        observation_done: Tuple[chex.Array, chex.Array],
+        observation_done: RNNGlobalObservation,
     ) -> Tuple[chex.Array, chex.Array]:
         """Forward pass."""
         observation, done = observation_done
@@ -224,11 +222,11 @@ def get_learner_fn(
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             # log episode return and length
-            done, reward = jax.tree_util.tree_map(
+            done = jax.tree_util.tree_map(
                 lambda x: jnp.repeat(x, config["system"]["num_agents"]).reshape(
                     config["arch"]["num_envs"], -1
                 ),
-                (timestep.last(), timestep.reward),
+                timestep.last(),
             )
             info = {
                 "episode_return": env_state.episode_return_info,
@@ -236,7 +234,7 @@ def get_learner_fn(
             }
 
             transition = PPOTransition(
-                done, action, value, reward, log_prob, last_timestep.observation, info
+                done, action, value, timestep.reward, log_prob, last_timestep.observation, info
             )
             hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
             learner_state = RNNLearnerState(
@@ -694,14 +692,14 @@ def run_experiment(_config: Dict) -> None:
     # Create envs
     generator = RandomGenerator(**config["env"]["rware_scenario"]["task_config"])
     env = jumanji.make(config["env"]["env_name"], generator=generator)
-    env = RwareMultiAgentWithGlobalStateWrapper(env)
+    env = GlobalStateWrapper(RwareWrapper(env))
     # Add agent id to observation.
     if config["system"]["add_agent_id"]:
         env = AgentIDWrapper(env=env, has_global_state=True)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env"]["env_name"], generator=generator)
-    eval_env = RwareMultiAgentWithGlobalStateWrapper(eval_env)
+    eval_env = GlobalStateWrapper(RwareWrapper(eval_env))
     if config["system"]["add_agent_id"]:
         eval_env = AgentIDWrapper(env=eval_env, has_global_state=True)
 

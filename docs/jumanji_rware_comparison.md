@@ -66,7 +66,7 @@ Please see below for Mava's recurrent and feedforward implementations of IPPO an
         <img src="images/rware_results/rec_mappo/small-4ag.png" alt="Mava rec mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
     <br>
-    <div style="text-align:center; margin-top: 10px;"> Mava recurrent IPPO performance on the <code>tiny-2ag</code>, <code>tiny-4ag</code> and <code>small-4ag</code> RWARE tasks.</div>
+    <div style="text-align:center; margin-top: 10px;"> Mava recurrent MAPPO performance on the <code>tiny-2ag</code>, <code>tiny-4ag</code> and <code>small-4ag</code> RWARE tasks.</div>
 </p>
 
 
