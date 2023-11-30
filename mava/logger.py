@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """Logger setup."""
-from typing import Dict, Protocol
+from typing import Dict, Optional, Protocol
 
 import jax.numpy as jnp
 import numpy as np
@@ -31,6 +31,7 @@ class LogFn(Protocol):
         t_env: int = 0,
         trainer_metric: bool = False,
         absolute_metric: bool = False,
+        eval_step: Optional[int] = None,
     ) -> float:
         ...
 
@@ -43,14 +44,16 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
         t_env: int = 0,
         trainer_metric: bool = False,
         absolute_metric: bool = False,
+        eval_step: Optional[int] = None,
     ) -> float:
         """Log the episode returns and lengths.
 
         Args:
             metrics (Dict): The metrics info.
-            t_env (int): The current timestep.
+            t_env (int): The current environment timestep.
             trainer_metric (bool): Whether to log the trainer metric.
             absolute_metric (bool): Whether to log the absolute metric.
+            eval_step (int): The count of the current evaluation.
         """
         if absolute_metric:
             prefix = "absolute/"
@@ -73,9 +76,13 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
 
         # Log metrics.
         if logger.should_log:
-            logger.log_stat(f"{prefix}mean_episode_returns", float(np.mean(episodes_return)), t_env)
-            logger.log_stat(f"{prefix}mean_episode_length", float(np.mean(episodes_length)), t_env)
-            logger.log_stat(f"{prefix}steps_per_second", steps_per_second, t_env)
+            logger.log_stat(
+                f"{prefix}mean_episode_returns", float(np.mean(episodes_return)), t_env, eval_step
+            )
+            logger.log_stat(
+                f"{prefix}mean_episode_length", float(np.mean(episodes_length)), t_env, eval_step
+            )
+            logger.log_stat(f"{prefix}steps_per_second", steps_per_second, t_env, eval_step)
 
             if trainer_metric:
                 logger.log_stat(f"{prefix}total_loss", float(np.mean(total_loss)), t_env)
