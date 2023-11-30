@@ -44,7 +44,7 @@ class Checkpointer:
         model_name: str,
         metadata: Optional[Dict] = None,
         rel_dir: str = "checkpoints",
-        timestamp_override: Optional[str] = None,
+        checkpoint_uid: Optional[str] = None,
         save_interval_steps: int = 1,
         max_to_keep: Optional[int] = 1,
         keep_period: Optional[int] = None,
@@ -57,9 +57,9 @@ class Checkpointer:
                 For storing model metadata. Defaults to None.
             rel_dir (str, optional):
                 Relative directory of checkpoints. Defaults to "checkpoints".
-            timestamp_override (Optional[str], optional):
-                Set the dir name within rel_dir/model_name/<...>.
-                Defaults to None, which means the timestamp is used.
+            checkpoint_uid (Optional[str], optional):
+                Set the uniqiue id of the checkpointer, rel_dir/model_name/checkpoint_uid/...
+                If not given, the timestamp is used.
             save_interval_steps (int, optional):
                 The interval at which checkpoints should be saved. Defaults to 1.
             max_to_keep (Optional[int], optional):
@@ -77,8 +77,8 @@ class Checkpointer:
         )
 
         orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
-        timestamp_str = (
-            timestamp_override if timestamp_override else datetime.now().strftime("%Y%m%d%H%M%S")
+        checkpoint_str = (
+            checkpoint_uid if checkpoint_uid else datetime.now().strftime("%Y%m%d%H%M%S")
         )
 
         options = orbax.checkpoint.CheckpointManagerOptions(
@@ -99,7 +99,7 @@ class Checkpointer:
         metadata_json_ready = tree_map(get_json_ready, metadata)
 
         self._manager = orbax.checkpoint.CheckpointManager(
-            directory=os.path.join(os.getcwd(), rel_dir, model_name, timestamp_str),
+            directory=os.path.join(os.getcwd(), rel_dir, model_name, checkpoint_str),
             checkpointers=orbax_checkpointer,
             options=options,
             metadata={
@@ -149,14 +149,14 @@ class Checkpointer:
     def restore_learner_state(
         self,
         unreplicated_input_learner_state: Union[LearnerState, RNNLearnerState],
-        n: Optional[int] = None,
+        timestep: Optional[int] = None,
         restore_params: bool = True,
         restore_hstates: bool = True,
     ) -> Union[LearnerState, RNNLearnerState]:
         """Restore the learner state.
 
         Args:
-            n (Optional[int], optional):
+            timestep (Optional[int], optional):
                 Specific timestep for restoration (of course, only if that timestep exists).
                 Defaults to None, in which case the latest step will be used.
 
@@ -171,7 +171,9 @@ class Checkpointer:
         ), "Loaded checkpoint was created with a different major version of the checkpointer."
 
         # Restore the checkpoint, either the n-th (if specified) or just the latest
-        restored_checkpoint = self._manager.restore(n if n else self._manager.latest_step())
+        restored_checkpoint = self._manager.restore(
+            timestep if timestep else self._manager.latest_step()
+        )
 
         # Dictionary of the restored learner state
         restored_learner_state_raw = restored_checkpoint["learner_state"]
