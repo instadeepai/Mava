@@ -49,7 +49,8 @@ from mava.types import (
     PPOTransition,
 )
 from mava.utils.jax import merge_leading_dims
-from mava.wrappers.jumanji import AgentIDWrapper, LogWrapper, MultiAgentWrapper
+from mava.wrappers.jumanji import MultiAgentWrapper
+from mava.wrappers.shared import AgentIDWrapper, LogWrapper
 
 
 class Actor(nn.Module):
