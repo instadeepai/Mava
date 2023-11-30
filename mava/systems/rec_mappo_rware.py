@@ -53,7 +53,7 @@ from mava.types import (
     RNNLearnerState,
 )
 from mava.utils.checkpointing import Checkpointer
-from mava.wrappers.jumanji import RwareWrapper
+from mava.wrappers.jumanji import MultiAgentWrapper
 from mava.wrappers.shared import AgentIDWrapper, GlobalStateWrapper, LogWrapper
 
 

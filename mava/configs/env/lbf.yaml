@@ -2,6 +2,7 @@
 defaults:
   - _self_
   - lbf_scenario: 2s-8x8-2p-2f-coop # [2s-8x8-2p-2f-coop, 8x8-2p-2f-coop, 2s-10x10-3p-3f, 10x10-3p-3f, 15x15-4p-3f, 15x15-4p-5f]
+# Further enviroment config details in "2s-8x8-2p-2f-coop" file.
 
 env_name: LevelBasedForaging-v0
 task_name: 2s-8x8-2p-2f-coop
