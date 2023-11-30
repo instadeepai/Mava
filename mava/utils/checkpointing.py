@@ -15,7 +15,6 @@
 import os
 import re
 import typing
-import warnings
 from copy import copy
 from datetime import datetime
 from pydoc import locate
@@ -68,13 +67,6 @@ class Checkpointer:
                 If set, will not delete any checkpoint where
                 checkpoint_step % keep_period == 0. Defaults to None.
         """
-
-        # Sharding info will be read from file, rather than from 'RestoreArgs'
-        warnings.filterwarnings(
-            action="ignore",
-            category=UserWarning,
-            message="Couldn't find sharding info under RestoreArgs",
-        )
 
         orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
         checkpoint_str = (
