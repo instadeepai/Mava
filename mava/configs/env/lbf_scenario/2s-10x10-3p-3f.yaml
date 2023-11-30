@@ -7,3 +7,7 @@ task_config:
   num_food: 3
   max_agent_level: 2
   force_coop: False
+
+grid_obs_config:
+  grid_size: 10
+  fov : 2
