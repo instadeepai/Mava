@@ -30,7 +30,6 @@ from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
 from jumanji.env import Environment
 from jumanji.environments.routing.robot_warehouse.generator import RandomGenerator
-from jumanji.types import Observation
 from jumanji.wrappers import AutoResetWrapper
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
@@ -44,18 +43,16 @@ from mava.types import (
     ExperimentOutput,
     LearnerFn,
     LearnerState,
+    Observation,
+    ObservationGlobalState,
     OptStates,
     Params,
     PPOTransition,
 )
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import merge_leading_dims
-from mava.wrappers.jumanji import (
-    AgentIDWrapper,
-    LogWrapper,
-    ObservationGlobalState,
-    RwareMultiAgentWithGlobalStateWrapper,
-)
+from mava.wrappers.jumanji import RwareWrapper
+from mava.wrappers.shared import AgentIDWrapper, GlobalStateWrapper, LogWrapper
 
 
 class Actor(nn.Module):
@@ -92,7 +89,7 @@ class Critic(nn.Module):
     """Critic Network."""
 
     @nn.compact
-    def __call__(self, observation: Observation) -> chex.Array:
+    def __call__(self, observation: ObservationGlobalState) -> chex.Array:
         """Forward pass."""
 
         critic_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
@@ -155,11 +152,11 @@ def get_learner_fn(
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             # LOG EPISODE METRICS
-            done, reward = jax.tree_util.tree_map(
+            done = jax.tree_util.tree_map(
                 lambda x: jnp.repeat(x, config["system"]["num_agents"]).reshape(
                     config["arch"]["num_envs"], -1
                 ),
-                (timestep.last(), timestep.reward),
+                timestep.last(),
             )
             info = {
                 "episode_return": env_state.episode_return_info,
@@ -167,7 +164,7 @@ def get_learner_fn(
             }
 
             transition = PPOTransition(
-                done, action, value, reward, log_prob, last_timestep.observation, info
+                done, action, value, timestep.reward, log_prob, last_timestep.observation, info
             )
             learner_state = LearnerState(params, opt_states, rng, env_state, timestep)
             return learner_state, transition
@@ -516,14 +513,14 @@ def run_experiment(_config: Dict) -> None:
     # Create envs
     generator = RandomGenerator(**config["env"]["rware_scenario"]["task_config"])
     env = jumanji.make(config["env"]["env_name"], generator=generator)
-    env = RwareMultiAgentWithGlobalStateWrapper(env)
+    env = GlobalStateWrapper(RwareWrapper(env))
     # Add agent id to observation.
     if config["system"]["add_agent_id"]:
         env = AgentIDWrapper(env=env, has_global_state=True)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env"]["env_name"], generator=generator)
-    eval_env = RwareMultiAgentWithGlobalStateWrapper(eval_env)
+    eval_env = GlobalStateWrapper(RwareWrapper(eval_env))
     if config["system"]["add_agent_id"]:
         eval_env = AgentIDWrapper(env=eval_env, has_global_state=True)
 
