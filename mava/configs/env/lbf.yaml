@@ -2,10 +2,10 @@
 defaults:
   - _self_
   - lbf_scenario: 2s-8x8-2p-2f-coop # [2s-8x8-2p-2f-coop, 8x8-2p-2f-coop, 2s-10x10-3p-3f, 10x10-3p-3f, 15x15-4p-3f, 15x15-4p-5f]
-# Further enviroment config details in "2s-8x8-2p-2f-coop" file.
+# Further environment config details in "2s-8x8-2p-2f-coop" file.
 
 env_name: LevelBasedForaging-v0
 task_name: 2s-8x8-2p-2f-coop
-# Choose whether to use the list of idividual reward(default setting) OR aggregate_rewards=True.
+# Choose whether to use the list of individual rewards (default setting) OR aggregate_rewards=True.
 aggregate_rewards : True  # If True, aggregates rewards across agents using the specified function.
 reward_aggregation_function: sum # The function for aggregating rewards ("sum" or "mean").

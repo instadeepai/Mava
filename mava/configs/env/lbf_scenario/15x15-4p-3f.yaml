@@ -2,7 +2,7 @@
 
 task_config:
   grid_size: 15
-  fov : 15
+  fov: 15
   num_agents: 4
   num_food: 3
   max_agent_level: 2

@@ -123,8 +123,8 @@ class LBFWrapper(MultiAgentWrapper):
         return timestep.replace(observation=observation, reward=reward)
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
-        """Modify the timestep and update the reward based on the specified reward
-        handling strategy."""
+        """Modify the timestep for Level-Based Foraging environment and update
+        the reward based on the specified reward handling strategy."""
 
         # Create a new observation with adjusted step count
         modified_observation = Observation(
