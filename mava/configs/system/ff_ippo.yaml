@@ -1,6 +1,6 @@
 # --- Defaults FF-IPPO ---
 
-num_updates: 1000 # Number of updates
+num_updates: 5000 # Number of updates
 seed: 42
 
 # --- Agent observations ---

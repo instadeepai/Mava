@@ -49,7 +49,7 @@ from mava.types import (
     PPOTransition,
 )
 from mava.utils.jax import merge_leading_dims
-from mava.wrappers.jumanji import MultiAgentWrapper
+from mava.wrappers.jumanji import LBFWrapper
 from mava.wrappers.shared import AgentIDWrapper, LogWrapper
 
 
@@ -506,14 +506,14 @@ def run_experiment(_config: Dict) -> None:
     # Create envs
     generator = RandomGenerator(**config["env"]["lbf_scenario"]["task_config"])
     env = jumanji.make(config["env"]["env_name"], generator=generator)
-    env = MultiAgentWrapper(env=env, aggregate_rewards=config["env"]["aggregate_rewards"])
+    env = LBFWrapper(env=env, aggregate_rewards=config["env"]["aggregate_rewards"])
     # Add agent id to observation.
     if config["system"]["add_agent_id"]:
         env = AgentIDWrapper(env)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env"]["env_name"], generator=generator)
-    eval_env = MultiAgentWrapper(eval_env, aggregate_rewards=config["env"]["aggregate_rewards"])
+    eval_env = LBFWrapper(eval_env, aggregate_rewards=config["env"]["aggregate_rewards"])
     if config["system"]["add_agent_id"]:
         eval_env = AgentIDWrapper(eval_env)
 

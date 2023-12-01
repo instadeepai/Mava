@@ -18,6 +18,8 @@ import chex
 import jax.numpy as jnp
 from jumanji import specs
 from jumanji.env import Environment
+from jumanji.environments.routing.lbf import LevelBasedForaging
+from jumanji.environments.routing.robot_warehouse import RobotWarehouse
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
 
@@ -25,25 +27,73 @@ from mava.types import Observation, State
 
 
 class MultiAgentWrapper(Wrapper):
+    def __init__(self, env: Environment):
+        super().__init__(env)
+
+    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
+        """Modify the timestep and update the reward based on the specified reward
+        handling strategy."""
+        pass
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
+        """Reset the environment. Updates the step count."""
+        state, timestep = self._env.reset(key)
+        return state, self.modify_timestep(timestep)
+
+    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
+        """Step the environment. Updates the step count."""
+        state, timestep = self._env.step(state, action)
+        return state, self.modify_timestep(timestep)
+
+    def observation_spec(self) -> specs.Spec[Observation]:
+        """Specification of the observation of the `RobotWarehouse` environment."""
+        step_count = specs.BoundedArray(
+            (self._env.num_agents,),
+            jnp.int32,
+            [0] * self._env.num_agents,
+            [self._env.time_limit] * self._env.num_agents,
+            "step_count",
+        )
+        return self._env.observation_spec().replace(step_count=step_count)
+
+
+class RWAREWrapper(MultiAgentWrapper):
+    """Multi-agent wrapper for the Robotic Warehouse environment."""
+
+    def __init__(self, env: RobotWarehouse):
+        super().__init__(env)
+
+    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
+        """Modify the timestep for the Robotic Warehouse environment."""
+        n_agents = self._env.num_agents
+        observation = Observation(
+            agents_view=timestep.observation.agents_view,
+            action_mask=timestep.observation.action_mask,
+            step_count=jnp.repeat(timestep.observation.step_count, n_agents),
+        )
+        reward = jnp.repeat(timestep.reward, n_agents)
+        discount = jnp.repeat(timestep.discount, n_agents)
+        return timestep.replace(observation=observation, reward=reward, discount=discount)
+
+
+class LBFWrapper(MultiAgentWrapper):
     """
-    Multi-agent wrapper for environments with configurable reward handling.
+     Multi-agent wrapper for the Level-Based Foraging environment.
 
     Args:
         env (Environment): The base environment.
-        use_individual_reward (bool): If True, the network uses the list of different rewards given.
         aggregate_rewards (bool): If True, aggregates rewards across agents.
         reward_aggregation_function (str): The function for aggregating rewards ("sum" or "mean").
     """
 
     def __init__(
         self,
-        env: Environment,
-        use_individual_reward: bool = False,
+        env: LevelBasedForaging,
         aggregate_rewards: bool = False,
         reward_aggregation_function: str = "sum",
     ):
         super().__init__(env)
-        self._use_individual_reward = use_individual_reward
+        self._env: LevelBasedForaging
         self._aggregate_rewards = aggregate_rewards
         self.reward_aggregation_function = reward_aggregation_function
         self._num_agents = self._env.num_agents
@@ -82,35 +132,10 @@ class MultiAgentWrapper(Wrapper):
             action_mask=timestep.observation.action_mask,
             step_count=jnp.repeat(timestep.observation.step_count, self._num_agents),
         )
-        if self._use_individual_reward:
-            # If the environment returns a list of individual rewards and these are used as is:
-            return timestep.replace(observation=modified_observation)
-        elif self._aggregate_rewards:
+        if self._aggregate_rewards:
             # If the environment returns a list of individual rewards and rewards needs
             # to be aggregated to use a single team_reward:
             return self.aggregate_rewards(timestep, modified_observation)
-        else:
-            # If the environment returns a single reward, repeat the original reward for each agent
-            modified_reward = jnp.repeat(timestep.reward, self._num_agents)
-            return timestep.replace(observation=modified_observation, reward=modified_reward)
 
-    def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
-        """Reset the environment. Updates the step count."""
-        state, timestep = self._env.reset(key)
-        return state, self.modify_timestep(timestep)
-
-    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
-        """Step the environment. Updates the step count."""
-        state, timestep = self._env.step(state, action)
-        return state, self.modify_timestep(timestep)
-
-    def observation_spec(self) -> specs.Spec[Observation]:
-        """Specification of the observation of the environment."""
-        step_count = specs.BoundedArray(
-            (self._env.num_agents,),
-            jnp.int32,
-            [0] * self._env.num_agents,
-            [self._env.time_limit] * self._env.num_agents,
-            "step_count",
-        )
-        return self._env.observation_spec().replace(step_count=step_count)
+        # The environment returns a list of individual rewards and these are used as is:
+        return timestep.replace(observation=modified_observation)

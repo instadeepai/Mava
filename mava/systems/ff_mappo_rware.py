@@ -51,7 +51,7 @@ from mava.types import (
 )
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import merge_leading_dims
-from mava.wrappers.jumanji import MultiAgentWrapper
+from mava.wrappers.jumanji import RWAREWrapper
 from mava.wrappers.shared import AgentIDWrapper, GlobalStateWrapper, LogWrapper
 
 
@@ -513,14 +513,14 @@ def run_experiment(_config: Dict) -> None:
     # Create envs
     generator = RandomGenerator(**config["env"]["rware_scenario"]["task_config"])
     env = jumanji.make(config["env"]["env_name"], generator=generator)
-    env = GlobalStateWrapper(MultiAgentWrapper(env))
+    env = GlobalStateWrapper(RWAREWrapper(env))
     # Add agent id to observation.
     if config["system"]["add_agent_id"]:
         env = AgentIDWrapper(env=env, has_global_state=True)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env"]["env_name"], generator=generator)
-    eval_env = GlobalStateWrapper(MultiAgentWrapper(eval_env))
+    eval_env = GlobalStateWrapper(RWAREWrapper(eval_env))
     if config["system"]["add_agent_id"]:
         eval_env = AgentIDWrapper(env=eval_env, has_global_state=True)
 

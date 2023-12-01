@@ -1,4 +1,4 @@
-# The config of the 10x10-3p-3f scenario
+# The config of the 10x10-3p-3f scenario with the VectorObserver set as default
 
 task_config:
   grid_size: 10
@@ -8,6 +8,7 @@ task_config:
   max_agent_level: 2
   force_coop: False
 
+# GridObserver config
 grid_obs_config:
   grid_size: 10
   fov : 10
