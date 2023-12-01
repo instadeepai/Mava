@@ -8,8 +8,3 @@ task_config:
   num_food: 2 # number of food in the environment.
   max_agent_level: 2 # maximum level of the agents (inclusive).
   force_coop: True # force cooperation between agents.
-
-# GridObserver config
-grid_obs_config:
-  grid_size: 8
-  fov : 2

@@ -53,7 +53,7 @@ from mava.types import (
     RNNLearnerState,
 )
 from mava.utils.checkpointing import Checkpointer
-from mava.wrappers.jumanji import RWAREWrapper
+from mava.wrappers.jumanji import RwareWrapper
 from mava.wrappers.shared import AgentIDWrapper, GlobalStateWrapper, LogWrapper
 
 
@@ -694,14 +694,14 @@ def run_experiment(_config: Dict) -> None:
     # Create envs
     generator = RandomGenerator(**config["env"]["scenario"]["task_config"])
     env = jumanji.make(config["env"]["env_name"], generator=generator)
-    env = GlobalStateWrapper(RWAREWrapper(env))
+    env = GlobalStateWrapper(RwareWrapper(env))
     # Add agent id to observation.
     if config["system"]["add_agent_id"]:
         env = AgentIDWrapper(env=env, has_global_state=True)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env"]["env_name"], generator=generator)
-    eval_env = GlobalStateWrapper(RWAREWrapper(eval_env))
+    eval_env = GlobalStateWrapper(RwareWrapper(eval_env))
     if config["system"]["add_agent_id"]:
         eval_env = AgentIDWrapper(env=eval_env, has_global_state=True)
 

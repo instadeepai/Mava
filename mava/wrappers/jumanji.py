@@ -33,16 +33,16 @@ class MultiAgentWrapper(Wrapper):
         self.time_limit = self._env.time_limit
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
-        """Modify the timestep for the selected enviroment."""
+        """Modify the timestep for `step` and `reset`."""
         pass
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
-        """Reset the environment and updates the timestep."""
+        """Reset the environment."""
         state, timestep = self._env.reset(key)
         return state, self.modify_timestep(timestep)
 
     def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
-        """Step the environment and updates the timestep."""
+        """Step the environment."""
         state, timestep = self._env.step(state, action)
         return state, self.modify_timestep(timestep)
 
@@ -58,7 +58,7 @@ class MultiAgentWrapper(Wrapper):
         return self._env.observation_spec().replace(step_count=step_count)
 
 
-class RWAREWrapper(MultiAgentWrapper):
+class RwareWrapper(MultiAgentWrapper):
     """Multi-agent wrapper for the Robotic Warehouse environment."""
 
     def __init__(self, env: RobotWarehouse):
@@ -76,21 +76,17 @@ class RWAREWrapper(MultiAgentWrapper):
         return timestep.replace(observation=observation, reward=reward, discount=discount)
 
 
-class LBFWrapper(MultiAgentWrapper):
+class LbfWrapper(MultiAgentWrapper):
     """
      Multi-agent wrapper for the Level-Based Foraging environment.
 
     Args:
         env (Environment): The base environment.
-        aggregate_rewards (bool): If True, aggregates rewards across agents.
-        reward_aggregation_function (str): The function for aggregating rewards ("sum" or "mean").
+        use_individual_rewards (bool): If true each agent gets a separate reward,
+        sum reward otherwise.
     """
 
-    def __init__(
-        self,
-        env: LevelBasedForaging,
-        use_individual_rewards: bool = False,
-    ):
+    def __init__(self, env: LevelBasedForaging, use_individual_rewards: bool = False):
         super().__init__(env)
         self._env: LevelBasedForaging
         self._use_individual_rewards = use_individual_rewards
