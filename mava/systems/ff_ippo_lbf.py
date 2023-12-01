@@ -504,16 +504,16 @@ def run_experiment(_config: Dict) -> None:
     log = logger_setup(config)
 
     # Create envs
-    generator = RandomGenerator(**config["env"]["lbf_scenario"]["task_config"])
+    generator = RandomGenerator(**config["env"]["scenario"]["task_config"])
     env = jumanji.make(config["env"]["env_name"], generator=generator)
-    env = LBFWrapper(env=env, aggregate_rewards=config["env"]["aggregate_rewards"])
+    env = LBFWrapper(env=env)
     # Add agent id to observation.
     if config["system"]["add_agent_id"]:
         env = AgentIDWrapper(env)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env"]["env_name"], generator=generator)
-    eval_env = LBFWrapper(eval_env, aggregate_rewards=config["env"]["aggregate_rewards"])
+    eval_env = LBFWrapper(eval_env)
     if config["system"]["add_agent_id"]:
         eval_env = AgentIDWrapper(eval_env)
 

@@ -1,4 +1,5 @@
 # The config of the tiny-2ag environment
+task_name: tiny-2ag
 
 task_config:
   column_height: 8

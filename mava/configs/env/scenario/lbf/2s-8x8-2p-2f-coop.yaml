@@ -1,4 +1,5 @@
 # The config of the 2s-8x8-2p-2f-coop scenario with the VectorObserver set as default.
+task_name: 2s-8x8-2p-2f-coop
 
 task_config:
   grid_size: 8 # size of the grid to generate.

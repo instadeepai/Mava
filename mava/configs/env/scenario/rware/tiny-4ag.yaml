@@ -1,4 +1,5 @@
-# The config of the tiny-4ag-easy environment
+# The config of the tiny_4ag environment
+task_name: tiny-4ag
 
 task_config:
   column_height: 8
@@ -6,4 +7,4 @@ task_config:
   shelf_columns: 3
   num_agents: 4
   sensor_range: 1
-  request_queue_size: 8
+  request_queue_size: 4
