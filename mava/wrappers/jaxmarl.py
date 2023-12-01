@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import namedtuple
 from typing import Dict, List, NamedTuple, Tuple
 
 import jax
 import jax.numpy as jnp
 from chex import Array, ArrayTree, PRNGKey
+from gymnax.environments import spaces as gymnax_spaces
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
 from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
@@ -33,6 +35,44 @@ def unbatchify(x: Array, agents: List[str]) -> Dict[str, Array]:
     return {agent: x[i] for i, agent in enumerate(agents)}
 
 
+def gymnax_space_to_jumanji_spec(space: gymnax_spaces.Space) -> specs.Spec:
+    if isinstance(space, gymnax_spaces.Discrete):
+        if space.shape == ():
+            return specs.DiscreteArray(num_values=space.n, dtype=space.dtype)
+        else:
+            return specs.MultiDiscreteArray(
+                num_values=jnp.full(space.shape, space.n), dtype=space.dtype
+            )
+    elif isinstance(space, gymnax_spaces.Box):
+        return specs.BoundedArray(
+            shape=space.shape,
+            dtype=space.dtype,
+            minimum=space.low,
+            maximum=space.high,
+        )
+    elif isinstance(space, gymnax_spaces.Dict):
+        # Jumanji needs something to hold the specs
+        contructor = namedtuple("SubSpace", list(space.spaces.keys()))  # type: ignore
+        # Recursively convert spaces to specs
+        sub_specs = {
+            sub_space_name: gymnax_space_to_jumanji_spec(sub_space)
+            for sub_space_name, sub_space in space.spaces.items()
+        }
+        return specs.Spec(constructor=contructor, name="", **sub_specs)
+    elif isinstance(space, gymnax_spaces.Tuple):
+        # Jumanji needs something to hold the specs
+        field_names = [f"sub_space_{i}" for i in range(len(space.spaces))]
+        constructor = namedtuple("SubSpace", field_names)  # type: ignore
+        # Recursively convert spaces to specs
+        sub_specs = {
+            f"sub_space_{i}": gymnax_space_to_jumanji_spec(sub_space)
+            for i, sub_space in enumerate(space.spaces)
+        }
+        return specs.Spec(constructor=constructor, name="", **sub_specs)
+    else:
+        raise ValueError(f"Unsupported gymnax space: {space}")
+
+
 class JaxMarlState(NamedTuple):
     state: ArrayTree
     key: PRNGKey
@@ -41,11 +81,22 @@ class JaxMarlState(NamedTuple):
 
 class JaxMarlWrapper(Wrapper):
     def __init__(self, env: MultiAgentEnv, timelimit: int = 500):
-        super().__init__(env)  # type: ignore
+        super().__init__(env)
         self._env: MultiAgentEnv
         self.agents = list(self._env.observation_spaces.keys())
         self._timelimit = timelimit
         self._action_shape = self.action_spec().shape
+
+        # check that all specs are the same as we only support homogeneous environments.
+        if not all(
+            self._env.observation_space(agent) == (self._env.observation_space(self.agents[0]))
+            for agent in self.agents[1:]
+        ):
+            e = (
+                f"Mava only supports environments with homogeneous agents, "
+                f"but you tried to use {type(env)} which is not homogeneous."
+            )
+            raise ValueError(e)
 
     def reset(self, key: PRNGKey) -> Tuple[JaxMarlState, TimeStep[Observation]]:
         key, reset_key = jax.random.split(key)
