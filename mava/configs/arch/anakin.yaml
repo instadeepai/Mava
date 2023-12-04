@@ -1,7 +1,7 @@
 # --- Anakin config ---
 
 # --- Training ---
-num_envs: 256  # Number of vectorised environments per device.
+num_envs: 8  # Number of vectorised environments per device.
 
 # --- Evaluation ---
 evaluation_greedy: False # Evaluate the policy greedily. If True the policy will select

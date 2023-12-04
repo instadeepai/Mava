@@ -139,7 +139,7 @@ def get_learner_fn(
 
         def _env_step(learner_state: LearnerState, _: Any) -> Tuple[LearnerState, PPOTransition]:
             """Step the environment."""
-            params, opt_states, rng, env_state, last_timestep = learner_state
+            params, opt_states, rng, env_state, last_timestep, _ = learner_state
 
             # SELECT ACTION
             rng, policy_rng = jax.random.split(rng)
@@ -175,7 +175,7 @@ def get_learner_fn(
         )
 
         # CALCULATE ADVANTAGE
-        params, opt_states, rng, env_state, last_timestep = learner_state
+        params, opt_states, rng, env_state, last_timestep, _ = learner_state
         last_val = critic_apply_fn(params.critic_params, last_timestep.observation)
 
         def _calculate_gae(

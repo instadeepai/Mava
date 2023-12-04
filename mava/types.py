@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Optional, Tuple,
 
 import chex
 from distrax import Distribution
+from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.frozen_dict import FrozenDict
 from jumanji.types import TimeStep
 from optax._src.base import OptState
@@ -116,6 +117,7 @@ class LearnerState(NamedTuple):
     key: chex.PRNGKey
     env_state: LogEnvState
     timestep: TimeStep
+    buffer_state: Optional[TrajectoryBufferState] = None
 
 
 class RNNLearnerState(NamedTuple):

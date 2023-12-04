@@ -18,6 +18,7 @@ from typing import Any, Dict, Sequence, Tuple
 
 import chex
 import distrax
+import flashbax as fbx
 import flax.linen as nn
 import hydra
 import jax
@@ -26,6 +27,7 @@ import jumanji
 import numpy as np
 import optax
 from colorama import Fore, Style
+from flashbax.buffers.trajectory_buffer import TrajectoryBuffer
 from flax import jax_utils
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
@@ -112,6 +114,7 @@ def get_learner_fn(
     apply_fns: Tuple[ActorApply, CriticApply],
     update_fns: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
     config: Dict,
+    buffer: TrajectoryBuffer,
 ) -> LearnerFn[LearnerState]:
     """Get the learner function."""
 
@@ -139,7 +142,7 @@ def get_learner_fn(
 
         def _env_step(learner_state: LearnerState, _: Any) -> Tuple[LearnerState, PPOTransition]:
             """Step the environment."""
-            params, opt_states, rng, env_state, last_timestep = learner_state
+            params, opt_states, rng, env_state, last_timestep, buffer_state = learner_state
 
             # SELECT ACTION
             rng, policy_rng = jax.random.split(rng)
@@ -166,7 +169,18 @@ def get_learner_fn(
             transition = PPOTransition(
                 done, action, value, timestep.reward, log_prob, last_timestep.observation, info
             )
-            learner_state = LearnerState(params, opt_states, rng, env_state, timestep)
+
+            flashbax_transition = {
+                "done": done,
+                "action": action,
+                "reward": timestep.reward,
+                "observation": timestep.observation.agents_view,
+                "legal_action_mask": timestep.observation.action_mask,
+            }
+
+            buffer_state = buffer.add(buffer_state, flashbax_transition)
+
+            learner_state = LearnerState(params, opt_states, rng, env_state, timestep, buffer_state)
             return learner_state, transition
 
         # STEP ENVIRONMENT FOR ROLLOUT LENGTH
@@ -175,7 +189,7 @@ def get_learner_fn(
         )
 
         # CALCULATE ADVANTAGE
-        params, opt_states, rng, env_state, last_timestep = learner_state
+        params, opt_states, rng, env_state, last_timestep, buffer_state = learner_state
         last_val = critic_apply_fn(params.critic_params, last_timestep.observation)
 
         def _calculate_gae(
@@ -362,7 +376,9 @@ def get_learner_fn(
         )
 
         params, opt_states, traj_batch, advantages, targets, rng = update_state
-        learner_state = LearnerState(params, opt_states, rng, env_state, last_timestep)
+        learner_state = LearnerState(
+            params, opt_states, rng, env_state, last_timestep, buffer_state
+        )
         metric = traj_batch.info
         return learner_state, (metric, loss_info)
 
@@ -433,6 +449,36 @@ def learner_setup(
     init_x = jax.tree_util.tree_map(lambda x: x[0], init_x)
     init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
 
+    dummy_flashbax_transition = {
+        "done": jnp.zeros((config["system"]["num_agents"],), dtype=bool),
+        "action": jnp.zeros((config["system"]["num_agents"],), dtype=jnp.int32),
+        "reward": jnp.zeros((config["system"]["num_agents"],), dtype=jnp.float32),
+        "observation": jnp.zeros(
+            (
+                config["system"]["num_agents"],
+                init_x.agents_view.shape[1],  # TODO: Could be much nicer.
+            ),
+            dtype=jnp.float32,
+        ),
+        "legal_action_mask": jnp.zeros(
+            (
+                config["system"]["num_agents"],
+                config["system"]["num_actions"],
+            ),
+            dtype=bool,
+        ),
+    }
+
+    buffer = fbx.make_flat_buffer(
+        max_length=int(1e6),
+        min_length=int(1),
+        sample_batch_size=1,
+        add_batch_size=config["arch"]["num_envs"],
+    )
+    buffer_state = buffer.init(
+        dummy_flashbax_transition,
+    )
+
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(rng_p, init_x)
     actor_opt_state = actor_optim.init(actor_params)
@@ -458,13 +504,17 @@ def learner_setup(
     update_fns = (actor_optim.update, critic_optim.update)
 
     # Get batched iterated update and replicate it to pmap it over cores.
-    learn = get_learner_fn(env, apply_fns, update_fns, config)
+    learn = get_learner_fn(env, apply_fns, update_fns, config, buffer)
     learn = jax.pmap(learn, axis_name="device")
 
     # Broadcast params and optimiser state to cores and batch.
     broadcast = lambda x: jnp.broadcast_to(
         x, (n_devices, config["system"]["update_batch_size"]) + x.shape
     )
+
+    # Broadcast buffer state to cores and batch.
+    buffer_state = jax.tree_map(broadcast, buffer_state)
+
     actor_params = jax.tree_map(broadcast, actor_params)
     actor_opt_state = jax.tree_map(broadcast, actor_opt_state)
     critic_params = jax.tree_map(broadcast, critic_params)
@@ -495,7 +545,9 @@ def learner_setup(
     params = Params(actor_params, critic_params)
     opt_states = OptStates(actor_opt_state, critic_opt_state)
 
-    init_learner_state = LearnerState(params, opt_states, step_rngs, env_states, timesteps)
+    init_learner_state = LearnerState(
+        params, opt_states, step_rngs, env_states, timesteps, buffer_state
+    )
     return learn, actor_network, init_learner_state
 
 
