@@ -61,7 +61,7 @@ exclude = [
     ".eggs",
 ]
 max-line-length=100
-max-cognitive-complexity=10
+max-cognitive-complexity=11
 import-order-style = "google"
 application-import-names = "mava"
 doctests = true

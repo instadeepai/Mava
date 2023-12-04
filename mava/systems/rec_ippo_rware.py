@@ -27,6 +27,7 @@ import jumanji
 import numpy as np
 import optax
 from colorama import Fore, Style
+from flax import jax_utils
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
 from jumanji.env import Environment
@@ -50,7 +51,9 @@ from mava.types import (
     RNNLearnerState,
     RNNObservation,
 )
-from mava.wrappers.jumanji import AgentIDWrapper, LogWrapper, RwareWrapper
+from mava.utils.checkpointing import Checkpointer
+from mava.wrappers.jumanji import RwareWrapper
+from mava.wrappers.shared import AgentIDWrapper, LogWrapper
 
 
 class ScannedRNN(nn.Module):
@@ -684,7 +687,7 @@ def run_experiment(_config: Dict) -> None:
     log = logger_setup(config)
 
     # Create envs
-    generator = RandomGenerator(**config["env"]["rware_scenario"]["task_config"])
+    generator = RandomGenerator(**config["env"]["scenario"]["task_config"])
     env = jumanji.make(config["env"]["env_name"], generator=generator)
     env = RwareWrapper(env)
     # Add agent id to observation.
@@ -738,6 +741,27 @@ def run_experiment(_config: Dict) -> None:
     )
     pprint(config)
 
+    # Set up checkpointer
+    save_checkpoint = config["logger"]["checkpointing"]["save_model"]
+    if save_checkpoint:
+        checkpointer = Checkpointer(
+            metadata=config,  # Save all config as metadata in the checkpoint
+            model_name=config["logger"]["system_name"],
+            **config["logger"]["checkpointing"]["save_args"],  # Checkpoint args
+        )
+
+    if config["logger"]["checkpointing"]["load_model"]:
+        loaded_checkpoint = Checkpointer(
+            model_name=config["logger"]["system_name"],
+            **config["logger"]["checkpointing"]["load_args"],  # Other checkpoint args
+        )
+        # Restore the learner state from the checkpoint
+        learner_state_reloaded = loaded_checkpoint.restore_learner_state(
+            unreplicated_input_learner_state=jax_utils.unreplicate(learner_state)
+        )
+        # Overwrite learner state with reloaded state, and replicate across devices.
+        learner_state = jax.device_put_replicated(learner_state_reloaded, jax.devices())
+
     # Run experiment for a total number of evaluations.
     max_episode_return = jnp.float32(0.0)
     best_params = None
@@ -775,7 +799,17 @@ def run_experiment(_config: Dict) -> None:
         episode_return = log(
             metrics=evaluator_output,
             t_env=steps_per_rollout * (i + 1),
+            eval_step=i,
         )
+
+        if save_checkpoint:
+            # Save checkpoint of learner state
+            checkpointer.save(
+                timestep=steps_per_rollout * (i + 1),
+                unreplicated_learner_state=jax_utils.unreplicate(learner_output.learner_state),
+                episode_return=episode_return,
+            )
+
         if config["arch"]["absolute_metric"] and max_episode_return <= episode_return:
             best_params = copy.deepcopy(trained_params)
             max_episode_return = episode_return

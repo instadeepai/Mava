@@ -37,9 +37,7 @@ State: TypeAlias = Any
 
 class Observation(NamedTuple):
     """The observation that the agent sees.
-    agents_view: the agents' view of other agents and items within their
-        field of view (fov). The number of features in the observation array
-        depends on the number of elemnts that can be seen in the fov of the agent.
+    agents_view: the agent's view of the environment.
     action_mask: boolean array specifying, for each agent, which action is legal.
     step_count: the number of steps elapsed since the beginning of the episode.
     """
