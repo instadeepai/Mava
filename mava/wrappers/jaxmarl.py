@@ -12,13 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 from collections import namedtuple
-from typing import Dict, List, NamedTuple, Tuple
+from typing import Dict, List, NamedTuple, Tuple, Union
 
 import jax
 import jax.numpy as jnp
 from chex import Array, ArrayTree, PRNGKey
 from gymnax.environments import spaces as gymnax_spaces
+from jaxmarl.environments import spaces as jaxmarl_spaces
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
 from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
@@ -27,76 +29,141 @@ from jumanji.wrappers import Wrapper
 from mava.types import Observation
 
 
+def _is_discrete(space: jaxmarl_spaces.Space) -> bool:
+    """JaxMarl sometimes uses gymnax and sometimes uses their own specs, so this is needed."""
+    return isinstance(space, (gymnax_spaces.Discrete, jaxmarl_spaces.Discrete))
+
+
+def _is_box(space: jaxmarl_spaces.Space) -> bool:
+    """JaxMarl sometimes uses gymnax and sometimes uses their own specs, so this is needed."""
+    return isinstance(space, (gymnax_spaces.Box, jaxmarl_spaces.Box))
+
+
+def _is_dict(space: jaxmarl_spaces.Space) -> bool:
+    """JaxMarl sometimes uses gymnax and sometimes uses their own specs, so this is needed."""
+    return isinstance(space, (gymnax_spaces.Dict, jaxmarl_spaces.Dict))
+
+
+def _is_tuple(space: jaxmarl_spaces.Space) -> bool:
+    return isinstance(space, (gymnax_spaces.Tuple, jaxmarl_spaces.Tuple))
+
+
 def batchify(x: Dict[str, Array], agents: List[str]) -> Array:
+    """Stack dictionary values into a single array."""
     return jnp.stack([x[agent] for agent in agents])
 
 
 def unbatchify(x: Array, agents: List[str]) -> Dict[str, Array]:
+    """Split array into dictionary entries."""
     return {agent: x[i] for i, agent in enumerate(agents)}
 
 
-def gymnax_space_to_jumanji_spec(space: gymnax_spaces.Space) -> specs.Spec:
-    if isinstance(space, gymnax_spaces.Discrete):
+def merge_space(
+    spec: Dict[str, Union[jaxmarl_spaces.Box, jaxmarl_spaces.Discrete]]
+) -> jaxmarl_spaces.Space:
+    """Convert a dictionary of spaces into a single space with a num_agents size first dimension.
+
+    JaxMarl uses a dictionary of specs, one per agent. For now we want this to be a single spec.
+    """
+    n_agents = len(spec)
+    single_spec = copy.deepcopy(list(spec.values())[0])
+
+    err = f"Unsupported space for merging spaces, expected Box or Discrete, got {type(single_spec)}"
+    assert _is_discrete(single_spec) or _is_box(single_spec), err
+
+    new_shape = (n_agents, *single_spec.shape)
+    single_spec.shape = new_shape
+
+    return single_spec
+
+
+def is_homogenous(env: MultiAgentEnv) -> bool:
+    """Check that all agents in an environment have the same observation and action spaces.
+
+    Note: currently this is done by checking the shape of the observation and action spaces
+    as gymnax/jaxmarl environments do not have a custom __eq__ for their specs.
+    """
+    agents = list(env.observation_spaces.keys())
+
+    main_agent_obs_shape = env.observation_space(agents[0]).shape
+    main_agent_act_shape = env.action_space(agents[0]).shape
+    # Cannot easily check low, high and n are the same, without being very messy.
+    # Unfortunately gymnax/jaxmarl doesn't have a custom __eq__ for their specs.
+    same_obs_shape = all(
+        env.observation_space(agent).shape == main_agent_obs_shape for agent in agents[1:]
+    )
+    same_act_shape = all(
+        env.action_space(agent).shape == main_agent_act_shape for agent in agents[1:]
+    )
+
+    return same_obs_shape and same_act_shape
+
+
+def jaxmarl_space_to_jumanji_spec(space: jaxmarl_spaces.Space) -> specs.Spec:
+    """Convert a jaxmarl space to a jumanji spec."""
+    if _is_discrete(space):
+        # jaxmarl have multi-discrete, but don't seem to use it.
         if space.shape == ():
             return specs.DiscreteArray(num_values=space.n, dtype=space.dtype)
         else:
             return specs.MultiDiscreteArray(
                 num_values=jnp.full(space.shape, space.n), dtype=space.dtype
             )
-    elif isinstance(space, gymnax_spaces.Box):
+    elif _is_box(space):
         return specs.BoundedArray(
             shape=space.shape,
             dtype=space.dtype,
             minimum=space.low,
             maximum=space.high,
         )
-    elif isinstance(space, gymnax_spaces.Dict):
+    elif _is_dict(space):
         # Jumanji needs something to hold the specs
         contructor = namedtuple("SubSpace", list(space.spaces.keys()))  # type: ignore
         # Recursively convert spaces to specs
         sub_specs = {
-            sub_space_name: gymnax_space_to_jumanji_spec(sub_space)
+            sub_space_name: jaxmarl_space_to_jumanji_spec(sub_space)
             for sub_space_name, sub_space in space.spaces.items()
         }
         return specs.Spec(constructor=contructor, name="", **sub_specs)
-    elif isinstance(space, gymnax_spaces.Tuple):
+    elif _is_tuple(space):
         # Jumanji needs something to hold the specs
         field_names = [f"sub_space_{i}" for i in range(len(space.spaces))]
         constructor = namedtuple("SubSpace", field_names)  # type: ignore
         # Recursively convert spaces to specs
         sub_specs = {
-            f"sub_space_{i}": gymnax_space_to_jumanji_spec(sub_space)
+            f"sub_space_{i}": jaxmarl_space_to_jumanji_spec(sub_space)
             for i, sub_space in enumerate(space.spaces)
         }
         return specs.Spec(constructor=constructor, name="", **sub_specs)
     else:
-        raise ValueError(f"Unsupported gymnax space: {space}")
+        raise ValueError(f"Unsupported JaxMarl space: {space}")
 
 
 class JaxMarlState(NamedTuple):
+    """Wrapper around a JaxMarl state to provide necessary attributes for jumanji environments."""
+
     state: ArrayTree
     key: PRNGKey
     step: int
 
 
 class JaxMarlWrapper(Wrapper):
+    """Wraps a JaxMarl environment so that its API is compatible with jumaji environments."""
+
     def __init__(self, env: MultiAgentEnv, timelimit: int = 500):
+        # Check that all specs are the same as we only support homogeneous environments, for now ;)
+        homogenous_error = (
+            f"Mava only supports environments with homogeneous agents, "
+            f"but you tried to use {env} which is not homogeneous."
+        )
+        assert is_homogenous(env), homogenous_error
+
         super().__init__(env)
         self._env: MultiAgentEnv
-        self.agents = list(self._env.observation_spaces.keys())
         self._timelimit = timelimit
         self._action_shape = self.action_spec().shape
 
-        # check that all specs are the same as we only support homogeneous environments.
-        if not all(
-            self._env.observation_space(agent) == (self._env.observation_space(self.agents[0]))
-            for agent in self.agents[1:]
-        ):
-            e = (
-                f"Mava only supports environments with homogeneous agents, "
-                f"but you tried to use {type(env)} which is not homogeneous."
-            )
-            raise ValueError(e)
+        self.agents = list(self._env.observation_spaces.keys())
 
     def reset(self, key: PRNGKey) -> Tuple[JaxMarlState, TimeStep[Observation]]:
         key, reset_key = jax.random.split(key)
@@ -112,7 +179,7 @@ class JaxMarlWrapper(Wrapper):
     def step(
         self, state: JaxMarlState, action: Array
     ) -> Tuple[JaxMarlState, TimeStep[Observation]]:
-        # todo: how do you know if it's a truncation with only done?
+        # todo: how do you know if it's a truncation with only dones?
         key, step_key = jax.random.split(state.key)
         obs, env_state, reward, done, infos = self._env.step(
             step_key, state.state, unbatchify(action, self.agents)
@@ -134,21 +201,17 @@ class JaxMarlWrapper(Wrapper):
         return JaxMarlState(env_state, key, state.step + 1), ts
 
     def observation_spec(self) -> specs.Spec:
-        """Returns the observation spec."""
-        # todo: this is hard coded for bounded arrays, need to make this general
-        single_spec = self._env.observation_space(self.agents[0])
-        agents_view = specs.BoundedArray(
-            shape=(self._env.num_agents, *single_spec.shape),
-            minimum=single_spec.low,
-            maximum=single_spec.high,
-            dtype=single_spec.dtype,
-            name="observation",
+        agents_view = jaxmarl_space_to_jumanji_spec(merge_space(self._env.observation_spaces))
+        single_agent_action_space = self._env.action_space(self.agents[0])
+        # we can't mask continuous actions, so just return a shape of 0 for this
+        n_actions = (
+            single_agent_action_space.n
+            if _is_discrete(self._env.action_space(self._env.agents[0]))
+            else 0
         )
-        n_actions = self._env.action_space(self.agents[0]).n
         action_mask = specs.BoundedArray(
             (self._env.num_agents, n_actions), bool, False, True, "action_mask"
         )
-        # todo: increment step_count
         step_count = specs.BoundedArray(
             (self._env.num_agents,), jnp.int32, 0, self._timelimit, "step_count"
         )
@@ -162,18 +225,12 @@ class JaxMarlWrapper(Wrapper):
         )
 
     def action_spec(self) -> specs.Spec:
-        """Returns the action spec."""
-        # todo: hard coded for discrete, need to make this general
-        single_spec = self._env.action_space(self.agents[0])
-        num_values = jnp.repeat(single_spec.n, self._env.num_agents)
-        return specs.MultiDiscreteArray(num_values=num_values, name="action")
+        return jaxmarl_space_to_jumanji_spec(merge_space(self._env.action_spaces))
 
     def reward_spec(self) -> specs.Array:
-        """Returns the reward spec."""
         return specs.Array(shape=(self._env.num_agents,), dtype=float, name="reward")
 
     def discount_spec(self) -> specs.BoundedArray:
-        """Returns the discount spec."""
         return specs.BoundedArray(
             shape=(self.num_agents,), dtype=float, minimum=0.0, maximum=1.0, name="discount"
         )
