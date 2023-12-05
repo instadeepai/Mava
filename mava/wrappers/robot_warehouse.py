@@ -12,12 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple, Union
 
 import gym
 import numpy as np
-from chex import Array
-from gym.spaces import Box, MultiDiscrete, flatdim
+from gym.spaces import Box, MultiDiscrete
+
+ResetOutput = Tuple[np.ndarray, Dict[str, Any]]
+StepOutput = Union[
+    Callable[[], ResetOutput], Tuple[np.ndarray, float, bool, bool, Dict], ResetOutput
+]
 
 
 class GymWrapper(gym.Wrapper):
@@ -53,28 +57,21 @@ class GymWrapper(gym.Wrapper):
             dtype=np.int32,
         )
 
-        # TODO: fix legal actions
-        self.longest_action_space = max(self.env.action_space, key=lambda x: x.n)
-
-    def reset(self) -> Tuple[Array, Dict]:
+    def reset(self) -> ResetOutput:
         """Resets the env."""
         # Reset the environment
         observations, extra = self.env.reset()
         self._done = False
         self._reset_next_step = False
 
-        # Get legal actions
-        legal_actions = self._get_legal_actions()
+        # Convert observations to numpy arrays
+        observations = self._convert_observations(observations)
 
-        # Convert observations and legal actions to numpy arrays
-        observations, legal_actions = self._convert_observations(observations, legal_actions)
-
-        # TODO: use extra if needed
-        info = {"extra_info": extra, "legal_actions": legal_actions}
+        info = {"extra_info": extra}
 
         return observations, info
 
-    def step(self, actions: List) -> Tuple[Array, float, bool, bool, Dict]:
+    def step(self, actions: List) -> StepOutput:
         """Steps in env."""
 
         # Possibly reset the environment
@@ -91,13 +88,8 @@ class GymWrapper(gym.Wrapper):
         if self._done:
             self._reset_next_step = True
 
-        # Get legal actions
-        legal_actions = self._get_legal_actions()
-
-        # Convert observations and legal actions to numpy arrays
-        next_observations, legal_actions = self._convert_observations(
-            next_observations, legal_actions
-        )
+        # Convert observations to numpy arrays
+        next_observations = self._convert_observations(next_observations)
 
         # Reward info
         if self.team_reward:
@@ -106,61 +98,40 @@ class GymWrapper(gym.Wrapper):
             reward = np.array(reward)
 
         # State info
-        info = {"extra_info": self._info, "legal_actions": legal_actions}
+        info = {"extra_info": self._info}
 
-        # NOTE: return done twice as termination and truncation for now.
-        return next_observations, reward, self._done, False, info
+        return next_observations, reward, terminated, truncated, info
 
-    def _get_legal_actions(self) -> List:
-        """Get legal actions from the environment."""
-        legal_actions = []
-        for agent_id in range(self.n_agents):
-            avail_agent = self.get_avail_agent_actions(agent_id)
-            legal_actions.append(avail_agent)
-        return legal_actions
-
-    def get_avail_agent_actions(self, agent_id) -> List:
-        """Returns the available actions for agent_id"""
-        valid = flatdim(self.env.action_space[agent_id]) * [1]
-        invalid = [0] * (self.longest_action_space.n - len(valid))
-        return valid + invalid
-
-    def _convert_observations(
-        self,
-        observations: List,
-        legal_actions: List,
-    ) -> Tuple[Array, Array]:
-        """Convert observation so it's numpy array."""
-        observations = np.array(observations, dtype="float32")
-        legal_actions = np.array(legal_actions, dtype="float32")
-
-        return observations, legal_actions
+    def _convert_observations(self, observations: List) -> np.ndarray:
+        """Convert observation to it's numpy array."""
+        converted_array: np.ndarray = np.array(observations, dtype="float32")
+        return converted_array
 
 
 class AgentIDWrapper(gym.Wrapper):
     """Add onehot agent IDs to observation."""
 
-    def __init__(self, env):
+    def __init__(self, env: gym.Env):
         super().__init__(env)
 
         self.agent_ids = np.eye(self.env.num_agents)
 
         _obs_dtype = self.env.observation_space.dtype
-        _obs_shape = self.observation_space.shape
+        _obs_shape = self.env.observation_space.shape
         _new_obs_shape = (self.env.num_agents, _obs_shape[1] + self.env.num_agents)
         self.observation_space = Box(low=-1, high=1, shape=_new_obs_shape, dtype=_obs_dtype)
 
-    def reset(self) -> Tuple[Array, Dict]:
+    def reset(self) -> Tuple[np.ndarray, Dict]:
         """Reset the environment."""
         obs, info = self.env.reset()
         obs = np.concatenate([self.agent_ids, obs], axis=1)
         return obs, info
 
-    def step(self, action: list) -> Tuple[Array, float, bool, bool, Dict]:
+    def step(self, action: list) -> Tuple[np.ndarray, float, bool, bool, Dict]:
         """Step the environment."""
-        obs, reward, done, _, info = self.env.step(action)
+        obs, reward, terminated, truncated, info = self.env.step(action)
         obs = np.concatenate([self.agent_ids, obs], axis=1)
-        return obs, reward, done, False, info
+        return obs, reward, terminated, truncated, info
 
 
 def make_env(
