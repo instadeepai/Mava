@@ -108,7 +108,7 @@ class GymWrapper(gym.Wrapper):
         # State info
         info = {"extra_info": self._info, "legal_actions": legal_actions}
 
-        #TODO: return termination and truncation
+        # NOTE: return done twice as termination and truncation for now.
         return next_observations, reward, self._done, False, info
 
     def _get_legal_actions(self) -> List:
@@ -158,7 +158,6 @@ class AgentIDWrapper(gym.Wrapper):
 
     def step(self, action: list) -> Tuple[Array, float, bool, bool, Dict]:
         """Step the environment."""
-        #TODO: return termination and truncation
         obs, reward, done, _, info = self.env.step(action)
         obs = np.concatenate([self.agent_ids, obs], axis=1)
         return obs, reward, done, False, info

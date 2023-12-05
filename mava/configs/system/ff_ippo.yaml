@@ -19,3 +19,26 @@ clip_eps: 0.2 # Clipping value for PPO updates and value function.
 ent_coef: 0.01 # Entropy regularisation term for loss function.
 vf_coef: 0.5 # Critic weight in
 max_grad_norm: 0.5 # Maximum norm of the gradients for a weight update.
+use_team_reward: True # whether to use a shared team reward
+anneal_lr: True # whether to anneal the learning rate
+gradient_accumulation_steps:  1 # the number of gradient accumulation steps
+norm_adv: True # toggles advantages normalization
+
+
+
+
+# runtime arguments to be filled in
+num_agents: ~ # num agents in the env
+num_actions: ~ # num actions per agent
+single_obs_dim: ~ # obs dim per agent
+local_batch_size: ~ # the size of the full batch per learner device
+local_minibatch_size: ~ # the size of each minibatch per learner device
+num_envs: ~ # number of envs across the world
+  # (local_n_envs * len(actor_device_ids) * n_threads_per_actor * world_size)
+batch_size: ~ # batch size across the world
+minibatch_size: ~ # minibatch size across the world
+  # eg. each update in ppo will be num_epochs * num_minibatches
+global_learner_devices: ~ # all learner devices across the world
+actor_devices: ~ # all actor devices
+learner_devices: ~ # all learner devices
+total_timesteps: ~
