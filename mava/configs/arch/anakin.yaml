@@ -1,5 +1,5 @@
 # --- Anakin config ---
-
+arch_name: "anakin"
 # --- Training ---
 num_envs: 256  # Number of vectorised environments per device.
 

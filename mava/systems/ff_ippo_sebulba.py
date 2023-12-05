@@ -43,6 +43,7 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
+from mava.logger import logger_setup
 from mava.wrappers.robot_warehouse import make_env as make_env_single
 
 # ACTOR_MASK = jnp.reshape(jnp.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1], "float32"), (1,32))
@@ -65,6 +66,77 @@ os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=false " "intra_op_parall
 # Fix CUDNN non-determinisim; https://github.com/google/jax/issues/4823#issuecomment-952835771
 os.environ["TF_XLA_FLAGS"] = "--xla_gpu_autotune_level=2 --xla_gpu_deterministic_reductions"
 os.environ["TF_CUDNN DETERMINISTIC"] = "1"
+
+
+# Evaluator:
+
+
+def evaluation(
+    envs: gym.vector.AsyncVectorEnv,
+    params: FrozenDict,
+    vmap_actor_apply,
+    key,
+    cfg,
+    log_fn,
+    t_env,
+) -> Dict[str, float]:
+
+    # During evaluation, we want deterministic ordering of seeds
+    @jax.jit
+    def get_action_and_value(  # TODO: Use the power_tools action methods?
+        params: flax.core.FrozenDict,
+        next_obs: np.ndarray,
+        legal_actions: np.ndarray,
+        key: jax.random.PRNGKey,
+    ):
+        next_obs = jnp.array(next_obs)
+        legal_actions = jnp.array(legal_actions)
+        logits = vmap_actor_apply(params.actor_params, next_obs)
+        # TODO: make legal actions part of obs similar to anakin arch
+        masked_logits = jnp.where(
+            legal_actions,
+            logits,
+            jnp.finfo(jnp.float32).min,
+        )
+        policy = distrax.Categorical(logits=masked_logits)
+
+        key, subkey = jax.random.split(key)
+        raw_action, _ = policy.sample_and_log_prob(seed=subkey)
+
+        return next_obs, raw_action, key
+
+    # put data in the last index
+    episode_returns = np.zeros((cfg.arch.num_eval_episodes,), dtype=np.float32)
+    episode_lengths = np.zeros((cfg.arch.num_eval_episodes,), dtype=np.float32)
+    next_obs, infos = envs.reset()
+    next_done = jnp.zeros(cfg.arch.num_envs, dtype=jax.numpy.bool_)
+    # TODO: make it flexible to different epiosdes lengths
+    for _ in range(0, 500):
+        cached_next_obs = next_obs
+        cached_next_done = next_done
+        cached_infos = infos
+        legal_actions = np.stack(cached_infos["legal_actions"])
+        (
+            cached_next_obs,
+            action,
+            key,
+        ) = get_action_and_value(params, cached_next_obs, legal_actions, key)
+        cpu_action = np.array(action)
+        next_obs, next_reward, next_done, _, infos = envs.step(cpu_action)
+        env_id = np.arange(cfg.arch.num_eval_episodes)
+        episode_returns[env_id] += np.mean(next_reward)
+        episode_lengths[env_id] += 1
+    # TODO: add sps
+    log_fn(
+        log_type={"Evaluator": {}},
+        t_env=t_env,
+        metrics_to_log={
+            "episode_info": {
+                "episode_return": episode_returns,
+                "episode_length": np.zeros_like(episode_returns),
+            },
+        },
+    )
 
 
 class Params(NamedTuple):
@@ -190,11 +262,12 @@ def rollout(
     writer,
     learner_devices,
     device_thread_id,
-    actor_device,
+    actor_device_id,
+    log_fn,
 ):
     envs = make_env(
         seed=cfg.system.seed + jax.process_index() + device_thread_id,
-        num_envs=cfg.arch.local_n_envs,
+        num_envs=cfg.arch.num_envs,
         env_cfg=cfg.env,
         use_team_reward=cfg.system.use_team_reward,
         async_envs=cfg.arch.async_envs,
@@ -235,17 +308,17 @@ def rollout(
         return next_obs, raw_action, raw_action, logprob, value.squeeze(), key
 
     # put data in the last index
-    episode_returns = np.zeros((cfg.arch.local_n_envs,), dtype=np.float32)
-    returned_episode_returns = np.zeros((cfg.arch.local_n_envs,), dtype=np.float32)
-    episode_lengths = np.zeros((cfg.arch.local_n_envs,), dtype=np.float32)
-    returned_episode_lengths = np.zeros((cfg.arch.local_n_envs,), dtype=np.float32)
+    episode_returns = np.zeros((cfg.arch.num_envs,), dtype=np.float32)
+    returned_episode_returns = np.zeros((cfg.arch.num_envs,), dtype=np.float32)
+    episode_lengths = np.zeros((cfg.arch.num_envs,), dtype=np.float32)
+    returned_episode_lengths = np.zeros((cfg.arch.num_envs,), dtype=np.float32)
 
     params_queue_get_time = deque(maxlen=10)
     rollout_time = deque(maxlen=10)
     rollout_queue_put_time = deque(maxlen=10)
     actor_policy_version = 0
     next_obs, infos = envs.reset()
-    next_done = jnp.zeros(cfg.arch.local_n_envs, dtype=jax.numpy.bool_)
+    next_done = jnp.zeros(cfg.arch.num_envs, dtype=jax.numpy.bool_)
 
     @jax.jit
     def prepare_data(storage: List[Transition]) -> Transition:
@@ -254,7 +327,6 @@ def rollout(
         )
 
     for update in range(1, cfg.system.num_updates + 2):
-        update_time_start = time.time()
         env_recv_time = 0
         inference_time = 0
         storage_time = 0
@@ -295,25 +367,19 @@ def rollout(
             ) = get_action_and_value(params, cached_next_obs, legal_actions, key)
             inference_time += time.time() - inference_time_start
 
-            d2h_time_start = time.time()
             cpu_action = np.array(action)
-            d2h_time += time.time() - d2h_time_start
 
             env_send_time_start = time.time()
             next_obs, next_reward, next_done, _, infos = envs.step(cpu_action)
             if cfg.system.use_team_reward:
                 next_rewards, next_dones, cached_next_dones = jax.tree_util.tree_map(
-                    lambda x: jnp.repeat(x, cfg.system.num_agents).reshape(
-                        cfg.arch.local_n_envs, -1
-                    ),
+                    lambda x: jnp.repeat(x, cfg.system.num_agents).reshape(cfg.arch.num_envs, -1),
                     (next_reward, next_done, cached_next_done),
                 )
 
             else:
                 next_dones, cached_next_dones = jax.tree_util.tree_map(
-                    lambda x: jnp.repeat(x, cfg.system.num_agents).reshape(
-                        cfg.arch.local_n_envs, -1
-                    ),
+                    lambda x: jnp.repeat(x, cfg.system.num_agents).reshape(cfg.arch.num_envs, -1),
                     (next_done, cached_next_done),
                 )
                 next_rewards = next_reward
@@ -325,7 +391,7 @@ def rollout(
             # TODO (Ruan): Check what envpool puts in info and make suitable wrapper.
             # env_id = info["env_id"]
             # Hack to make it work like envpool
-            env_id = np.arange(cfg.arch.local_n_envs)
+            env_id = np.arange(cfg.arch.num_envs)
             env_send_time += time.time() - env_send_time_start
             storage_time_start = time.time()
 
@@ -335,7 +401,8 @@ def rollout(
                 Transition(
                     obs=cached_next_obs,
                     dones=cached_next_dones,
-                    actions=raw_action,  # only store the raw actions for training.
+                    # only store the raw actions for training.
+                    actions=raw_action,
                     logprobs=logprob,
                     values=value,
                     env_ids=env_id,
@@ -366,7 +433,6 @@ def rollout(
             storage_time += time.time() - storage_time_start
         rollout_time.append(time.time() - rollout_time_start)
 
-        avg_episodic_return = np.mean(returned_episode_returns)
         partitioned_storage = prepare_data(storage)
         sharded_storage = Transition(
             *list(
@@ -399,52 +465,28 @@ def rollout(
 
         if (update % cfg.arch.log_frequency == 0) or (cfg.system.num_updates + 1 == update):
             # TODO:  make logger
-            if device_thread_id == 0:
-                print(
-                    f"global_step={global_step}, avg_episodic_return={avg_episodic_return}, rollout_time={np.mean(rollout_time)}"
-                )
-                print("SPS:", int(global_step / (time.time() - start_time)))
-            writer.add_scalar("stats/rollout_time", np.mean(rollout_time), global_step)
-            writer.add_scalar("charts/avg_episodic_return", avg_episodic_return, global_step)
-            writer.add_scalar(
-                "charts/avg_episodic_length",
-                np.mean(returned_episode_lengths),
-                global_step,
+            log_fn(
+                log_type={"Executor": {"device_thread_id": device_thread_id}},
+                t_env=global_step,
+                metrics_to_log={
+                    "episode_info": {
+                        "episode_return": returned_episode_returns,
+                        "episode_length": returned_episode_lengths,
+                    },
+                    "speed_info": {
+                        "sps": int(global_step / (time.time() - start_time)),
+                        "rollout_time": np.mean(rollout_time),
+                    },
+                    "queue_info": {
+                        "params_queue_get_time": np.mean(params_queue_get_time),
+                        "env_recv_time": env_recv_time,
+                        "inference_time": inference_time,
+                        "storage_time": storage_time,
+                        "env_send_time": env_send_time,
+                        "rollout_queue_put_time": np.mean(rollout_queue_put_time),
+                    },
+                },
             )
-            writer.add_scalar(
-                "stats/params_queue_get_time",
-                np.mean(params_queue_get_time),
-                global_step,
-            )
-            writer.add_scalar("stats/env_recv_time", env_recv_time, global_step)
-            writer.add_scalar("stats/inference_time", inference_time, global_step)
-            writer.add_scalar("stats/storage_time", storage_time, global_step)
-            writer.add_scalar("stats/d2h_time", d2h_time, global_step)
-            writer.add_scalar("stats/env_send_time", env_send_time, global_step)
-            writer.add_scalar(
-                "stats/rollout_queue_put_time",
-                np.mean(rollout_queue_put_time),
-                global_step,
-            )
-            writer.add_scalar(
-                "charts/SPS", int(global_step / (time.time() - start_time)), global_step
-            )
-            writer.add_scalar(
-                "charts/SPS_update",
-                int(
-                    cfg.arch.local_n_envs
-                    * cfg.system.rollout_length
-                    * len_actor_device_ids
-                    * cfg.arch.n_threads_per_actor
-                    * cfg.arch.world_size
-                    / (time.time() - update_time_start)
-                ),
-                global_step,
-            )
-
-            # for reward_name, reward_val in reward_components.items():
-            #     writer.add_scalar(f"reward/{reward_name}", reward_val, global_step)
-            #     reward_components[reward_name] = 0.0
 
 
 def get_trainer(cfg, optim_updates_fn):
@@ -507,7 +549,7 @@ def get_trainer(cfg, optim_updates_fn):
 
         advantages = jnp.zeros(
             (
-                cfg.arch.local_n_envs
+                cfg.arch.num_envs
                 * cfg.arch.n_threads_per_actor
                 * len(cfg.arch.actor_device_ids)
                 // len(cfg.arch.learner_device_ids),
@@ -726,7 +768,14 @@ def get_trainer(cfg, optim_updates_fn):
         v_loss = jax.lax.pmean(v_loss, axis_name="local_devices").mean()
         entropy_loss = jax.lax.pmean(entropy_loss, axis_name="local_devices").mean()
         approx_kl = jax.lax.pmean(approx_kl, axis_name="local_devices").mean()
-        return agent_state, loss, pg_loss, v_loss, entropy_loss, approx_kl, key
+        loss_info = {
+            "total_loss": loss,
+            "loss_actor": pg_loss,
+            "value_loss": v_loss,
+            "entropy": entropy_loss,
+            "approx_kl": approx_kl,
+        }
+        return agent_state, key, loss_info
 
     return single_device_update
 
@@ -734,14 +783,16 @@ def get_trainer(cfg, optim_updates_fn):
 @hydra.main(config_path="../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
 def run(cfg: DictConfig):
     cfg.system.local_batch_size = int(
-        cfg.arch.local_n_envs
+        cfg.arch.num_envs
         * cfg.system.rollout_length
         * cfg.arch.n_threads_per_actor
         * len(cfg.arch.actor_device_ids)
     )
+    config: Dict = OmegaConf.to_container(cfg, resolve=True)
+    log = logger_setup(config)
     eval_env = make_env(
         seed=0,
-        num_envs=cfg.arch.n_evals_envs,
+        num_envs=cfg.arch.num_eval_episodes,
         use_team_reward=cfg.system.use_team_reward,
         async_envs=True,
         training_mode=False,
@@ -749,10 +800,10 @@ def run(cfg: DictConfig):
     )()
     cfg.system.local_minibatch_size = int(cfg.system.local_batch_size // cfg.system.num_minibatches)
     assert (
-        cfg.arch.local_n_envs % len(cfg.arch.learner_device_ids) == 0
+        cfg.arch.num_envs % len(cfg.arch.learner_device_ids) == 0
     ), "local_num_envs must be divisible by len(learner_device_ids)"
     assert (
-        int(cfg.arch.local_n_envs / len(cfg.arch.learner_device_ids))
+        int(cfg.arch.num_envs / len(cfg.arch.learner_device_ids))
         * cfg.arch.n_threads_per_actor
         % cfg.system.num_minibatches
         == 0
@@ -768,7 +819,7 @@ def run(cfg: DictConfig):
     cfg.arch.world_size = jax.process_count()
     cfg.arch.local_rank = jax.process_index()
     cfg.system.num_envs = (
-        cfg.arch.local_n_envs
+        cfg.arch.num_envs
         * cfg.arch.world_size
         * cfg.arch.n_threads_per_actor
         * len(cfg.arch.actor_device_ids)
@@ -804,40 +855,32 @@ def run(cfg: DictConfig):
     # env setup
     envs = make_env(
         seed=cfg.system.seed,
-        num_envs=cfg.arch.local_n_envs,
+        num_envs=cfg.arch.num_envs,
         use_team_reward=cfg.system.use_team_reward,
         training_mode=True,
         env_cfg=cfg.env,
     )()
     cfg.system.num_agents = envs.single_observation_space.shape[0]  # must be 3
-    cfg.system.num_actions = int(envs.single_action_space.nvec[0])  # can definitely be done better
-    cfg.system.single_obs_dim = envs.single_observation_space.shape[1]  # must be 32
+    # can definitely be done better
+    cfg.system.num_actions = int(envs.single_action_space.nvec[0])
+    # must be 32
+    cfg.system.single_obs_dim = envs.single_observation_space.shape[1]
     cfg_dict = OmegaConf.to_container(cfg, resolve=True)
     pprint(cfg_dict)
-
-    """writer = SebulbaLogger(
-        f"runs/{run_name}",
-        config=cfg_dict,
-        use_neptune=cfg.neptune.use,
-        neptune_kwargs=cfg_dict["neptune"]["kwargs"],
-    )
-    writer.add_text(
-        "hyperparameters",
-        "|param|value|\n|-|-|\n%s"
-        % ("\n".join([f"|{key}|{value}|" for key, value in cfg_dict.items()])),
-    )"""
-    # select_actions = jax.jit(functools.partial(select_actions_ppo_ff, vmapped_actor))
 
     actor_network = Actor(action_dim=cfg.system.num_actions)
     critic_network = Critic()
 
     actor_params = actor_network.init(
         network_key,
-        np.array([envs.single_observation_space.sample()[0]]),  # should be (1, 30)
+        # should be (1, 30)
+        np.array([envs.single_observation_space.sample()[0]]),
     )
+    vmap_actor_apply = jax.vmap(actor_network.apply, in_axes=(None, 1), out_axes=(1))
     critic_params = critic_network.init(
         network_key,
-        np.array([envs.single_observation_space.sample()[0]]),  # should be (1, 30)
+        # should be (1, 30)
+        np.array([envs.single_observation_space.sample()[0]]),
     )
 
     def critic_linear_schedule(count):
@@ -928,6 +971,7 @@ def run(cfg: DictConfig):
     dummy_writer.add_scalar = lambda x, y, z: None
 
     unreplicated_params = flax.jax_utils.unreplicate(agent_state.params)
+
     for d_idx, d_id in enumerate(cfg.arch.actor_device_ids):
         device_params = jax.device_put(unreplicated_params, local_devices[d_id])
         for thread_id in range(cfg.arch.n_threads_per_actor):
@@ -945,6 +989,7 @@ def run(cfg: DictConfig):
                     learner_devices,
                     d_idx * cfg.arch.n_threads_per_actor + thread_id,
                     local_devices[d_id],
+                    log,
                 ),
             ).start()
 
@@ -952,7 +997,7 @@ def run(cfg: DictConfig):
     data_transfer_time = deque(maxlen=10)
     learner_policy_version = 0
     eval_idx = 0
-
+    log_frequency = cfg.system.num_updates // cfg.arch.num_evaluation
     while True:
         learner_policy_version += 1
         rollout_queue_get_time_start = time.time()
@@ -976,15 +1021,7 @@ def run(cfg: DictConfig):
                 sharded_next_dones.append(sharded_next_done)
         rollout_queue_get_time.append(time.time() - rollout_queue_get_time_start)
         training_time_start = time.time()
-        (
-            agent_state,
-            loss,
-            pg_loss,
-            v_loss,
-            entropy_loss,
-            approx_kl,
-            learner_keys,
-        ) = multi_device_update(
+        (agent_state, learner_keys, loss_info) = multi_device_update(
             agent_state,
             sharded_storages,
             sharded_next_obss,
@@ -998,41 +1035,38 @@ def run(cfg: DictConfig):
                 params_queues[d_idx * cfg.arch.n_threads_per_actor + thread_id].put(device_params)
 
         # record rewards for plotting purposes
-        if learner_policy_version % cfg.arch.log_frequency == 0:
-            """writer.add_scalar(
-                "stats/rollout_queue_get_time",
-                np.mean(rollout_queue_get_time),
-                global_step,
-            )
-            writer.add_scalar(
-                "stats/rollout_params_queue_get_time_diff",
-                np.mean(rollout_queue_get_time) - avg_params_queue_get_time,
-                global_step,
-            )
-            writer.add_scalar(
-                "stats/training_time", time.time() - training_time_start, global_step
-            )
-            writer.add_scalar(
-                "stats/rollout_queue_size", rollout_queues[-1].qsize(), global_step
-            )
-            writer.add_scalar(
-                "stats/params_queue_size", params_queues[-1].qsize(), global_step
-            )
-            print(
-                global_step,
-                f"actor_policy_version={actor_policy_version}, actor_update={update}, learner_policy_version={learner_policy_version}, training time: {time.time() - training_time_start}s",
+        if learner_policy_version % log_frequency == 0:
+            log(
+                log_type={"Learner": {"learner_policy_version": learner_policy_version}},
+                t_env=global_step,
+                metrics_to_log={
+                    "loss_info": loss_info,
+                    "queue_info": {
+                        "rollout_queue_get_time": np.mean(rollout_queue_get_time),
+                        "data_transfer_time": np.mean(data_transfer_time),
+                        "rollout_params_queue_get_time_diff": np.mean(rollout_queue_get_time)
+                        - avg_params_queue_get_time,
+                        "rollout_queue_size": rollout_queues[0].qsize(),
+                        "params_queue_size": params_queues[0].qsize(),
+                    },
+                    "speed_info": {
+                        "training_time": time.time() - training_time_start,
+                    },
+                },
             )
 
-            writer.add_scalar("losses/value_loss", v_loss[-1].item(), global_step)
-            writer.add_scalar("losses/policy_loss", pg_loss[-1].item(), global_step)
-            writer.add_scalar("losses/entropy", entropy_loss[-1].item(), global_step)
-            writer.add_scalar("losses/approx_kl", approx_kl[-1].item(), global_step)
-            writer.add_scalar("losses/loss", loss[-1].item(), global_step)"""
-            pass
+            # Evaluation
+            key, eval_rng = jax.random.split(key)
 
-            # # Evaluation
-            # key, eval_rng = jax.random.split(key)
-
+            evaluation(
+                envs=eval_env,
+                params=unreplicated_params,
+                vmap_actor_apply=vmap_actor_apply,
+                key=eval_rng,
+                cfg=cfg,
+                log_fn=log,
+                t_env=global_step,
+            )
             # eval_logs = evaluation(
             #     eval_env,
             #     cfg.arch.n_eval_episodes,
