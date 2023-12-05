@@ -46,8 +46,6 @@ from rich.pretty import pprint
 from mava.logger import logger_setup
 from mava.wrappers.robot_warehouse import make_env as make_env_single
 
-# ACTOR_MASK = jnp.reshape(jnp.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1], "float32"), (1,32))
-
 os.environ["JAX_USE_PJRT_C_API_ON_TPU"] = ""
 
 
@@ -86,20 +84,10 @@ def evaluation(
     def get_action_and_value(  # TODO: Use the power_tools action methods?
         params: flax.core.FrozenDict,
         next_obs: np.ndarray,
-        legal_actions: np.ndarray,
+        actions_mask: np.ndarray,
         key: jax.random.PRNGKey,
     ):
-        next_obs = jnp.array(next_obs)
-        legal_actions = jnp.array(legal_actions)
-        logits = vmap_actor_apply(params.actor_params, next_obs)
-        # TODO: make legal actions part of obs similar to anakin arch
-        masked_logits = jnp.where(
-            legal_actions,
-            logits,
-            jnp.finfo(jnp.float32).min,
-        )
-        policy = distrax.Categorical(logits=masked_logits)
-
+        policy = vmap_actor_apply(params.actor_params, next_obs, actions_mask)
         key, subkey = jax.random.split(key)
         raw_action, _ = policy.sample_and_log_prob(seed=subkey)
 
@@ -115,12 +103,12 @@ def evaluation(
         cached_next_obs = next_obs
         cached_next_done = next_done
         cached_infos = infos
-        legal_actions = np.stack(cached_infos["legal_actions"])
+        actions_mask = np.stack(cached_infos["actions_mask"])
         (
             cached_next_obs,
             action,
             key,
-        ) = get_action_and_value(params, cached_next_obs, legal_actions, key)
+        ) = get_action_and_value(params, cached_next_obs, actions_mask, key)
         cpu_action = np.array(action)
         next_obs, next_reward, next_done, _, infos = envs.step(cpu_action)
         env_id = np.arange(cfg.arch.num_eval_episodes)
@@ -170,6 +158,7 @@ class Transition(NamedTuple):
     rewards: list
     truncations: list
     terminations: list
+    actions_mask: list
 
 
 class Actor(nn.Module):
@@ -178,21 +167,28 @@ class Actor(nn.Module):
     action_dim: Sequence[int]
 
     @nn.compact
-    def __call__(self, observation: Array) -> distrax.Categorical:
+    def __call__(self, observation: Array, action_mask: Array) -> distrax.Categorical:
         """Forward pass."""
         x = observation
 
-        actor_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(x)
+        actor_output = nn.Dense(256, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(x)
         actor_output = nn.relu(actor_output)
-        actor_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
+        actor_output = nn.Dense(256, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
             actor_output
         )
         actor_output = nn.relu(actor_output)
+        actor_output = nn.LayerNorm(use_scale=False)(actor_output)
         actor_output = nn.Dense(
             self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(actor_output)
+        masked_logits = jnp.where(
+            action_mask,
+            actor_output,
+            jnp.finfo(jnp.float32).min,
+        )
+        policy = distrax.Categorical(logits=masked_logits)
 
-        return actor_output
+        return policy
 
 
 class Critic(nn.Module):
@@ -280,27 +276,17 @@ def rollout(
     # TODO: get this from main function
     actor_network = Actor(action_dim=cfg.system.num_actions)
     critic_network = Critic()
-    vmap_actor_apply = jax.vmap(actor_network.apply, in_axes=(None, 1), out_axes=(1))
+    vmap_actor_apply = jax.vmap(actor_network.apply, in_axes=(None, 1, 1), out_axes=(1))
     vmap_critic_apply = jax.vmap(critic_network.apply, in_axes=(None, 1), out_axes=(1))
 
     @jax.jit
     def get_action_and_value(  # TODO: Use the power_tools action methods?
         params: flax.core.FrozenDict,
         next_obs: np.ndarray,
-        legal_actions: np.ndarray,
+        actions_mask: np.ndarray,
         key: jax.random.PRNGKey,
     ):
-        next_obs = jnp.array(next_obs)
-        legal_actions = jnp.array(legal_actions)
-        logits = vmap_actor_apply(params.actor_params, next_obs)
-        # TODO: make legal actions part of obs similar to anakin arch
-        masked_logits = jnp.where(
-            legal_actions,
-            logits,
-            jnp.finfo(jnp.float32).min,
-        )
-        policy = distrax.Categorical(logits=masked_logits)
-
+        policy = vmap_actor_apply(params.actor_params, next_obs, actions_mask)
         key, subkey = jax.random.split(key)
         raw_action, logprob = policy.sample_and_log_prob(seed=subkey)
 
@@ -355,7 +341,7 @@ def rollout(
                 * len_actor_device_ids
                 * cfg.arch.world_size
             )
-            legal_actions = np.stack(cached_infos["legal_actions"])
+            actions_mask = np.stack(cached_infos["actions_mask"])
             inference_time_start = time.time()
             (
                 cached_next_obs,
@@ -364,7 +350,7 @@ def rollout(
                 logprob,
                 value,
                 key,
-            ) = get_action_and_value(params, cached_next_obs, legal_actions, key)
+            ) = get_action_and_value(params, cached_next_obs, actions_mask, key)
             inference_time += time.time() - inference_time_start
 
             cpu_action = np.array(action)
@@ -409,6 +395,7 @@ def rollout(
                     rewards=next_rewards,
                     truncations=truncateds,
                     terminations=next_dones,
+                    actions_mask=actions_mask,
                 )
             )
             if cfg.system.use_team_reward:
@@ -493,7 +480,7 @@ def get_trainer(cfg, optim_updates_fn):
     # TODO: get this from main function
     actor_network = Actor(action_dim=cfg.system.num_actions)
     critic_network = Critic()
-    vmap_actor_apply = jax.vmap(actor_network.apply, in_axes=(None, 1), out_axes=(1))
+    vmap_actor_apply = jax.vmap(actor_network.apply, in_axes=(None, 1, 1), out_axes=(1))
     vmap_critic_apply = jax.vmap(critic_network.apply, in_axes=(None, 1), out_axes=(1))
     update_actor_optim, update_critic_optim = optim_updates_fn
 
@@ -501,10 +488,10 @@ def get_trainer(cfg, optim_updates_fn):
     def get_logprob_entropy(
         actor_params: flax.core.FrozenDict,
         obs: np.ndarray,
+        actions_mask: np.ndarray,
         actions: np.ndarray,
     ):
-        logits = vmap_actor_apply(actor_params, obs)
-        policy = distrax.Categorical(logits=logits)
+        policy = vmap_actor_apply(actor_params, obs, actions_mask)
 
         # Can just pass in raw actions here.
         # No longer need to undo clipping since we are only
@@ -566,8 +553,8 @@ def get_trainer(cfg, optim_updates_fn):
         )
         return advantages, advantages + storage.values
 
-    def policy_loss(actor_params, obs, actions, behavior_logprobs, advantages):
-        newlogprob, entropy = get_logprob_entropy(actor_params, obs, actions)
+    def policy_loss(actor_params, obs, actions_mask, actions, behavior_logprobs, advantages):
+        newlogprob, entropy = get_logprob_entropy(actor_params, obs, actions_mask, actions)
         logratio = newlogprob - behavior_logprobs
         ratio = jnp.exp(logratio)
         approx_kl = ((ratio - 1) - logratio).mean()
@@ -669,6 +656,7 @@ def get_trainer(cfg, optim_updates_fn):
                         rewards=2,
                         truncations=2,
                         terminations=2,
+                        actions_mask=2,
                     ),
                     2,
                     2,
@@ -684,6 +672,7 @@ def get_trainer(cfg, optim_updates_fn):
                         rewards=2,
                         truncations=2,
                         terminations=2,
+                        actions_mask=2,
                     ),
                     2,
                     2,
@@ -703,10 +692,12 @@ def get_trainer(cfg, optim_updates_fn):
                     mb_behavior_logprobs,
                     mb_advantages,
                     mb_target_values,
+                    mb_actions_mask,
                 ) = minibatch
                 (p_loss, (pg_loss, entropy_loss, approx_kl),), actor_grads = policy_loss_grad_fn(
                     agent_state.params.actor_params,
                     mb_obs,
+                    mb_actions_mask,
                     mb_actions,
                     mb_behavior_logprobs,
                     mb_advantages,
@@ -752,6 +743,7 @@ def get_trainer(cfg, optim_updates_fn):
                     shuffled_storage.logprobs,
                     shuffled_advantages,
                     shuffled_target_values,
+                    shuffled_storage.actions_mask,
                 ),
             )
             return (agent_state, key), (loss, pg_loss, v_loss, entropy_loss, approx_kl)
@@ -875,8 +867,9 @@ def run(cfg: DictConfig):
         network_key,
         # should be (1, 30)
         np.array([envs.single_observation_space.sample()[0]]),
+        np.ones((1, cfg.system.num_actions)),
     )
-    vmap_actor_apply = jax.vmap(actor_network.apply, in_axes=(None, 1), out_axes=(1))
+    vmap_actor_apply = jax.vmap(actor_network.apply, in_axes=(None, 1, 1), out_axes=(1))
     critic_params = critic_network.init(
         network_key,
         # should be (1, 30)
@@ -944,18 +937,6 @@ def run(cfg: DictConfig):
     )
 
     agent_state = flax.jax_utils.replicate(agent_state, devices=learner_devices)
-    print(
-        actor_network.tabulate(
-            actor_key,
-            actor_network.apply(actor_params, np.array([envs.single_observation_space.sample()])),
-        )
-    )
-    print(
-        critic_network.tabulate(
-            critic_key,
-            critic_network.apply(critic_params, np.array([envs.single_observation_space.sample()])),
-        )
-    )
 
     single_device_update = get_trainer(cfg, (actor_optim.update, critic_optim.update))
 

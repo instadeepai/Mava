@@ -64,10 +64,14 @@ class GymWrapper(gym.Wrapper):
         self._done = False
         self._reset_next_step = False
 
-        # Convert observations to numpy arrays
-        observations = self._convert_observations(observations)
+        # Get legal actions
+        actions_mask = self._get_actions_mask()
 
-        info = {"extra_info": extra}
+        # Convert observations to numpy arrays
+        observations, actions_mask = self._convert_observations(observations, actions_mask)
+        self.step_count = np.zeros(self.num_agents)
+
+        info = {"extra_info": extra, "actions_mask": actions_mask}
 
         return observations, info
 
@@ -88,8 +92,13 @@ class GymWrapper(gym.Wrapper):
         if self._done:
             self._reset_next_step = True
 
-        # Convert observations to numpy arrays
-        next_observations = self._convert_observations(next_observations)
+        # Get legal actions
+        actions_mask = self._get_actions_mask()
+
+        # Convert observations and legal actions to numpy arrays
+        next_observations, actions_mask = self._convert_observations(
+            next_observations, actions_mask
+        )
 
         # Reward info
         if self.team_reward:
@@ -98,14 +107,31 @@ class GymWrapper(gym.Wrapper):
             reward = np.array(reward)
 
         # State info
-        info = {"extra_info": self._info}
+        info = {"extra_info": self._info, "actions_mask": actions_mask}
 
         return next_observations, reward, terminated, truncated, info
 
-    def _convert_observations(self, observations: List) -> np.ndarray:
+    def _get_actions_mask(self) -> List:
+        """Get legal actions from the environment."""
+        actions_mask = []
+        for agent_id in range(self.n_agents):
+            avail_agent = self.get_avail_agent_actions(agent_id)
+            actions_mask.append(avail_agent)
+        return actions_mask
+
+    def get_avail_agent_actions(self, agent_id: int) -> List:
+        """Returns the available actions for agent_id"""
+        # NOTE: robot-warehouse has no concept of legal actions
+        return [1] * self.env.action_space[agent_id].n
+
+    def _convert_observations(
+        self, observations: List, actions_mask: List
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """Convert observation to it's numpy array."""
-        converted_array: np.ndarray = np.array(observations, dtype="float32")
-        return converted_array
+        converted_observations: np.ndarray = np.array(observations, dtype="float32")
+        converted_actions_mask: np.ndarray = np.array(actions_mask, dtype="float32")
+
+        return converted_observations, converted_actions_mask
 
 
 class AgentIDWrapper(gym.Wrapper):
@@ -115,11 +141,17 @@ class AgentIDWrapper(gym.Wrapper):
         super().__init__(env)
 
         self.agent_ids = np.eye(self.env.num_agents)
-
-        _obs_dtype = self.env.observation_space.dtype
-        _obs_shape = self.env.observation_space.shape
+        _obs_low, _obs_high, _obs_dtype, _obs_shape = (
+            self.env.observation_space.low[0][0],
+            self.env.observation_space.high[0][0],
+            self.env.observation_space.dtype,
+            self.env.observation_space.shape,
+        )
         _new_obs_shape = (self.env.num_agents, _obs_shape[1] + self.env.num_agents)
-        self.observation_space = Box(low=-1, high=1, shape=_new_obs_shape, dtype=_obs_dtype)
+
+        self.observation_space = Box(
+            low=_obs_low, high=_obs_high, shape=_new_obs_shape, dtype=_obs_dtype
+        )
 
     def reset(self) -> Tuple[np.ndarray, Dict]:
         """Reset the environment."""
