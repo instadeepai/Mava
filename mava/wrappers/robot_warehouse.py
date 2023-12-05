@@ -17,6 +17,7 @@ from typing import Any, Callable, Dict, List, Tuple, Union
 import gym
 import numpy as np
 from gym.spaces import Box, MultiDiscrete
+from omegaconf import DictConfig
 
 ResetOutput = Tuple[np.ndarray, Dict[str, Any]]
 StepOutput = Union[
@@ -166,7 +167,7 @@ class AgentIDWrapper(gym.Wrapper):
         return obs, reward, terminated, truncated, info
 
 
-def make_env(
+def make_env_single(
     map_name: str = "rware-tiny-2ag-v1",
     team_reward: bool = True,
     add_agent_id: bool = True,
@@ -182,5 +183,39 @@ def make_env(
         if add_agent_id:
             env = AgentIDWrapper(env)
         return env
+
+    return thunk
+
+
+def make_env(
+    num_envs: int,
+    config: DictConfig,
+) -> Callable:
+    def thunk() -> gym.vector.VectorEnv:
+        if config.arch.async_envs:
+            envs = gym.vector.AsyncVectorEnv(
+                [
+                    make_env_single(
+                        map_name="rware-tiny-2ag-v1",
+                        team_reward=config.system.use_team_reward,
+                        add_agent_id=config.system.add_agent_id,
+                    )
+                    for _ in range(num_envs)
+                ]
+            )
+        else:
+            envs = gym.vector.SyncVectorEnv(
+                [
+                    make_env_single(
+                        map_name="rware-tiny-2ag-v1",
+                        team_reward=config.system.use_team_reward,
+                        add_agent_id=config.system.add_agent_id,
+                    )
+                    for _ in range(num_envs)
+                ]
+            )
+        envs.num_envs = num_envs
+        envs.is_vector_env = True
+        return envs
 
     return thunk

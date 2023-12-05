@@ -21,9 +21,8 @@ import time
 import uuid
 from collections import deque
 from functools import partial
-from multiprocessing import set_start_method
 from types import SimpleNamespace
-from typing import Dict, List, NamedTuple, Sequence
+from typing import Dict, List, Sequence
 
 import distrax
 import flax
@@ -38,35 +37,70 @@ import rware
 from chex import Array
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
-from flax.training.train_state import TrainState
 from omegaconf import DictConfig, OmegaConf
-from optax._src.base import OptState
 from rich.pretty import pprint
 
 from mava.logger import logger_setup
-from mava.wrappers.robot_warehouse import make_env as make_env_single
-
-os.environ["JAX_USE_PJRT_C_API_ON_TPU"] = ""
-
-
-# Fix weird OOM https://github.com/google/jax/discussions/6332#discussioncomment-1279991
-os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.6"
-os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=false " "intra_op_parallelism_threads=1"
-# Fix CUDNN non-determinisim; https://github.com/google/jax/issues/4823#issuecomment-952835771
-os.environ["TF_XLA_FLAGS"] = "--xla_gpu_autotune_level=2 --xla_gpu_deterministic_reductions"
-os.environ["TF_CUDNN DETERMINISTIC"] = "1"
+from mava.types import LearnerState, OptStates, Params
+from mava.types import SebulbaTransition as Transition
+from mava.utils.sebulba_tools import configure_computation_environment
+from mava.wrappers.robot_warehouse import make_env
 
 
-os.environ["JAX_USE_PJRT_C_API_ON_TPU"] = ""
-# Fix weird OOM https://github.com/google/jax/discussions/6332#discussioncomment-1279991
-os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.6"
-os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=false " "intra_op_parallelism_threads=1"
-# Fix CUDNN non-determinisim; https://github.com/google/jax/issues/4823#issuecomment-952835771
-os.environ["TF_XLA_FLAGS"] = "--xla_gpu_autotune_level=2 --xla_gpu_deterministic_reductions"
-os.environ["TF_CUDNN DETERMINISTIC"] = "1"
+class Actor(nn.Module):
+    """Actor Network."""
+
+    action_dim: Sequence[int]
+
+    @nn.compact
+    def __call__(self, observation: Array, action_mask: Array) -> distrax.Categorical:
+        """Forward pass."""
+        x = observation
+
+        actor_output = nn.Dense(256, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(x)
+        actor_output = nn.relu(actor_output)
+        actor_output = nn.Dense(256, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
+            actor_output
+        )
+        actor_output = nn.relu(actor_output)
+        # TODO: make it a feature
+        actor_output = nn.LayerNorm(use_scale=False)(actor_output)
+        actor_output = nn.Dense(
+            self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+        )(actor_output)
+        masked_logits = jnp.where(
+            action_mask,
+            actor_output,
+            jnp.finfo(jnp.float32).min,
+        )
+        actor_policy = distrax.Categorical(logits=masked_logits)
+
+        return actor_policy
 
 
-# Evaluator:
+class Critic(nn.Module):
+    """Critic Network."""
+
+    @nn.compact
+    def __call__(self, observation: Array) -> Array:
+        """Forward pass."""
+
+        critic_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
+            observation
+        )
+        critic_output = nn.relu(critic_output)
+        critic_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
+            critic_output
+        )
+        critic_output = nn.relu(critic_output)
+        critic_output = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
+            critic_output
+        )
+
+        return jnp.squeeze(critic_output, axis=-1)
+
+
+# Evaluator
 
 
 def evaluation(
@@ -127,129 +161,6 @@ def evaluation(
     )
 
 
-class Params(NamedTuple):
-    """Parameters of an actor critic network."""
-
-    actor_params: FrozenDict
-    critic_params: FrozenDict
-
-
-class OptStates(NamedTuple):
-    """OptStates of actor critic learner."""
-
-    actor_opt_state: OptState
-    critic_opt_state: OptState
-
-
-class LearnerState(NamedTuple):
-    """Parameters of an actor critic network."""
-
-    params: Params
-    opt_states: OptStates
-
-
-class Transition(NamedTuple):
-    obs: list
-    dones: list
-    actions: list
-    logprobs: list
-    values: list
-    env_ids: list
-    rewards: list
-    truncations: list
-    terminations: list
-    actions_mask: list
-
-
-class Actor(nn.Module):
-    """Actor Network."""
-
-    action_dim: Sequence[int]
-
-    @nn.compact
-    def __call__(self, observation: Array, action_mask: Array) -> distrax.Categorical:
-        """Forward pass."""
-        x = observation
-
-        actor_output = nn.Dense(256, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(x)
-        actor_output = nn.relu(actor_output)
-        actor_output = nn.Dense(256, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
-            actor_output
-        )
-        actor_output = nn.relu(actor_output)
-        actor_output = nn.LayerNorm(use_scale=False)(actor_output)
-        actor_output = nn.Dense(
-            self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
-        )(actor_output)
-        masked_logits = jnp.where(
-            action_mask,
-            actor_output,
-            jnp.finfo(jnp.float32).min,
-        )
-        policy = distrax.Categorical(logits=masked_logits)
-
-        return policy
-
-
-class Critic(nn.Module):
-    """Critic Network."""
-
-    @nn.compact
-    def __call__(self, observation: Array) -> Array:
-        """Forward pass."""
-
-        critic_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
-            observation
-        )
-        critic_output = nn.relu(critic_output)
-        critic_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
-            critic_output
-        )
-        critic_output = nn.relu(critic_output)
-        critic_output = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
-            critic_output
-        )
-
-        return jnp.squeeze(critic_output, axis=-1)
-
-
-def make_env(
-    seed,
-    num_envs,
-    env_cfg,
-    use_team_reward=True,
-    async_envs=False,
-    training_mode=True,
-):
-    # TODO: use env cfg
-    def thunk():
-        if async_envs:
-            envs = gym.vector.AsyncVectorEnv(
-                [
-                    make_env_single(
-                        map_name="rware-tiny-2ag-v1",
-                        team_reward=use_team_reward,
-                    )
-                    for _ in range(num_envs)
-                ]
-            )
-        else:
-            envs = gym.vector.SyncVectorEnv(
-                [
-                    make_env_single(
-                        map_name="rware-tiny-2ag-v1",
-                        team_reward=use_team_reward,
-                    )
-                    for _ in range(num_envs)
-                ]
-            )
-        envs.num_envs = num_envs
-        envs.is_vector_env = True
-        return envs
-
-    return thunk
-
-
 def rollout(
     key: jax.random.PRNGKey,
     cfg,
@@ -262,12 +173,8 @@ def rollout(
     log_fn,
 ):
     envs = make_env(
-        seed=cfg.system.seed + jax.process_index() + device_thread_id,
         num_envs=cfg.arch.num_envs,
-        env_cfg=cfg.env,
-        use_team_reward=cfg.system.use_team_reward,
-        async_envs=cfg.arch.async_envs,
-        training_mode=True,
+        config=cfg,
     )()
     len_actor_device_ids = len(cfg.arch.actor_device_ids)
     global_step = 0
@@ -783,12 +690,8 @@ def run(cfg: DictConfig):
     config: Dict = OmegaConf.to_container(cfg, resolve=True)
     log = logger_setup(config)
     eval_env = make_env(
-        seed=0,
         num_envs=cfg.arch.num_eval_episodes,
-        use_team_reward=cfg.system.use_team_reward,
-        async_envs=True,
-        training_mode=False,
-        env_cfg=cfg.env,
+        config=cfg,
     )()
     cfg.system.local_minibatch_size = int(cfg.system.local_batch_size // cfg.system.num_minibatches)
     assert (
@@ -846,11 +749,8 @@ def run(cfg: DictConfig):
 
     # env setup
     envs = make_env(
-        seed=cfg.system.seed,
         num_envs=cfg.arch.num_envs,
-        use_team_reward=cfg.system.use_team_reward,
-        training_mode=True,
-        env_cfg=cfg.env,
+        config=cfg,
     )()
     cfg.system.num_agents = envs.single_observation_space.shape[0]  # must be 3
     # can definitely be done better
@@ -1104,5 +1004,5 @@ def run(cfg: DictConfig):
 
 
 if __name__ == "__main__":
-    set_start_method("forkserver")
+    configure_computation_environment()
     run()

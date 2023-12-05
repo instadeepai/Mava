@@ -37,8 +37,9 @@ from rich.pretty import pprint
 
 from mava.evaluator import evaluator_setup
 from mava.logger import logger_setup
+from mava.types import ActorApply
+from mava.types import AnakinTransition as PPOTransition
 from mava.types import (
-    ActorApply,
     CriticApply,
     ExperimentOutput,
     LearnerFn,
@@ -47,7 +48,6 @@ from mava.types import (
     ObservationGlobalState,
     OptStates,
     Params,
-    PPOTransition,
 )
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import merge_leading_dims

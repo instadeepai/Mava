@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Optional, Tuple,
 import chex
 from distrax import Distribution
 from flax.core.frozen_dict import FrozenDict
-from jumanji.types import TimeStep
 from optax._src.base import OptState
 from typing_extensions import NamedTuple, TypeAlias
 
@@ -26,13 +25,13 @@ if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
 else:
     from flax.struct import dataclass
 
-
 Action: TypeAlias = chex.Array
 Value: TypeAlias = chex.Array
 Done: TypeAlias = chex.Array
 HiddenState: TypeAlias = chex.Array
 # Can't know the exact type of State.
 State: TypeAlias = Any
+TimeStep: TypeAlias = Any
 
 
 class Observation(NamedTuple):
@@ -75,7 +74,7 @@ RNNObservation: TypeAlias = Tuple[Observation, Done]
 RNNGlobalObservation: TypeAlias = Tuple[ObservationGlobalState, Done]
 
 
-class PPOTransition(NamedTuple):
+class AnakinTransition(NamedTuple):
     """Transition tuple for PPO."""
 
     done: Done
@@ -85,6 +84,19 @@ class PPOTransition(NamedTuple):
     log_prob: chex.Array
     obs: chex.Array
     info: Dict
+
+
+class SebulbaTransition(NamedTuple):
+    obs: list
+    dones: list
+    actions: list
+    logprobs: list
+    values: list
+    env_ids: list
+    rewards: list
+    truncations: list
+    terminations: list
+    actions_mask: list
 
 
 class Params(NamedTuple):
@@ -113,9 +125,9 @@ class LearnerState(NamedTuple):
 
     params: Params
     opt_states: OptStates
-    key: chex.PRNGKey
-    env_state: LogEnvState
-    timestep: TimeStep
+    key: Optional[chex.PRNGKey] = None
+    env_state: Optional[LogEnvState] = None
+    timestep: Optional[TimeStep] = None
 
 
 class RNNLearnerState(NamedTuple):

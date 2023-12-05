@@ -39,13 +39,13 @@ from rich.pretty import pprint
 
 from mava.evaluator import evaluator_setup
 from mava.logger import logger_setup
+from mava.types import AnakinTransition as PPOTransition
 from mava.types import (
     ExperimentOutput,
     HiddenStates,
     LearnerFn,
     OptStates,
     Params,
-    PPOTransition,
     RecActorApply,
     RecCriticApply,
     RNNLearnerState,
