@@ -103,7 +103,7 @@ class GymWrapper(gym.Wrapper):
 
         # Reward info
         if self.team_reward:
-            reward = np.array(np.array(reward).mean() * self.num_agents)
+            reward = np.array([np.array(reward).mean()] * self.num_agents)
         else:
             reward = np.array(reward)
 

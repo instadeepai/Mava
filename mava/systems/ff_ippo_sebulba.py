@@ -13,13 +13,10 @@
 # limitations under the License.
 
 import queue
-import random
 import threading
 import time
-import uuid
 from collections import deque
 from functools import partial
-from types import SimpleNamespace
 from typing import Any, Callable, Dict, List, Sequence, Tuple
 
 import distrax
@@ -31,7 +28,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-import rware
+import rware  # noqa: F401 # We need this to be able to import the robot warehouse environment
 from chex import Array, PRNGKey
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
@@ -123,9 +120,9 @@ def evaluation(
     ):
         policy = vmap_actor_apply(params.actor_params, next_obs, actions_mask)
         key, subkey = jax.random.split(key)
-        raw_action, _ = policy.sample_and_log_prob(seed=subkey)
+        action, _ = policy.sample_and_log_prob(seed=subkey)
 
-        return next_obs, raw_action, key
+        return next_obs, action, key
 
     # put data in the last index
     episode_returns = np.zeros((cfg.arch.num_eval_episodes,), dtype=np.float32)
@@ -162,95 +159,113 @@ def evaluation(
 
 
 def rollout(
-    key: jax.random.PRNGKey,
-    cfg,
-    rollout_queue,
+    key: PRNGKey,
+    cfg: DictConfig,
+    rollout_queue: queue.Queue,
     params_queue: queue.Queue,
-    learner_devices,
-    device_thread_id,
-    actor_device_id,
-    log_fn,
-):
+    learner_devices: List,
+    device_thread_id: int,
+    apply_fns: Tuple,
+    log_fn: Callable,
+) -> None:
+    """Executor rollout loop."""
+    # Create envs
     envs = make_env(
         num_envs=cfg.arch.num_envs,
         config=cfg,
     )()
+
+    # Setup
     len_executor_device_ids = len(cfg.arch.executor_device_ids)
-    global_step = 0
+    t_env = 0
     start_time = time.time()
 
-    # TODO: get this from main function
-    actor_network = Actor(action_dim=cfg.system.num_actions)
-    critic_network = Critic()
-    vmap_actor_apply = jax.vmap(actor_network.apply, in_axes=(None, 1, 1), out_axes=(1))
-    vmap_critic_apply = jax.vmap(critic_network.apply, in_axes=(None, 1), out_axes=(1))
+    # Get the apply functions for the actor and critic networks.
+    vmap_actor_apply, vmap_critic_apply = apply_fns
 
+    # Define the util functions: select action function and prepare data to share it with the learner.
     @jax.jit
-    def get_action_and_value(  # TODO: Use the power_tools action methods?
+    def get_action_and_value(
         params: flax.core.FrozenDict,
         next_obs: np.ndarray,
         actions_mask: np.ndarray,
         key: jax.random.PRNGKey,
-    ):
-        policy = vmap_actor_apply(params.actor_params, next_obs, actions_mask)
+    ) -> Tuple:
+        """Get action and value."""
         key, subkey = jax.random.split(key)
-        raw_action, logprob = policy.sample_and_log_prob(seed=subkey)
 
-        value = vmap_critic_apply(params.critic_params, next_obs)
-        return next_obs, raw_action, raw_action, logprob, value.squeeze(), key
+        policy = vmap_actor_apply(params.actor_params, next_obs, actions_mask)
+        action, logprob = policy.sample_and_log_prob(seed=subkey)
 
-    # put data in the last index
-    episode_returns = np.zeros((cfg.arch.num_envs,), dtype=np.float32)
-    returned_episode_returns = np.zeros((cfg.arch.num_envs,), dtype=np.float32)
-    episode_lengths = np.zeros((cfg.arch.num_envs,), dtype=np.float32)
-    returned_episode_lengths = np.zeros((cfg.arch.num_envs,), dtype=np.float32)
-
-    params_queue_get_time = deque(maxlen=10)
-    rollout_time = deque(maxlen=10)
-    rollout_queue_put_time = deque(maxlen=10)
-    actor_policy_version = 0
-    next_obs, infos = envs.reset()
-    next_done = jnp.zeros(cfg.arch.num_envs, dtype=jax.numpy.bool_)
+        value = vmap_critic_apply(params.critic_params, next_obs).squeeze()
+        return action, logprob, value, key
 
     @jax.jit
     def prepare_data(storage: List[Transition]) -> Transition:
+        """Prepare data to share with learner."""
         return jax.tree_map(
             lambda *xs: jnp.split(jnp.stack(xs), len(learner_devices), axis=1), *storage
         )
 
-    for update in range(1, cfg.system.num_updates + 2):
-        env_recv_time = 0
-        inference_time = 0
-        storage_time = 0
-        env_send_time = 0
+    # Define the episode info
+    env_id = np.arange(cfg.arch.num_envs)
+    episode_returns = np.zeros(
+        (cfg.arch.num_envs,), dtype=np.float32
+    )  # Accumulated episode returns
+    returned_episode_returns = np.zeros(
+        (cfg.arch.num_envs,), dtype=np.float32
+    )  # Final episode returns
+    episode_lengths = np.zeros(
+        (cfg.arch.num_envs,), dtype=np.float32
+    )  # Accumulated episode lengths
+    returned_episode_lengths = np.zeros(
+        (cfg.arch.num_envs,), dtype=np.float32
+    )  # Final episode lengths
 
+    # Define the data structure
+    params_queue_get_time: deque = deque(maxlen=10)
+    rollout_time: deque = deque(maxlen=10)
+    rollout_queue_put_time: deque = deque(maxlen=10)
+
+    # Reset envs
+    next_obs, infos = envs.reset()
+    next_dones = jnp.zeros((cfg.arch.num_envs, cfg.system.num_agents), dtype=jax.numpy.bool_)
+
+    # Loop till the learner has finished training
+    for update in range(1, cfg.system.num_updates + 2):
+        # Setup
+        env_recv_time: float = 0
+        inference_time: float = 0
+        storage_time: float = 0
+        env_send_time: float = 0
+
+        # Get the latest parameters from the learner
         params_queue_get_time_start = time.time()
         if cfg.arch.concurrency:
             if update != 2:
                 params = params_queue.get()
                 params.network_params["params"]["Dense_0"]["kernel"].block_until_ready()
-                actor_policy_version += 1
         else:
             params = params_queue.get()
-            actor_policy_version += 1
         params_queue_get_time.append(time.time() - params_queue_get_time_start)
+
+        # Rollout
         rollout_time_start = time.time()
-        storage = []
+        storage: List = []
+        # Loop over the rollout length
         for _ in range(0, cfg.system.rollout_length):
+            # Get previous step info
             cached_next_obs = next_obs
-            cached_next_done = next_done
+            cached_next_dones = next_dones
             cached_infos = infos
-            global_step += (
-                len(next_done)
-                * cfg.arch.n_threads_per_executor
-                * len_executor_device_ids
-                * cfg.arch.world_size
-            )
             actions_mask = np.stack(cached_infos["actions_mask"])
+
+            # Increment current timestep
+            t_env += cfg.arch.n_threads_per_executor * len_executor_device_ids * cfg.arch.world_size
+
+            # Get action and value
             inference_time_start = time.time()
             (
-                cached_next_obs,
-                raw_action,
                 action,
                 logprob,
                 value,
@@ -258,82 +273,61 @@ def rollout(
             ) = get_action_and_value(params, cached_next_obs, actions_mask, key)
             inference_time += time.time() - inference_time_start
 
-            cpu_action = np.array(action)
-
+            # Step the environment
             env_send_time_start = time.time()
-            next_obs, next_reward, next_done, _, infos = envs.step(cpu_action)
-            if cfg.system.use_team_reward:
-                next_rewards, next_dones, cached_next_dones = jax.tree_util.tree_map(
-                    lambda x: jnp.repeat(x, cfg.system.num_agents).reshape(cfg.arch.num_envs, -1),
-                    (next_reward, next_done, cached_next_done),
-                )
+            cpu_action = np.array(action)
+            next_obs, next_reward, terminated, truncated, infos = envs.step(cpu_action)
+            next_done = terminated + truncated
+            terminateds, truncateds, next_dones = jax.tree_util.tree_map(
+                lambda x: jnp.repeat(x, cfg.system.num_agents).reshape(cfg.arch.num_envs, -1),
+                (terminated, truncated, next_done),
+            )
 
-            else:
-                next_dones, cached_next_dones = jax.tree_util.tree_map(
-                    lambda x: jnp.repeat(x, cfg.system.num_agents).reshape(cfg.arch.num_envs, -1),
-                    (next_done, cached_next_done),
-                )
-                next_rewards = next_reward
-
-            # Accumulate components of reward for logger
-            # for cmp in reward_components.keys():
-            #     reward_components[cmp] += np.mean([info[cmp] for info in infos])
-
-            # TODO (Ruan): Check what envpool puts in info and make suitable wrapper.
-            # env_id = info["env_id"]
-            # Hack to make it work like envpool
-            env_id = np.arange(cfg.arch.num_envs)
+            # Append data to storage
             env_send_time += time.time() - env_send_time_start
             storage_time_start = time.time()
-
-            truncated = np.zeros_like(next_done)
-            truncateds = np.zeros_like(next_dones)
             storage.append(
                 Transition(
                     obs=cached_next_obs,
                     dones=cached_next_dones,
-                    # only store the raw actions for training.
-                    actions=raw_action,
+                    actions=action,
                     logprobs=logprob,
                     values=value,
-                    rewards=next_rewards,
+                    rewards=next_reward,
                     truncations=truncateds,
-                    terminations=next_dones,
+                    terminations=terminateds,
                     actions_mask=actions_mask,
                 )
             )
-            if cfg.system.use_team_reward:
-                episode_returns[
-                    env_id
-                ] += next_reward  # Not sure if this should be current previous reward
-            else:
-                episode_returns[env_id] += np.mean(next_reward)
+            storage_time += time.time() - storage_time_start
+
+            # Update episode info
+            episode_returns[env_id] += np.mean(next_reward)
             returned_episode_returns[env_id] = np.where(
-                next_done + truncated,  # not sure if prev or current done
+                next_done,
                 episode_returns[env_id],
                 returned_episode_returns[env_id],
             )
             episode_returns[env_id] *= (1 - next_done) * (1 - truncated)
             episode_lengths[env_id] += 1
             returned_episode_lengths[env_id] = np.where(
-                next_done + truncated,
+                next_done,
                 episode_lengths[env_id],
                 returned_episode_lengths[env_id],
             )
             episode_lengths[env_id] *= (1 - next_done) * (1 - truncated)
-            storage_time += time.time() - storage_time_start
         rollout_time.append(time.time() - rollout_time_start)
 
+        # Prepare data to share with learner
         partitioned_storage = prepare_data(storage)
         sharded_storage = Transition(
             *list(
                 map(
-                    lambda x: jax.device_put_sharded(x, devices=learner_devices),
+                    lambda x: jax.device_put_sharded(x, devices=learner_devices),  # type: ignore
                     partitioned_storage,
                 )
             )
         )
-        # next_obs, next_done are still in the host
         sharded_next_obs = jax.device_put_sharded(
             np.split(next_obs, len(learner_devices)), devices=learner_devices
         )
@@ -341,31 +335,30 @@ def rollout(
             np.split(next_dones, len(learner_devices)), devices=learner_devices
         )
         payload = (
-            global_step,
-            actor_policy_version,
-            update,
+            t_env,
             sharded_storage,
             sharded_next_obs,
             sharded_next_done,
             np.mean(params_queue_get_time),
-            device_thread_id,
         )
+
+        # Put data in the rollout queue to share it with the learner
         rollout_queue_put_time_start = time.time()
         rollout_queue.put(payload)
         rollout_queue_put_time.append(time.time() - rollout_queue_put_time_start)
 
         if (update % cfg.arch.log_frequency == 0) or (cfg.system.num_updates + 1 == update):
-            # TODO:  make logger
+            # Log info
             log_fn(
                 log_type={"Executor": {"device_thread_id": device_thread_id}},
-                t_env=global_step,
+                t_env=t_env,
                 metrics_to_log={
                     "episode_info": {
                         "episode_return": returned_episode_returns,
                         "episode_length": returned_episode_lengths,
                     },
                     "speed_info": {
-                        "sps": int(global_step / (time.time() - start_time)),
+                        "sps": int(t_env / (time.time() - start_time)),
                         "rollout_time": np.mean(rollout_time),
                     },
                     "queue_info": {
@@ -387,6 +380,7 @@ def get_trainer(cfg: DictConfig, apply_fns: Tuple, optim_updates_fn: Tuple) -> C
     vmap_actor_apply, vmap_critic_apply = apply_fns
     update_actor_optim, update_critic_optim = optim_updates_fn
 
+    # Define the function to compute GAE.
     def compute_gae_once(carry: Array, inp: Tuple, gamma: float, gae_lambda: float) -> Tuple:
         """Compute GAE once."""
         advantages = carry
@@ -441,9 +435,12 @@ def get_trainer(cfg: DictConfig, apply_fns: Tuple, optim_updates_fn: Tuple) -> C
         behavior_logprobs: Array,
         advantages: Array,
     ) -> Tuple:
+        """Actor loss."""
+        # Compute logprobs and entropy
         policy = vmap_actor_apply(actor_params, obs, actions_mask)
         newlogprob = policy.log_prob(actions)
         entropy = policy.entropy()
+
         logratio = newlogprob - behavior_logprobs
         ratio = jnp.exp(logratio)
         approx_kl = ((ratio - 1) - logratio).mean()
@@ -474,7 +471,6 @@ def get_trainer(cfg: DictConfig, apply_fns: Tuple, optim_updates_fn: Tuple) -> C
         key: jax.random.PRNGKey,
     ) -> Tuple:
         """Single device update."""
-
         # Horizontal stack all the data from different devices
         storage = jax.tree_map(lambda *x: jnp.hstack(x), *sharded_storages)
 
@@ -788,7 +784,7 @@ def run_experiment(cfg: DictConfig) -> None:
                     params_queues[-1],
                     learner_devices,
                     d_idx * cfg.arch.n_threads_per_executor + thread_id,
-                    local_devices[d_id],
+                    (vmap_actor_apply, vmap_critic_apply),
                     log,
                 ),
             ).start()
@@ -810,14 +806,11 @@ def run_experiment(cfg: DictConfig) -> None:
             for thread_id in range(cfg.arch.n_threads_per_executor):
                 # Get data from rollout queue
                 (
-                    global_step,
-                    actor_policy_version,
-                    update,
+                    t_env,
                     sharded_storage,
                     sharded_next_obs,
                     sharded_next_done,
                     avg_params_queue_get_time,
-                    device_thread_id,
                 ) = rollout_queues[d_idx * cfg.arch.n_threads_per_executor + thread_id].get()
                 sharded_storages.append(sharded_storage)
                 sharded_next_obss.append(sharded_next_obs)
@@ -848,7 +841,7 @@ def run_experiment(cfg: DictConfig) -> None:
             # Logging training info
             log(
                 log_type={"Learner": {"trainer_update_number": trainer_update_number}},
-                t_env=global_step,
+                t_env=t_env,
                 metrics_to_log={
                     "loss_info": loss_info,
                     "queue_info": {
@@ -874,7 +867,7 @@ def run_experiment(cfg: DictConfig) -> None:
                 key=eval_key,
                 cfg=cfg,
                 log_fn=log,
-                t_env=global_step,
+                t_env=t_env,
             )
 
         # Check if training is finished
@@ -887,7 +880,7 @@ def run_experiment(cfg: DictConfig) -> None:
                 key=eval_key,
                 cfg=cfg,
                 log_fn=log,
-                t_env=global_step,
+                t_env=t_env,
             )
             break
 
