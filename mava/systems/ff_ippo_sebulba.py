@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import functools
-import os
 import queue
 import random
 import threading
@@ -22,7 +20,7 @@ import uuid
 from collections import deque
 from functools import partial
 from types import SimpleNamespace
-from typing import Dict, List, Sequence
+from typing import Callable, Dict, List, Sequence
 
 import distrax
 import flax
@@ -35,6 +33,7 @@ import numpy as np
 import optax
 import rware
 from chex import Array
+from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
 from omegaconf import DictConfig, OmegaConf
@@ -166,7 +165,6 @@ def rollout(
     cfg,
     rollout_queue,
     params_queue: queue.Queue,
-    writer,
     learner_devices,
     device_thread_id,
     actor_device_id,
@@ -176,7 +174,7 @@ def rollout(
         num_envs=cfg.arch.num_envs,
         config=cfg,
     )()
-    len_actor_device_ids = len(cfg.arch.actor_device_ids)
+    len_executor_device_ids = len(cfg.arch.executor_device_ids)
     global_step = 0
     start_time = time.time()
 
@@ -223,7 +221,6 @@ def rollout(
         env_recv_time = 0
         inference_time = 0
         storage_time = 0
-        d2h_time = 0
         env_send_time = 0
 
         params_queue_get_time_start = time.time()
@@ -244,8 +241,8 @@ def rollout(
             cached_infos = infos
             global_step += (
                 len(next_done)
-                * cfg.arch.n_threads_per_actor
-                * len_actor_device_ids
+                * cfg.arch.n_threads_per_executor
+                * len_executor_device_ids
                 * cfg.arch.world_size
             )
             actions_mask = np.stack(cached_infos["actions_mask"])
@@ -431,21 +428,21 @@ def get_trainer(cfg, optim_updates_fn):
 
     @jax.jit
     def compute_gae(
-        agent_state: LearnerState,
+        agents_state: LearnerState,
         next_obs: np.ndarray,
         next_done: np.ndarray,
         storage: Transition,
     ):
         next_value = vmap_critic_apply(
-            agent_state.params.critic_params,
+            agents_state.params.critic_params,
             next_obs,
         )
 
         advantages = jnp.zeros(
             (
                 cfg.arch.num_envs
-                * cfg.arch.n_threads_per_actor
-                * len(cfg.arch.actor_device_ids)
+                * cfg.arch.n_threads_per_executor
+                * len(cfg.arch.executor_device_ids)
                 // len(cfg.arch.learner_device_ids),
                 cfg.system.num_agents,
             )
@@ -484,7 +481,7 @@ def get_trainer(cfg, optim_updates_fn):
 
     @jax.jit
     def single_device_update(
-        agent_state: LearnerState,
+        agents_state: LearnerState,
         sharded_storages: List,
         sharded_next_obs: List,
         sharded_next_done: List,
@@ -495,7 +492,7 @@ def get_trainer(cfg, optim_updates_fn):
         next_done = jnp.concatenate(sharded_next_done)
         policy_loss_grad_fn = jax.value_and_grad(policy_loss, has_aux=True)
         critic_loss_grad_fn = jax.value_and_grad(critic_loss, has_aux=True)
-        local_advantages, target_values = compute_gae(agent_state, next_obs, next_done, storage)
+        local_advantages, target_values = compute_gae(agents_state, next_obs, next_done, storage)
         # NOTE: advantage normalization at the mini-batch level across devices
         # TODO(Ruan + Omayma): Double check this. But should be correct.
         if cfg.system.norm_adv:
@@ -516,7 +513,7 @@ def get_trainer(cfg, optim_updates_fn):
             # local_advantages shape: (rollout_length, num_envs, num_agents)
 
         def update_epoch(carry, _):
-            agent_state, key = carry
+            agents_state, key = carry
             key, subkey = jax.random.split(key)
 
             def flatten(x):
@@ -592,7 +589,7 @@ def get_trainer(cfg, optim_updates_fn):
                 shuffled_target_values,
             ) = vmap_flatten_and_shuffle(storage, local_advantages, target_values)
 
-            def update_minibatch(agent_state, minibatch):
+            def update_minibatch(agents_state, minibatch):
                 (
                     mb_obs,
                     mb_actions,
@@ -602,7 +599,7 @@ def get_trainer(cfg, optim_updates_fn):
                     mb_actions_mask,
                 ) = minibatch
                 (p_loss, (pg_loss, entropy_loss, approx_kl),), actor_grads = policy_loss_grad_fn(
-                    agent_state.params.actor_params,
+                    agents_state.params.actor_params,
                     mb_obs,
                     mb_actions_mask,
                     mb_actions,
@@ -610,7 +607,7 @@ def get_trainer(cfg, optim_updates_fn):
                     mb_advantages,
                 )
                 (c_loss, (v_loss)), critic_grads = critic_loss_grad_fn(
-                    agent_state.params.critic_params,
+                    agents_state.params.critic_params,
                     mb_obs,
                     mb_target_values,
                 )
@@ -620,30 +617,30 @@ def get_trainer(cfg, optim_updates_fn):
                 loss = p_loss + c_loss
                 # UPDATE ACTOR PARAMS AND OPTIMISER STATE
                 actor_updates, actor_new_opt_state = update_actor_optim(
-                    actor_grads, agent_state.opt_states.actor_opt_state
+                    actor_grads, agents_state.opt_states.actor_opt_state
                 )
                 actor_new_params = optax.apply_updates(
-                    agent_state.params.actor_params, actor_updates
+                    agents_state.params.actor_params, actor_updates
                 )
 
                 # UPDATE CRITIC PARAMS AND OPTIMISER STATE
                 critic_updates, critic_new_opt_state = update_critic_optim(
-                    critic_grads, agent_state.opt_states.critic_opt_state
+                    critic_grads, agents_state.opt_states.critic_opt_state
                 )
                 critic_new_params = optax.apply_updates(
-                    agent_state.params.critic_params, critic_updates
+                    agents_state.params.critic_params, critic_updates
                 )
 
                 # PACK NEW PARAMS AND OPTIMISER STATE
                 new_params = Params(actor_new_params, critic_new_params)
                 new_opt_state = OptStates(actor_new_opt_state, critic_new_opt_state)
 
-                agent_state = LearnerState(params=new_params, opt_states=new_opt_state)
-                return agent_state, (loss, pg_loss, v_loss, entropy_loss, approx_kl)
+                agents_state = LearnerState(params=new_params, opt_states=new_opt_state)
+                return agents_state, (loss, pg_loss, v_loss, entropy_loss, approx_kl)
 
-            agent_state, (loss, pg_loss, v_loss, entropy_loss, approx_kl,) = jax.lax.scan(
+            agents_state, (loss, pg_loss, v_loss, entropy_loss, approx_kl,) = jax.lax.scan(
                 update_minibatch,
-                agent_state,
+                agents_state,
                 (
                     shuffled_storage.obs,
                     shuffled_storage.actions,
@@ -653,15 +650,15 @@ def get_trainer(cfg, optim_updates_fn):
                     shuffled_storage.actions_mask,
                 ),
             )
-            return (agent_state, key), (loss, pg_loss, v_loss, entropy_loss, approx_kl)
+            return (agents_state, key), (loss, pg_loss, v_loss, entropy_loss, approx_kl)
 
-        (agent_state, key), (
+        (agents_state, key), (
             loss,
             pg_loss,
             v_loss,
             entropy_loss,
             approx_kl,
-        ) = jax.lax.scan(update_epoch, (agent_state, key), (), length=cfg.system.ppo_epochs)
+        ) = jax.lax.scan(update_epoch, (agents_state, key), (), length=cfg.system.ppo_epochs)
         loss = jax.lax.pmean(loss, axis_name="local_devices").mean()
         pg_loss = jax.lax.pmean(pg_loss, axis_name="local_devices").mean()
         v_loss = jax.lax.pmean(v_loss, axis_name="local_devices").mean()
@@ -674,51 +671,46 @@ def get_trainer(cfg, optim_updates_fn):
             "entropy": entropy_loss,
             "approx_kl": approx_kl,
         }
-        return agent_state, key, loss_info
+        return agents_state, key, loss_info
 
     return single_device_update
 
 
-@hydra.main(config_path="../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
-def run(cfg: DictConfig):
-    cfg.system.local_batch_size = int(
-        cfg.arch.num_envs
-        * cfg.system.rollout_length
-        * cfg.arch.n_threads_per_actor
-        * len(cfg.arch.actor_device_ids)
-    )
-    config: Dict = OmegaConf.to_container(cfg, resolve=True)
-    log = logger_setup(config)
+def run_experiment(cfg: DictConfig) -> None:
+    """Run experiment."""
+    # Logger setup
+    cfg_dict: Dict = OmegaConf.to_container(cfg, resolve=True)
+    log = logger_setup(cfg_dict)
+
+    # Create eval_envs and dummy_envs to get observation and action spaces
     eval_env = make_env(
         num_envs=cfg.arch.num_eval_episodes,
         config=cfg,
     )()
+    dummy_envs = make_env(
+        num_envs=cfg.arch.num_envs,
+        config=cfg,
+    )()
+
+    # Config setup
+    cfg.system.local_batch_size = int(
+        cfg.arch.num_envs
+        * cfg.system.rollout_length
+        * cfg.arch.n_threads_per_executor
+        * len(cfg.arch.executor_device_ids)
+    )
     cfg.system.local_minibatch_size = int(cfg.system.local_batch_size // cfg.system.num_minibatches)
     assert (
         cfg.arch.num_envs % len(cfg.arch.learner_device_ids) == 0
     ), "local_num_envs must be divisible by len(learner_device_ids)"
     assert (
         int(cfg.arch.num_envs / len(cfg.arch.learner_device_ids))
-        * cfg.arch.n_threads_per_actor
+        * cfg.arch.n_threads_per_executor
         % cfg.system.num_minibatches
         == 0
     ), "int(local_num_envs / len(learner_device_ids)) must be divisible by num_minibatches"
-    if cfg.arch.distributed:
-        jax.distributed.initialize(
-            local_device_ids=range(
-                len(cfg.arch.learner_device_ids) + len(cfg.arch.actor_device_ids)
-            ),
-        )
-        print(list(range(len(cfg.arch.learner_device_ids) + len(cfg.arch.actor_device_ids))))
-
     cfg.arch.world_size = jax.process_count()
     cfg.arch.local_rank = jax.process_index()
-    cfg.system.num_envs = (
-        cfg.arch.num_envs
-        * cfg.arch.world_size
-        * cfg.arch.n_threads_per_actor
-        * len(cfg.arch.actor_device_ids)
-    )
     cfg.system.batch_size = cfg.system.local_batch_size * cfg.arch.world_size
     cfg.system.minibatch_size = cfg.system.local_minibatch_size * cfg.arch.world_size
     cfg.system.total_timesteps = cfg.system.num_updates * (
@@ -727,80 +719,49 @@ def run(cfg: DictConfig):
     local_devices = jax.local_devices()
     global_devices = jax.devices()
     learner_devices = [local_devices[d_id] for d_id in cfg.arch.learner_device_ids]
-    actor_devices = [local_devices[d_id] for d_id in cfg.arch.actor_device_ids]
+    actor_devices = [local_devices[d_id] for d_id in cfg.arch.executor_device_ids]
     global_learner_devices = [
         global_devices[d_id + process_index * len(local_devices)]
         for process_index in range(cfg.arch.world_size)
         for d_id in cfg.arch.learner_device_ids
     ]
-    print("global_learner_decices", global_learner_devices)
     cfg.system.global_learner_devices = [str(item) for item in global_learner_devices]
     cfg.system.actor_devices = [str(item) for item in actor_devices]
     cfg.system.learner_devices = [str(item) for item in learner_devices]
-
-    run_name = f"{cfg.logger.base_exp_path}__{uuid.uuid4()}"
-
-    # seeding
-    random.seed(cfg.system.seed)
-    np.random.seed(cfg.system.seed)
-    key = jax.random.PRNGKey(cfg.system.seed)
-    key, network_key, actor_key, critic_key = jax.random.split(key, 4)
-    learner_keys = jax.device_put_replicated(key, learner_devices)
-
-    # env setup
-    envs = make_env(
-        num_envs=cfg.arch.num_envs,
-        config=cfg,
-    )()
-    cfg.system.num_agents = envs.single_observation_space.shape[0]  # must be 3
-    # can definitely be done better
-    cfg.system.num_actions = int(envs.single_action_space.nvec[0])
-    # must be 32
-    cfg.system.single_obs_dim = envs.single_observation_space.shape[1]
-    cfg_dict = OmegaConf.to_container(cfg, resolve=True)
     pprint(cfg_dict)
 
-    actor_network = Actor(action_dim=cfg.system.num_actions)
-    critic_network = Critic()
+    # PRNG keys.
+    key = jax.random.PRNGKey(cfg.system.seed)
+    key, eval_key, actor_key, critic_key = jax.random.split(key, 4)
+    learner_keys = jax.device_put_replicated(key, learner_devices)
 
-    actor_params = actor_network.init(
-        network_key,
-        # should be (1, 30)
-        np.array([envs.single_observation_space.sample()[0]]),
-        np.ones((1, cfg.system.num_actions)),
-    )
-    vmap_actor_apply = jax.vmap(actor_network.apply, in_axes=(None, 1, 1), out_axes=(1))
-    critic_params = critic_network.init(
-        network_key,
-        # should be (1, 30)
-        np.array([envs.single_observation_space.sample()[0]]),
-    )
+    # Define network and optimiser
+    def get_linear_schedule_fn(lr: float) -> Callable:
+        def linear_schedule(count: int) -> float:
+            """Linear learning rate schedule"""
+            frac: float = (
+                1.0
+                - (count // (cfg.system.num_minibatches * cfg.system.ppo_epochs))
+                / cfg.system.num_updates
+            )
+            return lr * frac
 
-    def critic_linear_schedule(count):
-        # anneal learning rate linearly after one training iteration which contains
-        # (args.num_minibatches) gradient updates
-        frac = (
-            1.0
-            - (count // (cfg.system.num_minibatches * cfg.system.ppo_epochs))
-            / cfg.system.num_updates
-        )
-        return cfg.system.critic_lr * frac
+        return linear_schedule
 
-    def actor_linear_schedule(count):
-        # anneal learning rate linearly after one training iteration which contains
-        # (args.num_minibatches) gradient updates
-        frac = (
-            1.0
-            - (count // (cfg.system.num_minibatches * cfg.system.ppo_epochs))
-            / cfg.system.num_updates
-        )
-        return cfg.system.actor_lr * frac
+    cfg.system.num_agents = dummy_envs.single_observation_space.shape[0]
+    cfg.system.num_actions = int(dummy_envs.single_action_space.nvec[0])
+    cfg.system.single_obs_dim = dummy_envs.single_observation_space.shape[1]
+    init_obs = np.array([dummy_envs.single_observation_space.sample()[0]])
+    init_action_mask = np.ones((1, cfg.system.num_actions))
+    dummy_envs.close()  # close dummy envs
 
+    actor = Actor(action_dim=cfg.system.num_actions)
+    actor_params = actor.init(actor_key, init_obs, init_action_mask)
     actor_optim = optax.MultiSteps(
         optax.chain(
             optax.clip_by_global_norm(cfg.system.max_grad_norm),
             optax.inject_hyperparams(optax.adam)(
-                learning_rate=actor_linear_schedule
+                learning_rate=get_linear_schedule_fn(cfg.system.actor_lr)
                 if cfg.system.anneal_lr
                 else cfg.system.actor_lr,
                 eps=1e-5,
@@ -809,12 +770,15 @@ def run(cfg: DictConfig):
         every_k_schedule=cfg.system.gradient_accumulation_steps,
     )
     actor_opt_state = actor_optim.init(actor_params)
+    vmap_actor_apply = jax.vmap(actor.apply, in_axes=(None, 1, 1), out_axes=(1))
 
+    critic = Critic()
+    critic_params = critic.init(critic_key, init_obs)
     critic_optim = optax.MultiSteps(
         optax.chain(
             optax.clip_by_global_norm(cfg.system.max_grad_norm),
             optax.inject_hyperparams(optax.adam)(
-                learning_rate=critic_linear_schedule
+                learning_rate=get_linear_schedule_fn(cfg.system.critic_lr)
                 if cfg.system.anneal_lr
                 else cfg.system.critic_lr,
                 eps=1e-5,
@@ -822,10 +786,10 @@ def run(cfg: DictConfig):
         ),
         every_k_schedule=cfg.system.gradient_accumulation_steps,
     )
-
     critic_opt_state = critic_optim.init(critic_params)
 
-    agent_state = LearnerState(
+    # Define agents state
+    agents_state = LearnerState(
         params=Params(
             actor_params=actor_params,
             critic_params=critic_params,
@@ -835,27 +799,27 @@ def run(cfg: DictConfig):
             critic_opt_state=critic_opt_state,
         ),
     )
+    # Replicate agents state per learner device
+    agents_state = flax.jax_utils.replicate(agents_state, devices=learner_devices)
+    unreplicated_params = flax.jax_utils.unreplicate(agents_state.params)
 
-    agent_state = flax.jax_utils.replicate(agent_state, devices=learner_devices)
-
+    # Learner Setup
     single_device_update = get_trainer(cfg, (actor_optim.update, critic_optim.update))
-
     multi_device_update = jax.pmap(
         single_device_update,
         axis_name="local_devices",
         devices=global_learner_devices,
     )
 
-    params_queues = []
-    rollout_queues = []
-    dummy_writer = SimpleNamespace()
-    dummy_writer.add_scalar = lambda x, y, z: None
-
-    unreplicated_params = flax.jax_utils.unreplicate(agent_state.params)
-
-    for d_idx, d_id in enumerate(cfg.arch.actor_device_ids):
+    # Executor Setup
+    params_queues: List = []
+    rollout_queues: List = []
+    # Loop through each executor device
+    for d_idx, d_id in enumerate(cfg.arch.executor_device_ids):
+        # Replicate params per executor device
         device_params = jax.device_put(unreplicated_params, local_devices[d_id])
-        for thread_id in range(cfg.arch.n_threads_per_actor):
+        # Loop through each executor thread
+        for thread_id in range(cfg.arch.n_threads_per_executor):
             params_queues.append(queue.Queue(maxsize=1))
             rollout_queues.append(queue.Queue(maxsize=1))
             params_queues[-1].put(device_params)
@@ -866,27 +830,29 @@ def run(cfg: DictConfig):
                     cfg,
                     rollout_queues[-1],
                     params_queues[-1],
-                    dummy_writer,
                     learner_devices,
-                    d_idx * cfg.arch.n_threads_per_actor + thread_id,
+                    d_idx * cfg.arch.n_threads_per_executor + thread_id,
                     local_devices[d_id],
                     log,
                 ),
             ).start()
 
-    rollout_queue_get_time = deque(maxlen=10)
-    data_transfer_time = deque(maxlen=10)
-    learner_policy_version = 0
-    eval_idx = 0
+    rollout_queue_get_time: deque = deque(maxlen=10)
+    data_transfer_time: deque = deque(maxlen=10)
+    trainer_update_number = 0
     log_frequency = cfg.system.num_updates // cfg.arch.num_evaluation
     while True:
-        learner_policy_version += 1
+        trainer_update_number += 1
         rollout_queue_get_time_start = time.time()
         sharded_storages = []
         sharded_next_obss = []
         sharded_next_dones = []
-        for d_idx, d_id in enumerate(cfg.arch.actor_device_ids):
-            for thread_id in range(cfg.arch.n_threads_per_actor):
+
+        # Loop through each executor device
+        for d_idx, d_id in enumerate(cfg.arch.executor_device_ids):
+            # Loop through each executor thread
+            for thread_id in range(cfg.arch.n_threads_per_executor):
+                # Get data from rollout queue
                 (
                     global_step,
                     actor_policy_version,
@@ -896,29 +862,36 @@ def run(cfg: DictConfig):
                     sharded_next_done,
                     avg_params_queue_get_time,
                     device_thread_id,
-                ) = rollout_queues[d_idx * cfg.arch.n_threads_per_actor + thread_id].get()
+                ) = rollout_queues[d_idx * cfg.arch.n_threads_per_executor + thread_id].get()
                 sharded_storages.append(sharded_storage)
                 sharded_next_obss.append(sharded_next_obs)
                 sharded_next_dones.append(sharded_next_done)
+
         rollout_queue_get_time.append(time.time() - rollout_queue_get_time_start)
         training_time_start = time.time()
-        (agent_state, learner_keys, loss_info) = multi_device_update(
-            agent_state,
+
+        # Update learner
+        (agents_state, learner_keys, loss_info) = multi_device_update(
+            agents_state,
             sharded_storages,
             sharded_next_obss,
             sharded_next_dones,
             learner_keys,
         )
-        unreplicated_params = flax.jax_utils.unreplicate(agent_state.params)
-        for d_idx, d_id in enumerate(cfg.arch.actor_device_ids):
-            device_params = jax.device_put(unreplicated_params, local_devices[d_id])
-            for thread_id in range(cfg.arch.n_threads_per_actor):
-                params_queues[d_idx * cfg.arch.n_threads_per_actor + thread_id].put(device_params)
 
-        # record rewards for plotting purposes
-        if learner_policy_version % log_frequency == 0:
+        # Send updated params to executors
+        unreplicated_params = flax.jax_utils.unreplicate(agents_state.params)
+        for d_idx, d_id in enumerate(cfg.arch.executor_device_ids):
+            device_params = jax.device_put(unreplicated_params, local_devices[d_id])
+            for thread_id in range(cfg.arch.n_threads_per_executor):
+                params_queues[d_idx * cfg.arch.n_threads_per_executor + thread_id].put(
+                    device_params
+                )
+
+        if trainer_update_number % log_frequency == 0:
+            # Logging training info
             log(
-                log_type={"Learner": {"learner_policy_version": learner_policy_version}},
+                log_type={"Learner": {"trainer_update_number": trainer_update_number}},
                 t_env=global_step,
                 metrics_to_log={
                     "loss_info": loss_info,
@@ -937,72 +910,42 @@ def run(cfg: DictConfig):
             )
 
             # Evaluation
-            key, eval_rng = jax.random.split(key)
-
+            eval_key, _ = jax.random.split(eval_key)
             evaluation(
                 envs=eval_env,
                 params=unreplicated_params,
                 vmap_actor_apply=vmap_actor_apply,
-                key=eval_rng,
+                key=eval_key,
                 cfg=cfg,
                 log_fn=log,
                 t_env=global_step,
             )
-            # eval_logs = evaluation(
-            #     eval_env,
-            #     cfg.arch.n_eval_episodes,
-            #     unreplicated_params.actor_params,
-            #     select_actions,
-            #     writer.add_scalar,
-            #     eval_idx,
-            #     eval_rng,
-            # )
 
-            # for metric, value in eval_logs.items():
-            #     writer.add_scalar(f"charts/{metric}", value, global_step)
-
-            # print(f"EVALUATION: Average eval score - {eval_logs['average_score']}")
-
-            # # Save model
-            # if cfg.arch.save_model:
-            #     checkpointer.save(
-            #         global_step,
-            #         unreplicated_params.actor_params,
-            #         eval_logs,
-            #     )
-        if learner_policy_version >= cfg.system.num_updates:
-            key, eval_rng = jax.random.split(key)
-            # eval_logs = evaluation(
-            #     eval_env,
-            #     cfg.arch.n_eval_episodes,
-            #     unreplicated_params.actor_params,
-            #     select_actions,
-            #     writer.add_scalar,
-            #     eval_idx + 1,
-            #     eval_rng,
-            # )
-
-            # for metric, value in eval_logs.items():
-            #     writer.add_scalar(f"charts/{metric}", value, global_step)
-
-            # print(
-            #     f"FINAL EVALUATION: Average eval score - {eval_logs['average_score']}"
-            # )
-
-            # # Save model
-            # if cfg.arch.save_model:
-            #     checkpointer.save(
-            #         global_step,
-            #         unreplicated_params.actor_params,
-            #         eval_logs,
-            #     )
+        # Check if training is finished
+        if trainer_update_number >= cfg.system.num_updates:
+            eval_key, _ = jax.random.split(eval_key)
+            evaluation(
+                envs=eval_env,
+                params=unreplicated_params,
+                vmap_actor_apply=vmap_actor_apply,
+                key=eval_key,
+                cfg=cfg,
+                log_fn=log,
+                t_env=global_step,
+            )
             break
 
-    envs.close()
-    # writer.close()
-    return 1.0
+
+@hydra.main(config_path="../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
+def hydra_entry_point(cfg: DictConfig) -> None:
+    """Experiment entry point."""
+
+    # Run experiment.
+    run_experiment(cfg)
+
+    print(f"{Fore.CYAN}{Style.BRIGHT}IPPO experiment completed{Style.RESET_ALL}")
 
 
 if __name__ == "__main__":
     configure_computation_environment()
-    run()
+    hydra_entry_point()

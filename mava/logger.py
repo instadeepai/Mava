@@ -144,7 +144,7 @@ def get_logger_tools(logger: Logger, arch_name: str) -> LogFn:  # noqa: CCR001
             # TODO: add SPS
             log_string = (
                 f"Timesteps {t_env:07d} | "
-                f"Policy Version {log_type['Learner']['learner_policy_version']} | "
+                f"Policy Version {log_type['Learner']['trainer_update_number']} | "
                 f"Total Loss {float(np.mean(total_loss)):.3f} | "
                 f"Value Loss {float(np.mean(value_loss)):.3f} | "
                 f"Loss Actor {float(np.mean(loss_actor)):.3f} | "
