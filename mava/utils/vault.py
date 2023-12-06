@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import json
 import os
 from datetime import datetime
@@ -27,7 +28,7 @@ from flashbax.utils import get_tree_shape_prefix
 
 # CURRENT LIMITATIONS / TODO LIST
 # - Anakin -> extra minibatch dim...
-# - Better async stuff
+# - Async reading if necessary
 # - Only tested with flat buffers
 # - Reloading could be nicer, but doing so is tricky!
 
@@ -136,7 +137,7 @@ class Vault:
         ).result()
         return leaf_ds
 
-    def _write_leaf(
+    async def _write_leaf(
         self,
         source_leaf: Array,
         dest_leaf: ts.TensorStore,
@@ -147,18 +148,18 @@ class Vault:
             dest_start,
             dest_start + (source_interval[1] - source_interval[0]),  # type: ignore
         )
-        dest_leaf[:, slice(*dest_interval), ...].write(
+        await dest_leaf[:, slice(*dest_interval), ...].write(
             source_leaf[:, slice(*source_interval), ...],
-        ).result()
+        )
 
-    def _write_chunk(
+    async def _write_chunk(
         self,
         fbx_state: TrajectoryBufferState,
         source_interval: Tuple[int, int],
         dest_start: int,
     ) -> None:
         # Write to each ds
-        jax.tree_util.tree_map(
+        futures_tree = jax.tree_util.tree_map(
             lambda x, ds: self._write_leaf(
                 source_leaf=x,
                 dest_leaf=ds,
@@ -168,6 +169,8 @@ class Vault:
             fbx_state.experience,  # x = experience
             self._all_ds,  # ds = data stores
         )
+        futures, _ = jax.tree_util.tree_flatten(futures_tree)
+        await asyncio.gather(*futures)
 
     def write(
         self,
@@ -188,10 +191,13 @@ class Vault:
 
         elif source_interval[1] > source_interval[0]:
             # Vanilla write, no wrap around
-            self._write_chunk(
-                fbx_state=fbx_state,
-                source_interval=source_interval,
-                dest_start=self.vault_index if dest_start is None else dest_start,
+            dest_start = self.vault_index if dest_start is None else dest_start
+            asyncio.run(
+                self._write_chunk(
+                    fbx_state=fbx_state,
+                    source_interval=source_interval,
+                    dest_start=dest_start,
+                )
             )
             written_length = source_interval[1] - source_interval[0]
 
@@ -207,23 +213,40 @@ class Vault:
             source_interval_a = (source_interval[0], fbx_max_index)
             time_length_a = source_interval_a[1] - source_interval_a[0]
 
-            self._write_chunk(
-                fbx_state=fbx_state,
-                source_interval=source_interval_a,
-                dest_start=dest_start,
+            asyncio.run(
+                self._write_chunk(
+                    fbx_state=fbx_state,
+                    source_interval=source_interval_a,
+                    dest_start=dest_start,
+                )
             )
 
             # From 0 (wrapped) to CI
             source_interval_b = (0, source_interval[1])
             time_length_b = source_interval_b[1] - source_interval_b[0]
 
-            self._write_chunk(
-                fbx_state=fbx_state,
-                source_interval=source_interval_b,
-                dest_start=dest_start + time_length_a,
+            asyncio.run(
+                self._write_chunk(
+                    fbx_state=fbx_state,
+                    source_interval=source_interval_b,
+                    dest_start=dest_start + time_length_a,
+                )
             )
 
             written_length = time_length_a + time_length_b
+
+        # print(
+        #     f"Incoming fbx index was {fbx_current_index}, \
+        #         vs last received {self._last_received_fbx_index}"
+        # )
+        # print(
+        #     f"Wrote {source_interval} into {(dest_start, dest_start +  written_length)}\
+        #         (steps = {written_length}) to vault"
+        # )
+        # print(
+        #     f"Vault index is now \
+        #     {self.vault_index + written_length}"
+        # )
 
         # Update vault index, and write this to the ds too
         self.vault_index += written_length
@@ -252,6 +275,13 @@ class Vault:
             self._all_ds,  # data stores
         )
         return read_result
+
+    def get_full_buffer(self) -> TrajectoryBufferState:
+        return TrajectoryBufferState(
+            experience=self.read(),
+            current_index=self.vault_index,
+            is_full=True,
+        )
 
     def get_buffer(
         self, size: int, key: Array, starting_index: Optional[int] = None
