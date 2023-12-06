@@ -28,15 +28,16 @@ from mava.wrappers.jumanji import LbfWrapper, RwareWrapper
 from mava.wrappers.shared import AgentIDWrapper, GlobalStateWrapper, LogWrapper
 
 # Registry mapping environment names to their generator and wrapper classes.
-JumanjiRegistry = {
+_jumanji_registry = {
     "RobotWarehouse-v0": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper},
     "LevelBasedForaging-v0": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
 }
 
 
-def create_jumanji_env(env_name: str, config: Dict) -> Tuple[Environment, Environment]:
+def make_jumanji_env(env_name: str, config: Dict) -> Tuple[Environment, Environment]:
     """
     Create a Jumanji environments for training and evaluation.
+
     Args:
         env_name (str): The name of the environment to create.
         config (Dict): The configuration of the environment.
@@ -44,9 +45,9 @@ def create_jumanji_env(env_name: str, config: Dict) -> Tuple[Environment, Enviro
         A tuple of the environments.
     """
     # Config generator and select the wrapper.
-    generator = JumanjiRegistry[env_name]["generator"]
+    generator = _jumanji_registry[env_name]["generator"]
     generator = generator(**config["env"]["scenario"]["task_config"])
-    wrapper = JumanjiRegistry[env_name]["wrapper"]
+    wrapper = _jumanji_registry[env_name]["wrapper"]
 
     # Create envs.
     env = jumanji.make(env_name, generator=generator)
@@ -59,8 +60,8 @@ def create_jumanji_env(env_name: str, config: Dict) -> Tuple[Environment, Enviro
         env = AgentIDWrapper(env)
         eval_env = AgentIDWrapper(eval_env)
 
-    # Somehow it didn't work, only after switching the two ifs or do return GlobalStateWrapper(env)
-    if config["system"]["system_name"] in ["ff_mappo", "rec_mappo"]:
+    # Add the global state to observation.
+    if config["system"]["add_global_state"]:
         env = GlobalStateWrapper(env)
         eval_env = GlobalStateWrapper(env)
 
@@ -70,11 +71,13 @@ def create_jumanji_env(env_name: str, config: Dict) -> Tuple[Environment, Enviro
     return env, eval_env
 
 
-def create_jaxmarl_env(config: Dict) -> Environment:
+def make_jaxmarl_env(config: Dict) -> Environment:
     """
-    Create a JAXMARL environment.
+     Create a JAXMARL environment.
+
     Args:
         config (Dict): The configuration of the environment.
+
     Returns:
         A JAXMARL environment.
     """
@@ -82,7 +85,7 @@ def create_jaxmarl_env(config: Dict) -> Environment:
     pass
 
 
-def create_environment(config: Dict) -> Tuple[Environment, Environment]:
+def make(config: Dict) -> Tuple[Environment, Environment]:
     """
     Create environments for training and evaluation..
     Args:
@@ -92,7 +95,7 @@ def create_environment(config: Dict) -> Tuple[Environment, Environment]:
     """
 
     env_name = config["env"]["env_name"]
-    if env_name in JumanjiRegistry:
-        return create_jumanji_env(env_name, config)
+    if env_name in _jumanji_registry:
+        return make_jumanji_env(env_name, config)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")

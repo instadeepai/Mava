@@ -47,8 +47,8 @@ from mava.types import (
     PPOTransition,
 )
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.create_envs_utils import create_environment
 from mava.utils.jax import merge_leading_dims
+from mava.utils.make_env import make
 
 
 class Actor(nn.Module):
@@ -502,7 +502,7 @@ def run_experiment(_config: Dict) -> None:
     log = logger_setup(config)
 
     # Create the enviroments for train and eval.
-    env, eval_env = create_environment(config=config)
+    env, eval_env = make(config=config)
 
     # PRNG keys.
     rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["system"]["seed"]), num=3)

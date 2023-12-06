@@ -5,7 +5,7 @@ seed: 42
 
 # --- Agent observations ---
 add_agent_id: True
-system_name: ff_mappo
+add_global_state : True
 
 # --- RL hyperparameters ---
 actor_lr: 2.5e-4 # Learning rate for actor network
