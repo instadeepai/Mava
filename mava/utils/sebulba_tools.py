@@ -35,5 +35,5 @@ def configure_computation_environment() -> None:
     os.environ["TF_XLA_FLAGS"] = "--xla_gpu_autotune_level=2 --xla_gpu_deterministic_reductions"
     os.environ["TF_CUDNN DETERMINISTIC"] = "1"
 
-    # TODO: add docs
+    # Set the multiprocessing start method to forkserver to avoid issues with Neptune.
     set_start_method("forkserver")
