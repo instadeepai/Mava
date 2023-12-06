@@ -22,13 +22,11 @@ from typing import Any, Callable, Dict, List, Sequence, Tuple
 import distrax
 import flax
 import flax.linen as nn
-import gym
 import hydra
 import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-import rware  # noqa: F401 # We need this to be able to import the robot warehouse environment
 from chex import Array, PRNGKey
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
@@ -97,68 +95,87 @@ class Critic(nn.Module):
         return jnp.squeeze(critic_output, axis=-1)
 
 
-# Evaluator
+def evaluator_setup(
+    cfg: DictConfig,
+    apply_fn: Callable,
+    log_fn: Callable,
+) -> Callable:
+    """Setup evaluator: create envs, define evaluator function and return it."""
+    # Create envs
+    eval_envs = make_env(
+        num_envs=cfg.arch.num_eval_episodes,
+        config=cfg,
+    )()
 
-
-def evaluation(
-    envs: gym.vector.AsyncVectorEnv,
-    params: FrozenDict,
-    vmap_actor_apply,
-    key,
-    cfg,
-    log_fn,
-    t_env,
-) -> Dict[str, float]:
-
-    # During evaluation, we want deterministic ordering of seeds
     @jax.jit
-    def get_action_and_value(  # TODO: Use the power_tools action methods?
-        params: flax.core.FrozenDict,
-        next_obs: np.ndarray,
-        actions_mask: np.ndarray,
-        key: jax.random.PRNGKey,
-    ):
-        policy = vmap_actor_apply(params.actor_params, next_obs, actions_mask)
+    def get_action(
+        params: FrozenDict,
+        next_obs: Array,
+        actions_mask: Array,
+        key: PRNGKey,
+    ) -> Tuple:
+        """Get action."""
         key, subkey = jax.random.split(key)
-        action, _ = policy.sample_and_log_prob(seed=subkey)
+        policy = apply_fn(params.actor_params, next_obs, actions_mask)
+        if cfg.arch.evaluation_greedy:
+            action = policy.mode()
+        else:
+            action = policy.sample(seed=subkey)
+        return action, key
 
-        return next_obs, action, key
-
-    # put data in the last index
-    episode_returns = np.zeros((cfg.arch.num_eval_episodes,), dtype=np.float32)
-    episode_lengths = np.zeros((cfg.arch.num_eval_episodes,), dtype=np.float32)
-    next_obs, infos = envs.reset()
-    next_done = jnp.zeros(cfg.arch.num_envs, dtype=jax.numpy.bool_)
-    # TODO: make it flexible to different epiosdes lengths
-    for _ in range(0, 500):
-        cached_next_obs = next_obs
-        cached_next_done = next_done
-        cached_infos = infos
-        actions_mask = np.stack(cached_infos["actions_mask"])
-        (
-            cached_next_obs,
-            action,
-            key,
-        ) = get_action_and_value(params, cached_next_obs, actions_mask, key)
-        cpu_action = np.array(action)
-        next_obs, next_reward, next_done, _, infos = envs.step(cpu_action)
+    def evaluator(
+        params: FrozenDict,
+        key: PRNGKey,
+        t_env: int,
+    ) -> None:
+        """Run evaluation."""
+        # Initialize episode info
+        episode_returns = np.zeros((cfg.arch.num_eval_episodes,), dtype=np.float32)
+        episode_lengths = np.zeros((cfg.arch.num_eval_episodes,), dtype=np.float32)
         env_id = np.arange(cfg.arch.num_eval_episodes)
-        episode_returns[env_id] += np.mean(next_reward)
-        episode_lengths[env_id] += 1
-    # TODO: add sps
-    log_fn(
-        log_type={"Evaluator": {}},
-        t_env=t_env,
-        metrics_to_log={
-            "episode_info": {
-                "episode_return": episode_returns,
-                "episode_length": np.zeros_like(episode_returns),
+
+        # Reset envs
+        next_obs, infos = eval_envs.reset()
+        dones = jnp.zeros(cfg.arch.num_eval_episodes, dtype=jax.numpy.bool_)
+        while not dones.all():
+            # Load step info
+            cached_next_obs = next_obs
+            cached_infos = infos
+            actions_mask = np.stack(cached_infos["actions_mask"])
+
+            # Select action
+            (action, key) = get_action(params, cached_next_obs, actions_mask, key)
+            cpu_action = np.array(action)
+
+            # Step the environment
+            next_obs, next_reward, terminated, truncated, infos = eval_envs.step(cpu_action)
+            dones += (
+                terminated + truncated
+            )  # We need to add the dones here to make sure if an episode is done at least once.
+
+            episode_returns[env_id] += np.mean(next_reward) * (
+                1 - dones
+            )  # Only add the reward if the episode is not done.
+            episode_lengths[env_id] += 1 * (
+                1 - dones
+            )  # Only add the length if the episode is not done.
+
+        # Log info
+        log_fn(
+            log_type={"Evaluator": {}},
+            t_env=t_env,
+            metrics_to_log={
+                "episode_info": {
+                    "episode_return": episode_returns,
+                    "episode_length": np.zeros_like(episode_returns),
+                },
             },
-        },
-    )
+        )
+
+    return evaluator
 
 
-def rollout(
+def rollout(  # noqa: CCR001
     key: PRNGKey,
     cfg: DictConfig,
     rollout_queue: queue.Queue,
@@ -183,13 +200,13 @@ def rollout(
     # Get the apply functions for the actor and critic networks.
     vmap_actor_apply, vmap_critic_apply = apply_fns
 
-    # Define the util functions: select action function and prepare data to share it with the learner.
+    # Define the util functions: select action function and prepare data to share it with learner.
     @jax.jit
     def get_action_and_value(
-        params: flax.core.FrozenDict,
-        next_obs: np.ndarray,
-        actions_mask: np.ndarray,
-        key: jax.random.PRNGKey,
+        params: FrozenDict,
+        next_obs: Array,
+        actions_mask: Array,
+        key: PRNGKey,
     ) -> Tuple:
         """Get action and value."""
         key, subkey = jax.random.split(key)
@@ -321,7 +338,7 @@ def rollout(
         # Prepare data to share with learner
         partitioned_storage = prepare_data(storage)
         sharded_storage = Transition(
-            *list(
+            *list(  # noqa: C417
                 map(
                     lambda x: jax.device_put_sharded(x, devices=learner_devices),  # type: ignore
                     partitioned_storage,
@@ -625,21 +642,11 @@ def get_trainer(cfg: DictConfig, apply_fns: Tuple, optim_updates_fn: Tuple) -> C
     return single_device_update
 
 
-def run_experiment(cfg: DictConfig) -> None:
+def run_experiment(cfg: DictConfig) -> None:  # noqa: CCR001
     """Run experiment."""
     # Logger setup
     cfg_dict: Dict = OmegaConf.to_container(cfg, resolve=True)
     log = logger_setup(cfg_dict)
-
-    # Create eval_envs and dummy_envs to get observation and action spaces
-    eval_env = make_env(
-        num_envs=cfg.arch.num_eval_episodes,
-        config=cfg,
-    )()
-    dummy_envs = make_env(
-        num_envs=cfg.arch.num_envs,
-        config=cfg,
-    )()
 
     # Config setup
     cfg.system.local_batch_size = int(
@@ -697,6 +704,10 @@ def run_experiment(cfg: DictConfig) -> None:
 
         return linear_schedule
 
+    dummy_envs = make_env(  # Create dummy_envs to get observation and action spaces
+        num_envs=cfg.arch.num_envs,
+        config=cfg,
+    )()
     cfg.system.num_agents = dummy_envs.single_observation_space.shape[0]
     cfg.system.num_actions = int(dummy_envs.single_action_space.nvec[0])
     cfg.system.single_obs_dim = dummy_envs.single_observation_space.shape[1]
@@ -763,6 +774,9 @@ def run_experiment(cfg: DictConfig) -> None:
         devices=global_learner_devices,
     )
 
+    # Evaluation setup
+    eval_fn = evaluator_setup(cfg, vmap_actor_apply, log)
+
     # Executor Setup
     params_queues: List = []
     rollout_queues: List = []
@@ -801,7 +815,7 @@ def run_experiment(cfg: DictConfig) -> None:
         sharded_next_dones = []
 
         # Loop through each executor device
-        for d_idx, d_id in enumerate(cfg.arch.executor_device_ids):
+        for d_idx, _ in enumerate(cfg.arch.executor_device_ids):
             # Loop through each executor thread
             for thread_id in range(cfg.arch.n_threads_per_executor):
                 # Get data from rollout queue
@@ -860,26 +874,18 @@ def run_experiment(cfg: DictConfig) -> None:
 
             # Evaluation
             eval_key, _ = jax.random.split(eval_key)
-            evaluation(
-                envs=eval_env,
+            eval_fn(
                 params=unreplicated_params,
-                vmap_actor_apply=vmap_actor_apply,
                 key=eval_key,
-                cfg=cfg,
-                log_fn=log,
                 t_env=t_env,
             )
 
         # Check if training is finished
         if trainer_update_number >= cfg.system.num_updates:
             eval_key, _ = jax.random.split(eval_key)
-            evaluation(
-                envs=eval_env,
+            eval_fn(
                 params=unreplicated_params,
-                vmap_actor_apply=vmap_actor_apply,
                 key=eval_key,
-                cfg=cfg,
-                log_fn=log,
                 t_env=t_env,
             )
             break

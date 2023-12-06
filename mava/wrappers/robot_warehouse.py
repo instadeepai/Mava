@@ -16,6 +16,7 @@ from typing import Any, Callable, Dict, List, Tuple, Union
 
 import gym
 import numpy as np
+import rware  # noqa: F401 # We need this to be able to import the robot warehouse environment
 from gym.spaces import Box, MultiDiscrete
 from omegaconf import DictConfig
 

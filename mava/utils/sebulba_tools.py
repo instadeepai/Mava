@@ -16,7 +16,8 @@ import os
 from multiprocessing import set_start_method
 
 
-def configure_computation_environment():
+def configure_computation_environment() -> None:
+    """Configure the computation environment for JAX."""
     os.environ["JAX_USE_PJRT_C_API_ON_TPU"] = ""
 
     # Fix weird OOM https://github.com/google/jax/discussions/6332#discussioncomment-1279991
