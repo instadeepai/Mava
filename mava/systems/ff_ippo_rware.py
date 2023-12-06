@@ -614,11 +614,11 @@ def run_experiment(_config: Dict) -> None:
         max_length=int(5e6),
         min_length=int(1),
         sample_batch_size=1,
+        add_sequences=True,
         add_batch_size=(
             n_devices
             * config["system"]["num_updates_per_eval"]
             * config["system"]["update_batch_size"]
-            * config["system"]["rollout_length"]
             * config["arch"]["num_envs"]
         ),
     )
@@ -637,9 +637,11 @@ def run_experiment(_config: Dict) -> None:
     def _reshape_experience(experience: Dict[str, chex.Array]) -> Dict[str, chex.Array]:
         """Reshape experience to match buffer."""
 
-        # Merge 5 leading dimensions into 1. (D, NU, UB, T, NE, ...) -> (D * NU * UB * T * NE, ...)
+        # Swap the T and NE axes (D, NU, UB, T, NE, ...) -> (D, NU, UB, NE, T, ...)
+        experience: Dict[str, chex.Array] = jax.tree_map(lambda x: x.swapaxes(3, 4), experience)
+        # Merge 4 leading dimensions into 1. (D, NU, UB, NE, T ...) -> (D * NU * UB * NE, T, ...)
         experience: Dict[str, chex.Array] = jax.tree_map(
-            lambda x: x.reshape(-1, *x.shape[5:]), experience
+            lambda x: x.reshape(-1, *x.shape[4:]), experience
         )
         return experience
 
