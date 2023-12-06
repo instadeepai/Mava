@@ -203,7 +203,7 @@ def rollout(  # noqa: CCR001
             actions_mask = np.stack(cached_infos["actions_mask"])
 
             # Increment current timestep
-            t_env += cfg.arch.n_threads_per_executor * len_executor_device_ids
+            t_env += cfg.arch.n_threads_per_executor * len_executor_device_ids * cfg.arch.num_envs
 
             # Get action and value
             inference_time_start = time.time()
