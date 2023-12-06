@@ -609,7 +609,6 @@ def run_experiment(_config: Dict) -> None:
         ),
     }
 
-    # Could add sequences if we wanted to. Collapsing sequences for now.
     buffer = fbx.make_flat_buffer(
         max_length=int(5e6),
         min_length=int(1),
