@@ -13,21 +13,21 @@
 # limitations under the License.
 
 """Logger setup."""
-from typing import Any, Dict, Optional, Protocol
+from typing import Dict, Optional, Protocol, Union
 
+import jax.numpy as jnp
 import numpy as np
 from colorama import Fore, Style
 
-# TODO: find a solution for this
-# from mava.types import ExperimentOutput
+from mava.types import ExperimentOutput
 from mava.utils.logger_tools import Logger
 
 
 # Not in types.py because we only use it here.
-class LogFn(Protocol):
+class AnakinLogFn(Protocol):
     def __call__(
         self,
-        metrics: Any,
+        metrics: ExperimentOutput,
         t_env: int = 0,
         trainer_metric: bool = False,
         absolute_metric: bool = False,
@@ -36,11 +36,23 @@ class LogFn(Protocol):
         ...
 
 
-def get_logger_tools(logger: Logger, arch_name: str) -> LogFn:  # noqa: CCR001
+class SebulbaLogFn(Protocol):
+    def __call__(
+        self,
+        log_type: dict,
+        metrics_to_log: dict,
+        t_env: int = 0,
+    ) -> None:
+        ...
+
+
+def get_logger_tools(  # noqa: CCR001
+    logger: Logger, arch_name: str
+) -> Union[AnakinLogFn, SebulbaLogFn]:  # noqa: CCR001
     """Get the logger function."""
 
     def anakin_log(
-        metrics: Any,
+        metrics: ExperimentOutput,
         t_env: int = 0,
         trainer_metric: bool = False,
         absolute_metric: bool = False,
@@ -70,9 +82,8 @@ def get_logger_tools(logger: Logger, arch_name: str) -> LogFn:  # noqa: CCR001
             episodes_info = metrics.episodes_info
 
         # Flatten metrics info.
-        # TODO: verify that change this from jnp to np don't impact the logging
-        episodes_return = np.ravel(episodes_info["episode_return"])
-        episodes_length = np.ravel(episodes_info["episode_length"])
+        episodes_return = jnp.ravel(episodes_info["episode_return"])
+        episodes_length = jnp.ravel(episodes_info["episode_length"])
         steps_per_second = episodes_info["steps_per_second"]
 
         # Log metrics.
@@ -123,15 +134,16 @@ def get_logger_tools(logger: Logger, arch_name: str) -> LogFn:  # noqa: CCR001
 
         return float(np.mean(episodes_return))
 
-    def sebulba_log(
+    def sebulba_log(  # noqa: CCR001
         log_type: dict,
         metrics_to_log: dict,
         t_env: int = 0,
-    ) -> float:
+    ) -> None:
         """Log the desired metrics.
 
         Args:
-            log_type (dict): The type of metrics to log and extra infos related to the specific situations.
+            log_type (dict): This specifies the types of metrics to be logged, along with
+            additional information related to that metric type.
             metrics_to_log (dict): The metrics to log.
             t_env (int): The current environment timestep.
         """
@@ -141,7 +153,7 @@ def get_logger_tools(logger: Logger, arch_name: str) -> LogFn:  # noqa: CCR001
             loss_actor = metrics_to_log["loss_info"]["loss_actor"]
             entropy = metrics_to_log["loss_info"]["entropy"]
             approx_kl = metrics_to_log["loss_info"]["approx_kl"]
-            # TODO: add SPS
+            training_time = metrics_to_log["speed_info"]["training_time"]
             log_string = (
                 f"Timesteps {t_env:07d} | "
                 f"Policy Version {log_type['Learner']['trainer_update_number']} | "
@@ -150,7 +162,7 @@ def get_logger_tools(logger: Logger, arch_name: str) -> LogFn:  # noqa: CCR001
                 f"Loss Actor {float(np.mean(loss_actor)):.3f} | "
                 f"Entropy {float(np.mean(entropy)):.3f} | "
                 f"Approx KL {float(np.mean(approx_kl)):.3f} | "
-                f"Training Time {float(np.mean(metrics_to_log['speed_info']['training_time'])):.3f} | "
+                f"Training Time {float(np.mean(training_time)):.3f} | "
             )
             logger.console_logger.info(
                 f"{Fore.MAGENTA}{Style.BRIGHT}TRAINER: {log_string}{Style.RESET_ALL}"
@@ -158,9 +170,8 @@ def get_logger_tools(logger: Logger, arch_name: str) -> LogFn:  # noqa: CCR001
 
             # Log Loss infos
             for metric in metrics_to_log["loss_info"].keys():
-                logger.log_stat(
-                    f"learner/loss/{metric}", np.mean(metrics_to_log["loss_info"][metric]), t_env
-                )
+                metric_mean = np.mean(metrics_to_log["loss_info"][metric])
+                logger.log_stat(f"learner/loss/{metric}", metric_mean, t_env)  # type: ignore
 
             # Log Speed infos
             logger.log_stat(
@@ -179,6 +190,7 @@ def get_logger_tools(logger: Logger, arch_name: str) -> LogFn:  # noqa: CCR001
             episodes_return = metrics_to_log["episode_info"]["episode_return"]
             episodes_length = metrics_to_log["episode_info"]["episode_length"]
             steps_per_second = metrics_to_log["speed_info"]["sps"]
+            rollout_time = metrics_to_log["speed_info"]["rollout_time"]
             if log_type["Executor"]["device_thread_id"] == 0:
                 log_string = (
                     f"Timesteps {t_env:07d} | "
@@ -187,7 +199,7 @@ def get_logger_tools(logger: Logger, arch_name: str) -> LogFn:  # noqa: CCR001
                     f"Mean Episode Length {float(np.mean(episodes_length)):.3f} | "
                     f"Std Episode Length {float(np.std(episodes_length)):.3f} | "
                     f"Max Episode Length {float(np.max(episodes_length)):.3f} | "
-                    f"Rollout Time {float(np.mean(metrics_to_log['speed_info']['rollout_time'])):.3f} | "
+                    f"Rollout Time {float(np.mean(rollout_time)):.3f} | "
                     f"Steps Per Second {steps_per_second:.2e} "
                 )
                 logger.console_logger.info(
@@ -207,14 +219,13 @@ def get_logger_tools(logger: Logger, arch_name: str) -> LogFn:  # noqa: CCR001
 
             # Log queue infos:
             for metric in metrics_to_log["queue_info"].keys():
-                logger.log_stat(
-                    f"executor/stats/{metric}", np.mean(metrics_to_log["queue_info"][metric]), t_env
-                )
+                metric_mean = np.mean(metrics_to_log["queue_info"][metric])
+                logger.log_stat(f"executor/stats/{metric}", metric_mean, t_env)  # type: ignore
         else:
             # Evaluator
             episodes_return = metrics_to_log["episode_info"]["episode_return"]
             episodes_length = metrics_to_log["episode_info"]["episode_length"]
-            # steps_per_second = metrics_to_log['speed_info']['sps']
+            steps_per_second = metrics_to_log["speed_info"]["sps"]
             log_string = (
                 f"Timesteps {t_env:07d} | "
                 f"Mean Episode Return {float(np.mean(episodes_return)):.3f} | "
@@ -222,7 +233,7 @@ def get_logger_tools(logger: Logger, arch_name: str) -> LogFn:  # noqa: CCR001
                 f"Mean Episode Length {float(np.mean(episodes_length)):.3f} | "
                 f"Std Episode Length {float(np.std(episodes_length)):.3f} | "
                 f"Max Episode Length {float(np.max(episodes_length)):.3f} | "
-                # f"Steps Per Second {steps_per_second:.2e} "
+                f"Steps Per Second {steps_per_second:.2e} "
             )
             logger.console_logger.info(
                 f"{Fore.BLUE}{Style.BRIGHT}Evaluator: {log_string}{Style.RESET_ALL}"
@@ -233,12 +244,12 @@ def get_logger_tools(logger: Logger, arch_name: str) -> LogFn:  # noqa: CCR001
             )
             logger.log_stat("evaluator/mean_episode_length", float(np.mean(episodes_length)), t_env)
             # Log Speed infos
-            # logger.log_stat("evaluator/steps_per_second", steps_per_second, t_env)
+            logger.log_stat("evaluator/steps_per_second", steps_per_second, t_env)
 
     return anakin_log if arch_name == "anakin" else sebulba_log
 
 
-def logger_setup(config: Dict) -> LogFn:
+def logger_setup(config: Dict) -> Union[AnakinLogFn, SebulbaLogFn]:
     """Setup the logger."""
     logger = Logger(config)
     return get_logger_tools(logger, config["arch"]["arch_name"])

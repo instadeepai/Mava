@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, Optional, Tuple
+import time
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import chex
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
+import numpy as np
 from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
+from omegaconf import DictConfig
 
 from mava.types import (
     ActorApply,
@@ -29,6 +32,7 @@ from mava.types import (
     RecActorApply,
     RNNEvalState,
 )
+from mava.wrappers.robot_warehouse import make_env
 
 
 def get_ff_evaluator_fn(
@@ -250,7 +254,7 @@ def get_rnn_evaluator_fn(
     return evaluator_fn
 
 
-def evaluator_setup(
+def anakin_evaluator_setup(
     eval_env: Environment,
     rng_e: chex.PRNGKey,
     network: Any,
@@ -309,3 +313,98 @@ def evaluator_setup(
     eval_rngs = jnp.stack(eval_rngs).reshape(n_devices, -1)
 
     return evaluator, absolute_metric_evaluator, (trained_params, eval_rngs)
+
+
+def sebulba_evaluator_setup(
+    cfg: DictConfig,
+    apply_fn: Callable,
+    log_fn: Callable,
+) -> Callable:
+    """Setup evaluator: create envs, define evaluator function and return it."""
+    # Create envs
+    eval_envs = make_env(
+        num_envs=cfg.arch.num_eval_episodes,
+        config=cfg,
+    )()
+
+    @jax.jit
+    def get_action(
+        params: FrozenDict,
+        next_obs: chex.Array,
+        actions_mask: chex.Array,
+        key: chex.PRNGKey,
+    ) -> Tuple:
+        """Get action."""
+        key, subkey = jax.random.split(key)
+        policy = apply_fn(params.actor_params, next_obs, actions_mask)
+        if cfg.arch.evaluation_greedy:
+            action = policy.mode()
+        else:
+            action = policy.sample(seed=subkey)
+        return action, key
+
+    def evaluator(
+        params: FrozenDict,
+        key: chex.PRNGKey,
+        t_env: int,
+    ) -> None:
+        """Run evaluation."""
+        # Initialize episode info
+        episode_returns = np.zeros((cfg.arch.num_eval_episodes,), dtype=np.float32)
+        episode_lengths = np.zeros((cfg.arch.num_eval_episodes,), dtype=np.float32)
+        env_id = np.arange(cfg.arch.num_eval_episodes)
+
+        # Reset envs
+        next_obs, infos = eval_envs.reset()
+        dones = jnp.zeros(cfg.arch.num_eval_episodes, dtype=jax.numpy.bool_)
+
+        start_time = time.time()
+        timestep = 0
+        while not dones.all():
+            timestep += 1
+            # Load step info
+            cached_next_obs = next_obs
+            cached_infos = infos
+            actions_mask = np.stack(cached_infos["actions_mask"])
+
+            # Select action
+            (action, key) = get_action(params, cached_next_obs, actions_mask, key)
+            cpu_action = np.array(action)
+
+            # Step the environment
+            next_obs, next_reward, terminated, truncated, infos = eval_envs.step(cpu_action)
+            dones += (
+                terminated + truncated
+            )  # We need to add the dones here to make sure if an episode is done at least once.
+
+            episode_returns[env_id] += np.mean(next_reward) * (
+                1 - dones
+            )  # Only add the reward if the episode is not done.
+            episode_lengths[env_id] += 1 * (
+                1 - dones
+            )  # Only add the length if the episode is not done.
+
+        # Log info
+        log_fn(
+            log_type={"Evaluator": {}},
+            t_env=t_env,
+            metrics_to_log={
+                "episode_info": {
+                    "episode_return": episode_returns,
+                    "episode_length": np.zeros_like(episode_returns),
+                },
+                "speed_info": {
+                    "sps": int(timestep / (time.time() - start_time)),
+                },
+            },
+        )
+
+    return evaluator
+
+
+def get_evaluator_setup(arch_type: str = "anakin"):  # type: ignore
+    """Return setup evaluator based on architechture type"""
+    evaluator_setup_fn = (
+        anakin_evaluator_setup if arch_type == "anakin" else sebulba_evaluator_setup
+    )
+    return evaluator_setup_fn

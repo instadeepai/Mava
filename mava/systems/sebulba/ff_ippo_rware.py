@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from mava.utils.sebulba_tools import configure_computation_environment
 
 configure_computation_environment()
@@ -37,8 +38,10 @@ from flax.linen.initializers import constant, orthogonal
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
-from mava.logger import logger_setup
-from mava.types import LearnerState, OptStates, Params
+from mava.evaluator import get_evaluator_setup
+from mava.logger import SebulbaLogFn, logger_setup
+from mava.types import OptStates, Params
+from mava.types import SebulbaLearnerState as LearnerState
 from mava.types import SebulbaTransition as Transition
 from mava.utils.jax import convert_data, merge_leading_dims
 from mava.wrappers.robot_warehouse import make_env
@@ -60,7 +63,6 @@ class Actor(nn.Module):
             actor_output
         )
         actor_output = nn.relu(actor_output)
-        # TODO: make it a feature
         actor_output = nn.LayerNorm(use_scale=False)(actor_output)
         actor_output = nn.Dense(
             self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
@@ -95,86 +97,6 @@ class Critic(nn.Module):
         )
 
         return jnp.squeeze(critic_output, axis=-1)
-
-
-def evaluator_setup(
-    cfg: DictConfig,
-    apply_fn: Callable,
-    log_fn: Callable,
-) -> Callable:
-    """Setup evaluator: create envs, define evaluator function and return it."""
-    # Create envs
-    eval_envs = make_env(
-        num_envs=cfg.arch.num_eval_episodes,
-        config=cfg,
-    )()
-
-    @jax.jit
-    def get_action(
-        params: FrozenDict,
-        next_obs: Array,
-        actions_mask: Array,
-        key: PRNGKey,
-    ) -> Tuple:
-        """Get action."""
-        key, subkey = jax.random.split(key)
-        policy = apply_fn(params.actor_params, next_obs, actions_mask)
-        if cfg.arch.evaluation_greedy:
-            action = policy.mode()
-        else:
-            action = policy.sample(seed=subkey)
-        return action, key
-
-    def evaluator(
-        params: FrozenDict,
-        key: PRNGKey,
-        t_env: int,
-    ) -> None:
-        """Run evaluation."""
-        # Initialize episode info
-        episode_returns = np.zeros((cfg.arch.num_eval_episodes,), dtype=np.float32)
-        episode_lengths = np.zeros((cfg.arch.num_eval_episodes,), dtype=np.float32)
-        env_id = np.arange(cfg.arch.num_eval_episodes)
-
-        # Reset envs
-        next_obs, infos = eval_envs.reset()
-        dones = jnp.zeros(cfg.arch.num_eval_episodes, dtype=jax.numpy.bool_)
-        while not dones.all():
-            # Load step info
-            cached_next_obs = next_obs
-            cached_infos = infos
-            actions_mask = np.stack(cached_infos["actions_mask"])
-
-            # Select action
-            (action, key) = get_action(params, cached_next_obs, actions_mask, key)
-            cpu_action = np.array(action)
-
-            # Step the environment
-            next_obs, next_reward, terminated, truncated, infos = eval_envs.step(cpu_action)
-            dones += (
-                terminated + truncated
-            )  # We need to add the dones here to make sure if an episode is done at least once.
-
-            episode_returns[env_id] += np.mean(next_reward) * (
-                1 - dones
-            )  # Only add the reward if the episode is not done.
-            episode_lengths[env_id] += 1 * (
-                1 - dones
-            )  # Only add the length if the episode is not done.
-
-        # Log info
-        log_fn(
-            log_type={"Evaluator": {}},
-            t_env=t_env,
-            metrics_to_log={
-                "episode_info": {
-                    "episode_return": episode_returns,
-                    "episode_length": np.zeros_like(episode_returns),
-                },
-            },
-        )
-
-    return evaluator
 
 
 def rollout(  # noqa: CCR001
@@ -222,7 +144,7 @@ def rollout(  # noqa: CCR001
     @jax.jit
     def prepare_data(storage: List[Transition]) -> Transition:
         """Prepare data to share with learner."""
-        return jax.tree_map(
+        return jax.tree_map(  # type: ignore
             lambda *xs: jnp.split(jnp.stack(xs), len(learner_devices), axis=1), *storage
         )
 
@@ -260,7 +182,6 @@ def rollout(  # noqa: CCR001
 
         # Get the latest parameters from the learner
         params_queue_get_time_start = time.time()
-        # TODO: double check if we can remove this
         if cfg.arch.concurrency:
             if update != 2:
                 params = params_queue.get()
@@ -281,7 +202,7 @@ def rollout(  # noqa: CCR001
             actions_mask = np.stack(cached_infos["actions_mask"])
 
             # Increment current timestep
-            t_env += cfg.arch.n_threads_per_executor * len_executor_device_ids * cfg.arch.world_size
+            t_env += cfg.arch.n_threads_per_executor * len_executor_device_ids
 
             # Get action and value
             inference_time_start = time.time()
@@ -649,16 +570,16 @@ def run_experiment(cfg: DictConfig) -> None:  # noqa: CCR001
     """Run experiment."""
     # Logger setup
     cfg_dict: Dict = OmegaConf.to_container(cfg, resolve=True)
-    log = logger_setup(cfg_dict)
+    log: SebulbaLogFn = logger_setup(cfg_dict)  # type: ignore
 
     # Config setup
-    cfg.system.local_batch_size = int(
+    cfg.system.batch_size = int(
         cfg.arch.num_envs
         * cfg.system.rollout_length
         * cfg.arch.n_threads_per_executor
         * len(cfg.arch.executor_device_ids)
     )
-    cfg.system.local_minibatch_size = int(cfg.system.local_batch_size // cfg.system.num_minibatches)
+    cfg.system.minibatch_size = int(cfg.system.batch_size // cfg.system.num_minibatches)
     assert (
         cfg.arch.num_envs % len(cfg.arch.learner_device_ids) == 0
     ), "local_num_envs must be divisible by len(learner_device_ids)"
@@ -668,24 +589,18 @@ def run_experiment(cfg: DictConfig) -> None:  # noqa: CCR001
         % cfg.system.num_minibatches
         == 0
     ), "int(local_num_envs / len(learner_device_ids)) must be divisible by num_minibatches"
-    cfg.arch.world_size = jax.process_count()
-    cfg.arch.local_rank = jax.process_index()
-    cfg.system.batch_size = cfg.system.local_batch_size * cfg.arch.world_size
-    cfg.system.minibatch_size = cfg.system.local_minibatch_size * cfg.arch.world_size
-    cfg.system.total_timesteps = cfg.system.num_updates * (
-        cfg.system.local_batch_size * cfg.arch.world_size
-    )
+    cfg.system.total_timesteps = cfg.system.num_updates * (cfg.system.batch_size)
     local_devices = jax.local_devices()
     global_devices = jax.devices()
     learner_devices = [local_devices[d_id] for d_id in cfg.arch.learner_device_ids]
-    actor_devices = [local_devices[d_id] for d_id in cfg.arch.executor_device_ids]
+    executor_devices = [local_devices[d_id] for d_id in cfg.arch.executor_device_ids]
     global_learner_devices = [
         global_devices[d_id + process_index * len(local_devices)]
         for process_index in range(cfg.arch.world_size)
         for d_id in cfg.arch.learner_device_ids
     ]
     cfg.system.global_learner_devices = [str(item) for item in global_learner_devices]
-    cfg.system.actor_devices = [str(item) for item in actor_devices]
+    cfg.system.executor_devices = [str(item) for item in executor_devices]
     cfg.system.learner_devices = [str(item) for item in learner_devices]
     pprint(cfg_dict)
 
@@ -778,6 +693,7 @@ def run_experiment(cfg: DictConfig) -> None:  # noqa: CCR001
     )
 
     # Evaluation setup
+    evaluator_setup = get_evaluator_setup(cfg.arch.arch_name)
     eval_fn = evaluator_setup(cfg, vmap_actor_apply, log)
 
     # Executor Setup

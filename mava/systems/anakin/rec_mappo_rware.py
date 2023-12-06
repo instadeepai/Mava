@@ -37,8 +37,8 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava.evaluator import evaluator_setup
-from mava.logger import logger_setup
+from mava.evaluator import get_evaluator_setup
+from mava.logger import AnakinLogFn, logger_setup
 from mava.types import AnakinTransition as PPOTransition
 from mava.types import (
     ExperimentOutput,
@@ -689,7 +689,7 @@ def run_experiment(_config: Dict) -> None:
     """Runs experiment."""
     # Logger setup
     config = copy.deepcopy(_config)
-    log = logger_setup(config)
+    log: AnakinLogFn = logger_setup(config)  # type: ignore
 
     # Create envs
     generator = RandomGenerator(**config["env"]["scenario"]["task_config"])
@@ -712,6 +712,7 @@ def run_experiment(_config: Dict) -> None:
     learn, actor_network, learner_state = learner_setup(env, (rng, rng_p), config)
 
     # Setup evaluator.
+    evaluator_setup = get_evaluator_setup()
     evaluator, absolute_metric_evaluator, (trained_params, eval_rngs) = evaluator_setup(
         eval_env=eval_env,
         rng_e=rng_e,

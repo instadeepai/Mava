@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import warnings
 from typing import Any, Callable, Dict, List, Tuple, Union
 
 import gym
@@ -24,6 +25,10 @@ ResetOutput = Tuple[np.ndarray, Dict[str, Any]]
 StepOutput = Union[
     Callable[[], ResetOutput], Tuple[np.ndarray, float, bool, bool, Dict], ResetOutput
 ]
+
+
+# Ignore warnings from gym about having list of agents rewards/done instead of single one
+warnings.filterwarnings("ignore")
 
 
 class GymWrapper(gym.Wrapper):

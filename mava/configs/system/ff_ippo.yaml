@@ -9,7 +9,6 @@ add_agent_id: True
 # --- RL hyperparameters ---
 actor_lr: 0.0001414213562373095 # Learning rate for actor network
 critic_lr: 0.0001414213562373095 # Learning rate for critic network
-update_batch_size: 2 # Number of vectorised gradient updates per device.
 rollout_length: 128 # Number of environment steps per vectorised environment.
 ppo_epochs: 4 # Number of ppo epochs per training data batch.
 num_minibatches: 4 # Number of minibatches per ppo epoch.
@@ -20,12 +19,14 @@ ent_coef: 0.01 # Entropy regularisation term for loss function.
 vf_coef: 0.5 # Critic weight in
 max_grad_norm: 5.0 # Maximum norm of the gradients for a weight update.
 use_team_reward: False # whether to use a shared team reward
+
+# Additional arguments for anakin ppo
+update_batch_size: 2 # Number of vectorised gradient updates per device.
+
+# Additional arguments for sebulba ppo
 anneal_lr: True # whether to anneal the learning rate
 gradient_accumulation_steps:  1 # the number of gradient accumulation steps
 norm_adv: True # toggles advantages normalization
-
-
-
 
 # runtime arguments to be filled in
 num_agents: ~ # num agents in the env
@@ -33,7 +34,7 @@ num_actions: ~ # num actions per agent
 single_obs_dim: ~ # obs dim per agent
 local_batch_size: ~ # the size of the full batch per learner device
 local_minibatch_size: ~ # the size of each minibatch per learner device
-num_envs: ~ # number of envs across the world
+num_envs: ~ # number of envs across the different executors
   # (local_n_envs * len(executor_device_ids) * n_threads_per_executor * world_size)
 batch_size: ~ # batch size across the world
 minibatch_size: ~ # minibatch size across the world
