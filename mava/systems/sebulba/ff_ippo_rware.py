@@ -108,6 +108,7 @@ def rollout(  # noqa: CCR001
     device_thread_id: int,
     apply_fns: Tuple,
     log_fn: Callable,
+    log_frequency: int,
 ) -> None:
     """Executor rollout loop."""
     # Create envs
@@ -288,7 +289,7 @@ def rollout(  # noqa: CCR001
         rollout_queue.put(payload)
         rollout_queue_put_time.append(time.time() - rollout_queue_put_time_start)
 
-        if (update % cfg.arch.log_frequency == 0) or (cfg.system.num_updates + 1 == update):
+        if (update % log_frequency == 0) or (cfg.system.num_updates + 1 == update):
             # Log info
             log_fn(
                 log_type={"Executor": {"device_thread_id": device_thread_id}},
@@ -591,17 +592,11 @@ def run_experiment(cfg: DictConfig) -> None:  # noqa: CCR001
     ), "int(local_num_envs / len(learner_device_ids)) must be divisible by num_minibatches"
     cfg.system.total_timesteps = cfg.system.num_updates * (cfg.system.batch_size)
     local_devices = jax.local_devices()
-    global_devices = jax.devices()
     learner_devices = [local_devices[d_id] for d_id in cfg.arch.learner_device_ids]
     executor_devices = [local_devices[d_id] for d_id in cfg.arch.executor_device_ids]
-    global_learner_devices = [
-        global_devices[d_id + process_index * len(local_devices)]
-        for process_index in range(cfg.arch.world_size)
-        for d_id in cfg.arch.learner_device_ids
-    ]
-    cfg.system.global_learner_devices = [str(item) for item in global_learner_devices]
     cfg.system.executor_devices = [str(item) for item in executor_devices]
     cfg.system.learner_devices = [str(item) for item in learner_devices]
+    log_frequency = cfg.system.num_updates // cfg.arch.num_evaluation
     pprint(cfg_dict)
 
     # PRNG keys.
@@ -689,7 +684,7 @@ def run_experiment(cfg: DictConfig) -> None:  # noqa: CCR001
     multi_device_update = jax.pmap(
         single_device_update,
         axis_name="local_devices",
-        devices=global_learner_devices,
+        devices=learner_devices,
     )
 
     # Evaluation setup
@@ -719,13 +714,13 @@ def run_experiment(cfg: DictConfig) -> None:  # noqa: CCR001
                     d_idx * cfg.arch.n_threads_per_executor + thread_id,
                     (vmap_actor_apply, vmap_critic_apply),
                     log,
+                    log_frequency,
                 ),
             ).start()
 
     rollout_queue_get_time: deque = deque(maxlen=10)
     data_transfer_time: deque = deque(maxlen=10)
     trainer_update_number = 0
-    log_frequency = cfg.system.num_updates // cfg.arch.num_evaluation
     while True:
         trainer_update_number += 1
         rollout_queue_get_time_start = time.time()

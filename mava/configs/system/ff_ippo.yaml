@@ -40,6 +40,6 @@ batch_size: ~ # batch size across the world
 minibatch_size: ~ # minibatch size across the world
   # eg. each update in ppo will be num_epochs * num_minibatches
 global_learner_devices: ~ # all learner devices across the world
-actor_devices: ~ # all actor devices
+executor_devices: ~ # all actor devices
 learner_devices: ~ # all learner devices
 total_timesteps: ~
