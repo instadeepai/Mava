@@ -52,6 +52,7 @@ from mava.types import (
 )
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import merge_leading_dims
+from mava.utils.vault import Vault
 from mava.wrappers.jumanji import RwareWrapper
 from mava.wrappers.shared import AgentIDWrapper, LogWrapper
 
@@ -509,7 +510,8 @@ def learner_setup(
     return learn, actor_network, init_learner_state
 
 
-def run_experiment(_config: Dict) -> None:
+# TODO: fix cognitive complexity
+def run_experiment(_config: Dict) -> None:  # noqa: CCR001
     """Runs experiment."""
     # Logger setup
     config = copy.deepcopy(_config)
@@ -644,6 +646,9 @@ def run_experiment(_config: Dict) -> None:
         )
         return experience
 
+    # TODO: nicer config for vault etc
+    vault = Vault(buffer_state, config["logger"]["system_name"])
+
     # Run experiment for a total number of evaluations.
     max_episode_return = jnp.float32(0.0)
     best_params = None
@@ -662,6 +667,13 @@ def run_experiment(_config: Dict) -> None:
             }
         )
         buffer_state = buffer.add(buffer_state, flashbax_transition)
+
+        if i % 20 == 0:  # TODO: move to config
+            # Write to vault
+            vault_start_time = time.time()
+            vault.write(buffer_state)
+            vault_elapsed_time = time.time() - vault_start_time
+            print(f"Vault write time: {vault_elapsed_time:.2f}s")
 
         jax.block_until_ready(learner_output)
 
@@ -711,6 +723,9 @@ def run_experiment(_config: Dict) -> None:
 
         # Update runner state to continue training.
         learner_state = learner_output.learner_state
+
+    # Final write to vault for any remaining data
+    vault.write(buffer_state)
 
     # Measure absolute metric.
     if config["arch"]["absolute_metric"]:
