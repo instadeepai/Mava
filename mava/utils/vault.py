@@ -27,14 +27,13 @@ from flashbax.utils import get_tree_shape_prefix
 
 # CURRENT LIMITATIONS / TODO LIST
 # - Anakin -> extra minibatch dim...
-# - Only works when fbx_state.is_full is False (i.e. can't handle wraparound)
 # - Better async stuff
 # - Only tested with flat buffers
 # - Reloading could be nicer, but doing so is tricky!
 
 DRIVER = "file://"
 METADATA_FILE = "metadata.json"
-TIME_AXIS_MAX_LENGTH = int(10e12)
+TIME_AXIS_MAX_LENGTH = int(10e12)  # Upper bound on the length of the time axis
 VERSION = 0.1
 
 
@@ -65,6 +64,14 @@ class Vault:
             os.makedirs(self._base_path)
 
             def get_json_ready(obj: Any) -> Any:
+                """Ensure that the object is json serializable. Convert to string if not.
+
+                Args:
+                    obj (Any): Object to be considered
+
+                Returns:
+                    Any: json serializable object
+                """
                 if not isinstance(obj, (bool, str, int, float, type(None))):
                     return str(obj)
                 else:
@@ -228,17 +235,15 @@ class Vault:
     def _read_leaf(
         self,
         read_leaf: ts.TensorStore,
-        read_interval: Tuple[Optional[int], Optional[int]],
+        read_interval: Tuple[int, int],
     ) -> Array:
         return read_leaf[:, slice(*read_interval), ...].read().result()
 
-    def read(
-        self, read_interval: Tuple[Optional[int], Optional[int]] = (None, None)
-    ) -> Array:  # TODO typing
-        if read_interval == (None, None):
+    def read(self, read_interval: Tuple[int, int] = (0, 0)) -> Array:  # TODO typing
+        if read_interval == (0, 0):
             read_interval = (0, self.vault_index)  # Read all that has been written
 
-        return jax.tree_util.tree_map(
+        read_result = jax.tree_util.tree_map(
             lambda _, ds: self._read_leaf(
                 read_leaf=ds,
                 read_interval=read_interval,
@@ -246,6 +251,7 @@ class Vault:
             self._fbx_sample_experience,  # just for structure
             self._all_ds,  # data stores
         )
+        return read_result
 
     def get_buffer(
         self, size: int, key: Array, starting_index: Optional[int] = None
