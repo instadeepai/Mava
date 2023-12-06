@@ -15,7 +15,7 @@
 import json
 import os
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -23,14 +23,14 @@ import tensorstore as ts
 from chex import Array
 from etils import epath
 from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
+from flashbax.utils import get_tree_shape_prefix
 
 # CURRENT LIMITATIONS / TODO LIST
-# - Metadata write and read
-# - Vault multiplier ???
 # - Anakin -> extra minibatch dim...
 # - Only works when fbx_state.is_full is False (i.e. can't handle wraparound)
 # - Better async stuff
 # - Only tested with flat buffers
+# - Reloading could be nicer, but doing so is tricky!
 
 DRIVER = "file://"
 METADATA_FILE = "metadata.json"
@@ -63,9 +63,17 @@ class Vault:
         else:
             # Create the necessary dirs for the vault
             os.makedirs(self._base_path)
+
+            def get_json_ready(obj: Any) -> Any:
+                if not isinstance(obj, (bool, str, int, float, type(None))):
+                    return str(obj)
+                else:
+                    return obj
+
+            metadata_json_ready = jax.tree_util.tree_map(get_json_ready, metadata)
             self._metadata = {
                 "version": VERSION,
-                **(metadata or {}),  # Allow user to save extra metadata
+                **(metadata_json_ready or {}),  # Allow user to save extra metadata
             }
             metadata_path.write_text(json.dumps(self._metadata))
 
@@ -125,48 +133,93 @@ class Vault:
         self,
         source_leaf: Array,
         dest_leaf: ts.TensorStore,
-        source_interval: Tuple[Optional[int], Optional[int]],
-        dest_interval: Tuple[Optional[int], Optional[int]],
+        source_interval: Tuple[int, int],
+        dest_start: int,
     ) -> None:
+        dest_interval = (
+            dest_start,
+            dest_start + (source_interval[1] - source_interval[0]),  # type: ignore
+        )
         dest_leaf[:, slice(*dest_interval), ...].write(
             source_leaf[:, slice(*source_interval), ...],
         ).result()
 
-    def write(
+    def _write_chunk(
         self,
         fbx_state: TrajectoryBufferState,
-        source_interval: Tuple[Optional[int], Optional[int]] = (None, None),
-        dest_interval: Tuple[Optional[int], Optional[int]] = (None, None),
+        source_interval: Tuple[int, int],
+        dest_start: int,
     ) -> None:
-        # TODO: more than one current_index if B > 1
-        fbx_current_index = int(fbx_state.current_index)
-
-        if source_interval == (None, None):
-            source_interval = (self._last_received_fbx_index, fbx_current_index)
-        write_length = source_interval[1] - source_interval[0]  # type: ignore
-        if write_length == 0:
-            return  # Nothing to write
-
-        if dest_interval == (None, None):
-            dest_interval = (self.vault_index, self.vault_index + write_length)
-
-        # If user has provided a dest_interval, check that it's the correct length
-        assert write_length == (dest_interval[1] - dest_interval[0])  # type: ignore
-
         # Write to each ds
         jax.tree_util.tree_map(
             lambda x, ds: self._write_leaf(
                 source_leaf=x,
                 dest_leaf=ds,
                 source_interval=source_interval,
-                dest_interval=dest_interval,
+                dest_start=dest_start,
             ),
             fbx_state.experience,  # x = experience
             self._all_ds,  # ds = data stores
         )
 
+    def write(
+        self,
+        fbx_state: TrajectoryBufferState,
+        source_interval: Tuple[int, int] = (0, 0),
+        dest_start: Optional[int] = None,
+    ) -> None:
+        # TODO: more than one current_index if B > 1
+        fbx_current_index = int(fbx_state.current_index)
+
+        # By default, we write from `last received` to `current index` [CI]
+        if source_interval == (0, 0):
+            source_interval = (self._last_received_fbx_index, fbx_current_index)
+
+        if source_interval[1] == source_interval[0]:
+            # Nothing to write
+            return
+
+        elif source_interval[1] > source_interval[0]:
+            # Vanilla write, no wrap around
+            self._write_chunk(
+                fbx_state=fbx_state,
+                source_interval=source_interval,
+                dest_start=self.vault_index if dest_start is None else dest_start,
+            )
+            written_length = source_interval[1] - source_interval[0]
+
+        elif source_interval[1] < source_interval[0]:
+            # Wrap around!
+
+            # Get dest start
+            dest_start = self.vault_index if dest_start is None else dest_start
+            # Get seq dim
+            fbx_max_index = get_tree_shape_prefix(fbx_state.experience, n_axes=2)[1]
+
+            # From last received to max
+            source_interval_a = (source_interval[0], fbx_max_index)
+            time_length_a = source_interval_a[1] - source_interval_a[0]
+
+            self._write_chunk(
+                fbx_state=fbx_state,
+                source_interval=source_interval_a,
+                dest_start=dest_start,
+            )
+
+            # From 0 (wrapped) to CI
+            source_interval_b = (0, source_interval[1])
+            time_length_b = source_interval_b[1] - source_interval_b[0]
+
+            self._write_chunk(
+                fbx_state=fbx_state,
+                source_interval=source_interval_b,
+                dest_start=dest_start + time_length_a,
+            )
+
+            written_length = time_length_a + time_length_b
+
         # Update vault index, and write this to the ds too
-        self.vault_index += write_length
+        self.vault_index += written_length
         self._vault_index_ds.write(self.vault_index).result()
 
         # Keep track of the last fbx buffer idx received
