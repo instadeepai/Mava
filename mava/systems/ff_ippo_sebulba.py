@@ -20,7 +20,7 @@ import uuid
 from collections import deque
 from functools import partial
 from types import SimpleNamespace
-from typing import Callable, Dict, List, Sequence
+from typing import Any, Callable, Dict, List, Sequence, Tuple
 
 import distrax
 import flax
@@ -32,7 +32,7 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 import rware
-from chex import Array
+from chex import Array, PRNGKey
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
@@ -42,6 +42,7 @@ from rich.pretty import pprint
 from mava.logger import logger_setup
 from mava.types import LearnerState, OptStates, Params
 from mava.types import SebulbaTransition as Transition
+from mava.utils.jax import convert_data, merge_leading_dims
 from mava.utils.sebulba_tools import configure_computation_environment
 from mava.wrappers.robot_warehouse import make_env
 
@@ -295,7 +296,6 @@ def rollout(
                     actions=raw_action,
                     logprobs=logprob,
                     values=value,
-                    env_ids=env_id,
                     rewards=next_rewards,
                     truncations=truncateds,
                     terminations=next_dones,
@@ -380,39 +380,15 @@ def rollout(
             )
 
 
-def get_trainer(cfg, optim_updates_fn):
-    # TODO: get this from main function
-    actor_network = Actor(action_dim=cfg.system.num_actions)
-    critic_network = Critic()
-    vmap_actor_apply = jax.vmap(actor_network.apply, in_axes=(None, 1, 1), out_axes=(1))
-    vmap_critic_apply = jax.vmap(critic_network.apply, in_axes=(None, 1), out_axes=(1))
+def get_trainer(cfg: DictConfig, apply_fns: Tuple, optim_updates_fn: Tuple) -> Callable:
+    """Get the trainer function."""
+
+    # Get the apply functions for the actor and critic networks.
+    vmap_actor_apply, vmap_critic_apply = apply_fns
     update_actor_optim, update_critic_optim = optim_updates_fn
 
-    @jax.jit
-    def get_logprob_entropy(
-        actor_params: flax.core.FrozenDict,
-        obs: np.ndarray,
-        actions_mask: np.ndarray,
-        actions: np.ndarray,
-    ):
-        policy = vmap_actor_apply(actor_params, obs, actions_mask)
-
-        # Can just pass in raw actions here.
-        # No longer need to undo clipping since we are only
-        # storing the raw action produced by the clipped policy.
-        logprob = policy.log_prob(actions)
-        entropy = policy.entropy()
-        return logprob, entropy
-
-    @jax.jit
-    def get_value(
-        critic_params: flax.core.FrozenDict,
-        obs: np.ndarray,
-    ):
-        value = vmap_critic_apply(critic_params, obs)
-        return value
-
-    def compute_gae_once(carry, inp, gamma, gae_lambda):
+    def compute_gae_once(carry: Array, inp: Tuple, gamma: float, gae_lambda: float) -> Tuple:
+        """Compute GAE once."""
         advantages = carry
         nextdone, nextvalues, curvalues, reward = inp
         nextnonterminal = 1.0 - nextdone
@@ -426,13 +402,13 @@ def get_trainer(cfg, optim_updates_fn):
     )
     vmap_compute_gae = jax.vmap(compute_gae_once, in_axes=(1, (1, 1, 1, 1)), out_axes=(1, 1))
 
-    @jax.jit
     def compute_gae(
         agents_state: LearnerState,
         next_obs: np.ndarray,
         next_done: np.ndarray,
         storage: Transition,
-    ):
+    ) -> Tuple:
+        """Compute GAE."""
         next_value = vmap_critic_apply(
             agents_state.params.critic_params,
             next_obs,
@@ -457,8 +433,17 @@ def get_trainer(cfg, optim_updates_fn):
         )
         return advantages, advantages + storage.values
 
-    def policy_loss(actor_params, obs, actions_mask, actions, behavior_logprobs, advantages):
-        newlogprob, entropy = get_logprob_entropy(actor_params, obs, actions_mask, actions)
+    def actor_loss(
+        actor_params: FrozenDict,
+        obs: Array,
+        actions_mask: Array,
+        actions: Array,
+        behavior_logprobs: Array,
+        advantages: Array,
+    ) -> Tuple:
+        policy = vmap_actor_apply(actor_params, obs, actions_mask)
+        newlogprob = policy.log_prob(actions)
+        entropy = policy.entropy()
         logratio = newlogprob - behavior_logprobs
         ratio = jnp.exp(logratio)
         approx_kl = ((ratio - 1) - logratio).mean()
@@ -472,35 +457,41 @@ def get_trainer(cfg, optim_updates_fn):
         loss = pg_loss - cfg.system.ent_coef * entropy_loss
         return loss, (pg_loss, entropy_loss, jax.lax.stop_gradient(approx_kl))
 
-    def critic_loss(critic_params, obs, target_values):
-        newvalue = get_value(critic_params, obs)
+    def critic_loss(critic_params: FrozenDict, obs: Array, target_values: Array) -> Tuple:
+        """Critic loss."""
+        newvalue = vmap_critic_apply(critic_params, obs)
+
         # Value loss
         v_loss = 0.5 * ((newvalue - target_values) ** 2).mean()
         loss = v_loss * cfg.system.vf_coef
         return loss, (v_loss)
 
-    @jax.jit
     def single_device_update(
         agents_state: LearnerState,
         sharded_storages: List,
         sharded_next_obs: List,
         sharded_next_done: List,
         key: jax.random.PRNGKey,
-    ):
+    ) -> Tuple:
+        """Single device update."""
+
+        # Horizontal stack all the data from different devices
         storage = jax.tree_map(lambda *x: jnp.hstack(x), *sharded_storages)
+
+        # Define loss functions
+        actor_loss_grad_fn = jax.value_and_grad(actor_loss, has_aux=True)
+        critic_loss_grad_fn = jax.value_and_grad(critic_loss, has_aux=True)
+
+        # Unpack data and compute GAE
         next_obs = jnp.concatenate(sharded_next_obs)
         next_done = jnp.concatenate(sharded_next_done)
-        policy_loss_grad_fn = jax.value_and_grad(policy_loss, has_aux=True)
-        critic_loss_grad_fn = jax.value_and_grad(critic_loss, has_aux=True)
         local_advantages, target_values = compute_gae(agents_state, next_obs, next_done, storage)
-        # NOTE: advantage normalization at the mini-batch level across devices
-        # TODO(Ruan + Omayma): Double check this. But should be correct.
-        if cfg.system.norm_adv:
-            all_advantages = jax.lax.all_gather(local_advantages, axis_name="local_devices")
-            # all_advantages shape: (num_devices, rollout_length, num_envs, num_agents)
 
+        # Normalize advantages across environments and agents
+        if cfg.system.norm_adv:
+            # Gather advantages across devices
+            all_advantages = jax.lax.all_gather(local_advantages, axis_name="local_devices")
             advantages = jnp.concatenate(all_advantages, axis=1)
-            # advantages shape: (rollout_length, num_envs * num_devices, num_agents)
 
             # Normalize advantages across environments and agents
             mean_advantages = advantages.mean((1, 2), keepdims=True)
@@ -510,95 +501,57 @@ def get_trainer(cfg, optim_updates_fn):
             # Split advantages across devices
             split_advantages = jnp.split(advantages, all_advantages.shape[0], axis=1)
             local_advantages = split_advantages[jax.process_index()]
-            # local_advantages shape: (rollout_length, num_envs, num_agents)
 
-        def update_epoch(carry, _):
+        def update_epoch(
+            carry: Tuple[LearnerState, PRNGKey], _: Any
+        ) -> Tuple[Tuple[LearnerState, PRNGKey], Tuple]:
+            """Update epoch."""
+            # Unpack data and generate keys
             agents_state, key = carry
             key, subkey = jax.random.split(key)
 
-            def flatten(x):
-                return x.reshape((-1,) + x.shape[2:])
-
-            # taken from: https://github.com/google/brax/blob/main/brax/training/agents/ppo/train.py
-            def convert_data(x: jnp.ndarray):
-                x = jax.random.permutation(subkey, x)
-                x = jnp.reshape(
-                    x,
-                    (
-                        cfg.system.num_minibatches * cfg.system.gradient_accumulation_steps,
-                        -1,
-                    )
-                    + x.shape[1:],
+            # Shuffle data
+            def flatten_and_shuffle(
+                storage: Transition, local_advantages: Array, target_values: Array
+            ) -> Tuple[Transition, Array, Array]:
+                """Flatten and shuffle data."""
+                flatten = lambda x: merge_leading_dims(x)
+                convert = lambda x: convert_data(
+                    x, subkey, cfg.system.num_minibatches, cfg.system.gradient_accumulation_steps
                 )
-                return x
 
-            # TODO(Ruan): Need to keep the agent dimension here.
-            # Storage is (rollout_len, env, *shape) -> (rollout_len * env, *shape)
-            # Advantages + values is (rollout_len, env, agent) -> (rollout_len * env, agent)
+                shuffled_storage = jax.tree_map(lambda x: convert(flatten(x)), storage)
+                shuffled_advantages = convert(flatten(local_advantages))
+                shuffled_target_values = convert(flatten(target_values))
 
-            # Shuffled storage is (rollout_len * env, *shape) -> (num_minibatches, minibatch_size, *shape)
-            # Shuffled advantages + values is (rollout_len * env, ) -> (num_minibatches, minibatch_size)
-            def flatten_and_shuffle(storage, local_advantages, target_values):
-                flatten_storage = jax.tree_map(flatten, storage)
-                flatten_advantages = flatten(local_advantages)
-                flatten_target_values = flatten(target_values)
-                shuffled_storage = jax.tree_map(convert_data, flatten_storage)
-                shuffled_advantages = convert_data(flatten_advantages)
-                shuffled_target_values = convert_data(flatten_target_values)
-                return (shuffled_storage, shuffled_advantages, shuffled_target_values)
+                return shuffled_storage, shuffled_advantages, shuffled_target_values
 
-            vmap_flatten_and_shuffle = jax.vmap(
-                flatten_and_shuffle,
-                in_axes=(
-                    Transition(
-                        obs=2,
-                        dones=2,
-                        actions=2,
-                        logprobs=2,
-                        values=2,
-                        env_ids=None,
-                        rewards=2,
-                        truncations=2,
-                        terminations=2,
-                        actions_mask=2,
-                    ),
-                    2,
-                    2,
-                ),
-                out_axes=(
-                    Transition(
-                        obs=2,
-                        dones=2,
-                        actions=2,
-                        logprobs=2,
-                        values=2,
-                        env_ids=None,
-                        rewards=2,
-                        truncations=2,
-                        terminations=2,
-                        actions_mask=2,
-                    ),
-                    2,
-                    2,
-                ),
-            )
-
+            vmap_flatten_and_shuffle = jax.vmap(flatten_and_shuffle, in_axes=(2), out_axes=(2))
             (
                 shuffled_storage,
                 shuffled_advantages,
                 shuffled_target_values,
             ) = vmap_flatten_and_shuffle(storage, local_advantages, target_values)
 
-            def update_minibatch(agents_state, minibatch):
+            def update_minibatch(
+                agents_state: LearnerState, minibatch: Tuple
+            ) -> Tuple[LearnerState, Tuple]:
+                """Update minibatch."""
+                # Unpack data
                 (
-                    mb_obs,
-                    mb_actions,
-                    mb_behavior_logprobs,
+                    mb_shuffled_storage,
                     mb_advantages,
                     mb_target_values,
-                    mb_actions_mask,
                 ) = minibatch
-                (p_loss, (pg_loss, entropy_loss, approx_kl),), actor_grads = policy_loss_grad_fn(
+                mb_obs, mb_actions_mask, mb_actions, mb_behavior_logprobs = (
+                    mb_shuffled_storage.obs,
+                    mb_shuffled_storage.actions_mask,
+                    mb_shuffled_storage.actions,
+                    mb_shuffled_storage.logprobs,
+                )
+
+                # Compute losses and gradients
+                (p_loss, (pg_loss, entropy_loss, approx_kl),), actor_grads = actor_loss_grad_fn(
                     agents_state.params.actor_params,
                     mb_obs,
                     mb_actions_mask,
@@ -611,11 +564,13 @@ def get_trainer(cfg, optim_updates_fn):
                     mb_obs,
                     mb_target_values,
                 )
+                loss = p_loss + c_loss
+
+                # Compute mean loss across all devices
                 actor_grads = jax.lax.pmean(actor_grads, axis_name="local_devices")
                 critic_grads = jax.lax.pmean(critic_grads, axis_name="local_devices")
 
-                loss = p_loss + c_loss
-                # UPDATE ACTOR PARAMS AND OPTIMISER STATE
+                # Update actor params and optimiser state
                 actor_updates, actor_new_opt_state = update_actor_optim(
                     actor_grads, agents_state.opt_states.actor_opt_state
                 )
@@ -623,7 +578,7 @@ def get_trainer(cfg, optim_updates_fn):
                     agents_state.params.actor_params, actor_updates
                 )
 
-                # UPDATE CRITIC PARAMS AND OPTIMISER STATE
+                # Update critic params and optimiser state
                 critic_updates, critic_new_opt_state = update_critic_optim(
                     critic_grads, agents_state.opt_states.critic_opt_state
                 )
@@ -631,27 +586,26 @@ def get_trainer(cfg, optim_updates_fn):
                     agents_state.params.critic_params, critic_updates
                 )
 
-                # PACK NEW PARAMS AND OPTIMISER STATE
+                # Pack new params and optimiser state
                 new_params = Params(actor_new_params, critic_new_params)
                 new_opt_state = OptStates(actor_new_opt_state, critic_new_opt_state)
-
                 agents_state = LearnerState(params=new_params, opt_states=new_opt_state)
+
                 return agents_state, (loss, pg_loss, v_loss, entropy_loss, approx_kl)
 
+            # Loop through minibatches
             agents_state, (loss, pg_loss, v_loss, entropy_loss, approx_kl,) = jax.lax.scan(
                 update_minibatch,
                 agents_state,
                 (
-                    shuffled_storage.obs,
-                    shuffled_storage.actions,
-                    shuffled_storage.logprobs,
+                    shuffled_storage,
                     shuffled_advantages,
                     shuffled_target_values,
-                    shuffled_storage.actions_mask,
                 ),
             )
             return (agents_state, key), (loss, pg_loss, v_loss, entropy_loss, approx_kl)
 
+        # Loop through epochs
         (agents_state, key), (
             loss,
             pg_loss,
@@ -659,11 +613,8 @@ def get_trainer(cfg, optim_updates_fn):
             entropy_loss,
             approx_kl,
         ) = jax.lax.scan(update_epoch, (agents_state, key), (), length=cfg.system.ppo_epochs)
-        loss = jax.lax.pmean(loss, axis_name="local_devices").mean()
-        pg_loss = jax.lax.pmean(pg_loss, axis_name="local_devices").mean()
-        v_loss = jax.lax.pmean(v_loss, axis_name="local_devices").mean()
-        entropy_loss = jax.lax.pmean(entropy_loss, axis_name="local_devices").mean()
-        approx_kl = jax.lax.pmean(approx_kl, axis_name="local_devices").mean()
+
+        # Compute mean loss across all devices
         loss_info = {
             "total_loss": loss,
             "loss_actor": pg_loss,
@@ -671,6 +622,8 @@ def get_trainer(cfg, optim_updates_fn):
             "entropy": entropy_loss,
             "approx_kl": approx_kl,
         }
+        loss_info = jax.tree_map(lambda x: jax.lax.pmean(x, axis_name="local_devices"), loss_info)
+
         return agents_state, key, loss_info
 
     return single_device_update
@@ -787,6 +740,7 @@ def run_experiment(cfg: DictConfig) -> None:
         every_k_schedule=cfg.system.gradient_accumulation_steps,
     )
     critic_opt_state = critic_optim.init(critic_params)
+    vmap_critic_apply = jax.vmap(critic.apply, in_axes=(None, 1), out_axes=(1))
 
     # Define agents state
     agents_state = LearnerState(
@@ -804,7 +758,9 @@ def run_experiment(cfg: DictConfig) -> None:
     unreplicated_params = flax.jax_utils.unreplicate(agents_state.params)
 
     # Learner Setup
-    single_device_update = get_trainer(cfg, (actor_optim.update, critic_optim.update))
+    single_device_update = get_trainer(
+        cfg, (vmap_actor_apply, vmap_critic_apply), (actor_optim.update, critic_optim.update)
+    )
     multi_device_update = jax.pmap(
         single_device_update,
         axis_name="local_devices",

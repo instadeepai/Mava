@@ -92,7 +92,6 @@ class SebulbaTransition(NamedTuple):
     actions: list
     logprobs: list
     values: list
-    env_ids: list
     rewards: list
     truncations: list
     terminations: list

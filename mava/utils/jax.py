@@ -27,7 +27,7 @@ def ndim_at_least(x: chex.Array, num_dims: chex.Numeric) -> chex.Array:
     return x.ndim >= num_dims
 
 
-def merge_leading_dims(x: chex.Array, num_dims: chex.Numeric) -> chex.Array:
+def merge_leading_dims(x: chex.Array, num_dims: chex.Numeric = 2) -> chex.Array:
     """Merge leading dimensions.
 
     Note:
@@ -42,3 +42,26 @@ def merge_leading_dims(x: chex.Array, num_dims: chex.Numeric) -> chex.Array:
 
     new_shape = (np.prod(x.shape[:num_dims]),) + x.shape[num_dims:]
     return x.reshape(new_shape)
+
+
+def convert_data(
+    x: chex.Array, key: chex.PRNGKey, num_minibatches: int, gradient_accumulation_steps: int
+) -> chex.Array:
+    """Convert data to be used for training.
+
+    Note:
+        This implementation is a generic function for converting data
+        extracted from Brax PPO.
+        For the original implementation, please refer to the following link:
+        (https://github.com/google/brax/blob/main/brax/training/agents/ppo/train.py)
+    """
+    x = jax.random.permutation(key, x)
+    x = jnp.reshape(
+        x,
+        (
+            num_minibatches * gradient_accumulation_steps,
+            -1,
+        )
+        + x.shape[1:],
+    )
+    return x
