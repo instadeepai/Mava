@@ -21,7 +21,6 @@ import flax.linen as nn
 import hydra
 import jax
 import jax.numpy as jnp
-import jumanji
 import numpy as np
 import optax
 from colorama import Fore, Style
@@ -29,8 +28,6 @@ from flax import jax_utils
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
 from jumanji.env import Environment
-from jumanji.environments.routing.robot_warehouse.generator import RandomGenerator
-from jumanji.wrappers import AutoResetWrapper
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
@@ -50,9 +47,8 @@ from mava.types import (
     PPOTransition,
 )
 from mava.utils.checkpointing import Checkpointer
+from mava.utils.create_envs_utils import create_environment
 from mava.utils.jax import merge_leading_dims
-from mava.wrappers.jumanji import RwareWrapper
-from mava.wrappers.shared import AgentIDWrapper, GlobalStateWrapper, LogWrapper
 
 
 class Actor(nn.Module):
@@ -108,7 +104,7 @@ class Critic(nn.Module):
 
 
 def get_learner_fn(
-    env: jumanji.Environment,
+    env: Environment,
     apply_fns: Tuple[ActorApply, CriticApply],
     update_fns: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
     config: Dict,
@@ -510,19 +506,8 @@ def run_experiment(_config: Dict) -> None:
     config = copy.deepcopy(_config)
     log = logger_setup(config)
 
-    # Create envs
-    generator = RandomGenerator(**config["env"]["scenario"]["task_config"])
-    env = jumanji.make(config["env"]["env_name"], generator=generator)
-    env = GlobalStateWrapper(RwareWrapper(env))
-    # Add agent id to observation.
-    if config["system"]["add_agent_id"]:
-        env = AgentIDWrapper(env=env, has_global_state=True)
-    env = AutoResetWrapper(env)
-    env = LogWrapper(env)
-    eval_env = jumanji.make(config["env"]["env_name"], generator=generator)
-    eval_env = GlobalStateWrapper(RwareWrapper(eval_env))
-    if config["system"]["add_agent_id"]:
-        eval_env = AgentIDWrapper(env=eval_env, has_global_state=True)
+    # Create the enviroments for train and eval.
+    env, eval_env = create_environment(config=config)
 
     # PRNG keys.
     rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["system"]["seed"]), num=3)

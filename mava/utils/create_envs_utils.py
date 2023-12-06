@@ -25,7 +25,7 @@ from jumanji.environments.routing.robot_warehouse.generator import (
 from jumanji.wrappers import AutoResetWrapper
 
 from mava.wrappers.jumanji import LbfWrapper, RwareWrapper
-from mava.wrappers.shared import AgentIDWrapper, LogWrapper
+from mava.wrappers.shared import AgentIDWrapper, GlobalStateWrapper, LogWrapper
 
 # Registry mapping environment names to their generator and wrapper classes.
 JumanjiRegistry = {
@@ -43,24 +43,29 @@ def create_jumanji_env(env_name: str, config: Dict) -> Tuple[Environment, Enviro
     Returns:
         A tuple of the environments.
     """
+    # Config generator and select the wrapper.
+    generator = JumanjiRegistry[env_name]["generator"]
+    generator = generator(**config["env"]["scenario"]["task_config"])
+    wrapper = JumanjiRegistry[env_name]["wrapper"]
+
     # Create envs.
-    generator_class = JumanjiRegistry[env_name]["generator"]
-    generator = generator_class(**config["env"]["scenario"]["task_config"])
     env = jumanji.make(env_name, generator=generator)
-    wrapper_class = JumanjiRegistry[env_name]["wrapper"]
-    env = wrapper_class(env)
+    env = wrapper(env)
+    eval_env = jumanji.make(env_name, generator=generator)
+    eval_env = wrapper(eval_env)
 
     # Add agent id to observation.
     if config["system"]["add_agent_id"]:
         env = AgentIDWrapper(env)
+        eval_env = AgentIDWrapper(eval_env)
+
+    # Somehow it didn't work, only after switching the two ifs or do return GlobalStateWrapper(env)
+    if config["system"]["system_name"] in ["ff_mappo", "rec_mappo"]:
+        env = GlobalStateWrapper(env)
+        eval_env = GlobalStateWrapper(env)
+
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
-
-    # Create the evaluation environment.
-    eval_env = jumanji.make(env_name, generator=generator)
-    eval_env = wrapper_class(eval_env)
-    if config["system"]["add_agent_id"]:
-        eval_env = AgentIDWrapper(eval_env)
 
     return env, eval_env
 
