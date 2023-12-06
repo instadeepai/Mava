@@ -13,11 +13,13 @@
 # limitations under the License.
 
 import os
-from multiprocessing import set_start_method
 
 
 def configure_computation_environment() -> None:
-    """Configure the computation environment for JAX."""
+    """Configure the computation environment for JAX.
+
+    Note: Must be called before any JAX computation is run.
+    """
     os.environ["JAX_USE_PJRT_C_API_ON_TPU"] = ""
 
     # Fix weird OOM https://github.com/google/jax/discussions/6332#discussioncomment-1279991
@@ -34,6 +36,3 @@ def configure_computation_environment() -> None:
     # Fix CUDNN non-determinisim; https://github.com/google/jax/issues/4823#issuecomment-952835771
     os.environ["TF_XLA_FLAGS"] = "--xla_gpu_autotune_level=2 --xla_gpu_deterministic_reductions"
     os.environ["TF_CUDNN DETERMINISTIC"] = "1"
-
-    # Set the multiprocessing start method to forkserver to avoid issues with Neptune.
-    set_start_method("forkserver")

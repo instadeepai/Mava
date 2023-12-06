@@ -656,7 +656,7 @@ def run_experiment(_config: Dict) -> None:
         )
 
 
-@hydra.main(config_path="../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
+@hydra.main(config_path="../../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
     # Convert config to python dict.

@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from mava.utils.sebulba_tools import configure_computation_environment
+
+configure_computation_environment()
 
 import queue
 import threading
@@ -38,7 +41,6 @@ from mava.logger import logger_setup
 from mava.types import LearnerState, OptStates, Params
 from mava.types import SebulbaTransition as Transition
 from mava.utils.jax import convert_data, merge_leading_dims
-from mava.utils.sebulba_tools import configure_computation_environment
 from mava.wrappers.robot_warehouse import make_env
 
 
@@ -258,6 +260,7 @@ def rollout(  # noqa: CCR001
 
         # Get the latest parameters from the learner
         params_queue_get_time_start = time.time()
+        # TODO: double check if we can remove this
         if cfg.arch.concurrency:
             if update != 2:
                 params = params_queue.get()
@@ -891,7 +894,7 @@ def run_experiment(cfg: DictConfig) -> None:  # noqa: CCR001
             break
 
 
-@hydra.main(config_path="../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
+@hydra.main(config_path="../../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
 
@@ -902,5 +905,4 @@ def hydra_entry_point(cfg: DictConfig) -> None:
 
 
 if __name__ == "__main__":
-    configure_computation_environment()
     hydra_entry_point()

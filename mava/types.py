@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Optional, Tuple,
 import chex
 from distrax import Distribution
 from flax.core.frozen_dict import FrozenDict
+from jumanji.types import TimeStep
 from optax._src.base import OptState
 from typing_extensions import NamedTuple, TypeAlias
 
@@ -31,7 +32,6 @@ Done: TypeAlias = chex.Array
 HiddenState: TypeAlias = chex.Array
 # Can't know the exact type of State.
 State: TypeAlias = Any
-TimeStep: TypeAlias = Any
 
 
 class Observation(NamedTuple):
