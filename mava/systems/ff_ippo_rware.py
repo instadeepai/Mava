@@ -14,11 +14,10 @@
 
 import copy
 import time
-from typing import Any, Callable, Dict, Sequence, Tuple
+from typing import Any, Dict, Sequence, Tuple
 
 import chex
 import distrax
-import flashbax as fbx
 import flax.linen as nn
 import hydra
 import jax
@@ -43,8 +42,8 @@ from mava.types import (
     ActorApply,
     CriticApply,
     ExperimentOutput,
+    LearnerFn,
     LearnerState,
-    MavaState,
     Observation,
     OptStates,
     Params,
@@ -54,8 +53,6 @@ from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import merge_leading_dims
 from mava.wrappers.jumanji import RwareWrapper
 from mava.wrappers.shared import AgentIDWrapper, LogWrapper
-
-StoreExpLearnerFn = Callable[[MavaState], Tuple[ExperimentOutput[MavaState], PPOTransition]]
 
 
 class Actor(nn.Module):
@@ -115,7 +112,7 @@ def get_learner_fn(
     apply_fns: Tuple[ActorApply, CriticApply],
     update_fns: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
     config: Dict,
-) -> StoreExpLearnerFn[LearnerState]:
+) -> LearnerFn[LearnerState]:
     """Get the learner function."""
 
     # Get apply and update functions for actor and critic networks.
@@ -169,7 +166,6 @@ def get_learner_fn(
             transition = PPOTransition(
                 done, action, value, timestep.reward, log_prob, last_timestep.observation, info
             )
-
             learner_state = LearnerState(params, opt_states, rng, env_state, timestep)
             return learner_state, transition
 
@@ -179,7 +175,7 @@ def get_learner_fn(
         )
 
         # CALCULATE ADVANTAGE
-        (params, opt_states, rng, env_state, last_timestep) = learner_state
+        params, opt_states, rng, env_state, last_timestep = learner_state
         last_val = critic_apply_fn(params.critic_params, last_timestep.observation)
 
         def _calculate_gae(
@@ -368,11 +364,9 @@ def get_learner_fn(
         params, opt_states, traj_batch, advantages, targets, rng = update_state
         learner_state = LearnerState(params, opt_states, rng, env_state, last_timestep)
         metric = traj_batch.info
-        return learner_state, (metric, loss_info, traj_batch)
+        return learner_state, (metric, loss_info)
 
-    def learner_fn(
-        learner_state: LearnerState,
-    ) -> Tuple[ExperimentOutput[LearnerState], PPOTransition]:
+    def learner_fn(learner_state: LearnerState) -> ExperimentOutput[LearnerState]:
         """Learner function.
 
         This function represents the learner, it updates the network parameters
@@ -390,20 +384,17 @@ def get_learner_fn(
 
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
 
-        learner_state, (metric, loss_info, traj_batch) = jax.lax.scan(
+        learner_state, (metric, loss_info) = jax.lax.scan(
             batched_update_step, learner_state, None, config["system"]["num_updates_per_eval"]
         )
         total_loss, (value_loss, loss_actor, entropy) = loss_info
-        return (
-            ExperimentOutput(
-                learner_state=learner_state,
-                episodes_info=metric,
-                total_loss=total_loss,
-                value_loss=value_loss,
-                loss_actor=loss_actor,
-                entropy=entropy,
-            ),
-            traj_batch,
+        return ExperimentOutput(
+            learner_state=learner_state,
+            episodes_info=metric,
+            total_loss=total_loss,
+            value_loss=value_loss,
+            loss_actor=loss_actor,
+            entropy=entropy,
         )
 
     return learner_fn
@@ -411,7 +402,7 @@ def get_learner_fn(
 
 def learner_setup(
     env: Environment, rngs: chex.Array, config: Dict
-) -> Tuple[StoreExpLearnerFn[LearnerState], Actor, LearnerState]:
+) -> Tuple[LearnerFn[LearnerState], Actor, LearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
@@ -474,7 +465,6 @@ def learner_setup(
     broadcast = lambda x: jnp.broadcast_to(
         x, (n_devices, config["system"]["update_batch_size"]) + x.shape
     )
-
     actor_params = jax.tree_map(broadcast, actor_params)
     actor_opt_state = jax.tree_map(broadcast, actor_opt_state)
     critic_params = jax.tree_map(broadcast, critic_params)
@@ -589,61 +579,6 @@ def run_experiment(_config: Dict) -> None:
         # Overwrite learner state with reloaded state, and replicate across devices.
         learner_state = jax.device_put_replicated(learner_state_reloaded, jax.devices())
 
-    dummy_flashbax_transition = {
-        "done": jnp.zeros((config["system"]["num_agents"],), dtype=bool),
-        "action": jnp.zeros((config["system"]["num_agents"],), dtype=jnp.int32),
-        "reward": jnp.zeros((config["system"]["num_agents"],), dtype=jnp.float32),
-        "observation": jnp.zeros(
-            (
-                config["system"]["num_agents"],
-                env.observation_spec().agents_view.shape[1],
-            ),
-            dtype=jnp.float32,
-        ),
-        "legal_action_mask": jnp.zeros(
-            (
-                config["system"]["num_agents"],
-                config["system"]["num_actions"],
-            ),
-            dtype=bool,
-        ),
-    }
-
-    buffer = fbx.make_flat_buffer(
-        max_length=int(5e6),
-        min_length=int(1),
-        sample_batch_size=1,
-        add_sequences=True,
-        add_batch_size=(
-            n_devices
-            * config["system"]["num_updates_per_eval"]
-            * config["system"]["update_batch_size"]
-            * config["arch"]["num_envs"]
-        ),
-    )
-    buffer_state = buffer.init(
-        dummy_flashbax_transition,
-    )
-
-    # Shape legend:
-    # D: Number of devices
-    # NU: Number of updates per evaluation
-    # UB: Update batch size
-    # T: Time steps per rollout
-    # NE: Number of environments
-
-    @jax.jit
-    def _reshape_experience(experience: Dict[str, chex.Array]) -> Dict[str, chex.Array]:
-        """Reshape experience to match buffer."""
-
-        # Swap the T and NE axes (D, NU, UB, T, NE, ...) -> (D, NU, UB, NE, T, ...)
-        experience: Dict[str, chex.Array] = jax.tree_map(lambda x: x.swapaxes(3, 4), experience)
-        # Merge 4 leading dimensions into 1. (D, NU, UB, NE, T ...) -> (D * NU * UB * NE, T, ...)
-        experience: Dict[str, chex.Array] = jax.tree_map(
-            lambda x: x.reshape(-1, *x.shape[4:]), experience
-        )
-        return experience
-
     # Run experiment for a total number of evaluations.
     max_episode_return = jnp.float32(0.0)
     best_params = None
@@ -651,18 +586,7 @@ def run_experiment(_config: Dict) -> None:
         # Train.
         start_time = time.time()
 
-        learner_output, experience_to_store = learn(learner_state)
-        flashbax_transition = _reshape_experience(
-            {
-                "done": experience_to_store.done,  # (D, NU, UB, T, NE, ...)
-                "action": experience_to_store.action,  # (D, NU, UB, T, NE, ...)
-                "reward": experience_to_store.reward,  # (D, NU, UB, T, NE, ...)
-                "observation": experience_to_store.obs.agents_view,  # (D, NU, UB, T, NE, ...)
-                "legal_action_mask": experience_to_store.obs.action_mask,  # (D, NU, UB, T, NE, ...)
-            }
-        )
-        buffer_state = buffer.add(buffer_state, flashbax_transition)
-
+        learner_output = learn(learner_state)
         jax.block_until_ready(learner_output)
 
         # Log the results of the training.
