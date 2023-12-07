@@ -161,7 +161,7 @@ class JaxMarlWrapper(Wrapper):
         super().__init__(env)
         self._env: MultiAgentEnv
         self._timelimit = timelimit
-        self._action_shape = self.action_spec().shape
+        self._action_shape = (self.action_spec().shape[0],  int(self.action_spec().num_values[0]))
 
         self.agents = list(self._env.observation_spaces.keys())
 
