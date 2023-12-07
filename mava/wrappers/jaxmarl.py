@@ -26,7 +26,7 @@ from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
 from jumanji.wrappers import Wrapper
 
-from mava.types import Observation
+from mava.types import JaxMarlState, Observation
 
 
 def _is_discrete(space: jaxmarl_spaces.Space) -> bool:
@@ -139,14 +139,6 @@ def jaxmarl_space_to_jumanji_spec(space: jaxmarl_spaces.Space) -> specs.Spec:
         raise ValueError(f"Unsupported JaxMarl space: {space}")
 
 
-class JaxMarlState(NamedTuple):
-    """Wrapper around a JaxMarl state to provide necessary attributes for jumanji environments."""
-
-    state: ArrayTree
-    key: PRNGKey
-    step: int
-
-
 class JaxMarlWrapper(Wrapper):
     """Wraps a JaxMarl environment so that its API is compatible with jumaji environments."""
 
@@ -161,7 +153,7 @@ class JaxMarlWrapper(Wrapper):
         super().__init__(env)
         self._env: MultiAgentEnv
         self._timelimit = timelimit
-        self._action_shape = (self.action_spec().shape[0],  int(self.action_spec().num_values[0]))
+        self._action_shape = (self.action_spec().shape[0], int(self.action_spec().num_values[0]))
 
         self.agents = list(self._env.observation_spaces.keys())
 
