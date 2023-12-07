@@ -25,11 +25,11 @@ import jumanji
 import numpy as np
 import optax
 from colorama import Fore, Style
+from flax import jax_utils
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
 from jumanji.env import Environment
 from jumanji.environments.routing.robot_warehouse.generator import RandomGenerator
-from jumanji.types import Observation
 from jumanji.wrappers import AutoResetWrapper
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
@@ -43,17 +43,16 @@ from mava.types import (
     ExperimentOutput,
     LearnerFn,
     LearnerState,
+    Observation,
+    ObservationGlobalState,
     OptStates,
     Params,
     PPOTransition,
 )
+from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import merge_leading_dims
-from mava.wrappers.jumanji import (
-    AgentIDWrapper,
-    LogWrapper,
-    ObservationGlobalState,
-    RwareMultiAgentWithGlobalStateWrapper,
-)
+from mava.wrappers.jumanji import RwareWrapper
+from mava.wrappers.shared import AgentIDWrapper, GlobalStateWrapper, LogWrapper
 
 
 class Actor(nn.Module):
@@ -90,7 +89,7 @@ class Critic(nn.Module):
     """Critic Network."""
 
     @nn.compact
-    def __call__(self, observation: Observation) -> chex.Array:
+    def __call__(self, observation: ObservationGlobalState) -> chex.Array:
         """Forward pass."""
 
         critic_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
@@ -153,11 +152,11 @@ def get_learner_fn(
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             # LOG EPISODE METRICS
-            done, reward = jax.tree_util.tree_map(
+            done = jax.tree_util.tree_map(
                 lambda x: jnp.repeat(x, config["system"]["num_agents"]).reshape(
                     config["arch"]["num_envs"], -1
                 ),
-                (timestep.last(), timestep.reward),
+                timestep.last(),
             )
             info = {
                 "episode_return": env_state.episode_return_info,
@@ -165,7 +164,7 @@ def get_learner_fn(
             }
 
             transition = PPOTransition(
-                done, action, value, reward, log_prob, last_timestep.observation, info
+                done, action, value, timestep.reward, log_prob, last_timestep.observation, info
             )
             learner_state = LearnerState(params, opt_states, rng, env_state, timestep)
             return learner_state, transition
@@ -512,16 +511,16 @@ def run_experiment(_config: Dict) -> None:
     log = logger_setup(config)
 
     # Create envs
-    generator = RandomGenerator(**config["env"]["rware_scenario"]["task_config"])
+    generator = RandomGenerator(**config["env"]["scenario"]["task_config"])
     env = jumanji.make(config["env"]["env_name"], generator=generator)
-    env = RwareMultiAgentWithGlobalStateWrapper(env)
+    env = GlobalStateWrapper(RwareWrapper(env))
     # Add agent id to observation.
     if config["system"]["add_agent_id"]:
         env = AgentIDWrapper(env=env, has_global_state=True)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jumanji.make(config["env"]["env_name"], generator=generator)
-    eval_env = RwareMultiAgentWithGlobalStateWrapper(eval_env)
+    eval_env = GlobalStateWrapper(RwareWrapper(eval_env))
     if config["system"]["add_agent_id"]:
         eval_env = AgentIDWrapper(env=eval_env, has_global_state=True)
 
@@ -563,6 +562,27 @@ def run_experiment(_config: Dict) -> None:
     )
     pprint(config)
 
+    # Set up checkpointer
+    save_checkpoint = config["logger"]["checkpointing"]["save_model"]
+    if save_checkpoint:
+        checkpointer = Checkpointer(
+            metadata=config,  # Save all config as metadata in the checkpoint
+            model_name=config["logger"]["system_name"],
+            **config["logger"]["checkpointing"]["save_args"],  # Checkpoint args
+        )
+
+    if config["logger"]["checkpointing"]["load_model"]:
+        loaded_checkpoint = Checkpointer(
+            model_name=config["logger"]["system_name"],
+            **config["logger"]["checkpointing"]["load_args"],  # Other checkpoint args
+        )
+        # Restore the learner state from the checkpoint
+        learner_state_reloaded = loaded_checkpoint.restore_learner_state(
+            unreplicated_input_learner_state=jax_utils.unreplicate(learner_state)
+        )
+        # Overwrite learner state with reloaded state, and replicate across devices.
+        learner_state = jax.device_put_replicated(learner_state_reloaded, jax.devices())
+
     # Run experiment for a total number of evaluations.
     max_episode_return = jnp.float32(0.0)
     best_params = None
@@ -601,7 +621,17 @@ def run_experiment(_config: Dict) -> None:
         episode_return = log(
             metrics=evaluator_output,
             t_env=steps_per_rollout * (i + 1),
+            eval_step=i,
         )
+
+        if save_checkpoint:
+            # Save checkpoint of learner state
+            checkpointer.save(
+                timestep=steps_per_rollout * (i + 1),
+                unreplicated_learner_state=jax_utils.unreplicate(learner_output.learner_state),
+                episode_return=episode_return,
+            )
+
         if config["arch"]["absolute_metric"] and max_episode_return <= episode_return:
             best_params = copy.deepcopy(trained_params)
             max_episode_return = episode_return
