@@ -133,11 +133,20 @@ Please do follow along as we develop this next phase!
 
 ## See Also 🔎
 
-The current version of Mava has been based on code from the following projects:
+**InstaDeep's MARL ecosystem in JAX.** In particular, we suggest users check out the following sister repositories:
 
-- 🤖 [PureJaxRL][purejaxrl] for simple code implementations of end-to-end RL training in JAX.
+- 🔌 [OG-MARL](https://github.com/instadeepai/og-marl): datasets with baselines for offline MARL in JAX.
+- 🌴 [Jumanji](https://github.com/instadeepai/jumanji): a diverse suite of scalable reinforcement learning environments in JAX.
+- 😎 [Matrax](https://github.com/instadeepai/matrax): a collection of matrix games in JAX.
+- 🔦 [Flashbax](https://github.com/instadeepai/flashbax): accelerated replay buffers in JAX.
+- 📈 [MARL-eval](https://github.com/instadeepai/marl-eval): standardised experiment data aggregation and visualisation for MARL.
+
+**Related.** Other libraries related to accelerated MARL in JAX.
+
+- 🦊 [JaxMARL](https://github.com/flairox/jaxmarl): accelerated MARL environments with baselines in JAX.
 - 🌀 [DeepMind Anakin][anakin_paper] for the Anakin podracer architecture to train RL agents at scale.
-- 🌴 [Jumanji][jumanji] a diverse suite of scalable RL environments written in JAX, including multi-agent environments.
+- ♟️  [Pgx](https://github.com/sotetsuk/pgx): JAX implementations of classic board games, such as Chess, Go and Shogi.
+- 🔼 [Minimax](https://github.com/facebookresearch/minimax/): JAX implementations of autocurricula baselines for RL.
 
 ## Citing Mava 📚
 
