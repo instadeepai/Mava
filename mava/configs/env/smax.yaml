@@ -1,0 +1,7 @@
+# ---Environment Configs---
+defaults:
+  - _self_
+
+env_name: HeuristicEnemySMAX
+scenario: 2s3z
+kwargs: {}  # empty for now...
