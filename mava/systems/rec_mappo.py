@@ -690,7 +690,7 @@ def run_experiment(_config: Dict) -> None:
     """Runs experiment."""
     # Logger setup
     config = copy.deepcopy(_config)
-    log = logger_setup(config)
+    log, logger = logger_setup(config)
 
     # Create the enviroments for train and eval.
     scenario = map_name_to_scenario(config["env"]["scenario"])
@@ -845,6 +845,7 @@ def run_experiment(_config: Dict) -> None:
             t_env=steps_per_rollout * (i + 1),
             absolute_metric=True,
         )
+    logger.neptune_logger.stop()
 
 
 @hydra.main(config_path="../configs", config_name="default_rec_mappo.yaml", version_base="1.2")
