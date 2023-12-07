@@ -115,7 +115,7 @@ class AgentIDWrapper(Wrapper):
     ) -> Union[specs.Spec[Observation], specs.Spec[ObservationGlobalState]]:
         """Specification of the observation of the `RobotWarehouse` environment."""
         obs_spec = self._env.observation_spec()
-        num_obs_features = jnp.prod(jnp.asarray(obs_spec.agents_view.shape)) + self._env.num_agents
+        num_obs_features = obs_spec.agents_view.shape[-1] + self._env.num_agents
 
         agents_view = specs.Array(
             (self._env.num_agents, num_obs_features), jnp.int32, "agents_view"
@@ -169,7 +169,7 @@ class GlobalStateWrapper(Wrapper):
         """Specification of the observation of the `RobotWarehouse` environment."""
 
         obs_spec = self._env.observation_spec()
-        num_obs_features = jnp.prod(jnp.asarray(obs_spec.agents_view.shape))
+        num_obs_features = obs_spec.agents_view.shape[-1]
         global_state = specs.Array(
             (self._env.num_agents, self._env.num_agents * num_obs_features),
             jnp.int32,
