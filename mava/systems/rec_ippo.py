@@ -29,7 +29,10 @@ from colorama import Fore, Style
 from flax import jax_utils
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
+from jaxmarl import make as jaxmarl_make
+from jaxmarl.environments.smax.smax_env import map_name_to_scenario
 from jumanji.env import Environment
+from jumanji.wrappers import AutoResetWrapper
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
@@ -49,7 +52,8 @@ from mava.types import (
     RNNObservation,
 )
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.make_env import make
+from mava.wrappers.jaxmarl import JaxMarlWrapper
+from mava.wrappers.shared import AgentIDWrapper, LogWrapper
 
 
 class ScannedRNN(nn.Module):
@@ -684,7 +688,19 @@ def run_experiment(_config: Dict) -> None:
     log = logger_setup(config)
 
     # Create the enviroments for train and eval.
-    env, eval_env = make(config=config)
+    scenario = map_name_to_scenario(config["env"]["scenario"])
+    env = jaxmarl_make(config["env"]["env_name"], scenario=scenario)
+    env = JaxMarlWrapper(env)
+    # Add agent id to observation.
+    if config["system"]["add_agent_id"]:
+        env = AgentIDWrapper(env)
+    env = AutoResetWrapper(env)
+    env = LogWrapper(env)
+    eval_env = jaxmarl_make(config["env"]["env_name"], scenario=scenario)
+    eval_env = JaxMarlWrapper(eval_env)
+    # Add agent id to observation.
+    if config["system"]["add_agent_id"]:
+        eval_env = AgentIDWrapper(eval_env)
 
     # PRNG keys.
     rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["system"]["seed"]), num=3)
