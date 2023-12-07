@@ -14,11 +14,11 @@
 
 import copy
 from collections import namedtuple
-from typing import Dict, List, NamedTuple, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import jax
 import jax.numpy as jnp
-from chex import Array, ArrayTree, PRNGKey
+from chex import Array, PRNGKey
 from gymnax.environments import spaces as gymnax_spaces
 from jaxmarl.environments import spaces as jaxmarl_spaces
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv

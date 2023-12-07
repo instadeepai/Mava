@@ -71,7 +71,8 @@ class LogEnvState:
     episode_length_info: chex.Numeric
 
 
-class JaxMarlState(NamedTuple):
+@dataclass
+class JaxMarlState:
     """Wrapper around a JaxMarl state to provide necessary attributes for jumanji environments."""
 
     state: State
