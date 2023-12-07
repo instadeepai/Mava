@@ -503,7 +503,7 @@ def run_experiment(_config: Dict) -> None:
     """Runs experiment."""
     # Logger setup
     config = copy.deepcopy(_config)
-    log = logger_setup(config)
+    log, logger = logger_setup(config)
 
     # Create envs
     generator = RandomGenerator(**config["env"]["scenario"]["task_config"])
@@ -654,6 +654,8 @@ def run_experiment(_config: Dict) -> None:
             t_env=steps_per_rollout * (i + 1),
             absolute_metric=True,
         )
+
+    logger.neptune_logger.stop()
 
 
 @hydra.main(config_path="../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
