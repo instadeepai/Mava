@@ -1,0 +1,9 @@
+# ---Environment Configs---
+defaults:
+  - _self_
+
+env_name: HeuristicEnemySMAX
+# Possible scenarios:
+# 2s3z | 3s5z | 5m_vs_6m | 10m_vs_11m | 27m_vs_30m | 3s5z_vs_3s6z | 3s_vs_5z | 6h_vs_8z | smacv2_5_units | smacv2_10_units | smacv2_20_units
+scenario: 2s3z
+kwargs: {}  # empty for now...

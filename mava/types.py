@@ -71,6 +71,15 @@ class LogEnvState:
     episode_length_info: chex.Numeric
 
 
+@dataclass
+class JaxMarlState:
+    """Wrapper around a JaxMarl state to provide necessary attributes for jumanji environments."""
+
+    state: State
+    key: chex.PRNGKey
+    step: int
+
+
 RNNObservation: TypeAlias = Tuple[Observation, Done]
 RNNGlobalObservation: TypeAlias = Tuple[ObservationGlobalState, Done]
 
