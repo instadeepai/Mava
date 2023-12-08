@@ -23,7 +23,6 @@ import flax.linen as nn
 import hydra
 import jax
 import jax.numpy as jnp
-import jumanji
 import numpy as np
 import optax
 from colorama import Fore, Style
@@ -31,8 +30,6 @@ from flax import jax_utils
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
 from jumanji.env import Environment
-from jumanji.environments.routing.robot_warehouse.generator import RandomGenerator
-from jumanji.wrappers import AutoResetWrapper
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
@@ -52,8 +49,7 @@ from mava.types import (
     RNNObservation,
 )
 from mava.utils.checkpointing import Checkpointer
-from mava.wrappers.jumanji import RwareWrapper
-from mava.wrappers.shared import AgentIDWrapper, LogWrapper
+from mava.utils.make_env import make
 
 
 class ScannedRNN(nn.Module):
@@ -74,14 +70,15 @@ class ScannedRNN(nn.Module):
             self.initialize_carry(ins.shape[0], ins.shape[1]),
             rnn_state,
         )
-        new_rnn_state, y = nn.GRUCell()(rnn_state, ins)
+        new_rnn_state, y = nn.GRUCell(features=ins.shape[1])(rnn_state, ins)
         return new_rnn_state, y
 
     @staticmethod
     def initialize_carry(batch_size: int, hidden_size: int) -> chex.Array:
         """Initializes the carry state."""
         # Use a dummy key since the default state init fn is just zeros.
-        return nn.GRUCell.initialize_carry(jax.random.PRNGKey(0), (batch_size,), hidden_size)
+        cell = nn.GRUCell(features=hidden_size)
+        return cell.initialize_carry(jax.random.PRNGKey(0), (batch_size, hidden_size))
 
 
 class Actor(nn.Module):
@@ -153,7 +150,7 @@ class Critic(nn.Module):
 
 
 def get_learner_fn(
-    env: jumanji.Environment,
+    env: Environment,
     apply_fns: Tuple[RecActorApply, RecCriticApply],
     update_fns: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
     config: Dict,
@@ -686,19 +683,8 @@ def run_experiment(_config: Dict) -> None:
     config = copy.deepcopy(_config)
     log = logger_setup(config)
 
-    # Create envs
-    generator = RandomGenerator(**config["env"]["scenario"]["task_config"])
-    env = jumanji.make(config["env"]["env_name"], generator=generator)
-    env = RwareWrapper(env)
-    # Add agent id to observation.
-    if config["system"]["add_agent_id"]:
-        env = AgentIDWrapper(env)
-    env = AutoResetWrapper(env)
-    env = LogWrapper(env)
-    eval_env = jumanji.make(config["env"]["env_name"], generator=generator)
-    eval_env = RwareWrapper(eval_env)
-    if config["system"]["add_agent_id"]:
-        eval_env = AgentIDWrapper(eval_env)
+    # Create the enviroments for train and eval.
+    env, eval_env = make(config=config)
 
     # PRNG keys.
     rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["system"]["seed"]), num=3)

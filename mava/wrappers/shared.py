@@ -64,7 +64,6 @@ class AgentIDWrapper(Wrapper):
 
     def __init__(self, env: Environment, has_global_state: bool = False):
         super().__init__(env)
-        self.num_obs_features = self._env.num_obs_features + self._env.num_agents
         self.has_global_state = has_global_state
 
     def _add_agent_ids(
@@ -115,26 +114,24 @@ class AgentIDWrapper(Wrapper):
         self,
     ) -> Union[specs.Spec[Observation], specs.Spec[ObservationGlobalState]]:
         """Specification of the observation of the `RobotWarehouse` environment."""
+        obs_spec = self._env.observation_spec()
+        num_obs_features = obs_spec.agents_view.shape[-1] + self._env.num_agents
+
         agents_view = specs.Array(
-            (self._env.num_agents, self.num_obs_features), jnp.int32, "agents_view"
+            (self._env.num_agents, num_obs_features), jnp.int32, "agents_view"
         )
         global_state = specs.Array(
             (
                 self._env.num_agents,
-                self._env.num_obs_features * self._env.num_agents + self._env.num_agents,
+                num_obs_features * self._env.num_agents + self._env.num_agents,
             ),
             jnp.int32,
             "global_state",
         )
 
         if self.has_global_state:
-            return self._env.observation_spec().replace(
-                agents_view=agents_view,
-                global_state=global_state,
-            )
-        return self._env.observation_spec().replace(
-            agents_view=agents_view,
-        )
+            return obs_spec.replace(agents_view=agents_view, global_state=global_state)
+        return obs_spec.replace(agents_view=agents_view)
 
 
 class GlobalStateWrapper(Wrapper):
@@ -172,8 +169,9 @@ class GlobalStateWrapper(Wrapper):
         """Specification of the observation of the `RobotWarehouse` environment."""
 
         obs_spec = self._env.observation_spec()
+        num_obs_features = obs_spec.agents_view.shape[-1]
         global_state = specs.Array(
-            (self._env.num_agents, self._env.num_agents * self._env.num_obs_features),
+            (self._env.num_agents, self._env.num_agents * num_obs_features),
             jnp.int32,
             "global_state",
         )
