@@ -44,6 +44,8 @@ module = [
     "scipy.*",
     "hydra.*",
     "omegaconf.*",
+    "tensorstore.*",
+    "etils.*",
 ]
 
 [tool.flake8]
