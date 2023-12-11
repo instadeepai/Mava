@@ -114,7 +114,24 @@ we advise users to explicitly install the correct JAX version (see the [official
 
 ## Quickstart ⚡
 
-We have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-Agent System.
+To get started with training your first Mava system, simply run:
+```bash
+python mava/systems/ff_ippo.py
+```
+
+Mava makes use of Hydra for config manangement. In order to see our default system configs please see the `mava/configs/` directory. A benefit of Hydra is that configs can either be set in config yaml files or overwritten from the terminal on the fly. For an example of running a system on the LBF environment the above code can simply be adapted as follows:
+
+```bash
+python mava/systems/ff_ippo.py env=lbf
+```
+
+Different scenarions can also be run by making the following config updates from the terminal:
+
+```bash
+python mava/systems/ff_ippo.py env=rware env/scenario=tiny-4ag
+```
+
+Additionally, we also have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-agent system.
 
 ## Contributing 🤝
 
