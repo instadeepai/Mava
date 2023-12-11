@@ -6,4 +6,4 @@ system_name: ff_mappo
 # --- Other logger kwargs ---
 kwargs:
   neptune_project: Instadeep/Mava
-  neptune_tag: [ff-mappo, smax, hyperparameter-search, compare-jaxmarl-paper]
+  neptune_tag: [ff-mappo, smax, benchmark, win-rate]
