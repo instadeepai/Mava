@@ -146,6 +146,7 @@ class EvalState(NamedTuple):
     timestep: TimeStep
     step_count_: chex.Numeric
     return_: chex.Numeric
+    episode_won: chex.Numeric
 
 
 class RNNEvalState(NamedTuple):
@@ -158,6 +159,7 @@ class RNNEvalState(NamedTuple):
     hstate: HiddenState
     step_count_: chex.Numeric
     return_: chex.Numeric
+    episode_won: chex.Numeric
 
 
 MavaState = TypeVar("MavaState", LearnerState, RNNLearnerState, EvalState, RNNEvalState)

@@ -58,6 +58,7 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
         if absolute_metric:
             prefix = "absolute/"
             episodes_info = metrics.episodes_info
+            win_rate = episodes_info["win_rate"]
         elif trainer_metric:
             prefix = "trainer/"
             episodes_info = metrics.episodes_info
@@ -68,6 +69,7 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
         else:
             prefix = "evaluator/"
             episodes_info = metrics.episodes_info
+            win_rate = episodes_info["win_rate"]
 
         # Flatten metrics info.
         episodes_return = jnp.ravel(episodes_info["episode_return"])
@@ -89,6 +91,8 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
                 logger.log_stat(f"{prefix}value_loss", float(np.mean(value_loss)), t_env)
                 logger.log_stat(f"{prefix}loss_actor", float(np.mean(loss_actor)), t_env)
                 logger.log_stat(f"{prefix}entropy", float(np.mean(entropy)), t_env)
+            else:
+                logger.log_stat(f"{prefix}win_rate", float(win_rate), t_env, eval_step)
 
         log_string = (
             f"Timesteps {t_env:07d} | "
@@ -102,6 +106,7 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
         )
 
         if absolute_metric:
+            log_string += f"| Win Rate {float(win_rate):.3f}"
             logger.console_logger.info(
                 f"{Fore.BLUE}{Style.BRIGHT}ABSOLUTE METRIC: {log_string}{Style.RESET_ALL}"
             )
@@ -116,6 +121,7 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
                 f"{Fore.MAGENTA}{Style.BRIGHT}TRAINER: {log_string}{Style.RESET_ALL}"
             )
         else:
+            log_string += f"| Win Rate {float(win_rate):.3f}"
             logger.console_logger.info(
                 f"{Fore.GREEN}{Style.BRIGHT}EVALUATOR: {log_string}{Style.RESET_ALL}"
             )

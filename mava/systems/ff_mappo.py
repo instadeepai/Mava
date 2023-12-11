@@ -29,6 +29,7 @@ from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
 from jaxmarl import make as jaxmarl_make
 from jaxmarl.environments.smax.smax_env import map_name_to_scenario
+from jaxmarl.wrappers.baselines import SMAXLogWrapper
 from jumanji.env import Environment
 from jumanji.wrappers import AutoResetWrapper
 from omegaconf import DictConfig, OmegaConf
@@ -521,11 +522,12 @@ def run_experiment(_config: Dict) -> None:
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
     eval_env = jaxmarl_make(config["env"]["env_name"], scenario=scenario)
+    eval_env = SMAXLogWrapper(eval_env)
     eval_env = JaxMarlWrapper(eval_env)
+    eval_env = GlobalStateWrapper(eval_env)
     # Add agent id to observation.
     if config["system"]["add_agent_id"]:
         eval_env = AgentIDWrapper(eval_env)
-    eval_env = GlobalStateWrapper(env)
 
     # PRNG keys.
     rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["system"]["seed"]), num=3)

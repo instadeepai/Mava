@@ -54,7 +54,7 @@ def get_ff_evaluator_fn(
         def _env_step(eval_state: EvalState) -> EvalState:
             """Step the environment."""
             # PRNG keys.
-            rng, env_state, last_timestep, step_count_, return_ = eval_state
+            rng, env_state, last_timestep, step_count_, return_, _ = eval_state
 
             # Select action.
             rng, _rng = jax.random.split(rng)
@@ -71,7 +71,13 @@ def get_ff_evaluator_fn(
             # Log episode metrics.
             return_ += timestep.reward
             step_count_ += 1
-            eval_state = EvalState(rng, env_state, timestep, step_count_, return_)
+
+            # Get info.
+            info = timestep.extras
+            timestep.extras = {}
+            eval_state = EvalState(
+                rng, env_state, timestep, step_count_, return_, info["returned_won_episode"]
+            )
             return eval_state
 
         def not_done(carry: Tuple) -> bool:
@@ -85,6 +91,7 @@ def get_ff_evaluator_fn(
         eval_metrics = {
             "episode_return": final_state.return_,
             "episode_length": final_state.step_count_,
+            "win_rate": jnp.mean(final_state.episode_won),
         }
         return eval_metrics
 
@@ -106,14 +113,21 @@ def get_ff_evaluator_fn(
         step_rngs = jnp.stack(step_rngs).reshape(eval_batch, -1)
 
         eval_state = EvalState(
-            step_rngs, env_states, timesteps, 0, jnp.zeros_like(timesteps.reward)
+            step_rngs,
+            env_states,
+            timesteps,
+            jnp.zeros((eval_batch, 1)),
+            jnp.zeros_like(timesteps.reward),
+            jnp.zeros_like(timesteps.reward),
         )
         eval_metrics = jax.vmap(
             eval_one_episode,
-            in_axes=(None, EvalState(0, 0, 0, None, None)),
+            in_axes=(None, 0),
             axis_name="eval_batch",
         )(trained_params, eval_state)
-
+        eval_metrics["win_rate"] = (
+            jnp.sum(eval_metrics["win_rate"]) / config["arch"]["num_eval_episodes"]
+        ) * 100
         return ExperimentOutput(episodes_info=eval_metrics, learner_state=eval_state)
 
     return evaluator_fn
@@ -133,15 +147,7 @@ def get_rnn_evaluator_fn(
 
         def _env_step(eval_state: RNNEvalState) -> RNNEvalState:
             """Step the environment."""
-            (
-                rng,
-                env_state,
-                last_timestep,
-                last_done,
-                hstate,
-                step_count_,
-                return_,
-            ) = eval_state
+            (rng, env_state, last_timestep, last_done, hstate, step_count_, return_, _) = eval_state
 
             # PRNG keys.
             rng, policy_rng = jax.random.split(rng)
@@ -169,6 +175,11 @@ def get_rnn_evaluator_fn(
             # Log episode metrics.
             return_ += timestep.reward
             step_count_ += 1
+
+            # Get info.
+            info = timestep.extras
+            timestep.extras = {}
+
             eval_state = RNNEvalState(
                 rng,
                 env_state,
@@ -177,6 +188,7 @@ def get_rnn_evaluator_fn(
                 hstate,
                 step_count_,
                 return_,
+                info["returned_won_episode"],
             )
             return eval_state
 
@@ -191,6 +203,7 @@ def get_rnn_evaluator_fn(
         eval_metrics = {
             "episode_return": final_state.return_,
             "episode_length": final_state.step_count_,
+            "win_rate": jnp.mean(final_state.episode_won),
         }
         return eval_metrics
 
@@ -234,14 +247,17 @@ def get_rnn_evaluator_fn(
             hstate=init_hstate,
             step_count_=0,
             return_=jnp.zeros_like(timesteps.reward),
+            episode_won=jnp.zeros_like(timesteps.reward),
         )
 
         eval_metrics = jax.vmap(
             eval_one_episode,
-            in_axes=(None, RNNEvalState(0, 0, 0, 0, 0, None, None)),
+            in_axes=(None, RNNEvalState(0, 0, 0, 0, 0, None, 0, 0)),
             axis_name="eval_batch",
         )(trained_params, eval_state)
-
+        eval_metrics["win_rate"] = (
+            jnp.sum(eval_metrics["win_rate"]) / config["arch"]["num_eval_episodes"]
+        ) * 100
         return ExperimentOutput(
             episodes_info=eval_metrics,
             learner_state=eval_state,
