@@ -2,7 +2,7 @@
 ## Data recording from a PPO system
 We include here an example of an advanced use case with Mava: recording experience data from a PPO system, which can then be used for offline MARL—e.g. using the [OG-MARL](https://github.com/instadeepai/og-marl) framework. This functionality is demonstrated in `mava/advanced_usage/ff_ippo_rware_store_experience.py`, and uses [Flashbax](https://github.com/instadeepai/flashbax)'s `Vault` feature.
 
-Firstly, a vault must be created using on the structure of an experience buffer. Here, we create a dummy structure of the data we want to store:
+Firstly, a vault must be created using the structure of an experience buffer. Here, we create a dummy structure of the data we want to store:
 ```py
 # Transition structure
 dummy_flashbax_transition = {
@@ -94,7 +94,7 @@ flashbax_transition = _reshape_experience(
 buffer_state = buffer.add(buffer_state, flashbax_transition)
 ```
 
-Then, periodically, we can write this buffer state into the vault:
+Then, periodically, we can write this buffer state into the vault, which is stored on disk:
 ```py
 v.write(buffer_state)
 ```
