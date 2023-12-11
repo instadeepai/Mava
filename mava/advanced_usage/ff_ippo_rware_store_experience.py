@@ -26,6 +26,7 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 from colorama import Fore, Style
+from flashbax.vault import Vault
 from flax import jax_utils
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
@@ -50,7 +51,6 @@ from mava.types import (
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import merge_leading_dims
 from mava.utils.make_env import make
-from mava.utils.vault import Vault
 
 StoreExpLearnerFn = Callable[[MavaState], Tuple[ExperimentOutput[MavaState], PPOTransition]]
 
@@ -631,8 +631,12 @@ def run_experiment(_config: Dict) -> None:  # noqa: CCR001
         )
         return experience
 
-    # TODO: nicer config for vault etc
-    vault = Vault(buffer_state, config["logger"]["system_name"])
+    # Use vault to record experience
+    vault = Vault(
+        vault_name=config["logger"]["system_name"],
+        init_fbx_state=buffer_state,
+        vault_uid=config["logger"]["vault"]["save_args"]["vault_uid"],
+    )
 
     # Run experiment for a total number of evaluations.
     max_episode_return = jnp.float32(0.0)
@@ -642,23 +646,26 @@ def run_experiment(_config: Dict) -> None:  # noqa: CCR001
         start_time = time.time()
 
         learner_output, experience_to_store = learn(learner_state)
-        flashbax_transition = _reshape_experience(
-            {
-                "done": experience_to_store.done,  # (D, NU, UB, T, NE, ...)
-                "action": experience_to_store.action,  # (D, NU, UB, T, NE, ...)
-                "reward": experience_to_store.reward,  # (D, NU, UB, T, NE, ...)
-                "observation": experience_to_store.obs.agents_view,  # (D, NU, UB, T, NE, ...)
-                "legal_action_mask": experience_to_store.obs.action_mask,  # (D, NU, UB, T, NE, ...)
-            }
-        )
-        buffer_state = buffer.add(buffer_state, flashbax_transition)
 
-        if i % 20 == 0:  # TODO: move to config
-            # Write to vault
-            vault_start_time = time.time()
-            vault.write(buffer_state)
-            vault_elapsed_time = time.time() - vault_start_time
-            print(f"Vault write time: {vault_elapsed_time:.2f}s")
+        # Record data into the vault
+        if config["logger"]["vault"]["save_vault"]:
+            # Pack transition
+            flashbax_transition = _reshape_experience(
+                {
+                    # (D, NU, UB, T, NE, ...)
+                    "done": experience_to_store.done,
+                    "action": experience_to_store.action,
+                    "reward": experience_to_store.reward,
+                    "observation": experience_to_store.obs.agents_view,
+                    "legal_action_mask": experience_to_store.obs.action_mask,
+                }
+            )
+            # Add to fbx buffer
+            buffer_state = buffer.add(buffer_state, flashbax_transition)
+
+            # Save buffer into vault
+            if i % config["logger"]["vault"]["save_args"]["save_interval"] == 0:
+                vault.write(buffer_state)
 
         jax.block_until_ready(learner_output)
 

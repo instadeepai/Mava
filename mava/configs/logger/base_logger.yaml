@@ -26,3 +26,10 @@ checkpointing:
   load_model: False # Whether to load model checkpoints.
   load_args:
     checkpoint_uid: "" # Unique identifier for checkpoint to load.
+
+#  --- Vault ---
+vault:
+  save_vault: False # Whether to record data into a vault.
+  save_args:
+    save_interval: 10 # Number of eval steps between saving vaults.
+    vault_uid: ~ # Unique identifier for vault to save. Defaults to timestamp
