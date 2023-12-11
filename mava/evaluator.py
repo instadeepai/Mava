@@ -91,7 +91,7 @@ def get_ff_evaluator_fn(
         eval_metrics = {
             "episode_return": final_state.return_,
             "episode_length": final_state.step_count_,
-            "win_rate": jnp.mean(final_state.episode_won),
+            "won_episode": jnp.mean(final_state.episode_won),
         }
         return eval_metrics
 
@@ -125,9 +125,7 @@ def get_ff_evaluator_fn(
             in_axes=(None, 0),
             axis_name="eval_batch",
         )(trained_params, eval_state)
-        eval_metrics["win_rate"] = (
-            jnp.sum(eval_metrics["win_rate"]) / config["arch"]["num_eval_episodes"]
-        ) * 100
+        eval_metrics["won_episodes"] = eval_metrics["won_episode"]
         return ExperimentOutput(episodes_info=eval_metrics, learner_state=eval_state)
 
     return evaluator_fn
@@ -203,7 +201,7 @@ def get_rnn_evaluator_fn(
         eval_metrics = {
             "episode_return": final_state.return_,
             "episode_length": final_state.step_count_,
-            "win_rate": jnp.mean(final_state.episode_won),
+            "won_episode": jnp.mean(final_state.episode_won),
         }
         return eval_metrics
 
@@ -255,9 +253,7 @@ def get_rnn_evaluator_fn(
             in_axes=(None, RNNEvalState(0, 0, 0, 0, 0, None, 0, 0)),
             axis_name="eval_batch",
         )(trained_params, eval_state)
-        eval_metrics["win_rate"] = (
-            jnp.sum(eval_metrics["win_rate"]) / config["arch"]["num_eval_episodes"]
-        ) * 100
+        eval_metrics["won_episodes"] = eval_metrics["won_episode"]
         return ExperimentOutput(
             episodes_info=eval_metrics,
             learner_state=eval_state,

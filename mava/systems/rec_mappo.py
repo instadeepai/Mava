@@ -808,6 +808,7 @@ def run_experiment(_config: Dict) -> None:
         # Log the results of the evaluation.
         elapsed_time = time.time() - start_time
         evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
+        evaluator_output.episodes_info["win_rate"]=(jnp.sum(evaluator_output.episodes_info["won_episodes"]) / config["arch"]["num_eval_episodes"]) * 100
         episode_return = log(
             metrics=evaluator_output,
             t_env=steps_per_rollout * (i + 1),
@@ -842,6 +843,7 @@ def run_experiment(_config: Dict) -> None:
 
         elapsed_time = time.time() - start_time
         evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
+        evaluator_output.episodes_info["win_rate"]=(jnp.sum(evaluator_output.episodes_info["won_episodes"]) / config["arch"]["num_eval_episodes"]) * 100
         log(
             metrics=evaluator_output,
             t_env=steps_per_rollout * (i + 1),
