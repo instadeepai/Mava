@@ -15,6 +15,7 @@
 import json
 import logging
 import os
+import time
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -216,13 +217,20 @@ class JsonWriter:
             evaluation_step (int): the evaluation step
         """
 
+        current_time = time.time()
+
+        # This will ensure the first logged time is 0, which avoids taking compilation into account
+        # when plotting downstream.
+        if evaluation_step == 0:
+            self.start_time = current_time
+
         logging_prefix, *metric_key = key.split("/")
         metric_key = "/".join(metric_key)
 
         metrics = {metric_key: [value]}
 
         if logging_prefix == "evaluator":
-            step_metrics = {"step_count": timestep}
+            step_metrics = {"step_count": timestep, "elapsed_time": current_time - self.start_time}
             step_metrics.update(metrics)  # type: ignore
             step_str = f"step_{evaluation_step}"
             if step_str in self.run_data:
