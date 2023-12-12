@@ -664,7 +664,7 @@ def run_experiment(_config: Dict) -> None:
         evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
         evaluator_output.episodes_info["win_rate"] = (
             jnp.sum(evaluator_output.episodes_info["won_episodes"])
-            / config["arch"]["num_eval_episodes"]
+            / (config["arch"]["num_eval_episodes"]*10)
         ) * 100
 
         log(
