@@ -119,7 +119,7 @@ To get started with training your first Mava system, simply run one of the syste
 python mava/systems/ff_ippo.py
 ```
 
-Mava makes use of Hydra for config manangement. In order to see our default system configs please see the `mava/configs/` directory. A benefit of Hydra is that configs can either be set in config yaml files or overwritten from the terminal on the fly. For an example of running a system on the LBF environment the above code can simply be adapted as follows:
+Mava makes use of Hydra for config manangement. In order to see our default system configs please see the `mava/configs/` directory. A benefit of Hydra is that configs can either be set in config yaml files or overwritten from the terminal on the fly. For an example of running a system on the LBF environment, the above code can simply be adapted as follows:
 
 ```bash
 python mava/systems/ff_ippo.py env=lbf
