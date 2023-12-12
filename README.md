@@ -133,6 +133,9 @@ python mava/systems/ff_ippo.py env=rware env/scenario=tiny-4ag
 
 Additionally, we also have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-agent system.
 
+## Advanced Usage 👽
+Mava can be used in a wide array of advanced systems. As an example, we demonstrate recording experience data from one of our PPO systems, into a [Flashbax](https://github.com/instadeepai/flashbax) `Vault`. This vault can then easily be integrated into an offline MARL system, such as [OG-MARL](https://github.com/instadeepai/og-marl). See the [Advanced README](./mava/advanced_usage/README.md) for more information.
+
 ## Contributing 🤝
 
 Please read our [contributing docs](docs/CONTRIBUTING.md) for details on how to submit pull requests, our Contributor License Agreement and community guidelines.
