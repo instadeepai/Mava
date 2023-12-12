@@ -26,7 +26,7 @@ from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
 from jumanji.wrappers import Wrapper
 
-from mava.types import JaxMarlState, Observation
+from mava.types import JaxMarlState, Observation, ObservationGlobalState
 
 
 def _is_discrete(space: jaxmarl_spaces.Space) -> bool:
@@ -166,9 +166,12 @@ class JaxMarlWrapper(Wrapper):
         else:
             avail_actions = self._env.get_avail_actions(state)
 
-        obs = Observation(
+        global_state = jnp.tile(jnp.array(obs["world_state"]), (self._env.num_agents, 1))
+
+        obs = ObservationGlobalState(
             agents_view=batchify(obs, self.agents),
             action_mask=jnp.array(batchify(avail_actions, self.agents), dtype=jnp.float32),
+            global_state=global_state,
             step_count=jnp.zeros(self._env.num_agents, dtype=int),
         )
         return JaxMarlState(state, key, 0), restart(obs, extras={}, shape=(self.num_agents,))
@@ -186,14 +189,17 @@ class JaxMarlWrapper(Wrapper):
         else:
             avail_actions = self._env.get_avail_actions(env_state)
 
+        global_state = jnp.tile(jnp.array(obs["world_state"]), (self._env.num_agents, 1))
+
         step_type = jax.lax.select(done["__all__"], StepType.LAST, StepType.MID)
         ts = TimeStep(
             step_type=step_type,
             reward=batchify(reward, self.agents),
             discount=1.0 - batchify(done, self.agents),
-            observation=Observation(
+            observation=ObservationGlobalState(
                 agents_view=batchify(obs, self.agents),
                 action_mask=jnp.array(batchify(avail_actions, self.agents), dtype=jnp.float32),
+                global_state=global_state,
                 step_count=jnp.repeat(state.step, self._env.num_agents),
             ),
             extras=infos,
@@ -216,12 +222,18 @@ class JaxMarlWrapper(Wrapper):
         step_count = specs.BoundedArray(
             (self._env.num_agents,), jnp.int32, 0, self._timelimit, "step_count"
         )
+        global_state = specs.Array(
+            (self._env.num_agents, self._env.state_size),
+            jnp.int32,
+            "global_state",
+        )
 
         return specs.Spec(
-            Observation,
+            ObservationGlobalState,
             "ObservationSpec",
             agents_view=agents_view,
             action_mask=action_mask,
+            global_state=global_state,
             step_count=step_count,
         )
 

@@ -72,25 +72,12 @@ class AgentIDWrapper(Wrapper):
         agent_ids = jnp.eye(num_agents)
         new_agents_view = jnp.concatenate([agent_ids, timestep.observation.agents_view], axis=-1)
 
-        if self.has_global_state:
-            # Add the agent IDs to the global state
-            new_global_state = jnp.concatenate(
-                [agent_ids, timestep.observation.global_state], axis=-1
-            )
-
-            return ObservationGlobalState(
-                agents_view=new_agents_view,
-                action_mask=timestep.observation.action_mask,
-                step_count=timestep.observation.step_count,
-                global_state=new_global_state,
-            )
-
-        else:
-            return Observation(
-                agents_view=new_agents_view,
-                action_mask=timestep.observation.action_mask,
-                step_count=timestep.observation.step_count,
-            )
+        return ObservationGlobalState(
+            agents_view=new_agents_view,
+            action_mask=timestep.observation.action_mask,
+            step_count=timestep.observation.step_count,
+            global_state=self.ws_with_agent_id(timestep.observation),
+        )
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment."""
@@ -110,6 +97,13 @@ class AgentIDWrapper(Wrapper):
 
         return state, timestep
 
+    def ws_with_agent_id(self, obs):
+        # all_obs = jnp.array([obs[agent] for agent in self._env.agents])
+        world_state = obs.global_state[0]
+        world_state = world_state[None].repeat(self._env.num_allies, axis=0)
+        one_hot = jnp.eye(self._env.num_allies)
+        return jnp.concatenate((world_state, one_hot), axis=1)
+
     def observation_spec(
         self,
     ) -> Union[specs.Spec[Observation], specs.Spec[ObservationGlobalState]]:
@@ -123,15 +117,13 @@ class AgentIDWrapper(Wrapper):
         global_state = specs.Array(
             (
                 self._env.num_agents,
-                num_obs_features * self._env.num_agents + self._env.num_agents,
+                self._env.state_size + self._env.num_allies,
             ),
             jnp.int32,
             "global_state",
         )
 
-        if self.has_global_state:
-            return obs_spec.replace(agents_view=agents_view, global_state=global_state)
-        return obs_spec.replace(agents_view=agents_view)
+        return obs_spec.replace(agents_view=agents_view, global_state=global_state)
 
 
 class GlobalStateWrapper(Wrapper):

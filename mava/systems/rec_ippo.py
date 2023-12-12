@@ -729,14 +729,26 @@ def run_experiment(_config: Dict) -> None:  # noqa: CCR001
 
     # Create the enviroments for train and eval.
     scenario = map_name_to_scenario(config["env"]["scenario"])
-    env = jaxmarl_make(config["env"]["env_name"], scenario=scenario)
+    env = jaxmarl_make(
+        config["env"]["env_name"],
+        scenario=scenario,
+        see_enemy_actions=True,
+        walls_cause_death=True,
+        attack_mode="closest",
+    )
     env = JaxMarlWrapper(env)
     # Add agent id to observation.
     if config["system"]["add_agent_id"]:
         env = AgentIDWrapper(env)
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
-    eval_env = jaxmarl_make(config["env"]["env_name"], scenario=scenario)
+    eval_env = jaxmarl_make(
+        config["env"]["env_name"],
+        scenario=scenario,
+        see_enemy_actions=True,
+        walls_cause_death=True,
+        attack_mode="closest",
+    )
     eval_env = SMAXLogWrapper(eval_env)
     eval_env = JaxMarlWrapper(eval_env, True)
     # Add agent id to observation.
