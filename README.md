@@ -114,7 +114,7 @@ we advise users to explicitly install the correct JAX version (see the [official
 
 ## Quickstart ⚡
 
-To get started with training your first Mava system, simply run:
+To get started with training your first Mava system, simply run one of the system files. e.g.,
 ```bash
 python mava/systems/ff_ippo.py
 ```
