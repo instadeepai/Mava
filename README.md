@@ -125,7 +125,7 @@ Mava makes use of Hydra for config manangement. In order to see our default syst
 python mava/systems/ff_ippo.py env=lbf
 ```
 
-Different scenarions can also be run by making the following config updates from the terminal:
+Different scenarios can also be run by making the following config updates from the terminal:
 
 ```bash
 python mava/systems/ff_ippo.py env=rware env/scenario=tiny-4ag
