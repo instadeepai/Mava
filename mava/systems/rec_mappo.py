@@ -23,7 +23,6 @@ import flax.linen as nn
 import hydra
 import jax
 import jax.numpy as jnp
-import jumanji
 import numpy as np
 import optax
 from colorama import Fore, Style
@@ -31,8 +30,6 @@ from flax import jax_utils
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
 from jumanji.env import Environment
-from jumanji.environments.routing.robot_warehouse.generator import RandomGenerator
-from jumanji.wrappers import AutoResetWrapper
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
@@ -43,17 +40,17 @@ from mava.types import (
     ExperimentOutput,
     HiddenStates,
     LearnerFn,
+    ObservationGlobalState,
     OptStates,
     Params,
     RecActorApply,
     RecCriticApply,
+    RNNGlobalObservation,
     RNNLearnerState,
-    RNNObservation,
     RNNPPOTransition,
 )
 from mava.utils.checkpointing import Checkpointer
-from mava.wrappers.jumanji import RwareWrapper
-from mava.wrappers.shared import AgentIDWrapper, LogWrapper
+from mava.utils.make_env import make
 
 
 class ScannedRNN(nn.Module):
@@ -70,7 +67,7 @@ class ScannedRNN(nn.Module):
         rnn_state = carry
         ins, resets = x
         rnn_state = jnp.where(
-            resets[:, np.newaxis],
+            resets[:, jnp.newaxis],
             self.initialize_carry(ins.shape[0], ins.shape[1]),
             rnn_state,
         )
@@ -94,7 +91,7 @@ class Actor(nn.Module):
     def __call__(
         self,
         policy_hidden_state: chex.Array,
-        observation_done: RNNObservation,
+        observation_done: RNNGlobalObservation,
     ) -> Tuple[chex.Array, distrax.Categorical]:
         """Forward pass."""
         observation, done = observation_done
@@ -133,14 +130,14 @@ class Critic(nn.Module):
     def __call__(
         self,
         critic_hidden_state: Tuple[chex.Array, chex.Array],
-        observation_done: RNNObservation,
+        observation_done: RNNGlobalObservation,
     ) -> Tuple[chex.Array, chex.Array]:
         """Forward pass."""
         observation, done = observation_done
 
         critic_embedding = nn.Dense(
             128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(observation.agents_view)
+        )(observation.global_state)
         critic_embedding = nn.relu(critic_embedding)
 
         critic_rnn_in = (critic_embedding, done)
@@ -154,7 +151,7 @@ class Critic(nn.Module):
 
 
 def get_learner_fn(
-    env: jumanji.Environment,
+    env: Environment,
     apply_fns: Tuple[RecActorApply, RecCriticApply],
     update_fns: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
     config: Dict,
@@ -179,8 +176,8 @@ def get_learner_fn(
                 - rng (PRNGKey): The random number generator state.
                 - env_state (State): The environment state.
                 - last_timestep (TimeStep): The last timestep in the current trajectory.
-                - dones (bool): Whether the last timestep was a terminal state.
-                - hstates (HiddenStates): The current hidden states of the RNN.
+                - last_done (bool): Whether the last timestep was a terminal state.
+                - hstates (HiddenStates): The hidden state of the policy and critic RNN.
             _ (Any): The current metrics info.
         """
 
@@ -204,10 +201,7 @@ def get_learner_fn(
             batched_observation = jax.tree_util.tree_map(
                 lambda x: x[jnp.newaxis, :], last_timestep.observation
             )
-            ac_in = (
-                batched_observation,
-                last_done[:, 0][jnp.newaxis, :],
-            )
+            ac_in = (batched_observation, last_done[:, 0][jnp.newaxis, :])
 
             # Run the network.
             policy_hidden_state, actor_policy = actor_apply_fn(
@@ -220,11 +214,8 @@ def get_learner_fn(
             # Sample action from the policy and squeeze out the batch dimension.
             action = actor_policy.sample(seed=policy_rng)
             log_prob = actor_policy.log_prob(action)
-            value, action, log_prob = (
-                value.squeeze(0),
-                action.squeeze(0),
-                log_prob.squeeze(0),
-            )
+
+            action, log_prob, value = (action.squeeze(0), log_prob.squeeze(0), value.squeeze(0))
 
             # Step the environment.
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
@@ -252,7 +243,6 @@ def get_learner_fn(
                 critic_hidden_state,
                 info,
             )
-
             hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
             learner_state = RNNLearnerState(
                 params, opt_states, rng, env_state, timestep, done, hstates
@@ -282,13 +272,11 @@ def get_learner_fn(
         batched_last_observation = jax.tree_util.tree_map(
             lambda x: x[jnp.newaxis, :], last_timestep.observation
         )
-        ac_in = (
-            batched_last_observation,
-            last_done[:, 0][jnp.newaxis, :],
-        )
+        ac_in = (batched_last_observation, last_done[:, 0][jnp.newaxis, :])
 
         # Run the network.
         _, last_val = critic_apply_fn(params.critic_params, hstates.critic_hidden_state, ac_in)
+
         # Squeeze out the batch dimension and mask out the value of terminal states.
         last_val = last_val.squeeze(0)
         last_val = jnp.where(last_done, jnp.zeros_like(last_val), last_val)
@@ -351,7 +339,6 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate the actor loss."""
                     # RERUN NETWORK
-
                     obs_and_done = (traj_batch.obs, traj_batch.done[:, :, 0])
                     _, actor_policy = actor_apply_fn(
                         actor_params, traj_batch.policy_hidden_state[0], obs_and_done
@@ -561,7 +548,7 @@ def get_learner_fn(
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
                 - dones (bool): Whether the initial timestep was a terminal state.
-                - hstateS (HiddenStates): The initial hidden states of the RNN.
+                - hstates (HiddenStates): The hidden state of the policy and critic RNN.
         """
 
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
@@ -588,7 +575,6 @@ def learner_setup(
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
-
     # Get number of actions and agents.
     num_actions = int(env.action_spec().num_values[0])
     num_agents = env.action_spec().shape[0]
@@ -598,7 +584,7 @@ def learner_setup(
     # PRNG keys.
     rng, rng_p = rngs
 
-    # Define network and optimisers.
+    # Define network and optimiser.
     actor_network = Actor(config["system"]["num_actions"])
     critic_network = Critic()
     actor_optim = optax.chain(
@@ -612,32 +598,45 @@ def learner_setup(
 
     # Initialise observation: Select only obs for a single agent.
     init_obs = env.observation_spec().generate_value()
-    init_obs = jax.tree_util.tree_map(lambda x: x[0], init_obs)
+    # init_obs = jax.tree_util.tree_map(lambda x: x[0], init_obs)
     init_obs = jax.tree_util.tree_map(
         lambda x: jnp.repeat(x[jnp.newaxis, ...], config["arch"]["num_envs"], axis=0),
         init_obs,
     )
     init_obs = jax.tree_util.tree_map(lambda x: x[None, ...], init_obs)
-    init_done = jnp.zeros((1, config["arch"]["num_envs"]), dtype=bool)
-    init_x = (init_obs, init_done)
 
-    # Initialise hidden states.
+    # Select only a single agent
+    init_done = jnp.zeros((1, config["arch"]["num_envs"]), dtype=bool)
+    init_obs_single = ObservationGlobalState(
+        agents_view=init_obs.agents_view[:, :, 0, :],
+        action_mask=init_obs.action_mask[:, :, 0, :],
+        global_state=init_obs.global_state[:, :, 0, :],
+        step_count=init_obs.step_count[:, 0],
+    )
+
+    init_single = (init_obs_single, init_done)
+
+    # Initialise hidden state.
     init_policy_hstate = ScannedRNN.initialize_carry((config["arch"]["num_envs"]), 128)
     init_critic_hstate = ScannedRNN.initialize_carry((config["arch"]["num_envs"]), 128)
 
     # initialise params and optimiser state.
-    actor_params = actor_network.init(rng_p, init_policy_hstate, init_x)
+    actor_params = actor_network.init(rng_p, init_policy_hstate, init_single)
     actor_opt_state = actor_optim.init(actor_params)
-    critic_params = critic_network.init(rng_p, init_critic_hstate, init_x)
+    critic_params = critic_network.init(rng_p, init_critic_hstate, init_single)
     critic_opt_state = critic_optim.init(critic_params)
 
     # Vmap network apply function over number of agents.
     vmapped_actor_network_apply_fn = jax.vmap(
-        actor_network.apply, in_axes=(None, 1, (2, None)), out_axes=(1, 2)
+        actor_network.apply,
+        in_axes=(None, 1, (2, None)),
+        out_axes=(1, 2),
     )
     # Vmap network apply function over number of agents.
     vmapped_critic_network_apply_fn = jax.vmap(
-        critic_network.apply, in_axes=(None, 1, (2, None)), out_axes=(1, 2)
+        critic_network.apply,
+        in_axes=(None, 1, (2, None)),
+        out_axes=(1, 2),
     )
 
     # Get network apply functions and optimiser updates.
@@ -676,6 +675,7 @@ def learner_setup(
 
     # Split rngs for each core.
     rng, *step_rngs = jax.random.split(rng, n_devices * config["system"]["update_batch_size"] + 1)
+
     # Add dimension to pmap over.
     reshape_step_rngs = lambda x: x.reshape(
         (n_devices, config["system"]["update_batch_size"]) + x.shape[1:]
@@ -701,13 +701,7 @@ def learner_setup(
     params = Params(actor_params, critic_params)
     opt_states = OptStates(actor_opt_state, critic_opt_state)
     init_learner_state = RNNLearnerState(
-        params=params,
-        opt_states=opt_states,
-        key=step_rngs,
-        env_state=env_states,
-        timestep=timesteps,
-        dones=dones,
-        hstates=hstates,
+        params, opt_states, step_rngs, env_states, timesteps, dones, hstates
     )
     return learn, actor_network, init_learner_state
 
@@ -726,19 +720,8 @@ def run_experiment(_config: Dict) -> None:  # noqa: CCR001
             config["system"]["rollout_length"] % config["system"]["recurrent_chunk_size"] == 0
         ), "Rollout length must be divisible by recurrent chunk size."
 
-    # Create envs
-    generator = RandomGenerator(**config["env"]["scenario"]["task_config"])
-    env = jumanji.make(config["env"]["env_name"], generator=generator)
-    env = RwareWrapper(env)
-    # Add agent id to observation.
-    if config["system"]["add_agent_id"]:
-        env = AgentIDWrapper(env)
-    env = AutoResetWrapper(env)
-    env = LogWrapper(env)
-    eval_env = jumanji.make(config["env"]["env_name"], generator=generator)
-    eval_env = RwareWrapper(eval_env)
-    if config["system"]["add_agent_id"]:
-        eval_env = AgentIDWrapper(eval_env)
+    # Create the enviroments for train and eval.
+    env, eval_env = make(config=config)
 
     # PRNG keys.
     rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["system"]["seed"]), num=3)
@@ -823,7 +806,8 @@ def run_experiment(_config: Dict) -> None:  # noqa: CCR001
         # Prepare for evaluation.
         start_time = time.time()
         trained_params = jax.tree_util.tree_map(
-            lambda x: x[:, 0, ...], learner_output.learner_state.params.actor_params
+            lambda x: x[:, 0, ...],
+            learner_output.learner_state.params.actor_params,  # Select only actor params
         )
         rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
         eval_rngs = jnp.stack(eval_rngs)
@@ -879,7 +863,7 @@ def run_experiment(_config: Dict) -> None:  # noqa: CCR001
     logger.neptune_logger.stop()
 
 
-@hydra.main(config_path="../configs", config_name="default_rec_ippo.yaml", version_base="1.2")
+@hydra.main(config_path="../configs", config_name="default_rec_mappo.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
     # Convert config to python dict.
@@ -888,7 +872,7 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     # Run experiment.
     run_experiment(cfg)
 
-    print(f"{Fore.CYAN}{Style.BRIGHT}Recurrent IPPO experiment completed{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}Recurrent MAPPO experiment completed{Style.RESET_ALL}")
 
 
 if __name__ == "__main__":
