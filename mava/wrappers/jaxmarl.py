@@ -142,7 +142,7 @@ def jaxmarl_space_to_jumanji_spec(space: jaxmarl_spaces.Space) -> specs.Spec:
 class JaxMarlWrapper(Wrapper):
     """Wraps a JaxMarl environment so that its API is compatible with jumaji environments."""
 
-    def __init__(self, env: MultiAgentEnv, timelimit: int = 500):
+    def __init__(self, env: MultiAgentEnv, eval_flag: bool = False, timelimit: int = 500):
         # Check that all specs are the same as we only support homogeneous environments, for now ;)
         homogenous_error = (
             f"Mava only supports environments with homogeneous agents, "
@@ -156,14 +156,19 @@ class JaxMarlWrapper(Wrapper):
         self._action_shape = (self.action_spec().shape[0], int(self.action_spec().num_values[0]))
 
         self.agents = list(self._env.observation_spaces.keys())
+        self.eval = eval_flag
 
     def reset(self, key: PRNGKey) -> Tuple[JaxMarlState, TimeStep[Observation]]:
         key, reset_key = jax.random.split(key)
         obs, state = self._env.reset(reset_key)
+        if self.eval:
+            avail_actions = self._env.get_avail_actions(state.env_state)
+        else:
+            avail_actions = self._env.get_avail_actions(state)
 
         obs = Observation(
             agents_view=batchify(obs, self.agents),
-            action_mask=jnp.ones(self._action_shape),
+            action_mask=jnp.array(batchify(avail_actions, self.agents), dtype=jnp.float32),
             step_count=jnp.zeros(self._env.num_agents, dtype=int),
         )
         return JaxMarlState(state, key, 0), restart(obs, extras={}, shape=(self.num_agents,))
@@ -176,6 +181,10 @@ class JaxMarlWrapper(Wrapper):
         obs, env_state, reward, done, infos = self._env.step(
             step_key, state.state, unbatchify(action, self.agents)
         )
+        if self.eval:
+            avail_actions = self._env.get_avail_actions(env_state.env_state)
+        else:
+            avail_actions = self._env.get_avail_actions(env_state)
 
         step_type = jax.lax.select(done["__all__"], StepType.LAST, StepType.MID)
         ts = TimeStep(
@@ -184,7 +193,7 @@ class JaxMarlWrapper(Wrapper):
             discount=1.0 - batchify(done, self.agents),
             observation=Observation(
                 agents_view=batchify(obs, self.agents),
-                action_mask=jnp.ones(self._action_shape),
+                action_mask=jnp.array(batchify(avail_actions, self.agents), dtype=jnp.float32),
                 step_count=jnp.repeat(state.step, self._env.num_agents),
             ),
             extras=infos,

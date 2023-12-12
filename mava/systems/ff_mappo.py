@@ -523,7 +523,7 @@ def run_experiment(_config: Dict) -> None:
     env = LogWrapper(env)
     eval_env = jaxmarl_make(config["env"]["env_name"], scenario=scenario)
     eval_env = SMAXLogWrapper(eval_env)
-    eval_env = JaxMarlWrapper(eval_env)
+    eval_env = JaxMarlWrapper(eval_env, True)
     eval_env = GlobalStateWrapper(eval_env)
     # Add agent id to observation.
     if config["system"]["add_agent_id"]:
