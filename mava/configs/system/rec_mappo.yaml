@@ -22,5 +22,5 @@ vf_coef: 0.5 # Critic weight in
 max_grad_norm: 0.5 # Maximum norm of the gradients for a weight update.
 
 # --- Recurrent hyperparameters ---
-recurrent_chunk_size: 8 # The size of the chunks in which the recurrent sequences are divided during the training process.
+recurrent_chunk_size: ~ # The size of the chunks in which the recurrent sequences are divided during the training process.
 skip_hstates_update: False # Whether to skip updating the hidden states during training.
