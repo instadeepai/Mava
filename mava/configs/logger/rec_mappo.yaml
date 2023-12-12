@@ -1,7 +1,7 @@
 defaults:
     - base_logger
 
-system_name: rec_mappo
+system_name: rec_mappo_chunks
 
 # --- Other logger kwargs ---
 kwargs:

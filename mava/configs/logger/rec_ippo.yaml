@@ -1,7 +1,7 @@
 defaults:
     - base_logger
 
-system_name: rec_ippo
+system_name: rec_ippo_chunks
 
 # --- Other logger kwargs ---
 kwargs:

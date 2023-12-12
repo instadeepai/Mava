@@ -71,7 +71,8 @@ class LogEnvState:
     episode_length_info: chex.Numeric
 
 
-class JaxMarlState(NamedTuple):
+@dataclass
+class JaxMarlState:
     """Wrapper around a JaxMarl state to provide necessary attributes for jumanji environments."""
 
     state: State
@@ -92,6 +93,20 @@ class PPOTransition(NamedTuple):
     reward: chex.Array
     log_prob: chex.Array
     obs: chex.Array
+    info: Dict
+
+
+class RNNPPOTransition(NamedTuple):
+    """Transition tuple for PPO."""
+
+    done: Done
+    action: Action
+    value: Value
+    reward: chex.Array
+    log_prob: chex.Array
+    obs: chex.Array
+    policy_hidden_state: HiddenState
+    critic_hidden_state: HiddenState
     info: Dict
 
 
