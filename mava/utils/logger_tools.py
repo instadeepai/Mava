@@ -173,7 +173,6 @@ class JsonWriter:
         environment_name: str,
         seed: int,
     ):
-        self.start_time = time.time()
         self.path = path
         self.file_name = "metrics.json"
         self.run_data: Dict = {"absolute_metrics": {}}
