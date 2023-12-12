@@ -54,6 +54,12 @@ from mava.utils.make_env import make
 
 StoreExpLearnerFn = Callable[[MavaState], Tuple[ExperimentOutput[MavaState], PPOTransition]]
 
+# Experimental config
+SAVE_VAULT = True
+VAULT_NAME = "ff_ippo_rware"
+VAULT_UID = None  # None => timestamp
+VAULT_SAVE_INTERVAL = 5
+
 
 class Actor(nn.Module):
     """Actor Network."""
@@ -632,11 +638,12 @@ def run_experiment(_config: Dict) -> None:  # noqa: CCR001
         return experience
 
     # Use vault to record experience
-    vault = Vault(
-        vault_name=config["logger"]["system_name"],
-        init_fbx_state=buffer_state,
-        vault_uid=config["logger"]["vault"]["save_args"]["vault_uid"],
-    )
+    if SAVE_VAULT:
+        vault = Vault(
+            vault_name=VAULT_NAME,
+            init_fbx_state=buffer_state,
+            vault_uid=VAULT_UID,
+        )
 
     # Run experiment for a total number of evaluations.
     max_episode_return = jnp.float32(0.0)
@@ -648,7 +655,7 @@ def run_experiment(_config: Dict) -> None:  # noqa: CCR001
         learner_output, experience_to_store = learn(learner_state)
 
         # Record data into the vault
-        if config["logger"]["vault"]["save_vault"]:
+        if SAVE_VAULT:
             # Pack transition
             flashbax_transition = _reshape_experience(
                 {
@@ -664,8 +671,9 @@ def run_experiment(_config: Dict) -> None:  # noqa: CCR001
             buffer_state = buffer.add(buffer_state, flashbax_transition)
 
             # Save buffer into vault
-            if i % config["logger"]["vault"]["save_args"]["save_interval"] == 0:
-                vault.write(buffer_state)
+            if i % VAULT_SAVE_INTERVAL == 0:
+                write_length = vault.write(buffer_state)
+                print(f"(Wrote {write_length}) Vault index = {vault.vault_index}")
 
         jax.block_until_ready(learner_output)
 
