@@ -115,6 +115,7 @@ we advise users to explicitly install the correct JAX version (see the [official
 ## Quickstart ⚡
 
 To get started with training your first Mava system, simply run one of the system files. e.g.,
+
 ```bash
 python mava/systems/ff_ippo.py
 ```
@@ -132,6 +133,10 @@ python mava/systems/ff_ippo.py env=rware env/scenario=tiny-4ag
 ```
 
 Additionally, we also have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-agent system.
+
+## Advanced Usage 👽
+
+Mava can be used in a wide array of advanced systems. As an example, we demonstrate recording experience data from one of our PPO systems into a [Flashbax](https://github.com/instadeepai/flashbax) `Vault`. This vault can then easily be integrated into offline MARL systems, such as those found in [OG-MARL](https://github.com/instadeepai/og-marl). See the [Advanced README](./mava/advanced_usage/) for more information.
 
 ## Contributing 🤝
 
@@ -182,6 +187,11 @@ If you use Mava in your work, please cite the accompanying
     url={https://arxiv.org/pdf/2107.01460.pdf},
 }
 ```
+
+## Acknowledgements 🙏
+
+The development of Mava was supported with Cloud TPUs
+from Google's [TPU Research Cloud](https://sites.research.google/trc/about/) (TRC) 🌤.
 
 [Paper]: https://arxiv.org/pdf/2107.01460.pdf
 [quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/Quickstart.ipynb
