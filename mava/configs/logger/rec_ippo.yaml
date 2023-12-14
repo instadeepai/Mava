@@ -1,9 +1,9 @@
 defaults:
     - base_logger
 
-system_name: rec_ippo_chunks
+system_name: rec_ippo
 
 # --- Other logger kwargs ---
 kwargs:
   neptune_project: Instadeep/Mava
-  neptune_tag: [rec-ippo, smax, benchmark, win-rate]
+  neptune_tag: [rec-ippo, smax, sweep]
