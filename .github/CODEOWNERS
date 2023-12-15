@@ -1,7 +1,9 @@
-# Code owners for repo.
+# Code owners for repo
 
-# Default code owners for repo.
-*       @arnupretorius @KaleabTessera @DriesSmit @mmorris44 @AsadJeewa @RuanJohn @jcformanek
+# Default code owners for repo
 
-# Add specific code owners for certain files or folders below.
-# Specific code owners take precedence over the default ones.
+* @arnupretorius @DriesSmit @RuanJohn @jcformanek @siddarthsingh1 @sash-a @OmaymaMahjoub @ulricharmel @callumtilbury
+
+# Add specific code owners for certain files or folders below
+
+# Specific code owners take precedence over the default ones

@@ -1,0 +1,9 @@
+defaults:
+    - base_logger
+
+system_name: ff_mappo
+
+# --- Other logger kwargs ---
+kwargs:
+  neptune_project: Instadeep/Mava
+  neptune_tag: [ff-mappo, rware]

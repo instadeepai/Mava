@@ -107,7 +107,6 @@ celerybeat.pid
 # Environments
 .env
 .venv
-env/
 venv/
 ENV/
 env.bak/
@@ -135,25 +134,43 @@ dmypy.json
 .vscode
 .history
 
-# custom
-# Dockerfile
-# makefile
+# mava
 mava/bin
 mava/lib64
 mava/pyvenv.cfg
 mava/share
-train_loop
-eval_loop
+mava/include
+mava/workspace.code-workspace
+
+# learner_state checkpoints
+checkpoints
+
+# vaults
+vaults
+
+# misc
 NULL
 logs
-Checkpoints
-mava/workspace.code-workspace
 .DS_Store
-mava_testing
 .devcontainer/devcontainer.json
-3rdparty
+3.9
 
 # PyCharm
 .idea/
 
-meltingpot/
+# act: for testing github workflows
+bin/act
+
+# Created by debugging component
+component_dependency_map.png
+
+# Mava env
+mava_env/
+
+# Sacred logs
+results/
+
+# Hydra logs
+outputs/
+multirun/
+.neptune

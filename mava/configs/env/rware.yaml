@@ -1,0 +1,6 @@
+# ---Environment Configs---
+defaults:
+  - _self_
+  - scenario: tiny-2ag # [tiny-2ag, tiny-4ag, tiny-4ag-easy, small-4ag]
+
+env_name: RobotWarehouse-v0
