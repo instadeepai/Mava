@@ -717,7 +717,7 @@ def run_experiment(_config: Dict) -> None:  # noqa: CCR001
     """Runs experiment."""
     # Logger setup
     config = copy.deepcopy(_config)
-    log, _ = logger_setup(config)
+    log = logger_setup(config)
 
     # Set recurrent chunk size.
     if config["system"]["recurrent_chunk_size"] is None:
