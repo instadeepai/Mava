@@ -155,7 +155,7 @@ If you use Mava in your work, please cite the accompanying
 
 ```bibtex
 @article{pretorius2021mava,
-    title={Mava: Distributed Multi-Agent Reinforcement Learning in JAX},
+    title={Mava: a research library for distributed multi-agent reinforcement learning in JAX},
     author={Ruan de Kock and Oumayma Mahjoub and Sasha Abramowitz and Wiem Khlifi and Callum Rhys Tilbury
     and Claude Formanek and Andries P. Smit and Arnu Pretorius},
     year={2021},
