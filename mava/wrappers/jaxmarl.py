@@ -157,13 +157,19 @@ class JaxMarlWrapper(Wrapper):
 
         self.agents = list(self._env.observation_spaces.keys())
 
+        # Action mask fn
+        if hasattr(self._env, "get_avail_actions"):
+            self.get_avail_actions = self._get_avail_actions
+        else:
+            self.get_avail_actions = lambda _: jnp.ones(self._action_shape)
+
     def reset(self, key: PRNGKey) -> Tuple[JaxMarlState, TimeStep[Observation]]:
         key, reset_key = jax.random.split(key)
         obs, state = self._env.reset(reset_key)
 
         obs = Observation(
             agents_view=batchify(obs, self.agents),
-            action_mask=jnp.ones(self._action_shape),
+            action_mask=self.get_avail_actions(state),
             step_count=jnp.zeros(self._env.num_agents, dtype=int),
         )
         return JaxMarlState(state, key, 0), restart(obs, extras={}, shape=(self.num_agents,))
@@ -184,7 +190,7 @@ class JaxMarlWrapper(Wrapper):
             discount=1.0 - batchify(done, self.agents),
             observation=Observation(
                 agents_view=batchify(obs, self.agents),
-                action_mask=jnp.ones(self._action_shape),
+                action_mask=self.get_avail_actions(env_state),
                 step_count=jnp.repeat(state.step, self._env.num_agents),
             ),
             extras=infos,
@@ -226,3 +232,11 @@ class JaxMarlWrapper(Wrapper):
         return specs.BoundedArray(
             shape=(self.num_agents,), dtype=float, minimum=0.0, maximum=1.0, name="discount"
         )
+
+    def _get_avail_actions(self, state: JaxMarlState) -> Array:
+        if hasattr(state.state, "state"):  # In case logwrapper is used.
+            avail_actions = self._env.get_avail_actions(state.state)
+        else:
+            avail_actions = self._env.get_avail_actions(state)
+        action_mask = jnp.array(batchify(avail_actions, self.agents), dtype=jnp.float32)
+        return action_mask
