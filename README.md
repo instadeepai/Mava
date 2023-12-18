@@ -29,7 +29,7 @@
 
 <hr>
 
-👋 **UPDATE - 25/8/2023**: _We have changed the focus of Mava away from a framework and more towards a lightweight and easy-to-use codebase for MARL._ Mava is also now end-to-end JAX-based and henceforth we will only be supporting JAX-based environments. We currently provide native support for the [Jumanji][jumanji] environment API. Mava now follows a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl], where we allow for code duplication to enable readability and easy reuse. All algorithmic logic can be found in the file implementing a particular algorithm. If you would still like to use our deprecated TF2-based framework and systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
+👋 **UPDATE - 07/12/2023**: Mava is now fully in JAX. We currently provide native support for the [Jumanji][jumanji] environment API and follow a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl], where we allow for some code duplication to enable readability and easy reuse. If you would still like to use our deprecated TF2-based framework and systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
 
 <hr>
 
@@ -173,15 +173,13 @@ Please do follow along as we develop this next phase!
 ## Citing Mava 📚
 
 If you use Mava in your work, please cite the accompanying
-[technical report][Paper] (to be updated soon to reflect our transition to JAX):
+[technical report][Paper]:
 
 ```bibtex
-@article{pretorius2021mava,
-    title={Mava: A Research Framework for Distributed Multi-Agent Reinforcement Learning},
-    author={Arnu Pretorius and Kale-ab Tessera and Andries P. Smit and Kevin Eloff
-    and Claude Formanek and St John Grimbly and Siphelele Danisa and Lawrence Francis
-    and Jonathan Shock and Herman Kamper and Willie Brink and Herman Engelbrecht
-    and Alexandre Laterre and Karim Beguir},
+@article{dekock2023mava,
+    title={Mava: a research library for distributed multi-agent reinforcement learning in JAX},
+    author={Ruan de Kock and Omayma Mahjoub and Sasha Abramowitz and Wiem Khlifi and Callum Rhys Tilbury
+    and Claude Formanek and Andries P. Smit and Arnu Pretorius},
     year={2021},
     journal={arXiv preprint arXiv:2107.01460},
     url={https://arxiv.org/pdf/2107.01460.pdf},
