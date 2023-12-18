@@ -167,12 +167,13 @@ class JaxMarlWrapper(Wrapper):
         key, reset_key = jax.random.split(key)
         obs, state = self._env.reset(reset_key)
 
+        extras = {"global_state": jnp.array(obs["world_state"])}
         obs = Observation(
             agents_view=batchify(obs, self.agents),
             action_mask=self.get_avail_actions(state),
             step_count=jnp.zeros(self._env.num_agents, dtype=int),
         )
-        return JaxMarlState(state, key, 0), restart(obs, extras={}, shape=(self.num_agents,))
+        return JaxMarlState(state, key, 0), restart(obs, extras=extras, shape=(self.num_agents,))
 
     def step(
         self, state: JaxMarlState, action: Array
@@ -182,6 +183,7 @@ class JaxMarlWrapper(Wrapper):
         obs, env_state, reward, done, infos = self._env.step(
             step_key, state.state, unbatchify(action, self.agents)
         )
+        infos["global_state"] = jnp.array(obs["world_state"])
 
         step_type = jax.lax.select(done["__all__"], StepType.LAST, StepType.MID)
         ts = TimeStep(

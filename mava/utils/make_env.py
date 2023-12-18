@@ -44,7 +44,7 @@ def add_optional_wrappers(env: Environment, config: Dict) -> Environment:
 
     # Add the global state to observation.
     if config["system"]["add_global_state"]:
-        env = GlobalStateWrapper(env)
+        env = GlobalStateWrapper(env, config["system"]["add_agent_id"])
 
     return env
 
