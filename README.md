@@ -151,7 +151,7 @@ Please do follow along as we develop this next phase!
 ## Citing Mava 📚
 
 If you use Mava in your work, please cite the accompanying
-[technical report][Paper] (to be updated soon to reflect our transition to JAX):
+[technical report][Paper]:
 
 ```bibtex
 @article{pretorius2021mava,
