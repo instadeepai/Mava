@@ -114,7 +114,29 @@ we advise users to explicitly install the correct JAX version (see the [official
 
 ## Quickstart ⚡
 
-We have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-Agent System.
+To get started with training your first Mava system, simply run one of the system files. e.g.,
+
+```bash
+python mava/systems/ff_ippo.py
+```
+
+Mava makes use of Hydra for config manangement. In order to see our default system configs please see the `mava/configs/` directory. A benefit of Hydra is that configs can either be set in config yaml files or overwritten from the terminal on the fly. For an example of running a system on the LBF environment, the above code can simply be adapted as follows:
+
+```bash
+python mava/systems/ff_ippo.py env=lbf
+```
+
+Different scenarios can also be run by making the following config updates from the terminal:
+
+```bash
+python mava/systems/ff_ippo.py env=rware env/scenario=tiny-4ag
+```
+
+Additionally, we also have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-agent system.
+
+## Advanced Usage 👽
+
+Mava can be used in a wide array of advanced systems. As an example, we demonstrate recording experience data from one of our PPO systems into a [Flashbax](https://github.com/instadeepai/flashbax) `Vault`. This vault can then easily be integrated into offline MARL systems, such as those found in [OG-MARL](https://github.com/instadeepai/og-marl). See the [Advanced README](./mava/advanced_usage/) for more information.
 
 ## Contributing 🤝
 
@@ -145,7 +167,7 @@ Please do follow along as we develop this next phase!
 
 - 🦊 [JaxMARL](https://github.com/flairox/jaxmarl): accelerated MARL environments with baselines in JAX.
 - 🌀 [DeepMind Anakin][anakin_paper] for the Anakin podracer architecture to train RL agents at scale.
-- ♟️  [Pgx](https://github.com/sotetsuk/pgx): JAX implementations of classic board games, such as Chess, Go and Shogi.
+- ♟️ [Pgx](https://github.com/sotetsuk/pgx): JAX implementations of classic board games, such as Chess, Go and Shogi.
 - 🔼 [Minimax](https://github.com/facebookresearch/minimax/): JAX implementations of autocurricula baselines for RL.
 
 ## Citing Mava 📚
@@ -163,6 +185,11 @@ If you use Mava in your work, please cite the accompanying
     url={https://arxiv.org/pdf/2107.01460.pdf},
 }
 ```
+
+## Acknowledgements 🙏
+
+The development of Mava was supported with Cloud TPUs
+from Google's [TPU Research Cloud](https://sites.research.google/trc/about/) (TRC) 🌤.
 
 [Paper]: https://arxiv.org/pdf/2107.01460.pdf
 [quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/Quickstart.ipynb
