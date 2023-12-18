@@ -39,7 +39,7 @@ class LogFn(Protocol):
 def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
     """Get the logger function."""
 
-    def log(
+    def log(  # noqa: CCR001
         metrics: ExperimentOutput,
         t_env: int = 0,
         trainer_metric: bool = False,
@@ -69,6 +69,10 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
             prefix = "evaluator/"
             episodes_info = metrics.episodes_info
 
+        # Add win rate to episodes_info in case it exists.
+        if "won_episode" in episodes_info:
+            win_rate = (jnp.sum(episodes_info["won_episode"]) / logger.num_eval_episodes) * 100
+
         # Flatten metrics info.
         episodes_return = jnp.ravel(episodes_info["episode_return"])
         episodes_length = jnp.ravel(episodes_info["episode_length"])
@@ -89,6 +93,8 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
                 logger.log_stat(f"{prefix}value_loss", float(np.mean(value_loss)), t_env)
                 logger.log_stat(f"{prefix}loss_actor", float(np.mean(loss_actor)), t_env)
                 logger.log_stat(f"{prefix}entropy", float(np.mean(entropy)), t_env)
+            if "won_episode" in episodes_info:
+                logger.log_stat(f"{prefix}win_rate", float(win_rate), t_env, eval_step)
 
         log_string = (
             f"Timesteps {t_env:07d} | "
@@ -100,6 +106,8 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
             f"Max Episode Length {float(np.max(episodes_length)):.3f} | "
             f"Steps Per Second {steps_per_second:.2e} "
         )
+        if "won_episode" in episodes_info:
+            log_string += f"| Win Rate {win_rate:.2f}%"
 
         if absolute_metric:
             logger.console_logger.info(

@@ -51,6 +51,7 @@ class Logger:
         self.should_log = bool(
             cfg["logger"]["use_json"] or cfg["logger"]["use_tf"] or cfg["logger"]["use_neptune"]
         )
+        self.num_eval_episodes = cfg["arch"]["num_eval_episodes"]
 
     def _setup_tb(self, cfg: Dict) -> None:
         """Set up tensorboard logging."""
@@ -77,11 +78,15 @@ class Logger:
             json_logs_path = os.path.join(
                 cfg["logger"]["base_exp_path"], "json", cfg["logger"]["kwargs"]["json_path"]
             )
-
+        task_name = (
+            cfg["env"]["scenario"]
+            if isinstance(cfg["env"]["scenario"], str)
+            else cfg["env"]["scenario"]["task_name"]
+        )
         self.json_logger = JsonWriter(
             path=json_logs_path,
             algorithm_name=cfg["logger"]["system_name"],
-            task_name=cfg["env"]["scenario"]["task_name"],
+            task_name=task_name,
             environment_name=cfg["env"]["env_name"],
             seed=cfg["system"]["seed"],
         )
@@ -140,10 +145,14 @@ def get_neptune_logger(cfg: Dict) -> neptune.Run:
 
 def get_experiment_path(config: Dict, logger_type: str) -> str:
     """Helper function to create the experiment path."""
+    task_name = (
+        config["env"]["scenario"]
+        if isinstance(config["env"]["scenario"], str)
+        else config["env"]["scenario"]["task_name"]
+    )
     exp_path = (
         f"{logger_type}/{config['logger']['system_name']}/{config['env']['env_name']}/"
-        + f"{config['env']['scenario']['task_name']}"
-        + f"/envs_{config['arch']['num_envs']}/seed_{config['system']['seed']}"
+        + f"{task_name}/envs_{config['arch']['num_envs']}/seed_{config['system']['seed']}"
     )
 
     return exp_path
