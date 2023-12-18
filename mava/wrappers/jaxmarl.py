@@ -236,9 +236,6 @@ class JaxMarlWrapper(Wrapper):
         )
 
     def _get_avail_actions(self, state: JaxMarlState) -> Array:
-        if hasattr(state.state, "state"):  # In case logwrapper is used.
-            avail_actions = self._env.get_avail_actions(state.state)
-        else:
-            avail_actions = self._env.get_avail_actions(state)
+        avail_actions = self._env.get_avail_actions(state)
         action_mask = jnp.array(batchify(avail_actions, self.agents), dtype=jnp.float32)
         return action_mask

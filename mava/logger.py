@@ -58,6 +58,11 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
         if absolute_metric:
             prefix = "absolute/"
             episodes_info = metrics.episodes_info
+            # Add win rate to episodes_info in case it exists.
+            if "won_episode" in episodes_info:
+                win_rate = (
+                    jnp.sum(episodes_info["won_episode"]) / (logger.num_eval_episodes * 10)
+                ) * 100
         elif trainer_metric:
             prefix = "trainer/"
             episodes_info = metrics.episodes_info
@@ -68,10 +73,9 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
         else:
             prefix = "evaluator/"
             episodes_info = metrics.episodes_info
-
-        # Add win rate to episodes_info in case it exists.
-        if "won_episode" in episodes_info:
-            win_rate = (jnp.sum(episodes_info["won_episode"]) / logger.num_eval_episodes) * 100
+            # Add win rate to episodes_info in case it exists.
+            if "won_episode" in episodes_info:
+                win_rate = (jnp.sum(episodes_info["won_episode"]) / logger.num_eval_episodes) * 100
 
         # Flatten metrics info.
         episodes_return = jnp.ravel(episodes_info["episode_return"])
