@@ -9,27 +9,21 @@
 </h2>
 
 <div align="center">
-<!-- <a  href="https://pypi.org/project/id-mava/">
-    <img src="https://img.shields.io/pypi/pyversions/id-mava" alt="Python" />
-</a>
-<a  href="https://pypi.org/project/id-mava/">
-    <img src="https://badge.fury.io/py/id-mava.svg" alt="PyPi" />
-</a> -->
-<!-- <a  href="https://github.com/instadeepai/Mava/actions/workflows/ci.yaml?query=branch%3Adevelop">
-    <img src="https://github.com/instadeepai/Mava/workflows/format_and_test/badge.svg" alt="Formatting" />
-</a> -->
 <a  href="https://github.com/instadeepai/Mava/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License" />
 </a>
-<a  href="https://github.com/psf/black">
+<!-- <a  href="https://github.com/psf/black">
     <img src="https://img.shields.io/badge/code%20style-black-000000.svg" alt="Code style" />
+</a> -->
+<a href="https://arxiv.org/pdf/2107.01460.pdf">
+    <img src="https://img.shields.io/badge/PrePrint-ArXiv-red" alt="ArXiv">
 </a>
 <a href="https://colab.research.google.com/github/instadeepai/Mava/blob/develop/examples/Quickstart.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 </div>
 
 <hr>
 
-👋 **UPDATE - 07/12/2023**: Mava is now fully in JAX. We currently provide native support for the [Jumanji][jumanji] environment API and follow a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl], where we allow for some code duplication to enable readability and easy reuse. If you would still like to use our deprecated TF2-based framework and systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
+👋 **UPDATE - 19/12/2023**: Mava is now fully in JAX with substantial speed improvement compared to other popular libraries. We currently provide native support for the [Jumanji][jumanji] environment API, which is also supported in [Matrax](https://github.com/instadeepai/matrax) and a wrapper for the newly released [JaxMARL](https://github.com/flairox/jaxmarl) environments. Mava follows a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl], where we allow for some code duplication to enable readability and easy reuse. Finally, we have updated our technical report to reflect our transition to JAX. Please feel free to take a look [here](https://arxiv.org/pdf/2107.01460.pdf)! If you would still like to use our deprecated TF2-based framework and systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
 
 <hr>
 
@@ -188,8 +182,9 @@ If you use Mava in your work, please cite the accompanying
 
 ## Acknowledgements 🙏
 
-The development of Mava was supported with Cloud TPUs
-from Google's [TPU Research Cloud](https://sites.research.google/trc/about/) (TRC) 🌤.
+We would like to thank all the authors who contributed to the previous TF version of Mava: Kale-ab Tessera, St John Grimbly, Kevin Eloff, Siphelele Danisa, Lawrence Francis, Jonathan Shock, Herman Kamper, Willie Brink, Herman Engelbrecht, Alexandre Laterre, Karim Beguir. Their contributions can be found in our [TF technical report](https://arxiv.org/pdf/2107.01460v1.pdf).
+
+The development of Mava was supported with Cloud TPUs from Google's [TPU Research Cloud](https://sites.research.google/trc/about/) (TRC) 🌤.
 
 [Paper]: https://arxiv.org/pdf/2107.01460.pdf
 [quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/Quickstart.ipynb
