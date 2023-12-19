@@ -87,6 +87,9 @@ Furthermore, we illustrate the speed of Mava by showing the steps per second as 
     <div style="text-align:center; margin-top: 10px;"> Mava steps per second scaling with increased vectorised environments and total training run time for 20M environment steps.</div>
 </p>
 
+### 🧰 Beyond RWARE
+Mava has expanded its support to include the newly introduced [JaxMARL](https://github.com/flairox/jaxmarl) environments, aiming to enhance the diversity of benchmarking and experimentation options. This integration involves adapting wrappers and facilitating user-friendly interactions with these environments within the Mava repository. Among these is the StarCraft Multi-Agent Challenge in JAX (SMAX). For in-depth results and further information on SMAX experiments, please see the following [page](docs/smax_benchmarking.md).
+
 ## Code Philosophy 🧘
 
 The current code in Mava is adapted from [PureJaxRL](purejaxrl) which provides high-quality single-file implementations with research-friendly features. In turn, PureJaxRL is inspired by the code philosophy from [CleanRL][cleanrl]. Along this vein of easy-to-use and understandable RL codebases, Mava is not designed to be a modular library and is not meant to be imported. Our repository focuses on simplicity and clarity in its implementations while utilising the advantages offered by JAX such as `pmap` and `vmap`, making it an excellent resource for researchers and practitioners to build upon.
