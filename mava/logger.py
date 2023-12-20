@@ -134,7 +134,7 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
 
         return float(np.mean(episodes_return))
 
-    return log
+    return log, logger
 
 
 def logger_setup(config: Dict) -> LogFn:

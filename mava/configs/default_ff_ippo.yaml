@@ -2,4 +2,4 @@ defaults:
   - logger: ff_ippo
   - arch: anakin
   - system: ff_ippo
-  - env: rware
+  - env: smax

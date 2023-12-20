@@ -1,6 +1,6 @@
 # --- Defaults REC-MAPPO ---
 
-num_updates: 1000 # Number of updates
+num_updates: 1220 # Number of updates
 seed: 42
 
 # --- Agent observations ---
