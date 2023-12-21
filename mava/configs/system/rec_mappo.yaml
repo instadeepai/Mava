@@ -33,3 +33,9 @@ critic_network:
   activation: "relu"
   pre_torso_layer_sizes: [128]
   post_torso_layer_sizes: [128]
+
+# --- To be defined during training ---
+num_agents: ~
+num_actions: ~
+num_updates_per_eval: ~
+total_timesteps: ~

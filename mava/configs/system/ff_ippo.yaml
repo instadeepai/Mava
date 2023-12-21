@@ -31,3 +31,9 @@ critic_network:
   layer_sizes: [128, 128]
   use_layer_norm: False
   activation: "relu"
+
+# --- To be defined during training ---
+num_agents: ~
+num_actions: ~
+num_updates_per_eval: ~
+total_timesteps: ~

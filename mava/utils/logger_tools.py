@@ -22,6 +22,7 @@ from typing import Dict, Optional
 import neptune
 from colorama import Fore, Style
 from neptune.utils import stringify_unsupported
+from omegaconf import DictConfig
 from tensorboard_logger import configure, log_value
 
 
@@ -33,57 +34,53 @@ class Logger:
         (https://github.com/uoe-agents/epymarl/blob/main/src/utils/logging.py)
     """
 
-    def __init__(self, cfg: Dict) -> None:
+    def __init__(self, cfg: DictConfig) -> None:
         """Initialise the logger."""
         self.console_logger = get_python_logger()
         self.unique_token = datetime.now().strftime("%Y%m%d%H%M%S")
 
-        if cfg["logger"]["use_tf"]:
+        if cfg.logger.use_tf:
             self._setup_tb(cfg)
-        if cfg["logger"]["use_neptune"]:
+        if cfg.logger.use_neptune:
             self._setup_neptune(cfg)
-        if cfg["logger"]["use_json"]:
+        if cfg.logger.use_json:
             self._setup_json(cfg)
 
-        self.use_tb = cfg["logger"]["use_tf"]
-        self.use_neptune = cfg["logger"]["use_neptune"]
-        self.use_json = cfg["logger"]["use_json"]
-        self.should_log = bool(
-            cfg["logger"]["use_json"] or cfg["logger"]["use_tf"] or cfg["logger"]["use_neptune"]
-        )
+        self.use_tb = cfg.logger.use_tf
+        self.use_neptune = cfg.logger.use_neptune
+        self.use_json = cfg.logger.use_json
+        self.should_log = bool(cfg.logger.use_json or cfg.logger.use_tf or cfg.logger.use_neptune)
 
-    def _setup_tb(self, cfg: Dict) -> None:
+    def _setup_tb(self, cfg: DictConfig) -> None:
         """Set up tensorboard logging."""
         tb_exp_path = get_experiment_path(cfg, "tensorboard")
-        tb_logs_path = os.path.join(
-            cfg["logger"]["base_exp_path"], f"{tb_exp_path}/{self.unique_token}"
-        )
+        tb_logs_path = os.path.join(cfg.logger.base_exp_path, f"{tb_exp_path}/{self.unique_token}")
 
         configure(tb_logs_path)
         self.tb_logger = log_value
 
-    def _setup_neptune(self, cfg: Dict) -> None:
+    def _setup_neptune(self, cfg: DictConfig) -> None:
         """Set up neptune logging."""
         self.neptune_logger = get_neptune_logger(cfg)
 
-    def _setup_json(self, cfg: Dict) -> None:
+    def _setup_json(self, cfg: DictConfig) -> None:
         json_exp_path = get_experiment_path(cfg, "json")
         json_logs_path = os.path.join(
-            cfg["logger"]["base_exp_path"], f"{json_exp_path}/{self.unique_token}"
+            cfg.logger.base_exp_path, f"{json_exp_path}/{self.unique_token}"
         )
 
         # if a custom path is specified, use that instead
-        if cfg["logger"]["kwargs"]["json_path"] is not None:
+        if cfg.logger.kwargs.json_path is not None:
             json_logs_path = os.path.join(
-                cfg["logger"]["base_exp_path"], "json", cfg["logger"]["kwargs"]["json_path"]
+                cfg.logger.base_exp_path, "json", cfg.logger.kwargs.json_path
             )
 
         self.json_logger = JsonWriter(
             path=json_logs_path,
-            algorithm_name=cfg["logger"]["system_name"],
-            task_name=cfg["env"]["scenario"]["task_name"],
-            environment_name=cfg["env"]["env_name"],
-            seed=cfg["system"]["seed"],
+            algorithm_name=cfg.logger.system_name,
+            task_name=cfg.env.scenario.task_name,
+            environment_name=cfg.env.env_name,
+            seed=cfg.system.seed,
         )
 
     def log_stat(
@@ -126,10 +123,10 @@ def get_python_logger() -> logging.Logger:
     return logger
 
 
-def get_neptune_logger(cfg: Dict) -> neptune.Run:
+def get_neptune_logger(cfg: DictConfig) -> neptune.Run:
     """Set up neptune logging."""
-    tags = cfg["logger"]["kwargs"]["neptune_tag"]
-    project = cfg["logger"]["kwargs"]["neptune_project"]
+    tags = cfg.logger.kwargs.neptune_tag
+    project = cfg.logger.kwargs.neptune_project
 
     run = neptune.init_run(project=project, tags=tags)
 
@@ -138,12 +135,12 @@ def get_neptune_logger(cfg: Dict) -> neptune.Run:
     return run
 
 
-def get_experiment_path(config: Dict, logger_type: str) -> str:
+def get_experiment_path(config: DictConfig, logger_type: str) -> str:
     """Helper function to create the experiment path."""
     exp_path = (
-        f"{logger_type}/{config['logger']['system_name']}/{config['env']['env_name']}/"
-        + f"{config['env']['scenario']['task_name']}"
-        + f"/envs_{config['arch']['num_envs']}/seed_{config['system']['seed']}"
+        f"{logger_type}/{config.logger.system_name}/{config.env.env_name}/"
+        + f"{config.env.scenario.task_name}"
+        + f"/envs_{config.arch.num_envs}/seed_{config.system.seed}"
     )
 
     return exp_path

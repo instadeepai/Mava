@@ -1,15 +1,35 @@
+# Copyright 2022 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import functools
-from typing import Sequence, Tuple, Union, List
+from typing import Sequence, Tuple, Union
 
 import chex
+import distrax
 import jax
 import jax.numpy as jnp
 import numpy as np
 from flax import linen as nn
 from flax.linen.initializers import constant, orthogonal
-import distrax
-from mava.types import RNNObservation, Observation, ObservationGlobalState, RNNGlobalObservation
 from omegaconf import DictConfig
+
+from mava.types import (
+    Observation,
+    ObservationGlobalState,
+    RNNGlobalObservation,
+    RNNObservation,
+)
 
 
 class Torso(nn.Module):
@@ -207,16 +227,15 @@ def get_networks(
     if network == "feedforward":
         actor = FF_Actor(
             torso=create_torso("actor_network", "layer_sizes"),
-            num_actions=config["system"]["num_actions"],
+            num_actions=config.system.num_actions,
         )
         critic = FF_Critic(
             torso=create_torso("critic_network", "layer_sizes"),
-            layer_norm=config["system"]["critic_network"]["use_layer_norm"],
             centralized_critic=centralized_critic,
         )
     elif network == "recurrent":
         actor = Rec_Actor(
-            action_dim=config["system"]["num_actions"],
+            action_dim=config.system.num_actions,
             pre_torso=create_torso("actor_network", "pre_torso_layer_sizes"),
             post_torso=create_torso("actor_network", "post_torso_layer_sizes"),
         )
@@ -226,6 +245,6 @@ def get_networks(
             centralized_critic=centralized_critic,
         )
     else:
-        raise ValueError(f"Network {config['system']['network']} not supported.")
+        raise ValueError(f"Network {network} not supported.")
 
     return actor, critic
