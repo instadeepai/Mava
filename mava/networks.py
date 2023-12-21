@@ -1,5 +1,5 @@
 import functools
-from typing import Sequence, Tuple, Union
+from typing import Sequence, Tuple, Union, List
 
 import chex
 import jax
@@ -8,23 +8,26 @@ import numpy as np
 from flax import linen as nn
 from flax.linen.initializers import constant, orthogonal
 import distrax
-from mava.types import RNNObservation, Observation
+from mava.types import RNNObservation, Observation, ObservationGlobalState, RNNGlobalObservation
 from omegaconf import DictConfig
-from chex import Array
+
 
 class Torso(nn.Module):
-    """Feedforward torso."""
+    """MLP torso."""
+
     layer_sizes: Sequence[int]
     activation: str = "relu"
     use_layer_norm: bool = False
 
     def setup(self) -> None:
+        """Set up the activation function."""
         if self.activation == "relu":
             self.activation_fn = nn.relu
         elif self.activation == "tanh":
             self.activation_fn = nn.tanh
+
     @nn.compact
-    def __call__(self, observation: Array):
+    def __call__(self, observation: chex.Array) -> chex.Array:
         """Forward pass."""
         x = observation
         for layer_size in self.layer_sizes:
@@ -46,22 +49,26 @@ class FF_Actor(nn.Module):
     num_actions: Sequence[int]
 
     @nn.compact
-    def __call__(self, observation):
+    def __call__(self, observation: Observation) -> distrax.Categorical:
+        """Forward pass."""
         x = observation.agents_view
+
         x = self.torso(x)
         actor_output = nn.Dense(
             self.num_actions, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(x)
-        
+
         masked_logits = jnp.where(
             observation.action_mask,
             actor_output,
             jnp.finfo(jnp.float32).min,
         )
+
         actor_policy = distrax.Categorical(logits=masked_logits)
 
         return actor_policy
-    
+
+
 class FF_Critic(nn.Module):
     """Feedforward Critic Network."""
 
@@ -69,16 +76,20 @@ class FF_Critic(nn.Module):
     centralized_critic: bool = False
 
     @nn.compact
-    def __call__(self, observation):
+    def __call__(self, observation: Union[Observation, ObservationGlobalState]) -> chex.Array:
         """Forward pass."""
         if self.centralized_critic:
+            # Get global state in the case of a centralized critic.
             observation = observation.global_state
         else:
+            # Get single agent view in the case of a decentralized critic.
             observation = observation.agents_view
+
         critic_output = self.torso(observation)
-        critic_output = nn.Dense(
-            1, kernel_init=orthogonal(1.0), bias_init=constant(0.0)
-        )(critic_output)
+        critic_output = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
+            critic_output
+        )
+
         return jnp.squeeze(critic_output, axis=-1)
 
 
@@ -119,21 +130,22 @@ class Rec_Actor(nn.Module):
     post_torso: nn.Module
 
     @nn.compact
-    def __call__(self, policy_hidden_state, observation_done):
+    def __call__(
+        self,
+        policy_hidden_state: chex.Array,
+        observation_done: RNNObservation,
+    ) -> Tuple[chex.Array, distrax.Categorical]:
         """Forward pass."""
         observation, done = observation_done
 
         policy_embedding = self.pre_torso(observation.agents_view)
-
         policy_rnn_in = (policy_embedding, done)
         policy_hidden_state, policy_embedding = ScannedRNN()(policy_hidden_state, policy_rnn_in)
-
         actor_output = self.post_torso(policy_embedding)
-
         actor_output = nn.Dense(
             self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(actor_output)
-        
+
         masked_logits = jnp.where(
             observation.action_mask,
             actor_output,
@@ -147,7 +159,7 @@ class Rec_Actor(nn.Module):
 
 class Rec_Critic(nn.Module):
     """Recurrent Critic Network."""
-    
+
     pre_torso: nn.Module
     post_torso: nn.Module
     centralized_critic: bool = False
@@ -156,75 +168,64 @@ class Rec_Critic(nn.Module):
     def __call__(
         self,
         critic_hidden_state: Tuple[chex.Array, chex.Array],
-        observation_done: RNNObservation,
+        observation_done: Union[RNNObservation, RNNGlobalObservation],
     ) -> Tuple[chex.Array, chex.Array]:
         """Forward pass."""
         observation, done = observation_done
 
         if self.centralized_critic:
+            # Get global state in the case of a centralized critic.
             observation = observation.global_state
         else:
+            # Get single agent view in the case of a decentralized critic.
             observation = observation.agents_view
-        critic_embedding = self.pre_torso(observation)
 
+        critic_embedding = self.pre_torso(observation)
         critic_rnn_in = (critic_embedding, done)
         critic_hidden_state, critic_embedding = ScannedRNN()(critic_hidden_state, critic_rnn_in)
-
         critic_output = self.post_torso(critic_embedding)
-        critic_output = nn.Dense(
-            1, kernel_init=orthogonal(1.0), bias_init=constant(0.0)
-        )(critic_output)
+        critic_output = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
+            critic_output
+        )
 
         return critic_hidden_state, jnp.squeeze(critic_output, axis=-1)
 
 
-def get_networks(config: DictConfig, network: str, centralized_critic: bool =False)->Union[Tuple[FF_Actor, FF_Critic], Tuple[Rec_Actor, Rec_Critic]]:
+def get_networks(
+    config: DictConfig, network: str, centralized_critic: bool = False
+) -> Union[Tuple[FF_Actor, FF_Critic], Tuple[Rec_Actor, Rec_Critic]]:
     """Get the networks."""
+
+    def create_torso(network_key: str, layer_size_key: str) -> Torso:
+        """Helper function to create a torso object from the config."""
+        return Torso(
+            layer_sizes=config["system"][network_key][layer_size_key],
+            activation=config["system"][network_key]["activation"],
+            use_layer_norm=config["system"][network_key]["use_layer_norm"],
+        )
+
     if network == "feedforward":
         actor = FF_Actor(
-            torso=Torso(
-                layer_sizes=config["system"]["actor_network"]["layer_sizes"],
-                activation=config["system"]["actor_network"]["activation"],
-                use_layer_norm=config["system"]["actor_network"]["use_layer_norm"],
-            ),
+            torso=create_torso("actor_network", "layer_sizes"),
             num_actions=config["system"]["num_actions"],
         )
         critic = FF_Critic(
-            torso=Torso(
-                layer_sizes=config["system"]["critic_network"]["layer_sizes"],
-                activation=config["system"]["critic_network"]["activation"],
-                use_layer_norm=config["system"]["critic_network"]["use_layer_norm"],
-            ),
+            torso=create_torso("critic_network", "layer_sizes"),
+            layer_norm=config["system"]["critic_network"]["use_layer_norm"],
             centralized_critic=centralized_critic,
         )
     elif network == "recurrent":
         actor = Rec_Actor(
             action_dim=config["system"]["num_actions"],
-            pre_torso=Torso(
-                layer_sizes=config["system"]["actor_network"]["pre_torso_layer_sizes"],
-                activation=config["system"]["actor_network"]["activation"],
-                use_layer_norm=config["system"]["actor_network"]["use_layer_norm"],
-            ),
-            post_torso=Torso(
-                layer_sizes=config["system"]["actor_network"]["post_torso_layer_sizes"],
-                activation=config["system"]["actor_network"]["activation"],
-                use_layer_norm=config["system"]["actor_network"]["use_layer_norm"],
-            ),
+            pre_torso=create_torso("actor_network", "pre_torso_layer_sizes"),
+            post_torso=create_torso("actor_network", "post_torso_layer_sizes"),
         )
         critic = Rec_Critic(
-            pre_torso=Torso(
-                layer_sizes=config["system"]["critic_network"]["pre_torso_layer_sizes"],
-                activation=config["system"]["critic_network"]["activation"],
-                use_layer_norm=config["system"]["critic_network"]["use_layer_norm"],
-            ),
-            post_torso=Torso(
-                layer_sizes=config["system"]["critic_network"]["post_torso_layer_sizes"],
-                activation=config["system"]["critic_network"]["activation"],
-                use_layer_norm=config["system"]["critic_network"]["use_layer_norm"],
-            ),
+            pre_torso=create_torso("critic_network", "pre_torso_layer_sizes"),
+            post_torso=create_torso("critic_network", "post_torso_layer_sizes"),
             centralized_critic=centralized_critic,
         )
     else:
         raise ValueError(f"Network {config['system']['network']} not supported.")
-    
+
     return actor, critic

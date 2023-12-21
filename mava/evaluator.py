@@ -212,7 +212,9 @@ def get_rnn_evaluator_fn(
         step_rngs = jnp.stack(step_rngs).reshape(eval_batch, -1)
 
         # Initialise hidden state.
-        init_hstate = scanned_rnn.initialize_carry(eval_batch, 128)
+        init_hstate = scanned_rnn.initialize_carry(
+            eval_batch, config["system"]["actor_network"]["pre_torso_layer_sizes"][-1]
+        )
         init_hstate = jnp.expand_dims(init_hstate, axis=1)
         init_hstate = jnp.expand_dims(init_hstate, axis=2)
         init_hstate = jnp.tile(init_hstate, (1, config["system"]["num_agents"], 1))

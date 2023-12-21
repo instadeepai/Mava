@@ -359,9 +359,7 @@ def learner_setup(
 
     # Define network and optimiser.
     actor_network, critic_network = get_networks(
-        config=config,
-        network="feedforward",
-        centralized_critic=False
+        config=config, network="feedforward", centralized_critic=False
     )
     actor_optim = optax.chain(
         optax.clip_by_global_norm(config["system"]["max_grad_norm"]),

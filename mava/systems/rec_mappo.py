@@ -461,9 +461,7 @@ def learner_setup(
 
     # Define network and optimiser.
     actor_network, critic_network = get_networks(
-        config=config,
-        network="recurrent",
-        centralized_critic=True
+        config=config, network="recurrent", centralized_critic=True
     )
 
     actor_optim = optax.chain(

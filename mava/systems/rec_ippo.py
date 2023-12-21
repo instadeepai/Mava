@@ -468,9 +468,7 @@ def learner_setup(
 
     # Define network and optimisers.
     actor_network, critic_network = get_networks(
-        config=config,
-        network="recurrent",
-        centralized_critic=False
+        config=config, network="recurrent", centralized_critic=False
     )
     actor_optim = optax.chain(
         optax.clip_by_global_norm(config["system"]["max_grad_norm"]),
@@ -493,8 +491,13 @@ def learner_setup(
     init_x = (init_obs, init_done)
 
     # Initialise hidden states.
-    init_policy_hstate = ScannedRNN.initialize_carry((config["arch"]["num_envs"]), 128)
-    init_critic_hstate = ScannedRNN.initialize_carry((config["arch"]["num_envs"]), 128)
+    init_policy_hstate = ScannedRNN.initialize_carry(
+        (config["arch"]["num_envs"]), config["system"]["actor_network"]["pre_torso_layer_sizes"][-1]
+    )
+    init_critic_hstate = ScannedRNN.initialize_carry(
+        (config["arch"]["num_envs"]),
+        config["system"]["critic_network"]["pre_torso_layer_sizes"][-1],
+    )
 
     # initialise params and optimiser state.
     actor_params = actor_network.init(rng_p, init_policy_hstate, init_x)
