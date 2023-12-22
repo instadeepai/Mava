@@ -18,6 +18,7 @@ from typing import Any, Dict, Sequence, Tuple
 
 import chex
 import distrax
+import flax
 import flax.linen as nn
 import hydra
 import jax
@@ -457,41 +458,38 @@ def learner_setup(
     learn = get_learner_fn(env, apply_fns, update_fns, config)
     learn = jax.pmap(learn, axis_name="device")
 
-    # Broadcast params and optimiser state to cores and batch.
-    broadcast = lambda x: jnp.broadcast_to(
-        x, (n_devices, config["system"]["update_batch_size"]) + x.shape
-    )
-    actor_params = jax.tree_map(broadcast, actor_params)
-    actor_opt_state = jax.tree_map(broadcast, actor_opt_state)
-    critic_params = jax.tree_map(broadcast, critic_params)
-    critic_opt_state = jax.tree_map(broadcast, critic_opt_state)
-
-    # Initialise environment states and timesteps.
+    # Initialise environment states and timesteps: across devices and batches.
     rng, *env_rngs = jax.random.split(
         rng, n_devices * config["system"]["update_batch_size"] * config["arch"]["num_envs"] + 1
     )
     env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
         jnp.stack(env_rngs),
     )
-
-    # Split rngs for each core.
-    rng, *step_rngs = jax.random.split(rng, n_devices * config["system"]["update_batch_size"] + 1)
-
-    # Add dimension to pmap over.
-    reshape_step_rngs = lambda x: x.reshape(
-        (n_devices, config["system"]["update_batch_size"]) + x.shape[1:]
-    )
-    step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
     reshape_states = lambda x: x.reshape(
         (n_devices, config["system"]["update_batch_size"], config["arch"]["num_envs"]) + x.shape[1:]
     )
-    env_states = jax.tree_util.tree_map(reshape_states, env_states)
-    timesteps = jax.tree_util.tree_map(reshape_states, timesteps)
+    env_states = jax.tree_map(
+        reshape_states, env_states
+    )  # (Devices, Update_batch_size, Num_envs,..)
+    timesteps = jax.tree_map(reshape_states, timesteps)  # (Devices, Update_batch_size, Num_envs,..)
 
+    # Define params to be replicated across devices and batches.
+    rng, step_rngs = jax.random.split(rng)
     params = Params(actor_params, critic_params)
     opt_states = OptStates(actor_opt_state, critic_opt_state)
+    replicate_learner = (params, opt_states, step_rngs)
 
+    # Duplicate learner for update_batch_size.
+    broadcast = lambda x: jnp.broadcast_to(x, (config["system"]["update_batch_size"],) + x.shape)
+    replicate_learner = jax.tree_map(broadcast, replicate_learner)
+
+    # Duplicate learner across devices.
+    replicate_learner = flax.jax_utils.replicate(replicate_learner, devices=jax.devices())
+
+    # Initialise learner state.
+    params, opt_states, step_rngs = replicate_learner
     init_learner_state = LearnerState(params, opt_states, step_rngs, env_states, timesteps)
+
     return learn, actor_network, init_learner_state
 
 

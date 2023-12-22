@@ -19,6 +19,7 @@ from typing import Any, Dict, Sequence, Tuple
 
 import chex
 import distrax
+import flax
 import flax.linen as nn
 import hydra
 import jax
@@ -551,6 +552,7 @@ def learner_setup(
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
+
     # Get number of actions and agents.
     num_actions = int(env.action_spec().num_values[0])
     num_agents = env.action_spec().shape[0]
@@ -574,6 +576,7 @@ def learner_setup(
 
     # Initialise observation: Select only obs for a single agent.
     init_obs = env.observation_spec().generate_value()
+
     # init_obs = jax.tree_util.tree_map(lambda x: x[0], init_obs)
     init_obs = jax.tree_util.tree_map(
         lambda x: jnp.repeat(x[jnp.newaxis, ...], config["arch"]["num_envs"], axis=0),
@@ -589,7 +592,6 @@ def learner_setup(
         global_state=init_obs.global_state[:, :, 0, :],
         step_count=init_obs.step_count[:, 0],
     )
-
     init_single = (init_obs_single, init_done)
 
     # Initialise hidden state.
@@ -623,61 +625,56 @@ def learner_setup(
     learn = get_learner_fn(env, apply_fns, update_fns, config)
     learn = jax.pmap(learn, axis_name="device")
 
-    # Broadcast params and optimiser state to cores and batch.
-    broadcast = lambda x: jnp.broadcast_to(
-        x, (n_devices, config["system"]["update_batch_size"]) + x.shape
-    )
-    actor_params = jax.tree_map(broadcast, actor_params)
-    actor_opt_state = jax.tree_map(broadcast, actor_opt_state)
-    critic_params = jax.tree_map(broadcast, critic_params)
-    critic_opt_state = jax.tree_map(broadcast, critic_opt_state)
-
     # Duplicate the hidden state for each agent.
     init_policy_hstate = jnp.expand_dims(init_policy_hstate, axis=1)
     init_policy_hstate = jnp.tile(init_policy_hstate, (1, config["system"]["num_agents"], 1))
-    policy_hstates = jax.tree_map(broadcast, init_policy_hstate)
 
     init_critic_hstate = jnp.expand_dims(init_critic_hstate, axis=1)
     init_critic_hstate = jnp.tile(init_critic_hstate, (1, config["system"]["num_agents"], 1))
-    critic_hstates = jax.tree_map(broadcast, init_critic_hstate)
 
-    # Initialise environment states and timesteps.
+    # Initialise environment states and timesteps: across devices and batches.
     rng, *env_rngs = jax.random.split(
         rng, n_devices * config["system"]["update_batch_size"] * config["arch"]["num_envs"] + 1
     )
     env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
         jnp.stack(env_rngs),
     )
-
-    # Split rngs for each core.
-    rng, *step_rngs = jax.random.split(rng, n_devices * config["system"]["update_batch_size"] + 1)
-
-    # Add dimension to pmap over.
-    reshape_step_rngs = lambda x: x.reshape(
-        (n_devices, config["system"]["update_batch_size"]) + x.shape[1:]
-    )
-    step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
     reshape_states = lambda x: x.reshape(
         (n_devices, config["system"]["update_batch_size"], config["arch"]["num_envs"]) + x.shape[1:]
     )
-    env_states = jax.tree_util.tree_map(reshape_states, env_states)
-    timesteps = jax.tree_util.tree_map(reshape_states, timesteps)
+    env_states = jax.tree_map(
+        reshape_states, env_states
+    )  # (Devices, Update_batch_size, Num_envs,..)
+    timesteps = jax.tree_map(reshape_states, timesteps)  # (Devices, Update_batch_size, Num_envs,..)
 
-    # Initialise dones.
+    # Define params to be replicated across devices and batches.
     dones = jnp.zeros(
-        (
-            n_devices,
-            config["system"]["update_batch_size"],
-            config["arch"]["num_envs"],
-            config["system"]["num_agents"],
-        ),
+        (config["arch"]["num_envs"], config["system"]["num_agents"]),
         dtype=bool,
     )
-    hstates = HiddenStates(policy_hstates, critic_hstates)
+    rng, step_rngs = jax.random.split(rng)
     params = Params(actor_params, critic_params)
     opt_states = OptStates(actor_opt_state, critic_opt_state)
+    hstates = HiddenStates(init_policy_hstate, init_critic_hstate)
+    replicate_learner = (params, opt_states, hstates, step_rngs, dones)
+
+    # Duplicate learner for update_batch_size.
+    broadcast = lambda x: jnp.broadcast_to(x, (config["system"]["update_batch_size"],) + x.shape)
+    replicate_learner = jax.tree_map(broadcast, replicate_learner)
+
+    # Duplicate learner across devices.
+    replicate_learner = flax.jax_utils.replicate(replicate_learner, devices=jax.devices())
+
+    # Initialise learner state.
+    params, opt_states, hstates, step_rngs, dones = replicate_learner
     init_learner_state = RNNLearnerState(
-        params, opt_states, step_rngs, env_states, timesteps, dones, hstates
+        params=params,
+        opt_states=opt_states,
+        key=step_rngs,
+        env_state=env_states,
+        timestep=timesteps,
+        dones=dones,
+        hstates=hstates,
     )
     return learn, actor_network, init_learner_state
 
