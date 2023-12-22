@@ -502,9 +502,7 @@ def learner_setup(
 
 def run_experiment(_config: Dict) -> None:
     """Runs experiment."""
-    # Logger setup
     config = copy.deepcopy(_config)
-    logger = Logger(config)
 
     # Create the enviroments for train and eval.
     env, eval_env = make(config=config)
@@ -527,6 +525,33 @@ def run_experiment(_config: Dict) -> None:
     # Calculate total timesteps.
     n_devices = len(jax.devices())
     config["arch"]["devices"] = jax.devices()
+    if config["system"]["total_timesteps"] is None:
+        config["system"]["total_timesteps"] = (
+            n_devices
+            * config["system"]["num_updates"]
+            * config["system"]["rollout_length"]
+            * config["system"]["update_batch_size"]
+            * config["arch"]["num_envs"]
+        )
+    else:
+        config["system"]["num_updates"] = (
+            config["system"]["total_timesteps"]
+            // config["system"]["rollout_length"]
+            // config["system"]["update_batch_size"]
+            // config["arch"]["num_envs"]
+            // n_devices
+        )
+        print(
+            f"{Fore.RED}{Style.BRIGHT} Updated number of updates"
+            + f"to {config['system']['num_updates']}: If you want to train"
+            + " for a specific number of updates, please set total_timesteps to None"
+            + f"{Style.RESET_ALL}"
+        )
+
+    # Calculate number of updates per evaluation.
+    assert (
+        config["system"]["num_updates"] > config["arch"]["num_evaluation"]
+    ), "Number of updates per evaluation must be less than total number of updates."
     config["system"]["num_updates_per_eval"] = (
         config["system"]["num_updates"] // config["arch"]["num_evaluation"]
     )
@@ -537,14 +562,9 @@ def run_experiment(_config: Dict) -> None:
         * config["system"]["update_batch_size"]
         * config["arch"]["num_envs"]
     )
-    # Get total_timesteps
-    config["system"]["total_timesteps"] = (
-        n_devices
-        * config["system"]["num_updates"]
-        * config["system"]["rollout_length"]
-        * config["system"]["update_batch_size"]
-        * config["arch"]["num_envs"]
-    )
+
+    # Logger setup
+    logger = Logger(config)
     pprint(config)
 
     # Set up checkpointer
