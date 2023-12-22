@@ -98,6 +98,8 @@ class FeedForwardCritic(nn.Module):
     def __call__(self, observation: Union[Observation, ObservationGlobalState]) -> chex.Array:
         """Forward pass."""
         if self.centralised_critic:
+            if not isinstance(observation, ObservationGlobalState):
+                raise ValueError("Global state must be provided to the centralised critic.")
             # Get global state in the case of a centralised critic.
             observation = observation.global_state
         else:
@@ -193,6 +195,8 @@ class RecurrentCritic(nn.Module):
         observation, done = observation_done
 
         if self.centralised_critic:
+            if not isinstance(observation, ObservationGlobalState):
+                raise ValueError("Global state must be provided to the centralised critic.")
             # Get global state in the case of a centralised critic.
             observation = observation.global_state
         else:

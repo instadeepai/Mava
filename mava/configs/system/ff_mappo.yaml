@@ -23,7 +23,7 @@ max_grad_norm: 0.5 # Maximum norm of the gradients for a weight update.
 
 # ---Networks---
 actor_network:
-  layer_sizes: [256, 256]
+  layer_sizes: [128, 128]
   use_layer_norm: True
   activation: "relu"
 
