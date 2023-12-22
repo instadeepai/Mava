@@ -25,17 +25,11 @@ max_grad_norm: 0.5 # Maximum norm of the gradients for a weight update.
 actor_network:
   use_layer_norm: True
   activation: "relu"
-  pre_torso_layer_sizes: [256]
-  post_torso_layer_sizes: [256]
+  pre_torso_layer_sizes: [128]
+  post_torso_layer_sizes: [128]
 
 critic_network:
   use_layer_norm: False
   activation: "relu"
-  pre_torso_layer_sizes: [256]
-  post_torso_layer_sizes: [256]
-
-# --- To be defined during training ---
-num_agents: ~
-num_actions: ~
-num_updates_per_eval: ~
-total_timesteps: ~
+  pre_torso_layer_sizes: [128]
+  post_torso_layer_sizes: [128]
