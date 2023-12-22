@@ -37,19 +37,23 @@ _jumanji_registry = {
 }
 
 
-def add_optional_wrappers(env: Environment, config: Dict) -> Environment:
+def add_optional_wrappers(
+    env: Environment, config: Dict, add_global_state: bool = False
+) -> Environment:
     # Add agent id to observation.
     if config["system"]["add_agent_id"]:
         env = AgentIDWrapper(env)
 
     # Add the global state to observation.
-    if config["system"]["add_global_state"]:
+    if add_global_state:
         env = GlobalStateWrapper(env)
 
     return env
 
 
-def make_jumanji_env(env_name: str, config: Dict) -> Tuple[Environment, Environment]:
+def make_jumanji_env(
+    env_name: str, config: Dict, add_global_state: bool = False
+) -> Tuple[Environment, Environment]:
     """
     Create a Jumanji environments for training and evaluation.
 
@@ -71,8 +75,8 @@ def make_jumanji_env(env_name: str, config: Dict) -> Tuple[Environment, Environm
     eval_env = jumanji.make(env_name, generator=generator)
     eval_env = wrapper(eval_env)
 
-    env = add_optional_wrappers(env, config)
-    eval_env = add_optional_wrappers(eval_env, config)
+    env = add_optional_wrappers(env, config, add_global_state)
+    eval_env = add_optional_wrappers(eval_env, config, add_global_state)
 
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
@@ -80,7 +84,9 @@ def make_jumanji_env(env_name: str, config: Dict) -> Tuple[Environment, Environm
     return env, eval_env
 
 
-def make_jaxmarl_env(env_name: str, config: Dict) -> Tuple[Environment, Environment]:
+def make_jaxmarl_env(
+    env_name: str, config: Dict, add_global_state: bool = False
+) -> Tuple[Environment, Environment]:
     """
      Create a JAXMARL environment.
 
@@ -100,8 +106,8 @@ def make_jaxmarl_env(env_name: str, config: Dict) -> Tuple[Environment, Environm
     env = JaxMarlWrapper(jaxmarl.make(env_name, **kwargs))
     eval_env = JaxMarlWrapper(jaxmarl.make(env_name, **kwargs))
 
-    env = add_optional_wrappers(env, config)
-    eval_env = add_optional_wrappers(eval_env, config)
+    env = add_optional_wrappers(env, config, add_global_state)
+    eval_env = add_optional_wrappers(eval_env, config, add_global_state)
 
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
@@ -109,7 +115,7 @@ def make_jaxmarl_env(env_name: str, config: Dict) -> Tuple[Environment, Environm
     return env, eval_env
 
 
-def make(config: Dict) -> Tuple[Environment, Environment]:
+def make(config: Dict, add_global_state: bool = False) -> Tuple[Environment, Environment]:
     """
     Create environments for training and evaluation..
 
@@ -122,8 +128,8 @@ def make(config: Dict) -> Tuple[Environment, Environment]:
     env_name = config["env"]["env_name"]
 
     if env_name in _jumanji_registry:
-        return make_jumanji_env(env_name, config)
+        return make_jumanji_env(env_name, config, add_global_state)
     elif env_name in jaxmarl.registered_envs:
-        return make_jaxmarl_env(env_name, config)
+        return make_jaxmarl_env(env_name, config, add_global_state)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")
