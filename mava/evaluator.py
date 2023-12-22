@@ -106,11 +106,16 @@ def get_ff_evaluator_fn(
         step_rngs = jnp.stack(step_rngs).reshape(eval_batch, -1)
 
         eval_state = EvalState(
-            step_rngs, env_states, timesteps, 0, jnp.zeros_like(timesteps.reward)
+            key=step_rngs,
+            env_state=env_states,
+            timestep=timesteps,
+            step_count_=jnp.zeros((eval_batch, 1)),
+            return_=jnp.zeros_like(timesteps.reward),
         )
+
         eval_metrics = jax.vmap(
             eval_one_episode,
-            in_axes=(None, EvalState(0, 0, 0, None, None)),
+            in_axes=(None, 0),
             axis_name="eval_batch",
         )(trained_params, eval_state)
 
@@ -232,13 +237,13 @@ def get_rnn_evaluator_fn(
             timestep=timesteps,
             dones=dones,
             hstate=init_hstate,
-            step_count_=0,
+            step_count_=jnp.zeros((eval_batch, 1)),
             return_=jnp.zeros_like(timesteps.reward),
         )
 
         eval_metrics = jax.vmap(
             eval_one_episode,
-            in_axes=(None, RNNEvalState(0, 0, 0, 0, 0, None, None)),
+            in_axes=(None, 0),
             axis_name="eval_batch",
         )(trained_params, eval_state)
 

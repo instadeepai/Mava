@@ -410,7 +410,7 @@ def learner_setup(
     config["system"]["num_actions"] = num_actions
 
     # PRNG keys.
-    rng, rng_p = rngs
+    rng, actor_net_key, critic_net_key = rngs
 
     # Define network and optimiser.
     actor_network = Actor(config["system"]["num_actions"])
@@ -436,11 +436,11 @@ def learner_setup(
     init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
 
     # Initialise actor params and optimiser state.
-    actor_params = actor_network.init(rng_p, init_x)
+    actor_params = actor_network.init(actor_net_key, init_x)
     actor_opt_state = actor_optim.init(actor_params)
 
     # Initialise critic params and optimiser state.
-    critic_params = critic_network.init(rng_p, init_x)
+    critic_params = critic_network.init(critic_net_key, init_x)
     critic_opt_state = critic_optim.init(critic_params)
 
     # Vmap network apply function over number of agents.
@@ -506,10 +506,14 @@ def run_experiment(_config: Dict) -> None:
     env, eval_env = make(config=config, add_global_state=True)
 
     # PRNG keys.
-    rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["system"]["seed"]), num=3)
+    rng, rng_e, actor_net_key, critic_net_key = jax.random.split(
+        jax.random.PRNGKey(config["system"]["seed"]), num=4
+    )
 
     # Setup learner.
-    learn, actor_network, learner_state = learner_setup(env, (rng, rng_p), config)
+    learn, actor_network, learner_state = learner_setup(
+        env, (rng, actor_net_key, critic_net_key), config
+    )
 
     # Setup evaluator.
     evaluator, absolute_metric_evaluator, (trained_params, eval_rngs) = evaluator_setup(
