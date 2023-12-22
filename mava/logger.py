@@ -20,7 +20,7 @@ import numpy as np
 from colorama import Fore, Style
 
 from mava.types import ExperimentOutput
-from mava.utils.logger_tools import Logger
+from mava.utils.logger_tools import Logger as LoggerTools
 
 
 # Not in types.py because we only use it here.
@@ -36,10 +36,14 @@ class LogFn(Protocol):
         ...
 
 
-def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
-    """Get the logger function."""
+class Logger:
+    def __init__(self, config: Dict) -> None:
+        """Initialise the logger."""
+        self.logger = LoggerTools(config)
+        self.config = config
 
     def log(
+        self,
         metrics: ExperimentOutput,
         t_env: int = 0,
         trainer_metric: bool = False,
@@ -75,20 +79,20 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
         steps_per_second = episodes_info["steps_per_second"]
 
         # Log metrics.
-        if logger.should_log:
-            logger.log_stat(
+        if self.logger.should_log:
+            self.logger.log_stat(
                 f"{prefix}mean_episode_returns", float(np.mean(episodes_return)), t_env, eval_step
             )
-            logger.log_stat(
+            self.logger.log_stat(
                 f"{prefix}mean_episode_length", float(np.mean(episodes_length)), t_env, eval_step
             )
-            logger.log_stat(f"{prefix}steps_per_second", steps_per_second, t_env, eval_step)
+            self.logger.log_stat(f"{prefix}steps_per_second", steps_per_second, t_env, eval_step)
 
             if trainer_metric:
-                logger.log_stat(f"{prefix}total_loss", float(np.mean(total_loss)), t_env)
-                logger.log_stat(f"{prefix}value_loss", float(np.mean(value_loss)), t_env)
-                logger.log_stat(f"{prefix}loss_actor", float(np.mean(loss_actor)), t_env)
-                logger.log_stat(f"{prefix}entropy", float(np.mean(entropy)), t_env)
+                self.logger.log_stat(f"{prefix}total_loss", float(np.mean(total_loss)), t_env)
+                self.logger.log_stat(f"{prefix}value_loss", float(np.mean(value_loss)), t_env)
+                self.logger.log_stat(f"{prefix}loss_actor", float(np.mean(loss_actor)), t_env)
+                self.logger.log_stat(f"{prefix}entropy", float(np.mean(entropy)), t_env)
 
         log_string = (
             f"Timesteps {t_env:07d} | "
@@ -102,7 +106,7 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
         )
 
         if absolute_metric:
-            logger.console_logger.info(
+            self.logger.console_logger.info(
                 f"{Fore.BLUE}{Style.BRIGHT}ABSOLUTE METRIC: {log_string}{Style.RESET_ALL}"
             )
         elif trainer_metric:
@@ -112,20 +116,16 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
                 f"Loss Actor {float(np.mean(loss_actor)):.3f} | "
                 f"Entropy {float(np.mean(entropy)):.3f}"
             )
-            logger.console_logger.info(
+            self.logger.console_logger.info(
                 f"{Fore.MAGENTA}{Style.BRIGHT}TRAINER: {log_string}{Style.RESET_ALL}"
             )
         else:
-            logger.console_logger.info(
+            self.logger.console_logger.info(
                 f"{Fore.GREEN}{Style.BRIGHT}EVALUATOR: {log_string}{Style.RESET_ALL}"
             )
 
         return float(np.mean(episodes_return))
 
-    return log
-
-
-def logger_setup(config: Dict) -> LogFn:
-    """Setup the logger."""
-    logger = Logger(config)
-    return get_logger_tools(logger)
+    def stop(self) -> None:
+        if self.logger.use_neptune:
+            self.logger.neptune_logger.stop()
