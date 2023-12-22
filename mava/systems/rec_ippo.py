@@ -13,17 +13,13 @@
 # limitations under the License.
 
 import copy
-import functools
 import time
-from typing import Any, Dict, Sequence, Tuple
+from typing import Any, Dict, Tuple
 
 import chex
-import distrax
-import flax.linen as nn
 import hydra
 import jax
 import jax.numpy as jnp
-import numpy as np
 import optax
 from colorama import Fore, Style
 from flax import jax_utils
@@ -35,6 +31,8 @@ from rich.pretty import pprint
 
 from mava.evaluator import evaluator_setup
 from mava.logger import logger_setup
+from mava.networks import RecurrentActor as Actor
+from mava.networks import ScannedRNN, get_networks
 from mava.types import (
     ExperimentOutput,
     HiddenStates,
@@ -45,11 +43,9 @@ from mava.types import (
     RecActorApply,
     RecCriticApply,
     RNNLearnerState,
-    RNNObservation,
 )
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.make_env import make
-from mava.networks import get_networks, Rec_Actor as Actor, ScannedRNN
 
 
 def get_learner_fn(
@@ -468,7 +464,7 @@ def learner_setup(
 
     # Define network and optimisers.
     actor_network, critic_network = get_networks(
-        config=config, network="recurrent", centralized_critic=False
+        config=config, network="recurrent", centralised_critic=False
     )
     actor_optim = optax.chain(
         optax.clip_by_global_norm(config["system"]["max_grad_norm"]),

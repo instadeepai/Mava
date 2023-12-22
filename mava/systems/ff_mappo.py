@@ -13,20 +13,16 @@
 # limitations under the License.
 import copy
 import time
-from typing import Any, Dict, Sequence, Tuple
+from typing import Any, Dict, Tuple
 
 import chex
-import distrax
-import flax.linen as nn
 import hydra
 import jax
 import jax.numpy as jnp
-import numpy as np
 import optax
 from colorama import Fore, Style
 from flax import jax_utils
 from flax.core.frozen_dict import FrozenDict
-from flax.linen.initializers import constant, orthogonal
 from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
@@ -34,13 +30,14 @@ from rich.pretty import pprint
 
 from mava.evaluator import evaluator_setup
 from mava.logger import logger_setup
+from mava.networks import FeedForwardActor as Actor
+from mava.networks import get_networks
 from mava.types import (
     ActorApply,
     CriticApply,
     ExperimentOutput,
     LearnerFn,
     LearnerState,
-    Observation,
     ObservationGlobalState,
     OptStates,
     Params,
@@ -49,7 +46,6 @@ from mava.types import (
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import merge_leading_dims
 from mava.utils.make_env import make
-from mava.networks import get_networks, FF_Actor as Actor
 
 
 def get_learner_fn(
@@ -364,7 +360,7 @@ def learner_setup(
     actor_network, critic_network = get_networks(
         config=config,
         network="feedforward",
-        centralized_critic=True,
+        centralised_critic=True,
     )
     actor_optim = optax.chain(
         optax.clip_by_global_norm(config["system"]["max_grad_norm"]),
