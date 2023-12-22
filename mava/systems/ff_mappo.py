@@ -30,7 +30,7 @@ from rich.pretty import pprint
 
 from mava.evaluator import evaluator_setup
 from mava.logger import logger_setup
-from mava.networks import FF_Actor as Actor
+from mava.networks import FeedForwardActor as Actor
 from mava.networks import get_networks
 from mava.types import (
     ActorApply,
@@ -356,7 +356,7 @@ def learner_setup(
     actor_network, critic_network = get_networks(
         config=config,
         network="feedforward",
-        centralized_critic=True,
+        centralised_critic=True,
     )
     actor_optim = optax.chain(
         optax.clip_by_global_norm(config.system.max_grad_norm),

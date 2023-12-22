@@ -32,7 +32,7 @@ from mava.types import (
 )
 
 
-class Torso(nn.Module):
+class MLPTorso(nn.Module):
     """MLP torso."""
 
     layer_sizes: Sequence[int]
@@ -62,7 +62,7 @@ class Torso(nn.Module):
         return x
 
 
-class FF_Actor(nn.Module):
+class FeedForwardActor(nn.Module):
     """Feedforward Actor Network."""
 
     torso: nn.Module
@@ -89,20 +89,22 @@ class FF_Actor(nn.Module):
         return actor_policy
 
 
-class FF_Critic(nn.Module):
+class FeedForwardCritic(nn.Module):
     """Feedforward Critic Network."""
 
     torso: nn.Module
-    centralized_critic: bool = False
+    centralised_critic: bool = False
 
     @nn.compact
     def __call__(self, observation: Union[Observation, ObservationGlobalState]) -> chex.Array:
         """Forward pass."""
-        if self.centralized_critic:
-            # Get global state in the case of a centralized critic.
+        if self.centralised_critic:
+            if not isinstance(observation, ObservationGlobalState):
+                raise ValueError("Global state must be provided to the centralised critic.")
+            # Get global state in the case of a centralised critic.
             observation = observation.global_state
         else:
-            # Get single agent view in the case of a decentralized critic.
+            # Get single agent view in the case of a decentralised critic.
             observation = observation.agents_view
 
         critic_output = self.torso(observation)
@@ -142,7 +144,7 @@ class ScannedRNN(nn.Module):
         return cell.initialize_carry(jax.random.PRNGKey(0), (batch_size, hidden_size))
 
 
-class Rec_Actor(nn.Module):
+class RecurrentActor(nn.Module):
     """Recurrent Actor Network."""
 
     action_dim: Sequence[int]
@@ -177,12 +179,12 @@ class Rec_Actor(nn.Module):
         return policy_hidden_state, pi
 
 
-class Rec_Critic(nn.Module):
+class RecurrentCritic(nn.Module):
     """Recurrent Critic Network."""
 
     pre_torso: nn.Module
     post_torso: nn.Module
-    centralized_critic: bool = False
+    centralised_critic: bool = False
 
     @nn.compact
     def __call__(
@@ -193,11 +195,13 @@ class Rec_Critic(nn.Module):
         """Forward pass."""
         observation, done = observation_done
 
-        if self.centralized_critic:
-            # Get global state in the case of a centralized critic.
+        if self.centralised_critic:
+            if not isinstance(observation, ObservationGlobalState):
+                raise ValueError("Global state must be provided to the centralised critic.")
+            # Get global state in the case of a centralised critic.
             observation = observation.global_state
         else:
-            # Get single agent view in the case of a decentralized critic.
+            # Get single agent view in the case of a decentralised critic.
             observation = observation.agents_view
 
         critic_embedding = self.pre_torso(observation)
@@ -212,37 +216,37 @@ class Rec_Critic(nn.Module):
 
 
 def get_networks(
-    config: DictConfig, network: str, centralized_critic: bool = False
-) -> Union[Tuple[FF_Actor, FF_Critic], Tuple[Rec_Actor, Rec_Critic]]:
+    config: DictConfig, network: str, centralised_critic: bool = False
+) -> Union[Tuple[FeedForwardActor, FeedForwardCritic], Tuple[RecurrentActor, RecurrentCritic]]:
     """Get the networks."""
 
-    def create_torso(network_key: str, layer_size_key: str) -> Torso:
+    def create_torso(network_key: str, layer_size_key: str) -> MLPTorso:
         """Helper function to create a torso object from the config."""
-        return Torso(
+        return MLPTorso(
             layer_sizes=config["system"][network_key][layer_size_key],
             activation=config["system"][network_key]["activation"],
             use_layer_norm=config["system"][network_key]["use_layer_norm"],
         )
 
     if network == "feedforward":
-        actor = FF_Actor(
+        actor = FeedForwardActor(
             torso=create_torso("actor_network", "layer_sizes"),
-            num_actions=config.system.num_actions,
+            num_actions=config["system"]["num_actions"],
         )
-        critic = FF_Critic(
+        critic = FeedForwardCritic(
             torso=create_torso("critic_network", "layer_sizes"),
-            centralized_critic=centralized_critic,
+            centralised_critic=centralised_critic,
         )
     elif network == "recurrent":
-        actor = Rec_Actor(
-            action_dim=config.system.num_actions,
+        actor = RecurrentActor(
+            action_dim=config["system"]["num_actions"],
             pre_torso=create_torso("actor_network", "pre_torso_layer_sizes"),
             post_torso=create_torso("actor_network", "post_torso_layer_sizes"),
         )
-        critic = Rec_Critic(
+        critic = RecurrentCritic(
             pre_torso=create_torso("critic_network", "pre_torso_layer_sizes"),
             post_torso=create_torso("critic_network", "post_torso_layer_sizes"),
-            centralized_critic=centralized_critic,
+            centralised_critic=centralised_critic,
         )
     else:
         raise ValueError(f"Network {network} not supported.")

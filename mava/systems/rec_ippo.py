@@ -31,7 +31,7 @@ from rich.pretty import pprint
 
 from mava.evaluator import evaluator_setup
 from mava.logger import logger_setup
-from mava.networks import Rec_Actor as Actor
+from mava.networks import RecurrentActor as Actor
 from mava.networks import ScannedRNN, get_networks
 from mava.types import (
     ExperimentOutput,
@@ -462,7 +462,7 @@ def learner_setup(
 
     # Define network and optimisers.
     actor_network, critic_network = get_networks(
-        config=config, network="recurrent", centralized_critic=False
+        config=config, network="recurrent", centralised_critic=False
     )
     actor_optim = optax.chain(
         optax.clip_by_global_norm(config.system.max_grad_norm),
