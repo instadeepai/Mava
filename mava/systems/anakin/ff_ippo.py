@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import copy
 import time
 from typing import Any, Dict, Tuple
@@ -38,7 +39,6 @@ from mava.types import (
     ExperimentOutput,
     LearnerFn,
     LearnerState,
-    ObservationGlobalState,
     OptStates,
     Params,
     PPOTransition,
@@ -56,7 +56,7 @@ def get_learner_fn(
 ) -> LearnerFn[LearnerState]:
     """Get the learner function."""
 
-    # Unpack apply and update functions.
+    # Get apply and update functions for actor and critic networks.
     actor_apply_fn, critic_apply_fn = apply_fns
     actor_update_fn, critic_update_fn = update_fns
 
@@ -251,6 +251,7 @@ def get_learner_fn(
                 )
                 critic_new_params = optax.apply_updates(params.critic_params, critic_updates)
 
+                # PACK NEW PARAMS AND OPTIMISER STATE
                 new_params = Params(actor_new_params, critic_new_params)
                 new_opt_state = OptStates(actor_new_opt_state, critic_new_opt_state)
 
@@ -312,7 +313,7 @@ def get_learner_fn(
         Args:
             learner_state (NamedTuple):
                 - params (Params): The initial model parameters.
-                - opt_states (OptStates): The initial optimizer states.
+                - opt_states (OptStates): The initial optimizer state.
                 - rng (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
@@ -354,9 +355,7 @@ def learner_setup(
 
     # Define network and optimiser.
     actor_network, critic_network = get_networks(
-        config=config,
-        network="feedforward",
-        centralised_critic=True,
+        config=config, network="feedforward", centralised_critic=False
     )
     actor_optim = optax.chain(
         optax.clip_by_global_norm(config.system.max_grad_norm),
@@ -367,15 +366,9 @@ def learner_setup(
         optax.adam(config.system.critic_lr, eps=1e-5),
     )
 
-    # Initialise observation.
-    obs = env.observation_spec().generate_value()
-    # Select only obs for a single agent.
-    init_x = ObservationGlobalState(
-        agents_view=obs.agents_view[0],
-        action_mask=obs.action_mask[0],
-        global_state=obs.global_state[0],
-        step_count=obs.step_count[0],
-    )
+    # Initialise observation: Select only obs for a single agent.
+    init_x = env.observation_spec().generate_value()
+    init_x = jax.tree_util.tree_map(lambda x: x[0], init_x)
     init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
 
     # Initialise actor params and optimiser state.
@@ -470,6 +463,7 @@ def run_experiment(_config: DictConfig) -> None:
 
     # Calculate total timesteps.
     n_devices = len(jax.devices())
+
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
     steps_per_rollout = (
         n_devices
@@ -517,6 +511,7 @@ def run_experiment(_config: DictConfig) -> None:
     for i in range(config.arch.num_evaluation):
         # Train.
         start_time = time.time()
+
         learner_output = learn(learner_state)
         jax.block_until_ready(learner_output)
 
@@ -587,14 +582,14 @@ def run_experiment(_config: DictConfig) -> None:
         )
 
 
-@hydra.main(config_path="../configs", config_name="default_ff_mappo.yaml", version_base="1.2")
+@hydra.main(config_path="../../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
 
     # Run experiment.
     run_experiment(cfg)
 
-    print(f"{Fore.CYAN}{Style.BRIGHT}MAPPO experiment completed{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}IPPO experiment completed{Style.RESET_ALL}")
 
 
 if __name__ == "__main__":
