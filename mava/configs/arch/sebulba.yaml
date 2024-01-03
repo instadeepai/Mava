@@ -1,7 +1,6 @@
-# --- Anakin config ---
-arch_name: "anakin"
-# --- Training ---
-num_envs: 16  # Number of vectorised environments per device.
+# --- Sebulba config ---
+arch_name: "sebulba"
+num_envs: 16  # number of envs per thread
 
 # --- Evaluation ---
 evaluation_greedy: False # Evaluate the policy greedily. If True the policy will select
@@ -12,5 +11,14 @@ num_evaluation: 200 # Number of evenly spaced evaluations to perform during trai
 absolute_metric: True # Whether the absolute metric should be computed. For more details
   # on the absolute metric please see: https://arxiv.org/abs/2209.10485
 
+# --- Sebulba devices config ---
+n_threads_per_executor: 1  # num of different threads/env batches per actor
+executor_device_ids: [0] # ids of actor devices
+learner_device_ids: [0] # ids of learner devices
+
+# --- Sebulba rollout and env config ---
+concurrency: False # whether actor and learner should run concurrently
+async_envs: True # "whether to use async vector or sync vector envs"
+
 # --- To be defined during training ---
-devices: ~
+log_frequency: ~

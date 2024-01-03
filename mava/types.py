@@ -44,7 +44,8 @@ class Observation(NamedTuple):
 
     agents_view: chex.Array  # (num_agents, num_obs_features)
     action_mask: chex.Array  # (num_agents, num_actions)
-    step_count: chex.Array  # (num_agents, )
+    # TODO: fix this
+    # step_count: chex.Array  # (num_agents, )
 
 
 class ObservationGlobalState(NamedTuple):
@@ -125,6 +126,13 @@ class LearnerState(NamedTuple):
     key: chex.PRNGKey
     env_state: LogEnvState
     timestep: TimeStep
+
+
+class SebulbaLearnerState(NamedTuple):
+    """State of the learner."""
+
+    params: Params
+    opt_states: OptStates
 
 
 class RNNLearnerState(NamedTuple):

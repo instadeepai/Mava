@@ -142,7 +142,7 @@ def make_gym_env(
                 [
                     _make_env_single(
                         map_name=config.env.scenario,
-                        team_reward=config.system.use_team_reward,
+                        team_reward=config.env.use_individual_rewards,
                         add_agent_id=config.system.add_agent_id,
                     )
                     for _ in range(num_envs)
@@ -153,7 +153,7 @@ def make_gym_env(
                 [
                     _make_env_single(
                         map_name=config.env.scenario,
-                        team_reward=config.system.use_team_reward,
+                        team_reward=config.env.use_individual_rewards,
                         add_agent_id=config.system.add_agent_id,
                     )
                     for _ in range(num_envs)

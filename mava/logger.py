@@ -152,7 +152,6 @@ def get_logger_tools(  # noqa: CCR001
             value_loss = metrics_to_log["loss_info"]["value_loss"]
             loss_actor = metrics_to_log["loss_info"]["loss_actor"]
             entropy = metrics_to_log["loss_info"]["entropy"]
-            approx_kl = metrics_to_log["loss_info"]["approx_kl"]
             training_time = metrics_to_log["speed_info"]["training_time"]
             log_string = (
                 f"Timesteps {t_env:07d} | "
@@ -161,7 +160,6 @@ def get_logger_tools(  # noqa: CCR001
                 f"Value Loss {float(np.mean(value_loss)):.3f} | "
                 f"Loss Actor {float(np.mean(loss_actor)):.3f} | "
                 f"Entropy {float(np.mean(entropy)):.3f} | "
-                f"Approx KL {float(np.mean(approx_kl)):.3f} | "
                 f"Training Time {float(np.mean(training_time)):.3f} | "
             )
             logger.console_logger.info(
