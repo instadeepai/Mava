@@ -115,7 +115,7 @@ def make_jaxmarl_env(env_name: str, config: DictConfig) -> Tuple[Environment, En
 
 def _make_env_single(
     map_name: str = "rware-tiny-2ag-v1",
-    team_reward: bool = True,
+    use_individual_rewards: bool = False,
     add_agent_id: bool = True,
 ) -> Callable:
     """Create a function which creates a fully configured environment."""
@@ -124,7 +124,7 @@ def _make_env_single(
         """Create an environment."""
         env = GymWrapper(
             env=gym.make(map_name),
-            team_reward=team_reward,
+            use_individual_rewards=use_individual_rewards,
         )
         if add_agent_id:
             env = GymAgentIDWrapper(env)
@@ -142,7 +142,7 @@ def make_gym_env(
                 [
                     _make_env_single(
                         map_name=config.env.scenario,
-                        team_reward=config.env.use_individual_rewards,
+                        use_individual_rewards=config.env.use_individual_rewards,
                         add_agent_id=config.system.add_agent_id,
                     )
                     for _ in range(num_envs)
@@ -153,7 +153,7 @@ def make_gym_env(
                 [
                     _make_env_single(
                         map_name=config.env.scenario,
-                        team_reward=config.env.use_individual_rewards,
+                        use_individual_rewards=config.env.use_individual_rewards,
                         add_agent_id=config.system.add_agent_id,
                     )
                     for _ in range(num_envs)

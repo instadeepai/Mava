@@ -36,10 +36,10 @@ class GymWrapper(gym.Wrapper):
     def __init__(
         self,
         env: gym.Env,
-        team_reward: bool = True,
+        use_individual_rewards: bool = False,
     ):
         super().__init__(env)
-        self.team_reward = team_reward
+        self.use_individual_rewards = use_individual_rewards
         self._agents = [f"agent_{n}" for n in range(self.env.n_agents)]
         self.num_agents = self.env.n_agents
         self.num_actions = self.env.action_space[0].n
@@ -107,10 +107,10 @@ class GymWrapper(gym.Wrapper):
         )
 
         # Reward info
-        if self.team_reward:
-            reward = np.array([np.array(reward).mean()] * self.num_agents)
-        else:
+        if self.use_individual_rewards:
             reward = np.array(reward)
+        else:
+            reward = np.array([np.array(reward).mean()] * self.num_agents)
 
         # State info
         info = {"extra_info": self._info, "actions_mask": actions_mask}
