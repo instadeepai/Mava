@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple
+from typing import Callable, Tuple, Union
 
+import gym
 import jaxmarl
 import jumanji
 from jaxmarl.environments.smax import map_name_to_scenario
@@ -27,6 +28,8 @@ from jumanji.environments.routing.robot_warehouse.generator import (
 from jumanji.wrappers import AutoResetWrapper
 from omegaconf import DictConfig
 
+from mava.wrappers.gym import AgentIDWrapper as GymAgentIDWrapper
+from mava.wrappers.gym import GymWrapper
 from mava.wrappers.jaxmarl import JaxMarlWrapper
 from mava.wrappers.jumanji import LbfWrapper, RwareWrapper
 from mava.wrappers.shared import AgentIDWrapper, GlobalStateWrapper, LogWrapper
@@ -110,7 +113,66 @@ def make_jaxmarl_env(env_name: str, config: DictConfig) -> Tuple[Environment, En
     return env, eval_env
 
 
-def make(config: DictConfig) -> Tuple[Environment, Environment]:
+def _make_single_gym_env(
+    map_name: str = "rware-tiny-2ag-v1",
+    use_individual_rewards: bool = False,
+    add_agent_id: bool = True,
+) -> Callable:
+    """Create a function which creates a fully configured environment."""
+
+    def thunk() -> gym.Env:
+        """Create an environment."""
+        env = GymWrapper(
+            env=gym.make(map_name),
+            use_individual_rewards=use_individual_rewards,
+        )
+        if add_agent_id:
+            env = GymAgentIDWrapper(env)
+        return env
+
+    return thunk
+
+
+def make_gym_env(
+    config: DictConfig,
+) -> Callable:
+    """Create a gym environment.
+
+    Note: We support currently only rware environments.
+    """
+
+    def thunk(num_envs: int) -> gym.vector.VectorEnv:
+        """Create a vectorised environment."""
+        if config.arch.async_envs:
+            envs = gym.vector.AsyncVectorEnv(
+                [
+                    _make_single_gym_env(
+                        map_name=config.env.scenario,
+                        use_individual_rewards=config.env.use_individual_rewards,
+                        add_agent_id=config.system.add_agent_id,
+                    )
+                    for _ in range(num_envs)
+                ]
+            )
+        else:
+            envs = gym.vector.SyncVectorEnv(
+                [
+                    _make_single_gym_env(
+                        map_name=config.env.scenario,
+                        use_individual_rewards=config.env.use_individual_rewards,
+                        add_agent_id=config.system.add_agent_id,
+                    )
+                    for _ in range(num_envs)
+                ]
+            )
+        envs.num_envs = num_envs
+        envs.is_vector_env = True
+        return envs
+
+    return thunk
+
+
+def make(config: DictConfig) -> Union[Tuple[Environment, Environment], Callable]:
     """
     Create environments for training and evaluation..
 
@@ -126,5 +188,7 @@ def make(config: DictConfig) -> Tuple[Environment, Environment]:
         return make_jumanji_env(env_name, config)
     elif env_name in jaxmarl.registered_envs:
         return make_jaxmarl_env(env_name, config)
+    elif env_name.startswith("gym"):
+        return make_gym_env(config)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")

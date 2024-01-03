@@ -520,7 +520,9 @@ def run_experiment(_config: Dict) -> None:  # noqa: CCR001
     log = logger_setup(config)
 
     # Create the enviroments for train and eval.
-    env, eval_env = make(config=config)
+    envs = make(config=config)
+    assert isinstance(envs, tuple), "Non jax environments not supported in anakin architecture."
+    env, eval_env = envs
 
     # PRNG keys.
     rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["system"]["seed"]), num=3)
