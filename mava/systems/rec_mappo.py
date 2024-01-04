@@ -30,7 +30,7 @@ from optax._src.base import OptState
 from rich.pretty import pprint
 
 from mava.evaluator import anakin_evaluator_setup as evaluator_setup
-from mava.logger import logger_setup
+from mava.logger import Logger
 from mava.networks import RecurrentActor as Actor
 from mava.networks import ScannedRNN, get_networks
 from mava.types import (
@@ -585,7 +585,7 @@ def run_experiment(_config: DictConfig) -> None:
     """Runs experiment."""
     # Logger setup
     config = copy.deepcopy(_config)
-    log = logger_setup(config)
+    logger = Logger(config)
 
     # Create the enviroments for train and eval.
     envs = make(config=config)
@@ -665,10 +665,8 @@ def run_experiment(_config: DictConfig) -> None:
         # Log the results of the training.
         elapsed_time = time.time() - start_time
         learner_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
-        log(
-            metrics=learner_output,
-            t_env=steps_per_rollout * (i + 1),
-            trainer_metric=True,
+        logger.log_trainer_metrics(
+            experiment_output=learner_output, t_env=steps_per_rollout * (i + 1)
         )
 
         # Prepare for evaluation.
@@ -688,8 +686,8 @@ def run_experiment(_config: DictConfig) -> None:
         # Log the results of the evaluation.
         elapsed_time = time.time() - start_time
         evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
-        episode_return = log(
-            metrics=evaluator_output,
+        episode_return = logger.log_evaluator_metrics(
+            metrics=evaluator_output.episodes_info,
             t_env=steps_per_rollout * (i + 1),
             eval_step=i,
         )
@@ -722,18 +720,19 @@ def run_experiment(_config: DictConfig) -> None:
 
         elapsed_time = time.time() - start_time
         evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
-        log(
-            metrics=evaluator_output,
+        logger.log_evaluator_metrics(
+            metrics=evaluator_output.episodes_info,
             t_env=steps_per_rollout * (i + 1),
             absolute_metric=True,
         )
+
+    # Stop the logger.
+    logger.stop()
 
 
 @hydra.main(config_path="../configs", config_name="default_rec_mappo.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
-    # Convert config to python dict.
-    cfg: Dict = OmegaConf.to_container(cfg, resolve=True)
 
     # Run experiment.
     run_experiment(cfg)
