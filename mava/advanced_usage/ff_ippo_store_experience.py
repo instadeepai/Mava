@@ -35,7 +35,7 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava.evaluator import evaluator_setup
+from mava.evaluator import anakin_evaluator_setup as evaluator_setup
 from mava.logger import logger_setup
 from mava.types import (
     ActorApply,

@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, Optional, Tuple
+import time
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import chex
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
+import numpy as np
 from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
 from omegaconf import DictConfig
@@ -27,11 +29,13 @@ from mava.types import (
     EvalFn,
     EvalState,
     ExperimentOutput,
+    Observation,
     RecActorApply,
     RNNEvalState,
 )
 
 
+# ---anakin---
 def get_ff_evaluator_fn(
     env: Environment, apply_fn: ActorApply, config: DictConfig, eval_multiplier: int = 1
 ) -> EvalFn:
@@ -253,7 +257,7 @@ def get_rnn_evaluator_fn(
     return evaluator_fn
 
 
-def evaluator_setup(
+def anakin_evaluator_setup(
     eval_env: Environment,
     rng_e: chex.PRNGKey,
     network: Any,
@@ -263,6 +267,7 @@ def evaluator_setup(
     scanned_rnn: Optional[nn.Module] = None,
 ) -> Tuple[EvalFn, EvalFn, Tuple[FrozenDict, chex.Array]]:
     """Initialise evaluator_fn."""
+
     # Get available TPU cores.
     n_devices = len(jax.devices())
 
@@ -312,3 +317,82 @@ def evaluator_setup(
     eval_rngs = jnp.stack(eval_rngs).reshape(n_devices, -1)
 
     return evaluator, absolute_metric_evaluator, (trained_params, eval_rngs)
+
+
+# ---sebulba---
+def get_sebulba_ff_evaluator(
+    eval_envs: Environment,
+    apply_fn: ActorApply,
+    config: DictConfig,
+) -> Callable:
+    """Get the evaluator function for feedforward networks in sebulba architecture."""
+
+    @jax.jit
+    def get_action(
+        params: FrozenDict,
+        next_obs: chex.Array,
+        key: chex.PRNGKey,
+    ) -> Tuple:
+        """Get action."""
+        key, subkey = jax.random.split(key)
+        policy = apply_fn(params.actor_params, next_obs)
+        if config.arch.evaluation_greedy:
+            action = policy.mode()
+        else:
+            action = policy.sample(seed=subkey)
+        return action, key
+
+    def evaluator(
+        params: FrozenDict, rng: chex.PRNGKey, eval_multiplier: int = 1
+    ) -> Dict[str, Union[float, Any]]:
+        """Run evaluation."""
+        episodes_returns = np.array([])
+        episodes_lengths = np.array([])
+        start_time = time.time()
+        timestep = 0
+        for _ in range(eval_multiplier):
+            # Initialize episode info
+            episode_returns = np.zeros((config.arch.num_eval_episodes,), dtype=np.float32)
+            episode_lengths = np.zeros((config.arch.num_eval_episodes,), dtype=np.float32)
+            env_id = np.arange(config.arch.num_eval_episodes)
+
+            # Reset envs
+            next_obs, infos = eval_envs.reset()
+            dones = jnp.zeros(config.arch.num_eval_episodes, dtype=jax.numpy.bool_)
+
+            while not dones.all():
+                timestep += 1
+                # Load step info
+                cached_next_obs = next_obs
+                cached_infos = infos
+                actions_mask = np.stack(cached_infos["actions_mask"])
+
+                # Select action
+                (action, rng) = get_action(
+                    params, Observation(cached_next_obs, actions_mask, None), rng
+                )
+                cpu_action = np.array(action)
+
+                # Step the environment
+                next_obs, next_reward, terminated, truncated, infos = eval_envs.step(cpu_action)
+                dones += (
+                    terminated + truncated
+                )  # We need to add the dones here to make sure if an episode is done at least once.
+
+                episode_returns[env_id] += np.mean(next_reward) * (
+                    1 - dones
+                )  # Only add the reward if the episode is not done.
+                episode_lengths[env_id] += 1 * (
+                    1 - dones
+                )  # Only add the length if the episode is not done.
+            episodes_returns = np.append(episodes_returns, episode_returns)
+            episodes_lengths = np.append(episodes_lengths, episode_lengths)
+
+        eval_metrics = {
+            "episode_return": np.mean(episodes_returns),
+            "episode_length": np.mean(episodes_lengths),
+            "steps_per_second": int(timestep / (time.time() - start_time)),
+        }
+        return eval_metrics
+
+    return evaluator
