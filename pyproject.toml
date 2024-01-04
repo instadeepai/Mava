@@ -77,4 +77,5 @@ ignore = [
     "W503",  # Line break before binary operator (not compatible with black).
     "B017",  # assertRaises(Exception): or pytest.raises(Exception) should be considered evil.
     "E203",  # black and flake8 disagree on whitespace before ':'.
+    "E402",  # Module level import not at top of file.
 ]
