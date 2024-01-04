@@ -36,7 +36,7 @@ from flax.core.frozen_dict import FrozenDict
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
-from mava.logger import logger_setup
+from mava.logger import Logger
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import get_networks
 from mava.types import Observation, OptStates, Params
@@ -55,7 +55,7 @@ def rollout(  # noqa: CCR001
     params_queue: queue.Queue,
     device_thread_id: int,
     apply_fns: Tuple,
-    log_fn: Callable,
+    logger: Logger,
     learner_devices: List = None,
 ) -> None:
     """Executor rollout loop."""
@@ -234,16 +234,15 @@ def rollout(  # noqa: CCR001
 
         if (update % config.arch.log_frequency == 0) or (config.system.num_updates + 1 == update):
             # Log info
-            log_fn(
-                log_type={"Executor": {"device_thread_id": device_thread_id}},
+            logger.log_executor_metrics(
                 t_env=t_env,
-                metrics_to_log={
-                    "episode_info": {
+                metrics={
+                    "episodes_info": {
                         "episode_return": returned_episode_returns,
                         "episode_length": returned_episode_lengths,
+                        "steps_per_second": int(t_env / (time.time() - start_time)),
                     },
                     "speed_info": {
-                        "sps": int(t_env / (time.time() - start_time)),
                         "rollout_time": np.mean(rollout_time),
                     },
                     "queue_info": {
@@ -255,6 +254,7 @@ def rollout(  # noqa: CCR001
                         "rollout_queue_put_time": np.mean(rollout_queue_put_time),
                     },
                 },
+                device_thread_id=device_thread_id,
             )
 
 
@@ -608,7 +608,7 @@ def run_experiment(_config: DictConfig) -> None:
 
     # Setup logger.
     config.arch.log_frequency = config.system.num_updates // config.arch.num_evaluation
-    log = logger_setup(config)
+    logger = Logger(config)
     cfg_dict: Dict = OmegaConf.to_container(config, resolve=True)
     pprint(cfg_dict)
 
@@ -638,7 +638,7 @@ def run_experiment(_config: DictConfig) -> None:
                     params_queues[-1],
                     d_idx * config.arch.n_threads_per_executor + thread_id,
                     apply_fns,
-                    log,
+                    logger,
                     learner_devices,
                 ),
             ).start()
@@ -697,10 +697,8 @@ def run_experiment(_config: DictConfig) -> None:
 
         if trainer_update_number % config.arch.log_frequency == 0:
             # Logging training info
-            log(
-                log_type={"Learner": {"trainer_update_number": trainer_update_number}},
-                t_env=t_env,
-                metrics_to_log={
+            logger.log_trainer_metrics(
+                experiment_output={
                     "loss_info": loss_info,
                     "queue_info": {
                         "rollout_queue_get_time": np.mean(rollout_queue_get_time),
@@ -712,8 +710,10 @@ def run_experiment(_config: DictConfig) -> None:
                     },
                     "speed_info": {
                         "training_time": time.time() - training_time_start,
+                        "trainer_update_number": trainer_update_number,
                     },
                 },
+                t_env=t_env,
             )
 
             # Evaluation
