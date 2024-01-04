@@ -1,17 +1,17 @@
 # --- Logging options ---
 
-use_tf: True # Whether to use tensorboard logging.
+use_tf: False # Whether to use tensorboard logging.
 base_exp_path: results # Base path for logging.
-use_json: True # Whether to log marl-eval style to json files.
+use_json: False # Whether to log marl-eval style to json files.
 
 # --- Neptune logging ---
-use_neptune: True
+use_neptune: False
 
 # --- Other logger kwargs ---
 kwargs:
   neptune_project: Instadeep/Mava
   neptune_tag: [rware]
-  json_path: here # If set, json files will be logged to a set path so that multiple experiments can
+  json_path: ~ # If set, json files will be logged to a set path so that multiple experiments can
     # write to the same json file for easy downstream aggregation and plotting with marl-eval.
 
 # --- Checkpointing ---
