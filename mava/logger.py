@@ -154,7 +154,7 @@ class Logger:
             rollout_time = metrics["speed_info"]["rollout_time"]
             log_string += f" | Rollout Time {float(np.mean(rollout_time)):.3f}"
             self.logger.console_logger.info(
-                f"{Fore.GREEN}{Style.BRIGHT}Executor: {log_string}{Style.RESET_ALL}"
+                f"{Fore.BLUE}{Style.BRIGHT}Executor: {log_string}{Style.RESET_ALL}"
             )
 
     def log_evaluator_metrics(

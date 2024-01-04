@@ -36,6 +36,7 @@ from flax.core.frozen_dict import FrozenDict
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
+from mava.evaluator import get_sebulba_ff_evaluator as evaluator_setup
 from mava.logger import Logger
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import get_networks
@@ -44,8 +45,6 @@ from mava.types import PPOTransition as Transition
 from mava.types import SebulbaLearnerState as LearnerState
 from mava.utils.jax import merge_leading_dims
 from mava.utils.make_env import make
-
-# from mava.evaluator import get_evaluator_setup
 
 
 def rollout(  # noqa: CCR001
@@ -594,8 +593,8 @@ def run_experiment(_config: DictConfig) -> None:
     ) = learner_setup((actor_net_key, critic_net_key), config, learner_devices)
 
     # Setup evaluator.
-    # evaluator_setup = get_evaluator_setup(cfg.arch.arch_name)
-    # eval_fn = evaluator_setup(cfg, vmap_actor_apply, log)
+    eval_envs = make(config)(config.arch.num_eval_episodes)
+    evaluator = evaluator_setup(eval_envs=eval_envs, apply_fn=apply_fns[0], config=config)
 
     # Calculate total timesteps.
     batch_size = int(
@@ -718,20 +717,26 @@ def run_experiment(_config: DictConfig) -> None:
 
             # Evaluation
             rng_e, _ = jax.random.split(rng_e)
-            """eval_fn(
-                params=unreplicated_params,
-                key=rng_e,
+            evaluator_output = evaluator(params=unreplicated_params, rng=rng_e)
+            # Log the results of the evaluation.
+            episode_return = logger.log_evaluator_metrics(
                 t_env=t_env,
-            )"""
+                metrics=evaluator_output,
+                eval_step=trainer_update_number,
+            )
 
         # Check if training is finished
         if trainer_update_number >= config.system.num_updates:
             rng_e, _ = jax.random.split(rng_e)
-            """eval_fn(
-                params=unreplicated_params,
-                key=rng_e,
+            # Measure absolute metric
+            evaluator_output = evaluator(params=unreplicated_params, rng=rng_e, eval_multiplier=10)
+            # Log the results of the evaluation.
+            episode_return = logger.log_evaluator_metrics(
                 t_env=t_env,
-            )"""
+                metrics=evaluator_output,
+                eval_step=trainer_update_number + 1,
+                absolute_metric=True,
+            )
             break
 
 
