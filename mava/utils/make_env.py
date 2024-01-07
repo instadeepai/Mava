@@ -28,6 +28,7 @@ from jumanji.environments.routing.robot_warehouse.generator import (
 from jumanji.wrappers import AutoResetWrapper
 from omegaconf import DictConfig
 
+from mava.utils.jumanji_register import JumanjiScenarioManager
 from mava.wrappers.gym import AgentIDWrapper as GymAgentIDWrapper
 from mava.wrappers.gym import GymWrapper
 from mava.wrappers.jaxmarl import JaxMarlWrapper
@@ -65,8 +66,12 @@ def make_jumanji_env(env_name: str, config: DictConfig) -> Tuple[Environment, En
         A tuple of the environments.
     """
     # Config generator and select the wrapper.
+    scenario_manager = JumanjiScenarioManager(env_name, config["env"]["scenario"])
+    task_attributes = scenario_manager.register_environment()
+    config["env"]["scenario"] = {config["env"]["scenario"]: task_attributes}
+
     generator = _jumanji_registry[env_name]["generator"]
-    generator = generator(**config.env.scenario.task_config)
+    generator = generator(**task_attributes)
     wrapper = _jumanji_registry[env_name]["wrapper"]
 
     # Create envs.
