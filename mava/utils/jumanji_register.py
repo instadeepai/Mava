@@ -24,6 +24,7 @@ LBF_ATTRIBUTES_RANGES: Dict[str, Any] = {
     "fov": range(2, 20),  # Field of view of agent.
     "num_agents": range(2, 20),
     "num_food": range(1, 10),
+    "max_agent_level": range(2, 10),
     "force_coop": [True, False],  # Force cooperation between agents.
 }
 
@@ -87,14 +88,11 @@ class JumanjiScenarioManager:
         """Checks if a task is present in the JSON file and extracts its attributes.
         If the task is not found, it will be saved and its attributes extracted.
         """
+        # Check and extract the task's attributes
         if self.task_name in self.scenarios[self.env_name]:
-            # Check and extract the task's attributes
-            attributes = self.scenarios[self.env_name][self.task_name]
-            return attributes
+            return self.scenarios[self.env_name][self.task_name]
 
-        attributes = ENV_FUNCTIONS[self.env_name]["checker"](self.task_name)
-
-        return attributes
+        return ENV_FUNCTIONS[self.env_name]["checker"](self.task_name)
 
 
 def lbf_register_jumanji() -> Dict[str, Dict[str, Any]]:
@@ -105,18 +103,19 @@ def lbf_register_jumanji() -> Dict[str, Dict[str, Any]]:
     num_agents = range(2, 5)
     num_food_items = range(2, 5)
     if_force_coop = [True, False]
-    if_partial_observation = [True, False]
+    partial_observation = [True, False]
 
     # Generate scenarios by combining different values of the attributes
     # Construct the task name based on the attributes and use it as a key
     scenarios = {
-        f"{'' if not fov else '2s-'}{grid_size}x{grid_size}-{n_agents}p-{n_food}f"
+        f"{'2s-' if partial_ob else ''}{grid_size}x{grid_size}-{n_agents}p-{n_food}f"
         + f"{'-coop' if force_coop else ''}": {
             # Individual scenario attributes
             "grid_size": grid_size,
-            "fov": grid_size if not fov else 2,
+            "fov": 2 if partial_ob else grid_size,
             "num_agents": n_agents,
             "num_food": n_food,
+            "max_agent_level": 2,
             "force_coop": force_coop,
         }
         # Nested loops iterating over attribute values
@@ -124,7 +123,7 @@ def lbf_register_jumanji() -> Dict[str, Dict[str, Any]]:
         for n_agents in num_agents
         for n_food in num_food_items
         for force_coop in if_force_coop
-        for fov in if_partial_observation
+        for partial_ob in partial_observation
     }
 
     return scenarios
@@ -145,6 +144,7 @@ def lbf_check_task(task_name: str) -> Dict[str, Any]:
         "fov": fov,
         "num_agents": num_agents,
         "num_food": num_food,
+        "max_agent_level": 2,
         "force_coop": force_coop,
     }
 
