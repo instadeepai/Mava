@@ -114,7 +114,7 @@ def lbf_register_jumanji() -> Dict[str, Dict[str, Any]]:
         + f"{'-coop' if force_coop else ''}": {
             # Individual scenario attributes
             "grid_size": grid_size,
-            "fov": 2 if not fov else grid_size,
+            "fov": grid_size if not fov else 2,
             "num_agents": n_agents,
             "num_food": n_food,
             "force_coop": force_coop,
