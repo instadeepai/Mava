@@ -1,3 +1,9 @@
 # ---Environment Configs---
+defaults:
+  - _self_
+
 env_name: RobotWarehouse-v0
-scenario: tiny-2ag # [tiny-2ag, tiny-4ag, tiny-4ag-easy, small-4ag]
+scenario: rware:rware-tiny-2ag-v1 # rware:type_scenario [rware-tiny-2ag-v1, rware-tiny-4ag-v1, rware-tiny-4ag-easy-v1, rware-small-4ag-v1]
+env_source: gym  # [gym,jumanji]
+
+use_individual_rewards: False  # If True, use the list of individual rewards (used if the env_source is gym).

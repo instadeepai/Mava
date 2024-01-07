@@ -1,9 +1,0 @@
-# ---Environment Configs---
-defaults:
-  - _self_
-
-env_name: gym:rware-v1
-# Possible scenarios:
-# rware-tiny-2ag-v1 | rware-tiny-4ag-v1 | rware-tiny-4ag-easy-v1 | rware-small-4ag-v1
-scenario: rware-tiny-2ag-v1
-use_individual_rewards: False  # If True, use the list of individual rewards.

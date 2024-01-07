@@ -66,9 +66,10 @@ def make_jumanji_env(env_name: str, config: DictConfig) -> Tuple[Environment, En
         A tuple of the environments.
     """
     # Config generator and select the wrapper.
-    scenario_manager = JumanjiScenarioManager(env_name, config["env"]["scenario"])
+    jumanji_scenario = "-".join(config.env.scenario.split("-")[1:-1])
+    scenario_manager = JumanjiScenarioManager(env_name, jumanji_scenario)
     task_attributes = scenario_manager.register_environment()
-    config["env"]["scenario"] = {config["env"]["scenario"]: task_attributes}
+    config.env.scenario = {jumanji_scenario: task_attributes}
 
     generator = _jumanji_registry[env_name]["generator"]
     generator = generator(**task_attributes)
@@ -188,12 +189,13 @@ def make(config: DictConfig) -> Union[Tuple[Environment, Environment], Callable]
         A tuple of the environments.
     """
     env_name = config.env.env_name
+    env_source = config.env.env_source
 
-    if env_name in _jumanji_registry:
+    if env_name in _jumanji_registry and env_source == "jumanji":
         return make_jumanji_env(env_name, config)
     elif env_name in jaxmarl.registered_envs:
         return make_jaxmarl_env(env_name, config)
-    elif env_name.startswith("gym"):
+    elif env_source == "gym":
         return make_gym_env(config)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")
