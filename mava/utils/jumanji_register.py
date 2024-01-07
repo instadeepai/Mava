@@ -108,11 +108,11 @@ def lbf_register_jumanji() -> Dict[str, Dict[str, Any]]:
     # Generate scenarios by combining different values of the attributes
     # Construct the task name based on the attributes and use it as a key
     scenarios = {
-        f"{'2s-' if partial_ob else ''}{grid_size}x{grid_size}-{n_agents}p-{n_food}f"
+        f"{'2s-' if partial_obs else ''}{grid_size}x{grid_size}-{n_agents}p-{n_food}f"
         + f"{'-coop' if force_coop else ''}": {
             # Individual scenario attributes
             "grid_size": grid_size,
-            "fov": 2 if partial_ob else grid_size,
+            "fov": 2 if partial_obs else grid_size,
             "num_agents": n_agents,
             "num_food": n_food,
             "max_agent_level": 2,
@@ -123,7 +123,7 @@ def lbf_register_jumanji() -> Dict[str, Dict[str, Any]]:
         for n_agents in num_agents
         for n_food in num_food_items
         for force_coop in if_force_coop
-        for partial_ob in partial_observation
+        for partial_obs in partial_observation
     }
 
     return scenarios
