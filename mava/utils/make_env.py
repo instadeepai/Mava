@@ -38,13 +38,13 @@ _jumanji_registry = {
 
 
 def add_optional_wrappers(env: Environment, config: Dict) -> Environment:
-    # Add agent id to observation.
-    if config["system"]["add_agent_id"]:
-        env = AgentIDWrapper(env)
-
     # Add the global state to observation.
     if config["system"]["add_global_state"]:
         env = GlobalStateWrapper(env)
+
+    # Add agent id to observation.
+    if config["system"]["add_agent_id"]:
+        env = AgentIDWrapper(env, config["system"]["add_global_state"])
 
     return env
 

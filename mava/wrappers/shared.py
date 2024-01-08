@@ -121,19 +121,15 @@ class AgentIDWrapper(Wrapper):
             (self._env.num_agents, num_obs_features), jnp.int32, "agents_view"
         )
 
-        if hasattr(obs_spec, "global_state"):
-            state_size = obs_spec.global_state.shape[-1] + self._env.num_agents
-        else:
-            state_size = num_obs_features * self._env.num_agents + self._env.num_agents
-
-        global_state = specs.Array(
-            (self._env.num_agents, state_size),
-            jnp.int32,
-            "global_state",
-        )
-
         if self.has_global_state:
+            wrapped_state_shape = obs_spec.global_state.shape
+            state_shape = (
+                *wrapped_state_shape[:-1],
+                wrapped_state_shape[-1] + self._env.num_agents,
+            )
+            global_state = specs.Array(state_shape, jnp.int32, "global_state")
             return obs_spec.replace(agents_view=agents_view, global_state=global_state)
+
         return obs_spec.replace(agents_view=agents_view)
 
 
