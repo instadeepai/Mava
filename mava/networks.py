@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import functools
-from typing import Dict, Sequence, Tuple, Union
+from typing import Callable, Dict, Sequence, Tuple, Union
 
 import chex
 import distrax
@@ -21,7 +21,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from flax import linen as nn
-from flax.linen.initializers import constant, orthogonal
+from flax.linen.initializers import orthogonal
 
 from mava.types import (
     Observation,
@@ -30,30 +30,20 @@ from mava.types import (
     RNNObservation,
 )
 
-activation_fns = {"relu": nn.relu, "tanh": nn.tanh}
-
 
 class MLPTorso(nn.Module):
     """MLP torso."""
 
     layer_sizes: Sequence[int]
-    activation: str = "relu"
+    activation_fn: Callable[[chex.Array], chex.Array] = nn.relu
     use_layer_norm: bool = False
-
-    def setup(self) -> None:
-        """Set up the activation function."""
-        self.activation_fn = activation_fns[self.activation]
 
     @nn.compact
     def __call__(self, observation: chex.Array) -> chex.Array:
         """Forward pass."""
         x = observation
         for layer_size in self.layer_sizes:
-            x = nn.Dense(
-                layer_size,
-                kernel_init=orthogonal(np.sqrt(2)),
-                bias_init=constant(0.0),
-            )(x)
+            x = nn.Dense(layer_size, kernel_init=orthogonal(np.sqrt(2)))(x)
             if self.use_layer_norm:
                 x = nn.LayerNorm(use_scale=False)(x)
             x = self.activation_fn(x)
@@ -72,9 +62,7 @@ class FeedForwardActor(nn.Module):
         x = observation.agents_view
 
         x = self.torso(x)
-        actor_output = nn.Dense(
-            self.num_actions, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
-        )(x)
+        actor_output = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01))(x)
 
         masked_logits = jnp.where(
             observation.action_mask,
@@ -82,9 +70,7 @@ class FeedForwardActor(nn.Module):
             jnp.finfo(jnp.float32).min,
         )
 
-        actor_policy = distrax.Categorical(logits=masked_logits)
-
-        return actor_policy
+        return distrax.Categorical(logits=masked_logits)
 
 
 class FeedForwardCritic(nn.Module):
@@ -106,9 +92,7 @@ class FeedForwardCritic(nn.Module):
             observation = observation.agents_view
 
         critic_output = self.torso(observation)
-        critic_output = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
-            critic_output
-        )
+        critic_output = nn.Dense(1, kernel_init=orthogonal(1.0))(critic_output)
 
         return jnp.squeeze(critic_output, axis=-1)
 
@@ -162,9 +146,7 @@ class RecurrentActor(nn.Module):
         policy_rnn_in = (policy_embedding, done)
         policy_hidden_state, policy_embedding = ScannedRNN()(policy_hidden_state, policy_rnn_in)
         actor_output = self.post_torso(policy_embedding)
-        actor_output = nn.Dense(
-            self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
-        )(actor_output)
+        actor_output = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(actor_output)
 
         masked_logits = jnp.where(
             observation.action_mask,
@@ -206,23 +188,31 @@ class RecurrentCritic(nn.Module):
         critic_rnn_in = (critic_embedding, done)
         critic_hidden_state, critic_embedding = ScannedRNN()(critic_hidden_state, critic_rnn_in)
         critic_output = self.post_torso(critic_embedding)
-        critic_output = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
-            critic_output
-        )
+        critic_output = nn.Dense(1, kernel_init=orthogonal(1.0))(critic_output)
 
         return critic_hidden_state, jnp.squeeze(critic_output, axis=-1)
 
 
-def get_networks(
+def parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex.Array]:
+    """Get the activation function."""
+    activation_fns: Dict[str, Callable[[chex.Array], chex.Array]] = {
+        "relu": nn.relu,
+        "tanh": nn.tanh,
+    }
+    return activation_fns[activation_fn_name]
+
+
+def make(
     config: Dict, network: str, centralised_critic: bool = False
 ) -> Union[Tuple[FeedForwardActor, FeedForwardCritic], Tuple[RecurrentActor, RecurrentCritic]]:
     """Get the networks."""
 
     def create_torso(network_key: str, layer_size_key: str) -> MLPTorso:
         """Helper function to create a torso object from the config."""
+        activation_fn = parse_activation_fn(config["network"][network_key]["activation"])
         return MLPTorso(
             layer_sizes=config["network"][network_key][layer_size_key],
-            activation=config["network"][network_key]["activation"],
+            activation_fn=activation_fn,
             use_layer_norm=config["network"][network_key]["use_layer_norm"],
         )
 
