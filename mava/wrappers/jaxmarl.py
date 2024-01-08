@@ -26,7 +26,7 @@ from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
 from jumanji.wrappers import Wrapper
 
-from mava.types import JaxMarlState, ObservationGlobalState
+from mava.types import JaxMarlState, Observation, ObservationGlobalState
 
 
 def _is_discrete(space: jaxmarl_spaces.Space) -> bool:
@@ -142,7 +142,7 @@ def jaxmarl_space_to_jumanji_spec(space: jaxmarl_spaces.Space) -> specs.Spec:
 class JaxMarlWrapper(Wrapper):
     """Wraps a JaxMarl environment so that its API is compatible with jumaji environments."""
 
-    def __init__(self, env: MultiAgentEnv, timelimit: int = 500):
+    def __init__(self, env: MultiAgentEnv, has_global_state: bool = False, timelimit: int = 500):
         # Check that all specs are the same as we only support homogeneous environments, for now ;)
         homogenous_error = (
             f"Mava only supports environments with homogeneous agents, "
@@ -156,39 +156,58 @@ class JaxMarlWrapper(Wrapper):
         self._action_shape = (self.action_spec().shape[0], int(self.action_spec().num_values[0]))
         self.agents = list(self._env.observation_spaces.keys())
         self.has_action_mask = hasattr(self._env, "get_avail_actions")
+        self.has_global_state = has_global_state
 
-    def reset(self, key: PRNGKey) -> Tuple[JaxMarlState, TimeStep[ObservationGlobalState]]:
+    def reset(
+        self, key: PRNGKey
+    ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
         key, reset_key = jax.random.split(key)
         obs, state = self._env.reset(reset_key)
 
-        obs = ObservationGlobalState(
-            agents_view=batchify(obs, self.agents),
-            action_mask=self.action_mask(state),
-            global_state=self.get_global_state(obs),
-            step_count=jnp.zeros(self._env.num_agents, dtype=int),
-        )
+        if self.has_global_state:
+            obs = ObservationGlobalState(
+                agents_view=batchify(obs, self.agents),
+                action_mask=self.action_mask(state),
+                global_state=self.get_global_state(obs),
+                step_count=jnp.zeros(self._env.num_agents, dtype=int),
+            )
+        else:
+            obs = Observation(
+                agents_view=batchify(obs, self.agents),
+                action_mask=self.action_mask(state),
+                step_count=jnp.zeros(self._env.num_agents, dtype=int),
+            )
         return JaxMarlState(state, key, 0), restart(obs, shape=(self.num_agents,))
 
     def step(
         self, state: JaxMarlState, action: Array
-    ) -> Tuple[JaxMarlState, TimeStep[ObservationGlobalState]]:
+    ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
         # todo: how do you know if it's a truncation with only dones?
         key, step_key = jax.random.split(state.key)
         obs, env_state, reward, done, infos = self._env.step(
             step_key, state.state, unbatchify(action, self.agents)
         )
 
+        if self.has_global_state:
+            obs = ObservationGlobalState(
+                agents_view=batchify(obs, self.agents),
+                action_mask=self.action_mask(env_state),
+                global_state=self.get_global_state(obs),
+                step_count=jnp.repeat(state.step, self._env.num_agents),
+            )
+        else:
+            obs = Observation(
+                agents_view=batchify(obs, self.agents),
+                action_mask=self.action_mask(env_state),
+                step_count=jnp.repeat(state.step, self._env.num_agents),
+            )
+
         step_type = jax.lax.select(done["__all__"], StepType.LAST, StepType.MID)
         ts = TimeStep(
             step_type=step_type,
             reward=batchify(reward, self.agents),
             discount=1.0 - batchify(done, self.agents),
-            observation=ObservationGlobalState(
-                agents_view=batchify(obs, self.agents),
-                action_mask=self.action_mask(env_state),
-                global_state=self.get_global_state(obs),
-                step_count=jnp.repeat(state.step, self._env.num_agents),
-            ),
+            observation=obs,
             extras=infos,
         )
 
@@ -210,18 +229,26 @@ class JaxMarlWrapper(Wrapper):
             (self._env.num_agents,), jnp.int32, 0, self._timelimit, "step_count"
         )
 
-        global_state = specs.Array(
-            (self._env.num_agents, self._env.state_size),
-            jnp.int32,
-            "global_state",
-        )
+        if self.has_global_state:
+            global_state = specs.Array(
+                (self._env.num_agents, self._env.state_size),
+                jnp.int32,
+                "global_state",
+            )
 
+            return specs.Spec(
+                ObservationGlobalState,
+                "ObservationSpec",
+                agents_view=agents_view,
+                action_mask=action_mask,
+                global_state=global_state,
+                step_count=step_count,
+            )
         return specs.Spec(
-            ObservationGlobalState,
+            Observation,
             "ObservationSpec",
             agents_view=agents_view,
             action_mask=action_mask,
-            global_state=global_state,
             step_count=step_count,
         )
 
