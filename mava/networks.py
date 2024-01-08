@@ -30,6 +30,8 @@ from mava.types import (
     RNNObservation,
 )
 
+activation_fns = {"relu": nn.relu, "tanh": nn.tanh}
+
 
 class MLPTorso(nn.Module):
     """MLP torso."""
@@ -40,10 +42,7 @@ class MLPTorso(nn.Module):
 
     def setup(self) -> None:
         """Set up the activation function."""
-        if self.activation == "relu":
-            self.activation_fn = nn.relu
-        elif self.activation == "tanh":
-            self.activation_fn = nn.tanh
+        self.activation_fn = activation_fns[self.activation]
 
     @nn.compact
     def __call__(self, observation: chex.Array) -> chex.Array:
