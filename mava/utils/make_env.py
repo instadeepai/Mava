@@ -94,7 +94,7 @@ def make_jaxmarl_env(env_name: str, config: Dict) -> Tuple[Environment, Environm
 
     kwargs = config["env"]["kwargs"]
     if "smax" in env_name.lower():
-        kwargs["scenario"] = map_name_to_scenario(config["env"]["scenario"])
+        kwargs["scenario"] = map_name_to_scenario(config["env"]["scenario"]["task_name"])
 
     # Placeholder for creating JAXMARL environment.
     env = JaxMarlWrapper(jaxmarl.make(env_name, **kwargs))
