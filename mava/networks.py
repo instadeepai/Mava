@@ -62,11 +62,11 @@ class FeedForwardActor(nn.Module):
         x = observation.agents_view
 
         x = self.torso(x)
-        actor_output = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01))(x)
+        actor_logits = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01))(x)
 
         masked_logits = jnp.where(
             observation.action_mask,
-            actor_output,
+            actor_logits,
             jnp.finfo(jnp.float32).min,
         )
 
@@ -143,14 +143,14 @@ class RecurrentActor(nn.Module):
         observation, done = observation_done
 
         policy_embedding = self.pre_torso(observation.agents_view)
-        policy_rnn_in = (policy_embedding, done)
-        policy_hidden_state, policy_embedding = ScannedRNN()(policy_hidden_state, policy_rnn_in)
-        actor_output = self.post_torso(policy_embedding)
-        actor_output = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(actor_output)
+        policy_rnn_input = (policy_embedding, done)
+        policy_hidden_state, policy_embedding = ScannedRNN()(policy_hidden_state, policy_rnn_input)
+        actor_logits = self.post_torso(policy_embedding)
+        actor_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(actor_logits)
 
         masked_logits = jnp.where(
             observation.action_mask,
-            actor_output,
+            actor_logits,
             jnp.finfo(jnp.float32).min,
         )
 
@@ -185,8 +185,8 @@ class RecurrentCritic(nn.Module):
             observation = observation.agents_view
 
         critic_embedding = self.pre_torso(observation)
-        critic_rnn_in = (critic_embedding, done)
-        critic_hidden_state, critic_embedding = ScannedRNN()(critic_hidden_state, critic_rnn_in)
+        critic_rnn_input = (critic_embedding, done)
+        critic_hidden_state, critic_embedding = ScannedRNN()(critic_hidden_state, critic_rnn_input)
         critic_output = self.post_torso(critic_embedding)
         critic_output = nn.Dense(1, kernel_init=orthogonal(1.0))(critic_output)
 
