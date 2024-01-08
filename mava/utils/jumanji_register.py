@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import json
 import os
 from typing import Any, Dict
@@ -90,9 +91,11 @@ class JumanjiScenarioManager:
         """
         # Check and extract the task's attributes
         if self.task_name in self.scenarios[self.env_name]:
-            return self.scenarios[self.env_name][self.task_name]
+            attributes = self.scenarios[self.env_name][self.task_name]
+            return attributes
 
-        return ENV_FUNCTIONS[self.env_name]["checker"](self.task_name)
+        attributes = ENV_FUNCTIONS[self.env_name]["checker"](self.task_name)
+        return attributes
 
 
 def lbf_register_jumanji() -> Dict[str, Dict[str, Any]]:
