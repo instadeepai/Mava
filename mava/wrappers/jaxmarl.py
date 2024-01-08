@@ -154,14 +154,8 @@ class JaxMarlWrapper(Wrapper):
         self._env: MultiAgentEnv
         self._timelimit = timelimit
         self._action_shape = (self.action_spec().shape[0], int(self.action_spec().num_values[0]))
-
         self.agents = list(self._env.observation_spaces.keys())
-
-        # Action mask fn
-        if hasattr(self._env, "get_avail_actions"):
-            self.get_avail_actions = self._get_avail_actions
-        else:
-            self.get_avail_actions = lambda _: jnp.ones(self._action_shape)
+        self.has_action_mask = hasattr(self._env, "get_avail_actions")
 
     def reset(self, key: PRNGKey) -> Tuple[JaxMarlState, TimeStep[ObservationGlobalState]]:
         key, reset_key = jax.random.split(key)
@@ -169,7 +163,7 @@ class JaxMarlWrapper(Wrapper):
 
         obs = ObservationGlobalState(
             agents_view=batchify(obs, self.agents),
-            action_mask=self.get_avail_actions(state),
+            action_mask=self.action_mask(state),
             global_state=self.get_global_state(obs),
             step_count=jnp.zeros(self._env.num_agents, dtype=int),
         )
@@ -191,7 +185,7 @@ class JaxMarlWrapper(Wrapper):
             discount=1.0 - batchify(done, self.agents),
             observation=ObservationGlobalState(
                 agents_view=batchify(obs, self.agents),
-                action_mask=self.get_avail_actions(env_state),
+                action_mask=self.action_mask(env_state),
                 global_state=self.get_global_state(obs),
                 step_count=jnp.repeat(state.step, self._env.num_agents),
             ),
@@ -242,10 +236,14 @@ class JaxMarlWrapper(Wrapper):
             shape=(self.num_agents,), dtype=float, minimum=0.0, maximum=1.0, name="discount"
         )
 
-    def _get_avail_actions(self, state: JaxMarlState) -> Array:
-        avail_actions = self._env.get_avail_actions(state)
-        action_mask = jnp.array(batchify(avail_actions, self.agents), dtype=jnp.float32)
-        return action_mask
+    def action_mask(self, state: JaxMarlState) -> Array:
+        """Get action mask for each agent."""
+        if self.has_action_mask:
+            avail_actions = self._env.get_avail_actions(state)
+            mask = jnp.array(batchify(avail_actions, self.agents), dtype=jnp.float32)
+        else:
+            mask = jnp.ones(self._action_shape)
+        return mask
 
     def get_global_state(self, obs: Dict[str, Array]) -> Array:
         """Get global state from observation and copy it for each agent."""
