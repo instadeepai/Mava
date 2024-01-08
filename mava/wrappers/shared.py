@@ -120,11 +120,14 @@ class AgentIDWrapper(Wrapper):
         agents_view = specs.Array(
             (self._env.num_agents, num_obs_features), jnp.int32, "agents_view"
         )
+
+        if hasattr(obs_spec, "global_state"):
+            state_size = obs_spec.global_state.shape[-1] + self._env.num_agents
+        else:
+            state_size = num_obs_features * self._env.num_agents + self._env.num_agents
+
         global_state = specs.Array(
-            (
-                self._env.num_agents,
-                num_obs_features * self._env.num_agents + self._env.num_agents,
-            ),
+            (self._env.num_agents, state_size),
             jnp.int32,
             "global_state",
         )
@@ -142,66 +145,7 @@ class GlobalStateWrapper(Wrapper):
     by concatenating the observations of all agents.
     """
 
-    def __init__(self, env: Environment, add_agent_id: bool = False) -> None:
-        super().__init__(env)
-
-        self.add_agent_id = add_agent_id
-        if hasattr(self._env, "state_size"):
-            self.state_size = self._env.state_size
-            if add_agent_id:
-                self.state_size += self._env.num_allies
-            self.modify_observation = self._add_global_state
-        else:
-            obs_spec = self._env.observation_spec()
-            num_obs_features = obs_spec.agents_view.shape[-1]
-            self.state_size = self._env.num_agents * num_obs_features
-            self.modify_observation = self._concatenate_observation
-
-    def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
-        """Reset the environment. Updates the step count."""
-        state, timestep = self._env.reset(key)
-        return state, self.modify_observation(timestep)
-
-    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
-        """Step the environment. Updates the step count."""
-        state, timestep = self._env.step(state, action)
-        return state, self.modify_observation(timestep)
-
-    def observation_spec(self) -> specs.Spec[ObservationGlobalState]:
-        """Specification of the observation of the `RobotWarehouse` environment."""
-        obs_spec = self._env.observation_spec()
-        global_state = specs.Array(
-            (self._env.num_agents, self.state_size),
-            jnp.int32,
-            "global_state",
-        )
-        return specs.Spec(
-            ObservationGlobalState,
-            "ObservationSpec",
-            agents_view=obs_spec.agents_view,
-            action_mask=obs_spec.action_mask,
-            global_state=global_state,
-            step_count=obs_spec.step_count,
-        )
-
-    def _add_global_state(self, timestep: TimeStep) -> TimeStep[ObservationGlobalState]:
-        """Get the global state from the environment."""
-        global_state = timestep.extras.pop("global_state")
-        global_state = jnp.tile(global_state, (self._env.num_agents, 1))
-        if self.add_agent_id:
-            agents_id = jnp.eye(self._env.num_allies)
-            global_state = jnp.concatenate((global_state, agents_id), axis=1)
-
-        observation = ObservationGlobalState(
-            global_state=global_state,
-            agents_view=timestep.observation.agents_view,
-            action_mask=timestep.observation.action_mask,
-            step_count=timestep.observation.step_count,
-        )
-        return timestep.replace(observation=observation)
-
-    def _concatenate_observation(self, timestep: TimeStep) -> TimeStep[ObservationGlobalState]:
-        """Get the global state by concatenating the observations of all agents."""
+    def modify_timestep(self, timestep: TimeStep) -> TimeStep[ObservationGlobalState]:
         global_state = jnp.concatenate(timestep.observation.agents_view, axis=0)
         global_state = jnp.tile(global_state, (self._env.num_agents, 1))
 
@@ -211,4 +155,35 @@ class GlobalStateWrapper(Wrapper):
             action_mask=timestep.observation.action_mask,
             step_count=timestep.observation.step_count,
         )
+
         return timestep.replace(observation=observation)
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
+        """Reset the environment. Updates the step count."""
+        state, timestep = self._env.reset(key)
+        return state, self.modify_timestep(timestep)
+
+    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
+        """Step the environment. Updates the step count."""
+        state, timestep = self._env.step(state, action)
+        return state, self.modify_timestep(timestep)
+
+    def observation_spec(self) -> specs.Spec[ObservationGlobalState]:
+        """Specification of the observation of the `RobotWarehouse` environment."""
+
+        obs_spec = self._env.observation_spec()
+        num_obs_features = obs_spec.agents_view.shape[-1]
+        global_state = specs.Array(
+            (self._env.num_agents, self._env.num_agents * num_obs_features),
+            jnp.int32,
+            "global_state",
+        )
+
+        return specs.Spec(
+            ObservationGlobalState,
+            "ObservationSpec",
+            agents_view=obs_spec.agents_view,
+            action_mask=obs_spec.action_mask,
+            global_state=global_state,
+            step_count=obs_spec.step_count,
+        )
