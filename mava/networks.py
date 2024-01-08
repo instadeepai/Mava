@@ -222,9 +222,9 @@ def get_networks(
     def create_torso(network_key: str, layer_size_key: str) -> MLPTorso:
         """Helper function to create a torso object from the config."""
         return MLPTorso(
-            layer_sizes=config["system"][network_key][layer_size_key],
-            activation=config["system"][network_key]["activation"],
-            use_layer_norm=config["system"][network_key]["use_layer_norm"],
+            layer_sizes=config["network"][network_key][layer_size_key],
+            activation=config["network"][network_key]["activation"],
+            use_layer_norm=config["network"][network_key]["use_layer_norm"],
         )
 
     if network == "feedforward":
@@ -248,6 +248,6 @@ def get_networks(
             centralised_critic=centralised_critic,
         )
     else:
-        raise ValueError(f"Network {config['system']['network']} not supported.")
+        raise ValueError(f"The network '{network}' is not supported.")
 
     return actor, critic

@@ -488,11 +488,12 @@ def learner_setup(
 
     # Initialise hidden states.
     init_policy_hstate = ScannedRNN.initialize_carry(
-        (config["arch"]["num_envs"]), config["system"]["actor_network"]["pre_torso_layer_sizes"][-1]
+        (config["arch"]["num_envs"]),
+        config["network"]["actor_network"]["pre_torso_layer_sizes"][-1],
     )
     init_critic_hstate = ScannedRNN.initialize_carry(
         (config["arch"]["num_envs"]),
-        config["system"]["critic_network"]["pre_torso_layer_sizes"][-1],
+        config["network"]["critic_network"]["pre_torso_layer_sizes"][-1],
     )
 
     # initialise params and optimiser state.

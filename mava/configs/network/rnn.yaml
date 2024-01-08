@@ -1,0 +1,12 @@
+# ---Recurrent Structure Networks---
+actor_network:
+  use_layer_norm: True
+  activation: "relu"
+  pre_torso_layer_sizes: [128]
+  post_torso_layer_sizes: [128]
+
+critic_network:
+  use_layer_norm: False
+  activation: "relu"
+  pre_torso_layer_sizes: [128]
+  post_torso_layer_sizes: [128]
