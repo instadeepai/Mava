@@ -223,15 +223,15 @@ def get_networks(
     def create_torso(network_key: str, layer_size_key: str) -> MLPTorso:
         """Helper function to create a torso object from the config."""
         return MLPTorso(
-            layer_sizes=config["system"][network_key][layer_size_key],
-            activation=config["system"][network_key]["activation"],
-            use_layer_norm=config["system"][network_key]["use_layer_norm"],
+            layer_sizes=config.system[network_key][layer_size_key],
+            activation=config.system[network_key].activation,
+            use_layer_norm=config.system[network_key].use_layer_norm,
         )
 
     if network == "feedforward":
         actor = FeedForwardActor(
             torso=create_torso("actor_network", "layer_sizes"),
-            num_actions=config["system"]["num_actions"],
+            num_actions=config.system.num_actions,
         )
         critic = FeedForwardCritic(
             torso=create_torso("critic_network", "layer_sizes"),
@@ -239,7 +239,7 @@ def get_networks(
         )
     elif network == "recurrent":
         actor = RecurrentActor(
-            action_dim=config["system"]["num_actions"],
+            action_dim=config.system.num_actions,
             pre_torso=create_torso("actor_network", "pre_torso_layer_sizes"),
             post_torso=create_torso("actor_network", "post_torso_layer_sizes"),
         )
