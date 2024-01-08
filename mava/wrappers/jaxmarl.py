@@ -167,7 +167,7 @@ class JaxMarlWrapper(Wrapper):
             global_state=self.get_global_state(obs),
             step_count=jnp.zeros(self._env.num_agents, dtype=int),
         )
-        return JaxMarlState(state, key, 0), restart(obs, extras={}, shape=(self.num_agents,))
+        return JaxMarlState(state, key, 0), restart(obs, shape=(self.num_agents,))
 
     def step(
         self, state: JaxMarlState, action: Array

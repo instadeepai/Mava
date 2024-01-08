@@ -277,7 +277,7 @@ def evaluator_setup(
     """Initialise evaluator_fn."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
-    win_rate = config["env"]["env_name"] == ("HeuristicEnemySMAX" or "LearnedPolicyEnemySMAX")
+    win_rate = config["env"]["env_name"] in ["HeuristicEnemySMAX", "LearnedPolicyEnemySMAX"]
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
         assert scanned_rnn is not None
