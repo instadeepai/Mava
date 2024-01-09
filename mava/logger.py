@@ -64,7 +64,7 @@ def get_logger_tools(logger: Logger) -> LogFn:  # noqa: CCR001
                 # To measure the absolute metric, we evaluate the best policy
                 # found across training over 10 times the evaluation episodes.
                 # For more details on the absolute metric please see:
-                # https://arxiv.org/abs/2209.10485
+                # https://arxiv.org/abs/2209.10485.
                 n_episodes = logger.num_eval_episodes * 10
                 win_rate = (n_won_episodes / n_episodes) * 100
         elif trainer_metric:
