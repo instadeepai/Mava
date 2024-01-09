@@ -47,9 +47,9 @@ from mava.types import (
     Params,
     PPOTransition,
 )
+from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import merge_leading_dims
-from mava.utils.make_env import make
 from mava.utils.total_timestep_checker import check_total_timesteps
 
 
@@ -498,7 +498,7 @@ def run_experiment(_config: Dict) -> None:
     config = copy.deepcopy(_config)
 
     # Create the enviroments for train and eval.
-    env, eval_env = make(config)
+    env, eval_env = environments.make(config)
 
     # PRNG keys.
     key, key_e, actor_net_key, critic_net_key = jax.random.split(
