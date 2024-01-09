@@ -26,13 +26,13 @@ from jumanji.environments.routing.robot_warehouse.generator import (
 )
 from jumanji.wrappers import AutoResetWrapper
 
-from mava.utils.jumanji_register import JumanjiScenarioManager
+import mava.utils.jumanji_registry as jumanji_registry
 from mava.wrappers.jaxmarl import JaxMarlWrapper
 from mava.wrappers.jumanji import LbfWrapper, RwareWrapper
 from mava.wrappers.shared import AgentIDWrapper, GlobalStateWrapper, LogWrapper
 
 # Registry mapping environment names to their generator and wrapper classes.
-_jumanji_registry = {
+_jumanji_env_class = {
     "RobotWarehouse-v0": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper},
     "LevelBasedForaging-v0": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
 }
@@ -62,13 +62,14 @@ def make_jumanji_env(env_name: str, config: Dict) -> Tuple[Environment, Environm
         A tuple of the environments.
     """
     # Config generator and select the wrapper.
-    scenario_manager = JumanjiScenarioManager(config["env"]["env_name"], config["env"]["scenario"])
-    task_attributes = scenario_manager.register_environment()
-    config["env"]["scenario"] = {config["env"]["scenario"]: task_attributes}
+    task_config = jumanji_registry.get_task_config(
+        config["env"]["env_name"], config["env"]["scenario"]
+    )
+    config["env"]["scenario"] = {config["env"]["scenario"]: task_config}
 
-    generator = _jumanji_registry[env_name]["generator"]
-    generator = generator(**task_attributes)
-    wrapper = _jumanji_registry[env_name]["wrapper"]
+    generator = _jumanji_env_class[env_name]["generator"]
+    generator = generator(**task_config)
+    wrapper = _jumanji_env_class[env_name]["wrapper"]
 
     # Create envs.
     env = jumanji.make(env_name, generator=generator)
@@ -126,7 +127,7 @@ def make(config: Dict) -> Tuple[Environment, Environment]:
     """
     env_name = config["env"]["env_name"]
 
-    if env_name in _jumanji_registry:
+    if env_name in _jumanji_env_class:
         return make_jumanji_env(env_name, config)
     elif env_name in jaxmarl.registered_envs:
         return make_jaxmarl_env(env_name, config)
