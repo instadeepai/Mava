@@ -673,7 +673,7 @@ def run_experiment(_config: Dict) -> None:
     config = copy.deepcopy(_config)
 
     # Create the enviroments for train and eval.
-    env, eval_env = make(config=config, add_global_state=False)
+    env, eval_env = make(config)
 
     # PRNG keys.
     rng, rng_e, actor_net_key, critic_net_key = jax.random.split(
