@@ -50,6 +50,7 @@ from mava.types import (
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import merge_leading_dims
 from mava.utils.make_env import make
+from mava.utils.total_timestep_checker import check_total_timesteps
 
 
 class Actor(nn.Module):
@@ -521,28 +522,7 @@ def run_experiment(_config: Dict) -> None:
     # Calculate total timesteps.
     n_devices = len(jax.devices())
     config["arch"]["devices"] = jax.devices()
-    if config["system"]["total_timesteps"] is None:
-        config["system"]["total_timesteps"] = (
-            n_devices
-            * config["system"]["num_updates"]
-            * config["system"]["rollout_length"]
-            * config["system"]["update_batch_size"]
-            * config["arch"]["num_envs"]
-        )
-    else:
-        config["system"]["num_updates"] = (
-            config["system"]["total_timesteps"]
-            // config["system"]["rollout_length"]
-            // config["system"]["update_batch_size"]
-            // config["arch"]["num_envs"]
-            // n_devices
-        )
-        print(
-            f"{Fore.RED}{Style.BRIGHT} Updated number of updates"
-            + f"to {config['system']['num_updates']}: If you want to train"
-            + " for a specific number of updates, please set total_timesteps to None"
-            + f"{Style.RESET_ALL}"
-        )
+    config = check_total_timesteps(config)
 
     # Calculate number of updates per evaluation.
     assert (
