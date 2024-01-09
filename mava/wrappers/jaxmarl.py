@@ -140,7 +140,7 @@ def jaxmarl_space_to_jumanji_spec(space: jaxmarl_spaces.Space) -> specs.Spec:
 
 
 class JaxMarlWrapper(Wrapper):
-    """Wraps a JaxMarl environment so that its API is compatible with jumaji environments."""
+    """Wraps a JaxMarl environment so that its API is compatible with Jumanji environments."""
 
     def __init__(self, env: MultiAgentEnv, has_global_state: bool = False, timelimit: int = 500):
         # Check that all specs are the same as we only support homogeneous environments, for now ;)
@@ -269,7 +269,7 @@ class JaxMarlWrapper(Wrapper):
             avail_actions = self._env.get_avail_actions(state)
             mask = jnp.array(batchify(avail_actions, self.agents), dtype=jnp.float32)
         else:
-            mask = jnp.ones(self._action_shape)
+            mask = jnp.ones(self._action_shape, dtype=jnp.float32)
         return mask
 
     def get_global_state(self, obs: Dict[str, Array]) -> Array:

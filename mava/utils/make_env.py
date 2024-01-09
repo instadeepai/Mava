@@ -96,12 +96,13 @@ def make_jaxmarl_env(env_name: str, config: Dict) -> Tuple[Environment, Environm
     if "smax" in env_name.lower():
         kwargs["scenario"] = map_name_to_scenario(config["env"]["scenario"]["task_name"])
 
-    # Placeholder for creating JAXMARL environment.
+    # Create jaxmarl envs.
     env = JaxMarlWrapper(jaxmarl.make(env_name, **kwargs), config["system"]["add_global_state"])
     eval_env = JaxMarlWrapper(
         jaxmarl.make(env_name, **kwargs), config["system"]["add_global_state"]
     )
 
+    # Add optional wrappers.
     if config["system"]["add_agent_id"]:
         env = AgentIDWrapper(env, config["system"]["add_global_state"])
         eval_env = AgentIDWrapper(eval_env, config["system"]["add_global_state"])
