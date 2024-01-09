@@ -54,16 +54,16 @@ def get_ff_evaluator_fn(
         def _env_step(eval_state: EvalState) -> EvalState:
             """Step the environment."""
             # PRNG keys.
-            rng, env_state, last_timestep, step_count, episode_return = eval_state
+            key, env_state, last_timestep, step_count, episode_return = eval_state
 
             # Select action.
-            rng, _rng = jax.random.split(rng)
+            key, _key = jax.random.split(key)
             pi = apply_fn(params, last_timestep.observation)
 
             if config["arch"]["evaluation_greedy"]:
                 action = pi.mode()
             else:
-                action = pi.sample(seed=_rng)
+                action = pi.sample(seed=_key)
 
             # Step environment.
             env_state, timestep = env.step(env_state, action)
@@ -71,7 +71,7 @@ def get_ff_evaluator_fn(
             # Log episode metrics.
             episode_return += timestep.reward
             step_count += 1
-            eval_state = EvalState(rng, env_state, timestep, step_count, episode_return)
+            eval_state = EvalState(key, env_state, timestep, step_count, episode_return)
             return eval_state
 
         def not_done(carry: Tuple) -> bool:
@@ -88,7 +88,7 @@ def get_ff_evaluator_fn(
         }
         return eval_metrics
 
-    def evaluator_fn(trained_params: FrozenDict, rng: chex.PRNGKey) -> ExperimentOutput[EvalState]:
+    def evaluator_fn(trained_params: FrozenDict, key: chex.PRNGKey) -> ExperimentOutput[EvalState]:
         """Evaluator function."""
 
         # Initialise environment states and timesteps.
@@ -96,17 +96,17 @@ def get_ff_evaluator_fn(
 
         eval_batch = (config["arch"]["num_eval_episodes"] // n_devices) * eval_multiplier
 
-        rng, *env_rngs = jax.random.split(rng, eval_batch + 1)
+        key, *env_keys = jax.random.split(key, eval_batch + 1)
         env_states, timesteps = jax.vmap(env.reset)(
-            jnp.stack(env_rngs),
+            jnp.stack(env_keys),
         )
-        # Split rngs for each core.
-        rng, *step_rngs = jax.random.split(rng, eval_batch + 1)
+        # Split keys for each core.
+        key, *step_keys = jax.random.split(key, eval_batch + 1)
         # Add dimension to pmap over.
-        step_rngs = jnp.stack(step_rngs).reshape(eval_batch, -1)
+        step_keys = jnp.stack(step_keys).reshape(eval_batch, -1)
 
         eval_state = EvalState(
-            key=step_rngs,
+            key=step_keys,
             env_state=env_states,
             timestep=timesteps,
             step_count=jnp.zeros((eval_batch, 1)),
@@ -139,7 +139,7 @@ def get_rnn_evaluator_fn(
         def _env_step(eval_state: RNNEvalState) -> RNNEvalState:
             """Step the environment."""
             (
-                rng,
+                key,
                 env_state,
                 last_timestep,
                 last_done,
@@ -149,7 +149,7 @@ def get_rnn_evaluator_fn(
             ) = eval_state
 
             # PRNG keys.
-            rng, policy_rng = jax.random.split(rng)
+            key, policy_key = jax.random.split(key)
 
             # Add a batch dimension and env dimension to the observation.
             batched_observation = jax.tree_util.tree_map(
@@ -166,7 +166,7 @@ def get_rnn_evaluator_fn(
             if config["arch"]["evaluation_greedy"]:
                 action = pi.mode()
             else:
-                action = pi.sample(seed=policy_rng)
+                action = pi.sample(seed=policy_key)
 
             # Step environment.
             env_state, timestep = env.step(env_state, action[-1].squeeze(0))
@@ -175,7 +175,7 @@ def get_rnn_evaluator_fn(
             episode_return += timestep.reward
             step_count += 1
             eval_state = RNNEvalState(
-                rng,
+                key,
                 env_state,
                 timestep,
                 jnp.repeat(timestep.last(), config["system"]["num_agents"]),
@@ -200,7 +200,7 @@ def get_rnn_evaluator_fn(
         return eval_metrics
 
     def evaluator_fn(
-        trained_params: FrozenDict, rng: chex.PRNGKey
+        trained_params: FrozenDict, key: chex.PRNGKey
     ) -> ExperimentOutput[RNNEvalState]:
         """Evaluator function."""
 
@@ -209,12 +209,12 @@ def get_rnn_evaluator_fn(
 
         eval_batch = config["arch"]["num_eval_episodes"] // n_devices * eval_multiplier
 
-        rng, *env_rngs = jax.random.split(rng, eval_batch + 1)
-        env_states, timesteps = jax.vmap(env.reset)(jnp.stack(env_rngs))
-        # Split rngs for each core.
-        rng, *step_rngs = jax.random.split(rng, eval_batch + 1)
+        key, *env_keys = jax.random.split(key, eval_batch + 1)
+        env_states, timesteps = jax.vmap(env.reset)(jnp.stack(env_keys))
+        # Split keys for each core.
+        key, *step_keys = jax.random.split(key, eval_batch + 1)
         # Add dimension to pmap over.
-        step_rngs = jnp.stack(step_rngs).reshape(eval_batch, -1)
+        step_keys = jnp.stack(step_keys).reshape(eval_batch, -1)
 
         # Initialise hidden state.
         init_hstate = scanned_rnn.initialize_carry(eval_batch, 128)
@@ -232,7 +232,7 @@ def get_rnn_evaluator_fn(
         )
 
         eval_state = RNNEvalState(
-            key=step_rngs,
+            key=step_keys,
             env_state=env_states,
             timestep=timesteps,
             dones=dones,
@@ -257,7 +257,7 @@ def get_rnn_evaluator_fn(
 
 def evaluator_setup(
     eval_env: Environment,
-    rng_e: chex.PRNGKey,
+    key_e: chex.PRNGKey,
     network: Any,
     params: FrozenDict,
     config: Dict,
@@ -308,9 +308,9 @@ def evaluator_setup(
     evaluator = jax.pmap(evaluator, axis_name="device")
     absolute_metric_evaluator = jax.pmap(absolute_metric_evaluator, axis_name="device")
 
-    # Broadcast trained params to cores and split rngs for each core.
+    # Broadcast trained params to cores and split keys for each core.
     trained_params = jax.tree_util.tree_map(lambda x: x[:, 0, ...], params)
-    rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
-    eval_rngs = jnp.stack(eval_rngs).reshape(n_devices, -1)
+    key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
+    eval_keys = jnp.stack(eval_keys).reshape(n_devices, -1)
 
-    return evaluator, absolute_metric_evaluator, (trained_params, eval_rngs)
+    return evaluator, absolute_metric_evaluator, (trained_params, eval_keys)

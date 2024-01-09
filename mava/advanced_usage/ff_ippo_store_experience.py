@@ -137,7 +137,7 @@ def get_learner_fn(
             learner_state (NamedTuple):
                 - params (Params): The current model parameters.
                 - opt_states (OptStates): The current optimizer states.
-                - rng (PRNGKey): The random number generator state.
+                - key (PRNGKey): The random number generator state.
                 - env_state (State): The environment state.
                 - last_timestep (TimeStep): The last timestep in the current trajectory.
             _ (Any): The current metrics info.
@@ -145,13 +145,13 @@ def get_learner_fn(
 
         def _env_step(learner_state: LearnerState, _: Any) -> Tuple[LearnerState, PPOTransition]:
             """Step the environment."""
-            params, opt_states, rng, env_state, last_timestep = learner_state
+            params, opt_states, key, env_state, last_timestep = learner_state
 
             # SELECT ACTION
-            rng, policy_rng = jax.random.split(rng)
+            key, policy_key = jax.random.split(key)
             actor_policy = actor_apply_fn(params.actor_params, last_timestep.observation)
             value = critic_apply_fn(params.critic_params, last_timestep.observation)
-            action = actor_policy.sample(seed=policy_rng)
+            action = actor_policy.sample(seed=policy_key)
             log_prob = actor_policy.log_prob(action)
 
             # STEP ENVIRONMENT
@@ -173,7 +173,7 @@ def get_learner_fn(
                 done, action, value, timestep.reward, log_prob, last_timestep.observation, info
             )
 
-            learner_state = LearnerState(params, opt_states, rng, env_state, timestep)
+            learner_state = LearnerState(params, opt_states, key, env_state, timestep)
             return learner_state, transition
 
         # STEP ENVIRONMENT FOR ROLLOUT LENGTH
@@ -182,7 +182,7 @@ def get_learner_fn(
         )
 
         # CALCULATE ADVANTAGE
-        params, opt_states, rng, env_state, last_timestep = learner_state
+        params, opt_states, key, env_state, last_timestep = learner_state
         last_val = critic_apply_fn(params.critic_params, last_timestep.observation)
 
         def _calculate_gae(
@@ -335,12 +335,12 @@ def get_learner_fn(
 
                 return (new_params, new_opt_state), loss_info
 
-            params, opt_states, traj_batch, advantages, targets, rng = update_state
-            rng, shuffle_rng = jax.random.split(rng)
+            params, opt_states, traj_batch, advantages, targets, key = update_state
+            key, shuffle_key = jax.random.split(key)
 
             # SHUFFLE MINIBATCHES
             batch_size = config["system"]["rollout_length"] * config["arch"]["num_envs"]
-            permutation = jax.random.permutation(shuffle_rng, batch_size)
+            permutation = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
             batch = jax.tree_util.tree_map(lambda x: merge_leading_dims(x, 2), batch)
             shuffled_batch = jax.tree_util.tree_map(
@@ -358,18 +358,18 @@ def get_learner_fn(
                 _update_minibatch, (params, opt_states), minibatches
             )
 
-            update_state = (params, opt_states, traj_batch, advantages, targets, rng)
+            update_state = (params, opt_states, traj_batch, advantages, targets, key)
             return update_state, loss_info
 
-        update_state = (params, opt_states, traj_batch, advantages, targets, rng)
+        update_state = (params, opt_states, traj_batch, advantages, targets, key)
 
         # UPDATE EPOCHS
         update_state, loss_info = jax.lax.scan(
             _update_epoch, update_state, None, config["system"]["ppo_epochs"]
         )
 
-        params, opt_states, traj_batch, advantages, targets, rng = update_state
-        learner_state = LearnerState(params, opt_states, rng, env_state, last_timestep)
+        params, opt_states, traj_batch, advantages, targets, key = update_state
+        learner_state = LearnerState(params, opt_states, key, env_state, last_timestep)
         metric = traj_batch.info
         return learner_state, (metric, loss_info, traj_batch)
 
@@ -386,7 +386,7 @@ def get_learner_fn(
             learner_state (NamedTuple):
                 - params (Params): The initial model parameters.
                 - opt_states (OptStates): The initial optimizer state.
-                - rng (chex.PRNGKey): The random number generator state.
+                - key (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
         """
@@ -413,7 +413,7 @@ def get_learner_fn(
 
 
 def learner_setup(
-    env: Environment, rngs: chex.Array, config: Dict
+    env: Environment, keys: chex.Array, config: Dict
 ) -> Tuple[StoreExpLearnerFn[LearnerState], Actor, LearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
@@ -426,7 +426,7 @@ def learner_setup(
     config["system"]["num_actions"] = num_actions
 
     # PRNG keys.
-    rng, rng_p = rngs
+    key, key_p = keys
 
     # Define network and optimiser.
     actor_network = Actor(config["system"]["num_actions"])
@@ -446,11 +446,11 @@ def learner_setup(
     init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
 
     # Initialise actor params and optimiser state.
-    actor_params = actor_network.init(rng_p, init_x)
+    actor_params = actor_network.init(key_p, init_x)
     actor_opt_state = actor_optim.init(actor_params)
 
     # Initialise critic params and optimiser state.
-    critic_params = critic_network.init(rng_p, init_x)
+    critic_params = critic_network.init(key_p, init_x)
     critic_opt_state = critic_optim.init(critic_params)
 
     # Vmap network apply function over number of agents.
@@ -484,21 +484,21 @@ def learner_setup(
     critic_opt_state = jax.tree_map(broadcast, critic_opt_state)
 
     # Initialise environment states and timesteps.
-    rng, *env_rngs = jax.random.split(
-        rng, n_devices * config["system"]["update_batch_size"] * config["arch"]["num_envs"] + 1
+    key, *env_keys = jax.random.split(
+        key, n_devices * config["system"]["update_batch_size"] * config["arch"]["num_envs"] + 1
     )
     env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
-        jnp.stack(env_rngs),
+        jnp.stack(env_keys),
     )
 
-    # Split rngs for each core.
-    rng, *step_rngs = jax.random.split(rng, n_devices * config["system"]["update_batch_size"] + 1)
+    # Split keys for each core.
+    key, *step_keys = jax.random.split(key, n_devices * config["system"]["update_batch_size"] + 1)
 
     # Add dimension to pmap over.
-    reshape_step_rngs = lambda x: x.reshape(
+    reshape_step_keys = lambda x: x.reshape(
         (n_devices, config["system"]["update_batch_size"]) + x.shape[1:]
     )
-    step_rngs = reshape_step_rngs(jnp.stack(step_rngs))
+    step_keys = reshape_step_keys(jnp.stack(step_keys))
     reshape_states = lambda x: x.reshape(
         (n_devices, config["system"]["update_batch_size"], config["arch"]["num_envs"]) + x.shape[1:]
     )
@@ -508,7 +508,7 @@ def learner_setup(
     params = Params(actor_params, critic_params)
     opt_states = OptStates(actor_opt_state, critic_opt_state)
 
-    init_learner_state = LearnerState(params, opt_states, step_rngs, env_states, timesteps)
+    init_learner_state = LearnerState(params, opt_states, step_keys, env_states, timesteps)
     return learn, actor_network, init_learner_state
 
 
@@ -523,15 +523,15 @@ def run_experiment(_config: Dict) -> None:  # noqa: CCR001
     env, eval_env = make(config=config)
 
     # PRNG keys.
-    rng, rng_e, rng_p = jax.random.split(jax.random.PRNGKey(config["system"]["seed"]), num=3)
+    key, key_e, key_p = jax.random.split(jax.random.PRNGKey(config["system"]["seed"]), num=3)
 
     # Setup learner.
-    learn, actor_network, learner_state = learner_setup(env, (rng, rng_p), config)
+    learn, actor_network, learner_state = learner_setup(env, (key, key_p), config)
 
     # Setup evaluator.
-    evaluator, absolute_metric_evaluator, (trained_params, eval_rngs) = evaluator_setup(
+    evaluator, absolute_metric_evaluator, (trained_params, eval_keys) = evaluator_setup(
         eval_env=eval_env,
-        rng_e=rng_e,
+        key_e=key_e,
         network=actor_network,
         params=learner_state.params.actor_params,
         config=config,
@@ -690,12 +690,12 @@ def run_experiment(_config: Dict) -> None:  # noqa: CCR001
             lambda x: x[:, 0, ...],
             learner_output.learner_state.params.actor_params,  # Select only actor params
         )
-        rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
-        eval_rngs = jnp.stack(eval_rngs)
-        eval_rngs = eval_rngs.reshape(n_devices, -1)
+        key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
+        eval_keys = jnp.stack(eval_keys)
+        eval_keys = eval_keys.reshape(n_devices, -1)
 
         # Evaluate.
-        evaluator_output = evaluator(trained_params, eval_rngs)
+        evaluator_output = evaluator(trained_params, eval_keys)
         jax.block_until_ready(evaluator_output)
 
         # Log the results of the evaluation.
@@ -729,11 +729,11 @@ def run_experiment(_config: Dict) -> None:  # noqa: CCR001
     if config["arch"]["absolute_metric"]:
         start_time = time.time()
 
-        rng_e, *eval_rngs = jax.random.split(rng_e, n_devices + 1)
-        eval_rngs = jnp.stack(eval_rngs)
-        eval_rngs = eval_rngs.reshape(n_devices, -1)
+        key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
+        eval_keys = jnp.stack(eval_keys)
+        eval_keys = eval_keys.reshape(n_devices, -1)
 
-        evaluator_output = absolute_metric_evaluator(best_params, eval_rngs)
+        evaluator_output = absolute_metric_evaluator(best_params, eval_keys)
         jax.block_until_ready(evaluator_output)
 
         elapsed_time = time.time() - start_time
