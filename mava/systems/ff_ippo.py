@@ -147,6 +147,8 @@ def get_learner_fn(
             # Step environment
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
+            trunc = jnp.repeat(timestep.last(), config["system"]["num_agents"])
+            trunc = trunc.reshape(config["arch"]["num_envs"], -1)
             term = 1 - timestep.discount
 
             # Log episode metrics
@@ -156,7 +158,14 @@ def get_learner_fn(
             }
 
             transition = PPOTransition(
-                term, action, value, timestep.reward, log_prob, last_timestep.observation, info
+                terminal=term,
+                truncated=trunc,
+                action=action,
+                value=value,
+                reward=timestep.reward,
+                log_prob=log_prob,
+                obs=last_timestep.observation,
+                info=info,
             )
             learner_state = LearnerState(params, opt_states, rng, env_state, timestep)
             return learner_state, transition

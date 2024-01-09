@@ -236,7 +236,14 @@ def get_learner_fn(
             }
 
             transition = PPOTransition(
-                term, action, value, timestep.reward, log_prob, last_timestep.observation, info
+                terminal=term,
+                truncated=trunc,
+                action=action,
+                value=value,
+                reward=timestep.reward,
+                log_prob=log_prob,
+                obs=last_timestep.observation,
+                info=info,
             )
             hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
             learner_state = RNNLearnerState(
@@ -331,7 +338,7 @@ def get_learner_fn(
                     """Calculate the actor loss."""
                     # RERUN NETWORK
 
-                    obs_and_trunc = (traj_batch.obs, traj_batch.terminal[:, :, 0])
+                    obs_and_trunc = (traj_batch.obs, traj_batch.truncated[:, :, 0])
                     _, actor_policy = actor_apply_fn(
                         actor_params, init_policy_hstate.squeeze(0), obs_and_trunc
                     )
@@ -363,7 +370,7 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate the critic loss."""
                     # RERUN NETWORK
-                    obs_and_trunc = (traj_batch.obs, traj_batch.terminal[:, :, 0])
+                    obs_and_trunc = (traj_batch.obs, traj_batch.truncated[:, :, 0])
                     _, value = critic_apply_fn(
                         critic_params, init_critic_hstate.squeeze(0), obs_and_trunc
                     )
@@ -379,13 +386,13 @@ def get_learner_fn(
                     total_loss = config["system"]["vf_coef"] * value_loss
                     return total_loss, (value_loss)
 
-                # CALCULATE ACTOR LOSS
+                # Calculate actor loss
                 actor_grad_fn = jax.value_and_grad(_actor_loss_fn, has_aux=True)
                 actor_loss_info, actor_grads = actor_grad_fn(
                     params.actor_params, opt_states.actor_opt_state, traj_batch, advantages
                 )
 
-                # CALCULATE CRITIC LOSS
+                # Calculate critic loss
                 critic_grad_fn = jax.value_and_grad(_critic_loss_fn, has_aux=True)
                 critic_loss_info, critic_grads = critic_grad_fn(
                     params.critic_params, opt_states.critic_opt_state, traj_batch, targets
