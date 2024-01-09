@@ -473,10 +473,9 @@ def learner_setup(
     reshape_states = lambda x: x.reshape(
         (n_devices, config["system"]["update_batch_size"], config["arch"]["num_envs"]) + x.shape[1:]
     )
-    env_states = jax.tree_map(
-        reshape_states, env_states
-    )  # (Devices, Update_batch_size, Num_envs,..)
-    timesteps = jax.tree_map(reshape_states, timesteps)  # (Devices, Update_batch_size, Num_envs,..)
+    # (devices, update batch size, num_envs, ...)
+    env_states = jax.tree_map(reshape_states, env_states)
+    timesteps = jax.tree_map(reshape_states, timesteps)
 
     # Define params to be replicated across devices and batches.
     rng, step_rngs = jax.random.split(rng)

@@ -54,7 +54,7 @@ def get_ff_evaluator_fn(
         def _env_step(eval_state: EvalState) -> EvalState:
             """Step the environment."""
             # PRNG keys.
-            rng, env_state, last_timestep, step_count_, return_ = eval_state
+            rng, env_state, last_timestep, step_count, episode_return = eval_state
 
             # Select action.
             rng, _rng = jax.random.split(rng)
@@ -69,9 +69,9 @@ def get_ff_evaluator_fn(
             env_state, timestep = env.step(env_state, action)
 
             # Log episode metrics.
-            return_ += timestep.reward
-            step_count_ += 1
-            eval_state = EvalState(rng, env_state, timestep, step_count_, return_)
+            episode_return += timestep.reward
+            step_count += 1
+            eval_state = EvalState(rng, env_state, timestep, step_count, episode_return)
             return eval_state
 
         def not_done(carry: Tuple) -> bool:
@@ -83,8 +83,8 @@ def get_ff_evaluator_fn(
         final_state = jax.lax.while_loop(not_done, _env_step, init_eval_state)
 
         eval_metrics = {
-            "episode_return": final_state.return_,
-            "episode_length": final_state.step_count_,
+            "episode_return": final_state.episode_return,
+            "episode_length": final_state.step_count,
         }
         return eval_metrics
 
@@ -109,8 +109,8 @@ def get_ff_evaluator_fn(
             key=step_rngs,
             env_state=env_states,
             timestep=timesteps,
-            step_count_=jnp.zeros((eval_batch, 1)),
-            return_=jnp.zeros_like(timesteps.reward),
+            step_count=jnp.zeros((eval_batch, 1)),
+            episode_return=jnp.zeros_like(timesteps.reward),
         )
 
         eval_metrics = jax.vmap(
@@ -144,8 +144,8 @@ def get_rnn_evaluator_fn(
                 last_timestep,
                 last_done,
                 hstate,
-                step_count_,
-                return_,
+                step_count,
+                episode_return,
             ) = eval_state
 
             # PRNG keys.
@@ -172,16 +172,16 @@ def get_rnn_evaluator_fn(
             env_state, timestep = env.step(env_state, action[-1].squeeze(0))
 
             # Log episode metrics.
-            return_ += timestep.reward
-            step_count_ += 1
+            episode_return += timestep.reward
+            step_count += 1
             eval_state = RNNEvalState(
                 rng,
                 env_state,
                 timestep,
                 jnp.repeat(timestep.last(), config["system"]["num_agents"]),
                 hstate,
-                step_count_,
-                return_,
+                step_count,
+                episode_return,
             )
             return eval_state
 
@@ -194,8 +194,8 @@ def get_rnn_evaluator_fn(
         final_state = jax.lax.while_loop(not_done, _env_step, init_eval_state)
 
         eval_metrics = {
-            "episode_return": final_state.return_,
-            "episode_length": final_state.step_count_,
+            "episode_return": final_state.episode_return,
+            "episode_length": final_state.step_count,
         }
         return eval_metrics
 
@@ -237,8 +237,8 @@ def get_rnn_evaluator_fn(
             timestep=timesteps,
             dones=dones,
             hstate=init_hstate,
-            step_count_=jnp.zeros((eval_batch, 1)),
-            return_=jnp.zeros_like(timesteps.reward),
+            step_count=jnp.zeros((eval_batch, 1)),
+            episode_return=jnp.zeros_like(timesteps.reward),
         )
 
         eval_metrics = jax.vmap(

@@ -1,7 +1,7 @@
 # --- Defaults FF-IPPO ---
 
 total_timesteps: ~ # Set the total environment steps.
-#If unspecified, it's derived from num_updates; otherwise, num_updates adjusts based on this value.
+# If unspecified, it's derived from num_updates; otherwise, num_updates adjusts based on this value.
 num_updates: 1000 # Number of updates
 seed: 42
 
