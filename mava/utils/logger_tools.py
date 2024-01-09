@@ -51,6 +51,7 @@ class Logger:
         self.should_log = bool(
             cfg["logger"]["use_json"] or cfg["logger"]["use_tf"] or cfg["logger"]["use_neptune"]
         )
+        self.num_eval_episodes = cfg["arch"]["num_eval_episodes"]
 
     def _setup_tb(self, cfg: Dict) -> None:
         """Set up tensorboard logging."""
