@@ -90,17 +90,17 @@ class Actor(nn.Module):
     def __call__(
         self,
         policy_hidden_state: chex.Array,
-        observation_done: RNNObservation,
+        observation_trunc: RNNObservation,
     ) -> Tuple[chex.Array, distrax.Categorical]:
         """Forward pass."""
-        observation, done = observation_done
+        observation, trunc = observation_trunc
 
         policy_embedding = nn.Dense(
             128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(observation.agents_view)
         policy_embedding = nn.relu(policy_embedding)
 
-        policy_rnn_in = (policy_embedding, done)
+        policy_rnn_in = (policy_embedding, trunc)
         policy_hidden_state, policy_embedding = ScannedRNN()(policy_hidden_state, policy_rnn_in)
 
         actor_output = nn.Dense(128, kernel_init=orthogonal(2), bias_init=constant(0.0))(
@@ -129,17 +129,17 @@ class Critic(nn.Module):
     def __call__(
         self,
         critic_hidden_state: Tuple[chex.Array, chex.Array],
-        observation_done: RNNObservation,
+        observation_trunc: RNNObservation,
     ) -> Tuple[chex.Array, chex.Array]:
         """Forward pass."""
-        observation, done = observation_done
+        observation, trunc = observation_trunc
 
         critic_embedding = nn.Dense(
             128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(observation.agents_view)
         critic_embedding = nn.relu(critic_embedding)
 
-        critic_rnn_in = (critic_embedding, done)
+        critic_rnn_in = (critic_embedding, trunc)
         critic_hidden_state, critic_embedding = ScannedRNN()(critic_hidden_state, critic_rnn_in)
 
         critic = nn.Dense(128, kernel_init=orthogonal(2), bias_init=constant(0.0))(critic_embedding)
@@ -175,7 +175,7 @@ def get_learner_fn(
                 - rng (PRNGKey): The random number generator state.
                 - env_state (State): The environment state.
                 - last_timestep (TimeStep): The last timestep in the current trajectory.
-                - dones (bool): Whether the last timestep was a terminal state.
+                - truncated (bool): Whether the last timestep was a truncated.
                 - hstates (HiddenStates): The current hidden states of the RNN.
             _ (Any): The current metrics info.
         """
@@ -190,7 +190,7 @@ def get_learner_fn(
                 rng,
                 env_state,
                 last_timestep,
-                last_done,
+                last_trunc,
                 hstates,
             ) = learner_state
 
@@ -202,7 +202,7 @@ def get_learner_fn(
             )
             ac_in = (
                 batched_observation,
-                last_done[:, 0][jnp.newaxis, :],
+                last_trunc[:, 0][jnp.newaxis, :],
             )
 
             # Run the network.
@@ -225,31 +225,29 @@ def get_learner_fn(
             # Step the environment.
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
+            trunc = jnp.repeat(timestep.last(), config["system"]["num_agents"])
+            trunc = trunc.reshape(config["arch"]["num_envs"], -1)
+            term = 1 - timestep.discount
+
             # log episode return and length
-            done = jax.tree_util.tree_map(
-                lambda x: jnp.repeat(x, config["system"]["num_agents"]).reshape(
-                    config["arch"]["num_envs"], -1
-                ),
-                timestep.last(),
-            )
             info = {
                 "episode_return": env_state.episode_return_info,
                 "episode_length": env_state.episode_length_info,
             }
 
             transition = PPOTransition(
-                done, action, value, timestep.reward, log_prob, last_timestep.observation, info
+                term, action, value, timestep.reward, log_prob, last_timestep.observation, info
             )
             hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
             learner_state = RNNLearnerState(
-                params, opt_states, rng, env_state, timestep, done, hstates
+                params, opt_states, rng, env_state, timestep, trunc, hstates
             )
             return learner_state, transition
 
-        # INITIALISE RNN STATE
+        # Initialise rnn state
         initial_hstates = learner_state.hstates
 
-        # STEP ENVIRONMENT FOR ROLLOUT LENGTH
+        # Step environment for rollout length
         learner_state, traj_batch = jax.lax.scan(
             _env_step, learner_state, None, config["system"]["rollout_length"]
         )
@@ -261,7 +259,7 @@ def get_learner_fn(
             rng,
             env_state,
             last_timestep,
-            last_done,
+            last_trunc,
             hstates,
         ) = learner_state
 
@@ -271,14 +269,14 @@ def get_learner_fn(
         )
         ac_in = (
             batched_last_observation,
-            last_done[:, 0][jnp.newaxis, :],
+            last_trunc[:, 0][jnp.newaxis, :],
         )
 
         # Run the network.
         _, last_val = critic_apply_fn(params.critic_params, hstates.critic_hidden_state, ac_in)
         # Squeeze out the batch dimension and mask out the value of terminal states.
         last_val = last_val.squeeze(0)
-        last_val = jnp.where(last_done, jnp.zeros_like(last_val), last_val)
+        last_val = jnp.where(1 - last_timestep.discount, 0.0, last_val)
 
         def _calculate_gae(
             traj_batch: PPOTransition, last_val: chex.Array
@@ -288,14 +286,14 @@ def get_learner_fn(
             def _get_advantages(gae_and_next_value: Tuple, transition: PPOTransition) -> Tuple:
                 """Calculate the GAE for a single transition."""
                 gae, next_value = gae_and_next_value
-                done, value, reward = (
-                    transition.done,
+                term, value, reward = (
+                    transition.terminal,
                     transition.value,
                     transition.reward,
                 )
                 gamma = config["system"]["gamma"]
-                delta = reward + gamma * next_value * (1 - done) - value
-                gae = delta + gamma * config["system"]["gae_lambda"] * (1 - done) * gae
+                delta = reward + gamma * next_value * (1 - term) - value
+                gae = delta + gamma * config["system"]["gae_lambda"] * (1 - term) * gae
                 return (gae, value), gae
 
             _, advantages = jax.lax.scan(
@@ -333,9 +331,9 @@ def get_learner_fn(
                     """Calculate the actor loss."""
                     # RERUN NETWORK
 
-                    obs_and_done = (traj_batch.obs, traj_batch.done[:, :, 0])
+                    obs_and_trunc = (traj_batch.obs, traj_batch.terminal[:, :, 0])
                     _, actor_policy = actor_apply_fn(
-                        actor_params, init_policy_hstate.squeeze(0), obs_and_done
+                        actor_params, init_policy_hstate.squeeze(0), obs_and_trunc
                     )
                     log_prob = actor_policy.log_prob(traj_batch.action)
 
@@ -365,9 +363,9 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate the critic loss."""
                     # RERUN NETWORK
-                    obs_and_done = (traj_batch.obs, traj_batch.done[:, :, 0])
+                    obs_and_trunc = (traj_batch.obs, traj_batch.terminal[:, :, 0])
                     _, value = critic_apply_fn(
-                        critic_params, init_critic_hstate.squeeze(0), obs_and_done
+                        critic_params, init_critic_hstate.squeeze(0), obs_and_trunc
                     )
 
                     # CALCULATE VALUE LOSS
@@ -505,7 +503,7 @@ def get_learner_fn(
             rng,
             env_state,
             last_timestep,
-            last_done,
+            last_trunc,
             hstates,
         )
         metric = traj_batch.info
@@ -525,7 +523,7 @@ def get_learner_fn(
                 - rng (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
-                - dones (bool): Whether the initial timestep was a terminal state.
+                - truncated (bool): Whether the initial timestep was a terminal state.
                 - hstateS (HiddenStates): The initial hidden states of the RNN.
         """
 
@@ -583,8 +581,8 @@ def learner_setup(
         init_obs,
     )
     init_obs = jax.tree_util.tree_map(lambda x: x[None, ...], init_obs)
-    init_done = jnp.zeros((1, config["arch"]["num_envs"]), dtype=bool)
-    init_x = (init_obs, init_done)
+    init_trunc = jnp.zeros((1, config["arch"]["num_envs"]), dtype=bool)
+    init_x = (init_obs, init_trunc)
 
     # Initialise hidden states.
     init_policy_hstate = ScannedRNN.initialize_carry((config["arch"]["num_envs"]), 128)
@@ -652,8 +650,8 @@ def learner_setup(
     env_states = jax.tree_util.tree_map(reshape_states, env_states)
     timesteps = jax.tree_util.tree_map(reshape_states, timesteps)
 
-    # Initialise dones.
-    dones = jnp.zeros(
+    # Initialise truncateds.
+    truncs = jnp.zeros(
         (
             n_devices,
             config["system"]["update_batch_size"],
@@ -671,7 +669,7 @@ def learner_setup(
         key=step_rngs,
         env_state=env_states,
         timestep=timesteps,
-        dones=dones,
+        truncated=truncs,
         hstates=hstates,
     )
     return learn, actor_network, init_learner_state
