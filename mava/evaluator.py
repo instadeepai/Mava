@@ -35,7 +35,7 @@ def get_ff_evaluator_fn(
     env: Environment,
     apply_fn: ActorApply,
     config: dict,
-    include_win_rate: bool = False,
+    log_win_rate: bool = False,
     eval_multiplier: int = 1,
 ) -> EvalFn:
     """Get the evaluator function for feedforward networks.
@@ -91,7 +91,7 @@ def get_ff_evaluator_fn(
             "episode_length": final_state.step_count_,
         }
         # Log won episode if win rate is required.
-        if include_win_rate:
+        if log_win_rate:
             eval_metrics["won_episode"] = jnp.all(final_state.timestep.reward >= 1.0).astype(int)
         return eval_metrics
 
@@ -131,7 +131,7 @@ def get_rnn_evaluator_fn(
     apply_fn: RecActorApply,
     config: dict,
     scanned_rnn: nn.Module,
-    include_win_rate: bool = False,
+    log_win_rate: bool = False,
     eval_multiplier: int = 1,
 ) -> EvalFn:
     """Get the evaluator function for recurrent networks."""
@@ -201,7 +201,7 @@ def get_rnn_evaluator_fn(
             "episode_length": final_state.step_count_,
         }
         # Log won episode if win rate is required.
-        if include_win_rate:
+        if log_win_rate:
             eval_metrics["won_episode"] = jnp.all(final_state.timestep.reward >= 1.0).astype(int)
         return eval_metrics
 
@@ -274,7 +274,7 @@ def evaluator_setup(
     # Get available TPU cores.
     n_devices = len(jax.devices())
     # Check if win rate is required for evaluation.
-    include_win_rate = config["env"]["env_name"] in ["HeuristicEnemySMAX", "LearnedPolicyEnemySMAX"]
+    log_win_rate = config["env"]["env_name"] in ["HeuristicEnemySMAX", "LearnedPolicyEnemySMAX"]
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
         assert scanned_rnn is not None
@@ -286,14 +286,14 @@ def evaluator_setup(
             vmapped_eval_apply_fn,
             config,
             scanned_rnn,
-            include_win_rate,
+            log_win_rate,
         )
         absolute_metric_evaluator = get_rnn_evaluator_fn(
             eval_env,
             vmapped_eval_apply_fn,
             config,
             scanned_rnn,
-            include_win_rate,
+            log_win_rate,
             10,
         )
     else:
@@ -301,12 +301,12 @@ def evaluator_setup(
             network.apply,
             in_axes=(None, 0),
         )
-        evaluator = get_ff_evaluator_fn(eval_env, vmapped_eval_apply_fn, config, include_win_rate)
+        evaluator = get_ff_evaluator_fn(eval_env, vmapped_eval_apply_fn, config, log_win_rate)
         absolute_metric_evaluator = get_ff_evaluator_fn(
             eval_env,
             vmapped_eval_apply_fn,
             config,
-            include_win_rate,
+            log_win_rate,
             10,
         )
 
