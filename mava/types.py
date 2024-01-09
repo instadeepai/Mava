@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Optional, Tuple, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Tuple,
+    TypeVar,
+)
 
 import chex
 from distrax import Distribution
@@ -44,7 +54,7 @@ class Observation(NamedTuple):
 
     agents_view: chex.Array  # (num_agents, num_obs_features)
     action_mask: chex.Array  # (num_agents, num_actions)
-    step_count: chex.Array  # (num_agents, )
+    step_count: Optional[chex.Array] = None  # (num_agents, )
 
 
 class ObservationGlobalState(NamedTuple):
@@ -122,9 +132,9 @@ class LearnerState(NamedTuple):
 
     params: Params
     opt_states: OptStates
-    key: chex.PRNGKey
-    env_state: LogEnvState
-    timestep: TimeStep
+    key: Optional[chex.PRNGKey] = None
+    env_state: Optional[LogEnvState] = None
+    timestep: Optional[TimeStep] = None
 
 
 class RNNLearnerState(NamedTuple):
@@ -179,6 +189,15 @@ class ExperimentOutput(NamedTuple, Generic[MavaState]):
 
 LearnerFn = Callable[[MavaState], ExperimentOutput[MavaState]]
 EvalFn = Callable[[FrozenDict, chex.PRNGKey], ExperimentOutput[MavaState]]
+
+SebulbaLearnerFn = Callable[
+    [LearnerState, List, List, List, List, chex.PRNGKey],
+    Tuple[LearnerState, chex.PRNGKey, Dict[str, float]],
+]
+SingleDeviceFn = Callable[
+    [LearnerState, PPOTransition, Observation, chex.PRNGKey],
+    Tuple[LearnerState, chex.PRNGKey, Tuple],
+]
 
 ActorApply = Callable[[FrozenDict, Observation], Distribution]
 CriticApply = Callable[[FrozenDict, Observation], Value]
