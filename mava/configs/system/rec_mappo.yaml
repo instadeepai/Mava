@@ -21,19 +21,6 @@ ent_coef: 0.01 # Entropy regularisation term for loss function.
 vf_coef: 0.5 # Critic weight in
 max_grad_norm: 0.5 # Maximum norm of the gradients for a weight update.
 
-# ---Networks---
-actor_network:
-  use_layer_norm: True
-  activation: "relu"
-  pre_torso_layer_sizes: [128]
-  post_torso_layer_sizes: [128]
-
-critic_network:
-  use_layer_norm: False
-  activation: "relu"
-  pre_torso_layer_sizes: [128]
-  post_torso_layer_sizes: [128]
-
 # --- To be defined during training ---
 num_agents: ~
 num_actions: ~

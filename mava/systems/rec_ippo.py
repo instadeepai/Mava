@@ -29,10 +29,11 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
+from mava import networks
 from mava.evaluator import evaluator_setup
 from mava.logger import logger_setup
 from mava.networks import RecurrentActor as Actor
-from mava.networks import ScannedRNN, get_networks
+from mava.networks import ScannedRNN
 from mava.types import (
     ExperimentOutput,
     HiddenStates,
@@ -461,7 +462,7 @@ def learner_setup(
     rng, rng_p = rngs
 
     # Define network and optimisers.
-    actor_network, critic_network = get_networks(
+    actor_network, critic_network = networks.make(
         config=config, network="recurrent", centralised_critic=False
     )
     actor_optim = optax.chain(
@@ -485,7 +486,7 @@ def learner_setup(
     init_x = (init_obs, init_done)
 
     # Initialise hidden states.
-    hidden_size = config.system.actor_network.pre_torso_layer_sizes[-1]
+    hidden_size = config.network.actor_network.pre_torso_layer_sizes[-1]
     init_policy_hstate = ScannedRNN.initialize_carry((config.arch.num_envs), hidden_size)
     init_critic_hstate = ScannedRNN.initialize_carry((config.arch.num_envs), hidden_size)
 

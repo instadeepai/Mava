@@ -29,10 +29,10 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
+from mava import networks
 from mava.evaluator import evaluator_setup
 from mava.logger import logger_setup
 from mava.networks import FeedForwardActor as Actor
-from mava.networks import get_networks
 from mava.types import (
     ActorApply,
     CriticApply,
@@ -354,7 +354,7 @@ def learner_setup(
     rng, rng_p = rngs
 
     # Define network and optimiser.
-    actor_network, critic_network = get_networks(
+    actor_network, critic_network = networks.make(
         config=config, network="feedforward", centralised_critic=False
     )
     actor_optim = optax.chain(
