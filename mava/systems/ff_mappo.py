@@ -590,6 +590,8 @@ def run_experiment(_config: DictConfig) -> None:
 @hydra.main(config_path="../configs", config_name="default_ff_mappo.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
+    # Allow dynamic attributes.
+    OmegaConf.set_struct(cfg, False)
 
     # Run experiment.
     run_experiment(cfg)

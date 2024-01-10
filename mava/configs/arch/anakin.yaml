@@ -11,6 +11,3 @@ num_eval_episodes: 32 # Number of episodes to evaluate per evaluation.
 num_evaluation: 200 # Number of evenly spaced evaluations to perform during training.
 absolute_metric: True # Whether the absolute metric should be computed. For more details
   # on the absolute metric please see: https://arxiv.org/abs/2209.10485
-
-# --- To be defined during training ---
-devices: ~
