@@ -60,6 +60,9 @@ def get_learner_fn(
     actor_apply_fn, critic_apply_fn = apply_fns
     actor_update_fn, critic_update_fn = update_fns
 
+    n_agents = config["system"]["num_agents"]
+    n_envs = config["arch"]["num_envs"]
+
     def _update_step(learner_state: RNNLearnerState, _: Any) -> Tuple[RNNLearnerState, Tuple]:
         """A single update of the network.
 
@@ -75,7 +78,6 @@ def get_learner_fn(
                 - rng (PRNGKey): The random number generator state.
                 - env_state (State): The environment state.
                 - last_timestep (TimeStep): The last timestep in the current trajectory.
-                - truncated (bool): Whether the last timestep was a truncated.
                 - hstates (HiddenStates): The current hidden states of the RNN.
             _ (Any): The current metrics info.
         """
@@ -90,11 +92,12 @@ def get_learner_fn(
                 rng,
                 env_state,
                 last_timestep,
-                last_trunc,
                 hstates,
             ) = learner_state
 
             rng, policy_rng = jax.random.split(rng)
+
+            last_trunc = jnp.repeat(last_timestep.last(), n_agents).reshape(n_envs, -1)
 
             # Add a batch dimension to the observation.
             batched_observation = jax.tree_util.tree_map(
@@ -146,9 +149,7 @@ def get_learner_fn(
                 info=info,
             )
             hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
-            learner_state = RNNLearnerState(
-                params, opt_states, rng, env_state, timestep, trunc, hstates
-            )
+            learner_state = RNNLearnerState(params, opt_states, rng, env_state, timestep, hstates)
             return learner_state, transition
 
         # Initialise rnn state
@@ -159,14 +160,13 @@ def get_learner_fn(
             _env_step, learner_state, None, config["system"]["rollout_length"]
         )
 
-        # CALCULATE ADVANTAGE
+        # Calculate advantage
         (
             params,
             opt_states,
             rng,
             env_state,
             last_timestep,
-            last_trunc,
             hstates,
         ) = learner_state
 
@@ -174,6 +174,7 @@ def get_learner_fn(
         batched_last_observation = jax.tree_util.tree_map(
             lambda x: x[jnp.newaxis, :], last_timestep.observation
         )
+        last_trunc = jnp.repeat(last_timestep.last(), n_agents).reshape(n_envs, -1)
         ac_in = (
             batched_last_observation,
             last_trunc[:, 0][jnp.newaxis, :],
@@ -236,7 +237,7 @@ def get_learner_fn(
                     gae: chex.Array,
                 ) -> Tuple:
                     """Calculate the actor loss."""
-                    # RERUN NETWORK
+                    # Rerun network
 
                     obs_and_trunc = (traj_batch.obs, traj_batch.truncated[:, :, 0])
                     _, actor_policy = actor_apply_fn(
@@ -269,13 +270,13 @@ def get_learner_fn(
                     targets: chex.Array,
                 ) -> Tuple:
                     """Calculate the critic loss."""
-                    # RERUN NETWORK
+                    # Rerun network
                     obs_and_trunc = (traj_batch.obs, traj_batch.truncated[:, :, 0])
                     _, value = critic_apply_fn(
                         critic_params, init_critic_hstate.squeeze(0), obs_and_trunc
                     )
 
-                    # CALCULATE VALUE LOSS
+                    # Calculate value loss
                     value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
                         -config["system"]["clip_eps"], config["system"]["clip_eps"]
                     )
@@ -318,13 +319,13 @@ def get_learner_fn(
                     (critic_grads, critic_loss_info), axis_name="device"
                 )
 
-                # UPDATE ACTOR PARAMS AND OPTIMISER STATE
+                # Update actor params and optimiser state
                 actor_updates, actor_new_opt_state = actor_update_fn(
                     actor_grads, opt_states.actor_opt_state
                 )
                 actor_new_params = optax.apply_updates(params.actor_params, actor_updates)
 
-                # UPDATE CRITIC PARAMS AND OPTIMISER STATE
+                # Update critic params and optimiser state
                 critic_updates, critic_new_opt_state = critic_update_fn(
                     critic_grads, opt_states.critic_opt_state
                 )
@@ -333,7 +334,7 @@ def get_learner_fn(
                 new_params = Params(actor_new_params, critic_new_params)
                 new_opt_state = OptStates(actor_new_opt_state, critic_new_opt_state)
 
-                # PACK LOSS INFO
+                # Pack loss info
                 total_loss = actor_loss_info[0] + critic_loss_info[0]
                 value_loss = critic_loss_info[1]
                 actor_loss = actor_loss_info[1][0]
@@ -357,7 +358,7 @@ def get_learner_fn(
             init_policy_hstate, init_critic_hstate = init_hstates
             rng, shuffle_rng = jax.random.split(rng)
 
-            # SHUFFLE MINIBATCHES
+            # Shuffle minibatches
             permutation = jax.random.permutation(shuffle_rng, config["arch"]["num_envs"])
             batch = (init_policy_hstate, init_critic_hstate, traj_batch, advantages, targets)
             shuffled_batch = jax.tree_util.tree_map(
@@ -371,7 +372,7 @@ def get_learner_fn(
             )
             minibatches = jax.tree_util.tree_map(lambda x: jnp.swapaxes(x, 1, 0), reshaped_batch)
 
-            # UPDATE MINIBATCHES
+            # Update minibatches
             (params, opt_states), loss_info = jax.lax.scan(
                 _update_minibatch, (params, opt_states), minibatches
             )
@@ -398,7 +399,7 @@ def get_learner_fn(
             rng,
         )
 
-        # UPDATE EPOCHS
+        # Update epochs
         update_state, loss_info = jax.lax.scan(
             _update_epoch, update_state, None, config["system"]["ppo_epochs"]
         )
@@ -410,7 +411,6 @@ def get_learner_fn(
             rng,
             env_state,
             last_timestep,
-            last_trunc,
             hstates,
         )
         metric = traj_batch.info
@@ -430,7 +430,6 @@ def get_learner_fn(
                 - rng (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
-                - truncated (bool): Whether the initial timestep was a terminal state.
                 - hstateS (HiddenStates): The initial hidden states of the RNN.
         """
 
@@ -564,16 +563,6 @@ def learner_setup(
     env_states = jax.tree_util.tree_map(reshape_states, env_states)
     timesteps = jax.tree_util.tree_map(reshape_states, timesteps)
 
-    # Initialise truncateds.
-    truncs = jnp.zeros(
-        (
-            n_devices,
-            config["system"]["update_batch_size"],
-            config["arch"]["num_envs"],
-            config["system"]["num_agents"],
-        ),
-        dtype=bool,
-    )
     hstates = HiddenStates(policy_hstates, critic_hstates)
     params = Params(actor_params, critic_params)
     opt_states = OptStates(actor_opt_state, critic_opt_state)
@@ -583,7 +572,6 @@ def learner_setup(
         key=step_rngs,
         env_state=env_states,
         timestep=timesteps,
-        truncated=truncs,
         hstates=hstates,
     )
     return learn, actor_network, init_learner_state

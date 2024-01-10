@@ -89,7 +89,7 @@ class PPOTransition(NamedTuple):
     """Transition tuple for PPO."""
 
     terminal: Terminal
-    truncated: Truncated  # todo: this is now in both learner state and transition, just keep it here
+    truncated: Truncated
     action: Action
     value: Value
     reward: chex.Array

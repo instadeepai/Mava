@@ -135,8 +135,6 @@ def get_rnn_evaluator_fn(
     eval_multiplier: int = 1,
 ) -> EvalFn:
     """Get the evaluator function for recurrent networks."""
-    n_agents = config["system"]["num_agents"]
-    n_envs = config["arch"]["num_envs"]
 
     def eval_one_episode(params: FrozenDict, init_eval_state: RNNEvalState) -> Dict:
         """Evaluate one episode. It is vectorized over the number of evaluation episodes."""
