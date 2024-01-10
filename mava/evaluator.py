@@ -20,6 +20,7 @@ import jax
 import jax.numpy as jnp
 from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
+from omegaconf import DictConfig
 
 from mava.types import (
     ActorApply,
@@ -34,7 +35,7 @@ from mava.types import (
 def get_ff_evaluator_fn(
     env: Environment,
     apply_fn: ActorApply,
-    config: dict,
+    config: DictConfig,
     log_win_rate: bool = False,
     eval_multiplier: int = 1,
 ) -> EvalFn:
@@ -64,7 +65,7 @@ def get_ff_evaluator_fn(
             rng, _rng = jax.random.split(rng)
             pi = apply_fn(params, last_timestep.observation)
 
-            if config["arch"]["evaluation_greedy"]:
+            if config.arch.evaluation_greedy:
                 action = pi.mode()
             else:
                 action = pi.sample(seed=_rng)
@@ -101,7 +102,7 @@ def get_ff_evaluator_fn(
         # Initialise environment states and timesteps.
         n_devices = len(jax.devices())
 
-        eval_batch = (config["arch"]["num_eval_episodes"] // n_devices) * eval_multiplier
+        eval_batch = (config.arch.num_eval_episodes // n_devices) * eval_multiplier
 
         rng, *env_rngs = jax.random.split(rng, eval_batch + 1)
         env_states, timesteps = jax.vmap(env.reset)(
@@ -129,7 +130,7 @@ def get_ff_evaluator_fn(
 def get_rnn_evaluator_fn(
     env: Environment,
     apply_fn: RecActorApply,
-    config: dict,
+    config: DictConfig,
     scanned_rnn: nn.Module,
     log_win_rate: bool = False,
     eval_multiplier: int = 1,
@@ -167,7 +168,7 @@ def get_rnn_evaluator_fn(
             # Run the network.
             hstate, pi = apply_fn(params, hstate, ac_in)
 
-            if config["arch"]["evaluation_greedy"]:
+            if config.arch.evaluation_greedy:
                 action = pi.mode()
             else:
                 action = pi.sample(seed=policy_rng)
@@ -213,7 +214,7 @@ def get_rnn_evaluator_fn(
         # Initialise environment states and timesteps.
         n_devices = len(jax.devices())
 
-        eval_batch = config["arch"]["num_eval_episodes"] // n_devices * eval_multiplier
+        eval_batch = config.arch.num_eval_episodes // n_devices * eval_multiplier
 
         rng, *env_rngs = jax.random.split(rng, eval_batch + 1)
         env_states, timesteps = jax.vmap(env.reset)(jnp.stack(env_rngs))
@@ -224,11 +225,11 @@ def get_rnn_evaluator_fn(
 
         # Initialise hidden state.
         init_hstate = scanned_rnn.initialize_carry(
-            eval_batch, config["network"]["actor_network"]["pre_torso_layer_sizes"][-1]
+            eval_batch, config.network.actor_network.pre_torso_layer_sizes[-1]
         )
         init_hstate = jnp.expand_dims(init_hstate, axis=1)
         init_hstate = jnp.expand_dims(init_hstate, axis=2)
-        init_hstate = jnp.tile(init_hstate, (1, config["system"]["num_agents"], 1))
+        init_hstate = jnp.tile(init_hstate, (1, config.system.num_agents, 1))
 
         eval_state = RNNEvalState(
             key=step_rngs,
@@ -258,7 +259,7 @@ def evaluator_setup(
     rng_e: chex.PRNGKey,
     network: Any,
     params: FrozenDict,
-    config: Dict,
+    config: DictConfig,
     use_recurrent_net: bool = False,
     scanned_rnn: Optional[nn.Module] = None,
 ) -> Tuple[EvalFn, EvalFn, Tuple[FrozenDict, chex.Array]]:
@@ -266,7 +267,7 @@ def evaluator_setup(
     # Get available TPU cores.
     n_devices = len(jax.devices())
     # Check if win rate is required for evaluation.
-    log_win_rate = config["env"]["env_name"] in ["HeuristicEnemySMAX", "LearnedPolicyEnemySMAX"]
+    log_win_rate = config.env.env_name in ["HeuristicEnemySMAX", "LearnedPolicyEnemySMAX"]
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
         assert scanned_rnn is not None
