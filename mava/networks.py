@@ -22,6 +22,7 @@ import jax.numpy as jnp
 import numpy as np
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
+from omegaconf import DictConfig
 
 from mava.types import (
     Observation,
@@ -203,23 +204,23 @@ def parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex.
 
 
 def make(
-    config: Dict, network: str, centralised_critic: bool = False
+    config: DictConfig, network: str, centralised_critic: bool = False
 ) -> Union[Tuple[FeedForwardActor, FeedForwardCritic], Tuple[RecurrentActor, RecurrentCritic]]:
     """Get the networks."""
 
     def create_torso(network_key: str, layer_size_key: str) -> MLPTorso:
         """Helper function to create a torso object from the config."""
-        activation_fn = parse_activation_fn(config["network"][network_key]["activation"])
+        activation_fn = parse_activation_fn(config.network[network_key]["activation"])
         return MLPTorso(
-            layer_sizes=config["network"][network_key][layer_size_key],
+            layer_sizes=config.network[network_key][layer_size_key],
             activation_fn=activation_fn,
-            use_layer_norm=config["network"][network_key]["use_layer_norm"],
+            use_layer_norm=config.network[network_key].use_layer_norm,
         )
 
     if network == "feedforward":
         actor = FeedForwardActor(
             torso=create_torso("actor_network", "layer_sizes"),
-            num_actions=config["system"]["num_actions"],
+            num_actions=config.system.num_actions,
         )
         critic = FeedForwardCritic(
             torso=create_torso("critic_network", "layer_sizes"),
@@ -227,7 +228,7 @@ def make(
         )
     elif network == "recurrent":
         actor = RecurrentActor(
-            action_dim=config["system"]["num_actions"],
+            action_dim=config.system.num_actions,
             pre_torso=create_torso("actor_network", "pre_torso_layer_sizes"),
             post_torso=create_torso("actor_network", "post_torso_layer_sizes"),
         )
