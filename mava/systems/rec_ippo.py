@@ -13,29 +13,27 @@
 # limitations under the License.
 
 import copy
-import functools
 import time
-from typing import Any, Dict, Sequence, Tuple
+from typing import Any, Dict, Tuple
 
 import chex
-import distrax
-import flax.linen as nn
 import hydra
 import jax
 import jax.numpy as jnp
-import numpy as np
 import optax
 from colorama import Fore, Style
 from flax import jax_utils
 from flax.core.frozen_dict import FrozenDict
-from flax.linen.initializers import constant, orthogonal
 from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
+from mava import networks
 from mava.evaluator import evaluator_setup
 from mava.logger import logger_setup
+from mava.networks import RecurrentActor as Actor
+from mava.networks import ScannedRNN
 from mava.types import (
     ExperimentOutput,
     HiddenStates,
@@ -46,107 +44,9 @@ from mava.types import (
     RecActorApply,
     RecCriticApply,
     RNNLearnerState,
-    RNNObservation,
 )
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.make_env import make
-
-
-class ScannedRNN(nn.Module):
-    @functools.partial(
-        nn.scan,
-        variable_broadcast="params",
-        in_axes=0,
-        out_axes=0,
-        split_rngs={"params": False},
-    )
-    @nn.compact
-    def __call__(self, carry: chex.Array, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
-        """Applies the module."""
-        rnn_state = carry
-        ins, resets = x
-        rnn_state = jnp.where(
-            resets[:, np.newaxis],
-            self.initialize_carry(ins.shape[0], ins.shape[1]),
-            rnn_state,
-        )
-        new_rnn_state, y = nn.GRUCell(features=ins.shape[1])(rnn_state, ins)
-        return new_rnn_state, y
-
-    @staticmethod
-    def initialize_carry(batch_size: int, hidden_size: int) -> chex.Array:
-        """Initializes the carry state."""
-        # Use a dummy key since the default state init fn is just zeros.
-        cell = nn.GRUCell(features=hidden_size)
-        return cell.initialize_carry(jax.random.PRNGKey(0), (batch_size, hidden_size))
-
-
-class Actor(nn.Module):
-    """Actor Network."""
-
-    action_dim: Sequence[int]
-
-    @nn.compact
-    def __call__(
-        self,
-        policy_hidden_state: chex.Array,
-        observation_done: RNNObservation,
-    ) -> Tuple[chex.Array, distrax.Categorical]:
-        """Forward pass."""
-        observation, done = observation_done
-
-        policy_embedding = nn.Dense(
-            128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(observation.agents_view)
-        policy_embedding = nn.relu(policy_embedding)
-
-        policy_rnn_in = (policy_embedding, done)
-        policy_hidden_state, policy_embedding = ScannedRNN()(policy_hidden_state, policy_rnn_in)
-
-        actor_output = nn.Dense(128, kernel_init=orthogonal(2), bias_init=constant(0.0))(
-            policy_embedding
-        )
-        actor_output = nn.relu(actor_output)
-        actor_output = nn.Dense(
-            self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
-        )(actor_output)
-
-        masked_logits = jnp.where(
-            observation.action_mask,
-            actor_output,
-            jnp.finfo(jnp.float32).min,
-        )
-
-        pi = distrax.Categorical(logits=masked_logits)
-
-        return policy_hidden_state, pi
-
-
-class Critic(nn.Module):
-    """Critic Network."""
-
-    @nn.compact
-    def __call__(
-        self,
-        critic_hidden_state: Tuple[chex.Array, chex.Array],
-        observation_done: RNNObservation,
-    ) -> Tuple[chex.Array, chex.Array]:
-        """Forward pass."""
-        observation, done = observation_done
-
-        critic_embedding = nn.Dense(
-            128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(observation.agents_view)
-        critic_embedding = nn.relu(critic_embedding)
-
-        critic_rnn_in = (critic_embedding, done)
-        critic_hidden_state, critic_embedding = ScannedRNN()(critic_hidden_state, critic_rnn_in)
-
-        critic = nn.Dense(128, kernel_init=orthogonal(2), bias_init=constant(0.0))(critic_embedding)
-        critic = nn.relu(critic)
-        critic = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(critic)
-
-        return critic_hidden_state, jnp.squeeze(critic, axis=-1)
 
 
 def get_learner_fn(
@@ -564,8 +464,9 @@ def learner_setup(
     rng, rng_p = rngs
 
     # Define network and optimisers.
-    actor_network = Actor(config["system"]["num_actions"])
-    critic_network = Critic()
+    actor_network, critic_network = networks.make(
+        config=config, network="recurrent", centralised_critic=False
+    )
     actor_optim = optax.chain(
         optax.clip_by_global_norm(config["system"]["max_grad_norm"]),
         optax.adam(config["system"]["actor_lr"], eps=1e-5),
@@ -587,8 +488,14 @@ def learner_setup(
     init_x = (init_obs, init_done)
 
     # Initialise hidden states.
-    init_policy_hstate = ScannedRNN.initialize_carry((config["arch"]["num_envs"]), 128)
-    init_critic_hstate = ScannedRNN.initialize_carry((config["arch"]["num_envs"]), 128)
+    init_policy_hstate = ScannedRNN.initialize_carry(
+        (config["arch"]["num_envs"]),
+        config["network"]["actor_network"]["pre_torso_layer_sizes"][-1],
+    )
+    init_critic_hstate = ScannedRNN.initialize_carry(
+        (config["arch"]["num_envs"]),
+        config["network"]["critic_network"]["pre_torso_layer_sizes"][-1],
+    )
 
     # initialise params and optimiser state.
     actor_params = actor_network.init(rng_p, init_policy_hstate, init_x)
