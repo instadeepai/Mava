@@ -137,7 +137,6 @@ class RNNLearnerState(NamedTuple):
     key: chex.PRNGKey
     env_state: LogEnvState
     timestep: TimeStep
-    truncated: Truncated
     hstates: HiddenStates
 
 
@@ -157,7 +156,6 @@ class RNNEvalState(NamedTuple):
     key: chex.PRNGKey
     env_state: State
     timestep: TimeStep
-    truncated: Truncated
     hstate: HiddenState
     step_count_: chex.Numeric
     return_: chex.Numeric

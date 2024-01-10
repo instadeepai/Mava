@@ -61,6 +61,9 @@ def get_learner_fn(
     actor_apply_fn, critic_apply_fn = apply_fns
     actor_update_fn, critic_update_fn = update_fns
 
+    n_agents = config["system"]["num_agents"]
+    n_envs = config["arch"]["num_envs"]
+
     def _update_step(learner_state: RNNLearnerState, _: Any) -> Tuple[RNNLearnerState, Tuple]:
         """A single update of the network.
 
@@ -76,7 +79,6 @@ def get_learner_fn(
                 - rng (PRNGKey): The random number generator state.
                 - env_state (State): The environment state.
                 - last_timestep (TimeStep): The last timestep in the current trajectory.
-                - last_trunc (bool): Whether the last timestep was a truncated state.
                 - hstates (HiddenStates): The hidden state of the policy and critic RNN.
             _ (Any): The current metrics info.
         """
@@ -91,11 +93,11 @@ def get_learner_fn(
                 rng,
                 env_state,
                 last_timestep,
-                last_trunc,
                 hstates,
             ) = learner_state
 
             rng, policy_rng = jax.random.split(rng)
+            last_trunc = jnp.repeat(last_timestep.last(), n_agents).reshape(n_envs, -1)
 
             # Add a batch dimension to the observation.
             batched_observation = jax.tree_util.tree_map(
@@ -120,8 +122,7 @@ def get_learner_fn(
             # Step the environment.
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
-            trunc = jnp.repeat(timestep.last(), config["system"]["num_agents"])
-            trunc = trunc.reshape(config["arch"]["num_envs"], -1)
+            trunc = jnp.repeat(timestep.last(), n_agents).reshape(n_envs, -1)
             term = 1 - timestep.discount
 
             # log episode return and length
@@ -131,12 +132,17 @@ def get_learner_fn(
             }
 
             transition = PPOTransition(
-                term, trunc, action, value, timestep.reward, log_prob, last_timestep.observation, info
+                term,
+                trunc,
+                action,
+                value,
+                timestep.reward,
+                log_prob,
+                last_timestep.observation,
+                info,
             )
             hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
-            learner_state = RNNLearnerState(
-                params, opt_states, rng, env_state, timestep, trunc, hstates
-            )
+            learner_state = RNNLearnerState(params, opt_states, rng, env_state, timestep, hstates)
             return learner_state, transition
 
         # INITIALISE RNN STATE
@@ -154,9 +160,10 @@ def get_learner_fn(
             rng,
             env_state,
             last_timestep,
-            last_trunc,
             hstates,
         ) = learner_state
+
+        last_trunc = jnp.repeat(last_timestep.last(), n_agents).reshape(n_envs, -1)
 
         # Add a batch dimension to the observation.
         batched_last_observation = jax.tree_util.tree_map(
@@ -401,7 +408,6 @@ def get_learner_fn(
             rng,
             env_state,
             last_timestep,
-            last_trunc,
             hstates,
         )
         metric = traj_batch.info
@@ -570,21 +576,11 @@ def learner_setup(
     env_states = jax.tree_util.tree_map(reshape_states, env_states)
     timesteps = jax.tree_util.tree_map(reshape_states, timesteps)
 
-    # Initialise truncated.
-    truncs = jnp.zeros(
-        (
-            n_devices,
-            config["system"]["update_batch_size"],
-            config["arch"]["num_envs"],
-            config["system"]["num_agents"],
-        ),
-        dtype=bool,
-    )
     hstates = HiddenStates(policy_hstates, critic_hstates)
     params = Params(actor_params, critic_params)
     opt_states = OptStates(actor_opt_state, critic_opt_state)
     init_learner_state = RNNLearnerState(
-        params, opt_states, step_rngs, env_states, timesteps, truncs, hstates
+        params, opt_states, step_rngs, env_states, timesteps, hstates
     )
     return learn, actor_network, init_learner_state
 

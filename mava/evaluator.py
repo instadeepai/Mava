@@ -135,6 +135,8 @@ def get_rnn_evaluator_fn(
     eval_multiplier: int = 1,
 ) -> EvalFn:
     """Get the evaluator function for recurrent networks."""
+    n_agents = config["system"]["num_agents"]
+    n_envs = config["arch"]["num_envs"]
 
     def eval_one_episode(params: FrozenDict, init_eval_state: RNNEvalState) -> Dict:
         """Evaluate one episode. It is vectorized over the number of evaluation episodes."""
@@ -145,7 +147,6 @@ def get_rnn_evaluator_fn(
                 rng,
                 env_state,
                 last_timestep,
-                last_trunc,
                 hstate,
                 step_count_,
                 return_,
@@ -154,6 +155,8 @@ def get_rnn_evaluator_fn(
             # PRNG keys.
             rng, policy_rng = jax.random.split(rng)
 
+            # Was the last timestep truncated?
+            last_trunc = jnp.repeat(last_timestep.last(), config["system"]["num_agents"])
             # Add a batch dimension and env dimension to the observation.
             batched_observation = jax.tree_util.tree_map(
                 lambda x: x[jnp.newaxis, jnp.newaxis, :], last_timestep.observation
@@ -181,7 +184,6 @@ def get_rnn_evaluator_fn(
                 rng,
                 env_state,
                 timestep,
-                jnp.repeat(timestep.last(), config["system"]["num_agents"]),
                 hstate,
                 step_count_,
                 return_,
@@ -230,20 +232,10 @@ def get_rnn_evaluator_fn(
         init_hstate = jnp.expand_dims(init_hstate, axis=2)
         init_hstate = jnp.tile(init_hstate, (1, config["system"]["num_agents"], 1))
 
-        # Initialise truncated.
-        trunc = jnp.zeros(
-            (
-                eval_batch,
-                config["system"]["num_agents"],
-            ),
-            dtype=bool,
-        )
-
         eval_state = RNNEvalState(
             key=step_rngs,
             env_state=env_states,
             timestep=timesteps,
-            truncated=trunc,
             hstate=init_hstate,
             step_count_=0,
             return_=jnp.zeros_like(timesteps.reward),
@@ -251,7 +243,7 @@ def get_rnn_evaluator_fn(
 
         eval_metrics = jax.vmap(
             eval_one_episode,
-            in_axes=(None, RNNEvalState(0, 0, 0, 0, 0, None, None)),
+            in_axes=(None, RNNEvalState(0, 0, 0, 0, None, None)),
             axis_name="eval_batch",
         )(trained_params, eval_state)
 
