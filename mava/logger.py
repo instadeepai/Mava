@@ -95,7 +95,7 @@ class Logger:
         win_rate = (n_won_episodes / n_episodes) * 100
 
         if self.logger.should_log:
-            self.logger.log_stat(f"{prefix}win_rate", float(win_rate), t_env, eval_step)
+            self.logger.log_stat(f"{prefix}/win_rate", float(win_rate), t_env, eval_step)
 
         log_string += f"| Win Rate {win_rate:.2f}%"
         return log_string
