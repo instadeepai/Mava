@@ -68,7 +68,7 @@ def get_ff_evaluator_fn(
             if config.arch.evaluation_greedy:
                 action = pi.mode()
             else:
-                action = pi.sample(seed=_key)
+                action = pi.sample(seed=policy_key)
 
             # Step environment.
             env_state, timestep = env.step(env_state, action)
