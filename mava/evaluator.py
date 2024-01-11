@@ -62,7 +62,7 @@ def get_ff_evaluator_fn(
             key, env_state, last_timestep, step_count, episode_return = eval_state
 
             # Select action.
-            key, _key = jax.random.split(key)
+            key, policy_key = jax.random.split(key)
             pi = apply_fn(params, last_timestep.observation)
 
             if config.arch.evaluation_greedy:
