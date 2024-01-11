@@ -746,6 +746,9 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
 
+    # Allow dynamic attributes.
+    OmegaConf.set_struct(cfg, False)
+
     # Run experiment.
     run_experiment(cfg)
 
