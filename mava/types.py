@@ -145,8 +145,8 @@ class EvalState(NamedTuple):
     key: chex.PRNGKey
     env_state: State
     timestep: TimeStep
-    step_count: chex.Array
-    episode_return: chex.Array
+    step_count_: chex.Numeric
+    return_: chex.Numeric
 
 
 class RNNEvalState(NamedTuple):
@@ -157,8 +157,8 @@ class RNNEvalState(NamedTuple):
     timestep: TimeStep
     dones: chex.Array
     hstate: HiddenState
-    step_count: chex.Array
-    episode_return: chex.Array
+    step_count_: chex.Numeric
+    return_: chex.Numeric
 
 
 MavaState = TypeVar("MavaState", LearnerState, RNNLearnerState, EvalState, RNNEvalState)
