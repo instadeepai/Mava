@@ -26,7 +26,7 @@ import orbax.checkpoint
 from chex import Numeric
 from flax.core.frozen_dict import FrozenDict
 from jax.tree_util import tree_map
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from mava.types import HiddenStates, LearnerState, Params, RNNLearnerState
 
@@ -97,6 +97,9 @@ class Checkpointer:
             else:
                 return obj
 
+        # Convert metadata to JSON-ready format
+        if metadata is not None and isinstance(metadata, DictConfig):
+            metadata = OmegaConf.to_container(metadata, resolve=True)
         metadata_json_ready = tree_map(get_json_ready, metadata)
 
         self._manager = orbax.checkpoint.CheckpointManager(
@@ -156,6 +159,7 @@ class Checkpointer:
         timestep: Optional[int] = None,
         restore_params: bool = True,
         restore_hstates: bool = True,
+        convert_to_frozen_dict: bool = False,
     ) -> Union[LearnerState, RNNLearnerState]:
         """Restore the learner state.
 
@@ -163,6 +167,10 @@ class Checkpointer:
             timestep (Optional[int], optional):
                 Specific timestep for restoration (of course, only if that timestep exists).
                 Defaults to None, in which case the latest step will be used.
+            restore_params (bool, optional): Whether to restore the params.
+            restore_hstates (bool, optional): Whether to restore the hidden states.
+            convert_to_frozen_dict (bool, optional): Whether to convert the params and hstates
+            to FrozenDicts.
 
         Returns:
             Union[LearnerState, RNNLearnerState]: the restored learner state
@@ -190,15 +198,19 @@ class Checkpointer:
         new_learner_state = copy(unreplicated_input_learner_state)
 
         if restore_params:
-            new_learner_state = new_learner_state._replace(
-                params=Params(**FrozenDict(restored_learner_state_raw["params"])),
-            )
+            if convert_to_frozen_dict:
+                params = Params(**FrozenDict(restored_learner_state_raw["params"]))
+            else:
+                params = Params(**restored_learner_state_raw["params"])
+            new_learner_state = new_learner_state._replace(params=params)
 
         if restore_hstates and restored_learner_state_type == RNNLearnerState:
             new_learner_state = typing.cast(RNNLearnerState, new_learner_state)  # for mypy
-            new_learner_state = new_learner_state._replace(
-                hstates=HiddenStates(**FrozenDict(restored_learner_state_raw["hstates"])),
-            )
+            if convert_to_frozen_dict:
+                hstates = HiddenStates(**FrozenDict(restored_learner_state_raw["hstates"]))
+            else:
+                hstates = HiddenStates(**restored_learner_state_raw["hstates"])
+            new_learner_state = new_learner_state._replace(hstates=hstates)
 
         return new_learner_state
 
