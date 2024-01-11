@@ -12,28 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict
 
+import jax
 from colorama import Fore, Style
+from omegaconf import DictConfig
 
 
-def check_total_timesteps(config: Dict) -> Dict:
+def check_total_timesteps(config: DictConfig) -> DictConfig:
     """Check if total_timesteps is set, if not, set it based on the other parameters"""
-    n_devices = len(config["arch"]["devices"])
-    if config["system"]["total_timesteps"] is None:
-        config["system"]["total_timesteps"] = (
+    n_devices = len(jax.devices())
+    if config.system.total_timesteps is None:
+        config.system.total_timesteps = (
             n_devices
-            * config["system"]["num_updates"]
-            * config["system"]["rollout_length"]
-            * config["system"]["update_batch_size"]
-            * config["arch"]["num_envs"]
+            * config.system.num_updates
+            * config.system.rollout_length
+            * config.system.update_batch_size
+            * config.arch.num_envs
         )
     else:
-        config["system"]["num_updates"] = (
-            config["system"]["total_timesteps"]
-            // config["system"]["rollout_length"]
-            // config["system"]["update_batch_size"]
-            // config["arch"]["num_envs"]
+        config.system.num_updates = (
+            config.system.total_timesteps
+            // config.system.rollout_length
+            // config.system.update_batch_size
+            // config.archnum_envs
             // n_devices
         )
         print(
