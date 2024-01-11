@@ -61,7 +61,7 @@ class Logger:
             steps_per_second = episodes_info["steps_per_second"]
             if self.logger.should_log:
                 self.logger.log_stat(
-                    f"{prefix}steps_per_second", steps_per_second, t_env, eval_step
+                    f"{prefix}/steps_per_second", steps_per_second, t_env, eval_step
                 )
             log_string += f"Steps Per Second {steps_per_second:.2e}"
 
