@@ -4,3 +4,4 @@ defaults:
 
 env_name: RobotWarehouse-v0
 scenario: tiny-2ag # [tiny-2ag, tiny-4ag, tiny-4ag-easy, small-4ag]
+time_limit: 100

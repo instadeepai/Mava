@@ -48,7 +48,10 @@ def get_task_config(env_name: str, scenario: str) -> Any:
         dict: A dictionary containing the attributes of the scenario.
     """
     if env_name not in ENV_FUNCTIONS:
-        raise ValueError(f"Unknown environment name: {env_name}")
+        raise ValueError(
+            f"Unknown environment: {env_name}."
+            + f"Available environments: [{', '.join(ENV_FUNCTIONS.keys())}]"
+        )
 
     # Extract and return scenario attributes
     env_fn = ENV_FUNCTIONS[env_name]
