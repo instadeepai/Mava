@@ -165,7 +165,7 @@ bin/act
 component_dependency_map.png
 
 # Mava env
-mava/configs/env/scenario
+mava_env/
 
 # Sacred logs
 results/
