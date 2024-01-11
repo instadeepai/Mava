@@ -19,13 +19,13 @@ import jax.numpy as jnp
 from colorama import Fore, Style
 
 from mava.types import ExperimentOutput
-from mava.utils.logger_tools import Logger as LoggerTools
+from mava.utils.multi_logger import MultiLogger
 
 
 class Logger:
     def __init__(self, config: Dict) -> None:
         """Initialise the logger."""
-        self.logger = LoggerTools(config)
+        self.logger = MultiLogger(config)
         self.config = config
 
     def _log_episode_info(
