@@ -126,7 +126,7 @@ def get_python_logger() -> logging.Logger:
 
 def get_neptune_logger(cfg: DictConfig) -> neptune.Run:
     """Set up neptune logging."""
-    tags = cfg.logger.kwargs.neptune_tag
+    tags = list(cfg.logger.kwargs.neptune_tag)
     project = cfg.logger.kwargs.neptune_project
 
     run = neptune.init_run(project=project, tags=tags)
