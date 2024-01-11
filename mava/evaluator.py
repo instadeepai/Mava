@@ -79,13 +79,13 @@ def get_ff_evaluator_fn(
             eval_state = EvalState(rng, env_state, timestep, step_count_, return_)
             return eval_state
 
-        def not_done(carry: Tuple) -> bool:
-            """Check if the episode is done."""
+        def not_truncated(carry: Tuple) -> bool:
+            """Check if the episode is truncated."""
             timestep = carry[2]
-            is_not_done: bool = ~timestep.last()
-            return is_not_done
+            is_not_truncated: bool = ~timestep.last()
+            return is_not_truncated
 
-        final_state = jax.lax.while_loop(not_done, _env_step, init_eval_state)
+        final_state = jax.lax.while_loop(not_truncated, _env_step, init_eval_state)
 
         eval_metrics = {
             "episode_return": final_state.return_,
@@ -146,7 +146,6 @@ def get_rnn_evaluator_fn(
                 rng,
                 env_state,
                 last_timestep,
-                last_done,
                 hstate,
                 step_count_,
                 return_,
@@ -155,13 +154,15 @@ def get_rnn_evaluator_fn(
             # PRNG keys.
             rng, policy_rng = jax.random.split(rng)
 
+            # Was the last timestep truncated?
+            last_trunc = jnp.repeat(last_timestep.last(), config["system"]["num_agents"])
             # Add a batch dimension and env dimension to the observation.
             batched_observation = jax.tree_util.tree_map(
                 lambda x: x[jnp.newaxis, jnp.newaxis, :], last_timestep.observation
             )
             ac_in = (
                 batched_observation,
-                last_done[jnp.newaxis, jnp.newaxis, :][..., 0],
+                last_trunc[jnp.newaxis, jnp.newaxis, :][..., 0],
             )
 
             # Run the network.
@@ -182,20 +183,19 @@ def get_rnn_evaluator_fn(
                 rng,
                 env_state,
                 timestep,
-                jnp.repeat(timestep.last(), config.system.num_agents),
                 hstate,
                 step_count_,
                 return_,
             )
             return eval_state
 
-        def not_done(carry: Tuple) -> bool:
-            """Check if the episode is done."""
+        def not_truncated(carry: Tuple) -> bool:
+            """Check if the episode is truncated."""
             timestep = carry[2]
-            is_not_done: bool = ~timestep.last()
-            return is_not_done
+            is_not_trunc: bool = ~timestep.last()
+            return is_not_trunc
 
-        final_state = jax.lax.while_loop(not_done, _env_step, init_eval_state)
+        final_state = jax.lax.while_loop(not_truncated, _env_step, init_eval_state)
 
         eval_metrics = {
             "episode_return": final_state.return_,
@@ -231,20 +231,10 @@ def get_rnn_evaluator_fn(
         init_hstate = jnp.expand_dims(init_hstate, axis=2)
         init_hstate = jnp.tile(init_hstate, (1, config.system.num_agents, 1))
 
-        # Initialise dones.
-        dones = jnp.zeros(
-            (
-                eval_batch,
-                config.system.num_agents,
-            ),
-            dtype=bool,
-        )
-
         eval_state = RNNEvalState(
             key=step_rngs,
             env_state=env_states,
             timestep=timesteps,
-            dones=dones,
             hstate=init_hstate,
             step_count_=0,
             return_=jnp.zeros_like(timesteps.reward),
@@ -252,7 +242,7 @@ def get_rnn_evaluator_fn(
 
         eval_metrics = jax.vmap(
             eval_one_episode,
-            in_axes=(None, RNNEvalState(0, 0, 0, 0, 0, None, None)),
+            in_axes=(None, RNNEvalState(0, 0, 0, 0, None, None)),
             axis_name="eval_batch",
         )(trained_params, eval_state)
 

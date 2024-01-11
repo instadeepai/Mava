@@ -29,7 +29,8 @@ else:
 
 Action: TypeAlias = chex.Array
 Value: TypeAlias = chex.Array
-Done: TypeAlias = chex.Array
+Terminal: TypeAlias = chex.Array
+Truncated: TypeAlias = chex.Array
 HiddenState: TypeAlias = chex.Array
 # Can't know the exact type of State.
 State: TypeAlias = Any
@@ -80,14 +81,15 @@ class JaxMarlState:
     step: int
 
 
-RNNObservation: TypeAlias = Tuple[Observation, Done]
-RNNGlobalObservation: TypeAlias = Tuple[ObservationGlobalState, Done]
+RNNObservation: TypeAlias = Tuple[Observation, Truncated]
+RNNGlobalObservation: TypeAlias = Tuple[ObservationGlobalState, Truncated]
 
 
 class PPOTransition(NamedTuple):
     """Transition tuple for PPO."""
 
-    done: Done
+    terminal: Terminal
+    truncated: Truncated
     action: Action
     value: Value
     reward: chex.Array
@@ -135,7 +137,6 @@ class RNNLearnerState(NamedTuple):
     key: chex.PRNGKey
     env_state: LogEnvState
     timestep: TimeStep
-    dones: Done
     hstates: HiddenStates
 
 
@@ -155,7 +156,6 @@ class RNNEvalState(NamedTuple):
     key: chex.PRNGKey
     env_state: State
     timestep: TimeStep
-    dones: chex.Array
     hstate: HiddenState
     step_count_: chex.Numeric
     return_: chex.Numeric
