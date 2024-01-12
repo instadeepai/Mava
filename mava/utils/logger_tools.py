@@ -50,6 +50,7 @@ class Logger:
         self.use_neptune = cfg.logger.use_neptune
         self.use_json = cfg.logger.use_json
         self.should_log = bool(cfg.logger.use_json or cfg.logger.use_tf or cfg.logger.use_neptune)
+        self.num_eval_episodes = cfg.arch.num_eval_episodes
 
     def _setup_tb(self, cfg: DictConfig) -> None:
         """Set up tensorboard logging."""
@@ -125,7 +126,7 @@ def get_python_logger() -> logging.Logger:
 
 def get_neptune_logger(cfg: DictConfig) -> neptune.Run:
     """Set up neptune logging."""
-    tags = cfg.logger.kwargs.neptune_tag
+    tags = list(cfg.logger.kwargs.neptune_tag)
     project = cfg.logger.kwargs.neptune_project
 
     run = neptune.init_run(project=project, tags=tags)

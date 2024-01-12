@@ -29,10 +29,10 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
+from mava import networks
 from mava.evaluator import evaluator_setup
 from mava.logger import logger_setup
 from mava.networks import FeedForwardActor as Actor
-from mava.networks import get_networks
 from mava.types import (
     ActorApply,
     CriticApply,
@@ -354,7 +354,7 @@ def learner_setup(
     rng, rng_p = rngs
 
     # Define network and optimiser.
-    actor_network, critic_network = get_networks(
+    actor_network, critic_network = networks.make(
         config=config, network="feedforward", centralised_critic=False
     )
     actor_optim = optax.chain(
@@ -587,6 +587,8 @@ def run_experiment(_config: DictConfig) -> None:
 @hydra.main(config_path="../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
+    # Allow dynamic attributes.
+    OmegaConf.set_struct(cfg, False)
 
     # Run experiment.
     run_experiment(cfg)

@@ -29,10 +29,11 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
+from mava import networks
 from mava.evaluator import evaluator_setup
 from mava.logger import logger_setup
 from mava.networks import RecurrentActor as Actor
-from mava.networks import ScannedRNN, get_networks
+from mava.networks import ScannedRNN
 from mava.types import (
     ExperimentOutput,
     HiddenStates,
@@ -458,7 +459,7 @@ def learner_setup(
     rng, rng_p = rngs
 
     # Define network and optimiser.
-    actor_network, critic_network = get_networks(
+    actor_network, critic_network = networks.make(
         config=config, network="recurrent", centralised_critic=True
     )
 
@@ -492,8 +493,9 @@ def learner_setup(
     init_single = (init_obs_single, init_done)
 
     # Initialise hidden state.
-    init_policy_hstate = ScannedRNN.initialize_carry((config.arch.num_envs), 128)
-    init_critic_hstate = ScannedRNN.initialize_carry((config.arch.num_envs), 128)
+    hidden_size = config.network.actor_network.pre_torso_layer_sizes[-1]
+    init_policy_hstate = ScannedRNN.initialize_carry((config.arch.num_envs), hidden_size)
+    init_critic_hstate = ScannedRNN.initialize_carry((config.arch.num_envs), hidden_size)
 
     # initialise params and optimiser state.
     actor_params = actor_network.init(rng_p, init_policy_hstate, init_single)
@@ -732,8 +734,8 @@ def run_experiment(_config: DictConfig) -> None:
 @hydra.main(config_path="../configs", config_name="default_rec_mappo.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
-    # Convert config to python dict.
-    cfg: Dict = OmegaConf.to_container(cfg, resolve=True)
+    # Allow dynamic attributes.
+    OmegaConf.set_struct(cfg, False)
 
     # Run experiment.
     run_experiment(cfg)

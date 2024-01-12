@@ -43,13 +43,13 @@ _jumanji_registry = {
 
 
 def add_optional_wrappers(env: Environment, config: DictConfig) -> Environment:
-    # Add agent id to observation.
-    if config.system.add_agent_id:
-        env = AgentIDWrapper(env)
-
     # Add the global state to observation.
     if config.system.add_global_state:
         env = GlobalStateWrapper(env)
+
+    # Add agent id to observation.
+    if config.system.add_agent_id:
+        env = AgentIDWrapper(env, config.system.add_global_state)
 
     return env
 
@@ -102,16 +102,18 @@ def make_jaxmarl_env(env_name: str, config: DictConfig) -> Tuple[Environment, En
         A JAXMARL environment.
     """
 
-    kwargs = config.env.kwargs
+    kwargs = dict(config.env.kwargs)
     if "smax" in env_name.lower():
-        kwargs["scenario"] = map_name_to_scenario(config.env.scenario)
+        kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
 
-    # Placeholder for creating JAXMARL environment.
-    env = JaxMarlWrapper(jaxmarl.make(env_name, **kwargs))
-    eval_env = JaxMarlWrapper(jaxmarl.make(env_name, **kwargs))
+    # Create jaxmarl envs.
+    env = JaxMarlWrapper(jaxmarl.make(env_name, **kwargs), config.system.add_global_state)
+    eval_env = JaxMarlWrapper(jaxmarl.make(env_name, **kwargs), config.system.add_global_state)
 
-    env = add_optional_wrappers(env, config)
-    eval_env = add_optional_wrappers(eval_env, config)
+    # Add optional wrappers.
+    if config.system.add_agent_id:
+        env = AgentIDWrapper(env, config.system.add_global_state)
+        eval_env = AgentIDWrapper(eval_env, config.system.add_global_state)
 
     env = AutoResetWrapper(env)
     env = LogWrapper(env)
