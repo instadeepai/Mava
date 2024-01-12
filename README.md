@@ -9,27 +9,21 @@
 </h2>
 
 <div align="center">
-<!-- <a  href="https://pypi.org/project/id-mava/">
-    <img src="https://img.shields.io/pypi/pyversions/id-mava" alt="Python" />
-</a>
-<a  href="https://pypi.org/project/id-mava/">
-    <img src="https://badge.fury.io/py/id-mava.svg" alt="PyPi" />
-</a> -->
-<!-- <a  href="https://github.com/instadeepai/Mava/actions/workflows/ci.yaml?query=branch%3Adevelop">
-    <img src="https://github.com/instadeepai/Mava/workflows/format_and_test/badge.svg" alt="Formatting" />
-</a> -->
 <a  href="https://github.com/instadeepai/Mava/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License" />
 </a>
-<a  href="https://github.com/psf/black">
+<!-- <a  href="https://github.com/psf/black">
     <img src="https://img.shields.io/badge/code%20style-black-000000.svg" alt="Code style" />
+</a> -->
+<a href="https://arxiv.org/pdf/2107.01460.pdf">
+    <img src="https://img.shields.io/badge/PrePrint-ArXiv-red" alt="ArXiv">
 </a>
 <a href="https://colab.research.google.com/github/instadeepai/Mava/blob/develop/examples/Quickstart.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 </div>
 
 <hr>
 
-👋 **UPDATE - 25/8/2023**: _We have changed the focus of Mava away from a framework and more towards a lightweight and easy-to-use codebase for MARL._ Mava is also now end-to-end JAX-based and henceforth we will only be supporting JAX-based environments. We currently provide native support for the [Jumanji][jumanji] environment API. Mava now follows a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl], where we allow for code duplication to enable readability and easy reuse. All algorithmic logic can be found in the file implementing a particular algorithm. If you would still like to use our deprecated TF2-based framework and systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
+👋 **UPDATE - 19/12/2023**: Mava is now fully in JAX with substantial speed improvement compared to other popular libraries. We currently provide native support for the [Jumanji][jumanji] environment API, which is also supported in [Matrax](https://github.com/instadeepai/matrax) and a wrapper for the newly released [JaxMARL](https://github.com/flairox/jaxmarl) environments. Mava follows a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl], where we allow for some code duplication to enable readability and easy reuse. Finally, we have updated our technical report to reflect our transition to JAX. Please feel free to take a look [here](https://arxiv.org/pdf/2107.01460.pdf)! If you would still like to use our deprecated TF2-based framework and systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
 
 <hr>
 
@@ -120,7 +114,7 @@ To get started with training your first Mava system, simply run one of the syste
 python mava/systems/ff_ippo.py
 ```
 
-Mava makes use of Hydra for config manangement. In order to see our default system configs please see the `mava/configs/` directory. A benefit of Hydra is that configs can either be set in config yaml files or overwritten from the terminal on the fly. For an example of running a system on the LBF environment, the above code can simply be adapted as follows:
+Mava makes use of Hydra for config management. In order to see our default system configs please see the `mava/configs/` directory. A benefit of Hydra is that configs can either be set in config yaml files or overwritten from the terminal on the fly. For an example of running a system on the LBF environment, the above code can simply be adapted as follows:
 
 ```bash
 python mava/systems/ff_ippo.py env=lbf
@@ -173,15 +167,13 @@ Please do follow along as we develop this next phase!
 ## Citing Mava 📚
 
 If you use Mava in your work, please cite the accompanying
-[technical report][Paper] (to be updated soon to reflect our transition to JAX):
+[technical report][Paper]:
 
 ```bibtex
-@article{pretorius2021mava,
-    title={Mava: A Research Framework for Distributed Multi-Agent Reinforcement Learning},
-    author={Arnu Pretorius and Kale-ab Tessera and Andries P. Smit and Kevin Eloff
-    and Claude Formanek and St John Grimbly and Siphelele Danisa and Lawrence Francis
-    and Jonathan Shock and Herman Kamper and Willie Brink and Herman Engelbrecht
-    and Alexandre Laterre and Karim Beguir},
+@article{dekock2023mava,
+    title={Mava: a research library for distributed multi-agent reinforcement learning in JAX},
+    author={Ruan de Kock and Omayma Mahjoub and Sasha Abramowitz and Wiem Khlifi and Callum Rhys Tilbury
+    and Claude Formanek and Andries P. Smit and Arnu Pretorius},
     year={2021},
     journal={arXiv preprint arXiv:2107.01460},
     url={https://arxiv.org/pdf/2107.01460.pdf},
@@ -190,8 +182,9 @@ If you use Mava in your work, please cite the accompanying
 
 ## Acknowledgements 🙏
 
-The development of Mava was supported with Cloud TPUs
-from Google's [TPU Research Cloud](https://sites.research.google/trc/about/) (TRC) 🌤.
+We would like to thank all the authors who contributed to the previous TF version of Mava: Kale-ab Tessera, St John Grimbly, Kevin Eloff, Siphelele Danisa, Lawrence Francis, Jonathan Shock, Herman Kamper, Willie Brink, Herman Engelbrecht, Alexandre Laterre, Karim Beguir. Their contributions can be found in our [TF technical report](https://arxiv.org/pdf/2107.01460v1.pdf).
+
+The development of Mava was supported with Cloud TPUs from Google's [TPU Research Cloud](https://sites.research.google/trc/about/) (TRC) 🌤.
 
 [Paper]: https://arxiv.org/pdf/2107.01460.pdf
 [quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/Quickstart.ipynb

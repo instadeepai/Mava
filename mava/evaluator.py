@@ -20,6 +20,7 @@ import jax
 import jax.numpy as jnp
 from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
+from omegaconf import DictConfig
 
 from mava.types import (
     ActorApply,
@@ -32,7 +33,11 @@ from mava.types import (
 
 
 def get_ff_evaluator_fn(
-    env: Environment, apply_fn: ActorApply, config: dict, eval_multiplier: int = 1
+    env: Environment,
+    apply_fn: ActorApply,
+    config: DictConfig,
+    log_win_rate: bool = False,
+    eval_multiplier: int = 1,
 ) -> EvalFn:
     """Get the evaluator function for feedforward networks.
 
@@ -60,7 +65,7 @@ def get_ff_evaluator_fn(
             rng, _rng = jax.random.split(rng)
             pi = apply_fn(params, last_timestep.observation)
 
-            if config["arch"]["evaluation_greedy"]:
+            if config.arch.evaluation_greedy:
                 action = pi.mode()
             else:
                 action = pi.sample(seed=_rng)
@@ -86,6 +91,9 @@ def get_ff_evaluator_fn(
             "episode_return": final_state.return_,
             "episode_length": final_state.step_count_,
         }
+        # Log won episode if win rate is required.
+        if log_win_rate:
+            eval_metrics["won_episode"] = jnp.all(final_state.timestep.reward >= 1.0).astype(int)
         return eval_metrics
 
     def evaluator_fn(trained_params: FrozenDict, rng: chex.PRNGKey) -> ExperimentOutput[EvalState]:
@@ -94,7 +102,7 @@ def get_ff_evaluator_fn(
         # Initialise environment states and timesteps.
         n_devices = len(jax.devices())
 
-        eval_batch = (config["arch"]["num_eval_episodes"] // n_devices) * eval_multiplier
+        eval_batch = (config.arch.num_eval_episodes // n_devices) * eval_multiplier
 
         rng, *env_rngs = jax.random.split(rng, eval_batch + 1)
         env_states, timesteps = jax.vmap(env.reset)(
@@ -122,8 +130,9 @@ def get_ff_evaluator_fn(
 def get_rnn_evaluator_fn(
     env: Environment,
     apply_fn: RecActorApply,
-    config: dict,
+    config: DictConfig,
     scanned_rnn: nn.Module,
+    log_win_rate: bool = False,
     eval_multiplier: int = 1,
 ) -> EvalFn:
     """Get the evaluator function for recurrent networks."""
@@ -158,7 +167,7 @@ def get_rnn_evaluator_fn(
             # Run the network.
             hstate, pi = apply_fn(params, hstate, ac_in)
 
-            if config["arch"]["evaluation_greedy"]:
+            if config.arch.evaluation_greedy:
                 action = pi.mode()
             else:
                 action = pi.sample(seed=policy_rng)
@@ -173,7 +182,7 @@ def get_rnn_evaluator_fn(
                 rng,
                 env_state,
                 timestep,
-                jnp.repeat(timestep.last(), config["system"]["num_agents"]),
+                jnp.repeat(timestep.last(), config.system.num_agents),
                 hstate,
                 step_count_,
                 return_,
@@ -192,6 +201,9 @@ def get_rnn_evaluator_fn(
             "episode_return": final_state.return_,
             "episode_length": final_state.step_count_,
         }
+        # Log won episode if win rate is required.
+        if log_win_rate:
+            eval_metrics["won_episode"] = jnp.all(final_state.timestep.reward >= 1.0).astype(int)
         return eval_metrics
 
     def evaluator_fn(
@@ -202,7 +214,7 @@ def get_rnn_evaluator_fn(
         # Initialise environment states and timesteps.
         n_devices = len(jax.devices())
 
-        eval_batch = config["arch"]["num_eval_episodes"] // n_devices * eval_multiplier
+        eval_batch = config.arch.num_eval_episodes // n_devices * eval_multiplier
 
         rng, *env_rngs = jax.random.split(rng, eval_batch + 1)
         env_states, timesteps = jax.vmap(env.reset)(jnp.stack(env_rngs))
@@ -212,16 +224,18 @@ def get_rnn_evaluator_fn(
         step_rngs = jnp.stack(step_rngs).reshape(eval_batch, -1)
 
         # Initialise hidden state.
-        init_hstate = scanned_rnn.initialize_carry(eval_batch, 128)
+        init_hstate = scanned_rnn.initialize_carry(
+            eval_batch, config.network.actor_network.pre_torso_layer_sizes[-1]
+        )
         init_hstate = jnp.expand_dims(init_hstate, axis=1)
         init_hstate = jnp.expand_dims(init_hstate, axis=2)
-        init_hstate = jnp.tile(init_hstate, (1, config["system"]["num_agents"], 1))
+        init_hstate = jnp.tile(init_hstate, (1, config.system.num_agents, 1))
 
         # Initialise dones.
         dones = jnp.zeros(
             (
                 eval_batch,
-                config["system"]["num_agents"],
+                config.system.num_agents,
             ),
             dtype=bool,
         )
@@ -255,48 +269,47 @@ def evaluator_setup(
     rng_e: chex.PRNGKey,
     network: Any,
     params: FrozenDict,
-    config: Dict,
+    config: DictConfig,
     use_recurrent_net: bool = False,
     scanned_rnn: Optional[nn.Module] = None,
 ) -> Tuple[EvalFn, EvalFn, Tuple[FrozenDict, chex.Array]]:
     """Initialise evaluator_fn."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
-
+    # Check if win rate is required for evaluation.
+    log_win_rate = config.env.env_name in ["HeuristicEnemySMAX", "LearnedPolicyEnemySMAX"]
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
         assert scanned_rnn is not None
-
-        vmapped_eval_network_apply_fn = jax.vmap(
+        vmapped_eval_apply_fn = jax.vmap(
             network.apply, in_axes=(None, 1, (2, None)), out_axes=(1, 2)
         )
         evaluator = get_rnn_evaluator_fn(
             eval_env,
-            vmapped_eval_network_apply_fn,
+            vmapped_eval_apply_fn,
             config,
             scanned_rnn,
+            log_win_rate,
         )
         absolute_metric_evaluator = get_rnn_evaluator_fn(
             eval_env,
-            vmapped_eval_network_apply_fn,
+            vmapped_eval_apply_fn,
             config,
             scanned_rnn,
+            log_win_rate,
             10,
         )
     else:
-        vmapped_eval_network_apply_fn = jax.vmap(
+        vmapped_eval_apply_fn = jax.vmap(
             network.apply,
             in_axes=(None, 0),
         )
-        evaluator = get_ff_evaluator_fn(
-            eval_env,
-            vmapped_eval_network_apply_fn,
-            config,
-        )
+        evaluator = get_ff_evaluator_fn(eval_env, vmapped_eval_apply_fn, config, log_win_rate)
         absolute_metric_evaluator = get_ff_evaluator_fn(
             eval_env,
-            vmapped_eval_network_apply_fn,
+            vmapped_eval_apply_fn,
             config,
+            log_win_rate,
             10,
         )
 
