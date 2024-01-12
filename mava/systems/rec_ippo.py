@@ -672,7 +672,7 @@ def run_experiment(_config: DictConfig) -> None:
         # Log the results of the evaluation.
         elapsed_time = time.time() - start_time
         evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
-        episode_return = logger.log_evaluator_metrics(
+        episode_return = logger.log_eval_metrics(
             metrics=evaluator_output.episodes_info,
             t_env=steps_per_rollout * (i + 1),
             eval_step=i,
@@ -706,7 +706,7 @@ def run_experiment(_config: DictConfig) -> None:
 
         elapsed_time = time.time() - start_time
         evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
-        logger.log_evaluator_metrics(
+        logger.log_eval_metrics(
             metrics=evaluator_output.episodes_info,
             t_env=steps_per_rollout * (i + 1),
             absolute_metric=True,

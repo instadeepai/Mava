@@ -34,12 +34,12 @@ def check_total_timesteps(config: DictConfig) -> DictConfig:
             config.system.total_timesteps
             // config.system.rollout_length
             // config.system.update_batch_size
-config.arch.num_envs
+            // config.arch.num_envs
             // n_devices
         )
         print(
             f"{Fore.RED}{Style.BRIGHT} Updated number of updates "
-+ f"to {config.system.num_updates}: If you want to train"
+            + f"to {config.system.num_updates}: If you want to train"
             + " for a specific number of updates, please set total_timesteps to None"
             + f"{Style.RESET_ALL}"
         )

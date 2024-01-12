@@ -130,7 +130,7 @@ class Logger:
             f"{Fore.MAGENTA}{Style.BRIGHT}TRAINER: {log_string}{Style.RESET_ALL}"
         )
 
-    def log_evaluator_metrics(
+    def log_eval_metrics(
         self,
         metrics: Dict,
         t_env: int = 0,
