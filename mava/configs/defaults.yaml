@@ -23,7 +23,7 @@ use_neptune: False
 # --- Other logger kwargs ---
 kwargs:
   neptune_project: Instadeep/Mava
-  neptune_tag: [rware] # The system name will be added automatically.
+  neptune_tag: [rware] # The system name will be added automatically if 'use_neptune is True' .
   json_path: ~ # If set, json files will be logged to a set path so that multiple experiments can
     # write to the same json file for easy downstream aggregation and plotting with marl-eval.
 
