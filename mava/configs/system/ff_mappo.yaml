@@ -1,11 +1,11 @@
 # --- Defaults FF-MAPPO ---
-
+total_timesteps: ~ # Set the total environment steps.
+# If unspecified, it's derived from num_updates; otherwise, num_updates adjusts based on this value.
 num_updates: 1000 # Number of updates
 seed: 42
 
 # --- Agent observations ---
 add_agent_id: True
-add_global_state : True
 
 # --- RL hyperparameters ---
 actor_lr: 2.5e-4 # Learning rate for actor network
@@ -20,20 +20,3 @@ clip_eps: 0.2 # Clipping value for PPO updates and value function.
 ent_coef: 0.01 # Entropy regularisation term for loss function.
 vf_coef: 0.5 # Critic weight in
 max_grad_norm: 0.5 # Maximum norm of the gradients for a weight update.
-
-# ---Networks---
-actor_network:
-  layer_sizes: [128, 128]
-  use_layer_norm: True
-  activation: "relu"
-
-critic_network:
-  layer_sizes: [128, 128]
-  use_layer_norm: False
-  activation: "relu"
-
-# --- To be defined during training ---
-num_agents: ~
-num_actions: ~
-num_updates_per_eval: ~
-total_timesteps: ~
