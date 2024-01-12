@@ -34,7 +34,7 @@ def check_total_timesteps(config: DictConfig) -> DictConfig:
             config.system.total_timesteps
             // config.system.rollout_length
             // config.system.update_batch_size
-            // config.archnum_envs
+config.arch.num_envs
             // n_devices
         )
         print(
