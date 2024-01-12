@@ -26,8 +26,8 @@ from omegaconf import DictConfig
 from tensorboard_logger import configure, log_value
 
 
-class Logger:
-    """Logger class for logging to tensorboard, and neptune.
+class MultiLogger:
+    """MultiLogger class for logging to tensorboard, and neptune.
 
     Note:
         For the original implementation, please refer to the following link:
