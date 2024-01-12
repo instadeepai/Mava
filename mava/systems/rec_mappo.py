@@ -599,7 +599,7 @@ def learner_setup(
     return learn, actor_network, init_learner_state
 
 
-def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
+def run_experiment(_config: DictConfig) -> None:
     """Runs experiment."""
     # Logger setup
     config = copy.deepcopy(_config)
