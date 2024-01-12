@@ -38,6 +38,7 @@ class Logger:
         """Log the environment's episodes metrics."""
         episodes_return = jnp.ravel(episodes_info["episode_return"])
         episodes_length = jnp.ravel(episodes_info["episode_length"])
+        steps_per_second = episodes_info["steps_per_second"]
 
         if self.logger.should_log:
             self.logger.log_stat(
@@ -45,6 +46,9 @@ class Logger:
             )
             self.logger.log_stat(
                 f"{prefix}/mean_episode_length", float(jnp.mean(episodes_length)), t_env, eval_step
+            )
+            self.logger.log_stat(
+                f"{prefix}/steps_per_second", steps_per_second, t_env, eval_step
             )
 
         log_string = (
@@ -55,15 +59,8 @@ class Logger:
             f"Mean Episode Length {float(jnp.mean(episodes_length)):.3f} | "
             f"Std Episode Length {float(jnp.std(episodes_length)):.3f} | "
             f"Max Episode Length {float(jnp.max(episodes_length)):.3f} | "
+            f"Steps Per Second {steps_per_second:.2e}"
         )
-
-        if "steps_per_second" in episodes_info.keys():
-            steps_per_second = episodes_info["steps_per_second"]
-            if self.logger.should_log:
-                self.logger.log_stat(
-                    f"{prefix}/steps_per_second", steps_per_second, t_env, eval_step
-                )
-            log_string += f"Steps Per Second {steps_per_second:.2e}"
 
         # Add win rate to episodes_info in case it exists.
         if "won_episode" in episodes_info:
