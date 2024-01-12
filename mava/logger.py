@@ -47,9 +47,7 @@ class Logger:
             self.logger.log_stat(
                 f"{prefix}/mean_episode_length", float(jnp.mean(episodes_length)), t_env, eval_step
             )
-            self.logger.log_stat(
-                f"{prefix}/steps_per_second", steps_per_second, t_env, eval_step
-            )
+            self.logger.log_stat(f"{prefix}/steps_per_second", steps_per_second, t_env, eval_step)
 
         log_string = (
             f"Timesteps {t_env:07d} | "
