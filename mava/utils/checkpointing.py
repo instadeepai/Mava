@@ -159,7 +159,6 @@ class Checkpointer:
         timestep: Optional[int] = None,
         restore_params: bool = True,
         restore_hstates: bool = True,
-        convert_to_frozen_dict: bool = False,
     ) -> Union[LearnerState, RNNLearnerState]:
         """Restore the learner state.
 
@@ -169,8 +168,6 @@ class Checkpointer:
                 Defaults to None, in which case the latest step will be used.
             restore_params (bool, optional): Whether to restore the params.
             restore_hstates (bool, optional): Whether to restore the hidden states.
-            convert_to_frozen_dict (bool, optional): Whether to convert the params and hstates
-            to FrozenDicts.
 
         Returns:
             Union[LearnerState, RNNLearnerState]: the restored learner state
@@ -198,15 +195,15 @@ class Checkpointer:
         new_learner_state = copy(unreplicated_input_learner_state)
 
         if restore_params:
-            if convert_to_frozen_dict:
+            if isinstance(restored_learner_state_raw["params"]["actor_params"], FrozenDict):
                 params = Params(**FrozenDict(restored_learner_state_raw["params"]))
             else:
                 params = Params(**restored_learner_state_raw["params"])
             new_learner_state = new_learner_state._replace(params=params)
 
         if restore_hstates and restored_learner_state_type == RNNLearnerState:
-            new_learner_state = typing.cast(RNNLearnerState, new_learner_state)  # for mypy
-            if convert_to_frozen_dict:
+            new_learner_state = typing.cast(RNNLearnerState, new_learner_state)
+            if isinstance(restored_learner_state_raw["hstates"]["policy_hidden_state"], FrozenDict):
                 hstates = HiddenStates(**FrozenDict(restored_learner_state_raw["hstates"]))
             else:
                 hstates = HiddenStates(**restored_learner_state_raw["hstates"])
