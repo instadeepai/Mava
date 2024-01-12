@@ -1,7 +1,8 @@
 # --- Defaults FF-MAPPO ---
+system_name: ff_mappo
+network_name: mlp
 
-num_updates: 1000 # Number of updates
-seed: 42
+#num_updates: 1000 # Override the default num_updates
 
 # --- Agent observations ---
 add_agent_id: True

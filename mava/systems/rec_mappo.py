@@ -633,18 +633,18 @@ def run_experiment(_config: DictConfig) -> None:
     pprint(cfg)
 
     # Set up checkpointer
-    save_checkpoint = config.logger.checkpointing.save_model
+    save_checkpoint = config.checkpointing.save_model
     if save_checkpoint:
         checkpointer = Checkpointer(
             metadata=config,  # Save all config as metadata in the checkpoint
-            model_name=config.logger.system_name,
-            **config.logger.checkpointing.save_args,  # Checkpoint args
+            model_name=config.system.system_name,
+            **config.checkpointing.save_args,  # Checkpoint args
         )
 
-    if config.logger.checkpointing.load_model:
+    if config.checkpointing.load_model:
         loaded_checkpoint = Checkpointer(
-            model_name=config.logger.system_name,
-            **config.logger.checkpointing.load_args,  # Other checkpoint args
+            model_name=config.system.system_name,
+            **config.checkpointing.load_args,  # Other checkpoint args
         )
         # Restore the learner state from the checkpoint
         learner_state_reloaded = loaded_checkpoint.restore_learner_state(
@@ -729,11 +729,22 @@ def run_experiment(_config: DictConfig) -> None:
         )
 
 
-@hydra.main(config_path="../configs", config_name="default_rec_mappo.yaml", version_base="1.2")
+@hydra.main(config_path="../configs", config_name="defaults.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
+
+    # Load and merge the system and network config files with the original one
+    system_config_path = f"{hydra.utils.get_original_cwd()}/mava/configs/system/rec_mappo.yaml"
+    system_config = OmegaConf.load(system_config_path)
+    cfg.system = OmegaConf.merge(cfg.system, system_config)
+
+    network_config_path = (
+        f"{hydra.utils.get_original_cwd()}/mava/configs/network/{cfg.system.network_name}.yaml"
+    )
+    network_config = OmegaConf.load(network_config_path)
+    cfg["network"] = network_config
 
     # Run experiment.
     run_experiment(cfg)

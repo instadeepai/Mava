@@ -1,7 +1,8 @@
 # --- Defaults REC-IPPO ---
+system_name: rec_ippo
+network_name: rnn
 
-num_updates: 1000 # Number of updates
-seed: 42
+#num_updates: 1000 # Override the default num_updates
 
 # --- Agent observations ---
 add_agent_id: True

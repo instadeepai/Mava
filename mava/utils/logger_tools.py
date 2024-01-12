@@ -39,23 +39,23 @@ class Logger:
         self.console_logger = get_python_logger()
         self.unique_token = datetime.now().strftime("%Y%m%d%H%M%S")
 
-        if cfg.logger.use_tf:
+        if cfg.use_tf:
             self._setup_tb(cfg)
-        if cfg.logger.use_neptune:
+        if cfg.use_neptune:
             self._setup_neptune(cfg)
-        if cfg.logger.use_json:
+        if cfg.use_json:
             self._setup_json(cfg)
 
-        self.use_tb = cfg.logger.use_tf
-        self.use_neptune = cfg.logger.use_neptune
-        self.use_json = cfg.logger.use_json
-        self.should_log = bool(cfg.logger.use_json or cfg.logger.use_tf or cfg.logger.use_neptune)
+        self.use_tb = cfg.use_tf
+        self.use_neptune = cfg.use_neptune
+        self.use_json = cfg.use_json
+        self.should_log = bool(cfg.use_json or cfg.use_tf or cfg.use_neptune)
         self.num_eval_episodes = cfg.arch.num_eval_episodes
 
     def _setup_tb(self, cfg: DictConfig) -> None:
         """Set up tensorboard logging."""
         tb_exp_path = get_experiment_path(cfg, "tensorboard")
-        tb_logs_path = os.path.join(cfg.logger.base_exp_path, f"{tb_exp_path}/{self.unique_token}")
+        tb_logs_path = os.path.join(cfg.base_exp_path, f"{tb_exp_path}/{self.unique_token}")
 
         configure(tb_logs_path)
         self.tb_logger = log_value
@@ -66,19 +66,15 @@ class Logger:
 
     def _setup_json(self, cfg: DictConfig) -> None:
         json_exp_path = get_experiment_path(cfg, "json")
-        json_logs_path = os.path.join(
-            cfg.logger.base_exp_path, f"{json_exp_path}/{self.unique_token}"
-        )
+        json_logs_path = os.path.join(cfg.base_exp_path, f"{json_exp_path}/{self.unique_token}")
 
         # if a custom path is specified, use that instead
-        if cfg.logger.kwargs.json_path is not None:
-            json_logs_path = os.path.join(
-                cfg.logger.base_exp_path, "json", cfg.logger.kwargs.json_path
-            )
+        if cfg.kwargs.json_path is not None:
+            json_logs_path = os.path.join(cfg.base_exp_path, "json", cfg.kwargs.json_path)
 
         self.json_logger = JsonWriter(
             path=json_logs_path,
-            algorithm_name=cfg.logger.system_name,
+            algorithm_name=cfg.system.system_name,
             task_name=cfg.env.scenario.task_name,
             environment_name=cfg.env.env_name,
             seed=cfg.system.seed,
@@ -126,8 +122,9 @@ def get_python_logger() -> logging.Logger:
 
 def get_neptune_logger(cfg: DictConfig) -> neptune.Run:
     """Set up neptune logging."""
-    tags = list(cfg.logger.kwargs.neptune_tag)
-    project = cfg.logger.kwargs.neptune_project
+    tags = list(cfg.kwargs.neptune_tag)
+    tags.append(cfg.system.system_name)
+    project = cfg.kwargs.neptune_project
 
     run = neptune.init_run(project=project, tags=tags)
 
@@ -138,13 +135,11 @@ def get_neptune_logger(cfg: DictConfig) -> neptune.Run:
 
 def get_experiment_path(config: DictConfig, logger_type: str) -> str:
     """Helper function to create the experiment path."""
-    exp_path = (
-        f"{logger_type}/{config.logger.system_name}/{config.env.env_name}/"
+    return (
+        f"{logger_type}/{config.system.system_name}/{config.env.env_name}/"
         + f"{config.env.scenario.task_name}"
         + f"/envs_{config.arch.num_envs}/seed_{config.system.seed}"
     )
-
-    return exp_path
 
 
 class JsonWriter:
@@ -227,18 +222,20 @@ class JsonWriter:
 
         metrics = {metric_key: [value]}
 
-        if logging_prefix == "evaluator":
-            step_metrics = {"step_count": timestep, "elapsed_time": current_time - self.start_time}
-            step_metrics.update(metrics)  # type: ignore
+        if logging_prefix == "absolute":
+            self.run_data["absolute_metrics"].update(metrics)
+
+        elif logging_prefix == "evaluator":
+            # removed type ignore here
+            step_metrics = {
+                "step_count": timestep,
+                "elapsed_time": current_time - self.start_time,
+            } | metrics
             step_str = f"step_{evaluation_step}"
             if step_str in self.run_data:
                 self.run_data[step_str].update(step_metrics)
             else:
                 self.run_data[step_str] = step_metrics
-
-        # Store the absolute metrics
-        if logging_prefix == "absolute":
-            self.run_data["absolute_metrics"].update(metrics)
 
         with open(f"{self.path}/{self.file_name}", "w") as f:
             json.dump(self.data, f, indent=4)
