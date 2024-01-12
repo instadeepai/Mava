@@ -1,8 +1,9 @@
 defaults:
   - arch: anakin
   - env: rware
-  # - system: ff_ippo # TODO: This will be helpful for using one main program and choose which algorithm.
-  # - network: mlp
+# The second option is to change the system name here each time before executing its 'system.py' file (and add the network config to the default system.yaml).
+# This also frees up additional code in the system.py files
+ # - system: ff_ippo
 
 
 # Defaults for all systems

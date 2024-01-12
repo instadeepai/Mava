@@ -1,4 +1,7 @@
 # --- Defaults FF-IPPO ---
+# defaults:
+#   - network: mlp # This is used for the second approach mentioned in the defaults.yaml
+
 system_name: ff_ippo
 network_name: mlp
 
