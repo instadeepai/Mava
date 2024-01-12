@@ -38,9 +38,9 @@ def check_total_timesteps(config: DictConfig) -> DictConfig:
             // n_devices
         )
         print(
-            f"{Fore.RED}{Style.BRIGHT} Updated number of updates "
+            f"{Fore.RED}{Style.BRIGHT} Changing the number of updates "
             + f"to {config.system.num_updates}: If you want to train"
-            + " for a specific number of updates, please set total_timesteps to None"
+            + " for a specific number of updates, please set total_timesteps to None!"
             + f"{Style.RESET_ALL}"
         )
     return config
