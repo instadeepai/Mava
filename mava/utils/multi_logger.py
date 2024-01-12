@@ -26,8 +26,8 @@ from omegaconf import DictConfig
 from tensorboard_logger import configure, log_value
 
 
-class Logger:
-    """Logger class for logging to tensorboard, and neptune.
+class MultiLogger:
+    """MultiLogger class for logging to tensorboard, and neptune.
 
     Note:
         For the original implementation, please refer to the following link:
@@ -79,7 +79,7 @@ class Logger:
         self.json_logger = JsonWriter(
             path=json_logs_path,
             algorithm_name=cfg.logger.system_name,
-            task_name=cfg.env.scenario,
+            task_name=cfg.env.scenario.task_name,
             environment_name=cfg.env.env_name,
             seed=cfg.system.seed,
         )
@@ -140,7 +140,7 @@ def get_experiment_path(config: DictConfig, logger_type: str) -> str:
     """Helper function to create the experiment path."""
     exp_path = (
         f"{logger_type}/{config.logger.system_name}/{config.env.env_name}/"
-        + f"{config.env.scenario}"
+        + f"{config.env.scenario.task_name}"
         + f"/envs_{config.arch.num_envs}/seed_{config.system.seed}"
     )
 
