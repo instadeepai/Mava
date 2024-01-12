@@ -23,3 +23,4 @@ max_grad_norm: 0.5 # Maximum norm of the gradients for a weight update.
 
 # --- Recurrent hyperparameters ---
 recurrent_chunk_size: ~ # The size of the chunks in which the recurrent sequences are divided during the training process.
+# If unspecified, the rollout length is used as the chunk size which means that the recurrent sequences are not divided.
