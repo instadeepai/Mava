@@ -1,0 +1,10 @@
+# The config of the 8x8-2p-2f-coop scenario with the VectorObserver set as default
+task_name: 8x8-2p-2f-coop
+
+task_config:
+  grid_size: 8
+  fov: 8
+  num_agents: 2
+  num_food: 2
+  max_agent_level: 2
+  force_coop: True
