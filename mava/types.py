@@ -167,14 +167,9 @@ MavaState = TypeVar("MavaState", LearnerState, RNNLearnerState, EvalState, RNNEv
 class ExperimentOutput(NamedTuple, Generic[MavaState]):
     """Experiment output."""
 
-    episodes_info: Dict[str, chex.Array]
     learner_state: MavaState
-    # these aren't common between value and policy methods
-    # should likely just be a dict of metrics
-    total_loss: Optional[chex.Array] = None
-    value_loss: Optional[chex.Array] = None
-    loss_actor: Optional[chex.Array] = None
-    entropy: Optional[chex.Array] = None
+    episode_metrics: Dict[str, chex.Array]
+    train_metrics: Dict[str, chex.Array]
 
 
 LearnerFn = Callable[[MavaState], ExperimentOutput[MavaState]]

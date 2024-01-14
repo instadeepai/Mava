@@ -12,63 +12,91 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import abc
 import json
 import logging
 import os
 import time
 from datetime import datetime
-from typing import Dict, Optional
+from enum import Enum
+from typing import Dict, List, Optional
 
+import jax
 import neptune
 from colorama import Fore, Style
 from neptune.utils import stringify_unsupported
 from omegaconf import DictConfig
+from pandas.io.json._normalize import _simple_json_normalize as flatten_dict
 from tensorboard_logger import configure, log_value
 
 
-class MultiLogger:
-    """MultiLogger class for logging to tensorboard, and neptune.
+class LogEvent(Enum):
+    ACT = "actor"
+    TRAIN = "trainer"
+    EVAL = "evaluator"
+    ABSOLUTE = "absolute metric"
+    MISC = "misc"
 
-    Note:
-        For the original implementation, please refer to the following link:
-        (https://github.com/uoe-agents/epymarl/blob/main/src/utils/logging.py)
-    """
 
-    def __init__(self, cfg: DictConfig) -> None:
+class MavaLogger(abc.ABC):
+    @abc.abstractmethod
+    def __init__(self, cfg: DictConfig, unique_token: str) -> None:
         """Initialise the logger."""
-        self.console_logger = get_python_logger()
-        self.unique_token = datetime.now().strftime("%Y%m%d%H%M%S")
+        ...
 
-        if cfg.logger.use_tf:
-            self._setup_tb(cfg)
-        if cfg.logger.use_neptune:
-            self._setup_neptune(cfg)
-        if cfg.logger.use_json:
-            self._setup_json(cfg)
+    @abc.abstractmethod
+    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
+        raise NotImplementedError
 
-        self.use_tb = cfg.logger.use_tf
-        self.use_neptune = cfg.logger.use_neptune
-        self.use_json = cfg.logger.use_json
-        self.should_log = bool(cfg.logger.use_json or cfg.logger.use_tf or cfg.logger.use_neptune)
-        self.num_eval_episodes = cfg.arch.num_eval_episodes
+    def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent) -> None:
+        # in case the dict is nested, flatten it.
+        data = flatten_dict(data, sep="/")
 
-    def _setup_tb(self, cfg: DictConfig) -> None:
+        for key, value in data.items():
+            self.log_stat(key, value, step, eval_step, event)
+
+    def stop(self) -> None:
+        """Stop the logger."""
+        ...
+
+
+class NeptuneLogger(MavaLogger):
+    def __init__(self, cfg: DictConfig, unique_token: str) -> None:
+        """Set up neptune logging."""
+        tags = list(cfg.logger.kwargs.neptune_tag)
+        project = cfg.logger.kwargs.neptune_project
+
+        self.logger = neptune.init_run(project=project, tags=tags)
+
+        self.logger["config"] = stringify_unsupported(cfg)
+
+    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent):
+        t = step if event != LogEvent.EVAL else eval_step
+        self.logger[f"{event.value}/{key}"].log(value, step=t)
+
+    def stop(self) -> None:
+        return self.logger.stop()
+
+
+class TensorboardLogger(MavaLogger):
+    def __init__(self, cfg: DictConfig, unique_token: str) -> None:
         """Set up tensorboard logging."""
-        tb_exp_path = get_experiment_path(cfg, "tensorboard")
-        tb_logs_path = os.path.join(cfg.logger.base_exp_path, f"{tb_exp_path}/{self.unique_token}")
+        tb_exp_path = get_logger_path(cfg, "tensorboard")
+        tb_logs_path = os.path.join(cfg.logger.base_exp_path, f"{tb_exp_path}/{unique_token}")
 
         configure(tb_logs_path)
-        self.tb_logger = log_value
+        self.log = log_value
 
-    def _setup_neptune(self, cfg: DictConfig) -> None:
-        """Set up neptune logging."""
-        self.neptune_logger = get_neptune_logger(cfg)
+    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent):
+        t = step if event != LogEvent.EVAL else eval_step
+        self.log(f"{event.value}/{key}", value, t)
 
-    def _setup_json(self, cfg: DictConfig) -> None:
-        json_exp_path = get_experiment_path(cfg, "json")
-        json_logs_path = os.path.join(
-            cfg.logger.base_exp_path, f"{json_exp_path}/{self.unique_token}"
-        )
+
+class JsonLogger(MavaLogger):
+    def __init__(self, cfg: DictConfig, unique_token: str) -> None:
+        """Set up json logging."""
+        json_exp_path = get_logger_path(cfg, "json")
+        json_logs_path = os.path.join(cfg.logger.base_exp_path, f"{json_exp_path}/{unique_token}")
 
         # if a custom path is specified, use that instead
         if cfg.logger.kwargs.json_path is not None:
@@ -76,7 +104,7 @@ class MultiLogger:
                 cfg.logger.base_exp_path, "json", cfg.logger.kwargs.json_path
             )
 
-        self.json_logger = JsonWriter(
+        self.logger = JsonWriter(
             path=json_logs_path,
             algorithm_name=cfg.logger.system_name,
             task_name=cfg.env.scenario.task_name,
@@ -84,69 +112,97 @@ class MultiLogger:
             seed=cfg.system.seed,
         )
 
-    def log_stat(
-        self,
-        key: str,
-        value: float,
-        t: int,
-        eval_step: Optional[int] = None,
-    ) -> None:
-        """Log a single stat.
-
-        Args:
-            key (str): the metric that should be logged
-            value (str): the value of the metric that should be logged
-            t (int): the current environment timestep
-            eval_step (int): the count of the current evaluation.
-        """
-
-        if self.use_tb:
-            self.tb_logger(key, value, t)
-
-        if self.use_neptune:
-            self.neptune_logger[key].log(value, step=t)
-
-        if self.use_json:
-            self.json_logger.write(t, key, value, eval_step)
+    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent):
+        # JsonWriter can't serialize jax arrays
+        value = value.item() if isinstance(value, jax.Array) else value
+        self.logger.write(step, f"{event.value}/{key}", value, eval_step)
 
 
-def get_python_logger() -> logging.Logger:
-    """Set up a custom python logger."""
-    logger = logging.getLogger()
-    logger.handlers = []
-    ch = logging.StreamHandler()
-    formatter = logging.Formatter(f"{Fore.CYAN}{Style.BRIGHT}%(message)s", "%H:%M:%S")
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
-    # Set to info to suppress debug outputs.
-    logger.setLevel("INFO")
+class ConsoleLogger(MavaLogger):
+    _EVENT_COLOURS = {
+        LogEvent.TRAIN: Fore.MAGENTA,
+        LogEvent.EVAL: Fore.GREEN,
+        LogEvent.ABSOLUTE: Fore.BLUE,
+        LogEvent.ACT: Fore.CYAN,
+        LogEvent.MISC: Fore.YELLOW,
+    }
 
-    return logger
+    def __init__(self, cfg: DictConfig, unique_token: str) -> None:
+        """Set up console logging."""
+        # todo: this writes to outputs/... we should put it at the same path in get_logger_path
+        self.logger = logging.getLogger()
+        # todo: necessary?
+        self.logger.handlers = []
+        # todo: necessary?
+        ch = logging.StreamHandler()
+        formatter = logging.Formatter(f"{Fore.CYAN}{Style.BRIGHT}%(message)s", "%H:%M:%S")
+        ch.setFormatter(formatter)
+        self.logger.addHandler(ch)
+        # Set to info to suppress debug outputs.
+        self.logger.setLevel("INFO")
+
+    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent):
+        colour = self._EVENT_COLOURS[event]
+        key = key.replace("_", " ").capitalize()
+        self.logger.info(
+            f"{colour}{Style.BRIGHT}{event.value.upper()} - {key}: {value}{Style.RESET_ALL}"
+        )
+
+    def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent):
+        # in case the dict is nested, flatten it.
+        data = flatten_dict(data, sep=" ")
+
+        colour = self._EVENT_COLOURS[event]
+        # Replace underscores with spaces and capitalise keys. Round values to 3 decimal places.
+        log_str = " | ".join(
+            [f"{k.replace('_', ' ').capitalize()}: {v:.3f}" for k, v in data.items()]
+        )
+
+        self.logger.info(
+            f"{colour}{Style.BRIGHT}{event.value.upper()} - {log_str}{Style.RESET_ALL}"
+        )
 
 
-def get_neptune_logger(cfg: DictConfig) -> neptune.Run:
-    """Set up neptune logging."""
-    tags = list(cfg.logger.kwargs.neptune_tag)
-    project = cfg.logger.kwargs.neptune_project
+# todo: Docstrings
+class MultiLogger(MavaLogger):
+    def __init__(self, loggers: List[MavaLogger]) -> None:
+        self.loggers = loggers
 
-    run = neptune.init_run(project=project, tags=tags)
+    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
+        for logger in self.loggers:
+            logger.log_stat(key, value, step, eval_step, event)
 
-    run["config"] = stringify_unsupported(cfg)
+    def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent):
+        for logger in self.loggers:
+            logger.log_dict(data, step, eval_step, event)
 
-    return run
+
+def make_logger(cfg: DictConfig) -> MavaLogger:
+    loggers = []
+    unique_token = datetime.now().strftime("%Y%m%d%H%M%S")
+
+    if cfg.logger.use_neptune:
+        loggers.append(NeptuneLogger(cfg, unique_token))
+    if cfg.logger.use_tb:
+        loggers.append(TensorboardLogger(cfg, unique_token))
+    if cfg.logger.use_json:
+        loggers.append(JsonLogger(cfg, unique_token))
+    if cfg.logger.use_console:
+        loggers.append(ConsoleLogger(cfg, unique_token))
+
+    return MultiLogger(loggers)
 
 
-def get_experiment_path(config: DictConfig, logger_type: str) -> str:
+def get_logger_path(config: DictConfig, logger_type: str) -> str:
     """Helper function to create the experiment path."""
-    exp_path = (
+    return (
         f"{logger_type}/{config.logger.system_name}/{config.env.env_name}/"
         + f"{config.env.scenario.task_name}"
         + f"/envs_{config.arch.num_envs}/seed_{config.system.seed}"
     )
 
-    return exp_path
 
-
+# todo: move this to marl-eval
 class JsonWriter:
     """
     Writer to create json files for reporting experiment results according to marl-eval

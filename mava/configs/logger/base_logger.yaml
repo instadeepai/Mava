@@ -1,11 +1,10 @@
 # --- Logging options ---
 
-use_tf: False # Whether to use tensorboard logging.
 base_exp_path: results # Base path for logging.
-use_json: False # Whether to log marl-eval style to json files.
-
-# --- Neptune logging ---
-use_neptune: False
+use_console: True # Whether to log to stdout.
+use_tb: True # Whether to use tensorboard logging.
+use_json: True # Whether to log marl-eval style to json files.
+use_neptune: True  # Whether to log to neptune.ai.
 
 # --- Other logger kwargs ---
 kwargs:

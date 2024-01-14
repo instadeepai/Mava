@@ -94,6 +94,7 @@ def get_ff_evaluator_fn(
         # Log won episode if win rate is required.
         if log_win_rate:
             eval_metrics["won_episode"] = jnp.all(final_state.timestep.reward >= 1.0).astype(int)
+
         return eval_metrics
 
     def evaluator_fn(trained_params: FrozenDict, key: chex.PRNGKey) -> ExperimentOutput[EvalState]:
@@ -127,7 +128,7 @@ def get_ff_evaluator_fn(
             axis_name="eval_batch",
         )(trained_params, eval_state)
 
-        return ExperimentOutput(episodes_info=eval_metrics, learner_state=eval_state)
+        return ExperimentOutput(eval_state, eval_metrics, train_metrics={})
 
     return evaluator_fn
 
@@ -261,10 +262,7 @@ def get_rnn_evaluator_fn(
             axis_name="eval_batch",
         )(trained_params, eval_state)
 
-        return ExperimentOutput(
-            episodes_info=eval_metrics,
-            learner_state=eval_state,
-        )
+        return ExperimentOutput(eval_state, eval_metrics, train_metrics={})
 
     return evaluator_fn
 
