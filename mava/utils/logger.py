@@ -23,7 +23,9 @@ from typing import Dict, List, Optional
 
 import jax
 import neptune
+import numpy as np
 from colorama import Fore, Style
+from jax.typing import ArrayLike
 from neptune.utils import stringify_unsupported
 from omegaconf import DictConfig
 from pandas.io.json._normalize import _simple_json_normalize as flatten_dict
@@ -38,17 +40,74 @@ class LogEvent(Enum):
     MISC = "misc"
 
 
-class MavaLogger(abc.ABC):
+class MavaLogger:
+    """The main logger for Mava systems.
+
+    Thin wrapper around the MultiLogger that is able to describe arrays of metrics
+    and calculate environment specific metrics if required (e.g winrate).
+    """
+
+    def __init__(self, config: DictConfig) -> None:
+        self.logger: BaseLogger = make_logger(config)
+        self.cfg = config
+
+    def log(self, metrics: Dict, t: int, t_eval: int, event: LogEvent) -> None:
+        """Log a dictionary metrics at a given timestep.
+
+        Args:
+            metrics (Dict): dictionary of metrics to log.
+            t (int): the current timestep.
+            t_eval (int): the number of previous evaluations.
+            event (LogEvent): the event that the metrics are associated with.
+        """
+        # Ideally we want to avoid special metrics like this as much as possible.
+        # Might be better to calculate this outside as we want to keep the number of these
+        # if statements to a minimum.
+        if "won_episode" in metrics:
+            metrics = self.calc_winrate(metrics, event)
+
+        # {metrics_name: metric} -> {metrics_name: {mean: metric, ...}}
+        metrics = jax.tree_map(describe, metrics)
+        self.logger.log_dict(metrics, t, t_eval, event)
+
+    def calc_winrate(self, episode_metrics: Dict, event: LogEvent) -> Dict:
+        """Log the win rate of the environment's episodes."""
+        # Get the number of episodes used to evaluate.
+        if event == LogEvent.ABSOLUTE:
+            # To measure the absolute metric, we evaluate the best policy
+            # found across training over 10 times the evaluation episodes.
+            # For more details on the absolute metric please see:
+            # https://arxiv.org/abs/2209.10485.
+            n_episodes = self.cfg.arch.num_eval_episodes * 10
+        else:
+            n_episodes = self.cfg.arch.num_eval_episodes
+
+        # Calculate the win rate.
+        n_won_episodes = np.sum(episode_metrics["won_episode"])
+        win_rate = (n_won_episodes / n_episodes) * 100
+
+        episode_metrics["win_rate"] = win_rate
+        episode_metrics.pop("won_episode")
+
+        return episode_metrics
+
+    def stop(self) -> None:
+        """Stop the logger."""
+        self.logger.stop
+
+
+class BaseLogger(abc.ABC):
     @abc.abstractmethod
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
-        """Initialise the logger."""
         ...
 
     @abc.abstractmethod
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
+        """Log a single metric."""
         raise NotImplementedError
 
     def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent) -> None:
+        """Log a dictionary of metrics."""
         # in case the dict is nested, flatten it.
         data = flatten_dict(data, sep="/")
 
@@ -60,7 +119,24 @@ class MavaLogger(abc.ABC):
         ...
 
 
-class NeptuneLogger(MavaLogger):
+class MultiLogger(BaseLogger):
+    """Logger that can log to multiple loggers at oncce."""
+
+    def __init__(self, loggers: List[BaseLogger]) -> None:
+        self.loggers = loggers
+
+    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
+        for logger in self.loggers:
+            logger.log_stat(key, value, step, eval_step, event)
+
+    def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent):
+        for logger in self.loggers:
+            logger.log_dict(data, step, eval_step, event)
+
+
+class NeptuneLogger(BaseLogger):
+    """Logger for neptune.ai."""
+
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
         """Set up neptune logging."""
         tags = list(cfg.logger.kwargs.neptune_tag)
@@ -78,9 +154,10 @@ class NeptuneLogger(MavaLogger):
         return self.logger.stop()
 
 
-class TensorboardLogger(MavaLogger):
+class TensorboardLogger(BaseLogger):
+    """Logger for tensorboard"""
+
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
-        """Set up tensorboard logging."""
         tb_exp_path = get_logger_path(cfg, "tensorboard")
         tb_logs_path = os.path.join(cfg.logger.base_exp_path, f"{tb_exp_path}/{unique_token}")
 
@@ -92,9 +169,10 @@ class TensorboardLogger(MavaLogger):
         self.log(f"{event.value}/{key}", value, t)
 
 
-class JsonLogger(MavaLogger):
+class JsonLogger(BaseLogger):
+    """Json logger for marl-eval."""
+
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
-        """Set up json logging."""
         json_exp_path = get_logger_path(cfg, "json")
         json_logs_path = os.path.join(cfg.logger.base_exp_path, f"{json_exp_path}/{unique_token}")
 
@@ -118,7 +196,9 @@ class JsonLogger(MavaLogger):
         self.logger.write(step, f"{event.value}/{key}", value, eval_step)
 
 
-class ConsoleLogger(MavaLogger):
+class ConsoleLogger(BaseLogger):
+    """Logger for writing to stdout."""
+
     _EVENT_COLOURS = {
         LogEvent.TRAIN: Fore.MAGENTA,
         LogEvent.EVAL: Fore.GREEN,
@@ -128,24 +208,25 @@ class ConsoleLogger(MavaLogger):
     }
 
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
-        """Set up console logging."""
-        # todo: this writes to outputs/... we should put it at the same path in get_logger_path
         self.logger = logging.getLogger()
-        # todo: necessary?
+
         self.logger.handlers = []
-        # todo: necessary?
+
         ch = logging.StreamHandler()
         formatter = logging.Formatter(f"{Fore.CYAN}{Style.BRIGHT}%(message)s", "%H:%M:%S")
         ch.setFormatter(formatter)
         self.logger.addHandler(ch)
+
         # Set to info to suppress debug outputs.
         self.logger.setLevel("INFO")
 
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent):
         colour = self._EVENT_COLOURS[event]
+
+        # Replace underscores with spaces and capitalise keys.
         key = key.replace("_", " ").capitalize()
         self.logger.info(
-            f"{colour}{Style.BRIGHT}{event.value.upper()} - {key}: {value}{Style.RESET_ALL}"
+            f"{colour}{Style.BRIGHT}{event.value.upper()} - {key}: {value:.3f}{Style.RESET_ALL}"
         )
 
     def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent):
@@ -163,21 +244,7 @@ class ConsoleLogger(MavaLogger):
         )
 
 
-# todo: Docstrings
-class MultiLogger(MavaLogger):
-    def __init__(self, loggers: List[MavaLogger]) -> None:
-        self.loggers = loggers
-
-    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
-        for logger in self.loggers:
-            logger.log_stat(key, value, step, eval_step, event)
-
-    def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent):
-        for logger in self.loggers:
-            logger.log_dict(data, step, eval_step, event)
-
-
-def make_logger(cfg: DictConfig) -> MavaLogger:
+def make_logger(cfg: DictConfig) -> BaseLogger:
     loggers = []
     unique_token = datetime.now().strftime("%Y%m%d%H%M%S")
 
@@ -200,6 +267,14 @@ def get_logger_path(config: DictConfig, logger_type: str) -> str:
         + f"{config.env.scenario.task_name}"
         + f"/envs_{config.arch.num_envs}/seed_{config.system.seed}"
     )
+
+
+def describe(x: ArrayLike):
+    if not isinstance(x, jax.Array) or x.size <= 1:
+        return x
+
+    # np instead of jnp because we don't jit here
+    return {"mean": np.mean(x), "std": np.std(x), "min": np.min(x), "max": np.max(x)}
 
 
 # todo: move this to marl-eval

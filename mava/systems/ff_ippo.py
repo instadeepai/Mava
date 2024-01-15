@@ -32,7 +32,6 @@ from rich.pretty import pprint
 
 from mava import networks
 from mava.evaluator import evaluator_setup
-from mava.logger import Logger
 from mava.networks import FeedForwardActor as Actor
 from mava.types import (
     ActorApply,
@@ -47,7 +46,7 @@ from mava.types import (
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import merge_leading_dims
-from mava.utils.multi_logger import LogEvent
+from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
 
 
@@ -477,7 +476,7 @@ def run_experiment(_config: DictConfig) -> None:
     )
 
     # Logger setup
-    logger = Logger(config)
+    logger = MavaLogger(config)
     cfg: Dict = OmegaConf.to_container(config, resolve=True)
     cfg["arch"]["devices"] = jax.devices()
     pprint(cfg)
