@@ -137,6 +137,7 @@ def get_learner_fn(
                 "episode_length": env_state.episode_length_info,
             }
 
+            hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
             transition = RNNPPOTransition(
                 done,
                 action,
@@ -144,11 +145,9 @@ def get_learner_fn(
                 timestep.reward,
                 log_prob,
                 last_timestep.observation,
-                policy_hidden_state,
-                critic_hidden_state,
+                hstates,
                 info,
             )
-            hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
             learner_state = RNNLearnerState(
                 params, opt_states, key, env_state, timestep, done, hstates
             )
@@ -241,7 +240,7 @@ def get_learner_fn(
 
                     obs_and_done = (traj_batch.obs, traj_batch.done[:, :, 0])
                     _, actor_policy = actor_apply_fn(
-                        actor_params, traj_batch.policy_hidden_state[0], obs_and_done
+                        actor_params, traj_batch.hstates.policy_hidden_state[0], obs_and_done
                     )
                     log_prob = actor_policy.log_prob(traj_batch.action)
 
@@ -273,7 +272,7 @@ def get_learner_fn(
                     # RERUN NETWORK
                     obs_and_done = (traj_batch.obs, traj_batch.done[:, :, 0])
                     _, value = critic_apply_fn(
-                        critic_params, traj_batch.critic_hidden_state[0], obs_and_done
+                        critic_params, traj_batch.hstates.critic_hidden_state[0], obs_and_done
                     )
 
                     # CALCULATE VALUE LOSS
@@ -358,11 +357,7 @@ def get_learner_fn(
             key, shuffle_key = jax.random.split(key)
 
             # SHUFFLE MINIBATCHES
-            batch = (
-                traj_batch,
-                advantages,
-                targets,
-            )
+            batch = (traj_batch, advantages, targets)
             num_recurrent_chunks = (
                 config.system.rollout_length // config.system.recurrent_chunk_size
             )
