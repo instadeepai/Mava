@@ -14,12 +14,9 @@
 
 import os
 import re
-import typing
 import warnings
-from copy import copy
 from datetime import datetime
-from pydoc import locate
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import absl.logging as absl_logging
 import orbax.checkpoint
@@ -155,22 +152,21 @@ class Checkpointer:
 
     def restore_learner_state(
         self,
-        unreplicated_input_learner_state: Union[LearnerState, RNNLearnerState],
+        input_params: Params,
         timestep: Optional[int] = None,
-        restore_params: bool = True,
-        restore_hstates: bool = True,
-    ) -> Union[LearnerState, RNNLearnerState]:
+        restore_hstates: bool = False,
+    ) -> Tuple[Params, Union[HiddenStates, None]]:
         """Restore the learner state.
 
         Args:
+            input_params (Params): the params of the learner.
             timestep (Optional[int], optional):
                 Specific timestep for restoration (of course, only if that timestep exists).
                 Defaults to None, in which case the latest step will be used.
-            restore_params (bool, optional): Whether to restore the params.
             restore_hstates (bool, optional): Whether to restore the hidden states.
 
         Returns:
-            Union[LearnerState, RNNLearnerState]: the restored learner state
+            Tuple[Params,Union[HiddenStates, None]]: the restored params and hidden states.
         """
         # We want to ensure `major` versions match, but allow `minor` versions to differ
         # i.e. v0.1 and 0.2 are compatible, but v1.0 and v2.0 are not
@@ -187,29 +183,21 @@ class Checkpointer:
         # Dictionary of the restored learner state
         restored_learner_state_raw = restored_checkpoint["learner_state"]
 
-        # Restore the learner state type and check it matches the input type
-        restored_learner_state_type = locate(restored_checkpoint["type"])
-        assert restored_learner_state_type == type(unreplicated_input_learner_state)
+        # Restore params
+        if isinstance(input_params.actor_params, FrozenDict):
+            restored_params = Params(**FrozenDict(restored_learner_state_raw["params"]))
+        else:
+            restored_params = Params(**restored_learner_state_raw["params"])
 
-        # We base the new learner state on the input learner state
-        new_learner_state = copy(unreplicated_input_learner_state)
-
-        if restore_params:
-            if isinstance(restored_learner_state_raw["params"]["actor_params"], FrozenDict):
-                params = Params(**FrozenDict(restored_learner_state_raw["params"]))
+        # Restore hidden states if required
+        restored_hstates = None
+        if restore_hstates:
+            if isinstance(input_params.actor_params, FrozenDict):
+                restored_hstates = HiddenStates(**FrozenDict(restored_learner_state_raw["hstates"]))
             else:
-                params = Params(**restored_learner_state_raw["params"])
-            new_learner_state = new_learner_state._replace(params=params)
+                restored_hstates = HiddenStates(**restored_learner_state_raw["hstates"])
 
-        if restore_hstates and restored_learner_state_type == RNNLearnerState:
-            new_learner_state = typing.cast(RNNLearnerState, new_learner_state)
-            if isinstance(restored_learner_state_raw["hstates"]["policy_hidden_state"], FrozenDict):
-                hstates = HiddenStates(**FrozenDict(restored_learner_state_raw["hstates"]))
-            else:
-                hstates = HiddenStates(**restored_learner_state_raw["hstates"])
-            new_learner_state = new_learner_state._replace(hstates=hstates)
-
-        return new_learner_state
+        return restored_params, restored_hstates
 
     def get_cfg(self) -> DictConfig:
         """Return the metadata of the checkpoint.

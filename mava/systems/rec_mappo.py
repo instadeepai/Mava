@@ -23,7 +23,6 @@ import jax
 import jax.numpy as jnp
 import optax
 from colorama import Fore, Style
-from flax import jax_utils
 from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
@@ -49,6 +48,7 @@ from mava.types import (
 )
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
+from mava.utils.jax import unreplicate_learner_state
 from mava.utils.total_timestep_checker import check_total_timesteps
 
 
@@ -534,6 +534,24 @@ def learner_setup(
     init_critic_hstate = jnp.expand_dims(init_critic_hstate, axis=1)
     init_critic_hstate = jnp.tile(init_critic_hstate, (1, config.system.num_agents, 1))
 
+    # Pack params and initial states.
+    params = Params(actor_params, critic_params)
+    hstates = HiddenStates(init_policy_hstate, init_critic_hstate)
+
+    # Load model from checkpoint if specified.
+    if config.logger.checkpointing.load_model:
+        loaded_checkpoint = Checkpointer(
+            model_name=config.logger.system_name,
+            **config.logger.checkpointing.load_args,  # Other checkpoint args
+        )
+        # Restore the learner state from the checkpoint
+        restored_params, restored_hstates = loaded_checkpoint.restore_learner_state(
+            input_params=params, restore_hstates=True
+        )
+        # Update the params and hstates
+        params = restored_params
+        hstates = restored_hstates if restored_hstates else hstates
+
     # Initialise environment states and timesteps: across devices and batches.
     key, *env_keys = jax.random.split(
         key, n_devices * config.system.update_batch_size * config.arch.num_envs + 1
@@ -554,9 +572,7 @@ def learner_setup(
         dtype=bool,
     )
     key, step_keys = jax.random.split(key)
-    params = Params(actor_params, critic_params)
     opt_states = OptStates(actor_opt_state, critic_opt_state)
-    hstates = HiddenStates(init_policy_hstate, init_critic_hstate)
     replicate_learner = (params, opt_states, hstates, step_keys, dones)
 
     # Duplicate learner for update_batch_size.
@@ -639,18 +655,6 @@ def run_experiment(_config: DictConfig) -> None:
             **config.logger.checkpointing.save_args,  # Checkpoint args
         )
 
-    if config.logger.checkpointing.load_model:
-        loaded_checkpoint = Checkpointer(
-            model_name=config.logger.system_name,
-            **config.logger.checkpointing.load_args,  # Other checkpoint args
-        )
-        # Restore the learner state from the checkpoint
-        learner_state_reloaded = loaded_checkpoint.restore_learner_state(
-            unreplicated_input_learner_state=jax_utils.unreplicate(learner_state)
-        )
-        # Overwrite learner state with reloaded state, and replicate across devices.
-        learner_state = jax.device_put_replicated(learner_state_reloaded, jax.devices())
-
     # Run experiment for a total number of evaluations.
     max_episode_return = jnp.float32(0.0)
     best_params = None
@@ -694,7 +698,7 @@ def run_experiment(_config: DictConfig) -> None:
             # Save checkpoint of learner state
             checkpointer.save(
                 timestep=steps_per_rollout * (i + 1),
-                unreplicated_learner_state=jax_utils.unreplicate(learner_output.learner_state),
+                unreplicated_learner_state=unreplicate_learner_state(learner_output.learner_state),
                 episode_return=episode_return,
             )
 
