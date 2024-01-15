@@ -546,6 +546,7 @@ def run_experiment(_config: DictConfig) -> None:
             # Save checkpoint of learner state
             checkpointer.save(
                 timestep=steps_per_rollout * (eval_step + 1),
+                unreplicated_learner_state=jax_utils.unreplicate(learner_output.learner_state),
                 episode_return=episode_return,
             )
 

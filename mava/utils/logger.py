@@ -19,7 +19,7 @@ import os
 import time
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import jax
 import neptune
@@ -83,7 +83,7 @@ class MavaLogger:
             n_episodes = self.cfg.arch.num_eval_episodes
 
         # Calculate the win rate.
-        n_won_episodes = np.sum(episode_metrics["won_episode"])
+        n_won_episodes: int = np.sum(episode_metrics["won_episode"])
         win_rate = (n_won_episodes / n_episodes) * 100
 
         episode_metrics["win_rate"] = win_rate
@@ -116,7 +116,7 @@ class BaseLogger(abc.ABC):
 
     def stop(self) -> None:
         """Stop the logger."""
-        ...
+        return None
 
 
 class MultiLogger(BaseLogger):
@@ -129,7 +129,7 @@ class MultiLogger(BaseLogger):
         for logger in self.loggers:
             logger.log_stat(key, value, step, eval_step, event)
 
-    def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent):
+    def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent) -> None:
         for logger in self.loggers:
             logger.log_dict(data, step, eval_step, event)
 
@@ -146,12 +146,12 @@ class NeptuneLogger(BaseLogger):
 
         self.logger["config"] = stringify_unsupported(cfg)
 
-    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent):
+    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
         t = step if event != LogEvent.EVAL else eval_step
         self.logger[f"{event.value}/{key}"].log(value, step=t)
 
     def stop(self) -> None:
-        return self.logger.stop()
+        self.logger.stop()
 
 
 class TensorboardLogger(BaseLogger):
@@ -164,7 +164,7 @@ class TensorboardLogger(BaseLogger):
         configure(tb_logs_path)
         self.log = log_value
 
-    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent):
+    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
         t = step if event != LogEvent.EVAL else eval_step
         self.log(f"{event.value}/{key}", value, t)
 
@@ -190,7 +190,7 @@ class JsonLogger(BaseLogger):
             seed=cfg.system.seed,
         )
 
-    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent):
+    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
         # JsonWriter can't serialize jax arrays
         value = value.item() if isinstance(value, jax.Array) else value
         self.logger.write(step, f"{event.value}/{key}", value, eval_step)
@@ -220,7 +220,7 @@ class ConsoleLogger(BaseLogger):
         # Set to info to suppress debug outputs.
         self.logger.setLevel("INFO")
 
-    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent):
+    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
         colour = self._EVENT_COLOURS[event]
 
         # Replace underscores with spaces and capitalise keys.
@@ -229,7 +229,7 @@ class ConsoleLogger(BaseLogger):
             f"{colour}{Style.BRIGHT}{event.value.upper()} - {key}: {value:.3f}{Style.RESET_ALL}"
         )
 
-    def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent):
+    def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent) -> None:
         # in case the dict is nested, flatten it.
         data = flatten_dict(data, sep=" ")
 
@@ -245,7 +245,7 @@ class ConsoleLogger(BaseLogger):
 
 
 def make_logger(cfg: DictConfig) -> BaseLogger:
-    loggers = []
+    loggers: List[BaseLogger] = []
     unique_token = datetime.now().strftime("%Y%m%d%H%M%S")
 
     if cfg.logger.use_neptune:
@@ -269,7 +269,7 @@ def get_logger_path(config: DictConfig, logger_type: str) -> str:
     )
 
 
-def describe(x: ArrayLike):
+def describe(x: ArrayLike) -> Union[Dict[str, ArrayLike], ArrayLike]:
     if not isinstance(x, jax.Array) or x.size <= 1:
         return x
 
