@@ -139,10 +139,6 @@ class Checkpointer:
                 # We want to store the type of the learner state so we can restore it later
                 # str(type(...)) returns something like "<class 'mava.types.LearnerState'>"
                 # so we use regex to extract just the class name
-                "type": re.findall(
-                    r"<class '(.*)'>",
-                    str(type(unreplicated_learner_state)),
-                )[0],
             },
             # TODO: Currently we only log the episode return,
             #       but perhaps we should log other metrics.
@@ -150,13 +146,13 @@ class Checkpointer:
         )
         return model_save_success
 
-    def restore_learner_state(
+    def restore_params(
         self,
         input_params: Params,
         timestep: Optional[int] = None,
         restore_hstates: bool = False,
     ) -> Tuple[Params, Union[HiddenStates, None]]:
-        """Restore the learner state.
+        """Restore the params and the hidden state (in case of RNNs)
 
         Args:
             input_params (Params): the params of the learner.
