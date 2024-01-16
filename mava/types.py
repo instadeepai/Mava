@@ -84,18 +84,6 @@ RNNObservation: TypeAlias = Tuple[Observation, Done]
 RNNGlobalObservation: TypeAlias = Tuple[ObservationGlobalState, Done]
 
 
-class PPOTransition(NamedTuple):
-    """Transition tuple for PPO."""
-
-    done: Done
-    action: Action
-    value: Value
-    reward: chex.Array
-    log_prob: chex.Array
-    obs: chex.Array
-    info: Dict
-
-
 class Params(NamedTuple):
     """Parameters of an actor critic network."""
 
@@ -141,6 +129,31 @@ class RNNLearnerState(NamedTuple):
     timestep: TimeStep
     dones: Done
     hstates: HiddenStates
+
+
+class PPOTransition(NamedTuple):
+    """Transition tuple for PPO."""
+
+    done: Done
+    action: Action
+    value: Value
+    reward: chex.Array
+    log_prob: chex.Array
+    obs: chex.Array
+    info: Dict
+
+
+class RNNPPOTransition(NamedTuple):
+    """Transition tuple for PPO."""
+
+    done: Done
+    action: Action
+    value: Value
+    reward: chex.Array
+    log_prob: chex.Array
+    obs: chex.Array
+    hstates: HiddenStates
+    info: Dict
 
 
 class EvalState(NamedTuple):
