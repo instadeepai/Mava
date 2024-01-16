@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import os
-import re
 import warnings
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple, Union
