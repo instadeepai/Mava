@@ -68,8 +68,10 @@ def make_jumanji_env(
         A tuple of the environments.
     """
     # Config generator and select the wrapper.
-    task_config = jumanji_registry.get_task_config(config.env.env_name, config.env.scenario)
-    config.env.scenario = {config.env.scenario: task_config}
+    task_config = jumanji_registry.get_task_config(
+        config.env.env_name, config.env.scenario.task_name
+    )
+    config.env.scenario = {"task_name": config.env.scenario.task_name} | task_config
 
     generator = _jumanji_wrappers_and_args[env_name]["generator"]
     generator = generator(**task_config)
@@ -108,7 +110,7 @@ def make_jaxmarl_env(
 
     kwargs = dict(config.env.kwargs)
     if "smax" in env_name.lower():
-        kwargs["scenario"] = map_name_to_scenario(config.env.scenario)
+        kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
 
     # Create jaxmarl envs.
     env = JaxMarlWrapper(jaxmarl.make(env_name, **kwargs), add_global_state)
@@ -137,7 +139,7 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[Environmen
         A tuple of the environments.
     """
     env_name = config.env.env_name
-
+    config.env.scenario = {"task_name": config.env.scenario}
     if env_name in _jumanji_wrappers_and_args:
         return make_jumanji_env(env_name, config, add_global_state)
     elif env_name in jaxmarl.registered_envs:
