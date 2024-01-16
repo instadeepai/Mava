@@ -3,6 +3,7 @@ import os
 import random
 import time
 from dataclasses import dataclass
+from functools import partial
 from typing import NamedTuple, Tuple
 
 import distrax
@@ -19,7 +20,6 @@ from chex import PRNGKey
 from gymnasium.spaces import Box, MultiDiscrete
 from jax import Array
 from jax.typing import ArrayLike
-from stable_baselines3.common.buffers import ReplayBuffer
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -73,7 +73,7 @@ class Args:
     """Entropy regularization coefficient."""
     autotune: bool = True
     """automatic tuning of the entropy coefficient"""
-    n_envs: int = 8
+    n_envs: int = 16
     """number of parallel environments"""
 
 
@@ -123,39 +123,8 @@ class MaMuJoCoWrapper(gym.Wrapper):
     def state(self):
         return self.env.state()
 
-    # @property
-    # def observation_space(self) -> gym.Space:
-    #     space = self.env.observation_space("agent_0")
-    #     new_shape = (self.num_agents, space.shape[0])
-    #     return Box(
-    #         low=np.full(new_shape, space.low[0]),
-    #         high=np.full(new_shape, space.high[0]),
-    #         shape=new_shape,
-    #     )
-
-    # @property
-    # def action_space(self) -> gym.spaces.Space:
-    #     space = self.env.action_space("agent_0")
-    #     new_shape = (self.num_agents, space.shape[0])
-    #     return Box(
-    #         low=np.full(new_shape, space.low[0]),
-    #         high=np.full(new_shape, space.high[0]),
-    #         shape=new_shape,
-    #     )
-
 
 def make_env(env_id, factorization):
-    # def thunk():
-    #     if capture_video and idx == 0:
-    #         env = gym.make(env_id, render_mode="rgb_array")
-    #         env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
-    #     else:
-    #         env = gym.make(env_id)
-    #     env = gym.wrappers.RecordEpisodeStatistics(env)
-    #     env.action_space.seed(seed)
-    #     return env
-    #
-    # return thunk
     def thunk():
         env = gymnasium_robotics.mamujoco_v0.parallel_env(env_id, factorization)
         env = MaMuJoCoWrapper(env)
@@ -168,29 +137,13 @@ def make_env(env_id, factorization):
 
 # ALGO LOGIC: initialize agent here:
 class SoftQNetwork(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-        # todo: slightly better prod(shape[1:])?
-        # n_actions = env.single_action_space.shape[1]  # (agents, n_actions)
-        # n_obs = env.single_observation_space.shape[1]  # (agents, n_obs)
-        #
-        # self.fc1 = nn.Linear(n_obs + n_actions, 256)
-        # self.fc2 = nn.Linear(256, 256)
-        # self.fc3 = nn.Linear(256, 1)
-
+    def setup(self) -> None:
         self.net = nn.Sequential([nn.Dense(256), nn.relu, nn.Dense(256), nn.relu, nn.Dense(1)])
 
+    @nn.compact
     def __call__(self, x, a):
         x = jnp.concatenate([x, a], axis=-1)
         return self.net(x)
-
-    # def forward(self, x, a):
-    #     x = torch.cat([x, a], -1)
-    #     x = F.relu(self.fc1(x))
-    #     x = F.relu(self.fc2(x))
-    #     x = self.fc3(x)
-    #     return x
 
 
 LOG_STD_MAX = 2
@@ -198,51 +151,17 @@ LOG_STD_MIN = -5
 
 
 class Actor(nn.Module):
-    def __init__(self, env):
-        super().__init__()
-        # todo: slightly better prod(shape[1:])?
-        n_actions = env.single_action_space.shape[1]  # (agents, n_actions)
-        n_obs = env.single_observation_space.shape[1]  # (agents, n_obs)
+    env: gym.vector.VectorEnv
 
-        # self.fc1 = nn.Linear(n_obs, 256)
-        # self.fc2 = nn.Linear(256, 256)
-        # self.fc_mean = nn.Linear(256, n_actions)
-        # self.fc_logstd = nn.Linear(256, n_actions)  # action rescaling
+    def setup(self) -> None:
+        n_actions = self.env.single_action_space.shape[1]  # (agents, n_actions)
+        n_obs = self.env.single_observation_space.shape[1]  # (agents, n_obs)
 
         self.torso = nn.Sequential([nn.Dense(256), nn.relu, nn.Dense(256), nn.relu])
         self.mean_nn = nn.Dense(n_actions)
         self.logstd_nn = nn.Dense(n_actions)
 
-        # self.register_buffer(
-        #     "action_scale",
-        #     torch.tensor(
-        #         (env.single_action_space.high - env.single_action_space.low) / 2.0,
-        #         dtype=torch.float32,
-        #     ).unsqueeze(0),
-        # )
-        # self.register_buffer(
-        #     "action_bias",
-        #     torch.tensor(
-        #         (env.single_action_space.high + env.single_action_space.low) / 2.0,
-        #         dtype=torch.float32,
-        #     ).unsqueeze(0),
-        # )
-        act_high = env.single_action_space.high
-        act_low = env.single_action_space.low
-        self.action_scale = jnp.array((act_high - act_low) / 2.0)[jnp.newaxis, :]
-        self.action_bias = jnp.array((act_high + act_low) / 2.0)[jnp.newaxis, :]
-
-    # def forward(self, x):
-    #     x = F.relu(self.fc1(x))
-    #     x = F.relu(self.fc2(x))
-    #     mean = self.fc_mean(x)
-    #     log_std = self.fc_logstd(x)
-    #     log_std = torch.tanh(log_std)
-    #     # From SpinUp / Denis Yarats
-    #     log_std = LOG_STD_MIN + 0.5 * (LOG_STD_MAX - LOG_STD_MIN) * (log_std + 1)
-    #
-    #     return mean, log_std
-
+    @nn.compact
     def __call__(self, x: ArrayLike) -> Tuple[Array, Array]:
         x = self.torso(x)
 
@@ -255,45 +174,31 @@ class Actor(nn.Module):
 
         return mean, log_std
 
-    # def get_action(self, x: ArrayLike) -> Tuple[Array, Array, Array]:
-    #     mean, log_std = self(x)
-    #     std = log_std.exp()
-    #     normal = torch.distributions.Normal(mean, std)
-    #     x_t = normal.rsample()  # for reparameterization trick (mean + std * N(0,1))
-    #     y_t = torch.tanh(x_t)
-    #     action = y_t * self.action_scale + self.action_bias
-    #     log_prob = normal.log_prob(x_t)
-    #     # Enforcing Action Bound
-    #     log_prob -= torch.log(self.action_scale * (1 - y_t.pow(2)) + 1e-6)
-    #     log_prob = log_prob.sum(axis=-1, keepdim=True)
-    #     mean = torch.tanh(mean) * self.action_scale + self.action_bias
-    #     return action, log_prob, mean
 
-    def sample_action(self, x: ArrayLike, key: PRNGKey, eval: bool = False) -> Tuple[Array, Array]:
-        mean, log_std = self(x)
-        std = jnp.exp(log_std)
-        normal = distrax.Normal(mean, std)
+# todo: inside actor?
+@jax.jit
+def sample_action(
+    mean: ArrayLike, log_std: ArrayLike, key: PRNGKey, action_scale, action_bias, eval: bool = False
+) -> Tuple[Array, Array]:
+    std = jnp.exp(log_std)
+    normal = distrax.Normal(mean, std)
 
-        unbound_action = jax.lax.cond(
-            eval,
-            lambda: mean,
-            lambda: normal.sample(seed=key),
-        )
-        bound_action = jnp.tanh(unbound_action)
-        scaled_action = bound_action * self.action_scale + self.action_bias
+    unbound_action = jax.lax.cond(
+        eval,
+        lambda: mean,
+        lambda: normal.sample(seed=key),
+    )
+    bound_action = jnp.tanh(unbound_action)
+    scaled_action = bound_action * action_scale + action_bias
 
-        log_prob = normal.log_prob(unbound_action)
-        log_prob -= jnp.log(self.action_scale * (1 - bound_action**2) + 1e-6)
-        log_prob = jnp.sum(log_prob, axis=-1, keepdims=True)
+    log_prob = normal.log_prob(unbound_action)
+    log_prob -= jnp.log(action_scale * (1 - bound_action**2) + 1e-6)
+    log_prob = jnp.sum(log_prob, axis=-1, keepdims=True)
 
-        # we don't use this, but leaving here in case we need it
-        # mean = jnp.tanh(mean) * self.action_scale + self.action_bias
+    # we don't use this, but leaving here in case we need it
+    # mean = jnp.tanh(mean) * self.action_scale + self.action_bias
 
-        return scaled_action, log_prob
-
-
-# def jax_to_torch(x: Array):
-#     return torch.from_numpy(np.array(x)).to("cuda")
+    return scaled_action, log_prob
 
 
 if __name__ == "__main__":
@@ -308,18 +213,7 @@ poetry run pip install "stable_baselines3==2.0.0a1"
 
     args = tyro.cli(Args)
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
-    if args.track:
-        import wandb
 
-        wandb.init(
-            project=args.wandb_project_name,
-            entity=args.wandb_entity,
-            sync_tensorboard=True,
-            config=vars(args),
-            name=run_name,
-            monitor_gym=True,
-            save_code=True,
-        )
     writer = SummaryWriter(f"runs/{run_name}")
     writer.add_text(
         "hyperparameters",
@@ -331,10 +225,6 @@ poetry run pip install "stable_baselines3==2.0.0a1"
     key = jax.random.PRNGKey(args.seed)
     random.seed(args.seed)
     np.random.seed(args.seed)
-    # torch.manual_seed(args.seed)
-    # torch.backends.cudnn.deterministic = args.torch_deterministic
-
-    # device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
     # env setup
     envs = gym.vector.AsyncVectorEnv(
@@ -344,48 +234,41 @@ poetry run pip install "stable_baselines3==2.0.0a1"
         envs.single_action_space, gym.spaces.Box
     ), "only continuous action space is supported"
 
-    # max_action = float(
-    #     envs.single_action_space.high[0, 0]
-    # )  # hack for now, space is (agents, act_shape)
+    act_high = envs.single_action_space.high
+    act_low = envs.single_action_space.low
+    action_scale = jnp.array((act_high - act_low) / 2.0)[jnp.newaxis, :]
+    action_bias = jnp.array((act_high + act_low) / 2.0)[jnp.newaxis, :]
 
-    # actor = Actor(envs).to(device)
-    # qf1 = SoftQNetwork(envs).to(device)
-    # qf2 = SoftQNetwork(envs).to(device)
-    # qf1_target = SoftQNetwork(envs).to(device)
-    # qf2_target = SoftQNetwork(envs).to(device)
-    # qf1_target.load_state_dict(qf1.state_dict())
-    # qf2_target.load_state_dict(qf2.state_dict())
-    # q_optimizer = optim.Adam(list(qf1.parameters()) + list(qf2.parameters()), lr=args.q_lr)
-    # actor_optimizer = optim.Adam(list(actor.parameters()), lr=args.policy_lr)
     key, actor_key, q1_key, q2_key, q1_target_key, q2_target_key = jax.random.split(key, 6)
 
     n_actions = envs.single_action_space.shape[1]  # (agents, n_actions)
     n_obs = envs.single_observation_space.shape[1]  # (agents, n_obs)
     n_agents = envs.single_observation_space.shape[0]
+    dummy_actions = jnp.zeros((1, n_agents, n_actions))
+    dummy_obs = jnp.zeros((1, n_agents, n_obs))
 
     actor = Actor(envs)
-    actor_params = actor.init(actor_key, jnp.zeros((1, n_agents, n_obs)))
+    actor_params = actor.init(actor_key, dummy_obs)
 
     q = SoftQNetwork()
-    dummy_q_input = jnp.zeros((1, n_agents, n_obs + n_actions))
-    q1_params = q.init(q1_key, dummy_q_input)
-    q2_params = q.init(q2_key, dummy_q_input)
-    q1_target_params = q.init(q1_target_key, dummy_q_input)
-    q2_target_params = q.init(q2_target_key, dummy_q_input)
+    q1_params = q.init(q1_key, dummy_obs, dummy_actions)
+    q2_params = q.init(q2_key, dummy_obs, dummy_actions)
+    q1_target_params = q.init(q1_target_key, dummy_obs, dummy_actions)
+    q2_target_params = q.init(q2_target_key, dummy_obs, dummy_actions)
 
-    actor_optimizer = optax.adam(args.policy_lr)
-    actor_opt_state = actor_optimizer.init(actor_params)
-    q_optimizer = optax.adam(args.q_lr)
-    q_opt_state = q_optimizer.init((q1_params, q2_params))
+    actor_opt = optax.adam(args.policy_lr)
+    actor_opt_state = actor_opt.init(actor_params)
+    q_opt = optax.adam(args.q_lr)
+    q_opt_state = q_opt.init((q1_params, q2_params))
 
     # Automatic entropy tuning
     if args.autotune:
         # -torch.prod(torch.Tensor(envs.single_action_space.shape).to(device)).item()
-        target_entropy = jnp.array(envs.action_space.shape[-1])
+        target_entropy = -jnp.array(envs.action_space.shape[-1])
         log_alpha = jnp.zeros(1)
         alpha = jnp.exp(log_alpha)
-        a_optimizer = optax.adam(args.q_lr)  # optim.Adam([log_alpha], lr=args.q_lr)
-        a_opt_state = a_optimizer.init(log_alpha)
+        alpha_opt = optax.adam(args.q_lr)  # optim.Adam([log_alpha], lr=args.q_lr)
+        alpha_opt_state = alpha_opt.init(log_alpha)
     else:
         alpha = args.alpha
 
@@ -402,8 +285,6 @@ poetry run pip install "stable_baselines3==2.0.0a1"
         reward: ArrayLike
         done: ArrayLike
         next_obs: ArrayLike
-        # state: array
-        # next_state: array
 
     dummy_transition = Transition(
         obs=jnp.zeros((n_agents, obs_dim), dtype=float),
@@ -422,25 +303,122 @@ poetry run pip install "stable_baselines3==2.0.0a1"
     buffer_state = rb.init(dummy_transition)
     buffer_add = jax.jit(rb.add, donate_argnums=0)
     buffer_sample = jax.jit(rb.sample)
-    # rb = ReplayBuffer(
-    #     args.buffer_size,
-    #     envs.single_observation_space,
-    #     envs.single_action_space,
-    #     device,
-    #     handle_timeout_termination=False,
-    # )
+
     start_time = time.time()
     key = jax.random.PRNGKey(0)
+
+    # jit forward passes
+    actor_apply = jax.jit(actor.apply)
+    q_apply = jax.jit(q.apply)
+
+    # losses:
+    @jax.jit
+    def q_loss_fn(q_params, obs, action, target):
+        q1_params, q2_params = q_params
+        q1_a_values = q.apply(q1_params, obs, action).reshape(-1)
+        q2_a_values = q.apply(q2_params, obs, action).reshape(-1)
+
+        q1_loss = jnp.mean((q1_a_values - target) ** 2)
+        q2_loss = jnp.mean((q2_a_values - target) ** 2)
+
+        loss = q1_loss + q2_loss
+
+        return loss, (loss, q1_loss, q2_loss, q1_a_values, q2_a_values)
+
+    @jax.jit
+    def actor_loss_fn(actor_params, obs, alpha, q_params, key):
+        q1_params, q2_params = q_params
+
+        mean, log_std = actor.apply(actor_params, obs)
+        pi, log_pi = sample_action(mean, log_std, key, action_scale, action_bias)
+
+        qf1_pi = q.apply(q1_params, obs, pi)
+        qf2_pi = q.apply(q2_params, obs, pi)
+        min_qf_pi = jnp.minimum(qf1_pi, qf2_pi)
+
+        return ((alpha * log_pi) - min_qf_pi).mean()
+
+    @jax.jit
+    def alpha_loss_fn(log_alpha, log_pi, target_entropy):
+        return (jnp.exp(-log_alpha) * (log_pi + target_entropy)).mean()
+
+    @partial(
+        jax.jit,
+        donate_argnames=["q_params", "q_target_params", "actor_params", "log_alpha", "opt_states"],
+    )
+    def train(
+        q_params, q_target_params, actor_params, log_alpha, opt_states, data, keys, target_entropy
+    ):
+        q1_params, q2_params = q_params
+        q1_target_params, q2_target_params = q_target_params
+        q_opt_state, actor_opt_state, alpha_opt_state = opt_states
+        target_key, actor_key, alpha_key = keys
+
+        mean, log_std = actor_apply(actor_params, data.next_obs)
+        next_state_actions, next_state_log_pi = sample_action(
+            mean, log_std, target_key, action_scale, action_bias
+        )
+
+        qf1_next_target = q_apply(q1_target_params, data.next_obs, next_state_actions)
+        qf2_next_target = q_apply(q2_target_params, data.next_obs, next_state_actions)
+        min_qf_next_target = (
+            jnp.minimum(qf1_next_target, qf2_next_target) - jnp.exp(log_alpha) * next_state_log_pi
+        )
+
+        rewards = data.reward[..., jnp.newaxis, jnp.newaxis]
+        dones = data.done[..., jnp.newaxis, jnp.newaxis]
+        next_q_value = (rewards + (1.0 - dones) * args.gamma * min_qf_next_target).reshape(-1)
+
+        # optimize the q networks
+        q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
+        q_grads, (q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals) = q_grad_fn(
+            (q1_params, q2_params), data.obs, data.action, next_q_value
+        )
+        q_updates, q_opt_state = q_opt.update(q_grads, q_opt_state)
+        q1_params, q2_params = optax.apply_updates((q1_params, q2_params), q_updates)
+
+        # if global_step % args.policy_frequency == 0:  # TD 3 Delayed update support
+        # compensate for the delay by doing 'actor_update_interval' instead of 1
+        for _ in range(args.policy_frequency):
+            actor_grad_fn = jax.value_and_grad(actor_loss_fn)
+            actor_loss, act_grads = actor_grad_fn(
+                actor_params,
+                data.obs,
+                jnp.exp(log_alpha),
+                (q1_params, q2_params),
+                actor_key,
+            )
+            actor_updates, actor_opt_state = actor_opt.update(act_grads, actor_opt_state)
+            actor_params = optax.apply_updates(actor_params, actor_updates)
+
+            if args.autotune:
+                mean, log_std = actor_apply(actor_params, data.obs)
+                _, log_pi = sample_action(mean, log_std, alpha_key, action_scale, action_bias)
+
+                alpha_grad_fn = jax.value_and_grad(alpha_loss_fn)
+                alpha_loss, alpha_grads = alpha_grad_fn(log_alpha, log_pi, target_entropy)
+                alpha_updates, alpha_opt_state = alpha_opt.update(alpha_grads, alpha_opt_state)
+                log_alpha = optax.apply_updates(log_alpha, alpha_updates)
+
+        return (
+            (q1_params, q2_params),
+            (q1_target_params, q2_target_params),
+            actor_params,
+            log_alpha,
+            (q_opt_state, actor_opt_state, alpha_opt_state),
+            (q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss),
+        )
 
     # TRY NOT TO MODIFY: start the game
     obs, _ = envs.reset()
     for global_step in range(0, args.total_timesteps, args.n_envs):
         # ALGO LOGIC: put action logic here
+        key, act_key = jax.random.split(key)
         if global_step < args.learning_starts:
             actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
         else:
-            actions, _, _ = actor.sample_action(jnp.asarray(obs))
-            # actions = actions.detach().cpu().numpy()
+            mean, log_std = actor_apply(actor_params, obs)
+            actions, _ = sample_action(mean, log_std, act_key, action_scale, action_bias)
 
         # TRY NOT TO MODIFY: execute the game and log data.
         next_obs, rewards, terminations, truncations, infos = envs.step(actions)
@@ -462,103 +440,50 @@ poetry run pip install "stable_baselines3==2.0.0a1"
                 real_next_obs[idx] = infos["final_observation"][idx]
 
         transition = Transition(obs, actions, rewards, terminations, real_next_obs)
-        # transition = jax.tree_map(jnp.array, transition)
         buffer_state = buffer_add(buffer_state, transition)
-        # rb.add(obs, real_next_obs, actions, rewards, terminations, infos)
 
         # TRY NOT TO MODIFY: CRUCIAL step easy to overlook
         obs = next_obs
 
         # ALGO LOGIC: training.
         if global_step > args.learning_starts:
-            key, buff_key = jax.random.split(key)
-            _data = buffer_sample(buffer_state, buff_key)  # rb.sample(args.batch_size)
+            key, buff_key, target_key, actor_key, alpha_key = jax.random.split(key, 5)
+            _data = buffer_sample(buffer_state, buff_key)
             data = _data.experience.first
 
-            # with torch.no_grad():
-            next_state_actions, next_state_log_pi, _ = actor.sample_action(data.next_obs)
-            qf1_next_target = qf1_target(data.next_obs, next_state_actions)
-            qf2_next_target = qf2_target(data.next_obs, next_state_actions)
-            min_qf_next_target = (
-                jnp.min(qf1_next_target, qf2_next_target) - alpha * next_state_log_pi
+            (
+                (q1_params, q2_params),
+                (q1_target_params, q2_target_params),
+                actor_params,
+                log_alpha,
+                (q_opt_state, actor_opt_state, alpha_opt_state),
+                (q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss),
+            ) = train(
+                (q1_params, q2_params),
+                (q1_target_params, q2_target_params),
+                actor_params,
+                log_alpha,
+                (q_opt_state, actor_opt_state, alpha_opt_state),
+                data,
+                (target_key, actor_key, alpha_key),
+                target_entropy,
             )
 
-            rewards = data.reward.unsqueeze(-1).unsqueeze(-1)
-            dones = data.done.unsqueeze(-1).unsqueeze(-1)
-            next_q_value = (
-                rewards + (1.0 - dones.float()) * args.gamma * min_qf_next_target
-            ).reshape(-1)
-
-            def q_loss(q_params, obs, action, target):
-                # qf1_a_values = qf1(data.obs, data.action).view(-1)
-                # qf2_a_values = qf2(data.obs, data.action).view(-1)
-                # qf1_loss = F.mse_loss(qf1_a_values, next_q_value)
-                # qf2_loss = F.mse_loss(qf2_a_values, next_q_value)
-                # qf_loss = qf1_loss + qf2_loss
-                q1_params, q2_params = q_params
-                q1_a_values = q.apply(q1_params, obs, action).reshape(-1)
-                q2_a_values = q.apply(q2_params, obs, action).reshape(-1)
-
-                q1_loss = jnp.mean((q1_a_values - target) ** 2)
-                q2_loss = jnp.mean((q2_a_values - target) ** 2)
-
-                q_loss = q1_loss + q2_loss
-
-                return q_loss, (q1_loss, q2_loss)
-
-            # optimize the q networks
-            # q_optimizer.zero_grad()
-            # qf_loss.backward()
-            # q_optimizer.step()
-            q_grad_fn = jax.value_and_grad(q_loss)
-            q_grads, (q1_loss, q2_loss) = q_grad_fn(
-                (q1_params, q2_params), data.obs, data.action, next_q_value
-            )
-            q1_params, q2_params = optax.apply_updates(q_grads, (q1_params, q2_params))
-
-            if global_step % args.policy_frequency == 0:  # TD 3 Delayed update support
-                for _ in range(
-                    args.policy_frequency
-                ):  # compensate for the delay by doing 'actor_update_interval' instead of 1
-                    pi, log_pi, _ = actor.sample_action(data.obs)
-                    qf1_pi = qf1(data.obs, pi)
-                    qf2_pi = qf2(data.obs, pi)
-                    min_qf_pi = jnp.min(qf1_pi, qf2_pi)
-                    actor_loss = ((alpha * log_pi) - min_qf_pi).mean()
-
-                    actor_optimizer.zero_grad()
-                    actor_loss.backward()
-                    actor_optimizer.step()
-
-                    if args.autotune:
-                        with torch.no_grad():
-                            _, log_pi, _ = actor.sample_action(data.obs)
-                        alpha_loss = (-log_alpha.exp() * (log_pi + target_entropy)).mean()
-
-                        a_optimizer.zero_grad()
-                        alpha_loss.backward()
-                        a_optimizer.step()
-                        alpha = log_alpha.exp().item()
+            alpha = jnp.exp(log_alpha)
 
             # update the target networks
             if global_step % args.target_network_frequency == 0:
-                for param, target_param in zip(qf1.parameters(), qf1_target.parameters()):
-                    target_param.data.copy_(
-                        args.tau * param.data + (1 - args.tau) * target_param.data
-                    )
-                for param, target_param in zip(qf2.parameters(), qf2_target.parameters()):
-                    target_param.data.copy_(
-                        args.tau * param.data + (1 - args.tau) * target_param.data
-                    )
+                q1_target_params = optax.incremental_update(q1_params, q1_target_params, args.tau)
+                q2_target_params = optax.incremental_update(q2_params, q2_target_params, args.tau)
 
             if global_step % 100 == 0:
-                writer.add_scalar("losses/qf1_values", qf1_a_values.mean().item(), global_step)
-                writer.add_scalar("losses/qf2_values", qf2_a_values.mean().item(), global_step)
-                writer.add_scalar("losses/qf1_loss", qf1_loss.item(), global_step)
-                writer.add_scalar("losses/qf2_loss", qf2_loss.item(), global_step)
-                writer.add_scalar("losses/qf_loss", qf_loss.item() / 2.0, global_step)
+                writer.add_scalar("losses/qf1_values", jnp.mean(q1_a_vals).item(), global_step)
+                writer.add_scalar("losses/qf2_values", jnp.mean(q2_a_vals).item(), global_step)
+                writer.add_scalar("losses/qf1_loss", q1_loss.item(), global_step)
+                writer.add_scalar("losses/qf2_loss", q2_loss.item(), global_step)
+                writer.add_scalar("losses/qf_loss", (q_loss / 2.0).item(), global_step)
                 writer.add_scalar("losses/actor_loss", actor_loss.item(), global_step)
-                writer.add_scalar("losses/alpha", alpha, global_step)
+                writer.add_scalar("losses/alpha", alpha.item(), global_step)
                 print("SPS:", int(global_step / (time.time() - start_time)))
                 writer.add_scalar(
                     "charts/SPS", int(global_step / (time.time() - start_time)), global_step
