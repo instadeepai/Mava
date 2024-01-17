@@ -27,7 +27,6 @@ import numpy as np
 import optax
 from colorama import Fore, Style
 from flashbax.vault import Vault
-from flax import jax_utils
 from flax.core.frozen_dict import FrozenDict
 from flax.linen.initializers import constant, orthogonal
 from jumanji.env import Environment
@@ -49,7 +48,7 @@ from mava.types import (
     PPOTransition,
 )
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import merge_leading_dims
+from mava.utils.jax import merge_leading_dims, unreplicate_learner_state
 from mava.utils.make_env import make
 
 StoreExpLearnerFn = Callable[[MavaState], Tuple[ExperimentOutput[MavaState], PPOTransition]]
@@ -449,6 +448,19 @@ def learner_setup(
     critic_params = critic_network.init(key_p, init_x)
     critic_opt_state = critic_optim.init(critic_params)
 
+    # Load model from checkpoint if specified.
+    if config.logger.checkpointing.load_model:
+        loaded_checkpoint = Checkpointer(
+            model_name=config.logger.system_name,
+            **config.logger.checkpointing.load_args,  # Other checkpoint args
+        )
+        # Restore the learner state from the checkpoint
+        restored_params, _ = loaded_checkpoint.restore_params(
+            input_params=Params(actor_params, critic_params)
+        )
+        # Update the params
+        actor_params, critic_params = restored_params.actor_params, restored_params.critic_params
+
     # Vmap network apply function over number of agents.
     vmapped_actor_network_apply_fn = jax.vmap(
         actor_network.apply,
@@ -564,18 +576,6 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
             model_name=config.logger.system_name,
             **config.logger.checkpointing.save_args,  # Checkpoint args
         )
-
-    if config.logger.checkpointing.load_model:
-        loaded_checkpoint = Checkpointer(
-            model_name=config.logger.system_name,
-            **config.logger.checkpointing.load_args,  # Other checkpoint args
-        )
-        # Restore the learner state from the checkpoint
-        learner_state_reloaded = loaded_checkpoint.restore_learner_state(
-            unreplicated_input_learner_state=jax_utils.unreplicate(learner_state)
-        )
-        # Overwrite learner state with reloaded state, and replicate across devices.
-        learner_state = jax.device_put_replicated(learner_state_reloaded, jax.devices())
 
     dummy_flashbax_transition = {
         "done": jnp.zeros((config.system.num_agents,), dtype=bool),
@@ -706,7 +706,7 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
             # Save checkpoint of learner state
             checkpointer.save(
                 timestep=steps_per_rollout * (i + 1),
-                unreplicated_learner_state=jax_utils.unreplicate(learner_output.learner_state),
+                unreplicated_learner_state=unreplicate_learner_state(learner_output.learner_state),
                 episode_return=episode_return,
             )
 
