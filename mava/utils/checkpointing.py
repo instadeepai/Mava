@@ -178,7 +178,7 @@ class Checkpointer:
         # Check the type of `input_params` for compatibility.
         # This is a sanity check to ensure correct handling of parameter types.
         # In Flax 0.6.11, parameters were typically of the `FrozenDict` type,
-        # but in cu versions, a regular dictionary is used.
+        # but in current versions, a regular dictionary is used.
         if isinstance(input_params.actor_params, FrozenDict):
             restored_params = Params(**FrozenDict(restored_learner_state_raw["params"]))
         else:
