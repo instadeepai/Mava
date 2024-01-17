@@ -29,7 +29,7 @@ from mava.types import HiddenStates, LearnerState, Params, RNNLearnerState
 # Keep track of the version of the checkpointer
 # Any breaking API changes should be reflected in the major version (e.g. v0.1 -> v1.0)
 # whereas minor versions (e.g. v0.1 -> v0.2) indicate backwards compatibility
-CHECKPOINTER_VERSION = 0.1
+CHECKPOINTER_VERSION = 1.0
 
 
 class Checkpointer:
