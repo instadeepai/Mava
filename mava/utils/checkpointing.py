@@ -13,27 +13,23 @@
 # limitations under the License.
 
 import os
-import re
-import typing
 import warnings
-from copy import copy
 from datetime import datetime
-from pydoc import locate
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import absl.logging as absl_logging
 import orbax.checkpoint
 from chex import Numeric
 from flax.core.frozen_dict import FrozenDict
 from jax.tree_util import tree_map
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from mava.types import HiddenStates, LearnerState, Params, RNNLearnerState
 
 # Keep track of the version of the checkpointer
 # Any breaking API changes should be reflected in the major version (e.g. v0.1 -> v1.0)
 # whereas minor versions (e.g. v0.1 -> v0.2) indicate backwards compatibility
-CHECKPOINTER_VERSION = 0.1
+CHECKPOINTER_VERSION = 1.0
 
 
 class Checkpointer:
@@ -97,6 +93,9 @@ class Checkpointer:
             else:
                 return obj
 
+        # Convert metadata to JSON-ready format
+        if metadata is not None and isinstance(metadata, DictConfig):
+            metadata = OmegaConf.to_container(metadata, resolve=True)
         metadata_json_ready = tree_map(get_json_ready, metadata)
 
         self._manager = orbax.checkpoint.CheckpointManager(
@@ -136,13 +135,6 @@ class Checkpointer:
             step=timestep,
             items={
                 "learner_state": unreplicated_learner_state,
-                # We want to store the type of the learner state so we can restore it later
-                # str(type(...)) returns something like "<class 'mava.types.LearnerState'>"
-                # so we use regex to extract just the class name
-                "type": re.findall(
-                    r"<class '(.*)'>",
-                    str(type(unreplicated_learner_state)),
-                )[0],
             },
             # TODO: Currently we only log the episode return,
             #       but perhaps we should log other metrics.
@@ -150,22 +142,23 @@ class Checkpointer:
         )
         return model_save_success
 
-    def restore_learner_state(
+    def restore_params(
         self,
-        unreplicated_input_learner_state: Union[LearnerState, RNNLearnerState],
+        input_params: Params,
         timestep: Optional[int] = None,
-        restore_params: bool = True,
-        restore_hstates: bool = True,
-    ) -> Union[LearnerState, RNNLearnerState]:
-        """Restore the learner state.
+        restore_hstates: bool = False,
+    ) -> Tuple[Params, Union[HiddenStates, None]]:
+        """Restore the params and the hidden state (in case of RNNs)
 
         Args:
+            input_params (Params): the params of the learner.
             timestep (Optional[int], optional):
                 Specific timestep for restoration (of course, only if that timestep exists).
                 Defaults to None, in which case the latest step will be used.
+            restore_hstates (bool, optional): Whether to restore the hidden states.
 
         Returns:
-            Union[LearnerState, RNNLearnerState]: the restored learner state
+            Tuple[Params,Union[HiddenStates, None]]: the restored params and hidden states.
         """
         # We want to ensure `major` versions match, but allow `minor` versions to differ
         # i.e. v0.1 and 0.2 are compatible, but v1.0 and v2.0 are not
@@ -182,25 +175,24 @@ class Checkpointer:
         # Dictionary of the restored learner state
         restored_learner_state_raw = restored_checkpoint["learner_state"]
 
-        # Restore the learner state type and check it matches the input type
-        restored_learner_state_type = locate(restored_checkpoint["type"])
-        assert restored_learner_state_type == type(unreplicated_input_learner_state)
+        # Check the type of `input_params` for compatibility.
+        # This is a sanity check to ensure correct handling of parameter types.
+        # In Flax 0.6.11, parameters were typically of the `FrozenDict` type,
+        # but in later versions, a regular dictionary is used.
+        if isinstance(input_params.actor_params, FrozenDict):
+            restored_params = Params(**FrozenDict(restored_learner_state_raw["params"]))
+        else:
+            restored_params = Params(**restored_learner_state_raw["params"])
 
-        # We base the new learner state on the input learner state
-        new_learner_state = copy(unreplicated_input_learner_state)
+        # Restore hidden states if required
+        restored_hstates = None
+        if restore_hstates:
+            if isinstance(input_params.actor_params, FrozenDict):
+                restored_hstates = HiddenStates(**FrozenDict(restored_learner_state_raw["hstates"]))
+            else:
+                restored_hstates = HiddenStates(**restored_learner_state_raw["hstates"])
 
-        if restore_params:
-            new_learner_state = new_learner_state._replace(
-                params=Params(**FrozenDict(restored_learner_state_raw["params"])),
-            )
-
-        if restore_hstates and restored_learner_state_type == RNNLearnerState:
-            new_learner_state = typing.cast(RNNLearnerState, new_learner_state)  # for mypy
-            new_learner_state = new_learner_state._replace(
-                hstates=HiddenStates(**FrozenDict(restored_learner_state_raw["hstates"])),
-            )
-
-        return new_learner_state
+        return restored_params, restored_hstates
 
     def get_cfg(self) -> DictConfig:
         """Return the metadata of the checkpoint.
