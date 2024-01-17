@@ -61,4 +61,4 @@ def unreplicate_learner_state(
     Note:
         The function internally uses `jax_utils.unreplicate` twice to remove the necessary axes.
     """
-    return jax_utils.unreplicate(jax_utils.unreplicate(learner_state))  # type: ignore
+    return jax.tree_map(lambda x: x[0][0], learner_state)
