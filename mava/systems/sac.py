@@ -17,7 +17,7 @@ import numpy as np
 import optax
 import tyro
 from chex import PRNGKey
-from gymnasium.spaces import Box, MultiDiscrete
+from gymnasium.spaces import Box
 from jax import Array
 from jax.typing import ArrayLike
 from torch.utils.tensorboard import SummaryWriter
@@ -29,16 +29,6 @@ class Args:
     """the name of this experiment"""
     seed: int = 1
     """seed of the experiment"""
-    torch_deterministic: bool = True
-    """if toggled, `torch.backends.cudnn.deterministic=False`"""
-    cuda: bool = True
-    """if toggled, cuda will be enabled by default"""
-    track: bool = False
-    """if toggled, this experiment will be tracked with Weights and Biases"""
-    wandb_project_name: str = "cleanRL"
-    """the wandb's project name"""
-    wandb_entity: str = None
-    """the entity (team) of wandb's project"""
     capture_video: bool = False
     """whether to capture videos of the agent performances (check out `videos` folder)"""
 
@@ -67,8 +57,6 @@ class Args:
     """the frequency of training policy (delayed)"""
     target_network_frequency: int = 1  # Denis Yarats' implementation delays this by 2.
     """the frequency of updates for the target nerworks"""
-    noise_clip: float = 0.5
-    """noise clip parameter of the Target Policy Smoothing Regularization"""
     alpha: float = 0.2
     """Entropy regularization coefficient."""
     autotune: bool = True
@@ -234,6 +222,13 @@ poetry run pip install "stable_baselines3==2.0.0a1"
         envs.single_action_space, gym.spaces.Box
     ), "only continuous action space is supported"
 
+    envs.single_observation_space.dtype = np.float32
+
+    n_agents = envs.single_observation_space.shape[0]
+    action_dim = envs.single_action_space.shape[1]
+    obs_dim = envs.single_observation_space.shape[1]
+
+    # state_dim = envs.call("state")[0].shape[0]
     act_high = envs.single_action_space.high
     act_low = envs.single_action_space.low
     action_scale = jnp.array((act_high - act_low) / 2.0)[jnp.newaxis, :]
@@ -241,11 +236,8 @@ poetry run pip install "stable_baselines3==2.0.0a1"
 
     key, actor_key, q1_key, q2_key, q1_target_key, q2_target_key = jax.random.split(key, 6)
 
-    n_actions = envs.single_action_space.shape[1]  # (agents, n_actions)
-    n_obs = envs.single_observation_space.shape[1]  # (agents, n_obs)
-    n_agents = envs.single_observation_space.shape[0]
-    dummy_actions = jnp.zeros((1, n_agents, n_actions))
-    dummy_obs = jnp.zeros((1, n_agents, n_obs))
+    dummy_actions = jnp.zeros((1, n_agents, action_dim))
+    dummy_obs = jnp.zeros((1, n_agents, obs_dim))
 
     actor = Actor(envs)
     actor_params = actor.init(actor_key, dummy_obs)
@@ -264,20 +256,15 @@ poetry run pip install "stable_baselines3==2.0.0a1"
     # Automatic entropy tuning
     if args.autotune:
         # -torch.prod(torch.Tensor(envs.single_action_space.shape).to(device)).item()
-        target_entropy = -jnp.prod(jnp.array(envs.single_action_space.shape))
-        log_alpha = jnp.zeros(1)
+        target_entropy = jnp.repeat(-n_agents * action_dim, n_agents).astype(float)
+        # making sure we have dim (B,A,X) so broacasting works fine
+        target_entropy = target_entropy[jnp.newaxis, :, jnp.newaxis]
+        log_alpha = jnp.zeros_like(target_entropy)
         alpha = jnp.exp(log_alpha)
-        alpha_opt = optax.adam(args.q_lr)  # optim.Adam([log_alpha], lr=args.q_lr)
+        alpha_opt = optax.adam(args.q_lr)
         alpha_opt_state = alpha_opt.init(log_alpha)
     else:
         alpha = args.alpha
-
-    envs.single_observation_space.dtype = np.float32
-
-    n_agents = envs.single_observation_space.shape[0]
-    action_dim = envs.single_action_space.shape[1]
-    obs_dim = envs.single_observation_space.shape[1]
-    # state_dim = envs.call("state")[0].shape[0]
 
     class Transition(NamedTuple):
         obs: ArrayLike
@@ -486,7 +473,7 @@ poetry run pip install "stable_baselines3==2.0.0a1"
                 writer.add_scalar("losses/qf2_loss", q2_loss.item(), global_step)
                 writer.add_scalar("losses/qf_loss", (q_loss / 2.0).item(), global_step)
                 writer.add_scalar("losses/actor_loss", actor_loss.item(), global_step)
-                writer.add_scalar("losses/alpha", alpha.item(), global_step)
+                writer.add_scalar("losses/mean_alpha", jnp.mean(alpha).item(), global_step)
                 print("SPS:", int(global_step / (time.time() - start_time)))
                 writer.add_scalar(
                     "charts/SPS", int(global_step / (time.time() - start_time)), global_step
