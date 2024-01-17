@@ -264,7 +264,7 @@ poetry run pip install "stable_baselines3==2.0.0a1"
     # Automatic entropy tuning
     if args.autotune:
         # -torch.prod(torch.Tensor(envs.single_action_space.shape).to(device)).item()
-        target_entropy = -jnp.array(envs.action_space.shape[-1])
+        target_entropy = -jnp.prod(jnp.array(envs.single_action_space.shape))
         log_alpha = jnp.zeros(1)
         alpha = jnp.exp(log_alpha)
         alpha_opt = optax.adam(args.q_lr)  # optim.Adam([log_alpha], lr=args.q_lr)
@@ -379,26 +379,29 @@ poetry run pip install "stable_baselines3==2.0.0a1"
 
         # if global_step % args.policy_frequency == 0:  # TD 3 Delayed update support
         # compensate for the delay by doing 'actor_update_interval' instead of 1
-        for _ in range(args.policy_frequency):
-            actor_grad_fn = jax.value_and_grad(actor_loss_fn)
-            actor_loss, act_grads = actor_grad_fn(
-                actor_params,
-                data.obs,
-                jnp.exp(log_alpha),
-                (q1_params, q2_params),
-                actor_key,
-            )
-            actor_updates, actor_opt_state = actor_opt.update(act_grads, actor_opt_state)
-            actor_params = optax.apply_updates(actor_params, actor_updates)
+        # for _ in range(args.policy_frequency):
+        actor_grad_fn = jax.value_and_grad(actor_loss_fn)
+        actor_loss, act_grads = actor_grad_fn(
+            actor_params,
+            data.obs,
+            jnp.exp(log_alpha),
+            (q1_params, q2_params),
+            actor_key,
+        )
+        actor_updates, actor_opt_state = actor_opt.update(act_grads, actor_opt_state)
+        actor_params = optax.apply_updates(actor_params, actor_updates)
 
-            if args.autotune:
-                mean, log_std = actor_apply(actor_params, data.obs)
-                _, log_pi = sample_action(mean, log_std, alpha_key, action_scale, action_bias)
+        if args.autotune:
+            mean, log_std = actor_apply(actor_params, data.obs)
+            _, log_pi = sample_action(mean, log_std, alpha_key, action_scale, action_bias)
 
-                alpha_grad_fn = jax.value_and_grad(alpha_loss_fn)
-                alpha_loss, alpha_grads = alpha_grad_fn(log_alpha, log_pi, target_entropy)
-                alpha_updates, alpha_opt_state = alpha_opt.update(alpha_grads, alpha_opt_state)
-                log_alpha = optax.apply_updates(log_alpha, alpha_updates)
+            alpha_grad_fn = jax.value_and_grad(alpha_loss_fn)
+            alpha_loss, alpha_grads = alpha_grad_fn(log_alpha, log_pi, target_entropy)
+            alpha_updates, alpha_opt_state = alpha_opt.update(alpha_grads, alpha_opt_state)
+            log_alpha = optax.apply_updates(log_alpha, alpha_updates)
+
+        q1_target_params = optax.incremental_update(q1_params, q1_target_params, args.tau)
+        q2_target_params = optax.incremental_update(q2_params, q2_target_params, args.tau)
 
         return (
             (q1_params, q2_params),
@@ -472,9 +475,9 @@ poetry run pip install "stable_baselines3==2.0.0a1"
             alpha = jnp.exp(log_alpha)
 
             # update the target networks
-            if global_step % args.target_network_frequency == 0:
-                q1_target_params = optax.incremental_update(q1_params, q1_target_params, args.tau)
-                q2_target_params = optax.incremental_update(q2_params, q2_target_params, args.tau)
+            # if global_step % args.target_network_frequency == 0:
+            # q1_target_params = optax.incremental_update(q1_params, q1_target_params, args.tau)
+            # q2_target_params = optax.incremental_update(q2_params, q2_target_params, args.tau)
 
             if global_step % 100 == 0:
                 writer.add_scalar("losses/qf1_values", jnp.mean(q1_a_vals).item(), global_step)
