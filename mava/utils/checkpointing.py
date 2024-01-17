@@ -135,9 +135,6 @@ class Checkpointer:
             step=timestep,
             items={
                 "learner_state": unreplicated_learner_state,
-                # We want to store the type of the learner state so we can restore it later
-                # str(type(...)) returns something like "<class 'mava.types.LearnerState'>"
-                # so we use regex to extract just the class name
             },
             # TODO: Currently we only log the episode return,
             #       but perhaps we should log other metrics.
