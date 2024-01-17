@@ -20,7 +20,6 @@ import chex
 import jax
 import jax.numpy as jnp
 import numpy as np
-from flax import jax_utils
 
 from mava.types import LearnerState, RNNLearnerState
 
@@ -54,11 +53,8 @@ def unreplicate_learner_state(
 ) -> Union[LearnerState, RNNLearnerState]:
     """Unreplicates a learner state.
 
-    This function takes a learner state, and removes the axes associated with device replication
-    and the `update batch size`. The unreplication process is essential to store the learner state
-    in a checkpoint.
-
-    Note:
-        The function internally uses `jax_utils.unreplicate` twice to remove the necessary axes.
+    This function takes a learner state and removes some number of axes, associated with parameter
+    duplication. This is typically one axis for device replication, and one for
+    the `update batch size`.
     """
-    return jax.tree_map(lambda x: x[0][0], learner_state)
+    return jax.tree_map(lambda x: x[0][0], learner_state)  # type: ignore
