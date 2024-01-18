@@ -262,7 +262,11 @@ def get_rnn_evaluator_fn(
             axis_name="eval_batch",
         )(trained_params, eval_state)
 
-        return ExperimentOutput(eval_state, eval_metrics, train_metrics={})
+        return ExperimentOutput(
+            learner_state=eval_state,
+            episode_metrics=eval_metrics,
+            train_metrics={},
+        )
 
     return evaluator_fn
 

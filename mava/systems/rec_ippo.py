@@ -46,8 +46,8 @@ from mava.types import (
 )
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.jax import unreplicate_learner_state
+from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
 
 

@@ -47,8 +47,8 @@ from mava.types import (
     PPOTransition,
 )
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.jax import merge_leading_dims, unreplicate_learner_state
+from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.make_env import make
 
 StoreExpLearnerFn = Callable[[MavaState], Tuple[ExperimentOutput[MavaState], PPOTransition]]
