@@ -14,10 +14,14 @@
 
 # TODO: Rewrite this file to handle only JAX arrays.
 
+from typing import Union
+
 import chex
 import jax
 import jax.numpy as jnp
 import numpy as np
+
+from mava.types import LearnerState, RNNLearnerState
 
 
 def ndim_at_least(x: chex.Array, num_dims: chex.Numeric) -> chex.Array:
@@ -42,3 +46,16 @@ def merge_leading_dims(x: chex.Array, num_dims: chex.Numeric) -> chex.Array:
 
     new_shape = (np.prod(x.shape[:num_dims]),) + x.shape[num_dims:]
     return x.reshape(new_shape)
+
+
+def unreplicate_learner_state(
+    learner_state: Union[LearnerState, RNNLearnerState],
+    unreplicate_depth: int = 2,
+) -> Union[LearnerState, RNNLearnerState]:
+    """Unreplicates a learner state.
+
+    This function takes a learner state and removes some number of axes, associated
+    with parameter duplication. This is typically one axis for device replication,
+    and one for the `update batch size`.
+    """
+    return jax.tree_map(lambda x: x[(0,) * unreplicate_depth], learner_state)  # type: ignore
