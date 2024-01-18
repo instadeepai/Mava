@@ -752,9 +752,6 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
 
-    # Allow dynamic attributes.
-    OmegaConf.set_struct(cfg, False)
-
     # Run experiment.
     run_experiment(cfg)
 
