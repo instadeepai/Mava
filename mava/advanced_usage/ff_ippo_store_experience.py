@@ -612,6 +612,7 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     buffer_state = buffer.init(
         dummy_flashbax_transition,
     )
+    buffer_add = jax.jit(buffer.add, donate_argnums=(0))
 
     # Shape legend:
     # D: Number of devices
@@ -636,8 +637,10 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     if SAVE_VAULT:
         vault = Vault(
             vault_name=VAULT_NAME,
-            init_fbx_state=buffer_state,
+            experience_structure=buffer_state.experience,
             vault_uid=VAULT_UID,
+            # Metadata must be a python dictionary
+            metadata=OmegaConf.to_container(config, resolve=True),
         )
 
     # Run experiment for a total number of evaluations.
@@ -663,7 +666,7 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
                 }
             )
             # Add to fbx buffer
-            buffer_state = buffer.add(buffer_state, flashbax_transition)
+            buffer_state = buffer_add(buffer_state, flashbax_transition)
 
             # Save buffer into vault
             if i % VAULT_SAVE_INTERVAL == 0:
