@@ -27,9 +27,14 @@ from jumanji.environments.routing.robot_warehouse.generator import (
 from jumanji.wrappers import AutoResetWrapper
 from omegaconf import DictConfig
 
-from mava.wrappers.jaxmarl import JaxMarlWrapper
-from mava.wrappers.jumanji import LbfWrapper, RwareWrapper
-from mava.wrappers.shared import AgentIDWrapper, GlobalStateWrapper, LogWrapper
+from mava.wrappers import (
+    AgentIDWrapper,
+    GlobalStateWrapper,
+    JaxMarlWrapper,
+    LbfWrapper,
+    RecordEpisodeMetrics,
+    RwareWrapper,
+)
 
 # Registry mapping environment names to their generator and wrapper classes.
 _jumanji_registry = {
@@ -81,7 +86,7 @@ def make_jumanji_env(
     eval_env = add_optional_wrappers(eval_env, config, add_global_state)
 
     env = AutoResetWrapper(env)
-    env = LogWrapper(env)
+    env = RecordEpisodeMetrics(env)
 
     return env, eval_env
 
@@ -115,7 +120,7 @@ def make_jaxmarl_env(
         eval_env = AgentIDWrapper(eval_env, add_global_state)
 
     env = AutoResetWrapper(env)
-    env = LogWrapper(env)
+    env = RecordEpisodeMetrics(env)
 
     return env, eval_env
 
