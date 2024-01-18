@@ -14,35 +14,32 @@
 
 import copy
 import time
-from typing import Any, Callable, Dict, Sequence, Tuple
+from typing import Any, Callable, Dict, Tuple
 
 import chex
-import distrax
 import flashbax as fbx
-import flax.linen as nn
 import hydra
 import jax
 import jax.numpy as jnp
-import numpy as np
 import optax
 from colorama import Fore, Style
 from flashbax.vault import Vault
 from flax.core.frozen_dict import FrozenDict
-from flax.linen.initializers import constant, orthogonal
 from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
+from mava import networks
 from mava.evaluator import evaluator_setup
 from mava.logger import Logger
+from mava.networks import FeedForwardActor as Actor
 from mava.types import (
     ActorApply,
     CriticApply,
     ExperimentOutput,
     LearnerState,
     MavaState,
-    Observation,
     OptStates,
     Params,
     PPOTransition,
@@ -58,58 +55,6 @@ SAVE_VAULT = True
 VAULT_NAME = "ff_ippo_rware"
 VAULT_UID = None  # None => timestamp
 VAULT_SAVE_INTERVAL = 5
-
-
-class Actor(nn.Module):
-    """Actor Network."""
-
-    action_dim: Sequence[int]
-
-    @nn.compact
-    def __call__(self, observation: Observation) -> distrax.Categorical:
-        """Forward pass."""
-        x = observation.agents_view
-
-        actor_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(x)
-        actor_output = nn.relu(actor_output)
-        actor_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
-            actor_output
-        )
-        actor_output = nn.relu(actor_output)
-        actor_output = nn.Dense(
-            self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
-        )(actor_output)
-
-        masked_logits = jnp.where(
-            observation.action_mask,
-            actor_output,
-            jnp.finfo(jnp.float32).min,
-        )
-        actor_policy = distrax.Categorical(logits=masked_logits)
-
-        return actor_policy
-
-
-class Critic(nn.Module):
-    """Critic Network."""
-
-    @nn.compact
-    def __call__(self, observation: Observation) -> chex.Array:
-        """Forward pass."""
-
-        critic_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
-            observation.agents_view
-        )
-        critic_output = nn.relu(critic_output)
-        critic_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
-            critic_output
-        )
-        critic_output = nn.relu(critic_output)
-        critic_output = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
-            critic_output
-        )
-
-        return jnp.squeeze(critic_output, axis=-1)
 
 
 def get_learner_fn(
@@ -424,8 +369,9 @@ def learner_setup(
     key, key_p = keys
 
     # Define network and optimiser.
-    actor_network = Actor(config.system.num_actions)
-    critic_network = Critic()
+    actor_network, critic_network = networks.make(
+        config=config, network="feedforward", centralised_critic=False
+    )
     actor_optim = optax.chain(
         optax.clip_by_global_norm(config.system.max_grad_norm),
         optax.adam(config.system.actor_lr, eps=1e-5),
