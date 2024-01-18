@@ -74,7 +74,7 @@ def make_jumanji_env(
     # Create envs.
     env = jumanji.make(env_name, generator=generator)
     env = wrapper(env)
-    eval_env = jumanji.make(env_name, generator=generator)
+    eval_env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
     eval_env = wrapper(eval_env)
 
     env = add_optional_wrappers(env, config, add_global_state)

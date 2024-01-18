@@ -7,3 +7,6 @@ defaults:
 env_name: LevelBasedForaging-v0
 # Choose whether to aggregate the list of individual rewards and use the team reward (default setting) OR use_individual_rewards=True.
 use_individual_rewards: False  # If True, use the list of individual rewards.
+
+kwargs:
+  time_limit: 100
