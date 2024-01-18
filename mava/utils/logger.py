@@ -48,7 +48,7 @@ class MavaLogger:
     """
 
     def __init__(self, config: DictConfig) -> None:
-        self.logger: BaseLogger = make_logger(config)
+        self.logger: BaseLogger = _make_multi_logger(config)
         self.cfg = config
 
     def log(self, metrics: Dict, t: int, t_eval: int, event: LogEvent) -> None:
@@ -66,7 +66,7 @@ class MavaLogger:
         if "won_episode" in metrics:
             metrics = self.calc_winrate(metrics, event)
 
-        # {metrics_name: metric} -> {metrics_name: {mean: metric, ...}}
+        # {metric1_name: [metrics], ...} -> {metric1_name: {mean: metric, max: metric, ...}, ...}
         metrics = jax.tree_map(describe, metrics)
         self.logger.log_dict(metrics, t, t_eval, event)
 
@@ -93,7 +93,7 @@ class MavaLogger:
 
     def stop(self) -> None:
         """Stop the logger."""
-        self.logger.stop
+        self.logger.stop()
 
 
 class BaseLogger(abc.ABC):
@@ -138,7 +138,6 @@ class NeptuneLogger(BaseLogger):
     """Logger for neptune.ai."""
 
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
-        """Set up neptune logging."""
         tags = list(cfg.logger.kwargs.neptune_tag)
         project = cfg.logger.kwargs.neptune_project
 
@@ -244,7 +243,9 @@ class ConsoleLogger(BaseLogger):
         )
 
 
-def make_logger(cfg: DictConfig) -> BaseLogger:
+def _make_multi_logger(cfg: DictConfig) -> BaseLogger:
+    """Creates a MultiLogger given a config"""
+    
     loggers: List[BaseLogger] = []
     unique_token = datetime.now().strftime("%Y%m%d%H%M%S")
 
@@ -270,6 +271,8 @@ def get_logger_path(config: DictConfig, logger_type: str) -> str:
 
 
 def describe(x: ArrayLike) -> Union[Dict[str, ArrayLike], ArrayLike]:
+    """Generate summary statistics for an array of metrics."""
+    
     if not isinstance(x, jax.Array) or x.size <= 1:
         return x
 
