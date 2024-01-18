@@ -245,7 +245,7 @@ class ConsoleLogger(BaseLogger):
 
 def _make_multi_logger(cfg: DictConfig) -> BaseLogger:
     """Creates a MultiLogger given a config"""
-    
+
     loggers: List[BaseLogger] = []
     unique_token = datetime.now().strftime("%Y%m%d%H%M%S")
 
@@ -272,7 +272,7 @@ def get_logger_path(config: DictConfig, logger_type: str) -> str:
 
 def describe(x: ArrayLike) -> Union[Dict[str, ArrayLike], ArrayLike]:
     """Generate summary statistics for an array of metrics."""
-    
+
     if not isinstance(x, jax.Array) or x.size <= 1:
         return x
 
