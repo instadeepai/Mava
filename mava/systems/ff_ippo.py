@@ -324,7 +324,7 @@ def get_learner_fn(
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
 
         learner_state, (metric, loss_info) = jax.lax.scan(
-            batched_update_step, learner_state, None, config.system.num_updates_per_eval
+            batched_update_step, learner_state, None, config.arch.num_updates_per_eval
         )
         total_loss, (value_loss, loss_actor, entropy) = loss_info
         return ExperimentOutput(
@@ -444,7 +444,7 @@ def run_experiment(_config: DictConfig) -> None:
 
     # PRNG keys.
     key, key_e, actor_net_key, critic_net_key = jax.random.split(
-        jax.random.PRNGKey(config["system"]["seed"]), num=4
+        jax.random.PRNGKey(config.arch.seed), num=4
     )
 
     # Setup learner.
@@ -465,14 +465,14 @@ def run_experiment(_config: DictConfig) -> None:
     n_devices = len(jax.devices())
     config = check_total_timesteps(config)
     assert (
-        config.system.num_updates > config.arch.num_evaluation
+        config.arch.num_updates > config.arch.num_evaluation
     ), "Number of updates per evaluation must be less than total number of updates."
 
     # Calculate number of updates per evaluation.
-    config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
+    config.arch.num_updates_per_eval = config.arch.num_updates // config.arch.num_evaluation
     steps_per_rollout = (
         n_devices
-        * config.system.num_updates_per_eval
+        * config.arch.num_updates_per_eval
         * config.system.rollout_length
         * config.system.update_batch_size
         * config.arch.num_envs
@@ -588,17 +588,6 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
-
-    # Load and merge the system and network config files with the original one
-    system_config_path = f"{hydra.utils.get_original_cwd()}/mava/configs/system/ff_ippo.yaml"
-    system_config = OmegaConf.load(system_config_path)
-    cfg.system = OmegaConf.merge(cfg.system, system_config)
-
-    network_config_path = (
-        f"{hydra.utils.get_original_cwd()}/mava/configs/network/{cfg.system.network_name}.yaml"
-    )
-    network_config = OmegaConf.load(network_config_path)
-    cfg["network"] = network_config
 
     # Run experiment.
     run_experiment(cfg)

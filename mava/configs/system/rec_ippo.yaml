@@ -1,8 +1,8 @@
 # --- Defaults REC-IPPO ---
+defaults:
+  - network: rnn
+
 system_name: rec_ippo
-network_name: rnn
-total_timesteps: ~ # Set the total environment steps.
-# If unspecified, it's derived from num_updates; otherwise, num_updates adjusts based on this value.
 
 # --- Agent observations ---
 add_agent_id: True

@@ -390,7 +390,7 @@ def get_learner_fn(
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
 
         learner_state, (metric, loss_info, traj_batch) = jax.lax.scan(
-            batched_update_step, learner_state, None, config.system.num_updates_per_eval
+            batched_update_step, learner_state, None, config.arch.num_updates_per_eval
         )
         total_loss, (value_loss, loss_actor, entropy) = loss_info
         return (
@@ -519,7 +519,7 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     env, eval_env = make(config=config)
 
     # PRNG keys.
-    key, key_e, key_p = jax.random.split(jax.random.PRNGKey(config.system.seed), num=3)
+    key, key_e, key_p = jax.random.split(jax.random.PRNGKey(config.arch.seed), num=3)
 
     # Setup learner.
     learn, actor_network, learner_state = learner_setup(env, (key, key_p), config)
@@ -536,18 +536,18 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     # Calculate total timesteps.
     n_devices = len(jax.devices())
 
-    config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
+    config.arch.num_updates_per_eval = config.arch.num_updates // config.arch.num_evaluation
     steps_per_rollout = (
         n_devices
-        * config.system.num_updates_per_eval
+        * config.arch.num_updates_per_eval
         * config.system.rollout_length
         * config.system.update_batch_size
         * config.arch.num_envs
     )
     # Get total_timesteps
-    config.system.total_timesteps = (
+    config.arch.total_timesteps = (
         n_devices
-        * config.system.num_updates
+        * config.arch.num_updates
         * config.system.rollout_length
         * config.system.update_batch_size
         * config.arch.num_envs
@@ -604,7 +604,7 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
         add_sequences=True,
         add_batch_size=(
             n_devices
-            * config.system.num_updates_per_eval
+            * config.arch.num_updates_per_eval
             * config.system.update_batch_size
             * config.arch.num_envs
         ),

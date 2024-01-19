@@ -1,8 +1,8 @@
 # --- Defaults FF-MAPPO ---
+defaults:
+  - network: mlp
+
 system_name: ff_mappo
-network_name: mlp
-total_timesteps: ~ # Set the total environment steps.
-# If unspecified, it's derived from num_updates; otherwise, num_updates adjusts based on this value.
 
 # --- Agent observations ---
 add_agent_id: True

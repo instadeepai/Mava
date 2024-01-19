@@ -1,7 +1,12 @@
 # --- Anakin config ---
 
 # --- Training ---
+seed: 42
 num_envs: 16  # Number of vectorised environments per device.
+num_updates: 1000 # Number of updates
+total_timesteps: ~ # Set the total environment steps.
+# If unspecified, it's derived from num_updates; otherwise, num_updates adjusts based on this value.
+
 
 # --- Evaluation ---
 evaluation_greedy: False # Evaluate the policy greedily. If True the policy will select

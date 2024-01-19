@@ -210,11 +210,11 @@ def make(
 
     def create_torso(network_key: str, layer_size_key: str) -> MLPTorso:
         """Helper function to create a torso object from the config."""
-        activation_fn = parse_activation_fn(config.network[network_key]["activation"])
+        activation_fn = parse_activation_fn(config.system.network[network_key]["activation"])
         return MLPTorso(
-            layer_sizes=config.network[network_key][layer_size_key],
+            layer_sizes=config.system.network[network_key][layer_size_key],
             activation_fn=activation_fn,
-            use_layer_norm=config.network[network_key].use_layer_norm,
+            use_layer_norm=config.system.network[network_key].use_layer_norm,
         )
 
     if network == "feedforward":

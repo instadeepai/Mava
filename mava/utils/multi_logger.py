@@ -77,7 +77,7 @@ class MultiLogger:
             algorithm_name=cfg.system.system_name,
             task_name=cfg.env.scenario.task_name,
             environment_name=cfg.env.env_name,
-            seed=cfg.system.seed,
+            seed=cfg.arch.seed,
         )
 
     def log_stat(
@@ -138,7 +138,7 @@ def get_experiment_path(config: DictConfig, logger_type: str) -> str:
     return (
         f"{logger_type}/{config.system.system_name}/{config.env.env_name}/"
         + f"{config.env.scenario.task_name}"
-        + f"/envs_{config.arch.num_envs}/seed_{config.system.seed}"
+        + f"/envs_{config.arch.num_envs}/seed_{config.arch.seed}"
     )
 
 

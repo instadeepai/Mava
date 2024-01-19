@@ -1,12 +1,8 @@
 # --- Defaults FF-IPPO ---
-# defaults:
-#   - network: mlp # This is used for the second approach mentioned in the defaults.yaml
+defaults:
+  - network: mlp
 
 system_name: ff_ippo
-network_name: mlp
-
-total_timesteps: ~ # Set the total environment steps.
-# If unspecified, it's derived from num_updates; otherwise, num_updates adjusts based on this value.
 
 # --- Agent observations ---
 add_agent_id: True
