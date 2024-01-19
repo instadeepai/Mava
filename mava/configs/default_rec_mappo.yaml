@@ -4,3 +4,4 @@ defaults:
   - system: rec_mappo
   - network: rnn
   - env: rware
+  - _self_
