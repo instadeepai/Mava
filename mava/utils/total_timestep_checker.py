@@ -25,14 +25,14 @@ def check_total_timesteps(config: DictConfig) -> DictConfig:
         config.arch.total_timesteps = (
             n_devices
             * config.arch.num_updates
-            * config.system.rollout_length
+            * config.arch.rollout_length
             * config.system.update_batch_size
             * config.arch.num_envs
         )
     else:
         config.arch.num_updates = (
             config.arch.total_timesteps
-            // config.system.rollout_length
+            // config.arch.rollout_length
             // config.system.update_batch_size
             // config.arch.num_envs
             // n_devices

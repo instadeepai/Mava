@@ -14,42 +14,38 @@
 
 import copy
 import time
-from typing import Any, Callable, Dict, Sequence, Tuple
+from typing import Any, Callable, Dict, Tuple
 
 import chex
-import distrax
 import flashbax as fbx
-import flax.linen as nn
 import hydra
 import jax
 import jax.numpy as jnp
-import numpy as np
 import optax
 from colorama import Fore, Style
 from flashbax.vault import Vault
-from flax import jax_utils
 from flax.core.frozen_dict import FrozenDict
-from flax.linen.initializers import constant, orthogonal
 from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
+from mava import networks
 from mava.evaluator import evaluator_setup
-from mava.logger import Logger
+from mava.networks import FeedForwardActor as Actor
 from mava.types import (
     ActorApply,
     CriticApply,
     ExperimentOutput,
     LearnerState,
     MavaState,
-    Observation,
     OptStates,
     Params,
     PPOTransition,
 )
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import merge_leading_dims
+from mava.utils.jax import merge_leading_dims, unreplicate_learner_state
+from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.make_env import make
 
 StoreExpLearnerFn = Callable[[MavaState], Tuple[ExperimentOutput[MavaState], PPOTransition]]
@@ -59,58 +55,6 @@ SAVE_VAULT = True
 VAULT_NAME = "ff_ippo_rware"
 VAULT_UID = None  # None => timestamp
 VAULT_SAVE_INTERVAL = 5
-
-
-class Actor(nn.Module):
-    """Actor Network."""
-
-    action_dim: Sequence[int]
-
-    @nn.compact
-    def __call__(self, observation: Observation) -> distrax.Categorical:
-        """Forward pass."""
-        x = observation.agents_view
-
-        actor_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(x)
-        actor_output = nn.relu(actor_output)
-        actor_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
-            actor_output
-        )
-        actor_output = nn.relu(actor_output)
-        actor_output = nn.Dense(
-            self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
-        )(actor_output)
-
-        masked_logits = jnp.where(
-            observation.action_mask,
-            actor_output,
-            jnp.finfo(jnp.float32).min,
-        )
-        actor_policy = distrax.Categorical(logits=masked_logits)
-
-        return actor_policy
-
-
-class Critic(nn.Module):
-    """Critic Network."""
-
-    @nn.compact
-    def __call__(self, observation: Observation) -> chex.Array:
-        """Forward pass."""
-
-        critic_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
-            observation.agents_view
-        )
-        critic_output = nn.relu(critic_output)
-        critic_output = nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
-            critic_output
-        )
-        critic_output = nn.relu(critic_output)
-        critic_output = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
-            critic_output
-        )
-
-        return jnp.squeeze(critic_output, axis=-1)
 
 
 def get_learner_fn(
@@ -176,7 +120,7 @@ def get_learner_fn(
 
         # STEP ENVIRONMENT FOR ROLLOUT LENGTH
         learner_state, traj_batch = jax.lax.scan(
-            _env_step, learner_state, None, config.system.rollout_length
+            _env_step, learner_state, None, config.arch.rollout_length
         )
 
         # CALCULATE ADVANTAGE
@@ -326,10 +270,12 @@ def get_learner_fn(
                 value_loss = critic_loss_info[1]
                 actor_loss = actor_loss_info[1][0]
                 entropy = actor_loss_info[1][1]
-                loss_info = (
-                    total_loss,
-                    (value_loss, actor_loss, entropy),
-                )
+                loss_info = {
+                    "total_loss": total_loss,
+                    "value_loss": value_loss,
+                    "actor_loss": actor_loss,
+                    "entropy": entropy,
+                }
 
                 return (new_params, new_opt_state), loss_info
 
@@ -337,7 +283,7 @@ def get_learner_fn(
             key, shuffle_key = jax.random.split(key)
 
             # SHUFFLE MINIBATCHES
-            batch_size = config.system.rollout_length * config.arch.num_envs
+            batch_size = config.arch.rollout_length * config.arch.num_envs
             permutation = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
             batch = jax.tree_util.tree_map(lambda x: merge_leading_dims(x, 2), batch)
@@ -389,18 +335,14 @@ def get_learner_fn(
 
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
 
-        learner_state, (metric, loss_info, traj_batch) = jax.lax.scan(
+        learner_state, (episode_info, loss_info, traj_batch) = jax.lax.scan(
             batched_update_step, learner_state, None, config.arch.num_updates_per_eval
         )
-        total_loss, (value_loss, loss_actor, entropy) = loss_info
         return (
             ExperimentOutput(
                 learner_state=learner_state,
-                episodes_info=metric,
-                total_loss=total_loss,
-                value_loss=value_loss,
-                loss_actor=loss_actor,
-                entropy=entropy,
+                episode_metrics=episode_info,
+                train_metrics=loss_info,
             ),
             traj_batch,
         )
@@ -425,8 +367,9 @@ def learner_setup(
     key, key_p = keys
 
     # Define network and optimiser.
-    actor_network = Actor(config.system.num_actions)
-    critic_network = Critic()
+    actor_network, critic_network = networks.make(
+        config=config, network="feedforward", centralised_critic=False
+    )
     actor_optim = optax.chain(
         optax.clip_by_global_norm(config.system.max_grad_norm),
         optax.adam(config.system.actor_lr, eps=1e-5),
@@ -448,6 +391,19 @@ def learner_setup(
     # Initialise critic params and optimiser state.
     critic_params = critic_network.init(key_p, init_x)
     critic_opt_state = critic_optim.init(critic_params)
+
+    # Load model from checkpoint if specified.
+    if config.checkpointing.load_model:
+        loaded_checkpoint = Checkpointer(
+            model_name=config.system.system_name,
+            **config.checkpointing.load_args,  # Other checkpoint args
+        )
+        # Restore the learner state from the checkpoint
+        restored_params, _ = loaded_checkpoint.restore_params(
+            input_params=Params(actor_params, critic_params)
+        )
+        # Update the params
+        actor_params, critic_params = restored_params.actor_params, restored_params.critic_params
 
     # Vmap network apply function over number of agents.
     vmapped_actor_network_apply_fn = jax.vmap(
@@ -513,7 +469,7 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     """Runs experiment."""
     # Logger setup
     config = copy.deepcopy(_config)
-    logger = Logger(config)
+    logger = MavaLogger(config)
 
     # Create the enviroments for train and eval.
     env, eval_env = make(config=config)
@@ -540,7 +496,7 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     steps_per_rollout = (
         n_devices
         * config.arch.num_updates_per_eval
-        * config.system.rollout_length
+        * config.arch.rollout_length
         * config.system.update_batch_size
         * config.arch.num_envs
     )
@@ -548,7 +504,7 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     config.arch.total_timesteps = (
         n_devices
         * config.arch.num_updates
-        * config.system.rollout_length
+        * config.arch.rollout_length
         * config.system.update_batch_size
         * config.arch.num_envs
     )
@@ -564,18 +520,6 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
             model_name=config.system.system_name,
             **config.checkpointing.save_args,  # Checkpoint args
         )
-
-    if config.checkpointing.load_model:
-        loaded_checkpoint = Checkpointer(
-            model_name=config.system.system_name,
-            **config.checkpointing.load_args,  # Other checkpoint args
-        )
-        # Restore the learner state from the checkpoint
-        learner_state_reloaded = loaded_checkpoint.restore_learner_state(
-            unreplicated_input_learner_state=jax_utils.unreplicate(learner_state)
-        )
-        # Overwrite learner state with reloaded state, and replicate across devices.
-        learner_state = jax.device_put_replicated(learner_state_reloaded, jax.devices())
 
     dummy_flashbax_transition = {
         "done": jnp.zeros((config.system.num_agents,), dtype=bool),
@@ -612,6 +556,7 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     buffer_state = buffer.init(
         dummy_flashbax_transition,
     )
+    buffer_add = jax.jit(buffer.add, donate_argnums=(0))
 
     # Shape legend:
     # D: Number of devices
@@ -636,14 +581,16 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     if SAVE_VAULT:
         vault = Vault(
             vault_name=VAULT_NAME,
-            init_fbx_state=buffer_state,
+            experience_structure=buffer_state.experience,
             vault_uid=VAULT_UID,
+            # Metadata must be a python dictionary
+            metadata=OmegaConf.to_container(config, resolve=True),
         )
 
     # Run experiment for a total number of evaluations.
     max_episode_return = jnp.float32(0.0)
     best_params = None
-    for i in range(config.arch.num_evaluation):
+    for eval_step in range(config.arch.num_evaluation):
         # Train.
         start_time = time.time()
 
@@ -663,10 +610,10 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
                 }
             )
             # Add to fbx buffer
-            buffer_state = buffer.add(buffer_state, flashbax_transition)
+            buffer_state = buffer_add(buffer_state, flashbax_transition)
 
             # Save buffer into vault
-            if i % VAULT_SAVE_INTERVAL == 0:
+            if eval_step % VAULT_SAVE_INTERVAL == 0:
                 write_length = vault.write(buffer_state)
                 print(f"(Wrote {write_length}) Vault index = {vault.vault_index}")
 
@@ -674,10 +621,12 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
 
         # Log the results of the training.
         elapsed_time = time.time() - start_time
-        learner_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
-        logger.log_trainer_metrics(
-            experiment_output=learner_output, t_env=steps_per_rollout * (i + 1)
-        )
+        t = steps_per_rollout * (eval_step + 1)
+        learner_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        learner_output.episode_metrics["timestep"] = t
+
+        logger.log(learner_output.episode_metrics, t, eval_step, LogEvent.ACT)
+        logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
 
         # Prepare for evaluation.
         start_time = time.time()
@@ -695,18 +644,16 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
 
         # Log the results of the evaluation.
         elapsed_time = time.time() - start_time
-        evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
-        episode_return = logger.log_eval_metrics(
-            metrics=evaluator_output.episodes_info,
-            t_env=steps_per_rollout * (i + 1),
-            eval_step=i,
-        )
+        episode_return = jnp.mean(evaluator_output.episode_metrics["episode_return"])
+
+        evaluator_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.EVAL)
 
         if save_checkpoint:
             # Save checkpoint of learner state
             checkpointer.save(
-                timestep=steps_per_rollout * (i + 1),
-                unreplicated_learner_state=jax_utils.unreplicate(learner_output.learner_state),
+                timestep=steps_per_rollout * (eval_step + 1),
+                unreplicated_learner_state=unreplicate_learner_state(learner_output.learner_state),
                 episode_return=episode_return,
             )
 
@@ -732,33 +679,20 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
         jax.block_until_ready(evaluator_output)
 
         elapsed_time = time.time() - start_time
-        evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
-        logger.log_eval_metrics(
-            metrics=evaluator_output.episodes_info,
-            t_env=steps_per_rollout * (i + 1),
-            absolute_metric=True,
-        )
+
+        t = steps_per_rollout * (eval_step + 1)
+        evaluator_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.ABSOLUTE)
 
     # Stop logger
     logger.stop()
 
 
-@hydra.main(config_path="../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
+@hydra.main(config_path="../configs", config_name="defaults.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
-
-    # Load and merge the system and network config files with the original one
-    system_config_path = f"{hydra.utils.get_original_cwd()}/mava/configs/system/ff_ippo.yaml"
-    system_config = OmegaConf.load(system_config_path)
-    cfg.system = OmegaConf.merge(cfg.system, system_config)
-
-    network_config_path = (
-        f"{hydra.utils.get_original_cwd()}/mava/configs/network/{cfg.system.network_name}.yaml"
-    )
-    network_config = OmegaConf.load(network_config_path)
-    cfg["network"] = network_config
 
     # Run experiment.
     run_experiment(cfg)

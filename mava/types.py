@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Optional, Tuple, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Tuple, TypeVar
 
 import chex
 from distrax import Distribution
@@ -84,18 +84,6 @@ RNNObservation: TypeAlias = Tuple[Observation, Done]
 RNNGlobalObservation: TypeAlias = Tuple[ObservationGlobalState, Done]
 
 
-class PPOTransition(NamedTuple):
-    """Transition tuple for PPO."""
-
-    done: Done
-    action: Action
-    value: Value
-    reward: chex.Array
-    log_prob: chex.Array
-    obs: chex.Array
-    info: Dict
-
-
 class Params(NamedTuple):
     """Parameters of an actor critic network."""
 
@@ -139,6 +127,31 @@ class RNNLearnerState(NamedTuple):
     hstates: HiddenStates
 
 
+class PPOTransition(NamedTuple):
+    """Transition tuple for PPO."""
+
+    done: Done
+    action: Action
+    value: Value
+    reward: chex.Array
+    log_prob: chex.Array
+    obs: chex.Array
+    info: Dict
+
+
+class RNNPPOTransition(NamedTuple):
+    """Transition tuple for PPO."""
+
+    done: Done
+    action: Action
+    value: Value
+    reward: chex.Array
+    log_prob: chex.Array
+    obs: chex.Array
+    hstates: HiddenStates
+    info: Dict
+
+
 class EvalState(NamedTuple):
     """State of the evaluator."""
 
@@ -167,14 +180,9 @@ MavaState = TypeVar("MavaState", LearnerState, RNNLearnerState, EvalState, RNNEv
 class ExperimentOutput(NamedTuple, Generic[MavaState]):
     """Experiment output."""
 
-    episodes_info: Dict[str, chex.Array]
     learner_state: MavaState
-    # these aren't common between value and policy methods
-    # should likely just be a dict of metrics
-    total_loss: Optional[chex.Array] = None
-    value_loss: Optional[chex.Array] = None
-    loss_actor: Optional[chex.Array] = None
-    entropy: Optional[chex.Array] = None
+    episode_metrics: Dict[str, chex.Array]
+    train_metrics: Dict[str, chex.Array]
 
 
 LearnerFn = Callable[[MavaState], ExperimentOutput[MavaState]]
