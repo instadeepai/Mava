@@ -180,7 +180,7 @@ class JsonLogger(BaseLogger):
     """Json logger for marl-eval."""
 
     # These are the only metrics that marl-eval needs to plot.
-    _METRICS_TO_LOG = ["episode_return/mean", "win_rate/mean", "steps_per_second"]
+    _METRICS_TO_LOG = ["episode_return/mean", "win_rate", "steps_per_second"]
 
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
         json_exp_path = get_logger_path(cfg, "json")
@@ -201,20 +201,19 @@ class JsonLogger(BaseLogger):
         )
 
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
+        # Only write key if it's in the list of metrics to log.
+        if key not in self._METRICS_TO_LOG:
+            return
+
+        # The key is in the format <metric_name>/<aggregation_fn> so we need to change it to:
+        # <agg fn>_<metric_name>
+        if "/" in key:
+            key = "_".join(reversed(key.split("/")))
+
         # JsonWriter can't serialize jax arrays
         value = value.item() if isinstance(value, jax.Array) else value
         self.logger.write(step, f"{event.value}/{key}", value, eval_step)
 
-    def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent) -> None:
-        for key, value in data.items():
-            if key not in self._METRICS_TO_LOG:
-                continue
-
-            # episode_return/mean -> mean_episode_return
-            if "/" in key:
-                key = "_".join(reversed(key.split("/")))
-
-            self.log_stat(key, value, step, eval_step, event)
 
 
 class ConsoleLogger(BaseLogger):
