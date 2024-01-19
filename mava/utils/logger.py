@@ -144,8 +144,16 @@ class NeptuneLogger(BaseLogger):
         self.logger = neptune.init_run(project=project, tags=tags)
 
         self.logger["config"] = stringify_unsupported(cfg)
+        self.detailed_logging = cfg.logger.kwargs.detailed_neptune_logging
 
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
+        # Main metric if it's the mean of a list of metrics (ends with '/mean')
+        # or it's a single metric doesn't contain a '/'.
+        is_main_metric = "/" not in key or key.endswith("/mean")
+        # If we're not detailed logging (logging everything) then make sure it's a main metric.
+        if not self.detailed_logging and not is_main_metric:
+            return
+
         t = step if event != LogEvent.EVAL else eval_step
         self.logger[f"{event.value}/{key}"].log(value, step=t)
 
@@ -171,6 +179,9 @@ class TensorboardLogger(BaseLogger):
 class JsonLogger(BaseLogger):
     """Json logger for marl-eval."""
 
+    # These are the only metrics that marl-eval needs to plot.
+    _METRICS_TO_LOG = ["episode_return/mean", "win_rate/mean", "steps_per_second"]
+
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
         json_exp_path = get_logger_path(cfg, "json")
         json_logs_path = os.path.join(cfg.logger.base_exp_path, f"{json_exp_path}/{unique_token}")
@@ -193,6 +204,17 @@ class JsonLogger(BaseLogger):
         # JsonWriter can't serialize jax arrays
         value = value.item() if isinstance(value, jax.Array) else value
         self.logger.write(step, f"{event.value}/{key}", value, eval_step)
+
+    def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent) -> None:
+        for key, value in data.items():
+            if key not in self._METRICS_TO_LOG:
+                continue
+
+            # episode_return/mean -> mean_episode_return
+            if "/" in key:
+                key = "_".join(reversed(key.split("/")))
+
+            self.log_stat(key, value, step, eval_step, event)
 
 
 class ConsoleLogger(BaseLogger):
