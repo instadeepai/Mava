@@ -66,8 +66,13 @@ class MavaLogger:
         if "won_episode" in metrics:
             metrics = self.calc_winrate(metrics, event)
 
-        # {metric1_name: [metrics], ...} -> {metric1_name: {mean: metric, max: metric, ...}, ...}
-        metrics = jax.tree_map(describe, metrics)
+        if event == LogEvent.TRAIN:
+            # We only want to log mean losses, max/min/std don't matter.
+            metrics = jax.tree_map(np.mean, metrics)
+        else:
+            # {metric1_name: [metrics], ...} -> {metric1_name: {mean: metric, max: metric, ...}, ...}
+            metrics = jax.tree_map(describe, metrics)
+
         self.logger.log_dict(metrics, t, t_eval, event)
 
     def calc_winrate(self, episode_metrics: Dict, event: LogEvent) -> Dict:
@@ -132,6 +137,10 @@ class MultiLogger(BaseLogger):
     def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent) -> None:
         for logger in self.loggers:
             logger.log_dict(data, step, eval_step, event)
+
+    def sttop(self) -> None:
+        for logger in self.loggers:
+            logger.stop()
 
 
 class NeptuneLogger(BaseLogger):
