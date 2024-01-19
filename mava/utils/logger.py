@@ -139,7 +139,7 @@ class MultiLogger(BaseLogger):
         for logger in self.loggers:
             logger.log_dict(data, step, eval_step, event)
 
-    def sttop(self) -> None:
+    def stop(self) -> None:
         for logger in self.loggers:
             logger.stop()
 
