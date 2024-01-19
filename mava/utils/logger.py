@@ -36,7 +36,7 @@ class LogEvent(Enum):
     ACT = "actor"
     TRAIN = "trainer"
     EVAL = "evaluator"
-    ABSOLUTE = "absolute metric"
+    ABSOLUTE = "absolute"
     MISC = "misc"
 
 
@@ -66,8 +66,14 @@ class MavaLogger:
         if "won_episode" in metrics:
             metrics = self.calc_winrate(metrics, event)
 
-        # {metric1_name: [metrics], ...} -> {metric1_name: {mean: metric, max: metric, ...}, ...}
-        metrics = jax.tree_map(describe, metrics)
+        if event == LogEvent.TRAIN:
+            # We only want to log mean losses, max/min/std don't matter.
+            metrics = jax.tree_map(np.mean, metrics)
+        else:
+            # {metric1_name: [metrics], metric2_name: ...} ->
+            # {metric1_name: {mean: metric, max: metric, ...}, metric2_name: ...}
+            metrics = jax.tree_map(describe, metrics)
+
         self.logger.log_dict(metrics, t, t_eval, event)
 
     def calc_winrate(self, episode_metrics: Dict, event: LogEvent) -> Dict:
@@ -133,6 +139,10 @@ class MultiLogger(BaseLogger):
         for logger in self.loggers:
             logger.log_dict(data, step, eval_step, event)
 
+    def stop(self) -> None:
+        for logger in self.loggers:
+            logger.stop()
+
 
 class NeptuneLogger(BaseLogger):
     """Logger for neptune.ai."""
@@ -180,7 +190,7 @@ class JsonLogger(BaseLogger):
     """Json logger for marl-eval."""
 
     # These are the only metrics that marl-eval needs to plot.
-    _METRICS_TO_LOG = ["episode_return/mean", "win_rate/mean", "steps_per_second"]
+    _METRICS_TO_LOG = ["episode_return/mean", "win_rate", "steps_per_second"]
 
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
         json_exp_path = get_logger_path(cfg, "json")
@@ -201,20 +211,19 @@ class JsonLogger(BaseLogger):
         )
 
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
+        # Only write key if it's in the list of metrics to log.
+
+        if key not in self._METRICS_TO_LOG:
+            return
+
+        # The key is in the format <metric_name>/<aggregation_fn> so we need to change it to:
+        # <agg fn>_<metric_name>
+        if "/" in key:
+            key = "_".join(reversed(key.split("/")))
+
         # JsonWriter can't serialize jax arrays
         value = value.item() if isinstance(value, jax.Array) else value
         self.logger.write(step, f"{event.value}/{key}", value, eval_step)
-
-    def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent) -> None:
-        for key, value in data.items():
-            if key not in self._METRICS_TO_LOG:
-                continue
-
-            # episode_return/mean -> mean_episode_return
-            if "/" in key:
-                key = "_".join(reversed(key.split("/")))
-
-            self.log_stat(key, value, step, eval_step, event)
 
 
 class ConsoleLogger(BaseLogger):
@@ -255,10 +264,11 @@ class ConsoleLogger(BaseLogger):
         data = flatten_dict(data, sep=" ")
 
         colour = self._EVENT_COLOURS[event]
-        # Replace underscores with spaces and capitalise keys. Round values to 3 decimal places.
-        log_str = " | ".join(
-            [f"{k.replace('_', ' ').capitalize()}: {v:.3f}" for k, v in data.items()]
-        )
+        # Replace underscores with spaces and capitalise keys.
+        keys = [k.replace("_", " ").capitalize() for k in data.keys()]
+        # Round values to 3 decimal places if they are floats.
+        values = [v if isinstance(v, int) else f"{v:.3f}" for v in data.values()]
+        log_str = " | ".join([f"{k}: {v}" for k, v in zip(keys, values)])
 
         self.logger.info(
             f"{colour}{Style.BRIGHT}{event.value.upper()} - {log_str}{Style.RESET_ALL}"
@@ -293,7 +303,7 @@ def get_logger_path(config: DictConfig, logger_type: str) -> str:
 
 
 def describe(x: ArrayLike) -> Union[Dict[str, ArrayLike], ArrayLike]:
-    """Generate summary statistics for an array of metrics."""
+    """Generate summary statistics for an array of metrics (mean, std, min, max)."""
 
     if not isinstance(x, jax.Array) or x.size <= 1:
         return x
