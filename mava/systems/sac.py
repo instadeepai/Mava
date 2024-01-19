@@ -327,7 +327,7 @@ poetry run pip install "stable_baselines3==2.0.0a1"
 
     @jax.jit
     def alpha_loss_fn(log_alpha, log_pi, target_entropy):
-        return (jnp.exp(-log_alpha) * (log_pi + target_entropy)).mean()
+        return jnp.mean(-jnp.exp(log_alpha) * (log_pi + target_entropy))
 
     @partial(
         jax.jit,
