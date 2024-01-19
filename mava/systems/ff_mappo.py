@@ -523,8 +523,9 @@ def run_experiment(_config: DictConfig) -> None:
         elapsed_time = time.time() - start_time
         t = steps_per_rollout * (eval_step + 1)
         learner_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
-        learner_output.episode_metrics["timestep"] = t
 
+        # Separately log timesteps, actoring metrics and training metrics.
+        logger.log({"timestep": t}, t, eval_step, LogEvent.MISC)
         logger.log(learner_output.episode_metrics, t, eval_step, LogEvent.ACT)
         logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
 
