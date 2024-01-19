@@ -4,3 +4,4 @@ defaults:
   - system: ff_ippo
   - network: mlp
   - env: rware
+  - _self_

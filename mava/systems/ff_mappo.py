@@ -30,7 +30,6 @@ from rich.pretty import pprint
 
 from mava import networks
 from mava.evaluator import evaluator_setup
-from mava.logger import Logger
 from mava.networks import FeedForwardActor as Actor
 from mava.types import (
     ActorApply,
@@ -46,6 +45,7 @@ from mava.types import (
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import merge_leading_dims, unreplicate_learner_state
+from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
 
 
@@ -260,10 +260,12 @@ def get_learner_fn(
                 value_loss = critic_loss_info[1]
                 actor_loss = actor_loss_info[1][0]
                 entropy = actor_loss_info[1][1]
-                loss_info = (
-                    total_loss,
-                    (value_loss, actor_loss, entropy),
-                )
+                loss_info = {
+                    "total_loss": total_loss,
+                    "value_loss": value_loss,
+                    "actor_loss": actor_loss,
+                    "entropy": entropy,
+                }
 
                 return (new_params, new_opt_state), loss_info
 
@@ -321,17 +323,13 @@ def get_learner_fn(
 
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
 
-        learner_state, (metric, loss_info) = jax.lax.scan(
+        learner_state, (episode_info, loss_info) = jax.lax.scan(
             batched_update_step, learner_state, None, config.system.num_updates_per_eval
         )
-        total_loss, (value_loss, loss_actor, entropy) = loss_info
         return ExperimentOutput(
             learner_state=learner_state,
-            episodes_info=metric,
-            total_loss=total_loss,
-            value_loss=value_loss,
-            loss_actor=loss_actor,
-            entropy=entropy,
+            episode_metrics=episode_info,
+            train_metrics=loss_info,
         )
 
     return learner_fn
@@ -498,7 +496,7 @@ def run_experiment(_config: DictConfig) -> None:
     )
 
     # Logger setup
-    logger = Logger(config)
+    logger = MavaLogger(config)
     cfg: Dict = OmegaConf.to_container(config, resolve=True)
     cfg["arch"]["devices"] = jax.devices()
     pprint(cfg)
@@ -515,7 +513,7 @@ def run_experiment(_config: DictConfig) -> None:
     # Run experiment for a total number of evaluations.
     max_episode_return = jnp.float32(0.0)
     best_params = None
-    for i in range(config.arch.num_evaluation):
+    for eval_step in range(config.arch.num_evaluation):
         # Train.
         start_time = time.time()
         learner_output = learn(learner_state)
@@ -523,10 +521,13 @@ def run_experiment(_config: DictConfig) -> None:
 
         # Log the results of the training.
         elapsed_time = time.time() - start_time
-        learner_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
-        logger.log_trainer_metrics(
-            experiment_output=learner_output, t_env=steps_per_rollout * (i + 1)
-        )
+        t = steps_per_rollout * (eval_step + 1)
+        learner_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+
+        # Separately log timesteps, actoring metrics and training metrics.
+        logger.log({"timestep": t}, t, eval_step, LogEvent.MISC)
+        logger.log(learner_output.episode_metrics, t, eval_step, LogEvent.ACT)
+        logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
 
         # Prepare for evaluation.
         start_time = time.time()
@@ -544,17 +545,15 @@ def run_experiment(_config: DictConfig) -> None:
 
         # Log the results of the evaluation.
         elapsed_time = time.time() - start_time
-        evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
-        episode_return = logger.log_eval_metrics(
-            metrics=evaluator_output.episodes_info,
-            t_env=steps_per_rollout * (i + 1),
-            eval_step=i,
-        )
+        episode_return = jnp.mean(evaluator_output.episode_metrics["episode_return"])
+
+        evaluator_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.EVAL)
 
         if save_checkpoint:
             # Save checkpoint of learner state
             checkpointer.save(
-                timestep=steps_per_rollout * (i + 1),
+                timestep=steps_per_rollout * (eval_step + 1),
                 unreplicated_learner_state=unreplicate_learner_state(learner_output.learner_state),
                 episode_return=episode_return,
             )
@@ -578,12 +577,10 @@ def run_experiment(_config: DictConfig) -> None:
         jax.block_until_ready(evaluator_output)
 
         elapsed_time = time.time() - start_time
-        evaluator_output.episodes_info["steps_per_second"] = steps_per_rollout / elapsed_time
-        logger.log_eval_metrics(
-            metrics=evaluator_output.episodes_info,
-            t_env=steps_per_rollout * (i + 1),
-            absolute_metric=True,
-        )
+
+        t = steps_per_rollout * (eval_step + 1)
+        evaluator_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.ABSOLUTE)
 
     # Stop the logger.
     logger.stop()
