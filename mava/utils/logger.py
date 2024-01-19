@@ -36,7 +36,7 @@ class LogEvent(Enum):
     ACT = "actor"
     TRAIN = "trainer"
     EVAL = "evaluator"
-    ABSOLUTE = "absolute metric"
+    ABSOLUTE = "absolute"
     MISC = "misc"
 
 
@@ -212,6 +212,7 @@ class JsonLogger(BaseLogger):
 
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
         # Only write key if it's in the list of metrics to log.
+
         if key not in self._METRICS_TO_LOG:
             return
 
