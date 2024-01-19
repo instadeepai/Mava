@@ -70,7 +70,8 @@ class MavaLogger:
             # We only want to log mean losses, max/min/std don't matter.
             metrics = jax.tree_map(np.mean, metrics)
         else:
-            # {metric1_name: [metrics], ...} -> {metric1_name: {mean: metric, max: metric, ...}, ...}
+            # {metric1_name: [metrics], metric2_name: ...} ->
+            # {metric1_name: {mean: metric, max: metric, ...}, metric2_name: ...}
             metrics = jax.tree_map(describe, metrics)
 
         self.logger.log_dict(metrics, t, t_eval, event)
@@ -301,7 +302,7 @@ def get_logger_path(config: DictConfig, logger_type: str) -> str:
 
 
 def describe(x: ArrayLike) -> Union[Dict[str, ArrayLike], ArrayLike]:
-    """Generate summary statistics for an array of metrics."""
+    """Generate summary statistics for an array of metrics (mean, std, min, max)."""
 
     if not isinstance(x, jax.Array) or x.size <= 1:
         return x
