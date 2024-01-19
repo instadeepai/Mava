@@ -215,7 +215,6 @@ class JsonLogger(BaseLogger):
         self.logger.write(step, f"{event.value}/{key}", value, eval_step)
 
 
-
 class ConsoleLogger(BaseLogger):
     """Logger for writing to stdout."""
 
@@ -254,10 +253,11 @@ class ConsoleLogger(BaseLogger):
         data = flatten_dict(data, sep=" ")
 
         colour = self._EVENT_COLOURS[event]
-        # Replace underscores with spaces and capitalise keys. Round values to 3 decimal places.
-        log_str = " | ".join(
-            [f"{k.replace('_', ' ').capitalize()}: {v:.3f}" for k, v in data.items()]
-        )
+        # Replace underscores with spaces and capitalise keys.
+        keys = [k.replace("_", " ").capitalize() for k in data.keys()]
+        # Round values to 3 decimal places if they are floats.
+        values = [v if isinstance(v, int) else f"{v:.3f}" for v in data.values()]
+        log_str = " | ".join([f"{k}: {v}" for k, v in zip(keys, values)])
 
         self.logger.info(
             f"{colour}{Style.BRIGHT}{event.value.upper()} - {log_str}{Style.RESET_ALL}"
