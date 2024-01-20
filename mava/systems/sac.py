@@ -4,30 +4,42 @@ import random
 import time
 from dataclasses import dataclass
 from functools import partial
-from typing import NamedTuple, Tuple
+from typing import Any, ClassVar, Dict, NamedTuple, Optional, Tuple, Union
 
+import chex
 import distrax
 import flashbax as fbx
 import flax.linen as nn
 import gymnasium as gym
-import gymnasium_robotics
+
+# import gymnasium_robotics
 import jax
 import jax.numpy as jnp
+import jaxmarl
+
+# from torch.utils.tensorboard import SummaryWriter
+import neptune
 import numpy as np
 import optax
+import tensorboard_logger
 import tyro
 from chex import PRNGKey
 from gymnasium.spaces import Box
 from jax import Array
 from jax.typing import ArrayLike
-from torch.utils.tensorboard import SummaryWriter
+from jumanji import specs
+from jumanji.env import Environment, State
+from jumanji.types import Observation
+from jumanji.wrappers import GymObservation, jumanji_to_gym_obs
+
+from mava.wrappers.jaxmarl import JaxMarlWrapper
 
 
 @dataclass
 class Args:
     exp_name: str = os.path.basename(__file__)[: -len(".py")]
     """the name of this experiment"""
-    seed: int = 1
+    seed: int = 42
     """seed of the experiment"""
     capture_video: bool = False
     """whether to capture videos of the agent performances (check out `videos` folder)"""
@@ -114,13 +126,138 @@ class MaMuJoCoWrapper(gym.Wrapper):
 
 def make_env(env_id, factorization):
     def thunk():
-        env = gymnasium_robotics.mamujoco_v0.parallel_env(env_id, factorization)
-        env = MaMuJoCoWrapper(env)
+        # env = gymnasium_robotics.mamujoco_v0.parallel_env(env_id, factorization)
+        # env = MaMuJoCoWrapper(env)
+        env = jaxmarl.make("halfcheetah-6x1")
+        env = JaxMarlWrapper(env)
+        env = JumanjiToGymWrapper(env)
         env = gym.wrappers.RecordEpisodeStatistics(env)
 
         return env
 
     return thunk
+
+
+class JumanjiToGymWrapper(gym.Env):
+    """A wrapper that converts a Jumanji `Environment` to one that follows the `gym.Env` API."""
+
+    # Flag that prevents `gym.register` from misinterpreting the `_step` and
+    # `_reset` as signs of a deprecated gym Env API.
+    _gym_disable_underscore_compat: ClassVar[bool] = True
+
+    def __init__(self, env: Environment, seed: int = 0, backend: Optional[str] = None):
+        """Create the Gym environment.
+
+        Args:
+            env: `Environment` to wrap to a `gym.Env`.
+            seed: the seed that is used to initialize the environment's PRNG.
+            backend: the XLA backend.
+        """
+        self._env = env
+        self.metadata: Dict[str, str] = {}
+        self._key = jax.random.PRNGKey(seed)
+        self.backend = backend
+        self._state = None
+        self.observation_space = specs.jumanji_specs_to_gym_spaces(self._env.observation_spec())
+        self.action_space = specs.jumanji_specs_to_gym_spaces(self._env.action_spec())
+
+        def reset(key: chex.PRNGKey) -> Tuple[State, Observation, Optional[Dict]]:
+            """Reset function of a Jumanji environment to be jitted."""
+            state, timestep = self._env.reset(key)
+            return state, timestep.observation, timestep.extras
+
+        self._reset = jax.jit(reset, backend=self.backend)
+
+        def step(
+            state: State, action: chex.Array
+        ) -> Tuple[State, Observation, chex.Array, bool, Optional[Any]]:
+            """Step function of a Jumanji environment to be jitted."""
+            state, timestep = self._env.step(state, action)
+            trunc = jnp.bool_(timestep.last())
+            term = bool(1 - timestep.discount)
+            return state, timestep.observation, timestep.reward, term, trunc, timestep.extras
+
+        self._step = jax.jit(step, backend=self.backend)
+
+    def reset(
+        self,
+        *,
+        seed: Optional[int] = None,
+        return_info: bool = False,
+        options: Optional[dict] = None,
+    ) -> Union[GymObservation, Tuple[GymObservation, Optional[Any]]]:
+        """Resets the environment to an initial state by starting a new sequence
+        and returns the first `Observation` of this sequence.
+
+        Returns:
+            obs: an element of the environment's observation_space.
+            info (optional): contains supplementary information such as metrics.
+        """
+        if seed is not None:
+            self.seed(seed)
+        key, self._key = jax.random.split(self._key)
+        self._state, obs, extras = self._reset(key)
+
+        # Convert the observation to a numpy array or a nested dict thereof
+        obs = jumanji_to_gym_obs(obs)
+
+        if return_info:
+            info = jax.tree_util.tree_map(np.asarray, extras)
+            return obs, info
+        else:
+            return obs, {}  # type: ignore
+
+    def step(
+        self, action: chex.ArrayNumpy
+    ) -> Tuple[GymObservation, float, bool, bool, Optional[Any]]:
+        """Updates the environment according to the action and returns an `Observation`.
+
+        Args:
+            action: A NumPy array representing the action provided by the agent.
+
+        Returns:
+            observation: an element of the environment's observation_space.
+            reward: the amount of reward returned as a result of taking the action.
+            terminated: whether a terminal state is reached.
+            info: contains supplementary information such as metrics.
+        """
+
+        action = jnp.array(action)  # Convert input numpy array to JAX array
+        self._state, obs, reward, term, trunc, extras = self._step(self._state, action)
+
+        # Convert to get the correct signature
+        obs = jumanji_to_gym_obs(obs)
+        reward = float(reward)
+        term = bool(term)
+        trunc = bool(trunc)
+        info = jax.tree_util.tree_map(np.asarray, extras)
+
+        return obs, reward, term, trunc, info
+
+    def seed(self, seed: int = 0) -> None:
+        """Function which sets the seed for the environment's random number generator(s).
+
+        Args:
+            seed: the seed value for the random number generator(s).
+        """
+        self._key = jax.random.PRNGKey(seed)
+
+    def render(self, mode: str = "human") -> Any:
+        """Renders the environment.
+
+        Args:
+            mode: currently not used since Jumanji does not currently support modes.
+        """
+        del mode
+        return self._env.render(self._state)
+
+    def close(self) -> None:
+        """Closes the environment, important for rendering where pygame is imported."""
+        self._env.close()
+
+    @property
+    def unwrapped(self) -> Environment:
+        return self._env
 
 
 # ALGO LOGIC: initialize agent here:
@@ -202,12 +339,12 @@ poetry run pip install "stable_baselines3==2.0.0a1"
     args = tyro.cli(Args)
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 
-    writer = SummaryWriter(f"runs/{run_name}")
-    writer.add_text(
-        "hyperparameters",
-        "|param|value|\n|-|-|\n%s"
-        % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
-    )
+    tensorboard_logger.configure(run_name)
+    # writer.add_text(
+    #     "hyperparameters",
+    #     "|param|value|\n|-|-|\n%s"
+    #     % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
+    # )
 
     # TRY NOT TO MODIFY: seeding
     key = jax.random.PRNGKey(args.seed)
@@ -419,8 +556,12 @@ poetry run pip install "stable_baselines3==2.0.0a1"
                 if info is None or "episode" not in info:
                     continue
                 print(f"global_step={global_step}, episodic_return={info['episode']['r']}")
-                writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
-                writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
+                tensorboard_logger.log_value(
+                    "charts/episodic_return", info["episode"]["r"], global_step
+                )
+                tensorboard_logger.log_value(
+                    "charts/episodic_length", info["episode"]["l"], global_step
+                )
                 break
 
         # TRY NOT TO MODIFY: save data to reply buffer; handle `final_observation`
@@ -467,19 +608,27 @@ poetry run pip install "stable_baselines3==2.0.0a1"
             # q2_target_params = optax.incremental_update(q2_params, q2_target_params, args.tau)
 
             if global_step % 100 == 0:
-                writer.add_scalar("losses/qf1_values", jnp.mean(q1_a_vals).item(), global_step)
-                writer.add_scalar("losses/qf2_values", jnp.mean(q2_a_vals).item(), global_step)
-                writer.add_scalar("losses/qf1_loss", q1_loss.item(), global_step)
-                writer.add_scalar("losses/qf2_loss", q2_loss.item(), global_step)
-                writer.add_scalar("losses/qf_loss", (q_loss / 2.0).item(), global_step)
-                writer.add_scalar("losses/actor_loss", actor_loss.item(), global_step)
-                writer.add_scalar("losses/mean_alpha", jnp.mean(alpha).item(), global_step)
+                tensorboard_logger.log_value(
+                    "losses/qf1_values", jnp.mean(q1_a_vals).item(), global_step
+                )
+                tensorboard_logger.log_value(
+                    "losses/qf2_values", jnp.mean(q2_a_vals).item(), global_step
+                )
+                tensorboard_logger.log_value("losses/qf1_loss", q1_loss.item(), global_step)
+                tensorboard_logger.log_value("losses/qf2_loss", q2_loss.item(), global_step)
+                tensorboard_logger.log_value("losses/qf_loss", (q_loss / 2.0).item(), global_step)
+                tensorboard_logger.log_value("losses/actor_loss", actor_loss.item(), global_step)
+                tensorboard_logger.log_value(
+                    "losses/mean_alpha", jnp.mean(alpha).item(), global_step
+                )
                 print("SPS:", int(global_step / (time.time() - start_time)))
-                writer.add_scalar(
+                tensorboard_logger.log_value(
                     "charts/SPS", int(global_step / (time.time() - start_time)), global_step
                 )
                 if args.autotune:
-                    writer.add_scalar("losses/alpha_loss", alpha_loss.item(), global_step)
+                    tensorboard_logger.log_value(
+                        "losses/alpha_loss", alpha_loss.item(), global_step
+                    )
 
     envs.close()
-    writer.close()
+    # writer.close()
