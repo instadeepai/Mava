@@ -442,7 +442,7 @@ def get_learner_fn(
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
 
         learner_state, (episode_info, loss_info) = jax.lax.scan(
-            batched_update_step, learner_state, None, config.arch.num_updates_per_eval
+            batched_update_step, learner_state, None, config.system.num_updates_per_eval
         )
         return ExperimentOutput(
             learner_state=learner_state,

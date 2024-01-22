@@ -1,0 +1,7 @@
+defaults:
+  - logger: rec_mappo
+  - arch: anakin
+  - system: rec_mappo
+  - network: rnn
+  - env: rware
+  - _self_

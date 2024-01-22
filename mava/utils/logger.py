@@ -148,14 +148,13 @@ class NeptuneLogger(BaseLogger):
     """Logger for neptune.ai."""
 
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
-        tags = list(cfg.kwargs.neptune_tag)
-        tags.append(cfg.system.system_name)
-        project = cfg.kwargs.neptune_project
+        tags = list(cfg.logger.kwargs.neptune_tag)
+        project = cfg.logger.kwargs.neptune_project
 
         self.logger = neptune.init_run(project=project, tags=tags)
 
         self.logger["config"] = stringify_unsupported(cfg)
-        self.detailed_logging = cfg.kwargs.detailed_neptune_logging
+        self.detailed_logging = cfg.logger.kwargs.detailed_neptune_logging
 
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
         # Main metric if it's the mean of a list of metrics (ends with '/mean')
@@ -177,7 +176,7 @@ class TensorboardLogger(BaseLogger):
 
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
         tb_exp_path = get_logger_path(cfg, "tensorboard")
-        tb_logs_path = os.path.join(cfg.base_exp_path, f"{tb_exp_path}/{unique_token}")
+        tb_logs_path = os.path.join(cfg.logger.base_exp_path, f"{tb_exp_path}/{unique_token}")
 
         configure(tb_logs_path)
         self.log = log_value
@@ -195,18 +194,20 @@ class JsonLogger(BaseLogger):
 
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
         json_exp_path = get_logger_path(cfg, "json")
-        json_logs_path = os.path.join(cfg.base_exp_path, f"{json_exp_path}/{unique_token}")
+        json_logs_path = os.path.join(cfg.logger.base_exp_path, f"{json_exp_path}/{unique_token}")
 
         # if a custom path is specified, use that instead
-        if cfg.kwargs.json_path is not None:
-            json_logs_path = os.path.join(cfg.base_exp_path, "json", cfg.kwargs.json_path)
+        if cfg.logger.kwargs.json_path is not None:
+            json_logs_path = os.path.join(
+                cfg.logger.base_exp_path, "json", cfg.logger.kwargs.json_path
+            )
 
         self.logger = JsonWriter(
             path=json_logs_path,
-            algorithm_name=cfg.system.system_name,
+            algorithm_name=cfg.logger.system_name,
             task_name=cfg.env.scenario.task_name,
             environment_name=cfg.env.env_name,
-            seed=cfg.arch.seed,
+            seed=cfg.system.seed,
         )
 
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
@@ -280,13 +281,13 @@ def _make_multi_logger(cfg: DictConfig) -> BaseLogger:
     loggers: List[BaseLogger] = []
     unique_token = datetime.now().strftime("%Y%m%d%H%M%S")
 
-    if cfg.use_neptune:
+    if cfg.logger.use_neptune:
         loggers.append(NeptuneLogger(cfg, unique_token))
-    if cfg.use_tb:
+    if cfg.logger.use_tb:
         loggers.append(TensorboardLogger(cfg, unique_token))
-    if cfg.use_json:
+    if cfg.logger.use_json:
         loggers.append(JsonLogger(cfg, unique_token))
-    if cfg.use_console:
+    if cfg.logger.use_console:
         loggers.append(ConsoleLogger(cfg, unique_token))
 
     return MultiLogger(loggers)
@@ -295,9 +296,9 @@ def _make_multi_logger(cfg: DictConfig) -> BaseLogger:
 def get_logger_path(config: DictConfig, logger_type: str) -> str:
     """Helper function to create the experiment path."""
     return (
-        f"{logger_type}/{config.system.system_name}/{config.env.env_name}/"
+        f"{logger_type}/{config.logger.system_name}/{config.env.env_name}/"
         + f"{config.env.scenario.task_name}"
-        + f"/envs_{config.arch.num_envs}/seed_{config.arch.seed}"
+        + f"/envs_{config.arch.num_envs}/seed_{config.system.seed}"
     )
 
 

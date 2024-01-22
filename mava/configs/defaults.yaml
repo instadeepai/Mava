@@ -2,4 +2,4 @@ defaults:
   - arch: anakin
   - env: rware
   - system: ff_ippo  # Change the system name before running the `system.py` file OR run `python system_name.py system=system_name`.
-  - logging
+  - logger: logger
