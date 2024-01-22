@@ -204,10 +204,10 @@ class JsonLogger(BaseLogger):
 
         self.logger = JsonWriter(
             path=json_logs_path,
-            algorithm_name=cfg.logger.system_name,
+            algorithm_name=cfg.system.system_name,
             task_name=cfg.env.scenario.task_name,
             environment_name=cfg.env.env_name,
-            seed=cfg.system.seed,
+            seed=cfg.arch.seed,
         )
 
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
@@ -296,9 +296,9 @@ def _make_multi_logger(cfg: DictConfig) -> BaseLogger:
 def get_logger_path(config: DictConfig, logger_type: str) -> str:
     """Helper function to create the experiment path."""
     return (
-        f"{logger_type}/{config.logger.system_name}/{config.env.env_name}/"
+        f"{logger_type}/{config.system.system_name}/{config.env.env_name}/"
         + f"{config.env.scenario.task_name}"
-        + f"/envs_{config.arch.num_envs}/seed_{config.system.seed}"
+        + f"/envs_{config.arch.num_envs}/seed_{config.arch.seed}"
     )
 
 
@@ -393,18 +393,19 @@ class JsonWriter:
 
         metrics = {metric_key: [value]}
 
-        if logging_prefix == "evaluator":
-            step_metrics = {"step_count": timestep, "elapsed_time": current_time - self.start_time}
-            step_metrics.update(metrics)  # type: ignore
+        if logging_prefix == "absolute":
+            self.run_data["absolute_metrics"].update(metrics)
+
+        elif logging_prefix == "evaluator":
+            step_metrics = {
+                "step_count": timestep,
+                "elapsed_time": current_time - self.start_time,
+            } | metrics
             step_str = f"step_{evaluation_step}"
             if step_str in self.run_data:
                 self.run_data[step_str].update(step_metrics)
             else:
                 self.run_data[step_str] = step_metrics
-
-        # Store the absolute metrics
-        if logging_prefix == "absolute":
-            self.run_data["absolute_metrics"].update(metrics)
 
         with open(f"{self.path}/{self.file_name}", "w") as f:
             json.dump(self.data, f, indent=4)

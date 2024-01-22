@@ -2,9 +2,9 @@
 
 base_exp_path: results # Base path for logging.
 use_console: True # Whether to log to stdout.
-use_json: False # Whether to log marl-eval style to json files.
-use_tb: False # Whether to use tensorboard logging.
-use_neptune: False  # Whether to log to neptune.ai.
+use_json: True # Whether to log marl-eval style to json files.
+use_tb: True # Whether to use tensorboard logging.
+use_neptune: True  # Whether to log to neptune.ai.
 
 # --- Other logger kwargs ---
 kwargs:
@@ -16,7 +16,7 @@ kwargs:
 
 # --- Checkpointing ---
 checkpointing:
-  save_model: True # Whether to save model checkpoints.
+  save_model: False # Whether to save model checkpoints.
   save_args:
     save_interval_steps: 1 # Number of steps between saving checkpoints.
     max_to_keep: 1 # Maximum number of checkpoints to keep.

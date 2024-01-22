@@ -423,10 +423,10 @@ def learner_setup(
     timesteps = jax.tree_map(reshape_states, timesteps)
 
     # Load model from checkpoint if specified.
-    if config.checkpointing.load_model:
+    if config.logger.checkpointing.load_model:
         loaded_checkpoint = Checkpointer(
             model_name=config.system.system_name,
-            **config.checkpointing.load_args,  # Other checkpoint args
+            **config.logger.checkpointing.load_args,  # Other checkpoint args
         )
         # Restore the learner state from the checkpoint
         restored_params, _ = loaded_checkpoint.restore_params(input_params=params)
@@ -502,12 +502,12 @@ def run_experiment(_config: DictConfig) -> None:
     pprint(cfg)
 
     # Set up checkpointer
-    save_checkpoint = config.checkpointing.save_model
+    save_checkpoint = config.logger.checkpointing.save_model
     if save_checkpoint:
         checkpointer = Checkpointer(
             metadata=config,  # Save all config as metadata in the checkpoint
             model_name=config.system.system_name,
-            **config.checkpointing.save_args,  # Checkpoint args
+            **config.logger.checkpointing.save_args,  # Checkpoint args
         )
 
     # Run experiment for a total number of evaluations.
