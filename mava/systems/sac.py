@@ -128,7 +128,7 @@ def make_env(env_id, factorization):
     def thunk():
         # env = gymnasium_robotics.mamujoco_v0.parallel_env(env_id, factorization)
         # env = MaMuJoCoWrapper(env)
-        env = jaxmarl.make("halfcheetah-6x1")
+        env = jaxmarl.make("halfcheetah_6x1", homogenisation_method="max", auto_reset=False)
         env = JaxMarlWrapper(env)
         env = JumanjiToGymWrapper(env)
         env = gym.wrappers.RecordEpisodeStatistics(env)
@@ -138,6 +138,56 @@ def make_env(env_id, factorization):
     return thunk
 
 
+def jumanji_specs_to_gym_spaces(
+    spec: specs.Spec,
+) -> Union[
+    gym.spaces.Box,
+    gym.spaces.Discrete,
+    gym.spaces.MultiDiscrete,
+    gym.spaces.Space,
+    gym.spaces.Dict,
+]:
+    """Converts jumanji specs to gym spaces.
+
+    Args:
+        spec: jumanji spec of type jumanji.specs.Spec, can be an Array or any nested spec.
+
+    Returns:
+        gym.spaces object corresponding to the equivalent jumanji specs implementation.
+    """
+    if isinstance(spec, specs.DiscreteArray):
+        return gym.spaces.Discrete(n=spec.num_values, seed=None)
+    elif isinstance(spec, specs.MultiDiscreteArray):
+        return gym.spaces.MultiDiscrete(nvec=spec.num_values, seed=None)
+    elif isinstance(spec, specs.BoundedArray):
+        # When using NumPy: 1.21.5:
+        # MyPy error: "Call to untyped function "broadcast_to" in typed context"
+        low = np.broadcast_to(spec.minimum, shape=spec.shape)  # type: ignore
+        high = np.broadcast_to(spec.maximum, shape=spec.shape)  # type: ignore
+        return gym.spaces.Box(
+            low=low,
+            high=high,
+            shape=spec.shape,
+            dtype=spec.dtype,
+        )
+    elif isinstance(spec, Array):
+        return gym.spaces.Box(
+            low=-np.inf,
+            high=np.inf,
+            shape=spec.shape,
+            dtype=spec.dtype,
+            seed=None,
+        )
+    else:
+        # Nested spec
+        return gym.spaces.Dict(
+            {
+                # Iterate over specs
+                f"{key}": jumanji_specs_to_gym_spaces(value)
+                for key, value in vars(spec).items()
+                if isinstance(value, Spec)
+            }
+        )
 class JumanjiToGymWrapper(gym.Env):
     """A wrapper that converts a Jumanji `Environment` to one that follows the `gym.Env` API."""
 
@@ -158,13 +208,13 @@ class JumanjiToGymWrapper(gym.Env):
         self._key = jax.random.PRNGKey(seed)
         self.backend = backend
         self._state = None
-        self.observation_space = specs.jumanji_specs_to_gym_spaces(self._env.observation_spec())
-        self.action_space = specs.jumanji_specs_to_gym_spaces(self._env.action_spec())
+        self.observation_space = jumanji_specs_to_gym_spaces(self._env.observation_spec().agents_view)
+        self.action_space = jumanji_specs_to_gym_spaces(self._env.action_spec())
 
         def reset(key: chex.PRNGKey) -> Tuple[State, Observation, Optional[Dict]]:
             """Reset function of a Jumanji environment to be jitted."""
             state, timestep = self._env.reset(key)
-            return state, timestep.observation, timestep.extras
+            return state, timestep.observation.agents_view, timestep.extras
 
         self._reset = jax.jit(reset, backend=self.backend)
 
@@ -174,8 +224,8 @@ class JumanjiToGymWrapper(gym.Env):
             """Step function of a Jumanji environment to be jitted."""
             state, timestep = self._env.step(state, action)
             trunc = jnp.bool_(timestep.last())
-            term = bool(1 - timestep.discount)
-            return state, timestep.observation, timestep.reward, term, trunc, timestep.extras
+            term = jnp.bool_(1 - jnp.all(timestep.discount))
+            return state, timestep.observation.agents_view, timestep.reward, term, trunc, timestep.extras
 
         self._step = jax.jit(step, backend=self.backend)
 
@@ -227,7 +277,7 @@ class JumanjiToGymWrapper(gym.Env):
 
         # Convert to get the correct signature
         obs = jumanji_to_gym_obs(obs)
-        reward = float(reward)
+        reward = float(reward[0])
         term = bool(term)
         trunc = bool(trunc)
         info = jax.tree_util.tree_map(np.asarray, extras)
@@ -327,19 +377,11 @@ def sample_action(
 
 
 if __name__ == "__main__":
-    import stable_baselines3 as sb3
-
-    if sb3.__version__ < "2.0":
-        raise ValueError(
-            """Ongoing migration: run the following command to install the new dependencies:
-poetry run pip install "stable_baselines3==2.0.0a1"
-"""
-        )
 
     args = tyro.cli(Args)
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 
-    tensorboard_logger.configure(run_name)
+    tensorboard_logger.configure(f"runs/{run_name}")
     # writer.add_text(
     #     "hyperparameters",
     #     "|param|value|\n|-|-|\n%s"
@@ -630,5 +672,5 @@ poetry run pip install "stable_baselines3==2.0.0a1"
                         "losses/alpha_loss", alpha_loss.item(), global_step
                     )
 
-    envs.close()
+    # envs.close()
     # writer.close()

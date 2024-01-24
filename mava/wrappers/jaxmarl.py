@@ -153,7 +153,12 @@ class JaxMarlWrapper(Wrapper):
         super().__init__(env)
         self._env: MultiAgentEnv
         self._timelimit = timelimit
-        self._action_shape = (self.action_spec().shape[0], int(self.action_spec().num_values[0]))
+
+        if _is_discrete(self._env.action_space(self._env.agents[0])):
+            self._action_shape = (self.action_spec().shape[0], int(self.action_spec().num_values[0]))
+        else:
+            self._action_shape = self.action_spec().shape
+
         self.agents = list(self._env.observation_spaces.keys())
         self.has_action_mask = hasattr(self._env, "get_avail_actions")
         self.has_global_state = has_global_state
@@ -275,3 +280,6 @@ class JaxMarlWrapper(Wrapper):
     def get_global_state(self, obs: Dict[str, Array]) -> Array:
         """Get global state from observation and copy it for each agent."""
         return jnp.tile(jnp.array(obs["world_state"]), (self._env.num_agents, 1))
+
+    def close(self) -> None:
+        return None
