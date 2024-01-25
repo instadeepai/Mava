@@ -45,7 +45,7 @@ class Args:
     """whether to capture videos of the agent performances (check out `videos` folder)"""
 
     # Algorithm specific arguments
-    env_id: str = "HalfCheetah"
+    env_id: str = "MPE_simple_spread_v3"
     """the environment id of the task"""
     factorization: str = "2x3"
     """how the joints are split up"""
@@ -128,7 +128,8 @@ def make_env(env_id, factorization):
     def thunk():
         # env = gymnasium_robotics.mamujoco_v0.parallel_env(env_id, factorization)
         # env = MaMuJoCoWrapper(env)
-        env = jaxmarl.make("halfcheetah_6x1", homogenisation_method="max", auto_reset=False)
+        # env = jaxmarl.make("halfcheetah_6x1", homogenisation_method="max", auto_reset=False)
+        env = jaxmarl.make(env_id, action_type="Continuous")
         env = JaxMarlWrapper(env)
         env = JumanjiToGymWrapper(env)
         env = gym.wrappers.RecordEpisodeStatistics(env)
@@ -188,6 +189,8 @@ def jumanji_specs_to_gym_spaces(
                 if isinstance(value, Spec)
             }
         )
+
+
 class JumanjiToGymWrapper(gym.Env):
     """A wrapper that converts a Jumanji `Environment` to one that follows the `gym.Env` API."""
 
@@ -208,7 +211,9 @@ class JumanjiToGymWrapper(gym.Env):
         self._key = jax.random.PRNGKey(seed)
         self.backend = backend
         self._state = None
-        self.observation_space = jumanji_specs_to_gym_spaces(self._env.observation_spec().agents_view)
+        self.observation_space = jumanji_specs_to_gym_spaces(
+            self._env.observation_spec().agents_view
+        )
         self.action_space = jumanji_specs_to_gym_spaces(self._env.action_spec())
 
         def reset(key: chex.PRNGKey) -> Tuple[State, Observation, Optional[Dict]]:
@@ -225,7 +230,14 @@ class JumanjiToGymWrapper(gym.Env):
             state, timestep = self._env.step(state, action)
             trunc = jnp.bool_(timestep.last())
             term = jnp.bool_(1 - jnp.all(timestep.discount))
-            return state, timestep.observation.agents_view, timestep.reward, term, trunc, timestep.extras
+            return (
+                state,
+                timestep.observation.agents_view,
+                timestep.reward,
+                term,
+                trunc,
+                timestep.extras,
+            )
 
         self._step = jax.jit(step, backend=self.backend)
 
@@ -377,7 +389,6 @@ def sample_action(
 
 
 if __name__ == "__main__":
-
     args = tyro.cli(Args)
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 
