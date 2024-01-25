@@ -98,6 +98,23 @@ class FeedForwardCritic(nn.Module):
         return jnp.squeeze(critic_output, axis=-1)
 
 
+class ContinuousFFActor(nn.Module):
+    """Continuous Feedforward Actor Network."""
+
+    torso: nn.Module
+    num_actions: Sequence[int]
+
+    @nn.compact
+    def __call__(self, observation: Observation) -> distrax.MultivariateNormalDiag:
+        """Forward pass."""
+        x = observation.agents_view
+
+        x = self.torso(x)
+        actor_mean_logits = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01))(x)
+        actor_log_std_logits = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01))(x)
+        return actor_mean_logits, actor_log_std_logits
+
+
 class ScannedRNN(nn.Module):
     @functools.partial(
         nn.scan,
@@ -235,6 +252,15 @@ def make(
         critic = RecurrentCritic(
             pre_torso=create_torso("critic_network", "pre_torso_layer_sizes"),
             post_torso=create_torso("critic_network", "post_torso_layer_sizes"),
+            centralised_critic=centralised_critic,
+        )
+    elif network == "continuousff":
+        actor = ContinuousFFActor(
+            torso=create_torso("actor_network", "layer_sizes"),
+            num_actions=config.system.num_actions,
+        )
+        critic = FeedForwardCritic(
+            torso=create_torso("critic_network", "layer_sizes"),
             centralised_critic=centralised_critic,
         )
     else:

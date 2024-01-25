@@ -1,0 +1,12 @@
+# ---Environment Configs---
+defaults:
+  - _self_
+
+env_name: ant_4x2 # env_name = task_name
+action_type: continuous
+# Possible scenarios: ant_4x2 | halfcheetah_6x1 | hopper_3x1 | humanoid_9|8 | walker2d_2x3
+scenario:
+  task_name: ant_4x2
+
+kwargs:
+  episode_length: 100

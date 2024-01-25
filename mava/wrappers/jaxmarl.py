@@ -142,7 +142,7 @@ def jaxmarl_space_to_jumanji_spec(space: jaxmarl_spaces.Space) -> specs.Spec:
 class JaxMarlWrapper(Wrapper):
     """Wraps a JaxMarl environment so that its API is compatible with Jumanji environments."""
 
-    def __init__(self, env: MultiAgentEnv, has_global_state: bool = False, timelimit: int = 500):
+    def __init__(self, env: MultiAgentEnv, has_global_state: bool = False, timelimit: int = 100):
         # Check that all specs are the same as we only support homogeneous environments, for now ;)
         homogenous_error = (
             f"Mava only supports environments with homogeneous agents, "
@@ -153,7 +153,15 @@ class JaxMarlWrapper(Wrapper):
         super().__init__(env)
         self._env: MultiAgentEnv
         self._timelimit = timelimit
-        self._action_shape = (self.action_spec().shape[0], int(self.action_spec().num_values[0]))
+
+        if _is_discrete(env.action_space(self._env.agents[0])):
+            self._action_shape = (
+                self.action_spec().shape[0],
+                int(self.action_spec().num_values[0]),
+            )
+        else:
+            self._action_shape = self.action_spec().shape
+
         self.agents = list(self._env.observation_spaces.keys())
         self.has_action_mask = hasattr(self._env, "get_avail_actions")
         self.has_global_state = has_global_state
@@ -208,7 +216,7 @@ class JaxMarlWrapper(Wrapper):
             reward=batchify(reward, self.agents),
             discount=1.0 - batchify(done, self.agents),
             observation=obs,
-            extras=infos,
+            # extras=infos,
         )
 
         return JaxMarlState(env_state, key, state.step + 1), ts
