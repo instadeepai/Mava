@@ -15,6 +15,7 @@
 from typing import TYPE_CHECKING, Tuple
 
 import chex
+import jax
 import jax.numpy as jnp
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
@@ -32,6 +33,7 @@ class RecordEpisodeMetricsState:
     """State of the `LogWrapper`."""
 
     env_state: State
+    key: chex.PRNGKey
     # Temporary variables to keep track of the episode return and length.
     running_count_episode_return: chex.Numeric
     running_count_episode_length: chex.Numeric
@@ -45,8 +47,9 @@ class RecordEpisodeMetrics(Wrapper):
 
     def reset(self, key: chex.PRNGKey) -> Tuple[RecordEpisodeMetricsState, TimeStep]:
         """Reset the environment."""
-        state, timestep = self._env.reset(key)
-        state = RecordEpisodeMetricsState(state, 0.0, 0, 0.0, 0)
+        key, reset_key = jax.random.split(key)
+        state, timestep = self._env.reset(reset_key)
+        state = RecordEpisodeMetricsState(state, key, 0.0, 0, 0.0, 0)
         timestep.extras["episode_metrics"] = {"episode_return": 0.0, "episode_length": 0}
         return state, timestep
 
@@ -76,6 +79,7 @@ class RecordEpisodeMetrics(Wrapper):
 
         state = RecordEpisodeMetricsState(
             env_state=env_state,
+            key=state.key,
             running_count_episode_return=new_episode_return * not_done,
             running_count_episode_length=new_episode_length * not_done,
             episode_return=episode_return_info,

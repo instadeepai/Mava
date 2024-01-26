@@ -16,6 +16,7 @@ import gymnasium as gym
 import jax
 import jax.numpy as jnp
 
+# force cpu jax config
 jax.config.update("jax_platform_name", "cpu")
 import jaxmarl
 
@@ -63,7 +64,7 @@ class Args:
     """target smoothing coefficient (default: 0.005)"""
     batch_size: int = 256
     """the batch size of sample from the reply memory"""
-    learning_starts: int = int(5e3)
+    learning_starts: int = int(5e2)
     """timestep to start learning"""
     policy_lr: float = 3e-4
     """the learning rate of the policy network optimizer"""
@@ -202,12 +203,6 @@ if __name__ == "__main__":
     args = tyro.cli(Args)
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 
-    # tensorboard_logger.configure(f"runs/{run_name}")
-    # writer.add_text(
-    #     "hyperparameters",
-    #     "|param|value|\n|-|-|\n%s"
-    #     % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
-    # )
     # logger = neptune.init_run(project="InstaDeep/mava", tags=["sac", args.env_id])
 
     key = jax.random.PRNGKey(args.seed)
@@ -281,7 +276,7 @@ if __name__ == "__main__":
         add_batch_size=args.n_envs,
     )
     buffer_state = rb.init(dummy_transition)
-    buffer_add = jax.jit(rb.add, donate_argnums=0)
+    # buffer_add = jax.jit(rb.add, donate_argnums=0)
     buffer_sample = jax.jit(rb.sample)
 
     start_time = time.time()
@@ -291,45 +286,45 @@ if __name__ == "__main__":
     actor_apply = jax.jit(actor.apply)
     q_apply = jax.jit(q.apply)
 
-    def step(action, env_state, buffer_state):
+    @chex.assert_max_traces(n=2)
+    def step(action, obs, env_state, buffer_state):
         env_state, timestep = env_step(env_state, action)
         next_obs = timestep.observation.agents_view
         rewards = timestep.reward[:, 0]
-        terms = 1 - timestep.discount.astype(bool)[:, 0]
+        # todo logical not
+        terms = (1 - timestep.discount).astype(bool)[:, 0]
         truncs = timestep.last()
         infos = timestep.extras
-
-        # ep_return += np.mean(rewards)
-        #
-        # if timestep.last()[0]:
-        #     logger["episode return"].log(ep_return, step=global_step)
-        #     print(f"{global_step}: {ep_return}")
-        #     ep_return = 0.0
 
         real_next_obs = infos["final_observation"].agents_view
 
         transition = Transition(obs, action, rewards, terms, real_next_obs)
-        buffer_state = buffer_add(buffer_state, transition)
+        buffer_state = rb.add(buffer_state, transition)
 
-        return next_obs, env_state, buffer_state, infos
+        return next_obs, env_state, buffer_state, infos["episode_metrics"]
 
+    @jax.jit
+    @chex.assert_max_traces(n=1)
     def explore(_, carry):
-        (next_obs, env_state, buffer_state, key) = carry
+        (obs, env_state, buffer_state, metrics, key) = carry
         key, explore_key = jax.random.split(key)
         action = jax.random.uniform(explore_key, full_action_shape)
-        next_obs, env_state, buffer_state, infos = step(action, env_state, buffer_state)
+        next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
 
-        return next_obs, env_state, buffer_state, key
+        return next_obs, env_state, buffer_state, metrics, key
 
+    @jax.jit
+    @chex.assert_max_traces(n=1)
     def act(actor_params, obs, key, env_state, buffer_state):
         mean, log_std = actor_apply(actor_params, obs)
         action, _ = sample_action(mean, log_std, key, action_scale, action_bias)
 
-        next_obs, env_state, buffer_state, infos = step(action, env_state, buffer_state)
+        next_obs, env_state, buffer_state, infos = step(action, obs, env_state, buffer_state)
         return next_obs, env_state, buffer_state, infos
 
     # losses:
     @jax.jit
+    @chex.assert_max_traces(n=1)
     def q_loss_fn(q_params, obs, action, target):
         q1_params, q2_params = q_params
         q1_a_values = q.apply(q1_params, obs, action).reshape(-1)
@@ -343,6 +338,7 @@ if __name__ == "__main__":
         return loss, (loss, q1_loss, q2_loss, q1_a_values, q2_a_values)
 
     @jax.jit
+    @chex.assert_max_traces(n=1)
     def actor_loss_fn(actor_params, obs, alpha, q_params, key):
         q1_params, q2_params = q_params
 
@@ -356,6 +352,7 @@ if __name__ == "__main__":
         return ((alpha * log_pi) - min_qf_pi).mean()
 
     @jax.jit
+    @chex.assert_max_traces(n=1)
     def alpha_loss_fn(log_alpha, log_pi, target_entropy):
         return jnp.mean(-jnp.exp(log_alpha) * (log_pi + target_entropy))
 
@@ -363,6 +360,7 @@ if __name__ == "__main__":
         jax.jit,
         donate_argnames=["q_params", "q_target_params", "actor_params", "log_alpha", "opt_states"],
     )
+    @chex.assert_max_traces(n=1)
     def train(
         q_params, q_target_params, actor_params, log_alpha, opt_states, data, key, target_entropy
     ):
@@ -429,50 +427,60 @@ if __name__ == "__main__":
             (q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss),
         )
 
-    def _act_and_learn(
-        obs,
-        q1_params,
-        q2_params,
-        q1_target_params,
-        q2_target_params,
-        actor_params,
-        log_alpha,
-        key,
-        env_state,
-        buffer_state,
-    ):
+    @jax.jit
+    @chex.assert_max_traces(n=1)
+    def _act_and_learn(carry, _):
+        (
+            obs,
+            env_state,
+            buffer_state,
+            q_params,
+            q_target_params,
+            actor_params,
+            log_alpha,
+            opt_states,
+            key,
+        ) = carry
+
         key, act_key, buff_key, learn_key = jax.random.split(key, 4)
-        next_obs, env_state, buffer_state = act(actor_params, obs, act_key, env_state, buffer_state)
+        next_obs, env_state, buffer_state, metrics = act(
+            actor_params, obs, act_key, env_state, buffer_state
+        )
 
         data = buffer_sample(buffer_state, buff_key).experience.first
 
         (
-            (q1_params, q2_params),
-            (q1_target_params, q2_target_params),
+            q_params,
+            q_target_params,
             actor_params,
             log_alpha,
-            (q_opt_state, actor_opt_state, alpha_opt_state),
-            (q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss),
+            opt_states,
+            losses,
         ) = train(
-            (q1_params, q2_params),
-            (q1_target_params, q2_target_params),
+            q_params,
+            q_target_params,
             actor_params,
             log_alpha,
-            (q_opt_state, actor_opt_state, alpha_opt_state),
+            opt_states,
             data,
             learn_key,
             target_entropy,
         )
+        # losses = (q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss),
+
         return (
-            next_obs,
-            env_state,
-            buffer_state,
-            (q1_params, q2_params),
-            (q1_target_params, q2_target_params),
-            actor_params,
-            log_alpha,
-            (q_opt_state, actor_opt_state, alpha_opt_state),
-            (q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss),
+            (
+                next_obs,
+                env_state,
+                buffer_state,
+                q_params,
+                q_target_params,
+                actor_params,
+                log_alpha,
+                opt_states,
+                key,
+            ),
+            (metrics, losses),
         )
 
     # TRY NOT TO MODIFY: start the game
@@ -480,22 +488,57 @@ if __name__ == "__main__":
     env_reset = jax.jit(envs.reset)
     env_step = jax.jit(envs.step)
 
+    @jax.jit
+    @chex.assert_max_traces(n=1)
+    def first_explore(first_timestep, env_state, buffer_state, key):
+        init_val = (
+            first_timestep.observation.agents_view,
+            env_state,
+            buffer_state,
+            first_timestep.extras["episode_metrics"],
+            key,
+        )
+        return jax.lax.fori_loop(0, args.learning_starts // args.n_envs, explore, init_val)
+
+    start_time = time.time()
     state, timestep = env_reset(keys)
-    obs = timestep.observation.agents_view
+    # obs = timestep.observation.agents_view
 
     ep_return = 0.0
 
-    def learn(first_obs, env_state, buffer_state, key):
-        # fori(explore and learn)
-        # fori(act and learn)
-        init_val = first_obs, env_state, buffer_state, key
-        next_obs, env_state, buffer_state, key = jax.lax.fori_loop(
-            0, args.learning_starts, explore, init_val
-        )
-        return buffer_state
+    # fill up buffer
+    next_obs, env_state, buffer_state, metrics, key = first_explore(
+        timestep, state, buffer_state, key
+    )
+    print("first explore done")
+    mean_return = np.mean(metrics["episode_return"])
+    print(
+        f"[{args.learning_starts}] return: {mean_return:.3f} | sps: {args.learning_starts / (time.time() - start_time):.3f}"
+    )
 
-    bs = learn(obs, state, buffer_state, key)
-    print(bs)
+    # learner_state = (
+    #     next_obs,
+    #     env_state,
+    #     buffer_state,
+    #     (q1_params, q2_params),
+    #     (q1_target_params, q2_target_params),
+    #     actor_params,
+    #     log_alpha,
+    #     (q_opt_state, actor_opt_state, alpha_opt_state),
+    #     key,
+    # )
+    #
+    # steps_between_logging = 128 * args.n_envs
+    # for global_step in range(args.learning_starts, args.total_timesteps, steps_between_logging):
+    #     learner_state, (metrics, losses) = jax.lax.scan(
+    #         _act_and_learn, learner_state, None, length=steps_between_logging  # , unroll=16
+    #     )
+    #
+    #     mean_return = np.mean(metrics["episode_return"])
+    #     logger["mean_episode_return"].log(mean_return, step=global_step)
+    #     print(
+    #         f"[{global_step}] return: {mean_return:.3f} | sps: {global_step/(time.time() - start_time):.3f}"
+    #     )
 
     # for global_step in range(0, args.total_timesteps, args.n_envs):
     #     # ALGO LOGIC: put action logic here
