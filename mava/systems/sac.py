@@ -15,6 +15,8 @@ import gymnasium as gym
 # import gymnasium_robotics
 import jax
 import jax.numpy as jnp
+
+jax.config.update("jax_platform_name", "cpu")
 import jaxmarl
 
 # from torch.utils.tensorboard import SummaryWriter
@@ -32,6 +34,7 @@ from jumanji.env import Environment, State
 from jumanji.types import Observation, TimeStep
 from jumanji.wrappers import GymObservation, VmapWrapper, Wrapper, jumanji_to_gym_obs
 
+from mava.wrappers import RecordEpisodeMetrics
 from mava.wrappers.jaxmarl import JaxMarlWrapper
 
 
@@ -60,7 +63,7 @@ class Args:
     """target smoothing coefficient (default: 0.005)"""
     batch_size: int = 256
     """the batch size of sample from the reply memory"""
-    learning_starts: int = 5e3
+    learning_starts: int = int(5e3)
     """timestep to start learning"""
     policy_lr: float = 3e-4
     """the learning rate of the policy network optimizer"""
@@ -76,53 +79,6 @@ class Args:
     """automatic tuning of the entropy coefficient"""
     n_envs: int = 16
     """number of parallel environments"""
-
-
-def batchify(obs):
-    return np.stack(list(obs.values()))
-
-
-def unbatchify(obs):
-    return {f"agent_{i}": o for i, o in enumerate(obs)}
-
-
-class MaMuJoCoWrapper(gym.Wrapper):
-    def __init__(self, env):
-        super().__init__(env)
-
-        self.num_agents = len(self.env.observation_spaces)
-
-        obs_space = self.env.observation_space("agent_0")
-        new_shape = (self.num_agents, obs_space.shape[0])
-        self.observation_space = Box(
-            low=np.full(new_shape, obs_space.low[0]),
-            high=np.full(new_shape, obs_space.high[0]),
-            shape=new_shape,
-        )
-
-        act_space = self.env.action_space("agent_0")
-        new_shape = (self.num_agents, act_space.shape[0])
-        self.action_space = Box(
-            low=np.full(new_shape, act_space.low[0]),
-            high=np.full(new_shape, act_space.high[0]),
-            shape=new_shape,
-        )
-
-    def reset(self, seed, options):
-        obs, info = self.env.reset()
-        obs = batchify(obs)
-
-        return obs, info
-
-    def step(self, action):
-        o, r, term, trunc, i = self.env.step(unbatchify(action))
-        term = batchify(term)
-        trunc = batchify(trunc)
-
-        return batchify(o), batchify(r)[0], np.all(term), np.all(trunc), i
-
-    def state(self):
-        return self.env.state()
 
 
 class VmapAutoResetWrapper(Wrapper):
@@ -174,207 +130,6 @@ class VmapAutoResetWrapper(Wrapper):
         )
 
         return state, timestep
-
-
-def make_env(env_id, factorization):
-    def thunk():
-        # env = gymnasium_robotics.mamujoco_v0.parallel_env(env_id, factorization)
-        # env = MaMuJoCoWrapper(env)
-        env = jaxmarl.make(env_id, homogenisation_method="max", auto_reset=False)
-        # env = jaxmarl.make(env_id, action_type="Continuous")
-        env = JaxMarlWrapper(env)
-        env = VmapAutoResetWrapper(env)
-        # env = JumanjiToGymWrapper(env)
-        # env = gym.wrappers.RecordEpisodeStatistics(env)
-
-        return env
-
-    return thunk
-
-
-def jumanji_specs_to_gym_spaces(
-    spec: specs.Spec,
-) -> Union[
-    gym.spaces.Box,
-    gym.spaces.Discrete,
-    gym.spaces.MultiDiscrete,
-    gym.spaces.Space,
-    gym.spaces.Dict,
-]:
-    """Converts jumanji specs to gym spaces.
-
-    Args:
-        spec: jumanji spec of type jumanji.specs.Spec, can be an Array or any nested spec.
-
-    Returns:
-        gym.spaces object corresponding to the equivalent jumanji specs implementation.
-    """
-    if isinstance(spec, specs.DiscreteArray):
-        return gym.spaces.Discrete(n=spec.num_values, seed=None)
-    elif isinstance(spec, specs.MultiDiscreteArray):
-        return gym.spaces.MultiDiscrete(nvec=spec.num_values, seed=None)
-    elif isinstance(spec, specs.BoundedArray):
-        # When using NumPy: 1.21.5:
-        # MyPy error: "Call to untyped function "broadcast_to" in typed context"
-        low = np.broadcast_to(spec.minimum, shape=spec.shape)  # type: ignore
-        high = np.broadcast_to(spec.maximum, shape=spec.shape)  # type: ignore
-        return gym.spaces.Box(
-            low=low,
-            high=high,
-            shape=spec.shape,
-            dtype=spec.dtype,
-        )
-    elif isinstance(spec, Array):
-        return gym.spaces.Box(
-            low=-np.inf,
-            high=np.inf,
-            shape=spec.shape,
-            dtype=spec.dtype,
-            seed=None,
-        )
-    else:
-        # Nested spec
-        return gym.spaces.Dict(
-            {
-                # Iterate over specs
-                f"{key}": jumanji_specs_to_gym_spaces(value)
-                for key, value in vars(spec).items()
-                if isinstance(value, Spec)
-            }
-        )
-
-
-class JumanjiToGymWrapper(gym.Env):
-    """A wrapper that converts a Jumanji `Environment` to one that follows the `gym.Env` API."""
-
-    # Flag that prevents `gym.register` from misinterpreting the `_step` and
-    # `_reset` as signs of a deprecated gym Env API.
-    _gym_disable_underscore_compat: ClassVar[bool] = True
-
-    def __init__(self, env: Environment, seed: int = 0, backend: Optional[str] = None):
-        """Create the Gym environment.
-
-        Args:
-            env: `Environment` to wrap to a `gym.Env`.
-            seed: the seed that is used to initialize the environment's PRNG.
-            backend: the XLA backend.
-        """
-        self._env = env
-        self.metadata: Dict[str, str] = {}
-        self._key = jax.random.PRNGKey(seed)
-        self.backend = backend
-        self._state = None
-        self.observation_space = jumanji_specs_to_gym_spaces(
-            self._env.observation_spec().agents_view
-        )
-        self.action_space = jumanji_specs_to_gym_spaces(self._env.action_spec())
-
-        def reset(key: chex.PRNGKey) -> Tuple[State, Observation, Optional[Dict]]:
-            """Reset function of a Jumanji environment to be jitted."""
-            state, timestep = self._env.reset(key)
-            return state, timestep.observation.agents_view, timestep.extras
-
-        self._reset = jax.jit(reset, backend=self.backend)
-
-        def step(
-            state: State, action: chex.Array
-        ) -> Tuple[State, Observation, chex.Array, bool, Optional[Any]]:
-            """Step function of a Jumanji environment to be jitted."""
-            state, timestep = self._env.step(state, action)
-            trunc = jnp.bool_(timestep.last())
-            term = jnp.bool_(1 - jnp.all(timestep.discount, -1))
-            return (
-                state,
-                timestep.observation.agents_view,
-                timestep.reward,
-                term,
-                trunc,
-                timestep.extras,
-            )
-
-        self._step = jax.jit(step, backend=self.backend)
-
-    def reset(
-        self,
-        *,
-        seed: Optional[int] = None,
-        return_info: bool = False,
-        options: Optional[dict] = None,
-    ) -> Union[GymObservation, Tuple[GymObservation, Optional[Any]]]:
-        """Resets the environment to an initial state by starting a new sequence
-        and returns the first `Observation` of this sequence.
-
-        Returns:
-            obs: an element of the environment's observation_space.
-            info (optional): contains supplementary information such as metrics.
-        """
-        if seed is not None:
-            self.seed(seed)
-        key, self._key = jax.random.split(self._key)
-        keys = jax.random.split(key, args.n_envs)  # make n_envs keys so vmap works
-        self._state, obs, extras = self._reset(keys)
-
-        # Convert the observation to a numpy array or a nested dict thereof
-        obs = jumanji_to_gym_obs(obs)
-
-        if return_info:
-            info = jax.tree_util.tree_map(np.asarray, extras)
-            return obs, info
-        else:
-            return obs, {}  # type: ignore
-
-    def step(
-        self, action: chex.ArrayNumpy
-    ) -> Tuple[GymObservation, float, bool, bool, Optional[Any]]:
-        """Updates the environment according to the action and returns an `Observation`.
-
-        Args:
-            action: A NumPy array representing the action provided by the agent.
-
-        Returns:
-            observation: an element of the environment's observation_space.
-            reward: the amount of reward returned as a result of taking the action.
-            terminated: whether a terminal state is reached.
-            info: contains supplementary information such as metrics.
-        """
-
-        action = jnp.array(action)  # Convert input numpy array to JAX array
-        self._state, obs, reward, term, trunc, extras = self._step(self._state, action)
-
-        # Convert to get the correct signature
-        obs = jumanji_to_gym_obs(obs)
-        # flatten agent dim
-        reward = reward[:, 0]
-        term = term
-        trunc = trunc
-        info = jax.tree_util.tree_map(np.asarray, extras)
-
-        return obs, reward, term, trunc, info
-
-    def seed(self, seed: int = 0) -> None:
-        """Function which sets the seed for the environment's random number generator(s).
-
-        Args:
-            seed: the seed value for the random number generator(s).
-        """
-        self._key = jax.random.PRNGKey(seed)
-
-    def render(self, mode: str = "human") -> Any:
-        """Renders the environment.
-
-        Args:
-            mode: currently not used since Jumanji does not currently support modes.
-        """
-        del mode
-        return self._env.render(self._state)
-
-    def close(self) -> None:
-        """Closes the environment, important for rendering where pygame is imported."""
-        self._env.close()
-
-    @property
-    def unwrapped(self) -> Environment:
-        return self._env
 
 
 # ALGO LOGIC: initialize agent here:
@@ -453,29 +208,20 @@ if __name__ == "__main__":
     #     "|param|value|\n|-|-|\n%s"
     #     % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
     # )
-    logger = neptune.init_run(project="InstaDeep/mava", tags=["sac", args.env_id])
+    # logger = neptune.init_run(project="InstaDeep/mava", tags=["sac", args.env_id])
 
-    # TRY NOT TO MODIFY: seeding
     key = jax.random.PRNGKey(args.seed)
-    random.seed(args.seed)
-    np.random.seed(args.seed)
 
-    # env setup
-    # envs = gym.vector.AsyncVectorEnv(
-    #     [make_env(args.env_id, args.factorization) for _ in range(args.n_envs)]
-    # )
-    envs = make_env(args.env_id, args.factorization)()
-    # assert isinstance(
-    #     envs.action_space, gym.spaces.Box
-    # ), "only continuous action space is supported"
-
-    # envs.single_observation_space.dtype = np.float32
+    envs = jaxmarl.make(args.env_id, homogenisation_method="max", auto_reset=False)
+    envs = JaxMarlWrapper(envs)
+    envs = RecordEpisodeMetrics(envs)
+    envs = VmapAutoResetWrapper(envs)
 
     n_agents = envs.action_spec().shape[0]
     action_dim = envs.action_spec().shape[1]
     obs_dim = envs.observation_spec().agents_view.shape[1]
+    full_action_shape = (args.n_envs, n_agents, action_dim)
 
-    # state_dim = envs.call("state")[0].shape[0]
     act_high = jnp.zeros(envs.action_spec().shape) + envs.action_spec().maximum
     act_low = jnp.zeros(envs.action_spec().shape) + envs.action_spec().minimum
     action_scale = jnp.array((act_high - act_low) / 2.0)[jnp.newaxis, :]
@@ -545,6 +291,43 @@ if __name__ == "__main__":
     actor_apply = jax.jit(actor.apply)
     q_apply = jax.jit(q.apply)
 
+    def step(action, env_state, buffer_state):
+        env_state, timestep = env_step(env_state, action)
+        next_obs = timestep.observation.agents_view
+        rewards = timestep.reward[:, 0]
+        terms = 1 - timestep.discount.astype(bool)[:, 0]
+        truncs = timestep.last()
+        infos = timestep.extras
+
+        # ep_return += np.mean(rewards)
+        #
+        # if timestep.last()[0]:
+        #     logger["episode return"].log(ep_return, step=global_step)
+        #     print(f"{global_step}: {ep_return}")
+        #     ep_return = 0.0
+
+        real_next_obs = infos["final_observation"].agents_view
+
+        transition = Transition(obs, action, rewards, terms, real_next_obs)
+        buffer_state = buffer_add(buffer_state, transition)
+
+        return next_obs, env_state, buffer_state, infos
+
+    def explore(_, carry):
+        (next_obs, env_state, buffer_state, key) = carry
+        key, explore_key = jax.random.split(key)
+        action = jax.random.uniform(explore_key, full_action_shape)
+        next_obs, env_state, buffer_state, infos = step(action, env_state, buffer_state)
+
+        return next_obs, env_state, buffer_state, key
+
+    def act(actor_params, obs, key, env_state, buffer_state):
+        mean, log_std = actor_apply(actor_params, obs)
+        action, _ = sample_action(mean, log_std, key, action_scale, action_bias)
+
+        next_obs, env_state, buffer_state, infos = step(action, env_state, buffer_state)
+        return next_obs, env_state, buffer_state, infos
+
     # losses:
     @jax.jit
     def q_loss_fn(q_params, obs, action, target):
@@ -581,12 +364,12 @@ if __name__ == "__main__":
         donate_argnames=["q_params", "q_target_params", "actor_params", "log_alpha", "opt_states"],
     )
     def train(
-        q_params, q_target_params, actor_params, log_alpha, opt_states, data, keys, target_entropy
+        q_params, q_target_params, actor_params, log_alpha, opt_states, data, key, target_entropy
     ):
         q1_params, q2_params = q_params
         q1_target_params, q2_target_params = q_target_params
         q_opt_state, actor_opt_state, alpha_opt_state = opt_states
-        target_key, actor_key, alpha_key = keys
+        target_key, actor_key, alpha_key = jax.random.split(key, 3)
 
         mean, log_std = actor_apply(actor_params, data.next_obs)
         next_state_actions, next_state_log_pi = sample_action(
@@ -646,6 +429,52 @@ if __name__ == "__main__":
             (q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss),
         )
 
+    def _act_and_learn(
+        obs,
+        q1_params,
+        q2_params,
+        q1_target_params,
+        q2_target_params,
+        actor_params,
+        log_alpha,
+        key,
+        env_state,
+        buffer_state,
+    ):
+        key, act_key, buff_key, learn_key = jax.random.split(key, 4)
+        next_obs, env_state, buffer_state = act(actor_params, obs, act_key, env_state, buffer_state)
+
+        data = buffer_sample(buffer_state, buff_key).experience.first
+
+        (
+            (q1_params, q2_params),
+            (q1_target_params, q2_target_params),
+            actor_params,
+            log_alpha,
+            (q_opt_state, actor_opt_state, alpha_opt_state),
+            (q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss),
+        ) = train(
+            (q1_params, q2_params),
+            (q1_target_params, q2_target_params),
+            actor_params,
+            log_alpha,
+            (q_opt_state, actor_opt_state, alpha_opt_state),
+            data,
+            learn_key,
+            target_entropy,
+        )
+        return (
+            next_obs,
+            env_state,
+            buffer_state,
+            (q1_params, q2_params),
+            (q1_target_params, q2_target_params),
+            actor_params,
+            log_alpha,
+            (q_opt_state, actor_opt_state, alpha_opt_state),
+            (q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss),
+        )
+
     # TRY NOT TO MODIFY: start the game
     keys = jax.random.split(key, args.n_envs)
     env_reset = jax.jit(envs.reset)
@@ -656,105 +485,117 @@ if __name__ == "__main__":
 
     ep_return = 0.0
 
-    for global_step in range(0, args.total_timesteps, args.n_envs):
-        # ALGO LOGIC: put action logic here
-        key, act_key = jax.random.split(key)
-        if global_step < args.learning_starts:
-            actions = jax.random.uniform(act_key, (args.n_envs, *envs.action_spec().shape))
-            # actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
-        else:
-            mean, log_std = actor_apply(actor_params, obs)
-            actions, _ = sample_action(mean, log_std, act_key, action_scale, action_bias)
-
-        # TRY NOT TO MODIFY: execute the game and log data.
-        state, timestep = env_step(state, actions)
-        next_obs = timestep.observation.agents_view
-        rewards = timestep.reward
-        terminations = 1 - timestep.discount
-        truncations = timestep.last()
-        infos = timestep.extras
-
-        ep_return += np.mean(rewards)
-        # next_obs, rewards, terminations, truncations, infos = envs.step(actions)
-
-        # TRY NOT TO MODIFY: record rewards for plotting purposes
-        # if "final_info" in infos:
-        #     for info in infos["final_info"]:
-        #         if info is None or "episode" not in info:
-        #             continue
-        #         print(f"global_step={global_step}, episodic_return={info['episode']['r']}")
-        #         tensorboard_logger.log_value(
-        #             "charts/episodic_return", info["episode"]["r"], global_step
-        #         )
-        #         tensorboard_logger.log_value(
-        #             "charts/episodic_length", info["episode"]["l"], global_step
-        #         )
-        #         break
-        if timestep.last()[0]:
-            logger["episode return"].log(ep_return, step=global_step)
-            print(f"{global_step}: {ep_return}")
-            ep_return = 0.0
-
-        # TRY NOT TO MODIFY: save data to reply buffer; handle `final_observation`
-        # real_next_obs = next_obs.copy()
-        # for idx, trunc in enumerate(truncations):
-        #     if trunc:
-        #         real_next_obs[idx] = infos["final_observation"][idx]
-        real_next_obs = infos["final_observation"].agents_view
-
-        transition = Transition(
-            obs, actions, rewards[:, 0], terminations.astype(bool)[:, 0], real_next_obs
+    def learn(first_obs, env_state, buffer_state, key):
+        # fori(explore and learn)
+        # fori(act and learn)
+        init_val = first_obs, env_state, buffer_state, key
+        next_obs, env_state, buffer_state, key = jax.lax.fori_loop(
+            0, args.learning_starts, explore, init_val
         )
-        buffer_state = buffer_add(buffer_state, transition)
+        return buffer_state
 
-        # TRY NOT TO MODIFY: CRUCIAL step easy to overlook
-        obs = next_obs
+    bs = learn(obs, state, buffer_state, key)
+    print(bs)
 
-        # ALGO LOGIC: training.
-        if global_step > args.learning_starts:
-            key, buff_key, target_key, actor_key, alpha_key = jax.random.split(key, 5)
-            _data = buffer_sample(buffer_state, buff_key)
-            data = _data.experience.first
-
-            (
-                (q1_params, q2_params),
-                (q1_target_params, q2_target_params),
-                actor_params,
-                log_alpha,
-                (q_opt_state, actor_opt_state, alpha_opt_state),
-                (q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss),
-            ) = train(
-                (q1_params, q2_params),
-                (q1_target_params, q2_target_params),
-                actor_params,
-                log_alpha,
-                (q_opt_state, actor_opt_state, alpha_opt_state),
-                data,
-                (target_key, actor_key, alpha_key),
-                target_entropy,
-            )
-
-            alpha = jnp.exp(log_alpha)
-
-            # update the target networks
-            # if global_step % args.target_network_frequency == 0:
-            # q1_target_params = optax.incremental_update(q1_params, q1_target_params, args.tau)
-            # q2_target_params = optax.incremental_update(q2_params, q2_target_params, args.tau)
-
-            if global_step % 100 == 0:
-                logger["losses/qf1_values"].log(np.mean(q1_a_vals).item(), step=global_step)
-                logger["losses/qf2_values"].log(np.mean(q2_a_vals).item(), step=global_step)
-                logger["losses/qf1_loss"].log(q1_loss.item(), step=global_step)
-                logger["losses/qf2_loss"].log(q2_loss.item(), step=global_step)
-                logger["losses/qf_loss"].log((q_loss / 2.0).item(), step=global_step)
-                logger["losses/actor_loss"].log(actor_loss.item(), step=global_step)
-                logger["losses/mean_alpha"].log(np.mean(alpha).item(), step=global_step)
-                # print("SPS:", int(global_step / (time.time() - start_time)))
-                logger["charts/SPS"].log(
-                    int(global_step / (time.time() - start_time)), step=global_step
-                )
-                if args.autotune:
-                    logger["losses/alpha_loss"].log(alpha_loss.item(), step=global_step)
+    # for global_step in range(0, args.total_timesteps, args.n_envs):
+    #     # ALGO LOGIC: put action logic here
+    #     key, act_key = jax.random.split(key)
+    #     if global_step < args.learning_starts:
+    #         actions = jax.random.uniform(act_key, (args.n_envs, *envs.action_spec().shape))
+    #         # actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
+    #     else:
+    #         mean, log_std = actor_apply(actor_params, obs)
+    #         actions, _ = sample_action(mean, log_std, act_key, action_scale, action_bias)
+    #
+    #     # TRY NOT TO MODIFY: execute the game and log data.
+    #     state, timestep = env_step(state, actions)
+    #     next_obs = timestep.observation.agents_view
+    #     rewards = timestep.reward
+    #     terminations = 1 - timestep.discount
+    #     truncations = timestep.last()
+    #     infos = timestep.extras
+    #
+    #     ep_return += np.mean(rewards)
+    #     # next_obs, rewards, terminations, truncations, infos = envs.step(actions)
+    #
+    #     # TRY NOT TO MODIFY: record rewards for plotting purposes
+    #     # if "final_info" in infos:
+    #     #     for info in infos["final_info"]:
+    #     #         if info is None or "episode" not in info:
+    #     #             continue
+    #     #         print(f"global_step={global_step}, episodic_return={info['episode']['r']}")
+    #     #         tensorboard_logger.log_value(
+    #     #             "charts/episodic_return", info["episode"]["r"], global_step
+    #     #         )
+    #     #         tensorboard_logger.log_value(
+    #     #             "charts/episodic_length", info["episode"]["l"], global_step
+    #     #         )
+    #     #         break
+    #     if timestep.last()[0]:
+    #         logger["episode return"].log(ep_return, step=global_step)
+    #         print(f"{global_step}: {ep_return}")
+    #         ep_return = 0.0
+    #
+    #     # TRY NOT TO MODIFY: save data to reply buffer; handle `final_observation`
+    #     # real_next_obs = next_obs.copy()
+    #     # for idx, trunc in enumerate(truncations):
+    #     #     if trunc:
+    #     #         real_next_obs[idx] = infos["final_observation"][idx]
+    #     real_next_obs = infos["final_observation"].agents_view
+    #
+    #     transition = Transition(
+    #         obs, actions, rewards[:, 0], terminations.astype(bool)[:, 0], real_next_obs
+    #     )
+    #     buffer_state = buffer_add(buffer_state, transition)
+    #
+    #     # TRY NOT TO MODIFY: CRUCIAL step easy to overlook
+    #     obs = next_obs
+    #
+    #     # ALGO LOGIC: training.
+    #     if global_step > args.learning_starts:
+    #         key, buff_key, target_key, actor_key, alpha_key = jax.random.split(key, 5)
+    #         _data = buffer_sample(buffer_state, buff_key)
+    #         data = _data.experience.first
+    #
+    #         (
+    #             (q1_params, q2_params),
+    #             (q1_target_params, q2_target_params),
+    #             actor_params,
+    #             log_alpha,
+    #             (q_opt_state, actor_opt_state, alpha_opt_state),
+    #             (q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss),
+    #         ) = train(
+    #             (q1_params, q2_params),
+    #             (q1_target_params, q2_target_params),
+    #             actor_params,
+    #             log_alpha,
+    #             (q_opt_state, actor_opt_state, alpha_opt_state),
+    #             data,
+    #             (target_key, actor_key, alpha_key),
+    #             target_entropy,
+    #         )
+    #
+    #         alpha = jnp.exp(log_alpha)
+    #
+    #         # update the target networks
+    #         # if global_step % args.target_network_frequency == 0:
+    #         # q1_target_params = optax.incremental_update(q1_params, q1_target_params, args.tau)
+    #         # q2_target_params = optax.incremental_update(q2_params, q2_target_params, args.tau)
+    #
+    #         if global_step % 100 == 0:
+    #             logger["losses/qf1_values"].log(np.mean(q1_a_vals).item(), step=global_step)
+    #             logger["losses/qf2_values"].log(np.mean(q2_a_vals).item(), step=global_step)
+    #             logger["losses/qf1_loss"].log(q1_loss.item(), step=global_step)
+    #             logger["losses/qf2_loss"].log(q2_loss.item(), step=global_step)
+    #             logger["losses/qf_loss"].log((q_loss / 2.0).item(), step=global_step)
+    #             logger["losses/actor_loss"].log(actor_loss.item(), step=global_step)
+    #             logger["losses/mean_alpha"].log(np.mean(alpha).item(), step=global_step)
+    #             # print("SPS:", int(global_step / (time.time() - start_time)))
+    #             logger["charts/SPS"].log(
+    #                 int(global_step / (time.time() - start_time)), step=global_step
+    #             )
+    #             if args.autotune:
+    #                 logger["losses/alpha_loss"].log(alpha_loss.item(), step=global_step)
 
     # envs.close()
     # writer.close()
