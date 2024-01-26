@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Tuple, TypeVar
+from typing import Any, Callable, Dict, Generic, Tuple, TypeVar
 
 import chex
 from distrax import Distribution
@@ -20,12 +20,6 @@ from flax.core.frozen_dict import FrozenDict
 from jumanji.types import TimeStep
 from optax._src.base import OptState
 from typing_extensions import NamedTuple, TypeAlias
-
-if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
-    from dataclasses import dataclass
-else:
-    from flax.struct import dataclass
-
 
 Action: TypeAlias = chex.Array
 Value: TypeAlias = chex.Array
@@ -57,27 +51,6 @@ class ObservationGlobalState(NamedTuple):
     action_mask: chex.Array  # (num_agents, num_actions)
     global_state: chex.Array  # (num_agents, num_agents * num_obs_features)
     step_count: chex.Array  # (num_agents, )
-
-
-@dataclass
-class LogEnvState:
-    """State of the `LogWrapper`."""
-
-    env_state: State
-    episode_returns: chex.Numeric
-    episode_lengths: chex.Numeric
-    # Information about the episode return and length for logging purposes.
-    episode_return_info: chex.Numeric
-    episode_length_info: chex.Numeric
-
-
-@dataclass
-class JaxMarlState:
-    """Wrapper around a JaxMarl state to provide necessary attributes for jumanji environments."""
-
-    state: State
-    key: chex.PRNGKey
-    step: int
 
 
 RNNObservation: TypeAlias = Tuple[Observation, Done]
@@ -115,7 +88,7 @@ class LearnerState(NamedTuple, Generic[TParams, TOptStates]):
     params: TParams
     opt_states: TOptStates
     key: chex.PRNGKey
-    env_state: LogEnvState
+    env_state: State
     timestep: TimeStep
 
 
@@ -125,7 +98,7 @@ class RNNLearnerState(NamedTuple):
     params: Params
     opt_states: OptStates
     key: chex.PRNGKey
-    env_state: LogEnvState
+    env_state: State
     timestep: TimeStep
     dones: Done
     hstates: HiddenStates

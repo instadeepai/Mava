@@ -127,10 +127,7 @@ def get_learner_fn(
                 lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
                 timestep.last(),
             )
-            info = {
-                "episode_return": env_state.episode_return_info,
-                "episode_length": env_state.episode_length_info,
-            }
+            info = timestep.extras["episode_metrics"]
 
             hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
             transition = RNNPPOTransition(
