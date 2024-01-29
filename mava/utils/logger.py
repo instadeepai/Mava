@@ -163,6 +163,7 @@ class NeptuneLogger(BaseLogger):
             cfg.logger.base_exp_path, f"{json_exp_path}/{unique_token}/metrics.json"
         )
         self.unique_token = unique_token
+        self.upload_json_data = cfg.logger.kwargs.upload_json_data
 
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
         # Main metric if it's the mean of a list of metrics (ends with '/mean')
@@ -176,10 +177,11 @@ class NeptuneLogger(BaseLogger):
         self.logger[f"{event.value}/{key}"].log(value, step=t)
 
     def stop(self) -> None:
-        self._zip_and_upload()
+        if self.upload_json_data:
+            self._zip_and_upload_json()
         self.logger.stop()
 
-    def _zip_and_upload(self) -> None:
+    def _zip_and_upload_json(self) -> None:
         # Create the zip file path by replacing '.json' with '.zip'
         zip_file_path = self.json_file_path.rsplit(".json", 1)[0] + ".zip"
 
@@ -299,6 +301,18 @@ def _make_multi_logger(cfg: DictConfig) -> BaseLogger:
 
     loggers: List[BaseLogger] = []
     unique_token = datetime.now().strftime("%Y%m%d%H%M%S")
+
+    if (
+        cfg.logger.use_neptune
+        and cfg.logger.use_json
+        and cfg.logger.kwargs.upload_json_data
+        and cfg.logger.kwargs.json_path
+    ):
+        raise ValueError(
+            "Cannot upload json data to Neptune when `json_path` is set in the base logger config. "
+            "This is because each subsequent run will create a larger json file which will use "
+            "unnecessary storage."
+        )
 
     if cfg.logger.use_neptune:
         loggers.append(NeptuneLogger(cfg, unique_token))
