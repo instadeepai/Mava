@@ -159,10 +159,9 @@ class NeptuneLogger(BaseLogger):
 
         # Store json path for uploading json data to Neptune.
         json_exp_path = get_logger_path(cfg, "json")
-        json_logs_path = os.path.join(
+        self.json_file_path = os.path.join(
             cfg.logger.base_exp_path, f"{json_exp_path}/{unique_token}/metrics.json"
         )
-        self.json_file_path = json_logs_path
         self.unique_token = unique_token
 
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
