@@ -15,7 +15,6 @@ import gymnasium as gym
 # import gymnasium_robotics
 import jax
 import jax.numpy as jnp
-
 import jaxmarl
 
 # from torch.utils.tensorboard import SummaryWriter
@@ -76,7 +75,7 @@ class Args:
     """Entropy regularization coefficient."""
     autotune: bool = True
     """automatic tuning of the entropy coefficient"""
-    n_envs: int = 16
+    n_envs: int = 256
     """number of parallel environments"""
 
 
@@ -201,7 +200,7 @@ if __name__ == "__main__":
     args = tyro.cli(Args)
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 
-    logger = neptune.init_run(project="InstaDeep/mava", tags=["sac", args.env_id])
+    logger = neptune.init_run(project="InstaDeep/mava", tags=["sac", "fully-jitted", args.env_id])
 
     key = jax.random.PRNGKey(args.seed)
 
@@ -526,19 +525,38 @@ if __name__ == "__main__":
         key,
     )
 
-    steps_between_logging = 128
-    for global_step in range(args.learning_starts, args.total_timesteps):
-        t = global_step * args.n_envs
+    steps_between_logging = 10_000
+    for t in range(0, args.total_timesteps, args.n_envs):
         learner_state, (metrics, losses) = jax.lax.scan(
-            _act_and_learn, learner_state, None, length=steps_between_logging, unroll=16
+            _act_and_learn, learner_state, None, length=steps_between_logging
         )
 
-        mean_return = np.mean(metrics["episode_return"])
-        sps = t / (time.time() - start_time)
+        ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
+        mean_return = np.mean(ep_returns)
+        max_return = np.max(ep_returns)
 
-        logger["mean episode return"].log(mean_return, step=t)
-        logger["steps per second"].log(sps, step=t)
-        print(f"[{t}] return: {mean_return:.3f} | sps: {t:.3f}")
+        q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss = losses
+        log_alpha = learner_state[6]
+
+        curr_step = t * steps_between_logging + args.learning_starts
+        sps = curr_step / (time.time() - start_time)
+
+        logger["mean episode return"].log(mean_return, step=curr_step)
+        logger["max episode return"].log(max_return, step=curr_step)
+
+        logger["q loss"].log(np.mean(q_loss), step=curr_step)
+        logger["q1 loss"].log(np.mean(q1_loss), step=curr_step)
+        logger["q2 loss"].log(np.mean(q2_loss), step=curr_step)
+        logger["q1 values"].log(np.mean(q1_a_vals), step=curr_step)
+        logger["q2 values"].log(np.mean(q2_a_vals), step=curr_step)
+        logger["actor loss"].log(np.mean(actor_loss), step=curr_step)
+        logger["alpha loss"].log(np.mean(alpha_loss), step=curr_step)
+        logger["alpha"].log(np.mean(np.exp(log_alpha)), step=curr_step)
+
+
+        logger["steps per second"].log(sps, step=curr_step)
+
+        print(f"[{curr_step}] return: {mean_return:.3f} | sps: {sps:.3f}")
 
     # for global_step in range(0, args.total_timesteps, args.n_envs):
     #     # ALGO LOGIC: put action logic here
