@@ -44,7 +44,11 @@ from mava.types import (
 )
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import merge_leading_dims, unreplicate_learner_state
+from mava.utils.jax import (
+    make_learning_rate_schedule,
+    merge_leading_dims,
+    unreplicate_learner_state,
+)
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
 
@@ -355,13 +359,25 @@ def learner_setup(
     actor_network, critic_network = networks.make(
         config=config, network="feedforward", centralised_critic=False
     )
+
+    actor_lr = (
+        make_learning_rate_schedule(config.system.actor_lr, config)
+        if config.system.decay_learning_rates
+        else config.system.actor_lr
+    )
+    critic_lr = (
+        make_learning_rate_schedule(config.system.critic_lr, config)
+        if config.system.decay_learning_rates
+        else config.system.critic_lr
+    )
+
     actor_optim = optax.chain(
         optax.clip_by_global_norm(config.system.max_grad_norm),
-        optax.adam(config.system.actor_lr, eps=1e-5),
+        optax.adam(actor_lr, eps=1e-5),
     )
     critic_optim = optax.chain(
         optax.clip_by_global_norm(config.system.max_grad_norm),
-        optax.adam(config.system.critic_lr, eps=1e-5),
+        optax.adam(critic_lr, eps=1e-5),
     )
 
     # Initialise observation: Select only obs for a single agent.
