@@ -29,17 +29,17 @@ def ff_sample_actor_output(
         actor_mean_logits, actor_log_std_logits = actor
         actor_policy = distrax.MultivariateNormalDiag(
             actor_mean_logits, jnp.exp(actor_log_std_logits)
-        )        
+        )
         if get_log_prob:
             log_prob = actor_policy.log_prob(traj_actions)
-            
+
         else:
             raw_action, log_prob = actor_policy.sample_and_log_prob(seed=key)
             # actions = actions * n (if action in [-n, n]) -> Default: [-1, 1]
-            
+
         actions = jnp.tanh(raw_action)
         log_prob -= jnp.sum(jnp.log(0.5 * (1 - jnp.tanh(actions) ** 2) + 1e-6), axis=-1)
-        return (actor_policy, log_prob) if get_log_prob else (actions, log_prob )
+        return (actor_policy, log_prob) if get_log_prob else (actions, log_prob)
 
     def get_discrete_act() -> Any:
         if get_log_prob:
@@ -67,6 +67,6 @@ def select_actions_ppo_recurrent(
     policy = distrax.MultivariateNormalDiag(mean.squeeze(0), jnp.exp(log_std.squeeze(0)))
 
     actions, _ = policy.sample_and_log_prob(seed=key)
-    actions = jnp.tanh(actions) # )* 0.5 + 0.5
+    actions = jnp.tanh(actions)  # )* 0.5 + 0.5
 
     return hstate, actions

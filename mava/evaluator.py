@@ -15,13 +15,14 @@
 from typing import Any, Dict, Optional, Tuple
 
 import chex
+import distrax
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
 from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
 from omegaconf import DictConfig
-import distrax
+
 from mava.types import (
     ActorApply,
     EvalFn,
@@ -65,7 +66,7 @@ def get_ff_evaluator_fn(
             # Select action.
             key, policy_key = jax.random.split(key)
             # pi = apply_fn(params, last_timestep.observation)
-            
+
             actor_mean, actor_log_std = apply_fn(params, last_timestep.observation)
             policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
             raw_action, log_prob = policy.sample_and_log_prob(seed=policy_key)

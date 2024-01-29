@@ -244,7 +244,7 @@ class JaxMarlWrapper(Wrapper):
                 state_size = self._env.state_size
             else:
                 num_obs_features = self._env.observation_spaces[self._env.agents[0]].shape[0]
-                state_size =  self._env.num_agents * num_obs_features
+                state_size = self._env.num_agents * num_obs_features
             global_state = specs.Array(
                 (self._env.num_agents, state_size),
                 jnp.int32,
@@ -291,7 +291,7 @@ class JaxMarlWrapper(Wrapper):
         """Get global state from observation and copy it for each agent."""
         if hasattr(obs, "world_state"):
             return jnp.tile(jnp.array(obs["world_state"]), (self._env.num_agents, 1))
-        
+
         global_state = jnp.concatenate(agents_view, axis=0)
         global_state = jnp.tile(global_state, (self._env.num_agents, 1))
         return global_state

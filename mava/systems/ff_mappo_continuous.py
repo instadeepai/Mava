@@ -16,6 +16,7 @@ import time
 from typing import Any, Dict, Tuple
 
 import chex
+import distrax
 import flax
 import hydra
 import jax
@@ -27,7 +28,7 @@ from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
-import distrax
+
 from mava import networks
 from mava.evaluator import evaluator_setup
 from mava.networks import FeedForwardActor as Actor
@@ -85,13 +86,13 @@ def get_learner_fn(
 
             # SELECT ACTION
             key, policy_key = jax.random.split(key)
-            actor_mean, actor_log_std = actor_apply_fn(params.actor_params, last_timestep.observation)
+            actor_mean, actor_log_std = actor_apply_fn(
+                params.actor_params, last_timestep.observation
+            )
             policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
             raw_action, log_prob = policy.sample_and_log_prob(seed=policy_key)
             action = jnp.tanh(raw_action)
-            log_prob -= jnp.sum(
-                jnp.log( (1 - jnp.tanh(raw_action) ** 2) + 1e-6), axis=-1
-            )
+            log_prob -= jnp.sum(jnp.log((1 - jnp.tanh(raw_action) ** 2) + 1e-6), axis=-1)
             value = critic_apply_fn(params.critic_params, last_timestep.observation)
 
             # STEP ENVIRONMENT
@@ -169,10 +170,14 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate the actor loss."""
                     # RERUN NETWORK
-                    actor_mean, actor_log_std= actor_apply_fn(actor_params, traj_batch.obs)
-                    actor_policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
+                    actor_mean, actor_log_std = actor_apply_fn(actor_params, traj_batch.obs)
+                    actor_policy = distrax.MultivariateNormalDiag(
+                        actor_mean, jnp.exp(actor_log_std)
+                    )
                     log_prob = actor_policy.log_prob(traj_batch.action)
-                    log_prob -= jnp.sum(jnp.log( (1 - jnp.tanh(traj_batch.action) ** 2) + 1e-6), axis=-1)
+                    log_prob -= jnp.sum(
+                        jnp.log((1 - jnp.tanh(traj_batch.action) ** 2) + 1e-6), axis=-1
+                    )
                     entropy = actor_policy.entropy().mean()
 
                     # CALCULATE ACTOR LOSS

@@ -233,7 +233,7 @@ def make(
             activation_fn=activation_fn,
             use_layer_norm=config.network[network_key].use_layer_norm,
         )
-        
+
     actions_type = config.env.actions_type if hasattr(config.env, "actions_type") else "discrete"
     if network == "feedforward":
         actor = _networks[actions_type]["ff_actor"](
@@ -261,7 +261,8 @@ def make(
     return actor, critic
 
 
-_networks = {"discrete": {"ff_actor": FeedForwardActor, "rnn_actor": RecurrentActor},
-            "continuous": {"ff_actor": ContinuousFFActor, "rnn_actor": RecurrentActor},
-            "critics":  {"ff_critic": FeedForwardCritic, "rnn_critic": RecurrentCritic}, 
-            }
+_networks = {
+    "discrete": {"ff_actor": FeedForwardActor, "rnn_actor": RecurrentActor},
+    "continuous": {"ff_actor": ContinuousFFActor, "rnn_actor": RecurrentActor},
+    "critics": {"ff_critic": FeedForwardCritic, "rnn_critic": RecurrentCritic},
+}

@@ -115,14 +115,12 @@ def get_learner_fn(
             critic_hidden_state, value = critic_apply_fn(
                 params.critic_params, hstates.critic_hidden_state, ac_in
             )
-            
+
             # Sample action from the policy and squeeze out the batch dimension.
             actor_policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
             raw_action, logprob = actor_policy.sample_and_log_prob(seed=policy_key)
             action = jnp.tanh(raw_action)
-            logprob -= jnp.sum(
-                jnp.log((1 - jnp.tanh(raw_action) ** 2) + 1e-6), axis=-1
-            )
+            logprob -= jnp.sum(jnp.log((1 - jnp.tanh(raw_action) ** 2) + 1e-6), axis=-1)
 
             value, action, log_prob = (
                 value.squeeze(0),
@@ -248,10 +246,13 @@ def get_learner_fn(
                     _, actor_mean, actor_log_std = actor_apply_fn(
                         actor_params, traj_batch.hstates.policy_hidden_state[0], obs_and_done
                     )
-                    actor_policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
+                    actor_policy = distrax.MultivariateNormalDiag(
+                        actor_mean, jnp.exp(actor_log_std)
+                    )
                     log_prob = actor_policy.log_prob(traj_batch.action)
-                    logprob -= jnp.sum(jnp.log( (1 - jnp.tanh(traj_batch.action) ** 2) + 1e-6), axis=-1)
-        
+                    logprob -= jnp.sum(
+                        jnp.log((1 - jnp.tanh(traj_batch.action) ** 2) + 1e-6), axis=-1
+                    )
 
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
                     gae = (gae - gae.mean()) / (gae.std() + 1e-8)
@@ -266,7 +267,7 @@ def get_learner_fn(
                     )
                     loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
                     loss_actor = loss_actor.mean()
-                    entropy = actor_policy.entropy().mean() 
+                    entropy = actor_policy.entropy().mean()
 
                     total_loss = loss_actor - config.system.ent_coef * entropy
                     return total_loss, (loss_actor, entropy)

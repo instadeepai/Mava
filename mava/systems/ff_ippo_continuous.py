@@ -87,12 +87,14 @@ def get_learner_fn(
 
             # SELECT ACTION
             key, policy_key = jax.random.split(key)
-            actor_mean, actor_log_std = actor_apply_fn(params.actor_params, last_timestep.observation)
+            actor_mean, actor_log_std = actor_apply_fn(
+                params.actor_params, last_timestep.observation
+            )
             policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
             raw_action, log_prob = policy.sample_and_log_prob(seed=policy_key)
             action = jnp.tanh(raw_action)
             log_prob -= jnp.sum(
-                jnp.log( (1 - jnp.tanh(raw_action) ** 2) + 1e-6), axis=-1 #todo: why x0.5
+                jnp.log((1 - jnp.tanh(raw_action) ** 2) + 1e-6), axis=-1  # todo: why x0.5
             )
             value = critic_apply_fn(params.critic_params, last_timestep.observation)
 
@@ -170,10 +172,12 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate the actor loss."""
                     # RERUN NETWORK
-                    actor_mean, actor_log_std= actor_apply_fn(actor_params, traj_batch.obs)
+                    actor_mean, actor_log_std = actor_apply_fn(actor_params, traj_batch.obs)
                     policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
                     log_prob = policy.log_prob(traj_batch.action)
-                    log_prob -= jnp.sum(jnp.log( (1 - jnp.tanh(traj_batch.action) ** 2) + 1e-6), axis=-1)
+                    log_prob -= jnp.sum(
+                        jnp.log((1 - jnp.tanh(traj_batch.action) ** 2) + 1e-6), axis=-1
+                    )
                     entropy = policy.entropy().mean()
 
                     # CALCULATE ACTOR LOSS
