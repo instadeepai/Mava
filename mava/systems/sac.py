@@ -16,10 +16,7 @@ import gymnasium as gym
 import jax
 import jax.numpy as jnp
 
-# force cpu jax config
-# jax.config.update("jax_platform_name", "cpu")
 import jaxmarl
-import jumanji
 
 # from torch.utils.tensorboard import SummaryWriter
 import neptune
@@ -38,7 +35,6 @@ from jumanji.wrappers import GymObservation, VmapWrapper, Wrapper, jumanji_to_gy
 
 from mava.wrappers import RecordEpisodeMetrics
 from mava.wrappers.jaxmarl import JaxMarlWrapper
-from mava.wrappers.jumanji import LbfWrapper
 
 
 @dataclass
@@ -66,7 +62,7 @@ class Args:
     """target smoothing coefficient (default: 0.005)"""
     batch_size: int = 256
     """the batch size of sample from the reply memory"""
-    learning_starts: int = 5000
+    learning_starts: int = int(5e3)
     """timestep to start learning"""
     policy_lr: float = 3e-4
     """the learning rate of the policy network optimizer"""
@@ -80,7 +76,7 @@ class Args:
     """Entropy regularization coefficient."""
     autotune: bool = True
     """automatic tuning of the entropy coefficient"""
-    n_envs: int = 256
+    n_envs: int = 16
     """number of parallel environments"""
 
 
@@ -205,14 +201,12 @@ if __name__ == "__main__":
     args = tyro.cli(Args)
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 
-    # logger = neptune.init_run(project="InstaDeep/mava", tags=["sac", args.env_id])
+    logger = neptune.init_run(project="InstaDeep/mava", tags=["sac", args.env_id])
 
     key = jax.random.PRNGKey(args.seed)
 
     envs = jaxmarl.make(args.env_id, homogenisation_method="max", auto_reset=False)
     envs = JaxMarlWrapper(envs)
-    # envs = jumanji.make("LevelBasedForaging-v1")
-    # envs = LbfWrapper(envs)
     envs = RecordEpisodeMetrics(envs)
     envs = VmapAutoResetWrapper(envs)
 
@@ -290,43 +284,32 @@ if __name__ == "__main__":
     actor_apply = jax.jit(actor.apply)
     q_apply = jax.jit(q.apply)
 
-    @chex.assert_max_traces(n=1)
-    # def step(action, obs, env_state, buffer_state):
-    def step(action, obs, env_state):
-        env_state, timestep = envs.step(env_state, action)
+    @chex.assert_max_traces(n=2)
+    def step(action, obs, env_state, buffer_state):
+        env_state, timestep = env_step(env_state, action)
         next_obs = timestep.observation.agents_view
-        # rewards = timestep.reward[:, 0]
-        # # todo logical not
-        # terms = (1 - timestep.discount).astype(bool)[:, 0]
-        # truncs = timestep.last()
+        rewards = timestep.reward[:, 0]
+        # todo logical not
+        terms = (1 - timestep.discount).astype(bool)[:, 0]
+        truncs = timestep.last()
         infos = timestep.extras
-        #
-        # real_next_obs = infos["final_observation"].agents_view
-        #
-        # transition = Transition(obs, action, rewards, terms, real_next_obs)
-        # buffer_state = rb.add(buffer_state, transition)
 
-        # return next_obs, env_state, buffer_state, infos["episode_metrics"]
-        return next_obs, env_state, infos["episode_metrics"]
+        real_next_obs = infos["final_observation"].agents_view
 
-    # @jax.jit
+        transition = Transition(obs, action, rewards, terms, real_next_obs)
+        buffer_state = rb.add(buffer_state, transition)
+
+        return next_obs, env_state, buffer_state, infos["episode_metrics"]
+
+    @jax.jit
     @chex.assert_max_traces(n=1)
     def explore(_, carry):
-        (
-            obs,
-            env_state,
-            # buffer_state,
-            metrics,
-            key,
-        ) = carry
-        # key, explore_key = jax.random.split(key)
-        # action = jax.random.uniform(explore_key, full_action_shape)
-        action = jnp.zeros(full_action_shape)
-        # next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
-        next_obs, env_state, metrics = step(action, obs, env_state)
+        (obs, env_state, buffer_state, metrics, key) = carry
+        key, explore_key = jax.random.split(key)
+        action = jax.random.uniform(explore_key, full_action_shape)
+        next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
 
-        # return next_obs, env_state, buffer_state, metrics, key
-        return next_obs, env_state, metrics, key
+        return next_obs, env_state, buffer_state, metrics, key
 
     @jax.jit
     @chex.assert_max_traces(n=1)
@@ -500,64 +483,62 @@ if __name__ == "__main__":
 
     # TRY NOT TO MODIFY: start the game
     keys = jax.random.split(key, args.n_envs)
-    # env_reset = jax.jit(envs.reset)
-    # env_step = jax.jit(envs.step)
+    env_reset = jax.jit(envs.reset)
+    env_step = jax.jit(envs.step)
 
-    # @jax.jit
+    @jax.jit
     @chex.assert_max_traces(n=1)
-    def first_explore(first_timestep, env_state, key):
-        # def first_explore(first_timestep, env_state, buffer_state, key):
+    def first_explore(first_timestep, env_state, buffer_state, key):
         init_val = (
             first_timestep.observation.agents_view,
             env_state,
-            # buffer_state,
+            buffer_state,
             first_timestep.extras["episode_metrics"],
             key,
         )
-        return jax.lax.fori_loop(0, args.learning_starts, explore, init_val)
+        return jax.lax.fori_loop(0, args.learning_starts // args.n_envs, explore, init_val)
 
     start_time = time.time()
-    state, timestep = jax.jit(envs.reset)(keys)
+    state, timestep = env_reset(keys)
     # obs = timestep.observation.agents_view
 
     ep_return = 0.0
 
     # fill up buffer
-    next_obs, env_state, metrics, key = first_explore(timestep, state, key)
-    # next_obs, env_state, buffer_state, metrics, key = first_explore(
-    #     timestep, state, buffer_state, key
-    # )
-    jax.block_until_ready(next_obs)
+    next_obs, env_state, buffer_state, metrics, key = first_explore(
+        timestep, state, buffer_state, key
+    )
     print("first explore done")
-    print(time.time() - start_time)
-    # mean_return = np.mean(metrics["episode_return"])
-    # print(
-    #     f"[{args.learning_starts}] return: {mean_return:.3f} | sps: {args.n_envs * args.learning_starts / (time.time() - start_time):.3f}"
-    # )
+    mean_return = np.mean(metrics["episode_return"])
+    print(
+        f"[{args.learning_starts}] return: {mean_return:.3f} | sps: {args.learning_starts / (time.time() - start_time):.3f}"
+    )
 
-    # learner_state = (
-    #     next_obs,
-    #     env_state,
-    #     buffer_state,
-    #     (q1_params, q2_params),
-    #     (q1_target_params, q2_target_params),
-    #     actor_params,
-    #     log_alpha,
-    #     (q_opt_state, actor_opt_state, alpha_opt_state),
-    #     key,
-    # )
-    #
-    # steps_between_logging = 128 * args.n_envs
-    # for global_step in range(args.learning_starts, args.total_timesteps, steps_between_logging):
-    #     learner_state, (metrics, losses) = jax.lax.scan(
-    #         _act_and_learn, learner_state, None, length=steps_between_logging  # , unroll=16
-    #     )
-    #
-    #     mean_return = np.mean(metrics["episode_return"])
-    #     logger["mean_episode_return"].log(mean_return, step=global_step)
-    #     print(
-    #         f"[{global_step}] return: {mean_return:.3f} | sps: {global_step/(time.time() - start_time):.3f}"
-    #     )
+    learner_state = (
+        next_obs,
+        env_state,
+        buffer_state,
+        (q1_params, q2_params),
+        (q1_target_params, q2_target_params),
+        actor_params,
+        log_alpha,
+        (q_opt_state, actor_opt_state, alpha_opt_state),
+        key,
+    )
+
+    steps_between_logging = 128
+    for global_step in range(args.learning_starts, args.total_timesteps):
+        t = global_step * args.n_envs
+        learner_state, (metrics, losses) = jax.lax.scan(
+            _act_and_learn, learner_state, None, length=steps_between_logging, unroll=16
+        )
+
+        mean_return = np.mean(metrics["episode_return"])
+        sps = t / (time.time() - start_time)
+
+        logger["mean episode return"].log(mean_return, step=t)
+        logger["steps per second"].log(sps, step=t)
+        print(f"[{t}] return: {mean_return:.3f} | sps: {t:.3f}")
 
     # for global_step in range(0, args.total_timesteps, args.n_envs):
     #     # ALGO LOGIC: put action logic here
