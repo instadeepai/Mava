@@ -31,7 +31,7 @@ from rich.pretty import pprint
 
 from mava import networks
 from mava.evaluator import evaluator_setup
-from mava.networks import RecurrentActor as Actor
+from mava.networks import ContinuousRecActor as Actor
 from mava.networks import ScannedRNN
 from mava.types import (
     ExperimentOutput,

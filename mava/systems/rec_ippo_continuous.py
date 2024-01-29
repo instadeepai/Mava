@@ -32,7 +32,7 @@ from rich.pretty import pprint
 
 from mava import networks
 from mava.evaluator import evaluator_setup
-from mava.networks import RecurrentActor as Actor
+from mava.networks import ContinuousRecActor as Actor
 from mava.networks import ScannedRNN
 from mava.types import (
     ExperimentOutput,
@@ -118,9 +118,9 @@ def get_learner_fn(
 
             # Sample action from the policy and squeeze out the batch dimension.
             actor_policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
-            raw_action, logprob = actor_policy.sample_and_log_prob(seed=policy_key)
+            raw_action, log_prob = actor_policy.sample_and_log_prob(seed=policy_key)
             action = jnp.tanh(raw_action)
-            logprob -= jnp.sum(jnp.log((1 - jnp.tanh(raw_action) ** 2) + 1e-6), axis=-1)
+            log_prob -= jnp.sum(jnp.log((1 - jnp.tanh(raw_action) ** 2) + 1e-6), axis=-1)
 
             value, action, log_prob = (
                 value.squeeze(0),
@@ -250,7 +250,7 @@ def get_learner_fn(
                         actor_mean, jnp.exp(actor_log_std)
                     )
                     log_prob = actor_policy.log_prob(traj_batch.action)
-                    logprob -= jnp.sum(
+                    log_prob -= jnp.sum(
                         jnp.log((1 - jnp.tanh(traj_batch.action) ** 2) + 1e-6), axis=-1
                     )
 
@@ -480,7 +480,7 @@ def learner_setup(
     n_devices = len(jax.devices())
 
     # Get number of actions and agents.
-    num_actions = int(env.action_spec().num_values[0])
+    num_actions = env.action_spec().shape[1]
     num_agents = env.action_spec().shape[0]
     config.system.num_agents = num_agents
     config.system.num_actions = num_actions
@@ -525,7 +525,7 @@ def learner_setup(
 
     # Vmap network apply function over number of agents.
     vmapped_actor_network_apply_fn = jax.vmap(
-        actor_network.apply, in_axes=(None, 1, (2, None)), out_axes=(1, 2)
+        actor_network.apply, in_axes=(None, 1, (2, None)), out_axes=(1, 2, 2)
     )
     # Vmap network apply function over number of agents.
     vmapped_critic_network_apply_fn = jax.vmap(

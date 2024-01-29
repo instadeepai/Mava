@@ -393,7 +393,7 @@ def learner_setup(
     vmapped_actor_network_apply_fn = jax.vmap(
         actor_network.apply,
         in_axes=(None, 1),
-        out_axes=(1),
+        out_axes=(1, 1),
     )
     vmapped_critic_network_apply_fn = jax.vmap(
         critic_network.apply,

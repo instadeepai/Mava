@@ -210,6 +210,33 @@ class RecurrentCritic(nn.Module):
 
         return critic_hidden_state, jnp.squeeze(critic_output, axis=-1)
 
+class ContinuousRecActor(nn.Module):
+    """Continuous Recurrent Actor Network."""
+
+    action_dim: Sequence[int]
+    pre_torso: nn.Module
+    post_torso: nn.Module
+
+    @nn.compact
+    def __call__(
+        self,
+        policy_hidden_state: chex.Array,
+        observation_done: RNNObservation,
+    ) -> Tuple[chex.Array, distrax.Categorical]:
+        """Forward pass."""
+        observation, done = observation_done
+
+        policy_embedding = self.pre_torso(observation.agents_view)
+        policy_rnn_input = (policy_embedding, done)
+        policy_hidden_state, policy_embedding = ScannedRNN()(policy_hidden_state, policy_rnn_input)
+        actor_logits = self.post_torso(policy_embedding)
+        actor_mean = nn.Dense(
+            self.action_dim, kernel_init=orthogonal(0.01))(policy_embedding)
+
+        actor_log_std = nn.Dense(
+            self.action_dim, kernel_init=orthogonal(0.01))(policy_embedding)
+
+        return policy_hidden_state, actor_mean, actor_log_std
 
 def parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex.Array]:
     """Get the activation function."""
@@ -250,7 +277,7 @@ def make(
             pre_torso=create_torso("actor_network", "pre_torso_layer_sizes"),
             post_torso=create_torso("actor_network", "post_torso_layer_sizes"),
         )
-        critic = _networks["rnn_critic"](
+        critic = _networks["critics"]["rnn_critic"](
             pre_torso=create_torso("critic_network", "pre_torso_layer_sizes"),
             post_torso=create_torso("critic_network", "post_torso_layer_sizes"),
             centralised_critic=centralised_critic,
@@ -263,6 +290,6 @@ def make(
 
 _networks = {
     "discrete": {"ff_actor": FeedForwardActor, "rnn_actor": RecurrentActor},
-    "continuous": {"ff_actor": ContinuousFFActor, "rnn_actor": RecurrentActor},
+    "continuous": {"ff_actor": ContinuousFFActor, "rnn_actor": ContinuousRecActor},
     "critics": {"ff_critic": FeedForwardCritic, "rnn_critic": RecurrentCritic},
 }

@@ -3,5 +3,5 @@ defaults:
   - arch: anakin
   - system: rec_ippo
   - network: rnn_continuous   # [rnn, rnn_continuous]
-  - env: rware
+  - env: mabrax
   - _self_
