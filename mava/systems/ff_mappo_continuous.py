@@ -11,13 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import copy
 import time
 from typing import Any, Dict, Tuple
 
 import chex
-import distrax
 import flax
 import hydra
 import jax
@@ -29,16 +27,17 @@ from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
-
+import distrax
 from mava import networks
 from mava.evaluator import evaluator_setup
-from mava.networks import ContinuousFFActor as Actor
+from mava.networks import FeedForwardActor as Actor
 from mava.types import (
     ActorApply,
     CriticApply,
     ExperimentOutput,
     LearnerFn,
     LearnerState,
+    ObservationGlobalState,
     OptStates,
     Params,
     PPOTransition,
@@ -47,7 +46,6 @@ from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import merge_leading_dims, unreplicate_learner_state
 from mava.utils.logger import LogEvent, MavaLogger
-from mava.utils.select_action import ff_sample_actor_output
 from mava.utils.total_timestep_checker import check_total_timesteps
 
 
@@ -59,7 +57,7 @@ def get_learner_fn(
 ) -> LearnerFn[LearnerState]:
     """Get the learner function."""
 
-    # Get apply and update functions for actor and critic networks.
+    # Unpack apply and update functions.
     actor_apply_fn, critic_apply_fn = apply_fns
     actor_update_fn, critic_update_fn = update_fns
 
@@ -92,7 +90,7 @@ def get_learner_fn(
             raw_action, log_prob = policy.sample_and_log_prob(seed=policy_key)
             action = jnp.tanh(raw_action)
             log_prob -= jnp.sum(
-                jnp.log( (1 - jnp.tanh(raw_action) ** 2) + 1e-6), axis=-1 #todo: why x0.5
+                jnp.log( (1 - jnp.tanh(raw_action) ** 2) + 1e-6), axis=-1
             )
             value = critic_apply_fn(params.critic_params, last_timestep.observation)
 
@@ -108,8 +106,9 @@ def get_learner_fn(
                 "episode_return": env_state.episode_return_info,
                 "episode_length": env_state.episode_length_info,
             }
+
             transition = PPOTransition(
-                done, raw_action, value, timestep.reward, log_prob, last_timestep.observation, info
+                done, action, value, timestep.reward, log_prob, last_timestep.observation, info
             )
             learner_state = LearnerState(params, opt_states, key, env_state, timestep)
             return learner_state, transition
@@ -171,10 +170,10 @@ def get_learner_fn(
                     """Calculate the actor loss."""
                     # RERUN NETWORK
                     actor_mean, actor_log_std= actor_apply_fn(actor_params, traj_batch.obs)
-                    policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
-                    log_prob = policy.log_prob(traj_batch.action)
+                    actor_policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
+                    log_prob = actor_policy.log_prob(traj_batch.action)
                     log_prob -= jnp.sum(jnp.log( (1 - jnp.tanh(traj_batch.action) ** 2) + 1e-6), axis=-1)
-                    entropy = policy.entropy().mean()
+                    entropy = actor_policy.entropy().mean()
 
                     # CALCULATE ACTOR LOSS
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
@@ -190,6 +189,7 @@ def get_learner_fn(
                     )
                     loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
                     loss_actor = loss_actor.mean()
+                    entropy = actor_policy.entropy().mean()
 
                     total_loss_actor = loss_actor - config.system.ent_coef * entropy
                     return total_loss_actor, (loss_actor, entropy)
@@ -259,7 +259,6 @@ def get_learner_fn(
                 )
                 critic_new_params = optax.apply_updates(params.critic_params, critic_updates)
 
-                # PACK NEW PARAMS AND OPTIMISER STATE
                 new_params = Params(actor_new_params, critic_new_params)
                 new_opt_state = OptStates(actor_new_opt_state, critic_new_opt_state)
 
@@ -274,6 +273,7 @@ def get_learner_fn(
                     "actor_loss": actor_loss,
                     "entropy": entropy,
                 }
+
                 return (new_params, new_opt_state), loss_info
 
             params, opt_states, traj_batch, advantages, targets, key = update_state
@@ -322,7 +322,7 @@ def get_learner_fn(
         Args:
             learner_state (NamedTuple):
                 - params (Params): The initial model parameters.
-                - opt_states (OptStates): The initial optimizer state.
+                - opt_states (OptStates): The initial optimizer states.
                 - key (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
@@ -350,15 +350,19 @@ def learner_setup(
     n_devices = len(jax.devices())
 
     # Get number of actions and agents.
-    config.system.num_agents = env.action_spec().shape[0]
-    config.system.num_actions = int(env.action_spec().shape[1])
+    num_actions = env.action_spec().shape[1]
+    num_agents = env.action_spec().shape[0]
+    config.system.num_agents = num_agents
+    config.system.num_actions = num_actions
 
     # PRNG keys.
     key, actor_net_key, critic_net_key = keys
 
     # Define network and optimiser.
     actor_network, critic_network = networks.make(
-        config=config, network="feedforward", centralised_critic=False
+        config=config,
+        network="feedforward",
+        centralised_critic=True,
     )
     actor_optim = optax.chain(
         optax.clip_by_global_norm(config.system.max_grad_norm),
@@ -369,9 +373,15 @@ def learner_setup(
         optax.adam(config.system.critic_lr, eps=1e-5),
     )
 
-    # Initialise observation: Select only obs for a single agent.
-    init_x = env.observation_spec().generate_value()
-    init_x = jax.tree_util.tree_map(lambda x: x[0], init_x)
+    # Initialise observation.
+    obs = env.observation_spec().generate_value()
+    # Select only obs for a single agent.
+    init_x = ObservationGlobalState(
+        agents_view=obs.agents_view[0],
+        action_mask=obs.action_mask[0],
+        global_state=obs.global_state[0],
+        step_count=obs.step_count[0],
+    )
     init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
 
     # Initialise actor params and optimiser state.
@@ -454,11 +464,11 @@ def run_experiment(_config: DictConfig) -> None:
     config = copy.deepcopy(_config)
 
     # Create the enviroments for train and eval.
-    env, eval_env = environments.make(config)
+    env, eval_env = environments.make(config=config, add_global_state=True)
 
     # PRNG keys.
     key, key_e, actor_net_key, critic_net_key = jax.random.split(
-        jax.random.PRNGKey(config["system"]["seed"]), num=4
+        jax.random.PRNGKey(config.system.seed), num=4
     )
 
     # Setup learner.
@@ -513,7 +523,6 @@ def run_experiment(_config: DictConfig) -> None:
     for eval_step in range(config.arch.num_evaluation):
         # Train.
         start_time = time.time()
-
         learner_output = learn(learner_state)
         jax.block_until_ready(learner_output)
 
@@ -575,6 +584,7 @@ def run_experiment(_config: DictConfig) -> None:
         jax.block_until_ready(evaluator_output)
 
         elapsed_time = time.time() - start_time
+
         t = steps_per_rollout * (eval_step + 1)
         evaluator_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
         logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.ABSOLUTE)
@@ -583,7 +593,7 @@ def run_experiment(_config: DictConfig) -> None:
     logger.stop()
 
 
-@hydra.main(config_path="../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
+@hydra.main(config_path="../configs", config_name="default_ff_mappo.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
     # Allow dynamic attributes.
@@ -592,7 +602,7 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     # Run experiment.
     run_experiment(cfg)
 
-    print(f"{Fore.CYAN}{Style.BRIGHT}IPPO experiment completed{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}MAPPO experiment completed{Style.RESET_ALL}")
 
 
 if __name__ == "__main__":

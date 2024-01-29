@@ -21,7 +21,7 @@ import jax.numpy as jnp
 from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
 from omegaconf import DictConfig
-
+import distrax
 from mava.types import (
     ActorApply,
     EvalFn,
@@ -65,19 +65,17 @@ def get_ff_evaluator_fn(
             # Select action.
             key, policy_key = jax.random.split(key)
             # pi = apply_fn(params, last_timestep.observation)
-            # jax.debug.print("🤯 {x} 🤯", x=last_timestep.step_type)
-            """if config.arch.evaluation_greedy:
-                # TODO: check the pi.mode() in continous case.
-                action = pi.mode()
-            else:"""
+            
+            actor_mean, actor_log_std = apply_fn(params, last_timestep.observation)
+            policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
+            raw_action, log_prob = policy.sample_and_log_prob(seed=policy_key)
+            action = jnp.tanh(raw_action)
+            # if config.arch.evaluation_greedy:
+            #     action = pi.mode()
+            # else:
+            #     action = pi.sample(seed=policy_key)
 
-            # action, _ = ff_sample_actor_output(pi, policy_key)
-            # action = actor_policy.sample(seed=policy_key)
-            actor_policy = apply_fn(params, last_timestep.observation)
-            action, _ = ff_sample_actor_output(actor_policy, policy_key)
-
-            # # environment.
-            # jnp.array([[-1,-1], [-1,-1], [-1,-1], [-1,-1]])
+            # environment.
             env_state, timestep = env.step(env_state, action)
 
             # Log episode metrics.

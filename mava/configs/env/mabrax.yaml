@@ -2,11 +2,13 @@
 defaults:
   - _self_
 
-env_name: ant_4x2 # env_name = task_name
-action_type: continuous
+env_name: halfcheetah_6x1 # env_name = task_name
 # Possible scenarios: ant_4x2 | halfcheetah_6x1 | hopper_3x1 | humanoid_9|8 | walker2d_2x3
 scenario:
-  task_name: ant_4x2
+  task_name: halfcheetah_6x1
 
 kwargs:
-  episode_length: 100
+  episode_length: 1000
+  homogenisation_method: max # Use homegenous dimensions for observations and actions (use the max dim + padding with 0)
+
+actions_type: continuous # The type of actions used in this env (Suggestion: use/update the mlp_continuous.yaml in this case).

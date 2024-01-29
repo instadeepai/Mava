@@ -173,10 +173,11 @@ class JaxMarlWrapper(Wrapper):
         obs, state = self._env.reset(reset_key)
 
         if self.has_global_state:
+            agents_view = batchify(obs, self.agents)
             obs = ObservationGlobalState(
-                agents_view=batchify(obs, self.agents),
+                agents_view=agents_view,
                 action_mask=self.action_mask(state),
-                global_state=self.get_global_state(obs),
+                global_state=self.get_global_state(obs, agents_view),
                 step_count=jnp.zeros(self._env.num_agents, dtype=int),
             )
         else:
@@ -197,10 +198,11 @@ class JaxMarlWrapper(Wrapper):
         )
 
         if self.has_global_state:
+            agents_view = batchify(obs, self.agents)
             obs = ObservationGlobalState(
-                agents_view=batchify(obs, self.agents),
+                agents_view=agents_view,
                 action_mask=self.action_mask(env_state),
-                global_state=self.get_global_state(obs),
+                global_state=self.get_global_state(obs, agents_view),
                 step_count=jnp.repeat(state.step, self._env.num_agents),
             )
         else:
@@ -238,8 +240,13 @@ class JaxMarlWrapper(Wrapper):
         )
 
         if self.has_global_state:
+            if hasattr(self._env, "state_size"):
+                state_size = self._env.state_size
+            else:
+                num_obs_features = self._env.observation_spaces[self._env.agents[0]].shape[0]
+                state_size =  self._env.num_agents * num_obs_features
             global_state = specs.Array(
-                (self._env.num_agents, self._env.state_size),
+                (self._env.num_agents, state_size),
                 jnp.int32,
                 "global_state",
             )
@@ -280,6 +287,11 @@ class JaxMarlWrapper(Wrapper):
             mask = jnp.ones(self._action_shape, dtype=jnp.float32)
         return mask
 
-    def get_global_state(self, obs: Dict[str, Array]) -> Array:
+    def get_global_state(self, obs: Dict[str, Array], agents_view: Array) -> Array:
         """Get global state from observation and copy it for each agent."""
-        return jnp.tile(jnp.array(obs["world_state"]), (self._env.num_agents, 1))
+        if hasattr(obs, "world_state"):
+            return jnp.tile(jnp.array(obs["world_state"]), (self._env.num_agents, 1))
+        
+        global_state = jnp.concatenate(agents_view, axis=0)
+        global_state = jnp.tile(global_state, (self._env.num_agents, 1))
+        return global_state

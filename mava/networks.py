@@ -233,37 +233,35 @@ def make(
             activation_fn=activation_fn,
             use_layer_norm=config.network[network_key].use_layer_norm,
         )
-
+        
+    actions_type = config.env.actions_type if hasattr(config.env, "actions_type") else "discrete"
     if network == "feedforward":
-        actor = FeedForwardActor(
+        actor = _networks[actions_type]["ff_actor"](
             torso=create_torso("actor_network", "layer_sizes"),
             num_actions=config.system.num_actions,
         )
-        critic = FeedForwardCritic(
+        critic = _networks["critics"]["ff_critic"](
             torso=create_torso("critic_network", "layer_sizes"),
             centralised_critic=centralised_critic,
         )
     elif network == "recurrent":
-        actor = RecurrentActor(
+        actor = _networks[actions_type]["rnn_actor"](
             action_dim=config.system.num_actions,
             pre_torso=create_torso("actor_network", "pre_torso_layer_sizes"),
             post_torso=create_torso("actor_network", "post_torso_layer_sizes"),
         )
-        critic = RecurrentCritic(
+        critic = _networks["rnn_critic"](
             pre_torso=create_torso("critic_network", "pre_torso_layer_sizes"),
             post_torso=create_torso("critic_network", "post_torso_layer_sizes"),
-            centralised_critic=centralised_critic,
-        )
-    elif network == "continuousff":
-        actor = ContinuousFFActor(
-            torso=create_torso("actor_network", "layer_sizes"),
-            num_actions=config.system.num_actions,
-        )
-        critic = FeedForwardCritic(
-            torso=create_torso("critic_network", "layer_sizes"),
             centralised_critic=centralised_critic,
         )
     else:
         raise ValueError(f"The network '{network}' is not supported.")
 
     return actor, critic
+
+
+_networks = {"discrete": {"ff_actor": FeedForwardActor, "rnn_actor": RecurrentActor},
+            "continuous": {"ff_actor": ContinuousFFActor, "rnn_actor": RecurrentActor},
+            "critics":  {"ff_critic": FeedForwardCritic, "rnn_critic": RecurrentCritic}, 
+            }
