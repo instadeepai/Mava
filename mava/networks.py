@@ -210,6 +210,7 @@ class RecurrentCritic(nn.Module):
 
         return critic_hidden_state, jnp.squeeze(critic_output, axis=-1)
 
+
 class ContinuousRecActor(nn.Module):
     """Continuous Recurrent Actor Network."""
 
@@ -230,13 +231,12 @@ class ContinuousRecActor(nn.Module):
         policy_rnn_input = (policy_embedding, done)
         policy_hidden_state, policy_embedding = ScannedRNN()(policy_hidden_state, policy_rnn_input)
         actor_logits = self.post_torso(policy_embedding)
-        actor_mean = nn.Dense(
-            self.action_dim, kernel_init=orthogonal(0.01))(policy_embedding)
+        actor_mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(policy_embedding)
 
-        actor_log_std = nn.Dense(
-            self.action_dim, kernel_init=orthogonal(0.01))(policy_embedding)
+        actor_log_std = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(policy_embedding)
 
         return policy_hidden_state, actor_mean, actor_log_std
+
 
 def parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex.Array]:
     """Get the activation function."""
