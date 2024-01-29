@@ -136,9 +136,8 @@ class Checkpointer:
             items={
                 "learner_state": unreplicated_learner_state,
             },
-            # TODO: Currently we only log the episode return,
-            #       but perhaps we should log other metrics.
-            metrics={"episode_return": episode_return},
+            # TODO: Log other metrics if needed.
+            metrics={"episode_return": float(episode_return)},
         )
         return model_save_success
 
