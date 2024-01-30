@@ -47,7 +47,7 @@ class Args:
     """the environment id of the task"""
     factorization: str = "2x3"
     """how the joints are split up"""
-    total_timesteps: int = int(3e8)
+    total_timesteps: int = int(1e9)
     """total timesteps of the experiments"""
     buffer_size: int = int(1e6)
     """the replay memory buffer size"""
@@ -526,14 +526,15 @@ if __name__ == "__main__":
     )
 
     # rollout lenght?
-    steps_between_logging = 10_000
+    pmaped_steps = 10_000
+    steps_btwn_log = n_devices * args.n_envs * pmaped_steps
     learner_state = LearnerState(next_obs, env_state, buffer_state, params, opt_states, key)
     pmapped_learn = jax.pmap(
-        lambda state: jax.lax.scan(_act_and_learn, state, None, length=steps_between_logging),
+        lambda state: jax.lax.scan(_act_and_learn, state, None, length=pmaped_steps),
         axis_name="device",
     )
 
-    for t in range(0, args.total_timesteps, args.n_envs):
+    for t in range(args.learning_starts, args.total_timesteps, steps_btwn_log):
         learner_state, (metrics, losses) = pmapped_learn(learner_state)
 
         ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
@@ -543,21 +544,20 @@ if __name__ == "__main__":
         q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss = losses
         log_alpha = learner_state.params.log_alpha
 
-        curr_step = t * steps_between_logging + args.learning_starts
-        sps = curr_step / (time.time() - start_time)
+        sps = t / (time.time() - start_time)
 
-        logger["mean episode return"].log(mean_return, step=curr_step)
-        logger["max episode return"].log(max_return, step=curr_step)
+        logger["mean episode return"].log(mean_return, step=t)
+        logger["max episode return"].log(max_return, step=t)
 
-        logger["q loss"].log(np.mean(q_loss), step=curr_step)
-        logger["q1 loss"].log(np.mean(q1_loss), step=curr_step)
-        logger["q2 loss"].log(np.mean(q2_loss), step=curr_step)
-        logger["q1 values"].log(np.mean(q1_a_vals), step=curr_step)
-        logger["q2 values"].log(np.mean(q2_a_vals), step=curr_step)
-        logger["actor loss"].log(np.mean(actor_loss), step=curr_step)
-        logger["alpha loss"].log(np.mean(alpha_loss), step=curr_step)
-        logger["alpha"].log(np.mean(np.exp(learner_state.params.log_alpha)), step=curr_step)
+        logger["q loss"].log(np.mean(q_loss), step=t)
+        logger["q1 loss"].log(np.mean(q1_loss), step=t)
+        logger["q2 loss"].log(np.mean(q2_loss), step=t)
+        logger["q1 values"].log(np.mean(q1_a_vals), step=t)
+        logger["q2 values"].log(np.mean(q2_a_vals), step=t)
+        logger["actor loss"].log(np.mean(actor_loss), step=t)
+        logger["alpha loss"].log(np.mean(alpha_loss), step=t)
+        logger["alpha"].log(np.mean(np.exp(learner_state.params.log_alpha)), step=t)
 
-        logger["steps per second"].log(sps, step=curr_step)
+        logger["steps per second"].log(sps, step=t)
 
-        print(f"[{curr_step}] return: {mean_return:.3f} | sps: {sps:.3f}")
+        print(f"[{t}] return: {mean_return:.3f} | sps: {sps:.3f}")
