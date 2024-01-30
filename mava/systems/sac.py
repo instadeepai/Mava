@@ -49,6 +49,10 @@ class Args:
     """how the joints are split up"""
     total_timesteps: int = int(1e9)
     """total timesteps of the experiments"""
+    act_steps: int = 4
+    """number of steps to take in the environment before learning"""
+    learn_steps: int = 32
+    """number of times to sample and train before acting again"""
     buffer_size: int = int(1e6)
     """the replay memory buffer size"""
     gamma: float = 0.99
@@ -71,6 +75,8 @@ class Args:
     """Entropy regularization coefficient."""
     autotune: bool = True
     """automatic tuning of the entropy coefficient"""
+    target_entropy_scale: float = 1.0
+    """scale factor for target entropy"""
     n_envs: int = 256
     """number of parallel environments"""
 
@@ -197,7 +203,6 @@ class Actor(nn.Module):
 
 
 # todo: inside actor?
-@jax.jit
 def sample_action(
     mean: ArrayLike, log_std: ArrayLike, key: PRNGKey, action_scale, action_bias, eval: bool = False
 ) -> Tuple[Array, Array]:
@@ -226,7 +231,9 @@ if __name__ == "__main__":
     args = tyro.cli(Args)
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 
-    logger = neptune.init_run(project="InstaDeep/mava", tags=["sac", "pmapped", args.env_id])
+    logger = neptune.init_run(
+        project="InstaDeep/mava", tags=["sac", "pmapped", "sample-insert-ratio", args.env_id]
+    )
 
     key = jax.random.PRNGKey(args.seed)
     devices = jax.devices()
@@ -264,7 +271,7 @@ if __name__ == "__main__":
     q2_target_params = q.init(q2_target_key, dummy_obs, dummy_actions)
 
     # Automatic entropy tuning
-    target_entropy = jnp.repeat(-action_dim, n_agents).astype(float)
+    target_entropy = jnp.repeat(-args.target_entropy_scale * action_dim, n_agents).astype(float)
     # making sure we have dim=3 so broacasting works fine
     target_entropy = target_entropy[jnp.newaxis, :, jnp.newaxis]
     log_alpha = jnp.zeros_like(target_entropy)
@@ -315,14 +322,9 @@ if __name__ == "__main__":
         add_batch_size=args.n_envs,
     )
     buffer_state = jax.device_put_replicated(rb.init(dummy_transition), devices)
-    buffer_sample = jax.jit(rb.sample)
 
     start_time = time.time()
     key = jax.random.PRNGKey(0)
-
-    # jit forward passes
-    actor_apply = jax.jit(actor.apply)
-    q_apply = jax.jit(q.apply)
 
     @chex.assert_max_traces(n=2)
     def step(action, obs, env_state, buffer_state):
@@ -341,25 +343,7 @@ if __name__ == "__main__":
 
         return next_obs, env_state, buffer_state, infos["episode_metrics"]
 
-    @chex.assert_max_traces(n=1)
-    def explore(_, carry):
-        (obs, env_state, buffer_state, metrics, key) = carry
-        key, explore_key = jax.random.split(key)
-        action = jax.random.uniform(explore_key, full_action_shape)
-        next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
-
-        return next_obs, env_state, buffer_state, metrics, key
-
-    @chex.assert_max_traces(n=1)
-    def act(actor_params, obs, key, env_state, buffer_state):
-        mean, log_std = actor_apply(actor_params, obs)
-        action, _ = sample_action(mean, log_std, key, action_scale, action_bias)
-
-        next_obs, env_state, buffer_state, infos = step(action, obs, env_state, buffer_state)
-        return next_obs, env_state, buffer_state, infos
-
     # losses:
-    @jax.jit
     @chex.assert_max_traces(n=1)
     def q_loss_fn(q_params: Qs, obs, action, target):
         q1_params, q2_params = q_params
@@ -373,7 +357,6 @@ if __name__ == "__main__":
 
         return loss, (loss, q1_loss, q2_loss, q1_a_values, q2_a_values)
 
-    @jax.jit
     @chex.assert_max_traces(n=1)
     def actor_loss_fn(actor_params, obs, alpha, q_params: Qs, key):
         mean, log_std = actor.apply(actor_params, obs)
@@ -385,29 +368,24 @@ if __name__ == "__main__":
 
         return ((alpha * log_pi) - min_qf_pi).mean()
 
-    @jax.jit
     @chex.assert_max_traces(n=1)
     def alpha_loss_fn(log_alpha, log_pi, target_entropy):
         return jnp.mean(-jnp.exp(log_alpha) * (log_pi + target_entropy))
 
-    @partial(
-        jax.jit,
-        donate_argnames=["params", "opt_states"],
-    )
     @chex.assert_max_traces(n=1)
-    def train(
-        params: SacParams, opt_states: OptStates, data, key, target_entropy
-    ) -> Tuple[SacParams, optax.OptState, tuple]:  # todo: typing
+    def learn(
+        params: SacParams, opt_states: OptStates, data, key
+    ) -> Tuple[SacParams, OptStates, tuple]:  # todo: typing
         target_key, actor_key, alpha_key = jax.random.split(key, 3)
 
         # Generate Q target values.
-        mean, log_std = actor_apply(params.actor, data.next_obs)
+        mean, log_std = actor.apply(params.actor, data.next_obs)
         next_state_actions, next_state_log_pi = sample_action(
             mean, log_std, target_key, action_scale, action_bias
         )
 
-        qf1_next_target = q_apply(params.q.targets.q1, data.next_obs, next_state_actions)
-        qf2_next_target = q_apply(params.q.targets.q2, data.next_obs, next_state_actions)
+        qf1_next_target = q.apply(params.q.targets.q1, data.next_obs, next_state_actions)
+        qf2_next_target = q.apply(params.q.targets.q2, data.next_obs, next_state_actions)
         min_qf_next_target = (
             jnp.minimum(qf1_next_target, qf2_next_target)
             - jnp.exp(params.log_alpha) * next_state_log_pi
@@ -442,7 +420,7 @@ if __name__ == "__main__":
 
         # Update alpha.
         # if args.autotune:
-        mean, log_std = actor_apply(new_actor_params, data.obs)
+        mean, log_std = actor.apply(new_actor_params, data.obs)
         _, log_pi = sample_action(mean, log_std, alpha_key, action_scale, action_bias)
 
         alpha_grad_fn = jax.value_and_grad(alpha_loss_fn)
@@ -471,23 +449,54 @@ if __name__ == "__main__":
 
         return params, opt_states, losses
 
-    @jax.jit
+    @chex.assert_max_traces(n=1)
+    def sample_and_learn(carry, _):
+        buffer_state, params, opt_states, key = carry
+        key, buff_key, learn_key = jax.random.split(key, 3)
+
+        data = rb.sample(buffer_state, buff_key).experience.first
+        params, opt_state, losses = learn(params, opt_states, data, learn_key)
+
+        return (buffer_state, params, opt_state, key), losses
+
+    scanned_learn = lambda state: jax.lax.scan(
+        sample_and_learn, state, None, length=args.learn_steps
+    )
+
+    # todo: make this scannable, not for_i
+    @chex.assert_max_traces(n=1)
+    def explore(_, carry):
+        (obs, env_state, buffer_state, metrics, key) = carry
+        key, explore_key = jax.random.split(key)
+        action = jax.random.uniform(explore_key, full_action_shape)
+        next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
+
+        return next_obs, env_state, buffer_state, metrics, key
+
+    @chex.assert_max_traces(n=1)
+    def act(carry, _):
+        actor_params, obs, env_state, buffer_state, key = carry
+
+        mean, log_std = actor.apply(actor_params, obs)
+        action, _ = sample_action(mean, log_std, key, action_scale, action_bias)
+
+        next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
+        return (actor_params, next_obs, env_state, buffer_state, key), metrics
+
+    scanned_act = lambda state: jax.lax.scan(act, state, None, length=args.act_steps)
+
     @chex.assert_max_traces(n=1)  # todo: typing
-    def _act_and_learn(carry: LearnerState, _) -> Tuple[LearnerState, tuple]:
+    def act_and_learn(carry: LearnerState, _) -> Tuple[LearnerState, tuple]:
         """Act, sample, learn."""
         obs, env_state, buffer_state, params, opt_states, key = carry
-        key, act_key, buff_key, learn_key = jax.random.split(key, 4)
-
+        key, act_key, learn_key = jax.random.split(key, 3)
         # Act
-        next_obs, env_state, buffer_state, metrics = act(
-            params.actor, obs, act_key, env_state, buffer_state
-        )
+        act_state = (params.actor, obs, env_state, buffer_state, act_key)
+        (_, next_obs, env_state, buffer_state, _), metrics = scanned_act(act_state)
 
-        # Sample
-        data = buffer_sample(buffer_state, buff_key).experience.first
-
-        # Learn
-        params, opt_states, losses = train(params, opt_states, data, learn_key, target_entropy)
+        # Sample and learn
+        learn_state = (buffer_state, params, opt_states, learn_key)
+        (buffer_state, params, opt_states, _), losses = scanned_learn(learn_state)
 
         return (
             LearnerState(next_obs, env_state, buffer_state, params, opt_states, key),
@@ -527,14 +536,15 @@ if __name__ == "__main__":
 
     # rollout lenght?
     pmaped_steps = 10_000
-    steps_btwn_log = n_devices * args.n_envs * pmaped_steps
+    # todo: here should I multiply by act steps or learn steps or both or the mean?
+    steps_btwn_log = n_devices * args.n_envs * args.act_steps * pmaped_steps
     learner_state = LearnerState(next_obs, env_state, buffer_state, params, opt_states, key)
     pmaped_learn = jax.pmap(
-        lambda state: jax.lax.scan(_act_and_learn, state, None, length=pmaped_steps),
+        lambda state: jax.lax.scan(act_and_learn, state, None, length=pmaped_steps),
         axis_name="device",
     )
 
-    # We want start to align with the final step of the first pmaped_learn, 
+    # We want start to align with the final step of the first pmaped_learn,
     # where we've done explore_steps and 1 full learn step.
     start = args.explore_steps + steps_btwn_log
     for t in range(start, args.total_timesteps, steps_btwn_log):
