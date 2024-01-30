@@ -57,7 +57,7 @@ class Args:
     """target smoothing coefficient (default: 0.005)"""
     batch_size: int = 256
     """the batch size of sample from the reply memory"""
-    learning_starts: int = int(5e3)
+    explore_steps: int = int(5e3)
     """timestep to start learning"""
     policy_lr: float = 3e-4
     """the learning rate of the policy network optimizer"""
@@ -310,7 +310,7 @@ if __name__ == "__main__":
 
     rb = fbx.make_flat_buffer(
         max_length=args.buffer_size,
-        min_length=args.learning_starts,
+        min_length=args.explore_steps,
         sample_batch_size=args.batch_size,
         add_batch_size=args.n_envs,
     )
@@ -513,7 +513,7 @@ if __name__ == "__main__":
         explore_keys,
     )
     pmaped_explore = jax.pmap(
-        lambda state: jax.lax.fori_loop(0, args.learning_starts // args.n_envs, explore, state),
+        lambda state: jax.lax.fori_loop(0, args.explore_steps // args.n_envs, explore, state),
         axis_name="device",
     )
     next_obs, env_state, buffer_state, metrics, key = pmaped_explore(init_explore_state)
@@ -522,20 +522,23 @@ if __name__ == "__main__":
     ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
     mean_return = np.mean(ep_returns)
     print(
-        f"[{args.learning_starts}] return: {mean_return:.3f} | sps: {args.learning_starts / (time.time() - start_time):.3f}"
+        f"[{args.explore_steps}] return: {mean_return:.3f} | sps: {args.explore_steps / (time.time() - start_time):.3f}"
     )
 
     # rollout lenght?
     pmaped_steps = 10_000
     steps_btwn_log = n_devices * args.n_envs * pmaped_steps
     learner_state = LearnerState(next_obs, env_state, buffer_state, params, opt_states, key)
-    pmapped_learn = jax.pmap(
+    pmaped_learn = jax.pmap(
         lambda state: jax.lax.scan(_act_and_learn, state, None, length=pmaped_steps),
         axis_name="device",
     )
 
-    for t in range(args.learning_starts, args.total_timesteps, steps_btwn_log):
-        learner_state, (metrics, losses) = pmapped_learn(learner_state)
+    # We want start to align with the final step of the first pmaped_learn, 
+    # where we've done explore_steps and 1 full learn step.
+    start = args.explore_steps + steps_btwn_log
+    for t in range(start, args.total_timesteps, steps_btwn_log):
+        learner_state, (metrics, losses) = pmaped_learn(learner_state)
 
         ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
         mean_return = np.mean(ep_returns)
