@@ -1,30 +1,26 @@
-# docs and experiment results can be found at https://docs.cleanrl.dev/rl-algorithms/sac/#sac_continuous_actionpy
 import os
-import random
 import time
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, ClassVar, Dict, NamedTuple, Optional, Tuple, Union
+from typing import NamedTuple, Tuple
 
 import chex
 import distrax
 import flashbax as fbx
+import flax
 import flax.linen as nn
-import gymnasium as gym
-
-# import gymnasium_robotics
 import jax
+
+# jax.config.update("jax_platform_name", "cpu")
 import jax.numpy as jnp
 import jaxmarl
-
-# from torch.utils.tensorboard import SummaryWriter
 import neptune
 import numpy as np
 import optax
-import tensorboard_logger
 import tyro
 from chex import PRNGKey
-from gymnasium.spaces import Box
+from flashbax.buffers.flat_buffer import TrajectoryBuffer
+from flax.core.scope import FrozenVariableDict
 from jax import Array
 from jax.typing import ArrayLike
 from jumanji import specs
@@ -79,6 +75,39 @@ class Args:
     """number of parallel environments"""
 
 
+# todo: types.py
+class Qs(NamedTuple):
+    q1: FrozenVariableDict
+    q2: FrozenVariableDict
+
+
+class QsAndTarget(NamedTuple):
+    online: Qs
+    targets: Qs
+
+
+class SacParams(NamedTuple):
+    actor: FrozenVariableDict
+    q: QsAndTarget
+    log_alpha: Array
+
+
+class OptStates(NamedTuple):
+    actor: optax.OptState
+    q: optax.OptState
+    alpha: optax.OptState
+
+
+class LearnerState(NamedTuple):
+    obs: Array
+    env_state: State
+    buffer_state: TrajectoryBuffer
+    params: SacParams
+    opt_states: OptStates
+    key: PRNGKey
+
+
+# todo: jumanji PR
 class VmapAutoResetWrapper(Wrapper):
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep[Observation]]:
         state, timestep = jax.vmap(self._env.reset)(key)
@@ -149,9 +178,6 @@ class Actor(nn.Module):
     n_actions: int
 
     def setup(self) -> None:
-        # n_actions = self.env.action_spec().shape[1]  # (agents, n_actions)
-        # n_obs = self.env.observation_spec().agents_view.shape[1]  # (agents, n_obs)
-
         self.torso = nn.Sequential([nn.Dense(256), nn.relu, nn.Dense(256), nn.relu])
         self.mean_nn = nn.Dense(self.n_actions)
         self.logstd_nn = nn.Dense(self.n_actions)
@@ -200,22 +226,24 @@ if __name__ == "__main__":
     args = tyro.cli(Args)
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 
-    logger = neptune.init_run(project="InstaDeep/mava", tags=["sac", "fully-jitted", args.env_id])
+    logger = neptune.init_run(project="InstaDeep/mava", tags=["sac", "pmapped", args.env_id])
 
     key = jax.random.PRNGKey(args.seed)
+    devices = jax.devices()
+    n_devices = len(devices)
 
-    envs = jaxmarl.make(args.env_id, homogenisation_method="max", auto_reset=False)
-    envs = JaxMarlWrapper(envs)
-    envs = RecordEpisodeMetrics(envs)
-    envs = VmapAutoResetWrapper(envs)
+    env = jaxmarl.make(args.env_id, homogenisation_method="max", auto_reset=False)
+    env = JaxMarlWrapper(env)
+    env = RecordEpisodeMetrics(env)
+    env = VmapAutoResetWrapper(env)
 
-    n_agents = envs.action_spec().shape[0]
-    action_dim = envs.action_spec().shape[1]
-    obs_dim = envs.observation_spec().agents_view.shape[1]
+    n_agents = env.action_spec().shape[0]
+    action_dim = env.action_spec().shape[1]
+    obs_dim = env.observation_spec().agents_view.shape[1]
     full_action_shape = (args.n_envs, n_agents, action_dim)
 
-    act_high = jnp.zeros(envs.action_spec().shape) + envs.action_spec().maximum
-    act_low = jnp.zeros(envs.action_spec().shape) + envs.action_spec().minimum
+    act_high = jnp.zeros(env.action_spec().shape) + env.action_spec().maximum
+    act_low = jnp.zeros(env.action_spec().shape) + env.action_spec().minimum
     action_scale = jnp.array((act_high - act_low) / 2.0)[jnp.newaxis, :]
     action_bias = jnp.array((act_high + act_low) / 2.0)[jnp.newaxis, :]
 
@@ -224,33 +252,47 @@ if __name__ == "__main__":
     dummy_actions = jnp.zeros((1, n_agents, action_dim))
     dummy_obs = jnp.zeros((1, n_agents, obs_dim))
 
+    # Making actor network
     actor = Actor(action_dim)
     actor_params = actor.init(actor_key, dummy_obs)
 
+    # Making Q networks
     q = SoftQNetwork()
     q1_params = q.init(q1_key, dummy_obs, dummy_actions)
     q2_params = q.init(q2_key, dummy_obs, dummy_actions)
     q1_target_params = q.init(q1_target_key, dummy_obs, dummy_actions)
     q2_target_params = q.init(q2_target_key, dummy_obs, dummy_actions)
 
-    actor_opt = optax.adam(args.policy_lr)
-    actor_opt_state = actor_opt.init(actor_params)
-    q_opt = optax.adam(args.q_lr)
-    q_opt_state = q_opt.init((q1_params, q2_params))
-
     # Automatic entropy tuning
-    if args.autotune:
-        # -torch.prod(torch.Tensor(envs.single_action_space.shape).to(device)).item()
-        target_entropy = jnp.repeat(-n_agents * action_dim, n_agents).astype(float)
-        # making sure we have dim (B,A,X) so broacasting works fine
-        target_entropy = target_entropy[jnp.newaxis, :, jnp.newaxis]
-        log_alpha = jnp.zeros_like(target_entropy)
-        alpha = jnp.exp(log_alpha)
-        alpha_opt = optax.adam(args.q_lr)
-        alpha_opt_state = alpha_opt.init(log_alpha)
-    else:
-        alpha = args.alpha
+    target_entropy = jnp.repeat(-action_dim, n_agents).astype(float)
+    # making sure we have dim=3 so broacasting works fine
+    target_entropy = target_entropy[jnp.newaxis, :, jnp.newaxis]
+    log_alpha = jnp.zeros_like(target_entropy)
+    alpha = jnp.exp(log_alpha)
 
+    # Pack params
+    online_q_params = Qs(q1_params, q2_params)
+    target_q_params = Qs(q1_target_params, q2_target_params)
+    params = SacParams(actor_params, QsAndTarget(online_q_params, target_q_params), log_alpha)
+
+    # Make opt states.
+    actor_opt = optax.adam(args.policy_lr)
+    actor_opt_state = actor_opt.init(params.actor)
+
+    q_opt = optax.adam(args.q_lr)
+    q_opt_state = q_opt.init(params.q.online)
+
+    alpha_opt = optax.adam(args.q_lr)  # todo: alpha lr?
+    alpha_opt_state = alpha_opt.init(params.log_alpha)
+
+    # Pack opt states
+    opt_states = OptStates(actor_opt_state, q_opt_state, alpha_opt_state)
+
+    # Distribute params and opt states across all devices
+    params = jax.device_put_replicated(params, devices)
+    opt_states = jax.device_put_replicated(opt_states, devices)
+
+    # todo: move
     class Transition(NamedTuple):
         obs: ArrayLike
         action: ArrayLike
@@ -272,8 +314,7 @@ if __name__ == "__main__":
         sample_batch_size=args.batch_size,
         add_batch_size=args.n_envs,
     )
-    buffer_state = rb.init(dummy_transition)
-    # buffer_add = jax.jit(rb.add, donate_argnums=0)
+    buffer_state = jax.device_put_replicated(rb.init(dummy_transition), devices)
     buffer_sample = jax.jit(rb.sample)
 
     start_time = time.time()
@@ -285,7 +326,7 @@ if __name__ == "__main__":
 
     @chex.assert_max_traces(n=2)
     def step(action, obs, env_state, buffer_state):
-        env_state, timestep = env_step(env_state, action)
+        env_state, timestep = env.step(env_state, action)
         next_obs = timestep.observation.agents_view
         rewards = timestep.reward[:, 0]
         # todo logical not
@@ -300,7 +341,6 @@ if __name__ == "__main__":
 
         return next_obs, env_state, buffer_state, infos["episode_metrics"]
 
-    @jax.jit
     @chex.assert_max_traces(n=1)
     def explore(_, carry):
         (obs, env_state, buffer_state, metrics, key) = carry
@@ -310,7 +350,6 @@ if __name__ == "__main__":
 
         return next_obs, env_state, buffer_state, metrics, key
 
-    @jax.jit
     @chex.assert_max_traces(n=1)
     def act(actor_params, obs, key, env_state, buffer_state):
         mean, log_std = actor_apply(actor_params, obs)
@@ -322,7 +361,7 @@ if __name__ == "__main__":
     # losses:
     @jax.jit
     @chex.assert_max_traces(n=1)
-    def q_loss_fn(q_params, obs, action, target):
+    def q_loss_fn(q_params: Qs, obs, action, target):
         q1_params, q2_params = q_params
         q1_a_values = q.apply(q1_params, obs, action).reshape(-1)
         q2_a_values = q.apply(q2_params, obs, action).reshape(-1)
@@ -336,14 +375,12 @@ if __name__ == "__main__":
 
     @jax.jit
     @chex.assert_max_traces(n=1)
-    def actor_loss_fn(actor_params, obs, alpha, q_params, key):
-        q1_params, q2_params = q_params
-
+    def actor_loss_fn(actor_params, obs, alpha, q_params: Qs, key):
         mean, log_std = actor.apply(actor_params, obs)
         pi, log_pi = sample_action(mean, log_std, key, action_scale, action_bias)
 
-        qf1_pi = q.apply(q1_params, obs, pi)
-        qf2_pi = q.apply(q2_params, obs, pi)
+        qf1_pi = q.apply(q_params.q1, obs, pi)
+        qf2_pi = q.apply(q_params.q2, obs, pi)
         min_qf_pi = jnp.minimum(qf1_pi, qf2_pi)
 
         return ((alpha * log_pi) - min_qf_pi).mean()
@@ -355,188 +392,156 @@ if __name__ == "__main__":
 
     @partial(
         jax.jit,
-        donate_argnames=["q_params", "q_target_params", "actor_params", "log_alpha", "opt_states"],
+        donate_argnames=["params", "opt_states"],
     )
     @chex.assert_max_traces(n=1)
     def train(
-        q_params, q_target_params, actor_params, log_alpha, opt_states, data, key, target_entropy
-    ):
-        q1_params, q2_params = q_params
-        q1_target_params, q2_target_params = q_target_params
-        q_opt_state, actor_opt_state, alpha_opt_state = opt_states
+        params: SacParams, opt_states: OptStates, data, key, target_entropy
+    ) -> Tuple[SacParams, optax.OptState, tuple]:  # todo: typing
         target_key, actor_key, alpha_key = jax.random.split(key, 3)
 
-        mean, log_std = actor_apply(actor_params, data.next_obs)
+        # Generate Q target values.
+        mean, log_std = actor_apply(params.actor, data.next_obs)
         next_state_actions, next_state_log_pi = sample_action(
             mean, log_std, target_key, action_scale, action_bias
         )
 
-        qf1_next_target = q_apply(q1_target_params, data.next_obs, next_state_actions)
-        qf2_next_target = q_apply(q2_target_params, data.next_obs, next_state_actions)
+        qf1_next_target = q_apply(params.q.targets.q1, data.next_obs, next_state_actions)
+        qf2_next_target = q_apply(params.q.targets.q2, data.next_obs, next_state_actions)
         min_qf_next_target = (
-            jnp.minimum(qf1_next_target, qf2_next_target) - jnp.exp(log_alpha) * next_state_log_pi
+            jnp.minimum(qf1_next_target, qf2_next_target)
+            - jnp.exp(params.log_alpha) * next_state_log_pi
         )
 
         rewards = data.reward[..., jnp.newaxis, jnp.newaxis]
         dones = data.done[..., jnp.newaxis, jnp.newaxis]
         next_q_value = (rewards + (1.0 - dones) * args.gamma * min_qf_next_target).reshape(-1)
 
-        # optimize the q networks
+        # Update Q.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
-        q_grads, (q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals) = q_grad_fn(
-            (q1_params, q2_params), data.obs, data.action, next_q_value
-        )
-        q_updates, q_opt_state = q_opt.update(q_grads, q_opt_state)
-        q1_params, q2_params = optax.apply_updates((q1_params, q2_params), q_updates)
+        q_grads, q_loss_info = q_grad_fn(params.q.online, data.obs, data.action, next_q_value)
+        q_grads, q_loss_info = jax.lax.pmean((q_grads, q_loss_info), axis_name="device")
+        q_updates, new_q_opt_state = q_opt.update(q_grads, opt_states.q)
+        new_online_q_params = optax.apply_updates(params.q.online, q_updates)
 
+        # Update actor.
         # if global_step % args.policy_frequency == 0:  # TD 3 Delayed update support
         # compensate for the delay by doing 'actor_update_interval' instead of 1
         # for _ in range(args.policy_frequency):
         actor_grad_fn = jax.value_and_grad(actor_loss_fn)
         actor_loss, act_grads = actor_grad_fn(
-            actor_params,
+            params.actor,
             data.obs,
-            jnp.exp(log_alpha),
-            (q1_params, q2_params),
+            jnp.exp(params.log_alpha),
+            new_online_q_params,
             actor_key,
         )
-        actor_updates, actor_opt_state = actor_opt.update(act_grads, actor_opt_state)
-        actor_params = optax.apply_updates(actor_params, actor_updates)
+        actor_loss, act_grads = jax.lax.pmean((actor_loss, act_grads), axis_name="device")
+        actor_updates, new_actor_opt_state = actor_opt.update(act_grads, opt_states.actor)
+        new_actor_params = optax.apply_updates(params.actor, actor_updates)
 
-        if args.autotune:
-            mean, log_std = actor_apply(actor_params, data.obs)
-            _, log_pi = sample_action(mean, log_std, alpha_key, action_scale, action_bias)
+        # Update alpha.
+        # if args.autotune:
+        mean, log_std = actor_apply(new_actor_params, data.obs)
+        _, log_pi = sample_action(mean, log_std, alpha_key, action_scale, action_bias)
 
-            alpha_grad_fn = jax.value_and_grad(alpha_loss_fn)
-            alpha_loss, alpha_grads = alpha_grad_fn(log_alpha, log_pi, target_entropy)
-            alpha_updates, alpha_opt_state = alpha_opt.update(alpha_grads, alpha_opt_state)
-            log_alpha = optax.apply_updates(log_alpha, alpha_updates)
+        alpha_grad_fn = jax.value_and_grad(alpha_loss_fn)
+        alpha_loss, alpha_grads = alpha_grad_fn(params.log_alpha, log_pi, target_entropy)
+        alpha_loss, alpha_grads = jax.lax.pmean((alpha_loss, alpha_grads), axis_name="device")
+        alpha_updates, new_alpha_opt_state = alpha_opt.update(alpha_grads, opt_states.alpha)
+        new_log_alpha = optax.apply_updates(params.log_alpha, alpha_updates)
 
-        q1_target_params = optax.incremental_update(q1_params, q1_target_params, args.tau)
-        q2_target_params = optax.incremental_update(q2_params, q2_target_params, args.tau)
-
-        return (
-            (q1_params, q2_params),
-            (q1_target_params, q2_target_params),
-            actor_params,
-            log_alpha,
-            (q_opt_state, actor_opt_state, alpha_opt_state),
-            (q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss),
+        # Target network polyak update.
+        new_q1_target_params = optax.incremental_update(
+            new_online_q_params.q1, params.q.targets.q1, args.tau
         )
+        new_q2_target_params = optax.incremental_update(
+            new_online_q_params.q2, params.q.targets.q2, args.tau
+        )
+
+        params = SacParams(
+            new_actor_params,
+            QsAndTarget(new_online_q_params, Qs(new_q1_target_params, new_q2_target_params)),
+            new_log_alpha,
+        )
+        opt_states = OptStates(new_actor_opt_state, new_q_opt_state, new_alpha_opt_state)
+        # todo: dict
+        q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals = q_loss_info
+        losses = q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss
+
+        return params, opt_states, losses
 
     @jax.jit
-    @chex.assert_max_traces(n=1)
-    def _act_and_learn(carry, _):
-        (
-            obs,
-            env_state,
-            buffer_state,
-            q_params,
-            q_target_params,
-            actor_params,
-            log_alpha,
-            opt_states,
-            key,
-        ) = carry
-
+    @chex.assert_max_traces(n=1)  # todo: typing
+    def _act_and_learn(carry: LearnerState, _) -> Tuple[LearnerState, tuple]:
+        """Act, sample, learn."""
+        obs, env_state, buffer_state, params, opt_states, key = carry
         key, act_key, buff_key, learn_key = jax.random.split(key, 4)
+
+        # Act
         next_obs, env_state, buffer_state, metrics = act(
-            actor_params, obs, act_key, env_state, buffer_state
+            params.actor, obs, act_key, env_state, buffer_state
         )
 
+        # Sample
         data = buffer_sample(buffer_state, buff_key).experience.first
 
-        (
-            q_params,
-            q_target_params,
-            actor_params,
-            log_alpha,
-            opt_states,
-            losses,
-        ) = train(
-            q_params,
-            q_target_params,
-            actor_params,
-            log_alpha,
-            opt_states,
-            data,
-            learn_key,
-            target_entropy,
-        )
-        # losses = (q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss),
+        # Learn
+        params, opt_states, losses = train(params, opt_states, data, learn_key, target_entropy)
 
         return (
-            (
-                next_obs,
-                env_state,
-                buffer_state,
-                q_params,
-                q_target_params,
-                actor_params,
-                log_alpha,
-                opt_states,
-                key,
-            ),
+            LearnerState(next_obs, env_state, buffer_state, params, opt_states, key),
             (metrics, losses),
         )
 
     # TRY NOT TO MODIFY: start the game
-    keys = jax.random.split(key, args.n_envs)
-    env_reset = jax.jit(envs.reset)
-    env_step = jax.jit(envs.step)
-
-    @jax.jit
-    @chex.assert_max_traces(n=1)
-    def first_explore(first_timestep, env_state, buffer_state, key):
-        init_val = (
-            first_timestep.observation.agents_view,
-            env_state,
-            buffer_state,
-            first_timestep.extras["episode_metrics"],
-            key,
-        )
-        return jax.lax.fori_loop(0, args.learning_starts // args.n_envs, explore, init_val)
+    reset_keys = jax.random.split(key, args.n_envs * n_devices)
+    reset_keys = jnp.reshape(reset_keys, (n_devices, args.n_envs, -1))
 
     start_time = time.time()
-    state, timestep = env_reset(keys)
-    # obs = timestep.observation.agents_view
+    env_state, first_timestep = jax.pmap(env.reset, axis_name="device")(reset_keys)
 
     ep_return = 0.0
 
     # fill up buffer
-    next_obs, env_state, buffer_state, metrics, key = first_explore(
-        timestep, state, buffer_state, key
+    explore_keys = jax.random.split(key, n_devices)
+    init_explore_state = (
+        first_timestep.observation.agents_view,
+        env_state,
+        buffer_state,
+        first_timestep.extras["episode_metrics"],
+        explore_keys,
     )
+    pmaped_explore = jax.pmap(
+        lambda state: jax.lax.fori_loop(0, args.learning_starts // args.n_envs, explore, state),
+        axis_name="device",
+    )
+    next_obs, env_state, buffer_state, metrics, key = pmaped_explore(init_explore_state)
+
     print("first explore done")
-    mean_return = np.mean(metrics["episode_return"])
+    ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
+    mean_return = np.mean(ep_returns)
     print(
         f"[{args.learning_starts}] return: {mean_return:.3f} | sps: {args.learning_starts / (time.time() - start_time):.3f}"
     )
 
-    learner_state = (
-        next_obs,
-        env_state,
-        buffer_state,
-        (q1_params, q2_params),
-        (q1_target_params, q2_target_params),
-        actor_params,
-        log_alpha,
-        (q_opt_state, actor_opt_state, alpha_opt_state),
-        key,
+    # rollout lenght?
+    steps_between_logging = 10_000
+    learner_state = LearnerState(next_obs, env_state, buffer_state, params, opt_states, key)
+    pmapped_learn = jax.pmap(
+        lambda state: jax.lax.scan(_act_and_learn, state, None, length=steps_between_logging),
+        axis_name="device",
     )
 
-    steps_between_logging = 10_000
     for t in range(0, args.total_timesteps, args.n_envs):
-        learner_state, (metrics, losses) = jax.lax.scan(
-            _act_and_learn, learner_state, None, length=steps_between_logging
-        )
+        learner_state, (metrics, losses) = pmapped_learn(learner_state)
 
         ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
         mean_return = np.mean(ep_returns)
         max_return = np.max(ep_returns)
 
         q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss = losses
-        log_alpha = learner_state[6]
+        log_alpha = learner_state.params.log_alpha
 
         curr_step = t * steps_between_logging + args.learning_starts
         sps = curr_step / (time.time() - start_time)
@@ -551,112 +556,8 @@ if __name__ == "__main__":
         logger["q2 values"].log(np.mean(q2_a_vals), step=curr_step)
         logger["actor loss"].log(np.mean(actor_loss), step=curr_step)
         logger["alpha loss"].log(np.mean(alpha_loss), step=curr_step)
-        logger["alpha"].log(np.mean(np.exp(log_alpha)), step=curr_step)
-
+        logger["alpha"].log(np.mean(np.exp(learner_state.params.log_alpha)), step=curr_step)
 
         logger["steps per second"].log(sps, step=curr_step)
 
         print(f"[{curr_step}] return: {mean_return:.3f} | sps: {sps:.3f}")
-
-    # for global_step in range(0, args.total_timesteps, args.n_envs):
-    #     # ALGO LOGIC: put action logic here
-    #     key, act_key = jax.random.split(key)
-    #     if global_step < args.learning_starts:
-    #         actions = jax.random.uniform(act_key, (args.n_envs, *envs.action_spec().shape))
-    #         # actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
-    #     else:
-    #         mean, log_std = actor_apply(actor_params, obs)
-    #         actions, _ = sample_action(mean, log_std, act_key, action_scale, action_bias)
-    #
-    #     # TRY NOT TO MODIFY: execute the game and log data.
-    #     state, timestep = env_step(state, actions)
-    #     next_obs = timestep.observation.agents_view
-    #     rewards = timestep.reward
-    #     terminations = 1 - timestep.discount
-    #     truncations = timestep.last()
-    #     infos = timestep.extras
-    #
-    #     ep_return += np.mean(rewards)
-    #     # next_obs, rewards, terminations, truncations, infos = envs.step(actions)
-    #
-    #     # TRY NOT TO MODIFY: record rewards for plotting purposes
-    #     # if "final_info" in infos:
-    #     #     for info in infos["final_info"]:
-    #     #         if info is None or "episode" not in info:
-    #     #             continue
-    #     #         print(f"global_step={global_step}, episodic_return={info['episode']['r']}")
-    #     #         tensorboard_logger.log_value(
-    #     #             "charts/episodic_return", info["episode"]["r"], global_step
-    #     #         )
-    #     #         tensorboard_logger.log_value(
-    #     #             "charts/episodic_length", info["episode"]["l"], global_step
-    #     #         )
-    #     #         break
-    #     if timestep.last()[0]:
-    #         logger["episode return"].log(ep_return, step=global_step)
-    #         print(f"{global_step}: {ep_return}")
-    #         ep_return = 0.0
-    #
-    #     # TRY NOT TO MODIFY: save data to reply buffer; handle `final_observation`
-    #     # real_next_obs = next_obs.copy()
-    #     # for idx, trunc in enumerate(truncations):
-    #     #     if trunc:
-    #     #         real_next_obs[idx] = infos["final_observation"][idx]
-    #     real_next_obs = infos["final_observation"].agents_view
-    #
-    #     transition = Transition(
-    #         obs, actions, rewards[:, 0], terminations.astype(bool)[:, 0], real_next_obs
-    #     )
-    #     buffer_state = buffer_add(buffer_state, transition)
-    #
-    #     # TRY NOT TO MODIFY: CRUCIAL step easy to overlook
-    #     obs = next_obs
-    #
-    #     # ALGO LOGIC: training.
-    #     if global_step > args.learning_starts:
-    #         key, buff_key, target_key, actor_key, alpha_key = jax.random.split(key, 5)
-    #         _data = buffer_sample(buffer_state, buff_key)
-    #         data = _data.experience.first
-    #
-    #         (
-    #             (q1_params, q2_params),
-    #             (q1_target_params, q2_target_params),
-    #             actor_params,
-    #             log_alpha,
-    #             (q_opt_state, actor_opt_state, alpha_opt_state),
-    #             (q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss),
-    #         ) = train(
-    #             (q1_params, q2_params),
-    #             (q1_target_params, q2_target_params),
-    #             actor_params,
-    #             log_alpha,
-    #             (q_opt_state, actor_opt_state, alpha_opt_state),
-    #             data,
-    #             (target_key, actor_key, alpha_key),
-    #             target_entropy,
-    #         )
-    #
-    #         alpha = jnp.exp(log_alpha)
-    #
-    #         # update the target networks
-    #         # if global_step % args.target_network_frequency == 0:
-    #         # q1_target_params = optax.incremental_update(q1_params, q1_target_params, args.tau)
-    #         # q2_target_params = optax.incremental_update(q2_params, q2_target_params, args.tau)
-    #
-    #         if global_step % 100 == 0:
-    #             logger["losses/qf1_values"].log(np.mean(q1_a_vals).item(), step=global_step)
-    #             logger["losses/qf2_values"].log(np.mean(q2_a_vals).item(), step=global_step)
-    #             logger["losses/qf1_loss"].log(q1_loss.item(), step=global_step)
-    #             logger["losses/qf2_loss"].log(q2_loss.item(), step=global_step)
-    #             logger["losses/qf_loss"].log((q_loss / 2.0).item(), step=global_step)
-    #             logger["losses/actor_loss"].log(actor_loss.item(), step=global_step)
-    #             logger["losses/mean_alpha"].log(np.mean(alpha).item(), step=global_step)
-    #             # print("SPS:", int(global_step / (time.time() - start_time)))
-    #             logger["charts/SPS"].log(
-    #                 int(global_step / (time.time() - start_time)), step=global_step
-    #             )
-    #             if args.autotune:
-    #                 logger["losses/alpha_loss"].log(alpha_loss.item(), step=global_step)
-
-    # envs.close()
-    # writer.close()
