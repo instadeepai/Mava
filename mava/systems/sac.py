@@ -1,13 +1,25 @@
+# Copyright 2022 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import time
 from dataclasses import dataclass
-from functools import partial
-from typing import NamedTuple, Tuple
+from typing import Any, Dict, NamedTuple, Tuple
 
 import chex
 import distrax
 import flashbax as fbx
-import flax
 import flax.linen as nn
 import jax
 
@@ -20,13 +32,14 @@ import optax
 import tyro
 from chex import PRNGKey
 from flashbax.buffers.flat_buffer import TrajectoryBuffer
+from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.scope import FrozenVariableDict
 from jax import Array
 from jax.typing import ArrayLike
-from jumanji import specs
-from jumanji.env import Environment, State
+from jumanji.env import State
 from jumanji.types import Observation, TimeStep
-from jumanji.wrappers import GymObservation, VmapWrapper, Wrapper, jumanji_to_gym_obs
+from jumanji.wrappers import Wrapper
+from typing_extensions import TypeAlias
 
 from mava.wrappers import RecordEpisodeMetrics
 from mava.wrappers.jaxmarl import JaxMarlWrapper
@@ -49,9 +62,9 @@ class Args:
     """how the joints are split up"""
     total_timesteps: int = int(1e9)
     """total timesteps of the experiments"""
-    act_steps: int = 4
+    act_steps: int = 2
     """number of steps to take in the environment before learning"""
-    learn_steps: int = 32
+    learn_steps: int = 8
     """number of times to sample and train before acting again"""
     buffer_size: int = int(1e6)
     """the replay memory buffer size"""
@@ -59,7 +72,7 @@ class Args:
     """the discount factor gamma"""
     tau: float = 0.005
     """target smoothing coefficient (default: 0.005)"""
-    batch_size: int = 256
+    batch_size: int = 128
     """the batch size of sample from the reply memory"""
     explore_steps: int = int(5e3)
     """timestep to start learning"""
@@ -69,7 +82,8 @@ class Args:
     """the learning rate of the Q network network optimizer"""
     policy_frequency: int = 2
     """the frequency of training policy (delayed)"""
-    target_network_frequency: int = 1  # Denis Yarats' implementation delays this by 2.
+    # Denis Yarats' implementation delays this by 2.
+    target_network_frequency: int = 1
     """the frequency of updates for the target nerworks"""
     alpha: float = 0.2
     """Entropy regularization coefficient."""
@@ -111,6 +125,17 @@ class LearnerState(NamedTuple):
     params: SacParams
     opt_states: OptStates
     key: PRNGKey
+
+
+class Transition(NamedTuple):
+    obs: ArrayLike
+    action: ArrayLike
+    reward: ArrayLike
+    done: ArrayLike
+    next_obs: ArrayLike
+
+
+BufferState: TypeAlias = TrajectoryBufferState[Transition]
 
 
 # todo: jumanji PR
@@ -171,7 +196,7 @@ class SoftQNetwork(nn.Module):
         self.net = nn.Sequential([nn.Dense(256), nn.relu, nn.Dense(256), nn.relu, nn.Dense(1)])
 
     @nn.compact
-    def __call__(self, x, a):
+    def __call__(self, x: Array, a: Array) -> Array:
         x = jnp.concatenate([x, a], axis=-1)
         return self.net(x)
 
@@ -204,7 +229,12 @@ class Actor(nn.Module):
 
 # todo: inside actor?
 def sample_action(
-    mean: ArrayLike, log_std: ArrayLike, key: PRNGKey, action_scale, action_bias, eval: bool = False
+    mean: ArrayLike,
+    log_std: ArrayLike,
+    key: PRNGKey,
+    action_scale: Array,
+    action_bias: Array,
+    eval: bool = False,
 ) -> Tuple[Array, Array]:
     std = jnp.exp(log_std)
     normal = distrax.Normal(mean, std)
@@ -299,14 +329,6 @@ if __name__ == "__main__":
     params = jax.device_put_replicated(params, devices)
     opt_states = jax.device_put_replicated(opt_states, devices)
 
-    # todo: move
-    class Transition(NamedTuple):
-        obs: ArrayLike
-        action: ArrayLike
-        reward: ArrayLike
-        done: ArrayLike
-        next_obs: ArrayLike
-
     dummy_transition = Transition(
         obs=jnp.zeros((n_agents, obs_dim), dtype=float),
         action=jnp.zeros((n_agents, action_dim), dtype=float),
@@ -327,13 +349,15 @@ if __name__ == "__main__":
     key = jax.random.PRNGKey(0)
 
     @chex.assert_max_traces(n=2)
-    def step(action, obs, env_state, buffer_state):
+    def step(
+        action: Array, obs: Array, env_state: State, buffer_state: BufferState
+    ) -> Tuple[Array, State, BufferState, Dict]:
         env_state, timestep = env.step(env_state, action)
         next_obs = timestep.observation.agents_view
         rewards = timestep.reward[:, 0]
         # todo logical not
         terms = (1 - timestep.discount).astype(bool)[:, 0]
-        truncs = timestep.last()
+        # truncs = timestep.last()
         infos = timestep.extras
 
         real_next_obs = infos["final_observation"].agents_view
@@ -345,7 +369,9 @@ if __name__ == "__main__":
 
     # losses:
     @chex.assert_max_traces(n=1)
-    def q_loss_fn(q_params: Qs, obs, action, target):
+    def q_loss_fn(
+        q_params: Qs, obs: Array, action: Array, target: Array
+    ) -> Tuple[Array, Tuple[Array, Array, Array, Array, Array]]:
         q1_params, q2_params = q_params
         q1_a_values = q.apply(q1_params, obs, action).reshape(-1)
         q2_a_values = q.apply(q2_params, obs, action).reshape(-1)
@@ -358,7 +384,9 @@ if __name__ == "__main__":
         return loss, (loss, q1_loss, q2_loss, q1_a_values, q2_a_values)
 
     @chex.assert_max_traces(n=1)
-    def actor_loss_fn(actor_params, obs, alpha, q_params: Qs, key):
+    def actor_loss_fn(
+        actor_params: FrozenVariableDict, obs: Array, alpha: Array, q_params: Qs, key: chex.PRNGKey
+    ) -> Array:
         mean, log_std = actor.apply(actor_params, obs)
         pi, log_pi = sample_action(mean, log_std, key, action_scale, action_bias)
 
@@ -369,13 +397,14 @@ if __name__ == "__main__":
         return ((alpha * log_pi) - min_qf_pi).mean()
 
     @chex.assert_max_traces(n=1)
-    def alpha_loss_fn(log_alpha, log_pi, target_entropy):
+    def alpha_loss_fn(log_alpha: Array, log_pi: Array, target_entropy: Array) -> Array:
         return jnp.mean(-jnp.exp(log_alpha) * (log_pi + target_entropy))
 
+    # todo: typing
     @chex.assert_max_traces(n=1)
     def learn(
-        params: SacParams, opt_states: OptStates, data, key
-    ) -> Tuple[SacParams, OptStates, tuple]:  # todo: typing
+        params: SacParams, opt_states: OptStates, data: Transition, key: chex.PRNGKey
+    ) -> Tuple[SacParams, OptStates, Tuple[Array, Array, Array, Array, Array, Array, Array]]:
         target_key, actor_key, alpha_key = jax.random.split(key, 3)
 
         # Generate Q target values.
@@ -449,8 +478,11 @@ if __name__ == "__main__":
 
         return params, opt_states, losses
 
+    # todo: typing
     @chex.assert_max_traces(n=1)
-    def sample_and_learn(carry, _):
+    def sample_and_learn(
+        carry: Tuple[BufferState, SacParams, OptStates, chex.PRNGKey], _: Any
+    ) -> Tuple[Tuple[BufferState, SacParams, OptStates, chex.PRNGKey], tuple]:
         buffer_state, params, opt_states, key = carry
         key, buff_key, learn_key = jax.random.split(key, 3)
 
@@ -465,7 +497,9 @@ if __name__ == "__main__":
 
     # todo: make this scannable, not for_i
     @chex.assert_max_traces(n=1)
-    def explore(_, carry):
+    def explore(
+        _: int, carry: Tuple[Array, State, BufferState, Dict, chex.PRNGKey]
+    ) -> Tuple[Array, State, BufferState, Dict, chex.PRNGKey]:
         (obs, env_state, buffer_state, metrics, key) = carry
         key, explore_key = jax.random.split(key)
         action = jax.random.uniform(explore_key, full_action_shape)
@@ -474,7 +508,9 @@ if __name__ == "__main__":
         return next_obs, env_state, buffer_state, metrics, key
 
     @chex.assert_max_traces(n=1)
-    def act(carry, _):
+    def act(
+        carry: Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey], _: Any
+    ) -> Tuple[Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey], Dict]:
         actor_params, obs, env_state, buffer_state, key = carry
 
         mean, log_std = actor.apply(actor_params, obs)
@@ -486,7 +522,7 @@ if __name__ == "__main__":
     scanned_act = lambda state: jax.lax.scan(act, state, None, length=args.act_steps)
 
     @chex.assert_max_traces(n=1)  # todo: typing
-    def act_and_learn(carry: LearnerState, _) -> Tuple[LearnerState, tuple]:
+    def act_and_learn(carry: LearnerState, _: Any) -> Tuple[LearnerState, tuple]:
         """Act, sample, learn."""
         obs, env_state, buffer_state, params, opt_states, key = carry
         key, act_key, learn_key = jax.random.split(key, 3)
@@ -530,9 +566,8 @@ if __name__ == "__main__":
     print("first explore done")
     ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
     mean_return = np.mean(ep_returns)
-    print(
-        f"[{args.explore_steps}] return: {mean_return:.3f} | sps: {args.explore_steps / (time.time() - start_time):.3f}"
-    )
+    sps = n_devices * args.explore_steps / (time.time() - start_time)
+    print(f"[{args.explore_steps}] return: {mean_return:.3f} | sps: {sps:.3f}")
 
     # rollout lenght?
     pmaped_steps = 10_000
@@ -552,7 +587,7 @@ if __name__ == "__main__":
 
         ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
         mean_return = np.mean(ep_returns)
-        max_return = np.max(ep_returns)
+        max_return: float = np.max(ep_returns)
 
         q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss = losses
         log_alpha = learner_state.params.log_alpha

@@ -170,7 +170,10 @@ class JaxMarlWrapper(Wrapper):
         self._timelimit = timelimit
 
         if _is_discrete(self._env.action_space(self._env.agents[0])):
-            self._action_shape = (self.action_spec().shape[0], int(self.action_spec().num_values[0]))
+            self._action_shape = (
+                self.action_spec().shape[0],
+                int(self.action_spec().num_values[0]),
+            )
         else:
             self._action_shape = self.action_spec().shape
 
