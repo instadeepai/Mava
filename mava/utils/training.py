@@ -12,13 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable
+from typing import Callable, Union
 
 from omegaconf import DictConfig
 
 
 def make_learning_rate_schedule(init_lr: float, config: DictConfig) -> Callable:
     """Makes a very simple linear learning rate scheduler.
+
+    Args:
+        init_lr: initial learning rate.
+        config: system configuration.
 
     Note:
         We use a simple linear learning rate scheduler based on the suggestions from a blog on PPO
@@ -36,3 +40,19 @@ def make_learning_rate_schedule(init_lr: float, config: DictConfig) -> Callable:
         return init_lr * frac
 
     return linear_scedule
+
+
+def make_learning_rate(init_lr: float, config: DictConfig) -> Union[float, Callable]:
+    """Retuns a constant learning rate or a learning rate schedule.
+
+    Args:
+        init_lr: initial learning rate.
+        config: system configuration.
+
+    Returns:
+        A learning rate schedule or fixed learning rate.
+    """
+    if config.system.decay_learning_rates:
+        return make_learning_rate_schedule(init_lr, config)
+    else:
+        return init_lr
