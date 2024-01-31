@@ -46,6 +46,7 @@ from typing_extensions import TypeAlias
 
 from mava.wrappers import RecordEpisodeMetrics
 from mava.wrappers.jaxmarl import JaxMarlWrapper
+from mava.wrappers.observation import AgentIDWrapper
 
 
 # @dataclass
@@ -268,6 +269,7 @@ def run_experiment(cfg: DictConfig) -> None:
 
     env = jaxmarl.make(cfg.env.env_name, **cfg.env.kwargs)
     env = JaxMarlWrapper(env)
+    env = AgentIDWrapper(env)
     env = RecordEpisodeMetrics(env)
     env = VmapAutoResetWrapper(env)
 
