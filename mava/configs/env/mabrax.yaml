@@ -1,0 +1,13 @@
+# ---Environment Configs---
+defaults:
+  - _self_
+
+env_name: halfcheetah_6x1  # todo: list all env names
+
+# do we have scenarios here?
+# scenario:
+#   task_name: 2s3z
+
+kwargs:
+  homogenisation_method: max  # [max|concat] how to make the reward homogenous across agents
+  auto_reset: False

@@ -2,4 +2,4 @@ defaults:
   - logger: ff_isac
   - arch: anakin
   - system: ff_isac
-  - env: rware
+  - env: mabrax

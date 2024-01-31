@@ -18,9 +18,11 @@ from dataclasses import dataclass
 from typing import Any, Dict, NamedTuple, Tuple
 
 import chex
+from colorama import Fore, Style
 import distrax
 import flashbax as fbx
 import flax.linen as nn
+import hydra
 import jax
 
 # jax.config.update("jax_platform_name", "cpu")
@@ -28,6 +30,7 @@ import jax.numpy as jnp
 import jaxmarl
 import neptune
 import numpy as np
+from omegaconf import DictConfig, OmegaConf
 import optax
 import tyro
 from chex import PRNGKey
@@ -45,54 +48,52 @@ from mava.wrappers import RecordEpisodeMetrics
 from mava.wrappers.jaxmarl import JaxMarlWrapper
 
 
-@dataclass
-class Args:
-    exp_name: str = os.path.basename(__file__)[: -len(".py")]
-    """the name of this experiment"""
-    seed: int = 42
-    """seed of the experiment"""
-    capture_video: bool = False
-    """whether to capture videos of the agent performances (check out `videos` folder)"""
-
-    # Algorithm specific arguments
-    # env_id: str = "MPE_simple_spread_v3"
-    env_id: str = "halfcheetah_6x1"
-    """the environment id of the task"""
-    factorization: str = "2x3"
-    """how the joints are split up"""
-    total_timesteps: int = int(1e9)
-    """total timesteps of the experiments"""
-    act_steps: int = 1
-    """number of steps to take in the environment before learning"""
-    learn_steps: int = 1
-    """number of times to sample and train before acting again"""
-    buffer_size: int = int(1e6)
-    """the replay memory buffer size"""
-    gamma: float = 0.99
-    """the discount factor gamma"""
-    tau: float = 0.005
-    """target smoothing coefficient (default: 0.005)"""
-    batch_size: int = 128
-    """the batch size of sample from the reply memory"""
-    explore_steps: int = int(5e3)
-    """timestep to start learning"""
-    policy_lr: float = 3e-4
-    """the learning rate of the policy network optimizer"""
-    q_lr: float = 1e-3
-    """the learning rate of the Q network network optimizer"""
-    policy_frequency: int = 2
-    """the frequency of training policy (delayed)"""
-    # Denis Yarats' implementation delays this by 2.
-    target_network_frequency: int = 1
-    """the frequency of updates for the target nerworks"""
-    alpha: float = 0.2
-    """Entropy regularization coefficient."""
-    autotune: bool = True
-    """automatic tuning of the entropy coefficient"""
-    target_entropy_scale: float = 6.0
-    """scale factor for target entropy"""
-    n_envs: int = 256
-    """number of parallel environments"""
+# @dataclass
+# class Args:
+#     exp_name: str = os.path.basename(__file__)[: -len(".py")]
+#     """the name of this experiment"""
+#     seed: int = 42
+#     """seed of the experiment"""
+#
+#     # Algorithm specific arguments
+#     # env_id: str = "MPE_simple_spread_v3"
+#     env_id: str = "halfcheetah_6x1"
+#     """the environment id of the task"""
+#     factorization: str = "2x3"
+#     """how the joints are split up"""
+#     total_timesteps: int = int(1e9)
+#     """total timesteps of the experiments"""
+#     act_steps: int = 1
+#     """number of steps to take in the environment before learning"""
+#     learn_steps: int = 1
+#     """number of times to sample and train before acting again"""
+#     buffer_size: int = int(1e6)
+#     """the replay memory buffer size"""
+#     gamma: float = 0.99
+#     """the discount factor gamma"""
+#     tau: float = 0.005
+#     """target smoothing coefficient (default: 0.005)"""
+#     batch_size: int = 128
+#     """the batch size of sample from the reply memory"""
+#     explore_steps: int = int(5e3)
+#     """timestep to start learning"""
+#     policy_lr: float = 3e-4
+#     """the learning rate of the policy network optimizer"""
+#     q_lr: float = 1e-3
+#     """the learning rate of the Q network network optimizer"""
+#     policy_frequency: int = 2
+#     """the frequency of training policy (delayed)"""
+#     # Denis Yarats' implementation delays this by 2.
+#     target_network_frequency: int = 1
+#     """the frequency of updates for the target nerworks"""
+#     alpha: float = 0.2
+#     """Entropy regularization coefficient."""
+#     autotune: bool = True
+#     """automatic tuning of the entropy coefficient"""
+#     target_entropy_scale: float = 6.0
+#     """scale factor for target entropy"""
+#     n_envs: int = 256
+#     """number of parallel environments"""
 
 
 # todo: types.py
@@ -258,19 +259,14 @@ def sample_action(
     return scaled_action, log_prob
 
 
-if __name__ == "__main__":
-    args = tyro.cli(Args)
-    run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
+def run_experiment(cfg: DictConfig) -> None:
+    logger = neptune.init_run(project="InstaDeep/mava", tags=["sac", "test", cfg.env.env_name])
 
-    logger = neptune.init_run(
-        project="InstaDeep/mava", tags=["sac", "pmapped", "sample-insert-ratio", args.env_id]
-    )
-
-    key = jax.random.PRNGKey(args.seed)
+    key = jax.random.PRNGKey(cfg.system.seed)
     devices = jax.devices()
     n_devices = len(devices)
 
-    env = jaxmarl.make(args.env_id, homogenisation_method="max", auto_reset=False)
+    env = jaxmarl.make(cfg.env.env_name, **cfg.env.kwargs)
     env = JaxMarlWrapper(env)
     env = RecordEpisodeMetrics(env)
     env = VmapAutoResetWrapper(env)
@@ -278,7 +274,7 @@ if __name__ == "__main__":
     n_agents = env.action_spec().shape[0]
     action_dim = env.action_spec().shape[1]
     obs_dim = env.observation_spec().agents_view.shape[1]
-    full_action_shape = (args.n_envs, n_agents, action_dim)
+    full_action_shape = (cfg.system.n_envs, n_agents, action_dim)
 
     act_high = jnp.zeros(env.action_spec().shape) + env.action_spec().maximum
     act_low = jnp.zeros(env.action_spec().shape) + env.action_spec().minimum
@@ -302,7 +298,9 @@ if __name__ == "__main__":
     q2_target_params = q.init(q2_target_key, dummy_obs, dummy_actions)
 
     # Automatic entropy tuning
-    target_entropy = jnp.repeat(-args.target_entropy_scale * action_dim, n_agents).astype(float)
+    target_entropy = jnp.repeat(-cfg.system.target_entropy_scale * action_dim, n_agents).astype(
+        float
+    )
     # making sure we have dim=3 so broacasting works fine
     target_entropy = target_entropy[jnp.newaxis, :, jnp.newaxis]
     log_alpha = jnp.zeros_like(target_entropy)
@@ -314,13 +312,13 @@ if __name__ == "__main__":
     params = SacParams(actor_params, QsAndTarget(online_q_params, target_q_params), log_alpha)
 
     # Make opt states.
-    actor_opt = optax.adam(args.policy_lr)
+    actor_opt = optax.adam(cfg.system.policy_lr)
     actor_opt_state = actor_opt.init(params.actor)
 
-    q_opt = optax.adam(args.q_lr)
+    q_opt = optax.adam(cfg.system.q_lr)
     q_opt_state = q_opt.init(params.q.online)
 
-    alpha_opt = optax.adam(args.q_lr)  # todo: alpha lr?
+    alpha_opt = optax.adam(cfg.system.q_lr)  # todo: alpha lr?
     alpha_opt_state = alpha_opt.init(params.log_alpha)
 
     # Pack opt states
@@ -339,10 +337,10 @@ if __name__ == "__main__":
     )
 
     rb = fbx.make_flat_buffer(
-        max_length=args.buffer_size,
-        min_length=args.explore_steps,
-        sample_batch_size=args.batch_size,
-        add_batch_size=args.n_envs,
+        max_length=cfg.system.buffer_size,
+        min_length=cfg.system.explore_steps,
+        sample_batch_size=cfg.system.batch_size,
+        add_batch_size=cfg.system.n_envs,
     )
     buffer_state = jax.device_put_replicated(rb.init(dummy_transition), devices)
 
@@ -419,7 +417,7 @@ if __name__ == "__main__":
 
         rewards = data.reward[..., jnp.newaxis, jnp.newaxis]
         dones = data.done[..., jnp.newaxis, jnp.newaxis]
-        next_q_value = (rewards + (1.0 - dones) * args.gamma * min_qf_next_target).reshape(-1)
+        next_q_value = (rewards + (1.0 - dones) * cfg.system.gamma * min_qf_next_target).reshape(-1)
 
         # Update Q.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
@@ -430,7 +428,7 @@ if __name__ == "__main__":
 
         # Target network polyak update.
         new_target_q_params = optax.incremental_update(
-            new_online_q_params, params.q.targets, args.tau
+            new_online_q_params, params.q.targets, cfg.system.tau
         )
 
         q_and_target = QsAndTarget(new_online_q_params, new_target_q_params)
@@ -443,7 +441,7 @@ if __name__ == "__main__":
         params: SacParams, opt_states: OptStates, data: Transition, key: chex.PRNGKey
     ) -> Tuple[SacParams, OptStates, Tuple[Array, Array]]:
         # compensate for the delay by doing `policy_frequency` instead of 1
-        for _ in range(args.policy_frequency):
+        for _ in range(cfg.system.policy_frequency):
             actor_key, alpha_key = jax.random.split(key)
 
             # Update actor.
@@ -479,7 +477,7 @@ if __name__ == "__main__":
 
         params, opt_states, q_loss_info = update_q(params, opt_states, data, q_key)
         params, opt_states, (actor_loss, alpha_loss) = jax.lax.cond(
-            t % args.policy_frequency == 0,  # TD 3 Delayed update support
+            t % cfg.system.policy_frequency == 0,  # TD 3 Delayed update support
             update_actor_and_alpha,
             lambda params, opt_states, _, __: (params, opt_states, (0.0, 0.0)),
             params,
@@ -508,7 +506,7 @@ if __name__ == "__main__":
         return (buffer_state, params, opt_state, t, key), losses
 
     scanned_learn = lambda state: jax.lax.scan(
-        sample_and_learn, state, None, length=args.learn_steps
+        sample_and_learn, state, None, length=cfg.system.learn_steps
     )
 
     # todo: make this scannable, not for_i
@@ -535,7 +533,7 @@ if __name__ == "__main__":
         next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
         return (actor_params, next_obs, env_state, buffer_state, key), metrics
 
-    scanned_act = lambda state: jax.lax.scan(act, state, None, length=args.act_steps)
+    scanned_act = lambda state: jax.lax.scan(act, state, None, length=cfg.system.act_steps)
 
     @chex.assert_max_traces(n=1)  # todo: typing
     def act_and_learn(carry: LearnerState, _: Any) -> Tuple[LearnerState, tuple]:
@@ -556,8 +554,8 @@ if __name__ == "__main__":
         )
 
     # TRY NOT TO MODIFY: start the game
-    reset_keys = jax.random.split(key, args.n_envs * n_devices)
-    reset_keys = jnp.reshape(reset_keys, (n_devices, args.n_envs, -1))
+    reset_keys = jax.random.split(key, cfg.system.n_envs * n_devices)
+    reset_keys = jnp.reshape(reset_keys, (n_devices, cfg.system.n_envs, -1))
 
     start_time = time.time()
     env_state, first_timestep = jax.pmap(env.reset, axis_name="device")(reset_keys)
@@ -574,21 +572,24 @@ if __name__ == "__main__":
         explore_keys,
     )
     pmaped_explore = jax.pmap(
-        lambda state: jax.lax.fori_loop(0, args.explore_steps // args.n_envs, explore, state),
+        lambda state: jax.lax.fori_loop(
+            0, cfg.system.explore_steps // cfg.system.n_envs, explore, state
+        ),
         axis_name="device",
     )
     next_obs, env_state, buffer_state, metrics, key = pmaped_explore(init_explore_state)
 
-    print("first explore done")
+    print("First explore done")
     ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
-    mean_return = np.mean(ep_returns)
-    sps = n_devices * args.explore_steps / (time.time() - start_time)
-    print(f"[{args.explore_steps}] return: {mean_return:.3f} | sps: {sps:.3f}")
+    # likely that the episode hasn't ended yet and so we need to replace the nan with 0.
+    mean_return = np.mean(np.nan_to_num(ep_returns))
+    sps = n_devices * cfg.system.explore_steps / (time.time() - start_time)
+    print(f"[{cfg.system.explore_steps}] return: {mean_return:.3f} | sps: {sps:.3f}")
+    logger["mean episode return"].log(mean_return, step=cfg.system.explore_steps)
 
-    # rollout lenght?
     pmaped_steps = 5120
     # todo: here should I multiply by act steps or learn steps or both or the mean?
-    steps_btwn_log = n_devices * args.n_envs * args.act_steps * pmaped_steps
+    steps_btwn_log = n_devices * cfg.system.n_envs * pmaped_steps
     learner_state = LearnerState(
         next_obs, env_state, buffer_state, params, opt_states, jnp.zeros(n_devices), key
     )
@@ -599,8 +600,8 @@ if __name__ == "__main__":
 
     # We want start to align with the final step of the first pmaped_learn,
     # where we've done explore_steps and 1 full learn step.
-    start = args.explore_steps + steps_btwn_log
-    for t in range(start, args.total_timesteps, steps_btwn_log):
+    start = cfg.system.explore_steps + steps_btwn_log
+    for t in range(start, cfg.system.total_timesteps, steps_btwn_log):
         learner_state, (metrics, losses) = pmaped_learn(learner_state)
 
         ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
@@ -627,3 +628,19 @@ if __name__ == "__main__":
         logger["steps per second"].log(sps, step=t)
 
         print(f"[{t}] return: {mean_return:.3f} | sps: {sps:.3f}")
+
+
+@hydra.main(config_path="../configs", config_name="default_ff_isac.yaml", version_base="1.2")
+def hydra_entry_point(cfg: DictConfig) -> None:
+    """Experiment entry point."""
+    # Allow dynamic attributes.
+    OmegaConf.set_struct(cfg, False)
+
+    # Run experiment.
+    run_experiment(cfg)
+
+    print(f"{Fore.CYAN}{Style.BRIGHT}IPPO experiment completed{Style.RESET_ALL}")
+
+
+if __name__ == "__main__":
+    hydra_entry_point()

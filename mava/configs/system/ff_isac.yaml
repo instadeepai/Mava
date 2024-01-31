@@ -1,16 +1,25 @@
 # --- Defaults FF-ISAC ---
-
-num_updates: 5000 # Number of updates
 seed: 1
+n_envs: 256 # number of environments to run in parallel (vmapped)
 
 # --- Agent observations ---
 add_agent_id: True
 
 # --- RL hyperparameters ---
-tau: 0.005
-gamma: 0.95
-batch_size: 1024
-num_minibatches: 16
-rollout_length: 4
-rb_size: 1_000_000 # size of the replay buffer. Note: total size is this * num_learners
-lr: 3e-4
+# step related
+total_timesteps: 10000000
+explore_steps: 5000  # number of steps to take with random actions at the start of training
+act_steps: 1  # number of steps to take in the environment before learning
+learn_steps: 1  # number of times to sample and train before acting again
+policy_frequency: 2  # the frequency of training policy - every n q learning steps the policy is trained once
+# sizes
+buffer_size: 1000000  # size of the replay buffer. Note: total size is this * num_devices
+batch_size: 128
+# learning rates
+policy_lr: 3e-4  # the learning rate of the policy network optimizer
+q_lr: 1e-3  # the learning rate of the Q network network optimizer
+# other
+tau: 0.005  # smoothing coefficient for target networks
+gamma: 0.99  # discount factor
+target_entropy_scale: 6.0  # scale factor for target entropy
+
