@@ -14,13 +14,12 @@
 
 # TODO: Rewrite this file to handle only JAX arrays.
 
-from typing import Callable, Union
+from typing import Union
 
 import chex
 import jax
 import jax.numpy as jnp
 import numpy as np
-from omegaconf import DictConfig
 
 from mava.types import LearnerState, RNNLearnerState
 
@@ -60,15 +59,3 @@ def unreplicate_learner_state(
     and one for the `update batch size`.
     """
     return jax.tree_map(lambda x: x[(0,) * unreplicate_depth], learner_state)  # type: ignore
-
-
-def make_learning_rate_schedule(init_lr: float, config: DictConfig) -> Callable:
-    def linear_scedule(count: int) -> float:
-        frac: float = (
-            1.0
-            - (count // (config.system.ppo_epochs * config.system.num_minibatches))
-            / config.system.num_updates
-        )
-        return init_lr * frac
-
-    return linear_scedule
