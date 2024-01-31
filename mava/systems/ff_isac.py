@@ -581,7 +581,7 @@ def run_experiment(cfg: DictConfig) -> None:
     print("First explore done")
     ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
     # likely that the episode hasn't ended yet and so we need to replace the nan with 0.
-    mean_return = np.mean(np.nan_to_num(ep_returns))
+    mean_return = np.nan_to_num(np.mean(ep_returns))
     sps = n_devices * cfg.system.explore_steps / (time.time() - start_time)
     print(f"[{cfg.system.explore_steps}] return: {mean_return:.3f} | sps: {sps:.3f}")
     logger["mean episode return"].log(mean_return, step=cfg.system.explore_steps)
