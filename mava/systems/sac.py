@@ -62,9 +62,9 @@ class Args:
     """how the joints are split up"""
     total_timesteps: int = int(1e9)
     """total timesteps of the experiments"""
-    act_steps: int = 2
+    act_steps: int = 1
     """number of steps to take in the environment before learning"""
-    learn_steps: int = 8
+    learn_steps: int = 1
     """number of times to sample and train before acting again"""
     buffer_size: int = int(1e6)
     """the replay memory buffer size"""
@@ -89,7 +89,7 @@ class Args:
     """Entropy regularization coefficient."""
     autotune: bool = True
     """automatic tuning of the entropy coefficient"""
-    target_entropy_scale: float = 1.0
+    target_entropy_scale: float = 6.0
     """scale factor for target entropy"""
     n_envs: int = 256
     """number of parallel environments"""
@@ -124,6 +124,7 @@ class LearnerState(NamedTuple):
     buffer_state: TrajectoryBuffer
     params: SacParams
     opt_states: OptStates
+    t: int
     key: PRNGKey
 
 
@@ -383,7 +384,7 @@ if __name__ == "__main__":
 
         return loss, (loss, q1_loss, q2_loss, q1_a_values, q2_a_values)
 
-    @chex.assert_max_traces(n=1)
+    @chex.assert_max_traces(n=2)
     def actor_loss_fn(
         actor_params: FrozenVariableDict, obs: Array, alpha: Array, q_params: Qs, key: chex.PRNGKey
     ) -> Array:
@@ -396,21 +397,17 @@ if __name__ == "__main__":
 
         return ((alpha * log_pi) - min_qf_pi).mean()
 
-    @chex.assert_max_traces(n=1)
+    @chex.assert_max_traces(n=2)
     def alpha_loss_fn(log_alpha: Array, log_pi: Array, target_entropy: Array) -> Array:
         return jnp.mean(-jnp.exp(log_alpha) * (log_pi + target_entropy))
 
-    # todo: typing
-    @chex.assert_max_traces(n=1)
-    def learn(
+    def update_q(
         params: SacParams, opt_states: OptStates, data: Transition, key: chex.PRNGKey
-    ) -> Tuple[SacParams, OptStates, Tuple[Array, Array, Array, Array, Array, Array, Array]]:
-        target_key, actor_key, alpha_key = jax.random.split(key, 3)
-
+    ) -> Tuple[SacParams, OptStates, tuple]:
         # Generate Q target values.
         mean, log_std = actor.apply(params.actor, data.next_obs)
         next_state_actions, next_state_log_pi = sample_action(
-            mean, log_std, target_key, action_scale, action_bias
+            mean, log_std, key, action_scale, action_bias
         )
 
         qf1_next_target = q.apply(params.q.targets.q1, data.next_obs, next_state_actions)
@@ -431,47 +428,66 @@ if __name__ == "__main__":
         q_updates, new_q_opt_state = q_opt.update(q_grads, opt_states.q)
         new_online_q_params = optax.apply_updates(params.q.online, q_updates)
 
-        # Update actor.
-        # if global_step % args.policy_frequency == 0:  # TD 3 Delayed update support
-        # compensate for the delay by doing 'actor_update_interval' instead of 1
-        # for _ in range(args.policy_frequency):
-        actor_grad_fn = jax.value_and_grad(actor_loss_fn)
-        actor_loss, act_grads = actor_grad_fn(
-            params.actor,
-            data.obs,
-            jnp.exp(params.log_alpha),
-            new_online_q_params,
+        # Target network polyak update.
+        new_target_q_params = optax.incremental_update(
+            new_online_q_params, params.q.targets, args.tau
+        )
+
+        q_and_target = QsAndTarget(new_online_q_params, new_target_q_params)
+        params = params._replace(q=q_and_target)
+        opt_states = opt_states._replace(q=new_q_opt_state)
+
+        return params, opt_states, q_loss_info
+
+    def update_actor_and_alpha(
+        params: SacParams, opt_states: OptStates, data: Transition, key: chex.PRNGKey
+    ) -> Tuple[SacParams, OptStates, Tuple[Array, Array]]:
+        # compensate for the delay by doing `policy_frequency` instead of 1
+        for _ in range(args.policy_frequency):
+            actor_key, alpha_key = jax.random.split(key)
+
+            # Update actor.
+            actor_grad_fn = jax.value_and_grad(actor_loss_fn)
+            actor_loss, act_grads = actor_grad_fn(
+                params.actor, data.obs, jnp.exp(params.log_alpha), params.q.online, actor_key
+            )
+            actor_loss, act_grads = jax.lax.pmean((actor_loss, act_grads), axis_name="device")
+            actor_updates, new_actor_opt_state = actor_opt.update(act_grads, opt_states.actor)
+            new_actor_params = optax.apply_updates(params.actor, actor_updates)
+
+            # Update alpha.
+            mean, log_std = actor.apply(new_actor_params, data.obs)
+            _, log_pi = sample_action(mean, log_std, alpha_key, action_scale, action_bias)
+
+            alpha_grad_fn = jax.value_and_grad(alpha_loss_fn)
+            alpha_loss, alpha_grads = alpha_grad_fn(params.log_alpha, log_pi, target_entropy)
+            alpha_loss, alpha_grads = jax.lax.pmean((alpha_loss, alpha_grads), axis_name="device")
+            alpha_updates, new_alpha_opt_state = alpha_opt.update(alpha_grads, opt_states.alpha)
+            new_log_alpha = optax.apply_updates(params.log_alpha, alpha_updates)
+
+            params = params._replace(actor=new_actor_params, log_alpha=new_log_alpha)
+            opt_states = opt_states._replace(actor=new_actor_opt_state, alpha=new_alpha_opt_state)
+
+        return params, opt_states, (actor_loss, alpha_loss)
+
+    # todo: typing
+    @chex.assert_max_traces(n=1)
+    def update(
+        params: SacParams, opt_states: OptStates, data: Transition, t: int, key: chex.PRNGKey
+    ) -> Tuple[SacParams, OptStates, Tuple[Array, Array, Array, Array, Array, Array, Array]]:
+        q_key, actor_key = jax.random.split(key)
+
+        params, opt_states, q_loss_info = update_q(params, opt_states, data, q_key)
+        params, opt_states, (actor_loss, alpha_loss) = jax.lax.cond(
+            t % args.policy_frequency == 0,  # TD 3 Delayed update support
+            update_actor_and_alpha,
+            lambda params, opt_states, _, __: (params, opt_states, (0.0, 0.0)),
+            params,
+            opt_states,
+            data,
             actor_key,
         )
-        actor_loss, act_grads = jax.lax.pmean((actor_loss, act_grads), axis_name="device")
-        actor_updates, new_actor_opt_state = actor_opt.update(act_grads, opt_states.actor)
-        new_actor_params = optax.apply_updates(params.actor, actor_updates)
 
-        # Update alpha.
-        # if args.autotune:
-        mean, log_std = actor.apply(new_actor_params, data.obs)
-        _, log_pi = sample_action(mean, log_std, alpha_key, action_scale, action_bias)
-
-        alpha_grad_fn = jax.value_and_grad(alpha_loss_fn)
-        alpha_loss, alpha_grads = alpha_grad_fn(params.log_alpha, log_pi, target_entropy)
-        alpha_loss, alpha_grads = jax.lax.pmean((alpha_loss, alpha_grads), axis_name="device")
-        alpha_updates, new_alpha_opt_state = alpha_opt.update(alpha_grads, opt_states.alpha)
-        new_log_alpha = optax.apply_updates(params.log_alpha, alpha_updates)
-
-        # Target network polyak update.
-        new_q1_target_params = optax.incremental_update(
-            new_online_q_params.q1, params.q.targets.q1, args.tau
-        )
-        new_q2_target_params = optax.incremental_update(
-            new_online_q_params.q2, params.q.targets.q2, args.tau
-        )
-
-        params = SacParams(
-            new_actor_params,
-            QsAndTarget(new_online_q_params, Qs(new_q1_target_params, new_q2_target_params)),
-            new_log_alpha,
-        )
-        opt_states = OptStates(new_actor_opt_state, new_q_opt_state, new_alpha_opt_state)
         # todo: dict
         q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals = q_loss_info
         losses = q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss
@@ -481,15 +497,15 @@ if __name__ == "__main__":
     # todo: typing
     @chex.assert_max_traces(n=1)
     def sample_and_learn(
-        carry: Tuple[BufferState, SacParams, OptStates, chex.PRNGKey], _: Any
-    ) -> Tuple[Tuple[BufferState, SacParams, OptStates, chex.PRNGKey], tuple]:
-        buffer_state, params, opt_states, key = carry
+        carry: Tuple[BufferState, SacParams, OptStates, int, chex.PRNGKey], _: Any
+    ) -> Tuple[Tuple[BufferState, SacParams, OptStates, int, chex.PRNGKey], tuple]:
+        buffer_state, params, opt_states, t, key = carry
         key, buff_key, learn_key = jax.random.split(key, 3)
 
         data = rb.sample(buffer_state, buff_key).experience.first
-        params, opt_state, losses = learn(params, opt_states, data, learn_key)
+        params, opt_state, losses = update(params, opt_states, data, t, learn_key)
 
-        return (buffer_state, params, opt_state, key), losses
+        return (buffer_state, params, opt_state, t, key), losses
 
     scanned_learn = lambda state: jax.lax.scan(
         sample_and_learn, state, None, length=args.learn_steps
@@ -524,18 +540,18 @@ if __name__ == "__main__":
     @chex.assert_max_traces(n=1)  # todo: typing
     def act_and_learn(carry: LearnerState, _: Any) -> Tuple[LearnerState, tuple]:
         """Act, sample, learn."""
-        obs, env_state, buffer_state, params, opt_states, key = carry
+        obs, env_state, buffer_state, params, opt_states, t, key = carry
         key, act_key, learn_key = jax.random.split(key, 3)
         # Act
         act_state = (params.actor, obs, env_state, buffer_state, act_key)
         (_, next_obs, env_state, buffer_state, _), metrics = scanned_act(act_state)
 
         # Sample and learn
-        learn_state = (buffer_state, params, opt_states, learn_key)
-        (buffer_state, params, opt_states, _), losses = scanned_learn(learn_state)
+        learn_state = (buffer_state, params, opt_states, t, learn_key)
+        (buffer_state, params, opt_states, _, _), losses = scanned_learn(learn_state)
 
         return (
-            LearnerState(next_obs, env_state, buffer_state, params, opt_states, key),
+            LearnerState(next_obs, env_state, buffer_state, params, opt_states, t + 1, key),
             (metrics, losses),
         )
 
@@ -570,10 +586,12 @@ if __name__ == "__main__":
     print(f"[{args.explore_steps}] return: {mean_return:.3f} | sps: {sps:.3f}")
 
     # rollout lenght?
-    pmaped_steps = 10_000
+    pmaped_steps = 5120
     # todo: here should I multiply by act steps or learn steps or both or the mean?
     steps_btwn_log = n_devices * args.n_envs * args.act_steps * pmaped_steps
-    learner_state = LearnerState(next_obs, env_state, buffer_state, params, opt_states, key)
+    learner_state = LearnerState(
+        next_obs, env_state, buffer_state, params, opt_states, jnp.zeros(n_devices), key
+    )
     pmaped_learn = jax.pmap(
         lambda state: jax.lax.scan(act_and_learn, state, None, length=pmaped_steps),
         axis_name="device",
