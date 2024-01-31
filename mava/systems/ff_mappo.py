@@ -457,7 +457,9 @@ def run_experiment(_config: DictConfig) -> None:
     config = copy.deepcopy(_config)
 
     # Create the enviroments for train and eval.
-    env, eval_env = environments.make(config=config, add_global_state=True)
+    envs = environments.make(config=config, add_global_state=True)
+    assert isinstance(envs, tuple), "Non jax environments not supported in anakin architecture."
+    env, eval_env = envs
 
     # PRNG keys.
     key, key_e, actor_net_key, critic_net_key = jax.random.split(
