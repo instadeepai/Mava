@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import functools
-from typing import Callable, Dict, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Sequence, Tuple, Union
 
 import chex
 import distrax
@@ -105,7 +105,7 @@ class ContinuousFFActor(nn.Module):
     num_actions: Sequence[int]
 
     @nn.compact
-    def __call__(self, observation: Observation) -> distrax.MultivariateNormalDiag:
+    def __call__(self, observation: Observation) -> Tuple[chex.Array, chex.Array]:
         """Forward pass."""
         x = observation.agents_view
 
@@ -223,19 +223,19 @@ class ContinuousRecActor(nn.Module):
         self,
         policy_hidden_state: chex.Array,
         observation_done: RNNObservation,
-    ) -> Tuple[chex.Array, distrax.Categorical]:
+    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
         """Forward pass."""
         observation, done = observation_done
 
         policy_embedding = self.pre_torso(observation.agents_view)
         policy_rnn_input = (policy_embedding, done)
         policy_hidden_state, policy_embedding = ScannedRNN()(policy_hidden_state, policy_rnn_input)
+
         actor_logits = self.post_torso(policy_embedding)
-        actor_mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(policy_embedding)
+        actor_mean_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(actor_logits)
+        actor_log_std_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(actor_logits)
 
-        actor_log_std = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(policy_embedding)
-
-        return policy_hidden_state, actor_mean, actor_log_std
+        return policy_hidden_state, actor_mean_logits, actor_log_std_logits
 
 
 def parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex.Array]:
@@ -247,9 +247,7 @@ def parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex.
     return activation_fns[activation_fn_name]
 
 
-def make(
-    config: DictConfig, network: str, centralised_critic: bool = False
-) -> Union[Tuple[FeedForwardActor, FeedForwardCritic], Tuple[RecurrentActor, RecurrentCritic]]:
+def make(config: DictConfig, network: str, centralised_critic: bool = False) -> Any:
     """Get the networks."""
 
     def create_torso(network_key: str, layer_size_key: str) -> MLPTorso:

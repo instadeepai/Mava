@@ -15,7 +15,6 @@
 from typing import Any, Dict, Optional, Tuple
 
 import chex
-import distrax
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
@@ -31,7 +30,7 @@ from mava.types import (
     RecActorApply,
     RNNEvalState,
 )
-from mava.utils.select_action import ff_sample_actor_output
+from mava.utils.training import select_action_ppo
 
 
 def get_ff_evaluator_fn(
@@ -65,18 +64,20 @@ def get_ff_evaluator_fn(
 
             # Select action.
             key, policy_key = jax.random.split(key)
-            # pi = apply_fn(params, last_timestep.observation)
+            if config.env.actions_type == "continuous":
+                actor_mean, actor_log_std = apply_fn(params, last_timestep.observation)
+                action = select_action_ppo(
+                    (actor_mean, actor_log_std), policy_key, config.env.env_name, True
+                )
 
-            actor_mean, actor_log_std = apply_fn(params, last_timestep.observation)
-            policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
-            raw_action, log_prob = policy.sample_and_log_prob(seed=policy_key)
-            action = jnp.tanh(raw_action)
-            # if config.arch.evaluation_greedy:
-            #     action = pi.mode()
-            # else:
-            #     action = pi.sample(seed=policy_key)
+            else:
+                pi = apply_fn(params, last_timestep.observation)
+                if config.arch.evaluation_greedy:
+                    action = pi.mode()
+                else:
+                    action = pi.sample(seed=policy_key)
 
-            # environment.
+            # Step the environment.
             env_state, timestep = env.step(env_state, action)
 
             # Log episode metrics.
@@ -181,12 +182,17 @@ def get_rnn_evaluator_fn(
             )
 
             # Run the network.
-            hstate, pi = apply_fn(params, hstate, ac_in)
-
-            if config.arch.evaluation_greedy:
-                action = pi.mode()
+            if config.env.actions_type == "continuous":
+                hstate, actor_mean, actor_log_std = apply_fn(params, hstate, ac_in)
+                action = select_action_ppo(
+                    (actor_mean, actor_log_std), policy_key, config.env.env_name, True
+                )
             else:
-                action = pi.sample(seed=policy_key)
+                hstate, pi = apply_fn(params, hstate, ac_in)
+                if config.arch.evaluation_greedy:
+                    action = pi.mode()
+                else:
+                    action = pi.sample(seed=policy_key)
 
             # Step environment.
             env_state, timestep = env.step(env_state, action[-1].squeeze(0))
@@ -295,11 +301,16 @@ def evaluator_setup(
     n_devices = len(jax.devices())
     # Check if win rate is required for evaluation.
     log_win_rate = config.env.env_name in ["HeuristicEnemySMAX", "LearnedPolicyEnemySMAX"]
+
+    config.env.actions_type = (
+        config.env.actions_type if hasattr(config.env, "actions_type") else "discrete"
+    )
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
         assert scanned_rnn is not None
+        out_axes = (1, 2, 2) if config.env.actions_type == "continuous" else (1, 2)
         vmapped_eval_apply_fn = jax.vmap(
-            network.apply, in_axes=(None, 1, (2, None)), out_axes=(1, 2)
+            network.apply, in_axes=(None, 1, (2, None)), out_axes=out_axes
         )
         evaluator = get_rnn_evaluator_fn(
             eval_env,

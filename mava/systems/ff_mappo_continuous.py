@@ -16,7 +16,6 @@ import time
 from typing import Any, Dict, Tuple
 
 import chex
-import distrax
 import flax
 import hydra
 import jax
@@ -48,6 +47,7 @@ from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import merge_leading_dims, unreplicate_learner_state
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
+from mava.utils.training import get_logprob_entropy, select_action_ppo
 
 
 def get_learner_fn(
@@ -89,10 +89,10 @@ def get_learner_fn(
             actor_mean, actor_log_std = actor_apply_fn(
                 params.actor_params, last_timestep.observation
             )
-            policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
-            raw_action, log_prob = policy.sample_and_log_prob(seed=policy_key)
-            action = jnp.tanh(raw_action)
-            log_prob -= jnp.sum(jnp.log((1 - jnp.tanh(raw_action) ** 2) + 1e-6), axis=-1)
+            raw_action, action, log_prob = select_action_ppo(
+                (actor_mean, actor_log_std), policy_key, config.env.env_name
+            )
+
             value = critic_apply_fn(params.critic_params, last_timestep.observation)
 
             # STEP ENVIRONMENT
@@ -109,7 +109,7 @@ def get_learner_fn(
             }
 
             transition = PPOTransition(
-                done, action, value, timestep.reward, log_prob, last_timestep.observation, info
+                done, raw_action, value, timestep.reward, log_prob, last_timestep.observation, info
             )
             learner_state = LearnerState(params, opt_states, key, env_state, timestep)
             return learner_state, transition
@@ -171,14 +171,9 @@ def get_learner_fn(
                     """Calculate the actor loss."""
                     # RERUN NETWORK
                     actor_mean, actor_log_std = actor_apply_fn(actor_params, traj_batch.obs)
-                    actor_policy = distrax.MultivariateNormalDiag(
-                        actor_mean, jnp.exp(actor_log_std)
+                    log_prob, entropy = get_logprob_entropy(
+                        (actor_mean, actor_log_std), traj_batch.action, config.env.env_name
                     )
-                    log_prob = actor_policy.log_prob(traj_batch.action)
-                    log_prob -= jnp.sum(
-                        jnp.log((1 - jnp.tanh(traj_batch.action) ** 2) + 1e-6), axis=-1
-                    )
-                    entropy = actor_policy.entropy().mean()
 
                     # CALCULATE ACTOR LOSS
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
@@ -194,7 +189,6 @@ def get_learner_fn(
                     )
                     loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
                     loss_actor = loss_actor.mean()
-                    entropy = actor_policy.entropy().mean()
 
                     total_loss_actor = loss_actor - config.system.ent_coef * entropy
                     return total_loss_actor, (loss_actor, entropy)
@@ -355,10 +349,8 @@ def learner_setup(
     n_devices = len(jax.devices())
 
     # Get number of actions and agents.
-    num_actions = env.action_spec().shape[1]
-    num_agents = env.action_spec().shape[0]
-    config.system.num_agents = num_agents
-    config.system.num_actions = num_actions
+    config.system.num_agents = env.action_spec().shape[0]
+    config.system.num_actions = env.action_spec().shape[1]
 
     # PRNG keys.
     key, actor_net_key, critic_net_key = keys
@@ -404,7 +396,7 @@ def learner_setup(
     vmapped_actor_network_apply_fn = jax.vmap(
         actor_network.apply,
         in_axes=(None, 1),
-        out_axes=(1, 1),
+        out_axes=(1),
     )
     vmapped_critic_network_apply_fn = jax.vmap(
         critic_network.apply,

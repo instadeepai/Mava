@@ -17,7 +17,6 @@ import time
 from typing import Any, Dict, Tuple
 
 import chex
-import distrax
 import flax
 import hydra
 import jax
@@ -47,8 +46,8 @@ from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import merge_leading_dims, unreplicate_learner_state
 from mava.utils.logger import LogEvent, MavaLogger
-from mava.utils.select_action import ff_sample_actor_output
 from mava.utils.total_timestep_checker import check_total_timesteps
+from mava.utils.training import get_logprob_entropy, select_action_ppo
 
 
 def get_learner_fn(
@@ -90,11 +89,8 @@ def get_learner_fn(
             actor_mean, actor_log_std = actor_apply_fn(
                 params.actor_params, last_timestep.observation
             )
-            policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
-            raw_action, log_prob = policy.sample_and_log_prob(seed=policy_key)
-            action = jnp.tanh(raw_action)
-            log_prob -= jnp.sum(
-                jnp.log((1 - jnp.tanh(raw_action) ** 2) + 1e-6), axis=-1  # todo: why x0.5
+            raw_action, action, log_prob = select_action_ppo(
+                (actor_mean, actor_log_std), policy_key, config.env.env_name
             )
             value = critic_apply_fn(params.critic_params, last_timestep.observation)
 
@@ -173,12 +169,9 @@ def get_learner_fn(
                     """Calculate the actor loss."""
                     # RERUN NETWORK
                     actor_mean, actor_log_std = actor_apply_fn(actor_params, traj_batch.obs)
-                    policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
-                    log_prob = policy.log_prob(traj_batch.action)
-                    log_prob -= jnp.sum(
-                        jnp.log((1 - jnp.tanh(traj_batch.action) ** 2) + 1e-6), axis=-1
+                    log_prob, entropy = get_logprob_entropy(
+                        (actor_mean, actor_log_std), traj_batch.action, config.env.env_name
                     )
-                    entropy = policy.entropy().mean()
 
                     # CALCULATE ACTOR LOSS
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
@@ -393,7 +386,7 @@ def learner_setup(
     vmapped_actor_network_apply_fn = jax.vmap(
         actor_network.apply,
         in_axes=(None, 1),
-        out_axes=(1, 1),
+        out_axes=(1),
     )
     vmapped_critic_network_apply_fn = jax.vmap(
         critic_network.apply,
