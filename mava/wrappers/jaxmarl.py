@@ -180,6 +180,7 @@ class JaxMarlWrapper(Wrapper):
         self.agents = list(self._env.observation_spaces.keys())
         self.has_action_mask = hasattr(self._env, "get_avail_actions")
         self.has_global_state = has_global_state
+        self._env.num_agents = len(self.agents)
 
     def reset(
         self, key: PRNGKey

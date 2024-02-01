@@ -46,54 +46,6 @@ from mava.wrappers.jaxmarl import JaxMarlWrapper
 from mava.wrappers.observation import AgentIDWrapper
 
 
-# @dataclass
-# class Args:
-#     exp_name: str = os.path.basename(__file__)[: -len(".py")]
-#     """the name of this experiment"""
-#     seed: int = 42
-#     """seed of the experiment"""
-#
-#     # Algorithm specific arguments
-#     # env_id: str = "MPE_simple_spread_v3"
-#     env_id: str = "halfcheetah_6x1"
-#     """the environment id of the task"""
-#     factorization: str = "2x3"
-#     """how the joints are split up"""
-#     total_timesteps: int = int(1e9)
-#     """total timesteps of the experiments"""
-#     act_steps: int = 1
-#     """number of steps to take in the environment before learning"""
-#     learn_steps: int = 1
-#     """number of times to sample and train before acting again"""
-#     buffer_size: int = int(1e6)
-#     """the replay memory buffer size"""
-#     gamma: float = 0.99
-#     """the discount factor gamma"""
-#     tau: float = 0.005
-#     """target smoothing coefficient (default: 0.005)"""
-#     batch_size: int = 128
-#     """the batch size of sample from the reply memory"""
-#     explore_steps: int = int(5e3)
-#     """timestep to start learning"""
-#     policy_lr: float = 3e-4
-#     """the learning rate of the policy network optimizer"""
-#     q_lr: float = 1e-3
-#     """the learning rate of the Q network network optimizer"""
-#     policy_frequency: int = 2
-#     """the frequency of training policy (delayed)"""
-#     # Denis Yarats' implementation delays this by 2.
-#     target_network_frequency: int = 1
-#     """the frequency of updates for the target nerworks"""
-#     alpha: float = 0.2
-#     """Entropy regularization coefficient."""
-#     autotune: bool = True
-#     """automatic tuning of the entropy coefficient"""
-#     target_entropy_scale: float = 6.0
-#     """scale factor for target entropy"""
-#     n_envs: int = 256
-#     """number of parallel environments"""
-
-
 # todo: types.py
 class Qs(NamedTuple):
     q1: FrozenVariableDict
@@ -575,6 +527,7 @@ def run_experiment(cfg: DictConfig) -> None:
             0, cfg.system.explore_steps // cfg.system.n_envs, explore, state
         ),
         axis_name="device",
+        donate_argnums=0,
     )
     next_obs, env_state, buffer_state, metrics, key = pmaped_explore(init_explore_state)
 
@@ -595,6 +548,7 @@ def run_experiment(cfg: DictConfig) -> None:
     pmaped_learn = jax.pmap(
         lambda state: jax.lax.scan(act_and_learn, state, None, length=pmaped_steps),
         axis_name="device",
+        donate_argnums=0,
     )
 
     # We want start to align with the final step of the first pmaped_learn,
