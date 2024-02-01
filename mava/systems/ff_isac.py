@@ -210,7 +210,7 @@ def sample_action(
 
 
 def run_experiment(cfg: DictConfig) -> None:
-    logger = neptune.init_run(project="InstaDeep/mava", tags=["sac", "test", cfg.env.env_name])
+    logger = neptune.init_run(project="InstaDeep/mava", tags=list(cfg.logger.kwargs.neptune_tag))
 
     key = jax.random.PRNGKey(cfg.system.seed)
     devices = jax.devices()
