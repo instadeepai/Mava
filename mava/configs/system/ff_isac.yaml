@@ -7,7 +7,7 @@ add_agent_id: True
 
 # --- RL hyperparameters ---
 # step related
-total_timesteps: 10000000
+total_timesteps: 3e8
 explore_steps: 5000  # number of steps to take with random actions at the start of training
 act_steps: 1  # number of steps to take in the environment before learning
 learn_steps: 1  # number of times to sample and train before acting again

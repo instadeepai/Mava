@@ -27,6 +27,7 @@ import jax
 import jax.numpy as jnp
 import jaxmarl
 import neptune
+from neptune.utils import stringify_unsupported
 import numpy as np
 from omegaconf import DictConfig, OmegaConf
 import optax
@@ -211,6 +212,7 @@ def sample_action(
 
 def run_experiment(cfg: DictConfig) -> None:
     logger = neptune.init_run(project="InstaDeep/mava", tags=list(cfg.logger.kwargs.neptune_tag))
+    logger["config"] = stringify_unsupported(cfg)
 
     key = jax.random.PRNGKey(cfg.system.seed)
     devices = jax.devices()
@@ -554,7 +556,7 @@ def run_experiment(cfg: DictConfig) -> None:
     # We want start to align with the final step of the first pmaped_learn,
     # where we've done explore_steps and 1 full learn step.
     start = cfg.system.explore_steps + steps_btwn_log
-    for t in range(start, cfg.system.total_timesteps, steps_btwn_log):
+    for t in range(start, int(cfg.system.total_timesteps), steps_btwn_log):
         learner_state, (metrics, losses) = pmaped_learn(learner_state)
 
         ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
