@@ -1,5 +1,19 @@
 defaults:
+  - _self_
   - logger: ff_isac
   - arch: anakin
   - system: ff_isac
   - env: mabrax
+  - system/search_spaces@hydra.sweeper.params: ${system}
+  - override hydra/sweeper: optuna
+  - override hydra/sweeper/sampler: tpe
+
+hydra:
+    sweeper:
+        sampler:
+            seed: 6250365
+        direction: maximize # maximize
+        study_name: isac-sweep
+        storage: null
+        n_trials: 50
+        n_jobs: 1

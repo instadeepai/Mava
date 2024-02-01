@@ -1,0 +1,13 @@
+system.policy_lr: choice(1e-3, 5e-3, 1e-4, 5e-4, 1e-5, 5e-5)
+system.q_lr: choice(1e-3, 5e-3, 1e-4, 5e-4, 1e-5, 5e-5)
+
+system.n_envs: choice(64, 128, 256, 512)
+
+system.act_steps: choice(1, 2, 16, 32)
+system.learn_steps: choice(1, 2, 4, 16, 64)
+system.policy_frequency: choice(1, 2, 4)
+
+system.buffer_size: choice(100000, 1000000, 10000000)
+system.batch_size: choice(64, 128, 256, 512)
+
+system.target_entropy_scale: choice(1.0, 2.0, 5.0, 10.0)
