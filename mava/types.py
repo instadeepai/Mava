@@ -89,6 +89,13 @@ class Params(NamedTuple):
 
     actor_params: FrozenDict
     critic_params: FrozenDict
+    prox_actor_params: FrozenDict = None
+    prox_critic_params: FrozenDict = None
+
+
+class EWMAMoments(NamedTuple):
+    beta_prox: float
+    w: float
 
 
 class OptStates(NamedTuple):
@@ -113,6 +120,7 @@ class LearnerState(NamedTuple):
     key: chex.PRNGKey
     env_state: LogEnvState
     timestep: TimeStep
+    ewma_moments: EWMAMoments = None
 
 
 class RNNLearnerState(NamedTuple):
