@@ -189,8 +189,12 @@ LearnerFn = Callable[[MavaState], ExperimentOutput[MavaState]]
 EvalFn = Callable[[FrozenDict, chex.PRNGKey], ExperimentOutput[MavaState]]
 
 ActorApply = Callable[[FrozenDict, Observation], Distribution]
+ContActorApply = Callable[[FrozenDict, Observation], Tuple[chex.Array, chex.Array]]
 CriticApply = Callable[[FrozenDict, Observation], Value]
 RecActorApply = Callable[
     [FrozenDict, HiddenState, RNNObservation], Tuple[HiddenState, Distribution]
+]
+ContRecActorApply = Callable[
+    [FrozenDict, HiddenState, RNNObservation], Tuple[HiddenState, chex.Array, chex.Array]
 ]
 RecCriticApply = Callable[[FrozenDict, HiddenState, RNNObservation], Tuple[HiddenState, Value]]

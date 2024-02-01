@@ -30,7 +30,7 @@ from mava.types import (
     RecActorApply,
     RNNEvalState,
 )
-from mava.utils.training import select_action_ppo
+from mava.utils.training import select_action_eval
 
 
 def get_ff_evaluator_fn(
@@ -64,10 +64,11 @@ def get_ff_evaluator_fn(
 
             # Select action.
             key, policy_key = jax.random.split(key)
-            if config.env.actions_type == "continuous":
-                actor_mean, actor_log_std = apply_fn(params, last_timestep.observation)
-                action = select_action_ppo(
-                    (actor_mean, actor_log_std), policy_key, config.env.env_name, True
+            if config.env.actions_type == "continuous":  # TODO: add apply in select_action_ppo
+                action = select_action_eval(
+                    apply_fn(params, last_timestep.observation),
+                    policy_key,
+                    config.env.env_name,
                 )
 
             else:
@@ -183,9 +184,11 @@ def get_rnn_evaluator_fn(
 
             # Run the network.
             if config.env.actions_type == "continuous":
-                hstate, actor_mean, actor_log_std = apply_fn(params, hstate, ac_in)
-                action = select_action_ppo(
-                    (actor_mean, actor_log_std), policy_key, config.env.env_name, True
+                hstate, action = select_action_eval(
+                    apply_fn(params, hstate, ac_in),
+                    policy_key,
+                    config.env.env_name,
+                    "recurrent",
                 )
             else:
                 hstate, pi = apply_fn(params, hstate, ac_in)

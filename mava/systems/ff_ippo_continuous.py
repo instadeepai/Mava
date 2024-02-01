@@ -33,7 +33,7 @@ from mava import networks
 from mava.evaluator import evaluator_setup
 from mava.networks import ContinuousFFActor as Actor
 from mava.types import (
-    ActorApply,
+    ContActorApply,
     CriticApply,
     ExperimentOutput,
     LearnerFn,
@@ -52,7 +52,7 @@ from mava.utils.training import get_logprob_entropy, select_action_ppo
 
 def get_learner_fn(
     env: Environment,
-    apply_fns: Tuple[ActorApply, CriticApply],
+    apply_fns: Tuple[ContActorApply, CriticApply],
     update_fns: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
     config: DictConfig,
 ) -> LearnerFn[LearnerState]:

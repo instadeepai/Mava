@@ -34,13 +34,13 @@ from mava.evaluator import evaluator_setup
 from mava.networks import ContinuousRecActor as Actor
 from mava.networks import ScannedRNN
 from mava.types import (
+    ContRecActorApply,
     ExperimentOutput,
     HiddenStates,
     LearnerFn,
     ObservationGlobalState,
     OptStates,
     Params,
-    RecActorApply,
     RecCriticApply,
     RNNLearnerState,
     RNNPPOTransition,
@@ -55,7 +55,7 @@ from mava.utils.training import get_logprob_entropy, select_action_ppo
 
 def get_learner_fn(
     env: Environment,
-    apply_fns: Tuple[RecActorApply, RecCriticApply],
+    apply_fns: Tuple[ContRecActorApply, RecCriticApply],
     update_fns: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
     config: DictConfig,
 ) -> LearnerFn[RNNLearnerState]:

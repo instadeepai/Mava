@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Tuple
+from typing import Tuple, Union
 
 import distrax
 import jax.numpy as jnp
@@ -39,8 +39,10 @@ def get_logprob_entropy(
 
 
 def select_action_ppo(
-    actor_output: Tuple[Array, Array], key: PRNGKey, env_name: str, eval: bool = False
-) -> Any:
+    actor_output: Tuple[Array, Array],
+    key: PRNGKey,
+    env_name: str,
+) -> Tuple[Array, Array, Array]:
     """Select action for the given actor output."""
 
     actor_mean, actor_log_std = actor_output
@@ -49,17 +51,42 @@ def select_action_ppo(
     raw_action, log_prob = actor_policy.sample_and_log_prob(seed=key)
     action, log_prob = transform_actions_log(env_name, raw_action, log_prob)
 
-    return action if eval else (raw_action, action, log_prob)
+    return raw_action, action, log_prob
 
 
-def transform_actions_log(env_name: str, raw_action: Array, log_prob: Array) -> Tuple[Array, Array]:
+def select_action_eval(
+    actor_output: Union[Tuple[Array, Array], Tuple[Array, Array, Array]],
+    key: PRNGKey,
+    env_name: str,
+    network: str = "feedforward",
+) -> Union[Array, Tuple[Array, Array]]:
+    """Select action for the given actor output."""
+    # This throws typing issues when committing:
+    # if network == "recurrent":
+    #     hstate, actor_mean, actor_log_std = actor_output
+    # else:
+    #     actor_mean, actor_log_std = actor_output
+
+    actor_policy = distrax.MultivariateNormalDiag(actor_output[-1], jnp.exp(actor_output[-2]))
+
+    raw_action = actor_policy.sample(seed=key)
+    action = transform_actions_log(env_name, raw_action, None)
+
+    return (actor_output[0], action) if network == "recurrent" else action
+
+
+def transform_actions_log(
+    env_name: str, raw_action: Array, log_prob: Array
+) -> Union[Array, Tuple[Array, Array]]:
     """Transform action and log_prob values"""
 
     # IF action in [-N, N] and N != 1 ELSE [-1, 1] and N == 1
     n = 0.4 if env_name == "humanoid_9|8" else 1
-    action = n * jnp.tanh(raw_action) if raw_action is not None else raw_action
+    action = n * jnp.tanh(raw_action)
+    if log_prob is None:
+        return action  # during evaluation.
 
     # Note: jnp.log(derivative of action equation)
-    log_prob -= jnp.sum(jnp.log(n * (1 - jnp.tanh(raw_action) ** 2)) + 1e-6, axis=-1)
+    log_prob -= jnp.sum(jnp.log(n * (1 - jnp.tanh(raw_action) ** 2) + 1e-6), axis=-1)
 
     return action, log_prob
