@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import time
-from typing import Any, Dict, NamedTuple, Tuple
+from typing import Any, Dict, NamedTuple, Tuple, TypedDict
 
 import chex
 from colorama import Fore, Style
@@ -26,8 +26,6 @@ import jax
 # jax.config.update("jax_platform_name", "cpu")
 import jax.numpy as jnp
 import jaxmarl
-import neptune
-from neptune.utils import stringify_unsupported
 import numpy as np
 from omegaconf import DictConfig, OmegaConf
 import optax
@@ -41,6 +39,7 @@ from jumanji.env import State
 from jumanji.types import Observation, TimeStep
 from jumanji.wrappers import Wrapper
 from typing_extensions import TypeAlias
+from mava.utils.logger import LogEvent, MavaLogger
 
 from mava.wrappers import RecordEpisodeMetrics
 from mava.wrappers.jaxmarl import JaxMarlWrapper
@@ -87,6 +86,8 @@ class Transition(NamedTuple):
     done: ArrayLike
     next_obs: ArrayLike
 
+
+Metrics = Dict[str, Array]
 
 BufferState: TypeAlias = TrajectoryBufferState[Transition]
 
@@ -211,8 +212,7 @@ def sample_action(
 
 
 def run_experiment(cfg: DictConfig) -> None:
-    logger = neptune.init_run(project="InstaDeep/mava", tags=list(cfg.logger.kwargs.neptune_tag))
-    logger["config"] = stringify_unsupported(cfg)
+    logger = MavaLogger(cfg)
 
     key = jax.random.PRNGKey(cfg.system.seed)
     devices = jax.devices()
@@ -321,9 +321,7 @@ def run_experiment(cfg: DictConfig) -> None:
 
     # losses:
     @chex.assert_max_traces(n=1)
-    def q_loss_fn(
-        q_params: Qs, obs: Array, action: Array, target: Array
-    ) -> Tuple[Array, Tuple[Array, Array, Array, Array, Array]]:
+    def q_loss_fn(q_params: Qs, obs: Array, action: Array, target: Array) -> Tuple[Array, Metrics]:
         q1_params, q2_params = q_params
         q1_a_values = q.apply(q1_params, obs, action).reshape(-1)
         q2_a_values = q.apply(q2_params, obs, action).reshape(-1)
@@ -332,8 +330,15 @@ def run_experiment(cfg: DictConfig) -> None:
         q2_loss = jnp.mean((q2_a_values - target) ** 2)
 
         loss = q1_loss + q2_loss
+        loss_info = {
+            "loss": loss,
+            "q1_loss": q1_loss,
+            "q2_loss": q2_loss,
+            "q1_a_vals": q1_a_values,
+            "q2_a_vals": q2_a_values,
+        }
 
-        return loss, (loss, q1_loss, q2_loss, q1_a_values, q2_a_values)
+        return loss, loss_info
 
     @chex.assert_max_traces(n=2)
     def actor_loss_fn(
@@ -354,7 +359,7 @@ def run_experiment(cfg: DictConfig) -> None:
 
     def update_q(
         params: SacParams, opt_states: OptStates, data: Transition, key: chex.PRNGKey
-    ) -> Tuple[SacParams, OptStates, tuple]:
+    ) -> Tuple[SacParams, OptStates, Metrics]:
         # Generate Q target values.
         mean, log_std = actor.apply(params.actor, data.next_obs)
         next_state_actions, next_state_log_pi = sample_action(
@@ -392,8 +397,9 @@ def run_experiment(cfg: DictConfig) -> None:
 
     def update_actor_and_alpha(
         params: SacParams, opt_states: OptStates, data: Transition, key: chex.PRNGKey
-    ) -> Tuple[SacParams, OptStates, Tuple[Array, Array]]:
-        # compensate for the delay by doing `policy_frequency` instead of 1
+    ) -> Tuple[SacParams, OptStates, Metrics]:
+        # compensate for the delay by doing `policy_frequency` updates instead of 1.
+        assert cfg.system.policy_frequency > 0
         for _ in range(cfg.system.policy_frequency):
             actor_key, alpha_key = jax.random.split(key)
 
@@ -419,37 +425,39 @@ def run_experiment(cfg: DictConfig) -> None:
             params = params._replace(actor=new_actor_params, log_alpha=new_log_alpha)
             opt_states = opt_states._replace(actor=new_actor_opt_state, alpha=new_alpha_opt_state)
 
-        return params, opt_states, (actor_loss, alpha_loss)
+        loss_info = {"actor_loss": actor_loss, "alpha_loss": alpha_loss}
+        return params, opt_states, loss_info
 
-    # todo: typing
     @chex.assert_max_traces(n=1)
     def update(
         params: SacParams, opt_states: OptStates, data: Transition, t: int, key: chex.PRNGKey
-    ) -> Tuple[SacParams, OptStates, Tuple[Array, Array, Array, Array, Array, Array, Array]]:
+    ) -> Tuple[SacParams, OptStates, Metrics]:
         q_key, actor_key = jax.random.split(key)
 
         params, opt_states, q_loss_info = update_q(params, opt_states, data, q_key)
-        params, opt_states, (actor_loss, alpha_loss) = jax.lax.cond(
+        params, opt_states, act_loss_info = jax.lax.cond(
             t % cfg.system.policy_frequency == 0,  # TD 3 Delayed update support
             update_actor_and_alpha,
-            lambda params, opt_states, _, __: (params, opt_states, (0.0, 0.0)),
+            # just return same params and opt_states and 0 for losses
+            lambda params, opt_states, *_: (
+                params,
+                opt_states,
+                {"actor_loss": 0.0, "alpha_loss": 0.0},
+            ),
             params,
             opt_states,
             data,
             actor_key,
         )
 
-        # todo: dict
-        q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals = q_loss_info
-        losses = q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss
-
+        losses = q_loss_info | act_loss_info
         return params, opt_states, losses
 
     # todo: typing
     @chex.assert_max_traces(n=1)
     def sample_and_learn(
         carry: Tuple[BufferState, SacParams, OptStates, int, chex.PRNGKey], _: Any
-    ) -> Tuple[Tuple[BufferState, SacParams, OptStates, int, chex.PRNGKey], tuple]:
+    ) -> Tuple[Tuple[BufferState, SacParams, OptStates, int, chex.PRNGKey], Metrics]:
         buffer_state, params, opt_states, t, key = carry
         key, buff_key, learn_key = jax.random.split(key, 3)
 
@@ -513,8 +521,6 @@ def run_experiment(cfg: DictConfig) -> None:
     start_time = time.time()
     env_state, first_timestep = jax.pmap(env.reset, axis_name="device")(reset_keys)
 
-    ep_return = 0.0
-
     # fill up buffer
     explore_keys = jax.random.split(key, n_devices)
     init_explore_state = (
@@ -533,13 +539,11 @@ def run_experiment(cfg: DictConfig) -> None:
     )
     next_obs, env_state, buffer_state, metrics, key = pmaped_explore(init_explore_state)
 
-    print("First explore done")
     ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
     # likely that the episode hasn't ended yet and so we need to replace the nan with 0.
     mean_return = np.nan_to_num(np.mean(ep_returns))
     sps = n_devices * cfg.system.explore_steps / (time.time() - start_time)
-    print(f"[{cfg.system.explore_steps}] return: {mean_return:.3f} | sps: {sps:.3f}")
-    logger["mean episode return"].log(mean_return, step=cfg.system.explore_steps)
+    logger.log({"mean episode return": mean_return}, cfg.system.explore_steps, 0, LogEvent.ACT)
 
     pmaped_steps = 5120
     # todo: here should I multiply by act steps or learn steps or both or the mean?
@@ -562,27 +566,12 @@ def run_experiment(cfg: DictConfig) -> None:
         ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
         mean_return = np.mean(ep_returns)
         max_return: float = np.max(ep_returns)
-
-        q_loss, q1_loss, q2_loss, q1_a_vals, q2_a_vals, actor_loss, alpha_loss = losses
-        log_alpha = learner_state.params.log_alpha
-
+        ep_logs = {"mean episode return": mean_return, "max episode return": max_return}
         sps = t / (time.time() - start_time)
 
-        logger["mean episode return"].log(mean_return, step=t)
-        logger["max episode return"].log(max_return, step=t)
-
-        logger["q loss"].log(np.mean(q_loss), step=t)
-        logger["q1 loss"].log(np.mean(q1_loss), step=t)
-        logger["q2 loss"].log(np.mean(q2_loss), step=t)
-        logger["q1 values"].log(np.mean(q1_a_vals), step=t)
-        logger["q2 values"].log(np.mean(q2_a_vals), step=t)
-        logger["actor loss"].log(np.mean(actor_loss), step=t)
-        logger["alpha loss"].log(np.mean(alpha_loss), step=t)
-        logger["alpha"].log(np.mean(np.exp(learner_state.params.log_alpha)), step=t)
-
-        logger["steps per second"].log(sps, step=t)
-
-        print(f"[{t}] return: {mean_return:.3f} | sps: {sps:.3f}")
+        logger.log({"steps per second": sps}, t, 0, LogEvent.MISC)
+        logger.log(ep_logs, t, 0, LogEvent.ACT)
+        logger.log(losses | {"log_alpha": learner_state.params.log_alpha}, t, 0, LogEvent.TRAIN)
 
 
 @hydra.main(config_path="../configs", config_name="default_ff_isac.yaml", version_base="1.2")
@@ -594,7 +583,7 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     # Run experiment.
     run_experiment(cfg)
 
-    print(f"{Fore.CYAN}{Style.BRIGHT}IPPO experiment completed{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}ISAC experiment completed{Style.RESET_ALL}")
 
 
 if __name__ == "__main__":
