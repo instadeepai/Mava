@@ -9,8 +9,8 @@ scenario:
 
 kwargs:
   episode_length: 1000
-  homogenisation_method: None # Default: None. [max, concat] if the dims of observations and actions are not homegenous across agents.
-  # Homogeneous tasks : ant_4x2, walker2d_2x3
+  homogenisation_method: max # [None, max, concat] if the dims of observations and actions are not homegenous across agents.
+  # Homogeneous tasks: ant_4x2, walker2d_2x3 -> "homogenisation_method: None"
   auto_reset: True
 
 actions_type: continuous # The type of actions used in this env (Note: use the mlp_continuous.yaml in this case).

@@ -747,7 +747,9 @@ def run_experiment(_config: DictConfig) -> None:
     logger.stop()
 
 
-@hydra.main(config_path="../configs", config_name="default_rec_ippo.yaml", version_base="1.2")
+@hydra.main(
+    config_path="../configs", config_name="default_rec_ippo_continuous.yaml", version_base="1.2"
+)
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
     # Allow dynamic attributes.
