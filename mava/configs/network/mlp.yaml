@@ -2,9 +2,9 @@
 actor_network:
   layer_sizes: [128, 128]
   use_layer_norm: True
-  activation: "tanh"
+  activation: "relu"
 
 critic_network:
   layer_sizes: [128, 128]
   use_layer_norm: False
-  activation: "tanh"
+  activation: "relu"
