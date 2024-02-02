@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import time
+import zipfile
 from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional, Union
@@ -156,6 +157,14 @@ class NeptuneLogger(BaseLogger):
         self.logger["config"] = stringify_unsupported(cfg)
         self.detailed_logging = cfg.logger.kwargs.detailed_neptune_logging
 
+        # Store json path for uploading json data to Neptune.
+        json_exp_path = get_logger_path(cfg, "json")
+        self.json_file_path = os.path.join(
+            cfg.logger.base_exp_path, f"{json_exp_path}/{unique_token}/metrics.json"
+        )
+        self.unique_token = unique_token
+        self.upload_json_data = cfg.logger.kwargs.upload_json_data
+
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
         # Main metric if it's the mean of a list of metrics (ends with '/mean')
         # or it's a single metric doesn't contain a '/'.
@@ -168,7 +177,19 @@ class NeptuneLogger(BaseLogger):
         self.logger[f"{event.value}/{key}"].log(value, step=t)
 
     def stop(self) -> None:
+        if self.upload_json_data:
+            self._zip_and_upload_json()
         self.logger.stop()
+
+    def _zip_and_upload_json(self) -> None:
+        # Create the zip file path by replacing '.json' with '.zip'
+        zip_file_path = self.json_file_path.rsplit(".json", 1)[0] + ".zip"
+
+        # Create a zip file containing the specified JSON file
+        with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(self.json_file_path)
+
+        self.logger[f"metrics/metrics_{self.unique_token}"].upload(zip_file_path)
 
 
 class TensorboardLogger(BaseLogger):
@@ -281,6 +302,20 @@ def _make_multi_logger(cfg: DictConfig) -> BaseLogger:
     loggers: List[BaseLogger] = []
     unique_token = datetime.now().strftime("%Y%m%d%H%M%S")
 
+    if (
+        cfg.logger.use_neptune
+        and cfg.logger.use_json
+        and cfg.logger.kwargs.upload_json_data
+        and cfg.logger.kwargs.json_path
+    ):
+        raise ValueError(
+            "Cannot upload json data to Neptune when `json_path` is set in the base logger config. "
+            "This is because each subsequent run will create a larger json file which will use "
+            "unnecessary storage. Either set `upload_json_data: false` if you don't want to "
+            "upload your json data but store a large file locally or set `json_path: ~` in "
+            "the base logger config."
+        )
+
     if cfg.logger.use_neptune:
         loggers.append(NeptuneLogger(cfg, unique_token))
     if cfg.logger.use_tb:
@@ -295,11 +330,7 @@ def _make_multi_logger(cfg: DictConfig) -> BaseLogger:
 
 def get_logger_path(config: DictConfig, logger_type: str) -> str:
     """Helper function to create the experiment path."""
-    return (
-        f"{logger_type}/{config.logger.system_name}/{config.env.env_name}/"
-        + f"{config.env.scenario.task_name}"
-        + f"/envs_{config.arch.num_envs}/seed_{config.system.seed}"
-    )
+    return f"{logger_type}/{config.logger.system_name}"
 
 
 def describe(x: ArrayLike) -> Union[Dict[str, ArrayLike], ArrayLike]:
@@ -337,18 +368,17 @@ class JsonWriter:
         environment_name: str,
         seed: int,
     ):
-        self.path = path
-        self.file_name = "metrics.json"
+        self.file_path = f"{path}/metrics.json"
         self.run_data: Dict = {"absolute_metrics": {}}
 
         # If the file already exists, load it
-        if os.path.isfile(f"{self.path}/{self.file_name}"):
-            with open(f"{self.path}/{self.file_name}", "r") as f:
+        if os.path.isfile(self.file_path):
+            with open(self.file_path, "r") as f:
                 data = json.load(f)
 
         else:
             # Create the logging directory if it doesn't exist
-            os.makedirs(self.path, exist_ok=True)
+            os.makedirs(path, exist_ok=True)
             data = {}
 
         # Merge the existing data with the new data
@@ -361,7 +391,7 @@ class JsonWriter:
             self.data[environment_name][task_name][algorithm_name] = {}
         self.data[environment_name][task_name][algorithm_name][f"seed_{seed}"] = self.run_data
 
-        with open(f"{self.path}/{self.file_name}", "w") as f:
+        with open(self.file_path, "w") as f:
             json.dump(self.data, f, indent=4)
 
     def write(
@@ -407,5 +437,5 @@ class JsonWriter:
             else:
                 self.run_data[step_str] = step_metrics
 
-        with open(f"{self.path}/{self.file_name}", "w") as f:
+        with open(self.file_path, "w") as f:
             json.dump(self.data, f, indent=4)
