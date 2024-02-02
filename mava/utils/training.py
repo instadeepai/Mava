@@ -23,10 +23,8 @@ def get_logprob_entropy(
     actor_output: Tuple[Array, Array],
     traj_action: Array,
     env_name: str,
-    network: str = "feedforward",
 ) -> Tuple[Array, Array]:
     """Get the log probability and entropy of a given actor output and traj_batch action."""
-    assert network in {"feedforward", "recurrent"}, "Please specify the correct network!"
 
     actor_mean, actor_log_std = actor_output
     actor_policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
@@ -61,7 +59,7 @@ def select_action_eval(
     network: str = "feedforward",
 ) -> Union[Array, Tuple[Array, Array]]:
     """Select action for the given actor output."""
-    # This throws typing issues when committing:
+    # This outputs typing issues when committing:
     # if network == "recurrent":
     #     hstate, actor_mean, actor_log_std = actor_output
     # else:

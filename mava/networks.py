@@ -25,6 +25,7 @@ from flax.linen.initializers import orthogonal
 from omegaconf import DictConfig
 
 from mava.types import (
+    HiddenState,
     Observation,
     ObservationGlobalState,
     RNNGlobalObservation,
@@ -154,9 +155,9 @@ class RecurrentActor(nn.Module):
     @nn.compact
     def __call__(
         self,
-        policy_hidden_state: chex.Array,
+        policy_hidden_state: HiddenState,
         observation_done: RNNObservation,
-    ) -> Tuple[chex.Array, distrax.Categorical]:
+    ) -> Tuple[HiddenState, distrax.Categorical]:
         """Forward pass."""
         observation, done = observation_done
 
@@ -221,9 +222,9 @@ class ContinuousRecActor(nn.Module):
     @nn.compact
     def __call__(
         self,
-        policy_hidden_state: chex.Array,
+        policy_hidden_state: HiddenState,
         observation_done: RNNObservation,
-    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
+    ) -> Tuple[HiddenState, chex.Array, chex.Array]:
         """Forward pass."""
         observation, done = observation_done
 

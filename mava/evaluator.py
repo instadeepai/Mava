@@ -30,7 +30,6 @@ from mava.types import (
     RecActorApply,
     RNNEvalState,
 )
-from mava.utils.training import select_action_eval
 
 
 def get_ff_evaluator_fn(
@@ -64,21 +63,14 @@ def get_ff_evaluator_fn(
 
             # Select action.
             key, policy_key = jax.random.split(key)
-            if config.env.actions_type == "continuous":  # TODO: add apply in select_action_ppo
-                action = select_action_eval(
-                    apply_fn(params, last_timestep.observation),
-                    policy_key,
-                    config.env.env_name,
-                )
+            pi = apply_fn(params, last_timestep.observation)
 
+            if config.arch.evaluation_greedy:
+                action = pi.mode()
             else:
-                pi = apply_fn(params, last_timestep.observation)
-                if config.arch.evaluation_greedy:
-                    action = pi.mode()
-                else:
-                    action = pi.sample(seed=policy_key)
+                action = pi.sample(seed=policy_key)
 
-            # Step the environment.
+            # Step environment.
             env_state, timestep = env.step(env_state, action)
 
             # Log episode metrics.
@@ -183,19 +175,12 @@ def get_rnn_evaluator_fn(
             )
 
             # Run the network.
-            if config.env.actions_type == "continuous":
-                hstate, action = select_action_eval(
-                    apply_fn(params, hstate, ac_in),
-                    policy_key,
-                    config.env.env_name,
-                    "recurrent",
-                )
+            hstate, pi = apply_fn(params, hstate, ac_in)
+
+            if config.arch.evaluation_greedy:
+                action = pi.mode()
             else:
-                hstate, pi = apply_fn(params, hstate, ac_in)
-                if config.arch.evaluation_greedy:
-                    action = pi.mode()
-                else:
-                    action = pi.sample(seed=policy_key)
+                action = pi.sample(seed=policy_key)
 
             # Step environment.
             env_state, timestep = env.step(env_state, action[-1].squeeze(0))
@@ -304,16 +289,11 @@ def evaluator_setup(
     n_devices = len(jax.devices())
     # Check if win rate is required for evaluation.
     log_win_rate = config.env.env_name in ["HeuristicEnemySMAX", "LearnedPolicyEnemySMAX"]
-
-    config.env.actions_type = (
-        config.env.actions_type if hasattr(config.env, "actions_type") else "discrete"
-    )
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
         assert scanned_rnn is not None
-        out_axes = (1, 2, 2) if config.env.actions_type == "continuous" else (1, 2)
         vmapped_eval_apply_fn = jax.vmap(
-            network.apply, in_axes=(None, 1, (2, None)), out_axes=out_axes
+            network.apply, in_axes=(None, 1, (2, None)), out_axes=(1, 2)
         )
         evaluator = get_rnn_evaluator_fn(
             eval_env,

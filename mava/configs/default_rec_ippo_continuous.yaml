@@ -1,7 +1,0 @@
-defaults:
-  - logger: rec_ippo
-  - arch: anakin
-  - system: rec_ippo
-  - network: rnn_continuous
-  - env: mabrax
-  - _self_
