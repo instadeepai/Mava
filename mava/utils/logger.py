@@ -421,18 +421,19 @@ class JsonWriter:
 
         metrics = {metric_key: [value]}
 
-        if logging_prefix == "evaluator":
-            step_metrics = {"step_count": timestep, "elapsed_time": current_time - self.start_time}
-            step_metrics.update(metrics)  # type: ignore
+        if logging_prefix == "absolute":
+            self.run_data["absolute_metrics"].update(metrics)
+
+        elif logging_prefix == "evaluator":
+            step_metrics = {
+                "step_count": timestep,
+                "elapsed_time": current_time - self.start_time,
+            } | metrics
             step_str = f"step_{evaluation_step}"
             if step_str in self.run_data:
                 self.run_data[step_str].update(step_metrics)
             else:
                 self.run_data[step_str] = step_metrics
-
-        # Store the absolute metrics
-        if logging_prefix == "absolute":
-            self.run_data["absolute_metrics"].update(metrics)
 
         with open(self.file_path, "w") as f:
             json.dump(self.data, f, indent=4)
