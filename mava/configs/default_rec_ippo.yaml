@@ -2,6 +2,6 @@ defaults:
   - logger: rec_ippo
   - arch: anakin
   - system: rec_ippo
-  - network: rnn # rnn_continuous if actions are continuous.
-  - env: mabrax
+  - network: rnn
+  - env: rware
   - _self_

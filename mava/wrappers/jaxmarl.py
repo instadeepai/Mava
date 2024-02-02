@@ -142,7 +142,7 @@ def jaxmarl_space_to_jumanji_spec(space: jaxmarl_spaces.Space) -> specs.Spec:
 class JaxMarlWrapper(Wrapper):
     """Wraps a JaxMarl environment so that its API is compatible with Jumanji environments."""
 
-    def __init__(self, env: MultiAgentEnv, has_global_state: bool = False, timelimit: int = 100):
+    def __init__(self, env: MultiAgentEnv, has_global_state: bool = False, timelimit: int = 500):
         # Check that all specs are the same as we only support homogeneous environments, for now ;)
         homogenous_error = (
             f"Mava only supports environments with homogeneous agents, "
