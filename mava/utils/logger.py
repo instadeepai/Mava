@@ -311,9 +311,9 @@ def _make_multi_logger(cfg: DictConfig) -> BaseLogger:
         raise ValueError(
             "Cannot upload json data to Neptune when `json_path` is set in the base logger config. "
             "This is because each subsequent run will create a larger json file which will use "
-            "unnecessary storage. Either set `upload_json_data` if you don't want to upload your "
-            "json data but store a large file locally or remove `json_path` from the base logger "
-            "config."
+            "unnecessary storage. Either set `upload_json_data: false` if you don't want to "
+            "upload your json data but store a large file locally or set `json_path: ~` in "
+            "the base logger config."
         )
 
     if cfg.logger.use_neptune:
