@@ -64,7 +64,7 @@ def get_ff_evaluator_fn(
 
             # Select action.
             key, policy_key = jax.random.split(key)
-            if config.env.actions_type == "continuous":  # TODO: add apply in select_action_ppo
+            if config.env.actions_type == "continuous":
                 action = select_action_eval(
                     apply_fn(params, last_timestep.observation),
                     policy_key,

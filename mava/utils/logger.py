@@ -150,7 +150,7 @@ class NeptuneLogger(BaseLogger):
 
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
         tags = list(cfg.logger.kwargs.neptune_tag)
-        # tags.append(cfg.env.scenario.task_name)
+        # tags.append(f"{cfg.env.scenario.task_name}_sweep")
         project = cfg.logger.kwargs.neptune_project
 
         self.logger = neptune.init_run(project=project, tags=tags)
