@@ -249,7 +249,6 @@ def get_learner_fn(
                         (actor_mean, actor_log_std),
                         traj_batch.action,
                         config.env.env_name,
-                        network="recurrent",
                     )
 
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)

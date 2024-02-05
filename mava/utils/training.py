@@ -12,30 +12,53 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple, Union
+from typing import Callable, Tuple, Union
 
 import distrax
 import jax.numpy as jnp
 from chex import Array, PRNGKey
+from omegaconf import DictConfig
 
 
-def get_logprob_entropy(
-    actor_output: Tuple[Array, Array],
-    traj_action: Array,
-    env_name: str,
-    network: str = "feedforward",
-) -> Tuple[Array, Array]:
-    """Get the log probability and entropy of a given actor output and traj_batch action."""
-    assert network in {"feedforward", "recurrent"}, "Please specify the correct network!"
+def make_learning_rate_schedule(init_lr: float, config: DictConfig) -> Callable:
+    """Makes a very simple linear learning rate scheduler.
 
-    actor_mean, actor_log_std = actor_output
-    actor_policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
+    Args:
+        init_lr: initial learning rate.
+        config: system configuration.
 
-    log_prob = actor_policy.log_prob(traj_action)
-    entropy = actor_policy.entropy().mean()
+    Note:
+        We use a simple linear learning rate scheduler based on the suggestions from a blog on PPO
+        implementation details which can be viewed at http://tinyurl.com/mr3chs4p
+        This function can be extended to have more complex learning rate schedules by adding any
+        relevant arguments to the system config and then parsing them accordingly here.
+    """
 
-    _, log_prob = transform_actions_log(env_name, traj_action, log_prob)
-    return log_prob, entropy
+    def linear_scedule(count: int) -> float:
+        frac: float = (
+            1.0
+            - (count // (config.system.ppo_epochs * config.system.num_minibatches))
+            / config.system.num_updates
+        )
+        return init_lr * frac
+
+    return linear_scedule
+
+
+def make_learning_rate(init_lr: float, config: DictConfig) -> Union[float, Callable]:
+    """Retuns a constant learning rate or a learning rate schedule.
+
+    Args:
+        init_lr: initial learning rate.
+        config: system configuration.
+
+    Returns:
+        A learning rate schedule or fixed learning rate.
+    """
+    if config.system.decay_learning_rates:
+        return make_learning_rate_schedule(init_lr, config)
+    else:
+        return init_lr
 
 
 def select_action_ppo(
@@ -54,6 +77,23 @@ def select_action_ppo(
     return raw_action, action, log_prob
 
 
+def get_logprob_entropy(
+    actor_output: Tuple[Array, Array],
+    traj_action: Array,
+    env_name: str,
+) -> Tuple[Array, Array]:
+    """Get the log probability and entropy of a given actor output and traj_batch action."""
+
+    actor_mean, actor_log_std = actor_output
+    actor_policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
+
+    log_prob = actor_policy.log_prob(traj_action)
+    entropy = actor_policy.entropy().mean()
+
+    _, log_prob = transform_actions_log(env_name, traj_action, log_prob)
+    return log_prob, entropy
+
+
 def select_action_eval(
     actor_output: Union[Tuple[Array, Array], Tuple[Array, Array, Array]],
     key: PRNGKey,
@@ -67,7 +107,7 @@ def select_action_eval(
     # else:
     #     actor_mean, actor_log_std = actor_output
 
-    actor_policy = distrax.MultivariateNormalDiag(actor_output[-1], jnp.exp(actor_output[-2]))
+    actor_policy = distrax.MultivariateNormalDiag(actor_output[-2], jnp.exp(actor_output[-1]))
 
     raw_action = actor_policy.sample(seed=key)
     action = transform_actions_log(env_name, raw_action, None)
