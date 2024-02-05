@@ -59,13 +59,13 @@ def select_action_eval(
     network: str = "feedforward",
 ) -> Union[Array, Tuple[Array, Array]]:
     """Select action for the given actor output."""
-    # This outputs typing issues when committing:
+    # This throws typing issues when committing:
     # if network == "recurrent":
     #     hstate, actor_mean, actor_log_std = actor_output
     # else:
     #     actor_mean, actor_log_std = actor_output
 
-    actor_policy = distrax.MultivariateNormalDiag(actor_output[-1], jnp.exp(actor_output[-2]))
+    actor_policy = distrax.MultivariateNormalDiag(actor_output[-2], jnp.exp(actor_output[-1]))
 
     raw_action = actor_policy.sample(seed=key)
     action = transform_actions_log(env_name, raw_action, None)
