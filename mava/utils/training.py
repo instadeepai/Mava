@@ -12,11 +12,69 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple, Union
+from typing import Callable, Tuple, Union
 
 import distrax
 import jax.numpy as jnp
 from chex import Array, PRNGKey
+from omegaconf import DictConfig
+
+
+def make_learning_rate_schedule(init_lr: float, config: DictConfig) -> Callable:
+    """Makes a very simple linear learning rate scheduler.
+
+    Args:
+        init_lr: initial learning rate.
+        config: system configuration.
+
+    Note:
+        We use a simple linear learning rate scheduler based on the suggestions from a blog on PPO
+        implementation details which can be viewed at http://tinyurl.com/mr3chs4p
+        This function can be extended to have more complex learning rate schedules by adding any
+        relevant arguments to the system config and then parsing them accordingly here.
+    """
+
+    def linear_scedule(count: int) -> float:
+        frac: float = (
+            1.0
+            - (count // (config.system.ppo_epochs * config.system.num_minibatches))
+            / config.system.num_updates
+        )
+        return init_lr * frac
+
+    return linear_scedule
+
+
+def make_learning_rate(init_lr: float, config: DictConfig) -> Union[float, Callable]:
+    """Retuns a constant learning rate or a learning rate schedule.
+
+    Args:
+        init_lr: initial learning rate.
+        config: system configuration.
+
+    Returns:
+        A learning rate schedule or fixed learning rate.
+    """
+    if config.system.decay_learning_rates:
+        return make_learning_rate_schedule(init_lr, config)
+    else:
+        return init_lr
+
+
+def select_action_ppo(
+    actor_output: Tuple[Array, Array],
+    key: PRNGKey,
+    env_name: str,
+) -> Tuple[Array, Array, Array]:
+    """Select action for the given actor output."""
+
+    actor_mean, actor_log_std = actor_output
+    actor_policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
+
+    raw_action, log_prob = actor_policy.sample_and_log_prob(seed=key)
+    action, log_prob = transform_actions_log(env_name, raw_action, log_prob)
+
+    return raw_action, action, log_prob
 
 
 def get_logprob_entropy(
@@ -34,22 +92,6 @@ def get_logprob_entropy(
 
     _, log_prob = transform_actions_log(env_name, traj_action, log_prob)
     return log_prob, entropy
-
-
-def select_action_ppo(
-    actor_output: Tuple[Array, Array],
-    key: PRNGKey,
-    env_name: str,
-) -> Tuple[Array, Array, Array]:
-    """Select action for the given actor output."""
-
-    actor_mean, actor_log_std = actor_output
-    actor_policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
-
-    raw_action, log_prob = actor_policy.sample_and_log_prob(seed=key)
-    action, log_prob = transform_actions_log(env_name, raw_action, log_prob)
-
-    return raw_action, action, log_prob
 
 
 def select_action_eval(

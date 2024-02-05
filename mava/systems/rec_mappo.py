@@ -50,6 +50,7 @@ from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import unreplicate_learner_state
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
+from mava.utils.training import make_learning_rate
 
 
 def get_learner_fn(
@@ -476,13 +477,16 @@ def learner_setup(
         config=config, network="recurrent", centralised_critic=True
     )
 
+    actor_lr = make_learning_rate(config.system.actor_lr, config)
+    critic_lr = make_learning_rate(config.system.critic_lr, config)
+
     actor_optim = optax.chain(
         optax.clip_by_global_norm(config.system.max_grad_norm),
-        optax.adam(config.system.actor_lr, eps=1e-5),
+        optax.adam(actor_lr, eps=1e-5),
     )
     critic_optim = optax.chain(
         optax.clip_by_global_norm(config.system.max_grad_norm),
-        optax.adam(config.system.critic_lr, eps=1e-5),
+        optax.adam(critic_lr, eps=1e-5),
     )
 
     # Initialise observation: Select only obs for a single agent.
