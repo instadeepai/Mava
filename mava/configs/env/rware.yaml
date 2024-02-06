@@ -6,4 +6,4 @@ defaults:
 env_name: RobotWarehouse-v0
 
 kwargs:
-  time_limit: 100
+  time_limit: 500
