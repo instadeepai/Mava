@@ -191,7 +191,8 @@ def sample_action(
     eval: bool = False,
 ) -> Tuple[Array, Array]:
     std = jnp.exp(log_std)
-    normal = distrax.Normal(mean, std)
+    # normal = distrax.Normal(mean, std)
+    normal = distrax.MultivariateNormalDiag(mean, std)
 
     unbound_action = jax.lax.cond(
         eval,
@@ -201,7 +202,9 @@ def sample_action(
     bound_action = jnp.tanh(unbound_action)
     scaled_action = bound_action * action_scale + action_bias
 
-    log_prob = normal.log_prob(unbound_action)
+    # TODO: for some reason MultivariateNormalDiag.log_prob removes a trailing dim -
+    # is it squeezing and will this break for action shape != 1?
+    log_prob = normal.log_prob(unbound_action)[..., jnp.newaxis]
     log_prob -= jnp.log(action_scale * (1 - bound_action**2) + 1e-6)
     log_prob = jnp.sum(log_prob, axis=-1, keepdims=True)
 

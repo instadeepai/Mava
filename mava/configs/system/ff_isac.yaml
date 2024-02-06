@@ -22,6 +22,6 @@ q_lr: 1e-3  # the learning rate of the Q network network optimizer
 tau: 0.005  # smoothing coefficient for target networks
 gamma: 0.99  # discount factor
 
-autotune: False  # whether to autotune alpha
+autotune: True  # whether to autotune alpha
 target_entropy_scale: 5.0  # scale factor for target entropy (when auto-tuning)
 init_alpha: 0.1  # initial entropy value when not using autotune
