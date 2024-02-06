@@ -21,6 +21,7 @@ import jax.numpy as jnp
 from chex import Array, PRNGKey
 from gymnax.environments import spaces as gymnax_spaces
 from jaxmarl.environments import spaces as jaxmarl_spaces
+from jaxmarl.environments.mabrax.mabrax_env import MABraxEnv
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
 from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
@@ -177,7 +178,7 @@ class JaxMarlWrapper(Wrapper):
             obs = ObservationGlobalState(
                 agents_view=agents_view,
                 action_mask=self.action_mask(state),
-                global_state=self.get_global_state(obs, agents_view),
+                global_state=self.get_global_state(state, obs, agents_view),
                 step_count=jnp.zeros(self._env.num_agents, dtype=int),
             )
         else:
@@ -202,7 +203,7 @@ class JaxMarlWrapper(Wrapper):
             obs = ObservationGlobalState(
                 agents_view=agents_view,
                 action_mask=self.action_mask(env_state),
-                global_state=self.get_global_state(obs, agents_view),
+                global_state=self.get_global_state(env_state, obs, agents_view),
                 step_count=jnp.repeat(state.step, self._env.num_agents),
             )
         else:
@@ -287,10 +288,13 @@ class JaxMarlWrapper(Wrapper):
             mask = jnp.ones(self._action_shape, dtype=jnp.float32)
         return mask
 
-    def get_global_state(self, obs: Dict[str, Array], agents_view: Array) -> Array:
+    def get_global_state(self, state: Array, obs: Dict[str, Array], agents_view: Array) -> Array:
         """Get global state from observation and copy it for each agent."""
         if hasattr(obs, "world_state"):
             return jnp.tile(jnp.array(obs["world_state"]), (self._env.num_agents, 1))
+        # Use the global state of brax.
+        elif isinstance(self._env, MABraxEnv):
+            global_state = state.obs
 
         global_state = jnp.concatenate(agents_view, axis=0)
         global_state = jnp.tile(global_state, (self._env.num_agents, 1))
