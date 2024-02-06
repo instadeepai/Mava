@@ -302,7 +302,6 @@ def run_experiment(cfg: DictConfig) -> None:
     start_time = time.time()
     key = jax.random.PRNGKey(0)
 
-    @chex.assert_max_traces(n=2)
     def step(
         action: Array, obs: Array, env_state: State, buffer_state: BufferState
     ) -> Tuple[Array, State, BufferState, Dict]:
@@ -322,7 +321,6 @@ def run_experiment(cfg: DictConfig) -> None:
         return next_obs, env_state, buffer_state, infos["episode_metrics"]
 
     # losses:
-    @chex.assert_max_traces(n=1)
     def q_loss_fn(q_params: Qs, obs: Array, action: Array, target: Array) -> Tuple[Array, Metrics]:
         q1_params, q2_params = q_params
         q1_a_values = q.apply(q1_params, obs, action).reshape(-1)
@@ -342,7 +340,6 @@ def run_experiment(cfg: DictConfig) -> None:
 
         return loss, loss_info
 
-    @chex.assert_max_traces(n=4)
     def actor_loss_fn(
         actor_params: FrozenVariableDict, obs: Array, alpha: Array, q_params: Qs, key: chex.PRNGKey
     ) -> Array:
@@ -355,7 +352,6 @@ def run_experiment(cfg: DictConfig) -> None:
 
         return ((alpha * log_pi) - min_qf_pi).mean()
 
-    @chex.assert_max_traces(n=2)
     def alpha_loss_fn(log_alpha: Array, log_pi: Array, target_entropy: Array) -> Array:
         return jnp.mean(-jnp.exp(log_alpha) * (log_pi + target_entropy))
 
@@ -439,7 +435,6 @@ def run_experiment(cfg: DictConfig) -> None:
         loss_info = {"actor_loss": actor_loss, "alpha_loss": alpha_loss}
         return params, opt_states, loss_info
 
-    @chex.assert_max_traces(n=1)
     def update(
         params: SacParams, opt_states: OptStates, data: Transition, t: int, key: chex.PRNGKey
     ) -> Tuple[SacParams, OptStates, Metrics]:
@@ -464,8 +459,6 @@ def run_experiment(cfg: DictConfig) -> None:
         losses = q_loss_info | act_loss_info
         return params, opt_states, losses
 
-    # todo: typing
-    @chex.assert_max_traces(n=1)
     def sample_and_learn(
         carry: Tuple[BufferState, SacParams, OptStates, int, chex.PRNGKey], _: Any
     ) -> Tuple[Tuple[BufferState, SacParams, OptStates, int, chex.PRNGKey], Metrics]:
@@ -482,7 +475,6 @@ def run_experiment(cfg: DictConfig) -> None:
     )
 
     # todo: make this scannable, not for_i
-    @chex.assert_max_traces(n=1)
     def explore(
         _: int, carry: Tuple[Array, State, BufferState, Dict, chex.PRNGKey]
     ) -> Tuple[Array, State, BufferState, Dict, chex.PRNGKey]:
@@ -493,7 +485,6 @@ def run_experiment(cfg: DictConfig) -> None:
 
         return next_obs, env_state, buffer_state, metrics, key
 
-    @chex.assert_max_traces(n=1)
     def act(
         carry: Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey], _: Any
     ) -> Tuple[Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey], Dict]:
@@ -507,7 +498,7 @@ def run_experiment(cfg: DictConfig) -> None:
 
     scanned_act = lambda state: jax.lax.scan(act, state, None, length=cfg.system.act_steps)
 
-    @chex.assert_max_traces(n=1)  # todo: typing
+    # todo: typing
     def act_and_learn(carry: LearnerState, _: Any) -> Tuple[LearnerState, tuple]:
         """Act, sample, learn."""
         obs, env_state, buffer_state, params, opt_states, t, key = carry
