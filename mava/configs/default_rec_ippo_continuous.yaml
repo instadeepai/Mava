@@ -5,3 +5,16 @@ defaults:
   - network: rnn_continuous
   - env: mabrax
   - _self_
+  - system/search_spaces@hydra.sweeper.params: ${system}
+  - override hydra/sweeper: optuna
+  - override hydra/sweeper/sampler: tpe
+
+hydra:
+    sweeper:
+        sampler:
+            seed: 234
+        direction: maximize # maximize
+        study_name: rec-mabrax-sweep
+        storage: null
+        n_trials: 20
+        n_jobs: 1

@@ -1,0 +1,7 @@
+system.actor_lr: choice(2.5e-4, 5e-4, 7.5e-4, 1e-3)
+system.critic_lr: choice(2.5e-4, 5e-4, 7.5e-4, 1e-3)
+system.rollout_length: choice(128, 256, 516)
+system.ppo_epochs: choice(2,4,8,16)
+system.num_minibatches: choice(2,4,8)
+system.max_grad_norm: choice(0.5,5.0,10.0)
+system.clip_eps: choice(0.05, 0.2)
