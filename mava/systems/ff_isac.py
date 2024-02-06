@@ -214,7 +214,7 @@ def sample_action(
     return scaled_action, log_prob
 
 
-def run_experiment(cfg: DictConfig) -> None:
+def run_experiment(cfg: DictConfig) -> Array:
     logger = MavaLogger(cfg)
 
     key = jax.random.PRNGKey(cfg.system.seed)
@@ -580,17 +580,21 @@ def run_experiment(cfg: DictConfig) -> None:
         logger.log(ep_logs, t, 0, LogEvent.ACT)
         logger.log(losses | {"log_alpha": learner_state.params.log_alpha}, t, 0, LogEvent.TRAIN)
 
+    return mean_return
+
 
 @hydra.main(config_path="../configs", config_name="default_ff_isac.yaml", version_base="1.2")
-def hydra_entry_point(cfg: DictConfig) -> None:
+def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
 
     # Run experiment.
-    run_experiment(cfg)
+    final_return = run_experiment(cfg)
 
     print(f"{Fore.CYAN}{Style.BRIGHT}ISAC experiment completed{Style.RESET_ALL}")
+
+    return float(final_return)
 
 
 if __name__ == "__main__":
