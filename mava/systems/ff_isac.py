@@ -13,10 +13,9 @@
 # limitations under the License.
 
 import time
-from typing import Any, Dict, NamedTuple, Tuple, TypedDict
+from typing import Any, Dict, NamedTuple, Tuple
 
 import chex
-from colorama import Fore, Style
 import distrax
 import flashbax as fbx
 import flax.linen as nn
@@ -27,9 +26,9 @@ import jax
 import jax.numpy as jnp
 import jaxmarl
 import numpy as np
-from omegaconf import DictConfig, OmegaConf
 import optax
 from chex import PRNGKey
+from colorama import Fore, Style
 from flashbax.buffers.flat_buffer import TrajectoryBuffer
 from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.scope import FrozenVariableDict
@@ -38,9 +37,10 @@ from jax.typing import ArrayLike
 from jumanji.env import State
 from jumanji.types import Observation, TimeStep
 from jumanji.wrappers import Wrapper
+from omegaconf import DictConfig, OmegaConf
 from typing_extensions import TypeAlias
-from mava.utils.logger import LogEvent, MavaLogger
 
+from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers import RecordEpisodeMetrics
 from mava.wrappers.jaxmarl import JaxMarlWrapper
 from mava.wrappers.observation import AgentIDWrapper
@@ -251,13 +251,15 @@ def run_experiment(cfg: DictConfig) -> None:
     q2_target_params = q.init(q2_target_key, dummy_obs, dummy_actions)
 
     # Automatic entropy tuning
-    target_entropy = jnp.repeat(-cfg.system.target_entropy_scale * action_dim, n_agents).astype(
-        float
-    )
+    target_entropy = cfg.system.target_entropy_scale * action_dim
+    target_entropy = jnp.repeat(target_entropy, n_agents).astype(float)
     # making sure we have dim=3 so broacasting works fine
     target_entropy = target_entropy[jnp.newaxis, :, jnp.newaxis]
-    log_alpha = jnp.zeros_like(target_entropy)
-    alpha = jnp.exp(log_alpha)
+    if cfg.system.autotune:
+        log_alpha = jnp.zeros_like(target_entropy)
+    else:
+        log_alpha = jnp.log(cfg.system.init_alpha)
+        log_alpha = jnp.broadcast_to(log_alpha, target_entropy.shape)
 
     # Pack params
     online_q_params = Qs(q1_params, q2_params)
@@ -340,7 +342,7 @@ def run_experiment(cfg: DictConfig) -> None:
 
         return loss, loss_info
 
-    @chex.assert_max_traces(n=2)
+    @chex.assert_max_traces(n=4)
     def actor_loss_fn(
         actor_params: FrozenVariableDict, obs: Array, alpha: Array, q_params: Qs, key: chex.PRNGKey
     ) -> Array:
@@ -412,18 +414,27 @@ def run_experiment(cfg: DictConfig) -> None:
             actor_updates, new_actor_opt_state = actor_opt.update(act_grads, opt_states.actor)
             new_actor_params = optax.apply_updates(params.actor, actor_updates)
 
-            # Update alpha.
-            mean, log_std = actor.apply(new_actor_params, data.obs)
-            _, log_pi = sample_action(mean, log_std, alpha_key, action_scale, action_bias)
+            # Update alpha if autotuning.
+            if cfg.system.autotune:
+                mean, log_std = actor.apply(new_actor_params, data.obs)
+                _, log_pi = sample_action(mean, log_std, alpha_key, action_scale, action_bias)
 
-            alpha_grad_fn = jax.value_and_grad(alpha_loss_fn)
-            alpha_loss, alpha_grads = alpha_grad_fn(params.log_alpha, log_pi, target_entropy)
-            alpha_loss, alpha_grads = jax.lax.pmean((alpha_loss, alpha_grads), axis_name="device")
-            alpha_updates, new_alpha_opt_state = alpha_opt.update(alpha_grads, opt_states.alpha)
-            new_log_alpha = optax.apply_updates(params.log_alpha, alpha_updates)
+                alpha_grad_fn = jax.value_and_grad(alpha_loss_fn)
+                alpha_loss, alpha_grads = alpha_grad_fn(params.log_alpha, log_pi, target_entropy)
+                alpha_loss, alpha_grads = jax.lax.pmean(
+                    (alpha_loss, alpha_grads), axis_name="device"
+                )
+                alpha_updates, new_alpha_opt_state = alpha_opt.update(alpha_grads, opt_states.alpha)
+                new_log_alpha = optax.apply_updates(params.log_alpha, alpha_updates)
 
-            params = params._replace(actor=new_actor_params, log_alpha=new_log_alpha)
-            opt_states = opt_states._replace(actor=new_actor_opt_state, alpha=new_alpha_opt_state)
+                params = params._replace(actor=new_actor_params, log_alpha=new_log_alpha)
+                opt_states = opt_states._replace(
+                    actor=new_actor_opt_state, alpha=new_alpha_opt_state
+                )
+            else:
+                params = params._replace(actor=new_actor_params)
+                opt_states = opt_states._replace(actor=new_actor_opt_state)
+                alpha_loss = 0.0
 
         loss_info = {"actor_loss": actor_loss, "alpha_loss": alpha_loss}
         return params, opt_states, loss_info
@@ -540,14 +551,13 @@ def run_experiment(cfg: DictConfig) -> None:
     next_obs, env_state, buffer_state, metrics, key = pmaped_explore(init_explore_state)
 
     ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
-    # likely that the episode hasn't ended yet and so we need to replace the nan with 0.
+    # Likely that the episode hasn't ended yet and so we need to replace the nan with 0.
     mean_return = np.nan_to_num(np.mean(ep_returns))
     sps = n_devices * cfg.system.explore_steps / (time.time() - start_time)
     logger.log({"mean episode return": mean_return}, cfg.system.explore_steps, 0, LogEvent.ACT)
 
-    pmaped_steps = 5120
-    # todo: here should I multiply by act steps or learn steps or both or the mean?
-    steps_btwn_log = n_devices * cfg.system.n_envs * pmaped_steps
+    pmaped_steps = 1024
+    steps_btwn_log = n_devices * cfg.system.n_envs * cfg.system.act_steps * pmaped_steps
     learner_state = LearnerState(
         next_obs, env_state, buffer_state, params, opt_states, jnp.zeros(n_devices), key
     )
@@ -567,7 +577,10 @@ def run_experiment(cfg: DictConfig) -> None:
         mean_return = np.mean(ep_returns)
         max_return: float = np.max(ep_returns)
         ep_logs = {"mean episode return": mean_return, "max episode return": max_return}
-        sps = t / (time.time() - start_time)
+        # Multiply by learn steps here because anakin steps per second is learn + act steps
+        # But we want to make sure we're counting env steps correctly so it's not included
+        # in the loop counter.
+        sps = t * cfg.system.learn_steps / (time.time() - start_time)
 
         logger.log({"steps per second": sps}, t, 0, LogEvent.MISC)
         logger.log(ep_logs, t, 0, LogEvent.ACT)
