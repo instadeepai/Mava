@@ -291,11 +291,12 @@ class JaxMarlWrapper(Wrapper):
     def get_global_state(self, state: Array, obs: Dict[str, Array], agents_view: Array) -> Array:
         """Get global state from observation and copy it for each agent."""
         if hasattr(obs, "world_state"):
-            return jnp.tile(jnp.array(obs["world_state"]), (self._env.num_agents, 1))
-        # Use the global state of brax.
+            global_state = jnp.tile(jnp.array(obs["world_state"]), (self._env.num_agents, 1))
         elif isinstance(self._env, MABraxEnv):
+            # Use the global state of brax.
             global_state = state.obs
+        else:
+            global_state = jnp.concatenate(agents_view, axis=0)
+            global_state = jnp.tile(global_state, (self._env.num_agents, 1))
 
-        global_state = jnp.concatenate(agents_view, axis=0)
-        global_state = jnp.tile(global_state, (self._env.num_agents, 1))
         return global_state
