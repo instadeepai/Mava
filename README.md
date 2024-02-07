@@ -9,12 +9,18 @@
 </h2>
 
 <div align="center">
-<a  href="https://github.com/instadeepai/Mava/blob/main/LICENSE">
-    <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License" />
+<a href="https://www.python.org/doc/versions/">
+      <img src="https://img.shields.io/badge/python-3.9-blue" alt="Python Versions">
 </a>
-<!-- <a  href="https://github.com/psf/black">
-    <img src="https://img.shields.io/badge/code%20style-black-000000.svg" alt="Code style" />
-</a> -->
+<a  href="https://github.com/instadeepai/Mava/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/License-Apache%202.0-orange.svg" alt="License" />
+</a>
+<a  href="https://github.com/psf/black">
+    <img src="https://img.shields.io/badge/code%20style-black-000000.svg" alt="Code Style" />
+</a>
+<a  href="http://mypy-lang.org/">
+    <img src="https://www.mypy-lang.org/static/mypy_badge.svg" alt="MyPy" />
+</a>
 <a href="https://arxiv.org/pdf/2107.01460.pdf">
     <img src="https://img.shields.io/badge/PrePrint-ArXiv-red" alt="ArXiv">
 </a>
