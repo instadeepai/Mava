@@ -471,7 +471,7 @@ def learner_setup(
     num_actions = int(env.action_spec().num_values[0])
     num_agents = env.action_spec().shape[0]
     config.system.num_agents = num_agents
-    config.system.num_actions = num_actions
+    config.system.action_dim = num_actions
 
     # PRNG keys.
     key, actor_net_key, critic_net_key = keys
@@ -505,7 +505,7 @@ def learner_setup(
     init_x = (init_obs, init_done)
 
     # Initialise hidden states.
-    hidden_size = config.network.actor_network.pre_torso_layer_sizes[-1]
+    hidden_size = config.network.actor_network.pre_torso.layer_sizes[-1]
     init_policy_hstate = ScannedRNN.initialize_carry((config.arch.num_envs), hidden_size)
     init_critic_hstate = ScannedRNN.initialize_carry((config.arch.num_envs), hidden_size)
 

@@ -1,10 +1,15 @@
 # ---MLP Networks---
 actor_network:
+  _target_: mava.networks.MLPTorso
   layer_sizes: [128, 128]
   use_layer_norm: True
   activation: "relu"
 
+action_head:
+  _target_: mava.networks.DiscreteActionHead
+
 critic_network:
+  _target_: mava.networks.MLPTorso
   layer_sizes: [128, 128]
   use_layer_norm: False
   activation: "relu"

@@ -344,7 +344,7 @@ def learner_setup(
     num_actions = int(env.action_spec().num_values[0])
     num_agents = env.action_spec().shape[0]
     config.system.num_agents = num_agents
-    config.system.num_actions = num_actions
+    config.system.action_dim = num_actions
 
     # PRNG keys.
     key, actor_net_key, critic_net_key = keys

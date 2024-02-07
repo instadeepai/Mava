@@ -1,0 +1,19 @@
+# ---MLP Networks---
+actor_network:
+  _target_: mava.networks.CNNTorso
+  channel_sizes: [32, 32]
+  kernel_sizes: [3, 3]
+  strides: [1, 1]
+  use_layer_norm: False
+  activation: "relu"
+
+action_head:
+  _target_: mava.networks.DiscreteActionHead
+
+critic_network:
+  _target_: mava.networks.CNNTorso
+  channel_sizes: [32, 32]
+  kernel_sizes: [3, 3]
+  strides: [1, 1]
+  use_layer_norm: False
+  activation: "relu"

@@ -17,6 +17,7 @@ from typing import Callable, Dict, Sequence, Tuple, Union
 
 import chex
 import distrax
+import hydra
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -51,19 +52,38 @@ class MLPTorso(nn.Module):
         return x
 
 
-class FeedForwardActor(nn.Module):
-    """Feedforward Actor Network."""
+class CNNTorso(nn.Module):
+    """CNN torso."""
 
-    torso: nn.Module
-    num_actions: Sequence[int]
+    channel_sizes: Sequence[int]
+    kernel_sizes: Sequence[int]
+    strides: Sequence[int]
+    activation_fn: Callable[[chex.Array], chex.Array] = nn.relu
+    use_layer_norm: bool = False
 
     @nn.compact
-    def __call__(self, observation: Observation) -> distrax.Categorical:
+    def __call__(self, observation: chex.Array) -> chex.Array:
         """Forward pass."""
-        x = observation.agents_view
+        x = observation
+        for channel, kernel, stride in zip(self.channel_sizes, self.kernel_sizes, self.strides):
+            x = nn.Conv(channel, (kernel, kernel), (stride, stride))(x)
+            if self.use_layer_norm:
+                x = nn.LayerNorm(use_scale=False)(x)
+            x = self.activation_fn(x)
 
-        x = self.torso(x)
-        actor_logits = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01))(x)
+        return x.reshape((x.shape[0], -1))
+
+
+class DiscreteActionHead(nn.Module):
+    """Discrete Action Head"""
+
+    action_dim: int
+
+    @nn.compact
+    def __call__(self, x: chex.Array, observation: Observation) -> distrax.Categorical:
+        """Forward pass."""
+
+        actor_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(x)
 
         masked_logits = jnp.where(
             observation.action_mask,
@@ -72,6 +92,24 @@ class FeedForwardActor(nn.Module):
         )
 
         return distrax.Categorical(logits=masked_logits)
+
+
+class FeedForwardActor(nn.Module):
+    """Feed Forward Actor Network."""
+
+    torso: nn.Module
+    action_head: nn.Module
+
+    @nn.compact
+    def __call__(self, observation: Observation) -> distrax.DistributionLike:
+        """Forward pass."""
+        x = observation.agents_view
+
+        x = self.torso(x)
+
+        x = self.action_head(x, observation)
+
+        return x
 
 
 class FeedForwardCritic(nn.Module):
@@ -130,7 +168,7 @@ class ScannedRNN(nn.Module):
 class RecurrentActor(nn.Module):
     """Recurrent Actor Network."""
 
-    action_dim: Sequence[int]
+    action_head: nn.Module
     pre_torso: nn.Module
     post_torso: nn.Module
 
@@ -146,16 +184,8 @@ class RecurrentActor(nn.Module):
         policy_embedding = self.pre_torso(observation.agents_view)
         policy_rnn_input = (policy_embedding, done)
         policy_hidden_state, policy_embedding = ScannedRNN()(policy_hidden_state, policy_rnn_input)
-        actor_logits = self.post_torso(policy_embedding)
-        actor_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(actor_logits)
-
-        masked_logits = jnp.where(
-            observation.action_mask,
-            actor_logits,
-            jnp.finfo(jnp.float32).min,
-        )
-
-        pi = distrax.Categorical(logits=masked_logits)
+        policy_embedding = self.post_torso(policy_embedding)
+        pi = self.action_head(policy_embedding, observation)
 
         return policy_hidden_state, pi
 
@@ -208,33 +238,45 @@ def make(
 ) -> Union[Tuple[FeedForwardActor, FeedForwardCritic], Tuple[RecurrentActor, RecurrentCritic]]:
     """Get the networks."""
 
-    def create_torso(network_key: str, layer_size_key: str) -> MLPTorso:
+    def create_torso(network_config: DictConfig) -> nn.Module:
         """Helper function to create a torso object from the config."""
-        activation_fn = parse_activation_fn(config.network[network_key]["activation"])
-        return MLPTorso(
-            layer_sizes=config.network[network_key][layer_size_key],
+
+        torso_config = network_config
+        activation_fn = parse_activation_fn(torso_config.pop("activation"))
+
+        torso = hydra.utils.instantiate(
+            torso_config,
             activation_fn=activation_fn,
-            use_layer_norm=config.network[network_key].use_layer_norm,
         )
+        return torso
+
+    def create_action_head(network_config: DictConfig) -> nn.Module:
+        """Helper function to create a action head object from the config."""
+
+        action_head = hydra.utils.instantiate(
+            network_config,
+            action_dim=config.system.action_dim,
+        )
+        return action_head
 
     if network == "feedforward":
         actor = FeedForwardActor(
-            torso=create_torso("actor_network", "layer_sizes"),
-            num_actions=config.system.num_actions,
+            torso=create_torso(config.network["actor_network"]),
+            action_head=create_action_head(config.network["action_head"]),
         )
         critic = FeedForwardCritic(
-            torso=create_torso("critic_network", "layer_sizes"),
+            torso=create_torso(config.network["critic_network"]),
             centralised_critic=centralised_critic,
         )
     elif network == "recurrent":
         actor = RecurrentActor(
-            action_dim=config.system.num_actions,
-            pre_torso=create_torso("actor_network", "pre_torso_layer_sizes"),
-            post_torso=create_torso("actor_network", "post_torso_layer_sizes"),
+            action_head=create_action_head(config.network["action_head"]),
+            pre_torso=create_torso(config.network["actor_network"]["pre_torso"]),
+            post_torso=create_torso(config.network["actor_network"]["post_torso"]),
         )
         critic = RecurrentCritic(
-            pre_torso=create_torso("critic_network", "pre_torso_layer_sizes"),
-            post_torso=create_torso("critic_network", "post_torso_layer_sizes"),
+            pre_torso=create_torso(config.network["critic_network"]["pre_torso"]),
+            post_torso=create_torso(config.network["critic_network"]["post_torso"]),
             centralised_critic=centralised_critic,
         )
     else:
