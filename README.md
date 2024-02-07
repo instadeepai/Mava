@@ -54,6 +54,26 @@ Mava currently offers the following building blocks for MARL research:
 ### SMAX
 For comparing Mava’s stability to other JAX-based baseline algorithms, we train Mava’s recurrent IPPO and MAPPO systems on a broad range of [SMAX][smax] tasks. In all cases we do not rerun baselines but instead take results for final win rates from the [JaxMARL technical report](https://arxiv.org/pdf/2311.10090.pdf).
 
+<p align="center">
+ <a href="docs/images/smax_results/legend.png">
+        <img src="docs/images/smax_results/legend.png" alt="legend" width="40%"/>
+</a>
+</p>
+
+<p align="center">
+    <a href="docs/images/smax_results/3s5z.png">
+        <img src="docs/images/smax_results/3s5z.png" alt="Mava ff mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+    <a href="docs/images/smax_results/6h_vs_8z.png">
+        <img src="docs/images/smax_results/6h_vs_8z.png" alt="Mava ff mappo tiny 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+    <a href="docs/images/smax_results/3s5z_vs_3s6z.png">
+        <img src="docs/images/smax_results/3s5z_vs_3s6z.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+    <br>
+    <div style="text-align:center; margin-top: 10px;"> Mava Recurrent IPPO and MAPPO performance on the <code>3s5z</code>, <code>6h_vs_8z</code> and <code>3s5z_vs_3s6z</code> SMAX tasks.</div>
+</p>
+
 ### Robotic Warehouse
 
 All of the experiments below were performed using an NVIDIA Quadro RTX 4000 GPU with 8GB Memory.
