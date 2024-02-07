@@ -4,8 +4,8 @@ defaults:
   - system: rec_ippo
   - network: rnn_continuous
   - env: mabrax
-  - _self_
   - system/search_spaces@hydra.sweeper.params: ${system}
+  - _self_
   - override hydra/sweeper: optuna
   - override hydra/sweeper/sampler: tpe
 
