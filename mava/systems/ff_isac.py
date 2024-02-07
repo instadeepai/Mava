@@ -258,7 +258,7 @@ def run_experiment(cfg: DictConfig) -> Array:
     q2_target_params = q.init(q2_target_key, dummy_obs, dummy_actions)
 
     # Automatic entropy tuning
-    target_entropy = cfg.system.target_entropy_scale * action_dim
+    target_entropy = -cfg.system.target_entropy_scale * action_dim
     target_entropy = jnp.repeat(target_entropy, n_agents).astype(float)
     # making sure we have dim=3 so broacasting works fine
     target_entropy = target_entropy[jnp.newaxis, :, jnp.newaxis]
