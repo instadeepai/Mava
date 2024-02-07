@@ -14,8 +14,9 @@
 
 import copy
 from collections import namedtuple
-from typing import Dict, List, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 
+import chex
 import jax
 import jax.numpy as jnp
 from chex import Array, PRNGKey
@@ -27,7 +28,21 @@ from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
 from jumanji.wrappers import Wrapper
 
-from mava.types import JaxMarlState, Observation, ObservationGlobalState
+from mava.types import Observation, ObservationGlobalState, State
+
+if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
+    from dataclasses import dataclass
+else:
+    from flax.struct import dataclass
+
+
+@dataclass
+class JaxMarlState:
+    """Wrapper around a JaxMarl state to provide necessary attributes for jumanji environments."""
+
+    state: State
+    key: chex.PRNGKey
+    step: int
 
 
 def _is_discrete(space: jaxmarl_spaces.Space) -> bool:
