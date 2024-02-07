@@ -52,7 +52,7 @@ Mava currently offers the following building blocks for MARL research:
 ## Performance and Speed 🚀
 
 ### SMAX
-For comparing Mava’s stability to other JAX-based baseline algorithms, we train Mava’s recurrent IPPO and MAPPO systems on a broad range of [SMAX][smax] tasks. In all cases we do not rerun baselines but instead take results for final win rates from the [JaxMARL technical report](https://arxiv.org/pdf/2311.10090.pdf).
+For comparing Mava’s stability to other JAX-based baseline algorithms, we train Mava’s recurrent IPPO and MAPPO systems on a broad range of [SMAX][smax] tasks. In all cases we do not rerun baselines but instead take results for final win rates from the [JaxMARL technical report](https://arxiv.org/pdf/2311.10090.pdf). For the full SMAX experiments results, please see the following [page](docs/smax_benchmark.md).
 
 <p align="center">
  <a href="docs/images/smax_results/legend.png">
