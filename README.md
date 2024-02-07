@@ -27,12 +27,6 @@
 <a href="https://colab.research.google.com/github/instadeepai/Mava/blob/develop/examples/Quickstart.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 </div>
 
-<hr>
-
-👋 **UPDATE - 19/12/2023**: Mava is now fully in JAX with substantial speed improvement compared to other popular libraries. We currently provide native support for the [Jumanji][jumanji] environment API, which is also supported in [Matrax](https://github.com/instadeepai/matrax) and a wrapper for the newly released [JaxMARL](https://github.com/flairox/jaxmarl) environments. Mava follows a similar design philosophy to [CleanRL][cleanrl] and [PureJaxRL][purejaxrl], where we allow for some code duplication to enable readability and easy reuse. Finally, we have updated our technical report to reflect our transition to JAX. Please feel free to take a look [here](https://arxiv.org/pdf/2107.01460.pdf)! If you would still like to use our deprecated TF2-based framework and systems please install [`v0.1.3`](https://github.com/instadeepai/Mava/releases/tag/0.1.3) of Mava (e.g. `pip install id-mava==0.1.3`).
-
-<hr>
-
 ## Welcome to Mava! 🦁
 
 <div align="center">
@@ -51,10 +45,16 @@ To join us in these efforts, please feel free to reach out, raise issues or read
 Mava currently offers the following building blocks for MARL research:
 
 - 🥑 **Implementations of MARL algorithms**: Implementations of multi-agent PPO systems that follow both the Centralised Training with Decentralised Execution (CTDE) and Decentralised Training with Decentralised Execution (DTDE) MARL paradigms.
-- 🍬 **Environment Wrappers**: Example wrapper for mapping a Jumanji environment to an environment usable in Mava. At the moment, we only support [Robotic Warehouse][jumanji_rware] but plan to support more environments soon.
+- 🍬 **Environment Wrappers**: Example wrappers for mapping Jumanji environments to an environment that is compatible with Mava. At the moment, we support [Robotic Warehouse][jumanji_rware] and [Level-Based Foraging][jumanji_lbf] with plans to support more environments soon. We have also recently added support for the SMAX environment from [JaxMARL][jaxmarl].
 - 🎓 **Educational Material**: [Quickstart notebook][quickstart] to demonstrate how Mava can be used and to highlight the added value of JAX-based MARL.
+- 🧪 **Statistically robust evaluation**: Mava natively supports logging to json files which adhere to the standard suggested by [Gorsane et al. (2022)][toward_standard_eval] for easy downstream experiment plotting and aggregation using the tools found in the [MARL-eval][marl_eval] library.
 
 ## Performance and Speed 🚀
+
+### SMAX
+For comparing Mava’s stability to other JAX-based baseline algorithms, we train Mava’s recurrent IPPO and MAPPO systems on a broad range of [SMAX][smax] tasks. In all cases we do not rerun baselines but instead take results for final win rates from the [JaxMARL technical report](https://arxiv.org/pdf/2311.10090.pdf).
+
+### Robotic Warehouse
 
 All of the experiments below were performed using an NVIDIA Quadro RTX 4000 GPU with 8GB Memory.
 
@@ -148,10 +148,14 @@ We plan to iteratively expand Mava in the following increments:
 
 - 🌴 Support for more multi-agent Jumanji environments.
 - 🔁 More robust recurrent systems.
-- 📊 Benchmarks on more environments.
+- 🌳 Support for non JAX-based environments.
 - 🦾 Support for off-policy algorithms.
+- 🎛 Continuous action space environments and algorithms.
 
 Please do follow along as we develop this next phase!
+
+## TensorFlow 2 Mava:
+Originally Mava was written in Tensorflow and if you would still like to use our **deprecated** TF2-based framework and systems please install `v0.1.3` of Mava (i.e. `pip install id-mava==0.1.3`).
 
 ## See Also 🔎
 
@@ -160,8 +164,8 @@ Please do follow along as we develop this next phase!
 - 🔌 [OG-MARL](https://github.com/instadeepai/og-marl): datasets with baselines for offline MARL in JAX.
 - 🌴 [Jumanji](https://github.com/instadeepai/jumanji): a diverse suite of scalable reinforcement learning environments in JAX.
 - 😎 [Matrax](https://github.com/instadeepai/matrax): a collection of matrix games in JAX.
-- 🔦 [Flashbax](https://github.com/instadeepai/flashbax): accelerated replay buffers in JAX.
-- 📈 [MARL-eval](https://github.com/instadeepai/marl-eval): standardised experiment data aggregation and visualisation for MARL.
+- ⚡ [Flashbax](https://github.com/instadeepai/flashbax): accelerated replay buffers in JAX.
+- 📈 [MARL-eval][marl_eval]: standardised experiment data aggregation and visualisation for MARL.
 
 **Related.** Other libraries related to accelerated MARL in JAX.
 
@@ -180,7 +184,7 @@ If you use Mava in your work, please cite the accompanying
     title={Mava: a research library for distributed multi-agent reinforcement learning in JAX},
     author={Ruan de Kock and Omayma Mahjoub and Sasha Abramowitz and Wiem Khlifi and Callum Rhys Tilbury
     and Claude Formanek and Andries P. Smit and Arnu Pretorius},
-    year={2021},
+    year={2023},
     journal={arXiv preprint arXiv:2107.01460},
     url={https://arxiv.org/pdf/2107.01460.pdf},
 }
@@ -198,6 +202,11 @@ The development of Mava was supported with Cloud TPUs from Google's [TPU Researc
 [cleanrl]: https://github.com/vwxyzjn/cleanrl
 [purejaxrl]: https://github.com/luchris429/purejaxrl
 [jumanji_rware]: https://instadeepai.github.io/jumanji/environments/robot_warehouse/
+[jumanji_lbf]: https://github.com/sash-a/jumanji/tree/feat/lbf-truncate
 [epymarl]: https://github.com/uoe-agents/epymarl
 [anakin_paper]: https://arxiv.org/abs/2104.06272
 [rware]: https://github.com/semitable/robotic-warehouse
+[jaxmarl]: https://github.com/flairox/jaxmarl
+[toward_standard_eval]: https://arxiv.org/pdf/2209.10485.pdf
+[marl_eval]: https://github.com/instadeepai/marl-eval
+[smax]: https://github.com/FLAIROx/JaxMARL/tree/main/jaxmarl/environments/smax
