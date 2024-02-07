@@ -1,6 +1,6 @@
 colorama
 distrax @ git+https://github.com/google-deepmind/distrax  # distrax release doesn't support jax > 0.4.13
-flashbax @ git+https://github.com/instadeepai/flashbax#egg=flashbax
+flashbax~=0.1.0
 flax~=0.7.5
 hydra-core==1.3.2
 jax
