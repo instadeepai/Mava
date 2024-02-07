@@ -98,6 +98,7 @@ class RNNLearnerState(NamedTuple):
     timestep: TimeStep
     dones: Done
     hstates: HiddenStates
+    firsts: chex.Array
 
 
 class PPOTransition(NamedTuple):
@@ -123,6 +124,7 @@ class RNNPPOTransition(NamedTuple):
     obs: chex.Array
     hstates: HiddenStates
     info: Dict
+    first: chex.Array
 
 
 class EvalState(NamedTuple):

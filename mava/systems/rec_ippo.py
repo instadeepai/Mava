@@ -95,6 +95,7 @@ def get_learner_fn(
                 last_timestep,
                 last_done,
                 hstates,
+                last_is_first
             ) = learner_state
 
             key, policy_key = jax.random.split(key)
@@ -105,7 +106,7 @@ def get_learner_fn(
             )
             ac_in = (
                 batched_observation,
-                last_done[:, 0][jnp.newaxis, :],
+                last_is_first[:, 0][jnp.newaxis, :],
             )
 
             # Run the network.
@@ -133,6 +134,10 @@ def get_learner_fn(
                 lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
                 timestep.last(),
             )
+            first = jax.tree_util.tree_map(
+                lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
+                last_timestep.first(),
+            )
             info = timestep.extras["episode_metrics"]
 
             hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
@@ -145,9 +150,10 @@ def get_learner_fn(
                 last_timestep.observation,
                 hstates,
                 info,
+                first
             )
             learner_state = RNNLearnerState(
-                params, opt_states, key, env_state, timestep, done, hstates
+                params, opt_states, key, env_state, timestep, done, hstates, first
             )
             return learner_state, transition
 
@@ -168,6 +174,7 @@ def get_learner_fn(
             last_timestep,
             last_done,
             hstates,
+            last_first
         ) = learner_state
 
         # Add a batch dimension to the observation.
@@ -176,7 +183,7 @@ def get_learner_fn(
         )
         ac_in = (
             batched_last_observation,
-            last_done[:, 0][jnp.newaxis, :],
+            last_first[:, 0][jnp.newaxis, :]
         )
 
         # Run the network.
@@ -236,7 +243,7 @@ def get_learner_fn(
                     """Calculate the actor loss."""
                     # RERUN NETWORK
 
-                    obs_and_done = (traj_batch.obs, traj_batch.done[:, :, 0])
+                    obs_and_done = (traj_batch.obs, traj_batch.first[:, :, 0])
                     _, actor_policy = actor_apply_fn(
                         actor_params, traj_batch.hstates.policy_hidden_state[0], obs_and_done
                     )
@@ -268,7 +275,7 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate the critic loss."""
                     # RERUN NETWORK
-                    obs_and_done = (traj_batch.obs, traj_batch.done[:, :, 0])
+                    obs_and_done = (traj_batch.obs, traj_batch.first[:, :, 0])
                     _, value = critic_apply_fn(
                         critic_params, traj_batch.hstates.critic_hidden_state[0], obs_and_done
                     )
@@ -424,6 +431,7 @@ def get_learner_fn(
             last_timestep,
             last_done,
             hstates,
+            last_first
         )
         metric = traj_batch.info
         return learner_state, (metric, loss_info)
@@ -576,9 +584,10 @@ def learner_setup(
         (config.arch.num_envs, config.system.num_agents),
         dtype=bool,
     )
+    firsts = jnp.ones((config.arch.num_envs, config.system.num_agents), dtype=bool)
     key, step_keys = jax.random.split(key)
     opt_states = OptStates(actor_opt_state, critic_opt_state)
-    replicate_learner = (params, opt_states, hstates, step_keys, dones)
+    replicate_learner = (params, opt_states, hstates, step_keys, dones, firsts)
 
     # Duplicate learner for update_batch_size.
     broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size,) + x.shape)
@@ -588,7 +597,7 @@ def learner_setup(
     replicate_learner = flax.jax_utils.replicate(replicate_learner, devices=jax.devices())
 
     # Initialise learner state.
-    params, opt_states, hstates, step_keys, dones = replicate_learner
+    params, opt_states, hstates, step_keys, dones, firsts = replicate_learner
     init_learner_state = RNNLearnerState(
         params=params,
         opt_states=opt_states,
@@ -597,6 +606,7 @@ def learner_setup(
         timestep=timesteps,
         dones=dones,
         hstates=hstates,
+        firsts=firsts
     )
     return learn, actor_network, init_learner_state
 

@@ -2,7 +2,7 @@
 
 base_exp_path: results # Base path for logging.
 use_console: True # Whether to log to stdout.
-use_tb: False # Whether to use tensorboard logging.
+use_tb: True # Whether to use tensorboard logging.
 use_json: False # Whether to log marl-eval style to json files.
 use_neptune: False  # Whether to log to neptune.ai.
 
