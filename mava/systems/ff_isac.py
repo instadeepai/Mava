@@ -22,7 +22,7 @@ import flax.linen as nn
 import hydra
 import jax
 
-# jax.config.update("jax_platform_name", "cpu")
+jax.config.update("jax_platform_name", "cpu")
 import jax.numpy as jnp
 import jaxmarl
 import numpy as np
@@ -202,16 +202,20 @@ def sample_action(
     bound_action = jnp.tanh(unbound_action)
     scaled_action = bound_action * action_scale + action_bias
 
-    # TODO: for some reason MultivariateNormalDiag.log_prob removes a trailing dim -
-    # is it squeezing and will this break for action shape != 1?
-    log_prob = normal.log_prob(unbound_action)[..., jnp.newaxis]
-    log_prob -= jnp.log(action_scale * (1 - bound_action**2) + 1e-6)
-    log_prob = jnp.sum(log_prob, axis=-1, keepdims=True)
+    # MultivariateNormalDiag sums on last dim
+    log_prob = normal.log_prob(unbound_action)
+    rescale_term = jnp.log(action_scale * (1 - bound_action**2) + 1e-6).sum(axis=-1)
+    log_prob = log_prob - rescale_term
+
+    # from: https://github.com/google-deepmind/distrax/issues/216
+    # log_prob = normal.log_prob(unbound_action) - jnp.sum(
+    #     2 * (jnp.log(2) - unbound_action - jax.nn.softplus(-2 * unbound_action)), axis=-1
+    # )
 
     # we don't use this, but leaving here in case we need it
     # mean = jnp.tanh(mean) * self.action_scale + self.action_bias
 
-    return scaled_action, log_prob
+    return scaled_action, log_prob[..., jnp.newaxis]
 
 
 def run_experiment(cfg: DictConfig) -> Array:
