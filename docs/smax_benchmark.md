@@ -1,6 +1,6 @@
 # StarCraft Multi-Agent Challenge in JAX
 
-We trained Mava’s recurrent systems on eight varied SMAX scenarios, We executed a tuning sweep to identify the optimal hyperparameters for each scenario, followed by a benchmarking. The outcomes were then compared to the final win rates reported in [Rutherfordet al., 2023](https://arxiv.org/pdf/2311.10090.pdf), To ensure equitable comparisons, we adhered to specific criteria, including training over 10 million timesteps, utilising 64 parallel environments, and employing 10 different seeds.
+We trained Mava’s recurrent systems on eight varied SMAX scenarios, We executed a tuning sweep to identify the optimal hyperparameters for each scenario, followed by a benchmarking. The outcomes were then compared to the final win rates reported in [Rutherfordet al., 2023](https://arxiv.org/pdf/2311.10090.pdf). To ensure equitable comparisons, we adhered to specific criteria, including training over 10 million timesteps, utilising 64 parallel environments, and employing 10 different seeds.
 
 Please see below for Mava's recurrent IPPO and MAPPO performance on these scenarios.
 </br>
