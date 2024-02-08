@@ -105,6 +105,12 @@ class AutoResetWrapper(Wrapper):
     being processed each time `step` is called. Please use the `VmapAutoResetWrapper` instead.
     """
 
+    # todo: make this take in state also
+    def _obs_in_extras(self, timestep: TimeStep[Observation]) -> TimeStep[Observation]:
+        extras = timestep.extras
+        extras["final_observation"] = timestep.observation
+        return timestep.replace(extras=extras)
+
     def _auto_reset(self, state: State, timestep: TimeStep) -> Tuple[State, TimeStep[Observation]]:
         """Reset the state and overwrite `timestep.observation` with the reset observation
         if the episode has terminated.
@@ -138,7 +144,7 @@ class AutoResetWrapper(Wrapper):
         state, timestep = jax.lax.cond(
             timestep.last(),
             self._auto_reset,
-            lambda *x: x,
+            lambda st, ts: (st, self._obs_in_extras(ts)),
             state,
             timestep,
         )
@@ -366,7 +372,7 @@ def run_experiment(cfg: DictConfig) -> Array:
     def step(
         action: Array, obs: Array, env_state: State, buffer_state: BufferState
     ) -> Tuple[Array, State, BufferState, Dict]:
-        env_state, timestep = env.step(env_state, action)
+        env_state, timestep = jax.vmap(env.step)(env_state, action)
         next_obs = timestep.observation.agents_view
         rewards = timestep.reward[:, 0]
         # todo logical not
@@ -582,7 +588,7 @@ def run_experiment(cfg: DictConfig) -> Array:
     reset_keys = jnp.reshape(reset_keys, (n_devices, cfg.system.n_envs, -1))
 
     start_time = time.time()
-    env_state, first_timestep = jax.pmap(env.reset, axis_name="device")(reset_keys)
+    env_state, first_timestep = jax.pmap(jax.vmap(env.reset), axis_name="device")(reset_keys)
 
     # fill up buffer
     explore_keys = jax.random.split(key, n_devices)
