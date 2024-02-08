@@ -1,14 +1,14 @@
-<p align="center">
-    <a href="docs/images/mava_logos/mava_full_logo.png">
-        <img src="docs/images/mava_logos/mava_full_logo.png" alt="Mava logo" width="50%"/>
+<div style="text-align: center;">
+    <a href="docs/images/logos/mava_full_logo.png">
+        <img src="docs/images/logos/mava_full_logo.png" alt="Mava logo" style="width: 50%;"/>
     </a>
-</p>
+</div>
 
-<h2 align="center">
+<h2 style="text-align: center;">
     <p>Distributed Multi-Agent Reinforcement Learning in JAX</p>
 </h2>
 
-<div align="center">
+<div style="text-align: center;">
 <a href="https://www.python.org/doc/versions/">
       <img src="https://img.shields.io/badge/python-3.9-blue" alt="Python Versions">
 </a>
@@ -18,7 +18,7 @@
 <a  href="https://github.com/psf/black">
     <img src="https://img.shields.io/badge/code%20style-black-000000.svg" alt="Code Style" />
 </a>
-<a  href="http://mypy-lang.org/">
+<a  href="https://mypy-lang.org/">
     <img src="https://www.mypy-lang.org/static/mypy_badge.svg" alt="MyPy" />
 </a>
 <a href="https://arxiv.org/pdf/2107.01460.pdf">
@@ -28,13 +28,6 @@
 </div>
 
 ## Welcome to Mava! 🦁
-
-<div align="center">
-<h3>
-
-[**Installation**](#installation-) | [**Quickstart**](#quickstart-)
-
-</div>
 
 Mava provides simplified code for quickly iterating on ideas in multi-agent reinforcement learning (MARL) with useful implementations of MARL algorithms in JAX allowing for easy parallelisation across devices with JAX's `pmap`. Mava is a project originating in the Research Team at [InstaDeep](https://www.instadeep.com/).
 
@@ -54,25 +47,25 @@ Mava currently offers the following building blocks for MARL research:
 ### SMAX
 For comparing Mava’s stability to other JAX-based baseline algorithms, we train Mava’s recurrent IPPO and MAPPO systems on a broad range of [SMAX][smax] tasks. In all cases we do not rerun baselines but instead take results for final win rates from the [JaxMARL technical report](https://arxiv.org/pdf/2311.10090.pdf). For the full SMAX experiments results, please see the following [page](docs/smax_benchmark.md).
 
-<p align="center">
+<p style="text-align: center;">
  <a href="docs/images/smax_results/legend.png">
-        <img src="docs/images/smax_results/legend.png" alt="legend" width="40%"/>
+        <img src="docs/images/smax_results/legend.png" alt="legend" style="width: 40%;"/>
 </a>
 </p>
 
-<p align="center">
+<div style="text-align: center;">
     <a href="docs/images/smax_results/3s5z.png">
-        <img src="docs/images/smax_results/3s5z.png" alt="Mava ff mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+        <img src="docs/images/smax_results/3s5z.png" alt="Mava ff mappo tiny 2ag" style="width: 30%; display:inline-block; margin-right: 10px;"/>
     </a>
     <a href="docs/images/smax_results/6h_vs_8z.png">
-        <img src="docs/images/smax_results/6h_vs_8z.png" alt="Mava ff mappo tiny 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+        <img src="docs/images/smax_results/6h_vs_8z.png" alt="Mava ff mappo tiny 4ag" style="width: 30%; display:inline-block; margin-right: 10px;"/>
     </a>
     <a href="docs/images/smax_results/3s5z_vs_3s6z.png">
-        <img src="docs/images/smax_results/3s5z_vs_3s6z.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+        <img src="docs/images/smax_results/3s5z_vs_3s6z.png" alt="Mava ff mappo small 4ag" style="width: 30%; display:inline-block; margin-right: 10px;"/>
     </a>
     <br>
     <div style="text-align:center; margin-top: 10px;"> Mava Recurrent IPPO and MAPPO performance on the <code>3s5z</code>, <code>6h_vs_8z</code> and <code>3s5z_vs_3s6z</code> SMAX tasks.</div>
-</p>
+</div>
 
 ### Robotic Warehouse
 
@@ -80,65 +73,64 @@ All of the experiments below were performed using an NVIDIA Quadro RTX 4000 GPU 
 
 In order to show the utility of end-to-end JAX-based MARL systems and JAX-based environments we compare the speed of Mava against [EPyMARL][epymarl] as measured in total training wallclock time on simple [Robotic Warehouse][rware] (RWARE) tasks with 2 and 4 agents. Our aim is to illustrate the speed increases that are possible with using end-to-end Jax-based systems and we do not necessarily make an effort to achieve optimal performance. For EPyMARL, we use the hyperparameters as recommended by [Papoudakis et al. (2020)](https://arxiv.org/pdf/2006.07869.pdf) and for Mava we performed a basic grid search. In both cases, systems were trained up to 20 million total environment steps using 16 vectorised environments.
 
-<p align="center">
+<p style="text-align: center;">
  <a href="docs/images/rware_results/ff_mappo/main_readme/legend.png">
-        <img src="docs/images/rware_results/ff_mappo/main_readme/legend.png" alt="legend" width="80%"/>
+        <img src="docs/images/rware_results/ff_mappo/main_readme/legend.png" alt="legend" style="width: 80%;"/>
 </a>
 </p>
 
-<p align="center">
+<div style="text-align: center;">
     <a href="docs/images/rware_results/ff_mappo/main_readme/tiny-2ag-1.png">
-        <img src="docs/images/rware_results/ff_mappo/main_readme/tiny-2ag-1.png" alt="Mava ff mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+        <img src="docs/images/rware_results/ff_mappo/main_readme/tiny-2ag-1.png" alt="Mava ff mappo tiny 2ag" style="width: 30%; display:inline-block; margin-right: 10px;"/>
     </a>
     <a href="docs/images/rware_results/ff_mappo/main_readme/tiny-4ag-1.png">
-        <img src="docs/images/rware_results/ff_mappo/main_readme/tiny-4ag-1.png" alt="Mava ff mappo tiny 4ag" width="31%" style="display:inline-block; margin-right: 10px;"/>
+        <img src="docs/images/rware_results/ff_mappo/main_readme/tiny-4ag-1.png" alt="Mava ff mappo tiny 4ag" style="width: 31%; display:inline-block; margin-right: 10px;"/>
     </a>
     <a href="docs/images/rware_results/ff_mappo/main_readme/small-4ag-1.png">
-        <img src="docs/images/rware_results/ff_mappo/main_readme/small-4ag-1.png" alt="Mava ff mappo small 4ag" width="31%" style="display:inline-block; margin-right: 10px;"/>
+        <img src="docs/images/rware_results/ff_mappo/main_readme/small-4ag-1.png" alt="Mava ff mappo small 4ag" style="width: 31%; display:inline-block; margin-right: 10px;"/>
     </a>
-    <br>
-    <div style="text-align:center; margin-top: 10px;"> Mava feedforward MAPPO performance on the <code>tiny-2ag</code>, <code>tiny-4ag</code> and <code>small-4ag</code> RWARE tasks.</div>
-</p>
+    <div style="margin-top: 10px;"> Mava feedforward MAPPO performance on the <code>tiny-2ag</code>, <code>tiny-4ag</code> and <code>small-4ag</code> RWARE tasks.</div>
+</div>
 
 
-### 📌 An important note on the differences in converged performance
+### An important note on the differences in converged performance 📌
 
 In order to benefit from the wallclock speed-ups afforded by JAX-based systems it is required that environments also be written in JAX. It is for this reason that Mava does not use the exact same version of the RWARE environment as EPyMARL but instead uses a JAX-based implementation of RWARE found in [Jumanji][jumanji_rware], under the name RobotWarehouse. One of the notable differences in the underlying environment logic is that RobotWarehouse will not attempt to resolve agent collisions but will instead terminate an episode when agents do collide. In our experiments, this appeared to make the environment more challenging. For this reason we show the performance of Mava on Jumanji with and without termination upon collision indicated with `w/o collision` in the figure legends. For a more detailed discussion, please see the following [page](docs/jumanji_rware_comparison.md).
 
-### Level-Based Foraging
-Mava also supports [Jumanji][jumanji_lbf]'s LBF. We evaluate Mava's recurrent MAPPO system on LBF, against [EPyMARL][epymarl] (we used original [LBF](https://github.com/semitable/lb-foraging) for EPyMARL) in 2 and 4 agent settings up to 20 million timesteps. Both systems were trained using 16 vectorized environments. For the EPyMARL systems we use a NVIDIA A100 GPU and for the Mava systems we use a GeForce RTX 3050 laptop GPU with 4GB of memory. To show how Mava can generalise to different hardware, we also train the Mava systems on a TPU v3-8. We plan to publish comprehensive performance benchmarks for all Mava's algorithms across various LBF scenarios soon.
+### Level-Based Foraging 🌳
+Mava also supports [Jumanji][jumanji_lbf]'s LBF. We evaluate Mava's recurrent MAPPO system on LBF, against [EPyMARL][epymarl] (we used original [LBF](https://github.com/semitable/lb-foraging) for EPyMARL) in 2 and 4 agent settings up to 20 million timesteps. Both systems were trained using 16 vectorized environments. For the EPyMARL systems we use an NVIDIA A100 GPU and for the Mava systems we use a GeForce RTX 3050 laptop GPU with 4GB of memory. To show how Mava can generalise to different hardware, we also train the Mava systems on a TPU v3-8. We plan to publish comprehensive performance benchmarks for all Mava's algorithms across various LBF scenarios soon.
 
-<p align="center">
+<p style="text-align: center;">
  <a href="docs/images/lbf_results/legend_rec_mappo.png">
-        <img src="docs/images/lbf_results/legend_rec_mappo.png" alt="legend" width="60%"/>
+        <img src="docs/images/lbf_results/legend_rec_mappo.png" alt="legend" style="width: 60%;"/>
 </a>
 </p>
 
-<p align="center">
+<div style="text-align: center;">
     <a href="docs/images/lbf_results/2s-8x8-2p-2f-coop_rec_mappo.png">
-        <img src="docs/images/lbf_results/2s-8x8-2p-2f-coop_rec_mappo.png" alt="Mava ff mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+        <img src="docs/images/lbf_results/2s-8x8-2p-2f-coop_rec_mappo.png" alt="Mava ff mappo tiny 2ag" style="width: 30%; display:inline-block; margin-right: 10px;"/>
     </a>
     <a href="docs/images/lbf_results/15x15-4p-3f_rec_mappo.png">
-        <img src="docs/images/lbf_results/15x15-4p-3f_rec_mappo.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+        <img src="docs/images/lbf_results/15x15-4p-3f_rec_mappo.png" alt="Mava ff mappo small 4ag" style="width: 30%; display:inline-block; margin-right: 10px;"/>
     </a>
     <br>
     <div style="text-align:center; margin-top: 10px;"> Mava Recurrent MAPPO performance on the <code>2s-8x8-2p-2f-coop</code>, and <code>15x15-4p-3fz</code> Level-Based Foraging tasks.</div>
-</p>
+</div>
 
-### 🧨 Steps per second experiments using vectorised environments
+### Steps per second experiments using vectorised environments 🧨
 
 Furthermore, we illustrate the speed of Mava by showing the steps per second as the number of parallel environments is increased. These steps per second scaling plots were computed using a standard laptop GPU, specifically an RTX-3060 GPU with 6GB memory.
 
-<p align="center">
+<div style="text-align: center;">
     <a href="docs/images/speed_results/mava_sps_results.png">
-        <img src="docs/images/speed_results/mava_sps_results.png" alt="Mava sps" width="55%"/>
+        <img src="docs/images/speed_results/mava_sps_results.png" alt="Mava sps" style="width: 55%;"/>
     </a>
     <a href="docs/images/speed_results/ff_mappo_speed_comparison.png">
-        <img src="docs/images/speed_results/ff_mappo_speed_comparison.png" alt="Mava ff mappo speed comparison" width="39.33%" style="display:inline-block; margin-right: 10px;"/>
+        <img src="docs/images/speed_results/ff_mappo_speed_comparison.png" alt="Mava ff mappo speed comparison" style="width:39.33%; display:inline-block; margin-right: 10px;"/>
     </a>
     <br>
     <div style="text-align:center; margin-top: 10px;"> Mava steps per second scaling with increased vectorised environments and total training run time for 20M environment steps.</div>
-</p>
+</div>
 
 ## Code Philosophy 🧘
 

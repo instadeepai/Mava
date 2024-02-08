@@ -1,0 +1,72 @@
+
+# yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
+site_name: Mava Documentation
+site_author: InstaDeep Research
+site_url: https://instadeepai.github.io/Mava/
+site_dir: public
+
+theme:
+  name: material
+  logo: images/logos/instadeep_logo.png
+  favicon: images/logos/instadeep_logo.png
+  language: en
+  features:
+    - navigation.tracking # the URL is automatically updated with the active anchor
+    - navigation.sections # top-level sections are rendered as groups in the sidebar
+    - navigation.tabs.sticky # navigation tabs will lock below the header and always remain visible when scrolling
+    - navigation.indexes # documents can be directly attached to sections
+    - search.highlight # highlight search result
+    - search.share # share button
+    - search.suggest # smart suggestion
+    - toc.integrate
+    - toc.follow
+    - content.code.annotate
+    - navigation.tabs
+    - navigation.top
+  palette:
+    - scheme: default
+      primary: white
+      accent: deep purple
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - scheme: slate
+      primary: black
+      accent: deep purple
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+
+nav:
+  - Overview: 'index.md'
+  - Installation: 'DETAILED_INSTALL.md'
+  - Contributing: 'CONTRIBUTING.md'
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:pymdownx.emoji.to_svg
+      emoji_index: !!python/name:pymdownx.emoji.gemoji
+  - pymdownx.snippets:
+      base_path: ./
+  - pymdownx.pathconverter:
+      base_path: ./
+      relative_path: docs
+  - toc:
+      permalink: "#"
+      toc_depth: 3
+  - pymdownx.highlight:
+      linenums: true
+  - pymdownx.inlinehilite
+  - def_list
+  - admonition
+  - pymdownx.details
+
+# Git repo
+repo_name: instadeepai/Mava
+repo_url: https://github.com/instadeepai/Mava
+edit_uri: edit/develop/docs/
+
+# Copyright
+copyright: InstaDeep © 2024 Copyright, all rights reserved.
