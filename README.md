@@ -91,10 +91,10 @@ In order to show the utility of end-to-end JAX-based MARL systems and JAX-based 
         <img src="docs/images/rware_results/ff_mappo/main_readme/tiny-2ag-1.png" alt="Mava ff mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
     <a href="docs/images/rware_results/ff_mappo/main_readme/tiny-4ag-1.png">
-        <img src="docs/images/rware_results/ff_mappo/main_readme/tiny-4ag-1.png" alt="Mava ff mappo tiny 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+        <img src="docs/images/rware_results/ff_mappo/main_readme/tiny-4ag-1.png" alt="Mava ff mappo tiny 4ag" width="31%" style="display:inline-block; margin-right: 10px;"/>
     </a>
     <a href="docs/images/rware_results/ff_mappo/main_readme/small-4ag-1.png">
-        <img src="docs/images/rware_results/ff_mappo/main_readme/small-4ag-1.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+        <img src="docs/images/rware_results/ff_mappo/main_readme/small-4ag-1.png" alt="Mava ff mappo small 4ag" width="31%" style="display:inline-block; margin-right: 10px;"/>
     </a>
     <br>
     <div style="text-align:center; margin-top: 10px;"> Mava feedforward MAPPO performance on the <code>tiny-2ag</code>, <code>tiny-4ag</code> and <code>small-4ag</code> RWARE tasks.</div>
@@ -104,21 +104,6 @@ In order to show the utility of end-to-end JAX-based MARL systems and JAX-based 
 ### 📌 An important note on the differences in converged performance
 
 In order to benefit from the wallclock speed-ups afforded by JAX-based systems it is required that environments also be written in JAX. It is for this reason that Mava does not use the exact same version of the RWARE environment as EPyMARL but instead uses a JAX-based implementation of RWARE found in [Jumanji][jumanji_rware], under the name RobotWarehouse. One of the notable differences in the underlying environment logic is that RobotWarehouse will not attempt to resolve agent collisions but will instead terminate an episode when agents do collide. In our experiments, this appeared to make the environment more challenging. For this reason we show the performance of Mava on Jumanji with and without termination upon collision indicated with `w/o collision` in the figure legends. For a more detailed discussion, please see the following [page](docs/jumanji_rware_comparison.md).
-
-### 🧨 Steps per second experiments using vectorised environments
-
-Furthermore, we illustrate the speed of Mava by showing the steps per second as the number of parallel environments is increased. These steps per second scaling plots were computed using a standard laptop GPU, specifically an RTX-3060 GPU with 6GB memory.
-
-<p align="center">
-    <a href="docs/images/speed_results/mava_sps_results.png">
-        <img src="docs/images/speed_results/mava_sps_results.png" alt="Mava sps" width="55%"/>
-    </a>
-    <a href="docs/images/speed_results/ff_mappo_speed_comparison.png">
-        <img src="docs/images/speed_results/ff_mappo_speed_comparison.png" alt="Mava ff mappo speed comparison" width="39.33%" style="display:inline-block; margin-right: 10px;"/>
-    </a>
-    <br>
-    <div style="text-align:center; margin-top: 10px;"> Mava steps per second scaling with increased vectorised environments and total training run time for 20M environment steps.</div>
-</p>
 
 ### Level-Based Foraging
 Mava also supports [Jumanji][jumanji_lbf]'s LBF. We evaluate Mava's recurrent MAPPO system on LBF, against [EPyMARL][epymarl] (we used original [LBF](https://github.com/semitable/lb-foraging) for EPyMARL) in 2 and 4 agent settings up to 20 million timesteps. Both systems were trained using 16 vectorized environments. For the EPyMARL systems we use a NVIDIA A100 GPU and for the Mava systems we use a GeForce RTX 3050 laptop GPU with 4GB of memory. To show how Mava can generalise to different hardware, we also train the Mava systems on a TPU v3-8. We plan to publish comprehensive performance benchmarks for all Mava's algorithms across various LBF scenarios soon.
@@ -138,6 +123,21 @@ Mava also supports [Jumanji][jumanji_lbf]'s LBF. We evaluate Mava's recurrent MA
     </a>
     <br>
     <div style="text-align:center; margin-top: 10px;"> Mava Recurrent MAPPO performance on the <code>2s-8x8-2p-2f-coop</code>, and <code>15x15-4p-3fz</code> Level-Based Foraging tasks.</div>
+</p>
+
+### 🧨 Steps per second experiments using vectorised environments
+
+Furthermore, we illustrate the speed of Mava by showing the steps per second as the number of parallel environments is increased. These steps per second scaling plots were computed using a standard laptop GPU, specifically an RTX-3060 GPU with 6GB memory.
+
+<p align="center">
+    <a href="docs/images/speed_results/mava_sps_results.png">
+        <img src="docs/images/speed_results/mava_sps_results.png" alt="Mava sps" width="55%"/>
+    </a>
+    <a href="docs/images/speed_results/ff_mappo_speed_comparison.png">
+        <img src="docs/images/speed_results/ff_mappo_speed_comparison.png" alt="Mava ff mappo speed comparison" width="39.33%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+    <br>
+    <div style="text-align:center; margin-top: 10px;"> Mava steps per second scaling with increased vectorised environments and total training run time for 20M environment steps.</div>
 </p>
 
 ## Code Philosophy 🧘
