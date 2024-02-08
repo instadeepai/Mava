@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import time
+from datetime import datetime
 from typing import Any, Dict, NamedTuple, Tuple
 
 import chex
@@ -25,8 +26,10 @@ import jax
 # jax.config.update("jax_platform_name", "cpu")
 import jax.numpy as jnp
 import jaxmarl
-import numpy as np
+
+# import numpy as np
 import optax
+from brax.io import html
 from chex import PRNGKey
 from colorama import Fore, Style
 from flashbax.buffers.flat_buffer import TrajectoryBuffer
@@ -90,6 +93,57 @@ class Transition(NamedTuple):
 Metrics = Dict[str, Array]
 
 BufferState: TypeAlias = TrajectoryBufferState[Transition]
+
+
+class AutoResetWrapper(Wrapper):
+    """Automatically resets environments that are done. Once the terminal state is reached,
+    the state, observation, and step_type are reset. The observation and step_type of the
+    terminal TimeStep is reset to the reset observation and StepType.LAST, respectively.
+    The reward, discount, and extras retrieved from the transition to the terminal state.
+    WARNING: do not `jax.vmap` the wrapped environment (e.g. do not use with the `VmapWrapper`),
+    which would lead to inefficient computation due to both the `step` and `reset` functions
+    being processed each time `step` is called. Please use the `VmapAutoResetWrapper` instead.
+    """
+
+    def _auto_reset(self, state: State, timestep: TimeStep) -> Tuple[State, TimeStep[Observation]]:
+        """Reset the state and overwrite `timestep.observation` with the reset observation
+        if the episode has terminated.
+        """
+        if not hasattr(state, "key"):
+            raise AttributeError(
+                "This wrapper assumes that the state has attribute key which is used"
+                " as the source of randomness for automatic reset"
+            )
+
+        # Make sure that the random key in the environment changes at each call to reset.
+        # State is a type variable hence it does not have key type hinted, so we type ignore.
+        key, _ = jax.random.split(state.key)  # type: ignore
+        state, reset_timestep = self._env.reset(key)
+
+        extras = timestep.extras
+        extras["final_observation"] = timestep.observation
+
+        # Replace observation with reset observation.
+        timestep = timestep.replace(  # type: ignore
+            observation=reset_timestep.observation, extras=extras
+        )
+
+        return state, timestep
+
+    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep[Observation]]:
+        """Step the environment, with automatic resetting if the episode terminates."""
+        state, timestep = self._env.step(state, action)
+
+        # Overwrite the state and timestep appropriately if the episode terminates.
+        state, timestep = jax.lax.cond(
+            timestep.last(),
+            self._auto_reset,
+            lambda *x: x,
+            state,
+            timestep,
+        )
+
+        return state, timestep
 
 
 # todo: jumanji PR
@@ -204,13 +258,13 @@ def sample_action(
 
     # MultivariateNormalDiag sums on last dim
     log_prob = normal.log_prob(unbound_action)
-    rescale_term = jnp.log(action_scale * (1 - bound_action**2) + 1e-6).sum(axis=-1)
-    log_prob = log_prob - rescale_term
+    # rescale_term = jnp.log(action_scale * (1 - bound_action**2) + 1e-6).sum(axis=-1)
+    # log_prob = log_prob - rescale_term
 
     # from: https://github.com/google-deepmind/distrax/issues/216
-    # log_prob = normal.log_prob(unbound_action) - jnp.sum(
-    #     2 * (jnp.log(2) - unbound_action - jax.nn.softplus(-2 * unbound_action)), axis=-1
-    # )
+    log_prob = normal.log_prob(unbound_action) - jnp.sum(
+        2 * (jnp.log(2) - unbound_action - jax.nn.softplus(-2 * unbound_action)), axis=-1
+    )
 
     # we don't use this, but leaving here in case we need it
     # mean = jnp.tanh(mean) * self.action_scale + self.action_bias
@@ -228,8 +282,8 @@ def run_experiment(cfg: DictConfig) -> Array:
     env = jaxmarl.make(cfg.env.env_name, **cfg.env.kwargs)
     env = JaxMarlWrapper(env)
     env = AgentIDWrapper(env)
+    env = AutoResetWrapper(env)
     env = RecordEpisodeMetrics(env)
-    env = VmapAutoResetWrapper(env)
 
     n_agents = env.action_spec().shape[0]
     action_dim = env.action_spec().shape[1]
@@ -548,11 +602,11 @@ def run_experiment(cfg: DictConfig) -> Array:
     )
     next_obs, env_state, buffer_state, metrics, key = pmaped_explore(init_explore_state)
 
-    ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
-    # Likely that the episode hasn't ended yet and so we need to replace the nan with 0.
-    mean_return = np.nan_to_num(np.mean(ep_returns))
+    # ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
+    # # Likely that the episode hasn't ended yet and so we need to replace the nan with 0.
+    # mean_return = np.nan_to_num(np.mean(ep_returns))
     sps = n_devices * cfg.system.explore_steps / (time.time() - start_time)
-    logger.log({"mean episode return": mean_return}, cfg.system.explore_steps, 0, LogEvent.ACT)
+    logger.log(metrics, cfg.system.explore_steps, 0, LogEvent.ACT)
 
     pmaped_steps = 1024
     steps_btwn_log = n_devices * cfg.system.n_envs * cfg.system.act_steps * pmaped_steps
@@ -571,20 +625,50 @@ def run_experiment(cfg: DictConfig) -> Array:
     for t in range(start, int(cfg.system.total_timesteps), steps_btwn_log):
         learner_state, (metrics, losses) = pmaped_learn(learner_state)
 
-        ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
-        mean_return = np.mean(ep_returns)
-        max_return: float = np.max(ep_returns)
-        ep_logs = {"mean episode return": mean_return, "max episode return": max_return}
+        # ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
+        # mean_return = np.mean(ep_returns)
+        # max_return: float = np.max(ep_returns)
+        # ep_logs = {"mean episode return": mean_return, "max episode return": max_return}
         # Multiply by learn steps here because anakin steps per second is learn + act steps
         # But we want to make sure we're counting env steps correctly so it's not included
         # in the loop counter.
         sps = t * cfg.system.learn_steps / (time.time() - start_time)
 
-        logger.log({"steps per second": sps}, t, 0, LogEvent.MISC)
-        logger.log(ep_logs, t, 0, LogEvent.ACT)
+        logger.log({"step": t, "steps per second": sps}, t, 0, LogEvent.MISC)
+        logger.log(metrics, t, 0, LogEvent.ACT)
         logger.log(losses | {"log_alpha": learner_state.params.log_alpha}, t, 0, LogEvent.TRAIN)
 
-    return mean_return
+    #     key, step_key = jax.random.split(key)
+    #     action = {f"agent_{i}": jnp.ones(1) for i in range(6)}
+    #     obs, state, reward, done, infos = env.step(step_key, state, action)
+    #
+    #     states.append(state)
+    #     rews.append(reward)
+    #
+    # print(states[0])
+    # html.save("test2.html", env.sys, [s.pipeline_state for s in states])
+    # save animation
+    states = []
+    single_env = env._env
+    key, reset_key = jax.random.split(jax.random.PRNGKey(1))
+
+    state, ts = single_env.reset(reset_key)
+    actor_apply = jax.jit(actor.apply)
+    env_step = jax.jit(single_env.step)
+    sample_action_jit = jax.jit(sample_action)
+
+    for _ in range(1000):
+        key, step_key = jax.random.split(key)
+        mean, log_std = actor_apply(actor_params, ts.observation.agents_view)
+        action, _ = sample_action_jit(mean, log_std, step_key, action_scale, action_bias)
+        state, ts = env_step(state, action.squeeze(0))
+        states.append(state)
+
+    anim_file = f"anim_{cfg.env.env_name}_{datetime.now().strftime('%Y%m%d%H%M%S')}.html"
+    html.save(anim_file, env.unwrapped.sys, [s.env_state.state.pipeline_state for s in states])
+    # env.unwrapped.animate(states)
+
+    return jnp.mean(metrics["episode_return"])
 
 
 @hydra.main(config_path="../configs", config_name="default_ff_isac.yaml", version_base="1.2")

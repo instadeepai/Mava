@@ -24,6 +24,7 @@ from gymnax.environments import spaces as gymnax_spaces
 from jaxmarl.environments import spaces as jaxmarl_spaces
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
 from jumanji import specs
+from jumanji.env import Environment
 from jumanji.types import StepType, TimeStep, restart
 from jumanji.wrappers import Wrapper
 
@@ -299,6 +300,10 @@ class JaxMarlWrapper(Wrapper):
     def get_global_state(self, obs: Dict[str, Array]) -> Array:
         """Get global state from observation and copy it for each agent."""
         return jnp.tile(jnp.array(obs["world_state"]), (self._env.num_agents, 1))
+
+    @property
+    def unwrapped(self) -> Environment:
+        return self._env
 
     def close(self) -> None:
         return None
