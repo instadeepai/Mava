@@ -173,7 +173,7 @@ Please read our [contributing docs](docs/CONTRIBUTING.md) for details on how to 
 
 We plan to iteratively expand Mava in the following increments:
 
-- 🌴 Support for more multi-agent Jumanji environments.
+- 🌴 Support for more environments.
 - 🔁 More robust recurrent systems.
 - 🌳 Support for non JAX-based environments.
 - 🦾 Support for off-policy algorithms.
@@ -182,7 +182,7 @@ We plan to iteratively expand Mava in the following increments:
 Please do follow along as we develop this next phase!
 
 ## TensorFlow 2 Mava:
-Originally Mava was written in Tensorflow and if you would still like to use our **deprecated** TF2-based framework and systems please install `v0.1.3` of Mava (i.e. `pip install id-mava==0.1.3`).
+Originally Mava was written in Tensorflow 2. Support for the TF2-based framework and systems has now been fully **deprecated**. If you would still like to use it, please install `v0.1.3` of Mava (i.e. `pip install id-mava==0.1.3`).
 
 ## See Also 🔎
 
