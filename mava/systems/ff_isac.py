@@ -22,7 +22,7 @@ import flax.linen as nn
 import hydra
 import jax
 
-jax.config.update("jax_platform_name", "cpu")
+# jax.config.update("jax_platform_name", "cpu")
 import jax.numpy as jnp
 import jaxmarl
 import numpy as np
