@@ -121,7 +121,7 @@ Furthermore, we illustrate the speed of Mava by showing the steps per second as 
 </p>
 
 ### Level-Based Foraging
-Mava also supports [Jumanji][jumanji_lbf]'s LBF. We evaluate Mava's MAPPO recurrent system on LBF, against [EPyMARL][epymarl] (we used original [LBF](https://github.com/semitable/lb-foraging) for EPyMARL) in 2 and 4 agent settings over 20 million timesteps. Both systems are trained in 16 vectorized environments with GPUs: NVIDIA A-100 for EPyMARL and GeForce RTX 3050 with 4GB for Mava. Additionally, Mava is tested on 16 parallel environments using a TPU-V3. We plan to publish comprehensive performance metrics for Mava's algorithms across various LBF scenarios soon.
+Mava also supports [Jumanji][jumanji_lbf]'s LBF. We evaluate Mava's recurrent MAPPO system on LBF, against [EPyMARL][epymarl] (we used original [LBF](https://github.com/semitable/lb-foraging) for EPyMARL) in 2 and 4 agent settings up to 20 million timesteps. Both systems were trained using 16 vectorized environments. For the EPyMARL systems we use a NVIDIA A100 GPU and for the Mava systems we use a GeForce RTX 3050 laptop GPU with 4GB of memory. To show how Mava can generalise to different hardware, we also train the Mava systems on a TPU v3-8. We plan to publish comprehensive performance benchmarks for all Mava's algorithms across various LBF scenarios soon.
 
 <p align="center">
  <a href="docs/images/lbf_results/legend_rec_mappo.png">
