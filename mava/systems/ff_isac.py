@@ -35,6 +35,7 @@ from colorama import Fore, Style
 from flashbax.buffers.flat_buffer import TrajectoryBuffer
 from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.scope import FrozenVariableDict
+from flax.jax_utils import unreplicate
 from jax import Array
 from jax.typing import ArrayLike
 from jumanji.env import State
@@ -654,17 +655,20 @@ def run_experiment(cfg: DictConfig) -> Array:
     # print(states[0])
     # html.save("test2.html", env.sys, [s.pipeline_state for s in states])
     # save animation
-    states = []
-    single_env = env._env
-    key, reset_key = jax.random.split(jax.random.PRNGKey(1))
 
-    state, ts = single_env.reset(reset_key)
+    states = []
+    actor_params = unreplicate(learner_state.params.actor)
+
     actor_apply = jax.jit(actor.apply)
-    env_step = jax.jit(single_env.step)
+    env_step = jax.jit(env.step)
     sample_action_jit = jax.jit(sample_action)
 
+    _key, reset_key = jax.random.split(jax.random.PRNGKey(1))
+    state, ts = env.reset(reset_key)
+
     for _ in range(1000):
-        key, step_key = jax.random.split(key)
+        _key, step_key = jax.random.split(_key)
+
         mean, log_std = actor_apply(actor_params, ts.observation.agents_view)
         action, _ = sample_action_jit(mean, log_std, step_key, action_scale, action_bias)
         state, ts = env_step(state, action.squeeze(0))
@@ -672,7 +676,6 @@ def run_experiment(cfg: DictConfig) -> Array:
 
     anim_file = f"anim_{cfg.env.env_name}_{datetime.now().strftime('%Y%m%d%H%M%S')}.html"
     html.save(anim_file, env.unwrapped.sys, [s.env_state.state.pipeline_state for s in states])
-    # env.unwrapped.animate(states)
 
     return jnp.mean(metrics["episode_return"])
 
