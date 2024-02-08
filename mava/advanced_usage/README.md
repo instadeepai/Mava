@@ -6,20 +6,20 @@ Firstly, a vault must be created using the structure of an experience buffer. He
 ```py
 # Transition structure
 dummy_flashbax_transition = {
-    "done": jnp.zeros((config["system"]["num_agents"],), dtype=bool),
-    "action": jnp.zeros((config["system"]["num_agents"],), dtype=jnp.int32),
-    "reward": jnp.zeros((config["system"]["num_agents"],), dtype=jnp.float32),
+    "done": jnp.zeros((config.system.num_agents,), dtype=bool),
+    "action": jnp.zeros((config.system.num_agents,), dtype=jnp.int32),
+    "reward": jnp.zeros((config.system.num_agents,), dtype=jnp.float32),
     "observation": jnp.zeros(
         (
-            config["system"]["num_agents"],
+            config.system.num_agents,
             env.observation_spec().agents_view.shape[1],
         ),
         dtype=jnp.float32,
     ),
     "legal_action_mask": jnp.zeros(
         (
-            config["system"]["num_agents"],
-            config["system"]["num_actions"],
+            config.system.num_agents,
+            config.system.num_actions,
         ),
         dtype=bool,
     ),
@@ -27,7 +27,7 @@ dummy_flashbax_transition = {
 
 # Flashbax buffer
 buffer = fbx.make_flat_buffer(
-    max_length=int(5e6),
+    max_length=int(5e5),
     min_length=int(1),
     sample_batch_size=1,
     add_sequences=True,
@@ -49,7 +49,7 @@ We can now create a `Vault` for our data:
 ```py
 v = Vault(
     vault_name="our_system_name",
-    init_fbx_state=buffer_state,
+    experience_structure=buffer_state.experience,
     vault_uid="unique_vault_id",
 )
 ```
