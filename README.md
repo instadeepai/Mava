@@ -120,6 +120,26 @@ Furthermore, we illustrate the speed of Mava by showing the steps per second as 
     <div style="text-align:center; margin-top: 10px;"> Mava steps per second scaling with increased vectorised environments and total training run time for 20M environment steps.</div>
 </p>
 
+### Level-Based Foraging
+Mava also supports [Jumanji][jumanji_lbf]'s LBF. We evaluate Mava's MAPPO recurrent system on LBF, against [EPyMARL][epymarl] (we used original [LBF](https://github.com/semitable/lb-foraging) for EPyMARL) in 2 and 4 agent settings over 20 million timesteps. Both systems are trained in 16 vectorized environments with GPUs: NVIDIA A-100 for EPyMARL and GeForce RTX 3050 with 4GB for Mava. Additionally, Mava is tested on 16 parallel environments using a TPU-V3. We plan to publish comprehensive performance metrics for Mava's algorithms across various LBF scenarios soon.
+
+<p align="center">
+ <a href="docs/images/lbf_results/legend_rec_mappo.png">
+        <img src="docs/images/lbf_results/legend_rec_mappo.png" alt="legend" width="60%"/>
+</a>
+</p>
+
+<p align="center">
+    <a href="docs/images/lbf_results/2s-8x8-2p-2f-coop_rec_mappo.png">
+        <img src="docs/images/lbf_results/2s-8x8-2p-2f-coop_rec_mappo.png" alt="Mava ff mappo tiny 2ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+    <a href="docs/images/lbf_results/15x15-4p-3f_rec_mappo.png">
+        <img src="docs/images/lbf_results/15x15-4p-3f_rec_mappo.png" alt="Mava ff mappo small 4ag" width="30%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
+    <br>
+    <div style="text-align:center; margin-top: 10px;"> Mava Recurrent MAPPO performance on the <code>2s-8x8-2p-2f-coop</code>, and <code>15x15-4p-3fz</code> Level-Based Foraging tasks.</div>
+</p>
+
 ## Code Philosophy 🧘
 
 The current code in Mava is adapted from [PureJaxRL](purejaxrl) which provides high-quality single-file implementations with research-friendly features. In turn, PureJaxRL is inspired by the code philosophy from [CleanRL][cleanrl]. Along this vein of easy-to-use and understandable RL codebases, Mava is not designed to be a modular library and is not meant to be imported. Our repository focuses on simplicity and clarity in its implementations while utilising the advantages offered by JAX such as `pmap` and `vmap`, making it an excellent resource for researchers and practitioners to build upon.
