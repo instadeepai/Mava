@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 import chex
 import flax.linen as nn
@@ -24,18 +24,20 @@ from omegaconf import DictConfig
 
 from mava.types import (
     ActorApply,
+    ContActorApply,
+    ContRecActorApply,
     EvalFn,
     EvalState,
     ExperimentOutput,
     RecActorApply,
     RNNEvalState,
 )
-from mava.utils.training import select_action_eval_cont_ff, select_action_eval_cont_rnn
+from mava.utils.training import select_action_eval_cont
 
 
 def get_ff_evaluator_fn(
     env: Environment,
-    apply_fn: ActorApply,
+    apply_fn: Union[ActorApply, ContActorApply],
     config: DictConfig,
     log_win_rate: bool = False,
     eval_multiplier: int = 1,
@@ -65,18 +67,20 @@ def get_ff_evaluator_fn(
             # Select action.
             key, policy_key = jax.random.split(key)
             if config.env.actions_type == "continuous":
-                action = select_action_eval_cont_ff(
-                    apply_fn(params, last_timestep.observation),
+                mean, log_std = apply_fn(params, last_timestep.observation)
+                action = select_action_eval_cont(
+                    mean,
+                    log_std,
                     policy_key,
-                    config.env.env_name,
+                    config,
                 )
 
             else:
                 pi = apply_fn(params, last_timestep.observation)
                 if config.arch.evaluation_greedy:
-                    action = pi.mode()
+                    action = pi.mode()  # type: ignore
                 else:
-                    action = pi.sample(seed=policy_key)
+                    action = pi.sample(seed=policy_key)  # type: ignore
 
             # Step the environment.
             env_state, timestep = env.step(env_state, action)
@@ -147,7 +151,7 @@ def get_ff_evaluator_fn(
 
 def get_rnn_evaluator_fn(
     env: Environment,
-    apply_fn: RecActorApply,
+    apply_fn: Union[RecActorApply, ContRecActorApply],
     config: DictConfig,
     scanned_rnn: nn.Module,
     log_win_rate: bool = False,
@@ -184,14 +188,15 @@ def get_rnn_evaluator_fn(
 
             # Run the network.
             if config.env.actions_type == "continuous":
-                hstate, mean, std = apply_fn(params, hstate, ac_in)  # type: ignore
-                action = select_action_eval_cont_rnn(
-                    (mean, std),  # type: ignore
+                hstate, mean, log_std = apply_fn(params, hstate, ac_in)  # type: ignore
+                action = select_action_eval_cont(
+                    mean,
+                    log_std,
                     policy_key,
-                    config.env.env_name,
+                    config,
                 )
             else:
-                hstate, pi = apply_fn(params, hstate, ac_in)
+                hstate, pi = apply_fn(params, hstate, ac_in)  # type: ignore
                 if config.arch.evaluation_greedy:
                     action = pi.mode()
                 else:
@@ -311,7 +316,7 @@ def evaluator_setup(
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
         assert scanned_rnn is not None
-        out_axes = (1, 2, 2) if config.env.actions_type == "continuous" else (1, 2)
+        out_axes = (1, 2, 0) if config.env.actions_type == "continuous" else (1, 2)
         vmapped_eval_apply_fn = jax.vmap(
             network.apply, in_axes=(None, 1, (2, None)), out_axes=out_axes
         )

@@ -13,3 +13,5 @@ kwargs:
   # Note: "max" adds one-hot for the agent's ID. Homogeneous tasks: ant_4x2, walker2d_2x3
 
 actions_type: continuous # The type of actions used in this env (Note: use the mlp_continuous.yaml in this case).
+clip_action: 1  # clip_action = 0.4 if env_name == "humanoid_9|8" else 1
+# This is used to transform the action interval: IF action in [-clip_action, clip_action] -> clip_action * action

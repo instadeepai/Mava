@@ -15,6 +15,7 @@
 from typing import Callable, Tuple, Union
 
 import distrax
+import jax
 import jax.numpy as jnp
 from chex import Array, PRNGKey
 from omegaconf import DictConfig
@@ -34,7 +35,7 @@ def make_learning_rate_schedule(init_lr: float, config: DictConfig) -> Callable:
         relevant arguments to the system config and then parsing them accordingly here.
     """
 
-    def linear_scedule(count: int) -> float:
+    def linear_scheduler(count: int) -> float:
         frac: float = (
             1.0
             - (count // (config.system.ppo_epochs * config.system.num_minibatches))
@@ -42,7 +43,7 @@ def make_learning_rate_schedule(init_lr: float, config: DictConfig) -> Callable:
         )
         return init_lr * frac
 
-    return linear_scedule
+    return linear_scheduler
 
 
 def make_learning_rate(init_lr: float, config: DictConfig) -> Union[float, Callable]:
@@ -61,77 +62,110 @@ def make_learning_rate(init_lr: float, config: DictConfig) -> Union[float, Calla
         return init_lr
 
 
+def get_actor_policy(mean: Array, log_std: Array) -> distrax.MultivariateNormalDiag:
+    """Gets the actor policy based on mean and log_std from the actor's network.
+
+    Args:
+        mean: The mean values from the actor's network.
+        log_std: The log of the std values from the actor's network.
+
+    Returns:
+        distrax.MultivariateNormalDiag: The actor policy distribution.
+    """
+    return distrax.MultivariateNormalDiag(mean, jnp.exp(log_std))
+
+
 def select_action_cont_ppo(
-    actor_output: Tuple[Array, Array],
+    mean: Array,
+    log_std: Array,
     key: PRNGKey,
-    env_name: str,
+    config: DictConfig,
 ) -> Tuple[Array, Array, Array]:
-    """Select action for the continous action for systems given the actor output."""
+    """Selects an action for the continuous action for systems given the actor output.
 
-    actor_mean, actor_log_std = actor_output
-    # actor_log_std_logits = jnp.tile(actor_log_std_logits, (config.arch.num_envs,1))
-    actor_policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
+    Args:
+        mean: The mean values.
+        log_std: The log of std values.
+        key: The PRNGKey for random sampling.
+        config: The system config.
 
-    raw_action, log_prob = actor_policy.sample_and_log_prob(seed=key)
-    action, log_prob = transform_actions_log(env_name, raw_action, log_prob)
-
-    return raw_action, action, log_prob
+    Returns:
+        Tuple[Array, Array, Array]: The unbound action, the clipped action, and the log prob.
+    """
+    actor_policy = get_actor_policy(mean, log_std)
+    unbound_action, log_prob = actor_policy.sample_and_log_prob(seed=key)
+    action, log_prob = transform_actions_log(config, unbound_action, log_prob)
+    return unbound_action, action, log_prob
 
 
 def get_logprob_entropy(
     mean: Array,
     log_std: Array,
     action: Array,
-    env_name: str,
+    config: DictConfig,
 ) -> Tuple[Array, Array]:
-    """Get the log probability and entropy of a given mean, log_std and action."""
-    actor_policy = distrax.MultivariateNormalDiag(mean, jnp.exp(log_std))
+    """Gets the log probability and entropy of a given mean, log_std, and action.
+
+    Args:
+        mean: The mean values.
+        log_std (Array): The log of std values.
+        action (Array): The action values.
+        config (DictConfig): The system config.
+
+    Returns:
+        Tuple[Array, Array]: The log probability and the entropy.
+    """
+    actor_policy = get_actor_policy(mean, log_std)
     log_prob = actor_policy.log_prob(action)
     entropy = actor_policy.entropy().mean()
-    _, log_prob = transform_actions_log(env_name, action, log_prob)
+    _, log_prob = transform_actions_log(config, action, log_prob)
     return log_prob, entropy
 
 
-def select_action_eval_cont_ff(
-    actor_output: Tuple[Array, Array],
+def select_action_eval_cont(
+    mean: Array,
+    log_std: Array,
     key: PRNGKey,
-    env_name: str,
-) -> Union[Array, Tuple[Array, Array]]:
-    """Select action for the continous action for the FF-systems given the actor output."""
-    mean, log_std = actor_output
-    actor_policy = distrax.MultivariateNormalDiag(mean, log_std)
-
-    raw_action = actor_policy.sample(seed=key)
-    return transform_actions_log(env_name, raw_action, None)
-
-
-def select_action_eval_cont_rnn(
-    actor_output: Tuple[Array, Array],
-    key: PRNGKey,
-    env_name: str,
+    config: DictConfig,
 ) -> Array:
-    """Select action for the continous action for the Rec-systems given the actor output."""
-    mean, log_std = actor_output
+    """Selects an action for the continuous action given the actor output.
 
-    actor_policy = distrax.MultivariateNormalDiag(mean, log_std)
-    raw_action = actor_policy.sample(seed=key)
-    action = transform_actions_log(env_name, raw_action, None)
+    Args:
+        mean: The mean values.
+        log_std: The log of std values.
+        key: The PRNGKey for random sampling.
+        config: The system config.
 
-    return action
+    Returns:
+        Array: Return the clipped action.
+    """
+    actor_policy = get_actor_policy(mean, log_std)
+    unbound_action = actor_policy.sample(seed=key)
+    return transform_actions_log(config, unbound_action, None)
 
 
 def transform_actions_log(
-    env_name: str, raw_action: Array, log_prob: Array, n: int = 1
+    config: DictConfig,
+    unbound_action: Array,
+    log_prob: Array,
 ) -> Union[Array, Tuple[Array, Array]]:
-    """Transform action and log_prob values"""
+    """Transforms action and log_prob values.
 
-    # IF action in [-N, N] and N != 1 ELSE [-1, 1] and N == 1
-    # n = 0.4 if env_name == "humanoid_9|8" else 1
-    action = n * jnp.tanh(raw_action)
+    Args:
+        config: The system config.
+        unbound_action: The unbounded action values.
+        log_prob: The log probability values.
+
+    Returns:
+        Union[Array, Tuple[Array, Array]]: Either the action or the action and log prob.
+    """
+    n = config.env.clip_action
+    clipped_action = jnp.clip(jnp.tanh(unbound_action), -n, n)
     if log_prob is None:
-        return action  # during evaluation.
-
+        return clipped_action  # during evaluation.
     # Note: jnp.log(derivative of action equation)
-    log_prob -= jnp.sum(jnp.log(n * (1 - jnp.tanh(raw_action) ** 2) + 1e-6), axis=-1)
-
-    return action, log_prob
+    # log_prob -= jnp.sum(jnp.log(n * (1 - jnp.tanh(unbound_action) ** 2) + 1e-6), axis=-1)
+    log_prob -= jnp.sum(
+        2 * (jnp.log(2) - unbound_action - jax.nn.softplus(-2 * unbound_action)), axis=-1
+    )
+    return clipped_action, log_prob

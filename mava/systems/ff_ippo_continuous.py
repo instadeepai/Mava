@@ -94,7 +94,7 @@ def get_learner_fn(
                 params.actor_params, last_timestep.observation
             )
             raw_action, action, log_prob = select_action_cont_ppo(
-                (actor_mean, actor_log_std), policy_key, config.env.env_name
+                actor_mean, actor_log_std, policy_key, config
             )
             value = critic_apply_fn(params.critic_params, last_timestep.observation)
 
@@ -172,7 +172,7 @@ def get_learner_fn(
                     # RERUN NETWORK
                     actor_mean, actor_log_std = actor_apply_fn(actor_params, traj_batch.obs)
                     log_prob, entropy = get_logprob_entropy(
-                        actor_mean, actor_log_std, traj_batch.action, config.env.env_name
+                        actor_mean, actor_log_std, traj_batch.action, config
                     )
 
                     # CALCULATE ACTOR LOSS
@@ -392,7 +392,7 @@ def learner_setup(
     vmapped_actor_network_apply_fn = jax.vmap(
         actor_network.apply,
         in_axes=(None, 1),
-        out_axes=(1),
+        out_axes=(1, 0),
     )
     vmapped_critic_network_apply_fn = jax.vmap(
         critic_network.apply,

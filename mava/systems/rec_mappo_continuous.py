@@ -120,7 +120,7 @@ def get_learner_fn(
 
             # Sample action from the policy and squeeze out the batch dimension.
             raw_action, action, log_prob = select_action_cont_ppo(
-                (actor_mean, actor_log_std), policy_key, config.env.env_name
+                actor_mean, actor_log_std, policy_key, config
             )
             value, raw_action, action, log_prob = (
                 value.squeeze(0),
@@ -242,7 +242,7 @@ def get_learner_fn(
                         actor_params, traj_batch.hstates.policy_hidden_state[0], obs_and_done
                     )
                     log_prob, entropy = get_logprob_entropy(
-                        actor_mean, actor_log_std, traj_batch.action, config.env.env_name
+                        actor_mean, actor_log_std, traj_batch.action, config
                     )
 
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
@@ -529,7 +529,7 @@ def learner_setup(
     vmapped_actor_network_apply_fn = jax.vmap(
         actor_network.apply,
         in_axes=(None, 1, (2, None)),
-        out_axes=(1, 2, 2),
+        out_axes=(1, 2, 0),
     )
     # Vmap network apply function over number of agents.
     vmapped_critic_network_apply_fn = jax.vmap(
