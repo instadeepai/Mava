@@ -206,6 +206,7 @@ class VmapAutoResetWrapper(Wrapper):
 
 
 # ALGO LOGIC: initialize agent here:
+# todo: should this contain both networks?
 class SoftQNetwork(nn.Module):
     def setup(self) -> None:
         self.net = nn.Sequential([nn.Dense(256), nn.relu, nn.Dense(256), nn.relu, nn.Dense(1)])
@@ -383,11 +384,8 @@ def make_learn(
     rb: TrajectoryBuffer,
     target_entropy: chex.Array,
 ) -> Tuple[
-    Callable[
-        [int, Tuple[Array, State, BufferState, Dict, chex.PRNGKey]],
-        Tuple[Array, State, BufferState, Dict, chex.PRNGKey],
-    ],
-    Callable[[LearnerState, Any], Tuple[LearnerState, Tuple[Metrics, Metrics]]],
+    Callable[[LearnerState], Tuple[LearnerState, Metrics]],
+    Callable[[LearnerState], Tuple[LearnerState, Tuple[Metrics, Metrics]]],
 ]:
     actor, q = nns
     actor_opt, q_opt, alpha_opt = opts
@@ -565,21 +563,6 @@ def make_learn(
 
         return (buffer_state, params, opt_state, t, key), losses
 
-    scanned_learn = lambda state: jax.lax.scan(
-        sample_and_learn, state, None, length=cfg.system.learn_steps
-    )
-
-    # todo: make this scannable, not for_i
-    def explore(
-        _: int, carry: Tuple[Array, State, BufferState, Metrics, chex.PRNGKey]
-    ) -> Tuple[Array, State, BufferState, Metrics, chex.PRNGKey]:
-        (obs, env_state, buffer_state, metrics, key) = carry
-        key, explore_key = jax.random.split(key)
-        action = jax.random.uniform(explore_key, full_action_shape)
-        next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
-
-        return next_obs, env_state, buffer_state, metrics, key
-
     def act(
         carry: Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey], _: Any
     ) -> Tuple[Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey], Dict]:
@@ -591,6 +574,21 @@ def make_learn(
         next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
         return (actor_params, next_obs, env_state, buffer_state, key), metrics
 
+    def explore(carry: LearnerState, _: Any) -> Tuple[LearnerState, Metrics]:
+        obs, env_state, buffer_state, _, _, t, key = carry
+        key, explore_key = jax.random.split(key)
+        action = jax.random.uniform(explore_key, full_action_shape)
+        next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
+
+        t += cfg.system.n_envs
+        learner_state = carry._replace(
+            obs=next_obs, env_state=env_state, buffer_state=buffer_state, t=t, key=key
+        )
+        return learner_state, metrics
+
+    scanned_learn = lambda state: jax.lax.scan(
+        sample_and_learn, state, None, length=cfg.system.learn_steps
+    )
     scanned_act = lambda state: jax.lax.scan(act, state, None, length=cfg.system.act_steps)
 
     def act_and_learn(carry: LearnerState, _: Any) -> Tuple[LearnerState, Tuple[Metrics, Metrics]]:
@@ -606,12 +604,29 @@ def make_learn(
         learn_state = (buffer_state, params, opt_states, t, learn_key)
         (buffer_state, params, opt_states, _, _), losses = scanned_learn(learn_state)
 
+        t += cfg.system.n_envs * cfg.system.act_steps
         return (
-            LearnerState(next_obs, env_state, buffer_state, params, opt_states, t + 1, key),
+            LearnerState(next_obs, env_state, buffer_state, params, opt_states, t, key),
             (metrics, losses),
         )
 
-    return explore, act_and_learn
+    # pmap and scan over explore and learn
+    # todo: do this in make_learn?
+    # Make sure to not do n_envs explore steps (could fill up the buffer too much).
+    pmaped_steps = 1024  # todo: config option
+    explore_steps = cfg.system.explore_steps // cfg.system.n_envs
+    pmaped_explore = jax.pmap(
+        lambda state: jax.lax.scan(explore, state, None, length=explore_steps),
+        axis_name="device",
+        donate_argnums=0,
+    )
+    pmaped_learn = jax.pmap(
+        lambda state: jax.lax.scan(act_and_learn, state, None, length=pmaped_steps),
+        axis_name="device",
+        donate_argnums=0,
+    )
+
+    return pmaped_explore, pmaped_learn
 
 
 def run_experiment(cfg: DictConfig) -> Array:
@@ -621,70 +636,55 @@ def run_experiment(cfg: DictConfig) -> Array:
     steps_btwn_log = n_devices * cfg.system.n_envs * cfg.system.act_steps * pmaped_steps
 
     env, nns, opts, rb, params, opt_states, buffer_state, target_entropy, logger, key = init(cfg)
-    explore, act_and_learn = make_learn(cfg, env, nns, opts, rb, target_entropy)
-
-    # todo: do this in make_learn?
-    pmaped_learn = jax.pmap(
-        lambda state: jax.lax.scan(act_and_learn, state, None, length=pmaped_steps),
-        axis_name="device",
-        donate_argnums=0,
-    )
-
-    pmaped_explore = jax.pmap(
-        lambda state: jax.lax.fori_loop(
-            0, cfg.system.explore_steps // cfg.system.n_envs, explore, state
-        ),
-        axis_name="device",
-        donate_argnums=0,
-    )
+    explore, update = make_learn(cfg, env, nns, opts, rb, target_entropy)
 
     start_time = time.time()
 
-    reset_keys = jax.random.split(key, cfg.system.n_envs * n_devices)
+    reset_key, explore_key = jax.random.split(key)
+    reset_keys = jax.random.split(reset_key, cfg.system.n_envs * n_devices)
     reset_keys = jnp.reshape(reset_keys, (n_devices, cfg.system.n_envs, -1))
+    explore_keys = jax.random.split(explore_key, n_devices)
 
     env_state, first_timestep = jax.pmap(jax.vmap(env.reset), axis_name="device")(reset_keys)
-
-    # fill up buffer/explore
-    explore_keys = jax.random.split(key, n_devices)
-    init_explore_state = (
-        first_timestep.observation.agents_view,
-        env_state,
-        buffer_state,
-        first_timestep.extras["episode_metrics"],
-        explore_keys,
-    )
-    next_obs, env_state, buffer_state, metrics, key = pmaped_explore(init_explore_state)
-
-    # log explore episode metrics
-    final_metrics = episode_metrics.get_final_step_metrics(metrics)
-    logger.log(final_metrics, cfg.system.explore_steps, 0, LogEvent.ACT)
+    first_obs = first_timestep.observation.agents_view
 
     # Initial learner state.
     learner_state = LearnerState(
-        next_obs, env_state, buffer_state, params, opt_states, jnp.zeros(n_devices), key
+        first_obs, env_state, buffer_state, params, opt_states, jnp.zeros(n_devices), explore_keys
     )
+    # Fill up buffer/explore.
+    learner_state, metrics = explore(learner_state)
+
+    # Log explore metrics.
+    final_metrics = episode_metrics.get_final_step_metrics(metrics)
+    t = int(jnp.prod(learner_state.t))
+    sps = t / (time.time() - start_time)
+    logger.log({"step": t, "steps per second": sps}, t, 0, LogEvent.MISC)
+    logger.log(final_metrics, cfg.system.explore_steps, 0, LogEvent.ACT)
 
     # Main loop:
     # We want start to align with the final step of the first pmaped_learn,
     # where we've done explore_steps and 1 full learn step.
     start = cfg.system.explore_steps + steps_btwn_log
-    for t in range(start, int(cfg.system.total_timesteps), steps_btwn_log):
-        # learn
-        learner_state, (metrics, losses) = pmaped_learn(learner_state)
-        # eval:
+    for eval_idx, t in enumerate(range(start, int(cfg.system.total_timesteps), steps_btwn_log)):
+        # Learn:
+        learner_state, (metrics, losses) = update(learner_state)
+        # Evaluate:
         # todo...
 
+        # Log:
         # Multiply by learn steps here because anakin steps per second is learn + act steps
         # But we want to make sure we're counting env steps correctly so it's not included
         # in the loop counter.
         sps = t * cfg.system.learn_steps / (time.time() - start_time)
         final_metrics = episode_metrics.get_final_step_metrics(metrics)
+        loss_metrics = losses | {"log_alpha": learner_state.params.log_alpha}
 
-        logger.log({"step": t, "steps per second": sps}, t, 0, LogEvent.MISC)
-        logger.log(final_metrics, t, 0, LogEvent.ACT)
-        logger.log(losses | {"log_alpha": learner_state.params.log_alpha}, t, 0, LogEvent.TRAIN)
+        logger.log({"step": t, "steps per second": sps}, t, eval_idx, LogEvent.MISC)
+        logger.log(final_metrics, t, eval_idx, LogEvent.ACT)
+        logger.log(loss_metrics, t, eval_idx, LogEvent.TRAIN)
 
+    # todo: final eval
     # Record video
     states = []
     actor_params = unreplicate(learner_state.params.actor)
