@@ -157,6 +157,7 @@ def get_rnn_evaluator_fn(
                 env_state,
                 last_timestep,
                 last_done,
+                last_first,
                 hstate,
                 step_count,
                 episode_return,
@@ -171,7 +172,7 @@ def get_rnn_evaluator_fn(
             )
             ac_in = (
                 batched_observation,
-                last_done[jnp.newaxis, jnp.newaxis, :][..., 0],
+                last_first[jnp.newaxis, jnp.newaxis, :][..., 0],
             )
 
             # Run the network.
@@ -193,6 +194,7 @@ def get_rnn_evaluator_fn(
                 env_state,
                 timestep,
                 jnp.repeat(timestep.last(), config.system.num_agents),
+                jnp.repeat(timestep.first(), config.system.num_agents),
                 hstate,
                 step_count,
                 episode_return,
@@ -249,12 +251,20 @@ def get_rnn_evaluator_fn(
             ),
             dtype=bool,
         )
+        firsts = jnp.ones(
+            (
+                eval_batch,
+                config.system.num_agents,
+            ),
+            dtype=bool,
+        )
 
         eval_state = RNNEvalState(
             key=step_keys,
             env_state=env_states,
             timestep=timesteps,
             dones=dones,
+            firsts=firsts,
             hstate=init_hstate,
             step_count=jnp.zeros((eval_batch, 1)),
             episode_return=jnp.zeros_like(timesteps.reward),

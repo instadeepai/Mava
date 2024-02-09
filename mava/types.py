@@ -144,6 +144,7 @@ class RNNEvalState(NamedTuple):
     env_state: State
     timestep: TimeStep
     dones: chex.Array
+    firsts: chex.Array
     hstate: HiddenState
     step_count: chex.Array
     episode_return: chex.Array
