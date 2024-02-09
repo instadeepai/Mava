@@ -69,6 +69,7 @@ def select_action_cont_ppo(
     """Select action for the continous action for systems given the actor output."""
 
     actor_mean, actor_log_std = actor_output
+    # actor_log_std_logits = jnp.tile(actor_log_std_logits, (config.arch.num_envs,1))
     actor_policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
 
     raw_action, log_prob = actor_policy.sample_and_log_prob(seed=key)

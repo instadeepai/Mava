@@ -111,6 +111,7 @@ class ContinuousFFActor(nn.Module):
 
         x = self.torso(x)
         actor_mean_logits = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01))(x)
+        # actor_log_std_logits = self.param('log_std', nn.initializers.zeros, (self.num_actions,))
         actor_log_std_logits = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01))(x)
         return actor_mean_logits, actor_log_std_logits
 
@@ -233,6 +234,7 @@ class ContinuousRecActor(nn.Module):
 
         actor_logits = self.post_torso(policy_embedding)
         actor_mean_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(actor_logits)
+        # actor_log_std_logits = self.param("log_std", nn.initializers.zeros, (self.action_dim,))
         actor_log_std_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(actor_logits)
 
         return policy_hidden_state, actor_mean_logits, actor_log_std_logits
