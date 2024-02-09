@@ -96,6 +96,7 @@ def get_learner_fn(
                 last_timestep,
                 last_done,
                 hstates,
+                last_is_first
             ) = learner_state
 
             key, policy_key = jax.random.split(key)
@@ -104,7 +105,10 @@ def get_learner_fn(
             batched_observation = jax.tree_util.tree_map(
                 lambda x: x[jnp.newaxis, :], last_timestep.observation
             )
-            ac_in = (batched_observation, last_done[:, 0][jnp.newaxis, :])
+            ac_in = (
+                batched_observation,
+                last_is_first[:, 0][jnp.newaxis, :],
+            )
 
             # Run the network.
             policy_hidden_state, actor_policy = actor_apply_fn(
@@ -117,8 +121,11 @@ def get_learner_fn(
             # Sample action from the policy and squeeze out the batch dimension.
             action = actor_policy.sample(seed=policy_key)
             log_prob = actor_policy.log_prob(action)
-
-            action, log_prob, value = (action.squeeze(0), log_prob.squeeze(0), value.squeeze(0))
+            value, action, log_prob = (
+                value.squeeze(0),
+                action.squeeze(0),
+                log_prob.squeeze(0),
+            )
 
             # Step the environment.
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
@@ -127,6 +134,10 @@ def get_learner_fn(
             done = jax.tree_util.tree_map(
                 lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
                 timestep.last(),
+            )
+            first = jax.tree_util.tree_map(
+                lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
+                last_timestep.first(),
             )
             info = timestep.extras["episode_metrics"]
 
@@ -140,9 +151,10 @@ def get_learner_fn(
                 last_timestep.observation,
                 hstates,
                 info,
+                first
             )
             learner_state = RNNLearnerState(
-                params, opt_states, key, env_state, timestep, done, hstates
+                params, opt_states, key, env_state, timestep, done, hstates, first
             )
             return learner_state, transition
 
@@ -163,17 +175,20 @@ def get_learner_fn(
             last_timestep,
             last_done,
             hstates,
+            last_first
         ) = learner_state
 
         # Add a batch dimension to the observation.
         batched_last_observation = jax.tree_util.tree_map(
             lambda x: x[jnp.newaxis, :], last_timestep.observation
         )
-        ac_in = (batched_last_observation, last_done[:, 0][jnp.newaxis, :])
+        ac_in = (
+            batched_last_observation,
+            last_first[:, 0][jnp.newaxis, :]
+        )
 
         # Run the network.
         _, last_val = critic_apply_fn(params.critic_params, hstates.critic_hidden_state, ac_in)
-
         # Squeeze out the batch dimension and mask out the value of terminal states.
         last_val = last_val.squeeze(0)
         last_val = jnp.where(last_done, jnp.zeros_like(last_val), last_val)
@@ -228,7 +243,8 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate the actor loss."""
                     # RERUN NETWORK
-                    obs_and_done = (traj_batch.obs, traj_batch.done[:, :, 0])
+
+                    obs_and_done = (traj_batch.obs, traj_batch.first[:, :, 0])
                     _, actor_policy = actor_apply_fn(
                         actor_params, traj_batch.hstates.policy_hidden_state[0], obs_and_done
                     )
@@ -260,7 +276,7 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate the critic loss."""
                     # RERUN NETWORK
-                    obs_and_done = (traj_batch.obs, traj_batch.done[:, :, 0])
+                    obs_and_done = (traj_batch.obs, traj_batch.first[:, :, 0])
                     _, value = critic_apply_fn(
                         critic_params, traj_batch.hstates.critic_hidden_state[0], obs_and_done
                     )
@@ -349,7 +365,6 @@ def get_learner_fn(
             key, shuffle_key = jax.random.split(key)
 
             # SHUFFLE MINIBATCHES
-            permutation = jax.random.permutation(shuffle_key, config.arch.num_envs)
             batch = (traj_batch, advantages, targets)
             num_recurrent_chunks = (
                 config.system.rollout_length // config.system.recurrent_chunk_size
@@ -417,6 +432,7 @@ def get_learner_fn(
             last_timestep,
             last_done,
             hstates,
+            last_first
         )
         metric = traj_batch.info
         return learner_state, (metric, loss_info)
@@ -469,7 +485,7 @@ def learner_setup(
     # PRNG keys.
     key, actor_net_key, critic_net_key = keys
 
-    # Define network and optimiser.
+    # Define network and optimisers.
     actor_network, critic_network = networks.make(
         config=config, network="recurrent", centralised_critic=True
     )
@@ -582,9 +598,10 @@ def learner_setup(
         (config.arch.num_envs, config.system.num_agents),
         dtype=bool,
     )
+    firsts = jnp.ones((config.arch.num_envs, config.system.num_agents), dtype=bool)
     key, step_keys = jax.random.split(key)
     opt_states = OptStates(actor_opt_state, critic_opt_state)
-    replicate_learner = (params, opt_states, hstates, step_keys, dones)
+    replicate_learner = (params, opt_states, hstates, step_keys, dones, firsts)
 
     # Duplicate learner for update_batch_size.
     broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size,) + x.shape)
@@ -594,7 +611,7 @@ def learner_setup(
     replicate_learner = flax.jax_utils.replicate(replicate_learner, devices=jax.devices())
 
     # Initialise learner state.
-    params, opt_states, hstates, step_keys, dones = replicate_learner
+    params, opt_states, hstates, step_keys, dones, firsts = replicate_learner
     init_learner_state = RNNLearnerState(
         params=params,
         opt_states=opt_states,
@@ -603,6 +620,7 @@ def learner_setup(
         timestep=timesteps,
         dones=dones,
         hstates=hstates,
+        firsts=firsts
     )
     return learn, actor_network, init_learner_state
 
@@ -659,6 +677,7 @@ def run_experiment(_config: DictConfig) -> None:
         * config.system.update_batch_size
         * config.arch.num_envs
     )
+
     # Logger setup
     logger = MavaLogger(config)
     cfg: Dict = OmegaConf.to_container(config, resolve=True)
