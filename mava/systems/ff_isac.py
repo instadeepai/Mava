@@ -14,7 +14,7 @@
 
 import time
 from datetime import datetime
-from typing import Any, Dict, NamedTuple, Tuple
+from typing import Any, Callable, Dict, NamedTuple, Tuple
 
 import chex
 import distrax
@@ -22,12 +22,8 @@ import flashbax as fbx
 import flax.linen as nn
 import hydra
 import jax
-
-# jax.config.update("jax_platform_name", "cpu")
 import jax.numpy as jnp
 import jaxmarl
-
-# import numpy as np
 import optax
 from brax.io import html
 from chex import PRNGKey
@@ -45,9 +41,10 @@ from omegaconf import DictConfig, OmegaConf
 from typing_extensions import TypeAlias
 
 from mava.utils.logger import LogEvent, MavaLogger
-from mava.wrappers import RecordEpisodeMetrics
-from mava.wrappers.jaxmarl import JaxMarlWrapper
-from mava.wrappers.observation import AgentIDWrapper
+from mava.wrappers import AgentIDWrapper, JaxMarlWrapper, episode_metrics
+from mava.wrappers.jumanji import MultiAgentWrapper
+
+# jax.config.update("jax_platform_name", "cpu")
 
 
 # todo: types.py
@@ -264,11 +261,12 @@ def sample_action(
     scaled_action = bound_action * action_scale + action_bias
 
     # MultivariateNormalDiag sums on last dim
-    log_prob = normal.log_prob(unbound_action)
+    # log_prob = normal.log_prob(unbound_action)
     # rescale_term = jnp.log(action_scale * (1 - bound_action**2) + 1e-6).sum(axis=-1)
     # log_prob = log_prob - rescale_term
 
     # from: https://github.com/google-deepmind/distrax/issues/216
+    # todo: scale
     log_prob = normal.log_prob(unbound_action) - jnp.sum(
         2 * (jnp.log(2) - unbound_action - jax.nn.softplus(-2 * unbound_action)), axis=-1
     )
@@ -279,28 +277,35 @@ def sample_action(
     return scaled_action, log_prob[..., jnp.newaxis]
 
 
-def run_experiment(cfg: DictConfig) -> Array:
+# env, nns, opts, rb, params, opt_states, buffer_state, target_entropy, logger, key
+def init(
+    cfg: DictConfig,
+) -> Tuple[
+    MultiAgentWrapper,
+    Tuple[Actor, SoftQNetwork],
+    Tuple[optax.GradientTransformation, optax.GradientTransformation, optax.GradientTransformation],
+    TrajectoryBuffer,
+    SacParams,
+    OptStates,
+    BufferState,
+    chex.Array,
+    MavaLogger,
+    chex.PRNGKey,
+]:
     logger = MavaLogger(cfg)
 
     key = jax.random.PRNGKey(cfg.system.seed)
     devices = jax.devices()
-    n_devices = len(devices)
 
     env = jaxmarl.make(cfg.env.env_name, **cfg.env.kwargs)
     env = JaxMarlWrapper(env)
     env = AgentIDWrapper(env)
     env = AutoResetWrapper(env)
-    env = RecordEpisodeMetrics(env)
+    env = episode_metrics.RecordEpisodeMetrics(env)
 
     n_agents = env.action_spec().shape[0]
     action_dim = env.action_spec().shape[1]
     obs_dim = env.observation_spec().agents_view.shape[1]
-    full_action_shape = (cfg.system.n_envs, n_agents, action_dim)
-
-    act_high = jnp.zeros(env.action_spec().shape) + env.action_spec().maximum
-    act_low = jnp.zeros(env.action_spec().shape) + env.action_spec().minimum
-    action_scale = jnp.array((act_high - act_low) / 2.0)[jnp.newaxis, :]
-    action_bias = jnp.array((act_high + act_low) / 2.0)[jnp.newaxis, :]
 
     key, actor_key, q1_key, q2_key, q1_target_key, q2_target_key = jax.random.split(key, 6)
 
@@ -367,8 +372,37 @@ def run_experiment(cfg: DictConfig) -> Array:
     )
     buffer_state = jax.device_put_replicated(rb.init(dummy_transition), devices)
 
-    start_time = time.time()
-    key = jax.random.PRNGKey(0)
+    nns = (actor, q)
+    opts = (actor_opt, q_opt, alpha_opt)
+
+    return env, nns, opts, rb, params, opt_states, buffer_state, target_entropy, logger, key
+
+
+def make_learn(
+    cfg: DictConfig,
+    env: MultiAgentWrapper,
+    nns: Tuple[Actor, SoftQNetwork],
+    opts: Tuple[
+        optax.GradientTransformation, optax.GradientTransformation, optax.GradientTransformation
+    ],
+    rb: TrajectoryBuffer,
+    target_entropy: chex.Array,
+) -> Tuple[
+    Callable[
+        [int, Tuple[Array, State, BufferState, Dict, chex.PRNGKey]],
+        Tuple[Array, State, BufferState, Dict, chex.PRNGKey],
+    ],
+    Callable[[LearnerState, Any], Tuple[LearnerState, Tuple[Dict[str, Array], Dict[str, Array]]]],
+]:
+    actor, q = nns
+    actor_opt, q_opt, alpha_opt = opts
+
+    full_action_shape = (cfg.system.n_envs, *env.action_spec().shape)
+
+    act_high = jnp.zeros(env.action_spec().shape) + env.action_spec().maximum
+    act_low = jnp.zeros(env.action_spec().shape) + env.action_spec().minimum
+    action_scale = jnp.array((act_high - act_low) / 2.0)[jnp.newaxis, :]
+    action_bias = jnp.array((act_high + act_low) / 2.0)[jnp.newaxis, :]
 
     def step(
         action: Array, obs: Array, env_state: State, buffer_state: BufferState
@@ -567,8 +601,11 @@ def run_experiment(cfg: DictConfig) -> Array:
     scanned_act = lambda state: jax.lax.scan(act, state, None, length=cfg.system.act_steps)
 
     # todo: typing
-    def act_and_learn(carry: LearnerState, _: Any) -> Tuple[LearnerState, tuple]:
+    def act_and_learn(
+        carry: LearnerState, _: Any
+    ) -> Tuple[LearnerState, Tuple[Dict[str, Array], Dict[str, Array]]]:
         """Act, sample, learn."""
+
         obs, env_state, buffer_state, params, opt_states, t, key = carry
         key, act_key, learn_key = jax.random.split(key, 3)
         # Act
@@ -584,14 +621,41 @@ def run_experiment(cfg: DictConfig) -> Array:
             (metrics, losses),
         )
 
-    # TRY NOT TO MODIFY: start the game
+    return explore, act_and_learn
+
+
+def run_experiment(cfg: DictConfig) -> Array:
+    n_devices = len(jax.devices())
+
+    pmaped_steps = 1024  # todo: config option
+    steps_btwn_log = n_devices * cfg.system.n_envs * cfg.system.act_steps * pmaped_steps
+
+    env, nns, opts, rb, params, opt_states, buffer_state, target_entropy, logger, key = init(cfg)
+    explore, act_and_learn = make_learn(cfg, env, nns, opts, rb, target_entropy)
+
+    # todo: do this in make_learn?
+    pmaped_learn = jax.pmap(
+        lambda state: jax.lax.scan(act_and_learn, state, None, length=pmaped_steps),
+        axis_name="device",
+        donate_argnums=0,
+    )
+
+    pmaped_explore = jax.pmap(
+        lambda state: jax.lax.fori_loop(
+            0, cfg.system.explore_steps // cfg.system.n_envs, explore, state
+        ),
+        axis_name="device",
+        donate_argnums=0,
+    )
+
+    start_time = time.time()
+
     reset_keys = jax.random.split(key, cfg.system.n_envs * n_devices)
     reset_keys = jnp.reshape(reset_keys, (n_devices, cfg.system.n_envs, -1))
 
-    start_time = time.time()
     env_state, first_timestep = jax.pmap(jax.vmap(env.reset), axis_name="device")(reset_keys)
 
-    # fill up buffer
+    # fill up buffer/explore
     explore_keys = jax.random.split(key, n_devices)
     init_explore_state = (
         first_timestep.observation.agents_view,
@@ -600,66 +664,48 @@ def run_experiment(cfg: DictConfig) -> Array:
         first_timestep.extras["episode_metrics"],
         explore_keys,
     )
-    pmaped_explore = jax.pmap(
-        lambda state: jax.lax.fori_loop(
-            0, cfg.system.explore_steps // cfg.system.n_envs, explore, state
-        ),
-        axis_name="device",
-        donate_argnums=0,
-    )
     next_obs, env_state, buffer_state, metrics, key = pmaped_explore(init_explore_state)
 
-    # ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
-    # # Likely that the episode hasn't ended yet and so we need to replace the nan with 0.
-    # mean_return = np.nan_to_num(np.mean(ep_returns))
-    sps = n_devices * cfg.system.explore_steps / (time.time() - start_time)
-    logger.log(metrics, cfg.system.explore_steps, 0, LogEvent.ACT)
+    # log explore episode metrics
+    final_metrics = episode_metrics.get_final_step_metrics(metrics)
+    logger.log(final_metrics, cfg.system.explore_steps, 0, LogEvent.ACT)
 
-    pmaped_steps = 1024
-    steps_btwn_log = n_devices * cfg.system.n_envs * cfg.system.act_steps * pmaped_steps
+    # Initial learner state.
     learner_state = LearnerState(
         next_obs, env_state, buffer_state, params, opt_states, jnp.zeros(n_devices), key
     )
-    pmaped_learn = jax.pmap(
-        lambda state: jax.lax.scan(act_and_learn, state, None, length=pmaped_steps),
-        axis_name="device",
-        donate_argnums=0,
-    )
 
+    # Main loop:
     # We want start to align with the final step of the first pmaped_learn,
     # where we've done explore_steps and 1 full learn step.
     start = cfg.system.explore_steps + steps_btwn_log
     for t in range(start, int(cfg.system.total_timesteps), steps_btwn_log):
+        # learn
         learner_state, (metrics, losses) = pmaped_learn(learner_state)
+        # eval:
+        # todo...
 
-        # ep_returns = metrics["episode_return"][metrics["episode_return"] != 0]
-        # mean_return = np.mean(ep_returns)
-        # max_return: float = np.max(ep_returns)
-        # ep_logs = {"mean episode return": mean_return, "max episode return": max_return}
         # Multiply by learn steps here because anakin steps per second is learn + act steps
         # But we want to make sure we're counting env steps correctly so it's not included
         # in the loop counter.
         sps = t * cfg.system.learn_steps / (time.time() - start_time)
+        final_metrics = episode_metrics.get_final_step_metrics(metrics)
 
         logger.log({"step": t, "steps per second": sps}, t, 0, LogEvent.MISC)
-        logger.log(metrics, t, 0, LogEvent.ACT)
+        logger.log(final_metrics, t, 0, LogEvent.ACT)
         logger.log(losses | {"log_alpha": learner_state.params.log_alpha}, t, 0, LogEvent.TRAIN)
 
-    #     key, step_key = jax.random.split(key)
-    #     action = {f"agent_{i}": jnp.ones(1) for i in range(6)}
-    #     obs, state, reward, done, infos = env.step(step_key, state, action)
-    #
-    #     states.append(state)
-    #     rews.append(reward)
-    #
-    # print(states[0])
-    # html.save("test2.html", env.sys, [s.pipeline_state for s in states])
-    # save animation
-
+    # Record video
     states = []
     actor_params = unreplicate(learner_state.params.actor)
 
-    actor_apply = jax.jit(actor.apply)
+    # todo: store this in the actor?
+    act_high = jnp.zeros(env.action_spec().shape) + env.action_spec().maximum
+    act_low = jnp.zeros(env.action_spec().shape) + env.action_spec().minimum
+    action_scale = jnp.array((act_high - act_low) / 2.0)[jnp.newaxis, :]
+    action_bias = jnp.array((act_high + act_low) / 2.0)[jnp.newaxis, :]
+
+    actor_apply = jax.jit(nns[0].apply)
     env_step = jax.jit(env.step)
     sample_action_jit = jax.jit(sample_action)
 

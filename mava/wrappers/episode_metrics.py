@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Dict, Tuple
 
 import chex
 import jax
@@ -50,7 +50,11 @@ class RecordEpisodeMetrics(Wrapper):
         key, reset_key = jax.random.split(key)
         state, timestep = self._env.reset(reset_key)
         state = RecordEpisodeMetricsState(state, key, 0.0, 0, 0.0, 0)
-        timestep.extras["episode_metrics"] = {"episode_return": 0.0, "episode_length": 0}
+        timestep.extras["episode_metrics"] = {
+            "episode_return": 0.0,
+            "episode_length": 0,
+            "final_episode": False,
+        }
         return state, timestep
 
     def step(
@@ -75,6 +79,7 @@ class RecordEpisodeMetrics(Wrapper):
         timestep.extras["episode_metrics"] = {
             "episode_return": episode_return_info,
             "episode_length": episode_length_info,
+            "final_episode": done,
         }
 
         state = RecordEpisodeMetricsState(
@@ -86,3 +91,17 @@ class RecordEpisodeMetrics(Wrapper):
             episode_length=episode_length_info,
         )
         return state, timestep
+
+
+def get_final_step_metrics(metrics: Dict[str, chex.Array]) -> Dict[str, chex.Array]:
+    """Get the metrics for the final step of the episode."""
+    is_final_ep = metrics.pop("final_episode")
+
+    final_metrics: Dict[str, chex.Array]
+    # If it didn't make it to the final step, return zeros.
+    if not jnp.any(is_final_ep):
+        final_metrics = jax.tree_util.tree_map(jnp.zeros_like, metrics)
+    else:
+        final_metrics = jax.tree_util.tree_map(lambda x: x[is_final_ep], metrics)
+
+    return final_metrics
