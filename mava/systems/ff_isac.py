@@ -89,8 +89,11 @@ class Transition(NamedTuple):
 
 
 Metrics = Dict[str, Array]
-
 BufferState: TypeAlias = TrajectoryBufferState[Transition]
+Networks: TypeAlias = Tuple[nn.Module, nn.Module]
+Optimisers: TypeAlias = Tuple[
+    optax.GradientTransformation, optax.GradientTransformation, optax.GradientTransformation
+]
 
 
 class AutoResetWrapper(Wrapper):
@@ -252,38 +255,32 @@ def sample_action(
     # normal = distrax.Normal(mean, std)
     normal = distrax.MultivariateNormalDiag(mean, std)
 
-    unbound_action = jax.lax.cond(
+    sampled_action = jax.lax.cond(
         eval,
         lambda: mean,
         lambda: normal.sample(seed=key),
     )
-    bound_action = jnp.tanh(unbound_action)
+    bound_action = jnp.tanh(sampled_action)
     scaled_action = bound_action * action_scale + action_bias
 
-    # MultivariateNormalDiag sums on last dim
     # log_prob = normal.log_prob(unbound_action)
     # rescale_term = jnp.log(action_scale * (1 - bound_action**2) + 1e-6).sum(axis=-1)
     # log_prob = log_prob - rescale_term
 
-    # from: https://github.com/google-deepmind/distrax/issues/216
     # todo: scale
-    log_prob = normal.log_prob(unbound_action) - jnp.sum(
-        2 * (jnp.log(2) - unbound_action - jax.nn.softplus(-2 * unbound_action)), axis=-1
-    )
-
-    # we don't use this, but leaving here in case we need it
-    # mean = jnp.tanh(mean) * self.action_scale + self.action_bias
+    log_prob = normal.log_prob(sampled_action)
+    rescal_term = 2 * (jnp.log(2) - sampled_action - jax.nn.softplus(-2 * sampled_action))
+    log_prob = log_prob - jnp.sum(rescal_term, axis=-1)
 
     return scaled_action, log_prob[..., jnp.newaxis]
 
 
-# env, nns, opts, rb, params, opt_states, buffer_state, target_entropy, logger, key
 def init(
     cfg: DictConfig,
 ) -> Tuple[
     MultiAgentWrapper,
-    Tuple[Actor, SoftQNetwork],
-    Tuple[optax.GradientTransformation, optax.GradientTransformation, optax.GradientTransformation],
+    Networks,
+    Optimisers,
     TrajectoryBuffer,
     SacParams,
     OptStates,
@@ -381,10 +378,8 @@ def init(
 def make_learn(
     cfg: DictConfig,
     env: MultiAgentWrapper,
-    nns: Tuple[Actor, SoftQNetwork],
-    opts: Tuple[
-        optax.GradientTransformation, optax.GradientTransformation, optax.GradientTransformation
-    ],
+    nns: Networks,
+    opts: Optimisers,
     rb: TrajectoryBuffer,
     target_entropy: chex.Array,
 ) -> Tuple[
@@ -392,7 +387,7 @@ def make_learn(
         [int, Tuple[Array, State, BufferState, Dict, chex.PRNGKey]],
         Tuple[Array, State, BufferState, Dict, chex.PRNGKey],
     ],
-    Callable[[LearnerState, Any], Tuple[LearnerState, Tuple[Dict[str, Array], Dict[str, Array]]]],
+    Callable[[LearnerState, Any], Tuple[LearnerState, Tuple[Metrics, Metrics]]],
 ]:
     actor, q = nns
     actor_opt, q_opt, alpha_opt = opts
@@ -410,9 +405,7 @@ def make_learn(
         env_state, timestep = jax.vmap(env.step)(env_state, action)
         next_obs = timestep.observation.agents_view
         rewards = timestep.reward[:, 0]
-        # todo logical not
-        terms = (1 - timestep.discount).astype(bool)[:, 0]
-        # truncs = timestep.last()
+        terms = ~(timestep.discount).astype(bool)[:, 0]
         infos = timestep.extras
 
         real_next_obs = infos["final_observation"].agents_view
@@ -578,8 +571,8 @@ def make_learn(
 
     # todo: make this scannable, not for_i
     def explore(
-        _: int, carry: Tuple[Array, State, BufferState, Dict, chex.PRNGKey]
-    ) -> Tuple[Array, State, BufferState, Dict, chex.PRNGKey]:
+        _: int, carry: Tuple[Array, State, BufferState, Metrics, chex.PRNGKey]
+    ) -> Tuple[Array, State, BufferState, Metrics, chex.PRNGKey]:
         (obs, env_state, buffer_state, metrics, key) = carry
         key, explore_key = jax.random.split(key)
         action = jax.random.uniform(explore_key, full_action_shape)
@@ -600,10 +593,7 @@ def make_learn(
 
     scanned_act = lambda state: jax.lax.scan(act, state, None, length=cfg.system.act_steps)
 
-    # todo: typing
-    def act_and_learn(
-        carry: LearnerState, _: Any
-    ) -> Tuple[LearnerState, Tuple[Dict[str, Array], Dict[str, Array]]]:
+    def act_and_learn(carry: LearnerState, _: Any) -> Tuple[LearnerState, Tuple[Metrics, Metrics]]:
         """Act, sample, learn."""
 
         obs, env_state, buffer_state, params, opt_states, t, key = carry
