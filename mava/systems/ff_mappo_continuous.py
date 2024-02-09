@@ -50,7 +50,7 @@ from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import (
     get_logprob_entropy,
     make_learning_rate,
-    select_action_ppo,
+    select_action_cont_ppo,
 )
 
 
@@ -93,7 +93,7 @@ def get_learner_fn(
             actor_mean, actor_log_std = actor_apply_fn(
                 params.actor_params, last_timestep.observation
             )
-            raw_action, action, log_prob = select_action_ppo(
+            raw_action, action, log_prob = select_action_cont_ppo(
                 (actor_mean, actor_log_std), policy_key, config.env.env_name
             )
 
@@ -107,10 +107,7 @@ def get_learner_fn(
                 lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
                 timestep.last(),
             )
-            info = {
-                "episode_return": env_state.episode_return_info,
-                "episode_length": env_state.episode_length_info,
-            }
+            info = timestep.extras["episode_metrics"]
 
             transition = PPOTransition(
                 done, raw_action, value, timestep.reward, log_prob, last_timestep.observation, info
@@ -176,7 +173,10 @@ def get_learner_fn(
                     # RERUN NETWORK
                     actor_mean, actor_log_std = actor_apply_fn(actor_params, traj_batch.obs)
                     log_prob, entropy = get_logprob_entropy(
-                        (actor_mean, actor_log_std), traj_batch.action, config.env.env_name
+                        actor_mean,
+                        actor_log_std,
+                        traj_batch.action,
+                        config.env.env_name,
                     )
 
                     # CALCULATE ACTOR LOSS

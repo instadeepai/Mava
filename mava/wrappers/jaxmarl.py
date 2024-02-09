@@ -22,7 +22,8 @@ import jax.numpy as jnp
 from chex import Array, PRNGKey
 from gymnax.environments import spaces as gymnax_spaces
 from jaxmarl.environments import spaces as jaxmarl_spaces
-from jaxmarl.environments.mabrax.mabrax_env import MABraxEnv
+
+# from jaxmarl.environments.mabrax.mabrax_env import MABraxEnv
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
 from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
@@ -258,6 +259,7 @@ class JaxMarlWrapper(Wrapper):
         if self.has_global_state:
             if hasattr(self._env, "state_size"):
                 state_size = self._env.state_size
+            # todo: extract size for mabrax without the state access
             else:
                 num_obs_features = self._env.observation_spaces[self._env.agents[0]].shape[0]
                 state_size = self._env.num_agents * num_obs_features
@@ -307,9 +309,11 @@ class JaxMarlWrapper(Wrapper):
         """Get global state from observation and copy it for each agent."""
         if hasattr(obs, "world_state"):
             global_state = jnp.tile(jnp.array(obs["world_state"]), (self._env.num_agents, 1))
-        elif isinstance(self._env, MABraxEnv):
-            # Use the global state of brax.
-            global_state = state.obs
+        # elif isinstance(self._env, MABraxEnv):
+        #     # Use the global state of brax.
+        #     global_state = jnp.tile(state.obs, (self._env.num_agents, 1))
+        # # TODO: find a way to extract size in the obs speec without tricks
+
         else:
             global_state = jnp.concatenate(agents_view, axis=0)
             global_state = jnp.tile(global_state, (self._env.num_agents, 1))

@@ -61,12 +61,12 @@ def make_learning_rate(init_lr: float, config: DictConfig) -> Union[float, Calla
         return init_lr
 
 
-def select_action_ppo(
+def select_action_cont_ppo(
     actor_output: Tuple[Array, Array],
     key: PRNGKey,
     env_name: str,
 ) -> Tuple[Array, Array, Array]:
-    """Select action for the given actor output."""
+    """Select action for the continous action for systems given the actor output."""
 
     actor_mean, actor_log_std = actor_output
     actor_policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
@@ -78,50 +78,54 @@ def select_action_ppo(
 
 
 def get_logprob_entropy(
-    actor_output: Tuple[Array, Array],
-    traj_action: Array,
+    mean: Array,
+    log_std: Array,
+    action: Array,
     env_name: str,
 ) -> Tuple[Array, Array]:
-    """Get the log probability and entropy of a given actor output and traj_batch action."""
-
-    actor_mean, actor_log_std = actor_output
-    actor_policy = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_log_std))
-
-    log_prob = actor_policy.log_prob(traj_action)
+    """Get the log probability and entropy of a given mean, log_std and action."""
+    actor_policy = distrax.MultivariateNormalDiag(mean, jnp.exp(log_std))
+    log_prob = actor_policy.log_prob(action)
     entropy = actor_policy.entropy().mean()
-
-    _, log_prob = transform_actions_log(env_name, traj_action, log_prob)
+    _, log_prob = transform_actions_log(env_name, action, log_prob)
     return log_prob, entropy
 
 
-def select_action_eval(
-    actor_output: Union[Tuple[Array, Array], Tuple[Array, Array, Array]],
+def select_action_eval_cont_ff(
+    actor_output: Tuple[Array, Array],
     key: PRNGKey,
     env_name: str,
-    network: str = "feedforward",
 ) -> Union[Array, Tuple[Array, Array]]:
-    """Select action for the given actor output."""
-    # This throws typing issues when committing:
-    # if network == "recurrent":
-    #     hstate, actor_mean, actor_log_std = actor_output
-    # else:
-    #     actor_mean, actor_log_std = actor_output
+    """Select action for the continous action for the FF-systems given the actor output."""
+    mean, log_std = actor_output
+    actor_policy = distrax.MultivariateNormalDiag(mean, log_std)
 
-    actor_policy = distrax.MultivariateNormalDiag(actor_output[-2], jnp.exp(actor_output[-1]))
+    raw_action = actor_policy.sample(seed=key)
+    return transform_actions_log(env_name, raw_action, None)
 
+
+def select_action_eval_cont_rnn(
+    actor_output: Tuple[Array, Array],
+    key: PRNGKey,
+    env_name: str,
+) -> Array:
+    """Select action for the continous action for the Rec-systems given the actor output."""
+    mean, log_std = actor_output
+
+    actor_policy = distrax.MultivariateNormalDiag(mean, log_std)
     raw_action = actor_policy.sample(seed=key)
     action = transform_actions_log(env_name, raw_action, None)
 
-    return (actor_output[0], action) if network == "recurrent" else action
+    return action
 
 
 def transform_actions_log(
-    env_name: str, raw_action: Array, log_prob: Array
+    env_name: str, raw_action: Array, log_prob: Array, n: int = 1
 ) -> Union[Array, Tuple[Array, Array]]:
     """Transform action and log_prob values"""
 
     # IF action in [-N, N] and N != 1 ELSE [-1, 1] and N == 1
-    n = 0.4 if env_name == "humanoid_9|8" else 1
+    # n = 0.4 if env_name == "humanoid_9|8" else 1
     action = n * jnp.tanh(raw_action)
     if log_prob is None:
         return action  # during evaluation.

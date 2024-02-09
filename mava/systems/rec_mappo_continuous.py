@@ -53,7 +53,7 @@ from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import (
     get_logprob_entropy,
     make_learning_rate,
-    select_action_ppo,
+    select_action_cont_ppo,
 )
 
 
@@ -119,7 +119,7 @@ def get_learner_fn(
             )
 
             # Sample action from the policy and squeeze out the batch dimension.
-            raw_action, action, log_prob = select_action_ppo(
+            raw_action, action, log_prob = select_action_cont_ppo(
                 (actor_mean, actor_log_std), policy_key, config.env.env_name
             )
             value, raw_action, action, log_prob = (
@@ -137,10 +137,7 @@ def get_learner_fn(
                 lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
                 timestep.last(),
             )
-            info = {
-                "episode_return": env_state.episode_return_info,
-                "episode_length": env_state.episode_length_info,
-            }
+            info = timestep.extras["episode_metrics"]
 
             hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
             transition = RNNPPOTransition(
@@ -245,7 +242,7 @@ def get_learner_fn(
                         actor_params, traj_batch.hstates.policy_hidden_state[0], obs_and_done
                     )
                     log_prob, entropy = get_logprob_entropy(
-                        (actor_mean, actor_log_std), traj_batch.action, config.env.env_name
+                        actor_mean, actor_log_std, traj_batch.action, config.env.env_name
                     )
 
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
