@@ -21,42 +21,7 @@ from jumanji.env import Environment
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
 
-from mava.types import LogEnvState, Observation, ObservationGlobalState, State
-
-
-class LogWrapper(Wrapper):
-    """Log the episode returns and lengths."""
-
-    def reset(self, key: chex.PRNGKey) -> Tuple[LogEnvState, TimeStep]:
-        """Reset the environment."""
-        state, timestep = self._env.reset(key)
-        state = LogEnvState(state, jnp.float32(0.0), 0, jnp.float32(0.0), 0)
-        return state, timestep
-
-    def step(
-        self,
-        state: LogEnvState,
-        action: chex.Array,
-    ) -> Tuple[LogEnvState, TimeStep]:
-        """Step the environment."""
-        env_state, timestep = self._env.step(state.env_state, action)
-
-        done = timestep.last()
-        not_done = 1 - done
-
-        new_episode_return = state.episode_returns + jnp.mean(timestep.reward)
-        new_episode_length = state.episode_lengths + 1
-        episode_return_info = state.episode_return_info * not_done + new_episode_return * done
-        episode_length_info = state.episode_length_info * not_done + new_episode_length * done
-
-        state = LogEnvState(
-            env_state=env_state,
-            episode_returns=new_episode_return * not_done,
-            episode_lengths=new_episode_length * not_done,
-            episode_return_info=episode_return_info,
-            episode_length_info=episode_length_info,
-        )
-        return state, timestep
+from mava.types import Observation, ObservationGlobalState, State
 
 
 class AgentIDWrapper(Wrapper):

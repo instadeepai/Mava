@@ -14,19 +14,35 @@
 
 import copy
 from collections import namedtuple
-from typing import Dict, List, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 
+import chex
 import jax
 import jax.numpy as jnp
 from chex import Array, PRNGKey
 from gymnax.environments import spaces as gymnax_spaces
 from jaxmarl.environments import spaces as jaxmarl_spaces
+from jaxmarl.environments.mabrax.mabrax_env import MABraxEnv
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
 from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
 from jumanji.wrappers import Wrapper
 
-from mava.types import JaxMarlState, Observation, ObservationGlobalState
+from mava.types import Observation, ObservationGlobalState, State
+
+if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
+    from dataclasses import dataclass
+else:
+    from flax.struct import dataclass
+
+
+@dataclass
+class JaxMarlState:
+    """Wrapper around a JaxMarl state to provide necessary attributes for jumanji environments."""
+
+    state: State
+    key: chex.PRNGKey
+    step: int
 
 
 def _is_discrete(space: jaxmarl_spaces.Space) -> bool:
@@ -177,7 +193,7 @@ class JaxMarlWrapper(Wrapper):
             obs = ObservationGlobalState(
                 agents_view=agents_view,
                 action_mask=self.action_mask(state),
-                global_state=self.get_global_state(obs, agents_view),
+                global_state=self.get_global_state(state, obs, agents_view),
                 step_count=jnp.zeros(self._env.num_agents, dtype=int),
             )
         else:
@@ -202,7 +218,7 @@ class JaxMarlWrapper(Wrapper):
             obs = ObservationGlobalState(
                 agents_view=agents_view,
                 action_mask=self.action_mask(env_state),
-                global_state=self.get_global_state(obs, agents_view),
+                global_state=self.get_global_state(env_state, obs, agents_view),
                 step_count=jnp.repeat(state.step, self._env.num_agents),
             )
         else:
@@ -242,6 +258,8 @@ class JaxMarlWrapper(Wrapper):
         if self.has_global_state:
             if hasattr(self._env, "state_size"):
                 state_size = self._env.state_size
+            elif isinstance(self._env, MABraxEnv):
+                state_size = 1 + max(value.max() for value in self._env.agent_obs_mapping.values())
             else:
                 num_obs_features = self._env.observation_spaces[self._env.agents[0]].shape[0]
                 state_size = self._env.num_agents * num_obs_features
@@ -287,11 +305,16 @@ class JaxMarlWrapper(Wrapper):
             mask = jnp.ones(self._action_shape, dtype=jnp.float32)
         return mask
 
-    def get_global_state(self, obs: Dict[str, Array], agents_view: Array) -> Array:
+    def get_global_state(self, state: Array, obs: Dict[str, Array], agents_view: Array) -> Array:
         """Get global state from observation and copy it for each agent."""
         if hasattr(obs, "world_state"):
-            return jnp.tile(jnp.array(obs["world_state"]), (self._env.num_agents, 1))
+            global_state = jnp.tile(jnp.array(obs["world_state"]), (self._env.num_agents, 1))
+        elif isinstance(self._env, MABraxEnv):
+            # Use the global state of brax.
+            global_state = jnp.tile(state.obs, (self._env.num_agents, 1))
 
-        global_state = jnp.concatenate(agents_view, axis=0)
-        global_state = jnp.tile(global_state, (self._env.num_agents, 1))
+        else:
+            global_state = jnp.concatenate(agents_view, axis=0)
+            global_state = jnp.tile(global_state, (self._env.num_agents, 1))
+
         return global_state

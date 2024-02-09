@@ -106,10 +106,7 @@ def get_learner_fn(
                 lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
                 timestep.last(),
             )
-            info = {
-                "episode_return": env_state.episode_return_info,
-                "episode_length": env_state.episode_length_info,
-            }
+            info = timestep.extras["episode_metrics"]
 
             transition = PPOTransition(
                 done, action, value, timestep.reward, log_prob, last_timestep.observation, info
