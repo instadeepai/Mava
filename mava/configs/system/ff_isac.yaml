@@ -9,8 +9,8 @@ add_agent_id: True
 # step related
 total_timesteps: 3e8
 explore_steps: 5000  # number of steps to take with random actions at the start of training
-act_steps: 2  # number of steps to take in the environment before learning
-learn_steps: 2  # number of times to sample and train before acting again
+rollout_length: 2 # Number of environment steps per vectorised environment.
+epochs: 1 # Number of learn epochs per training data batch.
 policy_frequency: 4  # the frequency of training policy - every n q learning steps the policy is trained once
 # sizes
 buffer_size: 1000000  # size of the replay buffer. Note: total size is this * num_devices
