@@ -216,20 +216,32 @@ class SoftQNetwork(nn.Module):
         return self.net(x)
 
 
+# rlax does: 0, -4
 LOG_STD_MAX = 2
 LOG_STD_MIN = -5
 
 
 class Actor(nn.Module):
     n_actions: int
+    maximum: Array
+    minimum: Array
 
     def setup(self) -> None:
         self.torso = nn.Sequential([nn.Dense(256), nn.relu, nn.Dense(256), nn.relu])
         self.mean_nn = nn.Dense(self.n_actions)
         self.logstd_nn = nn.Dense(self.n_actions)
 
+        scale = 0.5 * (self.maximum - self.minimum)
+        self.bijector = distrax.Chain(
+            [
+                distrax.ScalarAffine(shift=self.minimum, scale=scale),
+                distrax.ScalarAffine(shift=1.0),
+                distrax.Tanh(),
+            ]
+        )
+
     @nn.compact
-    def __call__(self, x: ArrayLike) -> Tuple[Array, Array]:
+    def __call__(self, x: ArrayLike) -> distrax.Distribution:
         x = self.torso(x)
 
         mean = self.mean_nn(x)
@@ -238,8 +250,14 @@ class Actor(nn.Module):
         log_std = jnp.tanh(log_std)
         # From SpinUp / Denis Yarats
         log_std = LOG_STD_MIN + 0.5 * (LOG_STD_MAX - LOG_STD_MIN) * (log_std + 1)
+        std = jnp.exp(log_std)
 
-        return mean, log_std
+        pi = distrax.Transformed(
+            distribution=distrax.MultivariateNormalDiag(loc=mean, scale_diag=std),
+            bijector=distrax.Block(self.bijector, ndims=1),
+        )
+
+        return pi
 
 
 # todo: inside actor?
@@ -293,6 +311,9 @@ def init(
     n_agents = env.action_spec().shape[0]
     action_dim = env.action_spec().shape[1]
 
+    act_high = jnp.zeros(env.action_spec().shape) + env.action_spec().maximum
+    act_low = jnp.zeros(env.action_spec().shape) + env.action_spec().minimum
+
     key, actor_key, q1_key, q2_key, q1_target_key, q2_target_key = jax.random.split(key, 6)
 
     init_acts = env.action_spec().generate_value()
@@ -301,7 +322,7 @@ def init(
     init_obs_batched = init_obs[jnp.newaxis, ...]
 
     # Making actor network
-    actor = Actor(action_dim)
+    actor = Actor(action_dim, act_high, act_low)
     actor_params = actor.init(actor_key, init_obs_batched)
 
     # Making Q networks
@@ -397,11 +418,6 @@ def make_update_fns(
 
     full_action_shape = (cfg.system.n_envs, *env.action_spec().shape)
 
-    act_high = jnp.zeros(env.action_spec().shape) + env.action_spec().maximum
-    act_low = jnp.zeros(env.action_spec().shape) + env.action_spec().minimum
-    action_scale = jnp.array((act_high - act_low) / 2.0)[jnp.newaxis, :]
-    action_bias = jnp.array((act_high + act_low) / 2.0)[jnp.newaxis, :]
-
     def step(
         action: Array, obs: Array, env_state: State, buffer_state: BufferState
     ) -> Tuple[Array, State, BufferState, Dict]:
@@ -442,14 +458,15 @@ def make_update_fns(
     def actor_loss_fn(
         actor_params: FrozenVariableDict, obs: Array, alpha: Array, q_params: Qs, key: chex.PRNGKey
     ) -> Array:
-        mean, log_std = actor.apply(actor_params, obs)
-        pi, log_pi = sample_action(mean, log_std, key, action_scale, action_bias)
+        pi = actor.apply(actor_params, obs)
+        action, log_prob = pi.sample_and_log_prob(seed=key)
+        log_prob = log_prob[..., jnp.newaxis]
 
-        qf1_pi = q.apply(q_params.q1, obs, pi)
-        qf2_pi = q.apply(q_params.q2, obs, pi)
+        qf1_pi = q.apply(q_params.q1, obs, action)
+        qf2_pi = q.apply(q_params.q2, obs, action)
         min_qf_pi = jnp.minimum(qf1_pi, qf2_pi)
 
-        return ((alpha * log_pi) - min_qf_pi).mean()
+        return ((alpha * log_prob) - min_qf_pi).mean()
 
     def alpha_loss_fn(log_alpha: Array, log_pi: Array, target_entropy: Array) -> Array:
         return jnp.mean(-jnp.exp(log_alpha) * (log_pi + target_entropy))
@@ -463,11 +480,12 @@ def make_update_fns(
         rewards = data.reward[..., jnp.newaxis, jnp.newaxis]
         dones = data.done[..., jnp.newaxis, jnp.newaxis]
 
-        mean, log_std = actor.apply(params.actor, data.next_obs)
-        next_actions, next_log_prob = sample_action(mean, log_std, key, action_scale, action_bias)
+        pi = actor.apply(params.actor, data.next_obs)
+        next_action, next_log_prob = pi.sample_and_log_prob(seed=key)
+        next_log_prob = next_log_prob[..., jnp.newaxis]
 
-        next_q1_val = q.apply(params.q.targets.q1, data.next_obs, next_actions)
-        next_q2_val = q.apply(params.q.targets.q2, data.next_obs, next_actions)
+        next_q1_val = q.apply(params.q.targets.q1, data.next_obs, next_action)
+        next_q2_val = q.apply(params.q.targets.q2, data.next_obs, next_action)
         next_q_val = jnp.minimum(next_q1_val, next_q2_val)
         next_q_val = next_q_val - jnp.exp(params.log_alpha) * next_log_prob
 
@@ -517,11 +535,12 @@ def make_update_fns(
             alpha_loss = 0.0  # loss is 0 if autotune is off
             if cfg.system.autotune:
                 # Get log prob for alpha loss
-                mean, log_std = actor.apply(params.actor, data.obs)
-                _, log_pi = sample_action(mean, log_std, alpha_key, action_scale, action_bias)
+                pi = actor.apply(params.actor, data.obs)
+                _, log_prob = pi.sample_and_log_prob(seed=alpha_key)
+                log_prob = log_prob[..., jnp.newaxis]
 
                 alpha_grad_fn = jax.value_and_grad(alpha_loss_fn)
-                alpha_loss, alpha_grads = alpha_grad_fn(params.log_alpha, log_pi, target_entropy)
+                alpha_loss, alpha_grads = alpha_grad_fn(params.log_alpha, log_prob, target_entropy)
                 alpha_loss, alpha_grads = jax.lax.pmean(
                     (alpha_loss, alpha_grads), axis_name="device"
                 )
@@ -572,8 +591,8 @@ def make_update_fns(
         """Acting loop: select action, step env, add to buffer."""
         actor_params, obs, env_state, buffer_state, key = carry
 
-        mean, log_std = actor.apply(actor_params, obs)
-        action, _ = sample_action(mean, log_std, key, action_scale, action_bias)
+        pi = actor.apply(actor_params, obs)
+        action = pi.sample(seed=key)
 
         next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
         return (actor_params, next_obs, env_state, buffer_state, key), metrics
@@ -681,15 +700,8 @@ def run_experiment(cfg: DictConfig) -> Array:
     states = []
     actor_params = unreplicate(learner_state.params.actor)
 
-    # todo: store this in the actor?
-    act_high = jnp.zeros(env.action_spec().shape) + env.action_spec().maximum
-    act_low = jnp.zeros(env.action_spec().shape) + env.action_spec().minimum
-    action_scale = jnp.array((act_high - act_low) / 2.0)[jnp.newaxis, :]
-    action_bias = jnp.array((act_high + act_low) / 2.0)[jnp.newaxis, :]
-
     actor_apply = jax.jit(nns[0].apply)
     env_step = jax.jit(env.step)
-    sample_action_jit = jax.jit(sample_action)
 
     _key, reset_key = jax.random.split(jax.random.PRNGKey(1))
     state, ts = env.reset(reset_key)
@@ -697,8 +709,8 @@ def run_experiment(cfg: DictConfig) -> Array:
     for _ in range(1000):
         _key, step_key = jax.random.split(_key)
 
-        mean, log_std = actor_apply(actor_params, ts.observation.agents_view)
-        action, _ = sample_action_jit(mean, log_std, step_key, action_scale, action_bias)
+        pi = actor_apply(actor_params, ts.observation.agents_view)
+        action = pi.sample(seed=step_key)
         state, ts = env_step(state, action.squeeze(0))
         states.append(state)
 
