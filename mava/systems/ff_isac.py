@@ -23,7 +23,6 @@ import flax.linen as nn
 import hydra
 import jax
 import jax.numpy as jnp
-import jaxmarl
 import optax
 from brax.io import html
 from chex import PRNGKey
@@ -35,13 +34,12 @@ from flax.jax_utils import unreplicate
 from jax import Array
 from jax.typing import ArrayLike
 from jumanji.env import Environment, State
-from jumanji.types import Observation, TimeStep
-from jumanji.wrappers import Wrapper
 from omegaconf import DictConfig, OmegaConf
 from typing_extensions import TypeAlias
 
+from mava.utils import make_env as environments
 from mava.utils.logger import LogEvent, MavaLogger
-from mava.wrappers import AgentIDWrapper, JaxMarlWrapper, episode_metrics
+from mava.wrappers import episode_metrics
 
 # jax.config.update("jax_platform_name", "cpu")
 
@@ -95,124 +93,17 @@ Optimisers: TypeAlias = Tuple[
 ]
 
 
-class AutoResetWrapper(Wrapper):
-    """Automatically resets environments that are done. Once the terminal state is reached,
-    the state, observation, and step_type are reset. The observation and step_type of the
-    terminal TimeStep is reset to the reset observation and StepType.LAST, respectively.
-    The reward, discount, and extras retrieved from the transition to the terminal state.
-    WARNING: do not `jax.vmap` the wrapped environment (e.g. do not use with the `VmapWrapper`),
-    which would lead to inefficient computation due to both the `step` and `reset` functions
-    being processed each time `step` is called. Please use the `VmapAutoResetWrapper` instead.
-    """
-
-    # todo: make this take in state also
-    def _obs_in_extras(self, timestep: TimeStep[Observation]) -> TimeStep[Observation]:
-        extras = timestep.extras
-        extras["final_observation"] = timestep.observation
-        return timestep.replace(extras=extras)
-
-    def _auto_reset(self, state: State, timestep: TimeStep) -> Tuple[State, TimeStep[Observation]]:
-        """Reset the state and overwrite `timestep.observation` with the reset observation
-        if the episode has terminated.
-        """
-        if not hasattr(state, "key"):
-            raise AttributeError(
-                "This wrapper assumes that the state has attribute key which is used"
-                " as the source of randomness for automatic reset"
-            )
-
-        # Make sure that the random key in the environment changes at each call to reset.
-        # State is a type variable hence it does not have key type hinted, so we type ignore.
-        key, _ = jax.random.split(state.key)  # type: ignore
-        state, reset_timestep = self._env.reset(key)
-
-        extras = timestep.extras
-        extras["final_observation"] = timestep.observation
-
-        # Replace observation with reset observation.
-        timestep = timestep.replace(  # type: ignore
-            observation=reset_timestep.observation, extras=extras
-        )
-
-        return state, timestep
-
-    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep[Observation]]:
-        """Step the environment, with automatic resetting if the episode terminates."""
-        state, timestep = self._env.step(state, action)
-
-        # Overwrite the state and timestep appropriately if the episode terminates.
-        state, timestep = jax.lax.cond(
-            timestep.last(),
-            self._auto_reset,
-            lambda st, ts: (st, self._obs_in_extras(ts)),
-            state,
-            timestep,
-        )
-
-        return state, timestep
-
-
 # todo: jumanji PR
-class VmapAutoResetWrapper(Wrapper):
-    def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep[Observation]]:
-        state, timestep = jax.vmap(self._env.reset)(key)
-        return state, timestep
-
-    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep[Observation]]:
-        # Vmap homogeneous computation (parallelizable).
-        state, timestep = jax.vmap(self._env.step)(state, action)
-        # Map heterogeneous computation (non-parallelizable).
-        state, timestep = jax.lax.map(lambda args: self._maybe_reset(*args), (state, timestep))
-        return state, timestep
-
-    def _auto_reset(self, state: State, timestep: TimeStep) -> Tuple[State, TimeStep[Observation]]:
-        if not hasattr(state, "key"):
-            raise AttributeError(
-                "This wrapper assumes that the state has attribute key which is used"
-                " as the source of randomness for automatic reset"
-            )
-
-        # Make sure that the random key in the environment changes at each call to reset.
-        # State is a type variable hence it does not have key type hinted, so we type ignore.
-        key, _ = jax.random.split(state.key)
-        state, reset_timestep = self._env.reset(key)
-
-        extras = timestep.extras
-        extras["final_observation"] = timestep.observation
-
-        # Replace observation with reset observation.
-        timestep = timestep.replace(  # type: ignore
-            observation=reset_timestep.observation, extras=extras
-        )
-
-        return state, timestep
-
-    def _obs_in_extras(self, timestep: TimeStep[Observation]) -> TimeStep[Observation]:
-        extras = timestep.extras
-        extras["final_observation"] = timestep.observation
-        return timestep.replace(extras=extras)
-
-    def _maybe_reset(self, state: State, timestep: TimeStep) -> Tuple[State, TimeStep[Observation]]:
-        state, timestep = jax.lax.cond(
-            timestep.last(),
-            self._auto_reset,
-            lambda st, ts: (st, self._obs_in_extras(ts)),
-            state,
-            timestep,
-        )
-
-        return state, timestep
 
 
-# ALGO LOGIC: initialize agent here:
 # todo: should this contain both networks?
-class SoftQNetwork(nn.Module):
+class QNetwork(nn.Module):
     def setup(self) -> None:
         self.net = nn.Sequential([nn.Dense(256), nn.relu, nn.Dense(256), nn.relu, nn.Dense(1)])
 
     @nn.compact
-    def __call__(self, x: Array, a: Array) -> Array:
-        x = jnp.concatenate([x, a], axis=-1)
+    def __call__(self, obs: Array, actions: Array) -> Array:
+        x = jnp.concatenate([obs, actions], axis=-1)
         return self.net(x)
 
 
@@ -302,11 +193,7 @@ def init(
     devices = jax.devices()
     n_devices = len(devices)
 
-    env = jaxmarl.make(cfg.env.env_name, **cfg.env.kwargs)
-    env = JaxMarlWrapper(env)
-    env = AgentIDWrapper(env)
-    env = AutoResetWrapper(env)
-    env = episode_metrics.RecordEpisodeMetrics(env)
+    env, eval_env = environments.make(cfg)
 
     n_agents = env.action_spec().shape[0]
     action_dim = env.action_spec().shape[1]
@@ -326,7 +213,7 @@ def init(
     actor_params = actor.init(actor_key, init_obs_batched)
 
     # Making Q networks
-    q = SoftQNetwork()
+    q = QNetwork()
     q1_params = q.init(q1_key, init_obs_batched, init_acts_batched)
     q2_params = q.init(q2_key, init_obs_batched, init_acts_batched)
     q1_target_params = q.init(q1_target_key, init_obs_batched, init_acts_batched)
@@ -428,7 +315,7 @@ def make_update_fns(
         terms = ~(timestep.discount).astype(bool)[:, 0]
         infos = timestep.extras
 
-        real_next_obs = infos["final_observation"].agents_view
+        real_next_obs = infos["real_next_obs"].agents_view
 
         transition = Transition(obs, action, rewards, terms, real_next_obs)
         buffer_state = rb.add(buffer_state, transition)
