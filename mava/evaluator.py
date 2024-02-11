@@ -106,9 +106,7 @@ def get_ff_evaluator_fn(
         eval_batch = (config.arch.num_eval_episodes // n_devices) * eval_multiplier
 
         key, *env_keys = jax.random.split(key, eval_batch + 1)
-        env_states, timesteps = jax.vmap(env.reset)(
-            jnp.stack(env_keys),
-        )
+        env_states, timesteps = jax.vmap(env.reset)(jnp.stack(env_keys))
         # Split keys for each core.
         key, *step_keys = jax.random.split(key, eval_batch + 1)
         # Add dimension to pmap over.
@@ -277,7 +275,7 @@ def get_rnn_evaluator_fn(
 
 def evaluator_setup(
     eval_env: Environment,
-    key_e: chex.PRNGKey,
+    key: chex.PRNGKey,
     network: Any,
     params: FrozenDict,
     config: DictConfig,
@@ -329,7 +327,7 @@ def evaluator_setup(
 
     # Broadcast trained params to cores and split keys for each core.
     trained_params = jax.tree_util.tree_map(lambda x: x[:, 0, ...], params)
-    key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
+    key, *eval_keys = jax.random.split(key, n_devices + 1)
     eval_keys = jnp.stack(eval_keys).reshape(n_devices, -1)
 
     return evaluator, absolute_metric_evaluator, (trained_params, eval_keys)

@@ -269,6 +269,7 @@ class JaxMarlWrapper(Wrapper):
                 global_state=global_state,
                 step_count=step_count,
             )
+
         return specs.Spec(
             Observation,
             "ObservationSpec",
@@ -292,9 +293,9 @@ class JaxMarlWrapper(Wrapper):
         """Get action mask for each agent."""
         if self.has_action_mask:
             avail_actions = self._env.get_avail_actions(state)
-            mask = jnp.array(batchify(avail_actions, self.agents), dtype=jnp.float32)
+            mask = jnp.array(batchify(avail_actions, self.agents), dtype=bool)
         else:
-            mask = jnp.ones(self._action_shape, dtype=jnp.float32)
+            mask = jnp.ones(self._action_shape, dtype=bool)
         return mask
 
     def get_global_state(self, obs: Dict[str, Array]) -> Array:

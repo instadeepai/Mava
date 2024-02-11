@@ -480,7 +480,7 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     # Setup evaluator.
     evaluator, absolute_metric_evaluator, (trained_params, eval_keys) = evaluator_setup(
         eval_env=eval_env,
-        key_e=key_e,
+        key=key_e,
         network=actor_network,
         params=learner_state.params.actor_params,
         config=config,

@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import time
-from datetime import datetime
 from typing import Any, Callable, Dict, NamedTuple, Tuple
 
 import chex
@@ -23,25 +23,28 @@ import flax.linen as nn
 import hydra
 import jax
 import jax.numpy as jnp
+
+jax.config.update("jax_platform_name", "cpu")
+
 import optax
-from brax.io import html
 from chex import PRNGKey
 from colorama import Fore, Style
 from flashbax.buffers.flat_buffer import TrajectoryBuffer
 from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.scope import FrozenVariableDict
-from flax.jax_utils import unreplicate
 from jax import Array
 from jax.typing import ArrayLike
 from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
 from typing_extensions import TypeAlias
 
+from mava.evaluator import evaluator_setup
+from mava.types import Observation
 from mava.utils import make_env as environments
+from mava.utils.checkpointing import Checkpointer
+from mava.utils.jax import unreplicate_batch_dim
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers import episode_metrics
-
-# jax.config.update("jax_platform_name", "cpu")
 
 
 # todo: types.py
@@ -102,8 +105,8 @@ class QNetwork(nn.Module):
         self.net = nn.Sequential([nn.Dense(256), nn.relu, nn.Dense(256), nn.relu, nn.Dense(1)])
 
     @nn.compact
-    def __call__(self, obs: Array, actions: Array) -> Array:
-        x = jnp.concatenate([obs, actions], axis=-1)
+    def __call__(self, obs: Observation, actions: Array) -> Array:
+        x = jnp.concatenate([obs.agents_view, actions], axis=-1)
         return self.net(x)
 
 
@@ -132,8 +135,8 @@ class Actor(nn.Module):
         )
 
     @nn.compact
-    def __call__(self, x: ArrayLike) -> distrax.Distribution:
-        x = self.torso(x)
+    def __call__(self, obs: Observation) -> distrax.Distribution:
+        x = self.torso(obs.agents_view)
 
         mean = self.mean_nn(x)
 
@@ -186,7 +189,16 @@ def sample_action(
 
 def init(
     cfg: DictConfig,
-) -> Tuple[Environment, Networks, Optimisers, TrajectoryBuffer, LearnerState, Array, MavaLogger,]:
+) -> Tuple[
+    Tuple[Environment, Environment],
+    Networks,
+    Optimisers,
+    TrajectoryBuffer,
+    LearnerState,
+    Array,
+    MavaLogger,
+    chex.PRNGKey,
+]:
     logger = MavaLogger(cfg)
 
     key = jax.random.PRNGKey(cfg.system.seed)
@@ -205,8 +217,8 @@ def init(
 
     init_acts = env.action_spec().generate_value()
     init_acts_batched = init_acts[jnp.newaxis, ...]
-    init_obs = env.observation_spec().generate_value().agents_view.astype(float)
-    init_obs_batched = init_obs[jnp.newaxis, ...]
+    init_obs = env.observation_spec().generate_value()
+    init_obs_batched = jax.tree_map(lambda x: x[jnp.newaxis, ...], init_obs)
 
     # Making actor network
     actor = Actor(action_dim, act_high, act_low)
@@ -280,13 +292,13 @@ def init(
     first_keys = jax.random.split(key, n_devices)
 
     env_state, first_timestep = jax.pmap(jax.vmap(env.reset), axis_name="device")(reset_keys)
-    first_obs = first_timestep.observation.agents_view
+    first_obs = first_timestep.observation
 
     # Initial learner state.
     learner_state = LearnerState(
         first_obs, env_state, buffer_state, params, opt_states, jnp.zeros(n_devices), first_keys
     )
-    return env, nns, opts, rb, learner_state, target_entropy, logger
+    return (env, eval_env), nns, opts, rb, learner_state, target_entropy, logger, key
 
 
 def make_update_fns(
@@ -306,16 +318,16 @@ def make_update_fns(
     full_action_shape = (cfg.system.n_envs, *env.action_spec().shape)
 
     def step(
-        action: Array, obs: Array, env_state: State, buffer_state: BufferState
+        action: Array, obs: Observation, env_state: State, buffer_state: BufferState
     ) -> Tuple[Array, State, BufferState, Dict]:
         """Given an action, step the environment and add to the buffer."""
         env_state, timestep = jax.vmap(env.step)(env_state, action)
-        next_obs = timestep.observation.agents_view
+        next_obs = timestep.observation
         rewards = timestep.reward[:, 0]
         terms = ~(timestep.discount).astype(bool)[:, 0]
         infos = timestep.extras
 
-        real_next_obs = infos["real_next_obs"].agents_view
+        real_next_obs = infos["real_next_obs"]
 
         transition = Transition(obs, action, rewards, terms, real_next_obs)
         buffer_state = rb.add(buffer_state, transition)
@@ -538,14 +550,32 @@ def make_update_fns(
     return pmaped_explore, pmaped_updated_step
 
 
-def run_experiment(cfg: DictConfig) -> Array:
+def run_experiment(cfg: DictConfig) -> float:
     n_devices = len(jax.devices())
 
     pmaped_steps = 1024  # todo: config option
-    steps_btwn_log = n_devices * cfg.system.n_envs * cfg.system.rollout_length * pmaped_steps
+    steps_per_rollout = n_devices * cfg.system.n_envs * cfg.system.rollout_length * pmaped_steps
+    max_episode_return = -jnp.inf
 
-    env, nns, opts, rb, learner_state, target_entropy, logger = init(cfg)
+    (env, eval_env), nns, opts, rb, learner_state, target_entropy, logger, key = init(cfg)
     explore, update = make_update_fns(cfg, env, nns, opts, rb, target_entropy)
+
+    actor, _ = nns
+    key, eval_key = jax.random.split(key)
+    evaluator, absolute_metric_evaluator, (trained_params, eval_keys) = evaluator_setup(
+        eval_env=eval_env,
+        key=eval_key,
+        network=actor,
+        params=learner_state.params.actor,
+        config=cfg,
+    )
+
+    if cfg.logger.checkpointing.save_model:
+        checkpointer = Checkpointer(
+            metadata=cfg,  # Save all config as metadata in the checkpoint
+            model_name=cfg.logger.system_name,
+            **cfg.logger.checkpointing.save_args,  # Checkpoint args
+        )
 
     start_time = time.time()
 
@@ -562,13 +592,11 @@ def run_experiment(cfg: DictConfig) -> Array:
     # Main loop:
     # We want start to align with the final step of the first pmaped_learn,
     # where we've done explore_steps and 1 full learn step.
-    start = cfg.system.explore_steps + steps_btwn_log
-    for eval_idx, t in enumerate(range(start, int(cfg.system.total_timesteps), steps_btwn_log)):
-        # Learn:
+    start = cfg.system.explore_steps + steps_per_rollout
+    for eval_idx, t in enumerate(range(start, int(cfg.system.total_timesteps), steps_per_rollout)):
+        # Learn loop:
         learner_state, (metrics, losses) = update(learner_state)
         jax.block_until_ready(learner_state)
-        # Evaluate:
-        # todo...
 
         # Log:
         # Multiply by learn steps here because anakin steps per second is learn + act steps
@@ -577,34 +605,48 @@ def run_experiment(cfg: DictConfig) -> Array:
         sps = t * cfg.system.epochs / (time.time() - start_time)
         final_metrics = episode_metrics.get_final_step_metrics(metrics)
         loss_metrics = losses | {"log_alpha": learner_state.params.log_alpha}
-
-        logger.log({"step": t, "steps per second": sps}, t, eval_idx, LogEvent.MISC)
+        logger.log({"step": t, "steps_per_second": sps}, t, eval_idx, LogEvent.MISC)
         logger.log(final_metrics, t, eval_idx, LogEvent.ACT)
         logger.log(loss_metrics, t, eval_idx, LogEvent.TRAIN)
 
-    # todo: final eval
-    # Record video
-    states = []
-    actor_params = unreplicate(learner_state.params.actor)
+        # Evaluate:
+        key, eval_key = jax.random.split(key)
+        eval_keys = jax.random.split(eval_key, n_devices)
+        # todo: bug likely here -> don't have batch vmap yet so shouldn't unreplicate_batch_dim
+        eval_output = evaluator((learner_state.params.actor), eval_keys)
+        jax.block_until_ready(eval_output)
 
-    actor_apply = jax.jit(nns[0].apply)
-    env_step = jax.jit(env.step)
+        # Log:
+        episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
+        final_metrics = episode_metrics.get_final_step_metrics(eval_output.episode_metrics)
+        logger.log(final_metrics, t, eval_idx, LogEvent.EVAL)
 
-    _key, reset_key = jax.random.split(jax.random.PRNGKey(1))
-    state, ts = env.reset(reset_key)
+        # Save best actor params.
+        if cfg.arch.absolute_metric and max_episode_return <= episode_return:
+            best_params = copy.deepcopy((learner_state.params.actor))
+            max_episode_return = episode_return
 
-    for _ in range(1000):
-        _key, step_key = jax.random.split(_key)
+        # Checkpoint:
+        if cfg.logger.checkpointing.save_model:
+            # Save checkpoint of learner state
+            checkpointer.save(
+                timestep=t,
+                unreplicated_learner_state=unreplicate_learner_state(learner_state),
+                episode_return=episode_return,
+            )
 
-        pi = actor_apply(actor_params, ts.observation.agents_view)
-        action = pi.sample(seed=step_key)
-        state, ts = env_step(state, action.squeeze(0))
-        states.append(state)
+    # Measure absolute metric.
+    if cfg.arch.absolute_metric:
+        eval_keys = jax.random.split(key, n_devices)
 
-    anim_file = f"anim_{cfg.env.env_name}_{datetime.now().strftime('%Y%m%d%H%M%S')}.html"
-    html.save(anim_file, env.unwrapped.sys, [s.env_state.state.pipeline_state for s in states])
+        eval_output = absolute_metric_evaluator(best_params, eval_keys)
+        jax.block_until_ready(eval_output)
 
-    return jnp.mean(metrics["episode_return"])
+        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.ABSOLUTE)
+
+    logger.stop()
+
+    return float(max_episode_return)
 
 
 @hydra.main(config_path="../configs", config_name="default_ff_isac.yaml", version_base="1.2")

@@ -83,7 +83,7 @@ class AgentIDWrapper(Wrapper):
         num_obs_features = obs_spec.agents_view.shape[-1] + self._env.num_agents
 
         agents_view = specs.Array(
-            (self._env.num_agents, num_obs_features), jnp.int32, "agents_view"
+            (self._env.num_agents, num_obs_features), obs_spec.agents_view.dtype, "agents_view"
         )
 
         if self.has_global_state:
