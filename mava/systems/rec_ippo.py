@@ -49,6 +49,7 @@ from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import unreplicate_learner_state
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
+from mava.utils.training import make_learning_rate
 
 
 def get_learner_fn(
@@ -479,13 +480,17 @@ def learner_setup(
     actor_network, critic_network = networks.make(
         config=config, network="recurrent", centralised_critic=False
     )
+
+    actor_lr = make_learning_rate(config.system.actor_lr, config)
+    critic_lr = make_learning_rate(config.system.critic_lr, config)
+
     actor_optim = optax.chain(
         optax.clip_by_global_norm(config.system.max_grad_norm),
-        optax.adam(config.system.actor_lr, eps=1e-5),
+        optax.adam(actor_lr, eps=1e-5),
     )
     critic_optim = optax.chain(
         optax.clip_by_global_norm(config.system.max_grad_norm),
-        optax.adam(config.system.critic_lr, eps=1e-5),
+        optax.adam(critic_lr, eps=1e-5),
     )
 
     # Initialise observation: Select only obs for a single agent.
@@ -675,7 +680,7 @@ def run_experiment(_config: DictConfig) -> None:
 
         # Log the results of the training.
         elapsed_time = time.time() - start_time
-        t = steps_per_rollout * (eval_step + 1)
+        t = int(steps_per_rollout * (eval_step + 1))
         learner_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
 
         # Separately log timesteps, actoring metrics and training metrics.
@@ -731,7 +736,7 @@ def run_experiment(_config: DictConfig) -> None:
 
         elapsed_time = time.time() - start_time
 
-        t = steps_per_rollout * (eval_step + 1)
+        t = int(steps_per_rollout * (eval_step + 1))
         evaluator_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
         logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.ABSOLUTE)
 
