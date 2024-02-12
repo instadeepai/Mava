@@ -273,11 +273,11 @@ def init(
         next_obs=init_obs,
     )
 
-    rb = fbx.make_flat_buffer(
+    rb = fbx.make_item_buffer(
         max_length=cfg.system.buffer_size,
         min_length=cfg.system.explore_steps,
         sample_batch_size=cfg.system.batch_size,
-        add_batch_size=cfg.system.n_envs,
+        add_batches=True,
     )
     buffer_state = jax.device_put_replicated(rb.init(init_transition), devices)
 
@@ -460,7 +460,7 @@ def make_update_fns(
         key, buff_key, q_key, actor_key = jax.random.split(key, 4)
 
         # sample
-        data = rb.sample(buffer_state, buff_key).experience.first
+        data = rb.sample(buffer_state, buff_key).experience
 
         # learn
         params, opt_states, q_loss_info = update_q(params, opt_states, data, q_key)
