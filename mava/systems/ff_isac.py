@@ -22,6 +22,7 @@ import flashbax as fbx
 import flax.linen as nn
 import hydra
 import jax
+import jax.lax as lax
 import jax.numpy as jnp
 import optax
 from chex import PRNGKey
@@ -166,7 +167,7 @@ def sample_action(
     # normal = distrax.Normal(mean, std)
     normal = distrax.MultivariateNormalDiag(mean, std)
 
-    sampled_action = jax.lax.cond(
+    sampled_action = lax.cond(
         eval,
         lambda: mean,
         lambda: normal.sample(seed=key),
@@ -410,7 +411,9 @@ def make_update_fns(
         # Update Q function.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
         q_grads, q_loss_info = q_grad_fn(params.q.online, data.obs, data.action, target_q_val)
-        q_grads, q_loss_info = jax.lax.pmean((q_grads, q_loss_info), axis_name="device")
+        # Mean over the device and batch dimension.
+        q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="device")
+        q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="batch")
         q_updates, new_q_opt_state = q_opt.update(q_grads, opt_states.q)
         new_online_q_params = optax.apply_updates(params.q.online, q_updates)
 
@@ -440,7 +443,9 @@ def make_update_fns(
             actor_loss, act_grads = actor_grad_fn(
                 params.actor, data.obs, jnp.exp(params.log_alpha), params.q.online, actor_key
             )
-            actor_loss, act_grads = jax.lax.pmean((actor_loss, act_grads), axis_name="device")
+            # Mean over the device and batch dimensions.
+            actor_loss, act_grads = lax.pmean((actor_loss, act_grads), axis_name="device")
+            actor_loss, act_grads = lax.pmean((actor_loss, act_grads), axis_name="batch")
             actor_updates, new_actor_opt_state = actor_opt.update(act_grads, opt_states.actor)
             new_actor_params = optax.apply_updates(params.actor, actor_updates)
 
@@ -457,9 +462,8 @@ def make_update_fns(
 
                 alpha_grad_fn = jax.value_and_grad(alpha_loss_fn)
                 alpha_loss, alpha_grads = alpha_grad_fn(params.log_alpha, log_prob, target_entropy)
-                alpha_loss, alpha_grads = jax.lax.pmean(
-                    (alpha_loss, alpha_grads), axis_name="device"
-                )
+                alpha_loss, alpha_grads = lax.pmean((alpha_loss, alpha_grads), axis_name="device")
+                alpha_loss, alpha_grads = lax.pmean((alpha_loss, alpha_grads), axis_name="batch")
                 alpha_updates, new_alpha_opt_state = alpha_opt.update(alpha_grads, opt_states.alpha)
                 new_log_alpha = optax.apply_updates(params.log_alpha, alpha_updates)
 
@@ -482,7 +486,7 @@ def make_update_fns(
 
         # learn
         params, opt_states, q_loss_info = update_q(params, opt_states, data, q_key)
-        params, opt_states, act_loss_info = jax.lax.cond(
+        params, opt_states, act_loss_info = lax.cond(
             t % cfg.system.policy_frequency == 0,  # TD 3 Delayed update support
             update_actor_and_alpha,
             # just return same params and opt_states and 0 for losses
@@ -526,8 +530,8 @@ def make_update_fns(
         )
         return learner_state, metrics
 
-    scanned_update = lambda state: jax.lax.scan(update_epoch, state, None, length=cfg.system.epochs)
-    scanned_act = lambda state: jax.lax.scan(act, state, None, length=cfg.system.rollout_length)
+    scanned_update = lambda state: lax.scan(update_epoch, state, None, length=cfg.system.epochs)
+    scanned_act = lambda state: lax.scan(act, state, None, length=cfg.system.rollout_length)
 
     # Act loop -> sample -> update loop
     def update_step(carry: LearnerState, _: Any) -> Tuple[LearnerState, Tuple[Metrics, Metrics]]:
@@ -555,7 +559,7 @@ def make_update_fns(
     explore_steps = cfg.system.explore_steps // cfg.system.n_envs
     pmaped_explore = jax.pmap(
         jax.vmap(
-            lambda state: jax.lax.scan(explore, state, None, length=explore_steps),
+            lambda state: lax.scan(explore, state, None, length=explore_steps),
             axis_name="batch",
         ),
         axis_name="device",
@@ -563,7 +567,7 @@ def make_update_fns(
     )
     pmaped_updated_step = jax.pmap(
         jax.vmap(
-            lambda state: jax.lax.scan(update_step, state, None, length=pmaped_steps),
+            lambda state: lax.scan(update_step, state, None, length=pmaped_steps),
             axis_name="batch",
         ),
         axis_name="device",
