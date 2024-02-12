@@ -39,7 +39,7 @@ from mava.evaluator import evaluator_setup
 from mava.types import Observation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import unreplicate_learner_state
+from mava.utils.jax import unreplicate_batch_dim, unreplicate_learner_state
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers import episode_metrics
 
@@ -204,6 +204,11 @@ def init(
     devices = jax.devices()
     n_devices = len(devices)
 
+    def replicate(x: Any) -> Any:
+        """First replicate the update batch dim then put on devices."""
+        x = jax.tree_map(lambda y: jnp.broadcast_to(y, (cfg.system.update_batch_size, *y.shape)), x)
+        return jax.device_put_replicated(x, devices)
+
     env, eval_env = environments.make(cfg)
 
     n_agents = env.action_spec().shape[0]
@@ -260,8 +265,8 @@ def init(
     opt_states = OptStates(actor_opt_state, q_opt_state, alpha_opt_state)
 
     # Distribute params and opt states across all devices
-    params = jax.device_put_replicated(params, devices)
-    opt_states = jax.device_put_replicated(opt_states, devices)
+    params = replicate(params)
+    opt_states = replicate(opt_states)
 
     # Create replay buffer
     init_transition = Transition(
@@ -279,23 +284,36 @@ def init(
         sample_batch_size=cfg.system.batch_size,
         add_batches=True,
     )
-    buffer_state = jax.device_put_replicated(rb.init(init_transition), devices)
+    buffer_state = replicate(rb.init(init_transition))
 
     nns = (actor, q)
     opts = (actor_opt, q_opt, alpha_opt)
 
     # Reset env.
+    n_keys = cfg.system.n_envs * n_devices * cfg.system.update_batch_size
+    key_shape = (n_devices, cfg.system.update_batch_size, cfg.system.n_envs, -1)
     key, reset_key = jax.random.split(key)
-    reset_keys = jax.random.split(reset_key, cfg.system.n_envs * n_devices)
-    reset_keys = jnp.reshape(reset_keys, (n_devices, cfg.system.n_envs, -1))
-    first_keys = jax.random.split(key, n_devices)
+    reset_keys = jax.random.split(reset_key, n_keys)
+    reset_keys = jnp.reshape(reset_keys, key_shape)
 
-    env_state, first_timestep = jax.pmap(jax.vmap(env.reset), axis_name="device")(reset_keys)
+    # Keys passed to learner
+    first_keys = jax.random.split(key, (n_devices * cfg.system.update_batch_size))
+    first_keys = first_keys.reshape((n_devices, cfg.system.update_batch_size, -1))
+
+    env_state, first_timestep = jax.pmap(  # devices
+        jax.vmap(  # update_batch_size
+            jax.vmap(env.reset),  # n_envs
+            axis_name="batch",
+        ),
+        axis_name="device",
+    )(reset_keys)
     first_obs = first_timestep.observation
+
+    t = jnp.zeros((n_devices, cfg.system.update_batch_size), dtype=int)
 
     # Initial learner state.
     learner_state = LearnerState(
-        first_obs, env_state, buffer_state, params, opt_states, jnp.zeros(n_devices), first_keys
+        first_obs, env_state, buffer_state, params, opt_states, t, first_keys
     )
     return (env, eval_env), nns, opts, rb, learner_state, target_entropy, logger, key
 
@@ -536,12 +554,18 @@ def make_update_fns(
     pmaped_steps = 1024  # todo: config option
     explore_steps = cfg.system.explore_steps // cfg.system.n_envs
     pmaped_explore = jax.pmap(
-        lambda state: jax.lax.scan(explore, state, None, length=explore_steps),
+        jax.vmap(
+            lambda state: jax.lax.scan(explore, state, None, length=explore_steps),
+            axis_name="batch",
+        ),
         axis_name="device",
         donate_argnums=0,
     )
     pmaped_updated_step = jax.pmap(
-        lambda state: jax.lax.scan(update_step, state, None, length=pmaped_steps),
+        jax.vmap(
+            lambda state: jax.lax.scan(update_step, state, None, length=pmaped_steps),
+            axis_name="batch",
+        ),
         axis_name="device",
         donate_argnums=0,
     )
@@ -613,7 +637,7 @@ def run_experiment(cfg: DictConfig) -> float:
         key, eval_key = jax.random.split(key)
         eval_keys = jax.random.split(eval_key, n_devices)
         # todo: bug likely here -> don't have batch vmap yet so shouldn't unreplicate_batch_dim
-        eval_output = evaluator(learner_state.params.actor, eval_keys)
+        eval_output = evaluator(unreplicate_batch_dim(learner_state.params.actor), eval_keys)
         jax.block_until_ready(eval_output)
 
         # Log:
@@ -622,7 +646,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
         # Save best actor params.
         if cfg.arch.absolute_metric and max_episode_return <= episode_return:
-            best_params = copy.deepcopy((learner_state.params.actor))
+            best_params = copy.deepcopy(unreplicate_batch_dim(learner_state.params.actor))
             max_episode_return = episode_return
 
         # Checkpoint:

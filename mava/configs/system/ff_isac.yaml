@@ -9,6 +9,8 @@ add_agent_id: True
 # step related
 total_timesteps: 3e8
 explore_steps: 5000  # number of steps to take with random actions at the start of training
+update_batch_size: 2 # Number of vectorised gradient updates per device.
+
 rollout_length: 2 # Number of environment steps per vectorised environment.
 epochs: 1 # Number of learn epochs per training data batch.
 policy_frequency: 4  # the frequency of training policy - every n q learning steps the policy is trained once
