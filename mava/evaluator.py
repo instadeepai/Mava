@@ -275,7 +275,7 @@ def get_rnn_evaluator_fn(
     return evaluator_fn
 
 
-def evaluator_setup(
+def make_eval_fns(
     eval_env: Environment,
     network: Any,
     config: DictConfig,

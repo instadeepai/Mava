@@ -29,7 +29,7 @@ from optax._src.base import OptState
 from rich.pretty import pprint
 
 from mava import networks
-from mava.evaluator import evaluator_setup
+from mava.evaluator import make_eval_fns
 from mava.networks import FeedForwardActor as Actor
 from mava.types import (
     ActorApply,
@@ -482,7 +482,7 @@ def run_experiment(_config: DictConfig) -> None:
     trained_params = unreplicate_batch_dim(learner_state.params.actor_params)
     eval_keys = jax.random.split(key, n_devices)
     eval_keys = eval_keys.reshape(n_devices, -1)
-    evaluator, absolute_metric_evaluator = evaluator_setup(eval_env, actor_network, config)
+    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network, config)
 
     config = check_total_timesteps(config)
     assert (
