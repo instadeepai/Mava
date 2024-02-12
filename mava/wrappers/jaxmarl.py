@@ -168,15 +168,7 @@ class JaxMarlWrapper(Wrapper):
         super().__init__(env)
         self._env: MultiAgentEnv
         self._timelimit = timelimit
-
-        if _is_discrete(env.action_space(self._env.agents[0])):
-            self._action_shape = (
-                self.action_spec().shape[0],
-                int(self.action_spec().num_values[0]),
-            )
-        else:
-            self._action_shape = self.action_spec().shape
-
+        self._action_shape = (self.action_spec().shape[0], int(self.action_spec().num_values[0]))
         self.agents = list(self._env.observation_spaces.keys())
         self.has_action_mask = hasattr(self._env, "get_avail_actions")
         self.has_global_state = has_global_state
@@ -188,11 +180,10 @@ class JaxMarlWrapper(Wrapper):
         obs, state = self._env.reset(reset_key)
 
         if self.has_global_state:
-            agents_view = batchify(obs, self.agents)
             obs = ObservationGlobalState(
-                agents_view=agents_view,
+                agents_view=batchify(obs, self.agents),
                 action_mask=self.action_mask(state),
-                global_state=self.get_global_state(obs, agents_view),
+                global_state=self.get_global_state(obs),
                 step_count=jnp.zeros(self._env.num_agents, dtype=int),
             )
         else:
@@ -213,11 +204,10 @@ class JaxMarlWrapper(Wrapper):
         )
 
         if self.has_global_state:
-            agents_view = batchify(obs, self.agents)
             obs = ObservationGlobalState(
-                agents_view=agents_view,
+                agents_view=batchify(obs, self.agents),
                 action_mask=self.action_mask(env_state),
-                global_state=self.get_global_state(obs, agents_view),
+                global_state=self.get_global_state(obs),
                 step_count=jnp.repeat(state.step, self._env.num_agents),
             )
         else:
@@ -233,7 +223,7 @@ class JaxMarlWrapper(Wrapper):
             reward=batchify(reward, self.agents),
             discount=1.0 - batchify(done, self.agents),
             observation=obs,
-            # extras=infos,
+            extras=infos,
         )
 
         return JaxMarlState(env_state, key, state.step + 1), ts
@@ -255,13 +245,8 @@ class JaxMarlWrapper(Wrapper):
         )
 
         if self.has_global_state:
-            if hasattr(self._env, "state_size"):
-                state_size = self._env.state_size
-            else:
-                num_obs_features = self._env.observation_spaces[self._env.agents[0]].shape[0]
-                state_size = self._env.num_agents * num_obs_features
             global_state = specs.Array(
-                (self._env.num_agents, state_size),
+                (self._env.num_agents, self._env.state_size),
                 jnp.int32,
                 "global_state",
             )
@@ -302,11 +287,6 @@ class JaxMarlWrapper(Wrapper):
             mask = jnp.ones(self._action_shape, dtype=jnp.float32)
         return mask
 
-    def get_global_state(self, obs: Dict[str, Array], agents_view: Array) -> Array:
+    def get_global_state(self, obs: Dict[str, Array]) -> Array:
         """Get global state from observation and copy it for each agent."""
-        if hasattr(obs, "world_state"):
-            return jnp.tile(jnp.array(obs["world_state"]), (self._env.num_agents, 1))
-
-        global_state = jnp.concatenate(agents_view, axis=0)
-        global_state = jnp.tile(global_state, (self._env.num_agents, 1))
-        return global_state
+        return jnp.tile(jnp.array(obs["world_state"]), (self._env.num_agents, 1))
