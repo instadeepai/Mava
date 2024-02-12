@@ -14,7 +14,7 @@
 
 # TODO: Rewrite this file to handle only JAX arrays.
 
-from typing import Union
+from typing import Any, Union
 
 import chex
 import jax
@@ -59,3 +59,9 @@ def unreplicate_learner_state(
     and one for the `update batch size`.
     """
     return jax.tree_map(lambda x: x[(0,) * unreplicate_depth], learner_state)  # type: ignore
+
+
+def unreplicate_batch_dim(x: Any) -> Any:
+    """Unreplicated just the batch dim.
+    In mava's case it is always the second dimension after the device dimension."""
+    return jax.tree_map(lambda x: x[:, 0, ...], x)  # type: ignore

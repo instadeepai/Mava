@@ -44,7 +44,11 @@ from mava.types import (
     PPOTransition,
 )
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import merge_leading_dims, unreplicate_learner_state
+from mava.utils.jax import (
+    merge_leading_dims,
+    unreplicate_batch_dim,
+    unreplicate_learner_state,
+)
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.make_env import make
 
@@ -468,6 +472,9 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     config = copy.deepcopy(_config)
     logger = MavaLogger(config)
 
+    # Calculate total timesteps.
+    n_devices = len(jax.devices())
+
     # Create the enviroments for train and eval.
     env, eval_env = make(config=config)
 
@@ -478,16 +485,10 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     learn, actor_network, learner_state = learner_setup(env, (key, key_p), config)
 
     # Setup evaluator.
-    evaluator, absolute_metric_evaluator, (trained_params, eval_keys) = evaluator_setup(
-        eval_env=eval_env,
-        key_e=key_e,
-        network=actor_network,
-        params=learner_state.params.actor_params,
-        config=config,
-    )
-
-    # Calculate total timesteps.
-    n_devices = len(jax.devices())
+    trained_params = unreplicate_batch_dim(learner_state.params.actor_params)
+    eval_keys = jax.random.split(key, n_devices)
+    eval_keys = eval_keys.reshape(n_devices, -1)
+    evaluator, absolute_metric_evaluator = evaluator_setup(eval_env, actor_network, config)
 
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
     steps_per_rollout = (
@@ -627,10 +628,8 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
 
         # Prepare for evaluation.
         start_time = time.time()
-        trained_params = jax.tree_util.tree_map(
-            lambda x: x[:, 0, ...],
-            learner_output.learner_state.params.actor_params,  # Select only actor params
-        )
+
+        trained_params = unreplicate_batch_dim(learner_state.params.actor_params)
         key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
