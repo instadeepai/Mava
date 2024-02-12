@@ -584,7 +584,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     # Log explore metrics.
     final_metrics = episode_metrics.get_final_step_metrics(metrics)
-    t = int(jnp.prod(learner_state.t))
+    t = int(jnp.sum(learner_state.t))
     sps = t / (time.time() - start_time)
     logger.log({"step": t, "steps per second": sps}, t, 0, LogEvent.MISC)
     logger.log(final_metrics, cfg.system.explore_steps, 0, LogEvent.ACT)
