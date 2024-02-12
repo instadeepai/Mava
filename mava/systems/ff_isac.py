@@ -23,9 +23,6 @@ import flax.linen as nn
 import hydra
 import jax
 import jax.numpy as jnp
-
-jax.config.update("jax_platform_name", "cpu")
-
 import optax
 from chex import PRNGKey
 from colorama import Fore, Style
@@ -42,9 +39,11 @@ from mava.evaluator import evaluator_setup
 from mava.types import Observation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import unreplicate_batch_dim
+from mava.utils.jax import unreplicate_learner_state
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers import episode_metrics
+
+# jax.config.update("jax_platform_name", "cpu")
 
 
 # todo: types.py
@@ -562,6 +561,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     actor, _ = nns
     key, eval_key = jax.random.split(key)
+    # todo: don't need to return trained_params or eval keys
     evaluator, absolute_metric_evaluator, (trained_params, eval_keys) = evaluator_setup(
         eval_env=eval_env,
         key=eval_key,
@@ -613,13 +613,12 @@ def run_experiment(cfg: DictConfig) -> float:
         key, eval_key = jax.random.split(key)
         eval_keys = jax.random.split(eval_key, n_devices)
         # todo: bug likely here -> don't have batch vmap yet so shouldn't unreplicate_batch_dim
-        eval_output = evaluator((learner_state.params.actor), eval_keys)
+        eval_output = evaluator(learner_state.params.actor, eval_keys)
         jax.block_until_ready(eval_output)
 
         # Log:
         episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
-        final_metrics = episode_metrics.get_final_step_metrics(eval_output.episode_metrics)
-        logger.log(final_metrics, t, eval_idx, LogEvent.EVAL)
+        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
 
         # Save best actor params.
         if cfg.arch.absolute_metric and max_episode_return <= episode_return:
@@ -629,9 +628,10 @@ def run_experiment(cfg: DictConfig) -> float:
         # Checkpoint:
         if cfg.logger.checkpointing.save_model:
             # Save checkpoint of learner state
+            unreplicated_learner_state = unreplicate_learner_state(learner_state)  # type: ignore
             checkpointer.save(
                 timestep=t,
-                unreplicated_learner_state=unreplicate_learner_state(learner_state),
+                unreplicated_learner_state=unreplicated_learner_state,
                 episode_return=episode_return,
             )
 

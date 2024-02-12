@@ -233,7 +233,7 @@ class JaxMarlWrapper(Wrapper):
             reward=batchify(reward, self.agents),
             discount=1.0 - batchify(done, self.agents),
             observation=obs,
-            extras=infos,
+            # extras=infos,
         )
 
         return JaxMarlState(env_state, key, state.step + 1), ts

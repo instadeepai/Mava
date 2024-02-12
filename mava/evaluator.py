@@ -309,14 +309,10 @@ def evaluator_setup(
             10,
         )
     else:
-        vmapped_eval_apply_fn = jax.vmap(
-            network.apply,
-            in_axes=(None, 0),
-        )
-        evaluator = get_ff_evaluator_fn(eval_env, vmapped_eval_apply_fn, config, log_win_rate)
+        evaluator = get_ff_evaluator_fn(eval_env, network.apply, config, log_win_rate)
         absolute_metric_evaluator = get_ff_evaluator_fn(
             eval_env,
-            vmapped_eval_apply_fn,
+            network.apply,
             config,
             log_win_rate,
             10,
