@@ -519,7 +519,7 @@ def run_experiment(_config: DictConfig) -> None:
 
         # Log the results of the training.
         elapsed_time = time.time() - start_time
-        t = steps_per_rollout * (eval_step + 1)
+        t = int(steps_per_rollout * (eval_step + 1))
         learner_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
 
         # Separately log timesteps, actoring metrics and training metrics.
@@ -575,7 +575,7 @@ def run_experiment(_config: DictConfig) -> None:
         jax.block_until_ready(evaluator_output)
 
         elapsed_time = time.time() - start_time
-        t = steps_per_rollout * (eval_step + 1)
+        t = int(steps_per_rollout * (eval_step + 1))
         evaluator_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
         logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.ABSOLUTE)
 
