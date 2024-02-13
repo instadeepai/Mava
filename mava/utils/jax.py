@@ -62,6 +62,10 @@ def unreplicate_learner_state(
 
 
 def unreplicate_batch_dim(x: Any) -> Any:
-    """Unreplicated just the batch dim.
-    In mava's case it is always the second dimension after the device dimension."""
+    """Unreplicated just the update batch dimension. 
+    (The dimension that is vmapped over when acting and learning)
+
+    In mava's case it is always the second dimension, after the device dimension.
+    We simply take element 0 as the params are identical across this dimension.
+    """
     return jax.tree_map(lambda x: x[:, 0, ...], x)  # type: ignore

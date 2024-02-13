@@ -479,9 +479,8 @@ def run_experiment(_config: DictConfig) -> None:
     )
 
     # Setup evaluator.
-    trained_params = unreplicate_batch_dim(learner_state.params.actor_params)
-    eval_keys = jax.random.split(key, n_devices)
-    eval_keys = eval_keys.reshape(n_devices, -1)
+    # One key per device for evaluation.
+    eval_keys = jax.random.split(key_e, n_devices)
     evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network, config)
 
     config = check_total_timesteps(config)
