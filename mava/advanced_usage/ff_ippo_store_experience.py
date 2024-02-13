@@ -485,9 +485,7 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     learn, actor_network, learner_state = learner_setup(env, (key, key_p), config)
 
     # Setup evaluator.
-    trained_params = unreplicate_batch_dim(learner_state.params.actor_params)
-    eval_keys = jax.random.split(key, n_devices)
-    eval_keys = eval_keys.reshape(n_devices, -1)
+    eval_keys = jax.random.split(key_e, n_devices)
     evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network, config)
 
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
