@@ -84,13 +84,13 @@ class DiscreteActionHead(nn.Module):
     action_dim: int
 
     @nn.compact
-    def __call__(self, x: chex.Array, action_mask: chex.Array) -> distrax.Categorical:
+    def __call__(self, obs_embedding: chex.Array, observation: Observation) -> distrax.Categorical:
         """Forward pass."""
 
-        actor_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(x)
+        actor_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(obs_embedding)
 
         masked_logits = jnp.where(
-            action_mask,
+            observation.action_mask,
             actor_logits,
             jnp.finfo(jnp.float32).min,
         )
@@ -107,13 +107,13 @@ class FeedForwardActor(nn.Module):
     @nn.compact
     def __call__(self, observation: Observation) -> distrax.DistributionLike:
         """Forward pass."""
-        x = observation.agents_view
 
-        x = self.torso(x)
+        obs_embedding = self.torso(observation.agents_view)
 
-        x = self.action_head(x, observation.action_mask)
-
-        return x
+        # We pass both the observation embedding and the observation object to the action head
+        # since the observation object contains the action mask and other potentially useful
+        # information.
+        return self.action_head(obs_embedding, observation)
 
 
 class FeedForwardCritic(nn.Module):
@@ -189,7 +189,7 @@ class RecurrentActor(nn.Module):
         policy_rnn_input = (policy_embedding, done)
         policy_hidden_state, policy_embedding = ScannedRNN()(policy_hidden_state, policy_rnn_input)
         policy_embedding = self.post_torso(policy_embedding)
-        pi = self.action_head(policy_embedding, observation.action_mask)
+        pi = self.action_head(policy_embedding, observation)
 
         return policy_hidden_state, pi
 
