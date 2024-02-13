@@ -64,7 +64,7 @@ class QsAndTarget(NamedTuple):
 #     log_alpha: Array
     
 class QLearnParams(NamedTuple):
-    dqn_params:QsAndTarget
+    dqns:QsAndTarget
     # NOTE (Louise) later add Qmix network
 
 
@@ -106,19 +106,16 @@ Optimisers: TypeAlias = Tuple[
 # todo: should this contain both networks?
 num_actions = ... # TODO (Claude) we need to pass the number of actions at setup time NOTE (Louise) done! From your other code
 class QNetwork(nn.Module):
-    def setup(self,num_actions) -> None:
+    num_actions:int
+    def setup(self) -> None:
         # self.net = nn.Sequential([nn.Dense(256), nn.relu, nn.Dense(256), nn.relu, nn.Dense(1)])
-        self.net = nn.Sequential([nn.Dense(256), nn.relu, nn.Dense(256), nn.relu, nn.Dense(num_actions)])
+        self.net = nn.Sequential([nn.Dense(256), nn.relu, nn.Dense(256), nn.relu, nn.Dense(self.num_actions)])
 
 
-    # @nn.compact
-    # def __call__(self, obs: Observation, actions: Array) -> Array:
-    #     x = jnp.concatenate([obs.agents_view, actions], axis=-1)
-    #     return self.net(x)
-
-    @nn.compact # NOTE (Claude): the network should only take observations as input
+    @nn.compact
     def __call__(self, obs: Observation) -> Array:
-        return self.net(obs)
+        x = obs.agents_view
+        return self.net(x)
 
 
 # rlax does: 0, -4 NOTE (Claude) we dont need this stuff. Its for stocastic policies
@@ -223,7 +220,7 @@ def init(
 
     env, eval_env = environments.make(cfg)
 
-    n_agents = env.action_spec().shape[0]
+    # n_agents = env.action_spec().shape[0]
     # action_dim = env.action_spec().shape[1] # TODO (CLaude) get the number of actions here
     num_actions = int(env.action_spec().num_values[0]) # NOTE (Claude) got this from the PPO systems
 
@@ -235,8 +232,8 @@ def init(
 
     init_obs = env.observation_spec().generate_value()
     init_acts = env.action_spec().generate_value()
-    init_obs_batched = jax.tree_map(lambda x: x[jnp.newaxis, ...], init_obs)
-    init_act_batched = jax.tree_map(lambda x: x[jnp.newaxis, ...], init_acts)
+    init_obs_batched = jax.tree_map(lambda x: x[0][jnp.newaxis, ...], init_obs)
+    # init_act_batched = jax.tree_map(lambda x: x[jnp.newaxis, ...], init_acts)
 
     # Making actor network
     # actor = Actor(action_dim, act_high, act_low)
@@ -261,7 +258,7 @@ def init(
     #     log_alpha = jnp.broadcast_to(log_alpha, target_entropy.shape)
 
     # Pack params
-    q_params = QsAndTarget(q_params, q_target_params)
+    params = QLearnParams(QsAndTarget(Qs(q_params), Qs(q_target_params)))
     # target_q_params = Qs(q1_target_params, q2_target_params)
     # params = SacParams(actor_params, QsAndTarget(online_q_params, target_q_params), log_alpha)
 
@@ -270,7 +267,7 @@ def init(
     # actor_opt_state = actor_opt.init(params.actor)
 
     q_opt = optax.adam(cfg.system.q_lr)
-    q_opt_state = q_opt.init(params.online)
+    q_opt_state = q_opt.init(params.dqns.online)
 
     # alpha_opt = optax.adam(cfg.system.q_lr)  # todo: alpha lr?
     # alpha_opt_state = alpha_opt.init(params.log_alpha)
@@ -336,17 +333,17 @@ def make_update_fns(
     cfg: DictConfig,
     env: Environment,
     nns: Networks,
-    # qopts: Optimisers,
+    opts: Optimisers,
     rb: TrajectoryBuffer,
-    target_entropy: chex.Array,
+    # target_entropy: chex.Array,
 ) -> Tuple[
     Callable[[LearnerState], Tuple[LearnerState, Metrics]],
     Callable[[LearnerState], Tuple[LearnerState, Tuple[Metrics, Metrics]]],
 ]:
     _, q = nns # NOTE (Louise) put mixer later
-    # actor_opt, q_opt, alpha_opt = opts
+    q_opt = opts
 
-    full_action_shape = (cfg.system.n_envs, *env.action_spec().shape) # NOTE (Claude) I dont think this is right since we have discrete actions
+    # full_action_shape = (cfg.system.n_envs, *env.action_spec().shape) # NOTE (Claude) I dont think this is right since we have discrete actions
 
     def step(
         action: Array, obs: Observation, env_state: State, buffer_state: BufferState
@@ -366,8 +363,8 @@ def make_update_fns(
         return next_obs, env_state, buffer_state, infos["episode_metrics"]
 
     # losses:
-    def q_loss_fn(q_params: Qs, obs: Array, action: Array, target: Array) -> Tuple[Array, Metrics]:
-        q_online = q.apply(q_params, obs).reshape(-1)
+    def q_loss_fn(q_params: QsAndTarget, obs: Array, action: Array, target: Array) -> Tuple[Array, Metrics]:
+        q_online = q.apply(q_params.online, obs).reshape(-1)
         q_loss = jnp.mean((q_online - target) ** 2)
 
         loss_info = {
@@ -406,10 +403,12 @@ def make_update_fns(
         # next_action, next_log_prob = pi.sample_and_log_prob(seed=key)
         # next_log_prob = next_log_prob[..., jnp.newaxis]
 
-        next_q_vals = q.apply(params.target, data.next_obs)
+        next_q_vals_online = q.apply(params.online, data.next_obs) #NOTE (Louise) not superduper efficient
+        next_q_vals_target = q.apply(params.target, data.next_obs)
 
         # TODO (Claude) do double q-value selection here...
-        next_q_val = ...
+        next_action = jnp.argmax(next_q_vals_online)
+        next_q_val = next_q_vals_target[next_action]
 
         target_q_val = (rewards + (1.0 - dones) * cfg.system.gamma * next_q_val).reshape(-1)
 
@@ -428,7 +427,7 @@ def make_update_fns(
         )
 
         # Repack params and opt_states.
-        q_and_target = QsAndTarget(new_online_q_params, new_target_q_params)
+        q_and_target = QsAndTarget(Qs(new_online_q_params), Qs(new_target_q_params))
         params = params._replace(q=q_and_target)
         opt_states = opt_states._replace(q=new_q_opt_state)
 
@@ -515,7 +514,7 @@ def make_update_fns(
         """Acting loop: select action, step env, add to buffer."""
         actor_params, obs, env_state, buffer_state, key = carry
 
-        action = 0
+        action = jax.numpy.zeros((128,5)) #  NOTE (Louise) make this better. This needs to be better
         # pi = actor.apply(actor_params, obs)
         # action = pi.sample(seed=key)
 
@@ -545,7 +544,7 @@ def make_update_fns(
         obs, env_state, buffer_state, params, opt_states, t, key = carry
         key, act_key, learn_key = jax.random.split(key, 3)
         # Act
-        act_state = (params.online, obs, env_state, buffer_state, act_key)
+        act_state = (params.dqns.online, obs, env_state, buffer_state, act_key)
         (_, next_obs, env_state, buffer_state, _), metrics = scanned_act(act_state)
 
         # Sample and learn
@@ -592,17 +591,17 @@ def run_experiment(cfg: DictConfig) -> float:
     steps_per_rollout = n_devices * cfg.system.n_envs * cfg.system.rollout_length * pmaped_steps
     max_episode_return = -jnp.inf
 
-    (env, eval_env), nns, opts, rb, learner_state, target_entropy, logger, key = init(cfg)
-    explore, update = make_update_fns(cfg, env, nns, opts, rb, target_entropy)
+    (env, eval_env), nns, opts, rb, learner_state, logger, key = init(cfg)
+    update = make_update_fns(cfg, env, nns, opts, rb)
 
-    # actor, _ = nns
+    _,q = nns
     key, eval_key = jax.random.split(key)
     # todo: don't need to return trained_params or eval keys
     evaluator, absolute_metric_evaluator, (trained_params, eval_keys) = evaluator_setup(
         eval_env=eval_env,
         key=eval_key,
-        # network=actor, NOTE (Louise) this part needs redoing with that replacement actor function
-        params=learner_state.params.actor,
+        network=q, #NOTE (Louise) this part needs redoing with that replacement actor function
+        params=learner_state.params.dqns.online,
         config=cfg,
     )
 
@@ -616,14 +615,14 @@ def run_experiment(cfg: DictConfig) -> float:
     start_time = time.time()
 
     # Fill up buffer/explore.
-    learner_state, metrics = explore(learner_state)
+    # learner_state, metrics = explore(learner_state)
 
-    # Log explore metrics.
-    final_metrics = episode_metrics.get_final_step_metrics(metrics)
-    t = int(jnp.sum(learner_state.t))
-    sps = t / (time.time() - start_time)
-    logger.log({"step": t, "steps per second": sps}, t, 0, LogEvent.MISC)
-    logger.log(final_metrics, cfg.system.explore_steps, 0, LogEvent.ACT)
+    # # Log explore metrics.
+    # final_metrics = episode_metrics.get_final_step_metrics(metrics)
+    # t = int(jnp.sum(learner_state.t))
+    # sps = t / (time.time() - start_time)
+    # logger.log({"step": t, "steps per second": sps}, t, 0, LogEvent.MISC)
+    # logger.log(final_metrics, cfg.system.explore_steps, 0, LogEvent.ACT)
 
     # Main loop:
     # We want start to align with the final step of the first pmaped_learn,
