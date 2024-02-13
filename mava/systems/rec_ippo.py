@@ -605,7 +605,6 @@ def run_experiment(_config: DictConfig) -> None:
     """Runs experiment."""
     config = copy.deepcopy(_config)
 
-    # Calculate total timesteps.
     n_devices = len(jax.devices())
 
     # Set recurrent chunk size.
@@ -640,6 +639,7 @@ def run_experiment(_config: DictConfig) -> None:
         scanned_rnn=ScannedRNN,
     )
 
+    # Calculate total timesteps.
     config = check_total_timesteps(config)
     assert (
         config.system.num_updates > config.arch.num_evaluation

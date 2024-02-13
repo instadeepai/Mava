@@ -454,7 +454,6 @@ def run_experiment(_config: DictConfig) -> None:
     """Runs experiment."""
     config = copy.deepcopy(_config)
 
-    # Calculate total timesteps.
     n_devices = len(jax.devices())
 
     # Create the enviroments for train and eval.
@@ -475,6 +474,7 @@ def run_experiment(_config: DictConfig) -> None:
     eval_keys = jax.random.split(key_e, n_devices)
     evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network, config)
 
+    # Calculate total timesteps.
     config = check_total_timesteps(config)
     assert (
         config.system.num_updates > config.arch.num_evaluation

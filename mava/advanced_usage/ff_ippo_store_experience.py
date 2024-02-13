@@ -472,7 +472,6 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     config = copy.deepcopy(_config)
     logger = MavaLogger(config)
 
-    # Calculate total timesteps.
     n_devices = len(jax.devices())
 
     # Create the enviroments for train and eval.
