@@ -17,13 +17,11 @@ from typing import Callable, Dict, Sequence, Tuple, Union
 
 import chex
 import distrax
-import hydra
 import jax
 import jax.numpy as jnp
 import numpy as np
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
-from omegaconf import DictConfig
 
 from mava.types import (
     Observation,
@@ -37,8 +35,11 @@ class MLPTorso(nn.Module):
     """MLP torso."""
 
     layer_sizes: Sequence[int]
-    activation_fn: Callable[[chex.Array], chex.Array] = nn.relu
+    activation: str = "relu"
     use_layer_norm: bool = False
+
+    def setup(self) -> None:
+        self.activation_fn = _parse_activation_fn(self.activation)
 
     @nn.compact
     def __call__(self, observation: chex.Array) -> chex.Array:
@@ -58,8 +59,11 @@ class CNNTorso(nn.Module):
     channel_sizes: Sequence[int]
     kernel_sizes: Sequence[int]
     strides: Sequence[int]
-    activation_fn: Callable[[chex.Array], chex.Array] = nn.relu
+    activation: str = "relu"
     use_layer_norm: bool = False
+
+    def setup(self) -> None:
+        self.activation_fn = _parse_activation_fn(self.activation)
 
     @nn.compact
     def __call__(self, observation: chex.Array) -> chex.Array:
@@ -80,13 +84,13 @@ class DiscreteActionHead(nn.Module):
     action_dim: int
 
     @nn.compact
-    def __call__(self, x: chex.Array, observation: Observation) -> distrax.Categorical:
+    def __call__(self, x: chex.Array, action_mask: chex.Array) -> distrax.Categorical:
         """Forward pass."""
 
         actor_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(x)
 
         masked_logits = jnp.where(
-            observation.action_mask,
+            action_mask,
             actor_logits,
             jnp.finfo(jnp.float32).min,
         )
@@ -107,7 +111,7 @@ class FeedForwardActor(nn.Module):
 
         x = self.torso(x)
 
-        x = self.action_head(x, observation)
+        x = self.action_head(x, observation.action_mask)
 
         return x
 
@@ -168,9 +172,9 @@ class ScannedRNN(nn.Module):
 class RecurrentActor(nn.Module):
     """Recurrent Actor Network."""
 
-    action_head: nn.Module
     pre_torso: nn.Module
     post_torso: nn.Module
+    action_head: nn.Module
 
     @nn.compact
     def __call__(
@@ -185,7 +189,7 @@ class RecurrentActor(nn.Module):
         policy_rnn_input = (policy_embedding, done)
         policy_hidden_state, policy_embedding = ScannedRNN()(policy_hidden_state, policy_rnn_input)
         policy_embedding = self.post_torso(policy_embedding)
-        pi = self.action_head(policy_embedding, observation)
+        pi = self.action_head(policy_embedding, observation.action_mask)
 
         return policy_hidden_state, pi
 
@@ -224,62 +228,10 @@ class RecurrentCritic(nn.Module):
         return critic_hidden_state, jnp.squeeze(critic_output, axis=-1)
 
 
-def parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex.Array]:
+def _parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex.Array]:
     """Get the activation function."""
     activation_fns: Dict[str, Callable[[chex.Array], chex.Array]] = {
         "relu": nn.relu,
         "tanh": nn.tanh,
     }
     return activation_fns[activation_fn_name]
-
-
-def make(
-    config: DictConfig, network: str, centralised_critic: bool = False
-) -> Union[Tuple[FeedForwardActor, FeedForwardCritic], Tuple[RecurrentActor, RecurrentCritic]]:
-    """Get the networks."""
-
-    def create_torso(network_config: DictConfig) -> nn.Module:
-        """Helper function to create a torso object from the config."""
-
-        torso_config = network_config
-        activation_fn = parse_activation_fn(torso_config.pop("activation"))
-
-        torso = hydra.utils.instantiate(
-            torso_config,
-            activation_fn=activation_fn,
-        )
-        return torso
-
-    def create_action_head(network_config: DictConfig) -> nn.Module:
-        """Helper function to create a action head object from the config."""
-
-        action_head = hydra.utils.instantiate(
-            network_config,
-            action_dim=config.system.action_dim,
-        )
-        return action_head
-
-    if network == "feedforward":
-        actor = FeedForwardActor(
-            torso=create_torso(config.network["actor_network"]),
-            action_head=create_action_head(config.network["action_head"]),
-        )
-        critic = FeedForwardCritic(
-            torso=create_torso(config.network["critic_network"]),
-            centralised_critic=centralised_critic,
-        )
-    elif network == "recurrent":
-        actor = RecurrentActor(
-            action_head=create_action_head(config.network["action_head"]),
-            pre_torso=create_torso(config.network["actor_network"]["pre_torso"]),
-            post_torso=create_torso(config.network["actor_network"]["post_torso"]),
-        )
-        critic = RecurrentCritic(
-            pre_torso=create_torso(config.network["critic_network"]["pre_torso"]),
-            post_torso=create_torso(config.network["critic_network"]["post_torso"]),
-            centralised_critic=centralised_critic,
-        )
-    else:
-        raise ValueError(f"The network '{network}' is not supported.")
-
-    return actor, critic

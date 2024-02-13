@@ -29,9 +29,9 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava import networks
 from mava.evaluator import evaluator_setup
 from mava.networks import RecurrentActor as Actor
+from mava.networks import RecurrentCritic as Critic
 from mava.networks import ScannedRNN
 from mava.types import (
     ExperimentOutput,
@@ -477,9 +477,16 @@ def learner_setup(
     key, actor_net_key, critic_net_key = keys
 
     # Define network and optimisers.
-    actor_network, critic_network = networks.make(
-        config=config, network="recurrent", centralised_critic=False
+    actor_pre_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
+    actor_post_torso = hydra.utils.instantiate(config.network.actor_network.post_torso)
+    actor_action_head = hydra.utils.instantiate(config.network.action_head, action_dim=num_actions)
+    critic_pre_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
+    critic_post_torso = hydra.utils.instantiate(config.network.critic_network.post_torso)
+
+    actor_network = Actor(
+        pre_torso=actor_pre_torso, post_torso=actor_post_torso, action_head=actor_action_head
     )
+    critic_network = Critic(pre_torso=critic_pre_torso, post_torso=critic_post_torso)
 
     actor_lr = make_learning_rate(config.system.actor_lr, config)
     critic_lr = make_learning_rate(config.system.critic_lr, config)

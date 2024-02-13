@@ -3,13 +3,13 @@ actor_network:
   pre_torso:
     _target_: mava.networks.MLPTorso
     layer_sizes: [128]
-    use_layer_norm: True
-    activation: "relu"
+    use_layer_norm: False
+    activation: relu
   post_torso:
     _target_: mava.networks.MLPTorso
     layer_sizes: [128]
-    use_layer_norm: True
-    activation: "relu"
+    use_layer_norm: False
+    activation: relu
 
 action_head:
   _target_: mava.networks.DiscreteActionHead
@@ -19,9 +19,9 @@ critic_network:
     _target_: mava.networks.MLPTorso
     layer_sizes: [128]
     use_layer_norm: False
-    activation: "relu"
+    activation: relu
   post_torso:
     _target_: mava.networks.MLPTorso
     layer_sizes: [128]
     use_layer_norm: False
-    activation: "relu"
+    activation: relu
