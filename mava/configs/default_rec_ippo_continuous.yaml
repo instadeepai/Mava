@@ -13,7 +13,7 @@ hydra:
     sweeper:
         sampler:
             seed: 234
-        direction: maximize # maximize
+        direction: maximize
         study_name: rec-mabrax-sweep
         storage: null
         n_trials: 20

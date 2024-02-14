@@ -13,4 +13,5 @@ kwargs:
   # Note: "max" adds one-hot for the agent's ID so the system.add_agent_id should be False. In this case, the agent's ID will be
   # added to the global_state within the wrapper.
 
+actions_type: continuous # The type of actions used in this env (Note: use the mlp_continuous.yaml in this case).
 env_wrapper: MabraxWrapper

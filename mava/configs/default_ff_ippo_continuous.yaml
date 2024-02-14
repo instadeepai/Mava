@@ -14,7 +14,7 @@ hydra:
         sampler:
             seed: 234
         direction: maximize
-        study_name: rec-mabrax-sweep
+        study_name: ff-mabrax-sweep
         storage: null
         n_trials: 20
         n_jobs: 1
