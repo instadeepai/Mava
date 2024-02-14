@@ -1,4 +1,4 @@
-# ---MLP Networks---
+# ---CNN Networks---
 actor_network:
   pre_torso:
     _target_: mava.networks.CNNTorso
