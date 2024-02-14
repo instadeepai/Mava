@@ -62,7 +62,7 @@ def unreplicate_learner_state(
 
 
 def unreplicate_batch_dim(x: Any) -> Any:
-    """Unreplicated just the update batch dimension. 
+    """Unreplicated just the update batch dimension.
     (The dimension that is vmapped over when acting and learning)
 
     In mava's case it is always the second dimension, after the device dimension.
