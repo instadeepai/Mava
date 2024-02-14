@@ -54,3 +54,13 @@ def unreplicate_n_dims(x: Any, unreplicate_depth: int = 2) -> Any:
     This is typically one axis for device replication, and one for the `update batch size`.
     """
     return jax.tree_map(lambda x: x[(0,) * unreplicate_depth], x)  # type: ignore
+
+
+def unreplicate_batch_dim(x: Any) -> Any:
+    """Unreplicated just the update batch dimension.
+    (The dimension that is vmapped over when acting and learning)
+
+    In mava's case it is always the second dimension, after the device dimension.
+    We simply take element 0 as the params are identical across this dimension.
+    """
+    return jax.tree_map(lambda x: x[:, 0, ...], x)  # type: ignore
