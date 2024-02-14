@@ -158,7 +158,13 @@ def jaxmarl_space_to_jumanji_spec(space: jaxmarl_spaces.Space) -> specs.Spec:
 class JaxMarlWrapper(Wrapper):
     """Wraps a JaxMarl environment so that its API is compatible with Jumanji environments."""
 
-    def __init__(self, env: MultiAgentEnv, has_global_state: bool = False, timelimit: int = 100):
+    def __init__(
+        self,
+        env: MultiAgentEnv,
+        has_global_state: bool = False,
+        add_id_to_state: bool = False,
+        timelimit: int = 100,
+    ):
         # Check that all specs are the same as we only support homogeneous environments, for now ;)
         homogenous_error = (
             f"Mava only supports environments with homogeneous agents, "
@@ -181,6 +187,9 @@ class JaxMarlWrapper(Wrapper):
         self.agents = list(self._env.observation_spaces.keys())
         self.has_action_mask = hasattr(self._env, "get_avail_actions")
         self.has_global_state = has_global_state
+        self.add_id_to_state = (
+            add_id_to_state  # If the add_agent_id=False add agent's ID to global state.
+        )
 
     def reset(
         self, key: PRNGKey
@@ -234,7 +243,6 @@ class JaxMarlWrapper(Wrapper):
             reward=batchify(reward, self.agents),
             discount=1.0 - batchify(done, self.agents),
             observation=obs,
-            # extras=infos,
         )
 
         return JaxMarlState(env_state, key, state.step + 1), ts
@@ -259,7 +267,10 @@ class JaxMarlWrapper(Wrapper):
             if hasattr(self._env, "state_size"):
                 state_size = self._env.state_size
             elif isinstance(self._env, MABraxEnv):
-                state_size = 1 + max(value.max() for value in self._env.agent_obs_mapping.values())
+                state_size = self._env.env.observation_size
+                state_size = (
+                    state_size + self._env.num_agents if self.add_id_to_state else state_size
+                )
             else:
                 num_obs_features = self._env.observation_spaces[self._env.agents[0]].shape[0]
                 state_size = self._env.num_agents * num_obs_features
@@ -312,6 +323,11 @@ class JaxMarlWrapper(Wrapper):
         elif isinstance(self._env, MABraxEnv):
             # Use the global state of brax.
             global_state = jnp.tile(state.obs, (self._env.num_agents, 1))
+
+            if self.add_id_to_state:
+                agent_ids = jnp.eye(self._env.num_agents)
+                global_state = jnp.tile(state.obs, (self._env.num_agents, 1))
+                global_state = jnp.concatenate([agent_ids, global_state], axis=-1)
 
         else:
             global_state = jnp.concatenate(agents_view, axis=0)

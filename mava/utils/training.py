@@ -79,7 +79,6 @@ def select_action_cont_ppo(
     mean: Array,
     log_std: Array,
     key: PRNGKey,
-    config: DictConfig,
 ) -> Tuple[Array, Array, Array]:
     """Selects an action for the continuous action for systems given the actor output.
 
@@ -94,7 +93,7 @@ def select_action_cont_ppo(
     """
     actor_policy = get_actor_policy(mean, log_std)
     unbound_action, log_prob = actor_policy.sample_and_log_prob(seed=key)
-    action, log_prob = transform_actions_log(config, unbound_action, log_prob)
+    action, log_prob = transform_actions_log(unbound_action, log_prob)
     return unbound_action, action, log_prob
 
 
@@ -102,7 +101,6 @@ def get_logprob_entropy(
     mean: Array,
     log_std: Array,
     action: Array,
-    config: DictConfig,
 ) -> Tuple[Array, Array]:
     """Gets the log probability and entropy of a given mean, log_std, and action.
 
@@ -118,7 +116,7 @@ def get_logprob_entropy(
     actor_policy = get_actor_policy(mean, log_std)
     log_prob = actor_policy.log_prob(action)
     entropy = actor_policy.entropy().mean()
-    _, log_prob = transform_actions_log(config, action, log_prob)
+    _, log_prob = transform_actions_log(action, log_prob)
     return log_prob, entropy
 
 
@@ -126,7 +124,6 @@ def select_action_eval_cont(
     mean: Array,
     log_std: Array,
     key: PRNGKey,
-    config: DictConfig,
 ) -> Array:
     """Selects an action for the continuous action given the actor output.
 
@@ -141,11 +138,10 @@ def select_action_eval_cont(
     """
     actor_policy = get_actor_policy(mean, log_std)
     unbound_action = actor_policy.sample(seed=key)
-    return transform_actions_log(config, unbound_action, None)
+    return transform_actions_log(unbound_action, None)
 
 
 def transform_actions_log(
-    config: DictConfig,
     unbound_action: Array,
     log_prob: Array,
 ) -> Union[Array, Tuple[Array, Array]]:
@@ -159,13 +155,12 @@ def transform_actions_log(
     Returns:
         Union[Array, Tuple[Array, Array]]: Either the action or the action and log prob.
     """
-    n = config.env.clip_action
-    clipped_action = jnp.clip(jnp.tanh(unbound_action), -n, n)
+    action = jnp.tanh(unbound_action)
     if log_prob is None:
-        return clipped_action  # during evaluation.
+        return action  # during evaluation.
     # Note: jnp.log(derivative of action equation)
     # log_prob -= jnp.sum(jnp.log(n * (1 - jnp.tanh(unbound_action) ** 2) + 1e-6), axis=-1)
     log_prob -= jnp.sum(
         2 * (jnp.log(2) - unbound_action - jax.nn.softplus(-2 * unbound_action)), axis=-1
     )
-    return clipped_action, log_prob
+    return action, log_prob

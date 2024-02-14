@@ -94,7 +94,9 @@ def get_learner_fn(
                 params.actor_params, last_timestep.observation
             )
             raw_action, action, log_prob = select_action_cont_ppo(
-                actor_mean, actor_log_std, policy_key, config
+                actor_mean,
+                actor_log_std,
+                policy_key,
             )
             value = critic_apply_fn(params.critic_params, last_timestep.observation)
 
@@ -172,7 +174,9 @@ def get_learner_fn(
                     # RERUN NETWORK
                     actor_mean, actor_log_std = actor_apply_fn(actor_params, traj_batch.obs)
                     log_prob, entropy = get_logprob_entropy(
-                        actor_mean, actor_log_std, traj_batch.action, config
+                        actor_mean,
+                        actor_log_std,
+                        traj_batch.action,
                     )
 
                     # CALCULATE ACTOR LOSS

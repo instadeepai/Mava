@@ -122,7 +122,9 @@ def get_learner_fn(
 
             # Sample action from the policy and squeeze out the batch dimension.
             raw_action, action, log_prob = select_action_cont_ppo(
-                actor_mean, actor_log_std, policy_key, config
+                actor_mean,
+                actor_log_std,
+                policy_key,
             )
             value, raw_action, action, log_prob = (
                 value.squeeze(0),
@@ -250,7 +252,6 @@ def get_learner_fn(
                         actor_mean,
                         actor_log_std,
                         traj_batch.action,
-                        config,
                     )
 
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)

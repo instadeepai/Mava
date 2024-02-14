@@ -9,9 +9,8 @@ scenario:
 
 kwargs:
   episode_length: 1000
-  homogenisation_method: None #Default is None. [max, concat] if the dims of observations and actions are not homegenous across agents.
-  # Note: "max" adds one-hot for the agent's ID. Homogeneous tasks: ant_4x2, walker2d_2x3
+  homogenisation_method: max #Default is None. [max, concat] if the dims of observations and actions are not homegenous across agents.
+  # Note: "max" adds one-hot for the agent's ID so the system.add_agent_id should be False. In this case, the agent's ID will be
+  # added to the global_state within the wrapper.
 
-actions_type: continuous # The type of actions used in this env (Note: use the mlp_continuous.yaml in this case).
-clip_action: 1  # clip_action = 0.4 if env_name == "humanoid_9|8" else 1
-# This is used to transform the action interval: IF action in [-clip_action, clip_action] -> clip_action * action
+actions_type: continuous # Set the type of actions used in this env.

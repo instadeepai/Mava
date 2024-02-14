@@ -94,7 +94,9 @@ def get_learner_fn(
                 params.actor_params, last_timestep.observation
             )
             raw_action, action, log_prob = select_action_cont_ppo(
-                actor_mean, actor_log_std, policy_key, config
+                actor_mean,
+                actor_log_std,
+                policy_key,
             )
             value = critic_apply_fn(params.critic_params, last_timestep.observation)
 
@@ -175,7 +177,6 @@ def get_learner_fn(
                         actor_mean,
                         actor_log_std,
                         traj_batch.action,
-                        config,
                     )
 
                     # CALCULATE ACTOR LOSS

@@ -72,7 +72,6 @@ def get_ff_evaluator_fn(
                     mean,
                     log_std,
                     policy_key,
-                    config,
                 )
 
             else:
@@ -193,7 +192,6 @@ def get_rnn_evaluator_fn(
                     mean,
                     log_std,
                     policy_key,
-                    config,
                 )
             else:
                 hstate, pi = apply_fn(params, hstate, ac_in)  # type: ignore
