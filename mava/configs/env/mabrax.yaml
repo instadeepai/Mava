@@ -1,0 +1,16 @@
+# ---Environment Configs---
+defaults:
+  - _self_
+
+# Possible envs: [ant_4x2, halfcheetah_6x1, hopper_3x1, humanoid_9|8, walker2d_2x3]
+env_name: ant_4x2
+scenario:
+  task_name: ant_4x2  # In this case: env_name = task_name
+
+kwargs:
+  episode_length: 1000
+  homogenisation_method: max #Default is None. [max, concat] if the dims of observations and actions are not homegenous across agents.
+  # Note: "max" adds one-hot for the agent's ID so the system.add_agent_id should be False. In this case, the agent's ID will be
+  # added to the global_state within the wrapper.
+
+env_wrapper: MabraxWrapper
