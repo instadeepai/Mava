@@ -756,7 +756,9 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Stop the logger.
     logger.stop()
-    return episode_return
+
+    # Return the final evaluation episode return
+    return float(episode_return)
 
 
 @hydra.main(

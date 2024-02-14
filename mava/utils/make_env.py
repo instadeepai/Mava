@@ -30,10 +30,11 @@ from omegaconf import DictConfig
 from mava.wrappers import (
     AgentIDWrapper,
     GlobalStateWrapper,
-    JaxMarlWrapper,
     LbfWrapper,
+    MabraxWrapper,
     RecordEpisodeMetrics,
     RwareWrapper,
+    SmaxWrapper,
 )
 
 # Registry mapping environment names to their generator and wrapper classes.
@@ -41,6 +42,8 @@ _jumanji_registry = {
     "RobotWarehouse-v0": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper},
     "LevelBasedForaging-v0": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
 }
+
+_jaxmarl_registry = {"SmaxWrapper": SmaxWrapper, "MabraxWrapper": MabraxWrapper}
 
 
 def add_optional_wrappers(
@@ -110,8 +113,12 @@ def make_jaxmarl_env(
         kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
 
     # Create jaxmarl envs.
-    env = JaxMarlWrapper(jaxmarl.make(env_name, **kwargs), add_global_state)
-    eval_env = JaxMarlWrapper(jaxmarl.make(env_name, **kwargs), add_global_state)
+    env = _jaxmarl_registry[config.env.env_wrapper](
+        jaxmarl.make(env_name, **kwargs), add_global_state
+    )
+    eval_env = _jaxmarl_registry[config.env.env_wrapper](
+        jaxmarl.make(env_name, **kwargs), add_global_state
+    )
 
     # Add optional wrappers.
     if config.system.add_agent_id:

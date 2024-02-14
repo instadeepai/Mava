@@ -609,7 +609,7 @@ def learner_setup(
     return learn, actor_network, init_learner_state
 
 
-def run_experiment(_config: DictConfig) -> None:
+def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
     config = copy.deepcopy(_config)
 
@@ -711,7 +711,7 @@ def run_experiment(_config: DictConfig) -> None:
 
         # Log the results of the evaluation.
         elapsed_time = time.time() - start_time
-        episode_return = jnp.mean(evaluator_output.episode_metrics["episode_return"])
+        episode_return: float = jnp.mean(evaluator_output.episode_metrics["episode_return"])
 
         evaluator_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
         logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.EVAL)
@@ -751,19 +751,24 @@ def run_experiment(_config: DictConfig) -> None:
     # Stop the logger.
     logger.stop()
 
+    # Return the final evaluation episode return
+    return float(episode_return)
+
 
 @hydra.main(
     config_path="../configs", config_name="default_rec_ippo_continuous.yaml", version_base="1.2"
 )
-def hydra_entry_point(cfg: DictConfig) -> None:
+def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
 
     # Run experiment.
-    run_experiment(cfg)
+    # run_experiment(cfg)
+    episode_return = run_experiment(cfg)
 
     print(f"{Fore.CYAN}{Style.BRIGHT}Recurrent IPPO experiment completed{Style.RESET_ALL}")
+    return episode_return
 
 
 if __name__ == "__main__":
