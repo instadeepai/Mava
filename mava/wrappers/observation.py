@@ -81,18 +81,20 @@ class AgentIDWrapper(Wrapper):
         """Specification of the observation of the `RobotWarehouse` environment."""
         obs_spec = self._env.observation_spec()
         num_obs_features = obs_spec.agents_view.shape[-1] + self._env.num_agents
+        dtype = obs_spec.agents_view.dtype
 
-        agents_view = specs.Array(
-            (self._env.num_agents, num_obs_features), jnp.int32, "agents_view"
-        )
+        agents_view = specs.Array((self._env.num_agents, num_obs_features), dtype, "agents_view")
 
         if self.has_global_state:
-            wrapped_state_shape = obs_spec.global_state.shape
-            state_shape = (
+            wrapped_state_spec = obs_spec.global_state
+            wrapped_state_shape = wrapped_state_spec.shape
+            wrapped_state_dtype = wrapped_state_spec.dtype
+
+            wrapped_state_shape = (
                 *wrapped_state_shape[:-1],
                 wrapped_state_shape[-1] + self._env.num_agents,
             )
-            global_state = specs.Array(state_shape, jnp.int32, "global_state")
+            global_state = specs.Array(wrapped_state_shape, wrapped_state_dtype, "global_state")
             return obs_spec.replace(agents_view=agents_view, global_state=global_state)
 
         return obs_spec.replace(agents_view=agents_view)
@@ -136,7 +138,7 @@ class GlobalStateWrapper(Wrapper):
         num_obs_features = obs_spec.agents_view.shape[-1]
         global_state = specs.Array(
             (self._env.num_agents, self._env.num_agents * num_obs_features),
-            jnp.int32,
+            obs_spec.agents_view.dtype,
             "global_state",
         )
 
