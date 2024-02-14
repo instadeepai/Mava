@@ -50,6 +50,7 @@ from mava.utils.jax import unreplicate_learner_state
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import make_learning_rate
+from mava.wrappers.episode_metrics import get_final_step_metrics
 
 
 def get_learner_fn(
@@ -688,11 +689,13 @@ def run_experiment(_config: DictConfig) -> None:
         # Log the results of the training.
         elapsed_time = time.time() - start_time
         t = int(steps_per_rollout * (eval_step + 1))
-        learner_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        episode_metrics = get_final_step_metrics(learner_output.episode_metrics)
+        episode_return = jnp.mean(episode_metrics["episode_return"])
+        episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
 
         # Separately log timesteps, actoring metrics and training metrics.
         logger.log({"timestep": t}, t, eval_step, LogEvent.MISC)
-        logger.log(learner_output.episode_metrics, t, eval_step, LogEvent.ACT)
+        logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
         logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
 
         # Prepare for evaluation.
