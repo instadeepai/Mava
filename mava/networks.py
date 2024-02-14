@@ -85,7 +85,20 @@ class DiscreteActionHead(nn.Module):
 
     @nn.compact
     def __call__(self, obs_embedding: chex.Array, observation: Observation) -> distrax.Categorical:
-        """Forward pass."""
+        """Action selection for distrete action space environments.
+
+        Args:
+            obs_embedding: Observation embedding from network torso.
+            observation: Observation object containing `agents_view`, `action_mask` and
+                `step_count`.
+
+        Returns:
+            A distrax.Categorical distribution over the action space for sampling actions from.
+
+        NOTE: We pass both the observation embedding and the observation object to the action head
+        since the observation object contains the action mask and other potentially useful
+        information.
+        """
 
         actor_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(obs_embedding)
 
@@ -110,9 +123,6 @@ class FeedForwardActor(nn.Module):
 
         obs_embedding = self.torso(observation.agents_view)
 
-        # We pass both the observation embedding and the observation object to the action head
-        # since the observation object contains the action mask and other potentially useful
-        # information.
         return self.action_head(obs_embedding, observation)
 
 
