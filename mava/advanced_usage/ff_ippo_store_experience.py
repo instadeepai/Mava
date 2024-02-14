@@ -30,9 +30,9 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava import networks
 from mava.evaluator import evaluator_setup
 from mava.networks import FeedForwardActor as Actor
+from mava.networks import FeedForwardCritic as Critic
 from mava.types import (
     ActorApply,
     CriticApply,
@@ -364,9 +364,13 @@ def learner_setup(
     key, key_p = keys
 
     # Define network and optimiser.
-    actor_network, critic_network = networks.make(
-        config=config, network="feedforward", centralised_critic=False
-    )
+    actor_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
+    actor_action_head = hydra.utils.instantiate(config.network.action_head, action_dim=num_actions)
+    critic_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
+
+    actor_network = Actor(torso=actor_torso, action_head=actor_action_head)
+    critic_network = Critic(torso=critic_torso)
+
     actor_optim = optax.chain(
         optax.clip_by_global_norm(config.system.max_grad_norm),
         optax.adam(config.system.actor_lr, eps=1e-5),

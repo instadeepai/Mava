@@ -29,9 +29,9 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava import networks
 from mava.evaluator import evaluator_setup
 from mava.networks import RecurrentActor as Actor
+from mava.networks import RecurrentCritic as Critic
 from mava.networks import ScannedRNN
 from mava.types import (
     ExperimentOutput,
@@ -472,15 +472,22 @@ def learner_setup(
     num_actions = int(env.action_spec().num_values[0])
     num_agents = env.action_spec().shape[0]
     config.system.num_agents = num_agents
-    config.system.num_actions = num_actions
+    config.system.action_dim = num_actions
 
     # PRNG keys.
     key, actor_net_key, critic_net_key = keys
 
     # Define network and optimisers.
-    actor_network, critic_network = networks.make(
-        config=config, network="recurrent", centralised_critic=False
+    actor_pre_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
+    actor_post_torso = hydra.utils.instantiate(config.network.actor_network.post_torso)
+    actor_action_head = hydra.utils.instantiate(config.network.action_head, action_dim=num_actions)
+    critic_pre_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
+    critic_post_torso = hydra.utils.instantiate(config.network.critic_network.post_torso)
+
+    actor_network = Actor(
+        pre_torso=actor_pre_torso, post_torso=actor_post_torso, action_head=actor_action_head
     )
+    critic_network = Critic(pre_torso=critic_pre_torso, post_torso=critic_post_torso)
 
     actor_lr = make_learning_rate(config.system.actor_lr, config)
     critic_lr = make_learning_rate(config.system.critic_lr, config)
@@ -506,7 +513,7 @@ def learner_setup(
     init_x = (init_obs, init_done)
 
     # Initialise hidden states.
-    hidden_size = config.network.actor_network.pre_torso_layer_sizes[-1]
+    hidden_size = config.network.actor_network.pre_torso.layer_sizes[-1]
     init_policy_hstate = ScannedRNN.initialize_carry((config.arch.num_envs), hidden_size)
     init_critic_hstate = ScannedRNN.initialize_carry((config.arch.num_envs), hidden_size)
 
