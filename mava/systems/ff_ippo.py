@@ -564,6 +564,9 @@ def run_experiment(_config: DictConfig) -> float:
         # Update runner state to continue training.
         learner_state = learner_output.learner_state
 
+    # Record the performance for the final evaluation run.
+    eval_performance = float(jnp.mean(evaluator_output.episode_metrics[config.env.eval_metric]))
+
     # Measure absolute metric.
     if config.arch.absolute_metric:
         start_time = time.time()
@@ -583,8 +586,6 @@ def run_experiment(_config: DictConfig) -> float:
     # Stop the logger.
     logger.stop()
 
-    # Return the evaluation performance.
-    eval_performance = float(jnp.mean(evaluator_output.episode_metrics[config.env.eval_metric]))
     return eval_performance
 
 
