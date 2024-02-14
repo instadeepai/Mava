@@ -173,8 +173,7 @@ class NeptuneLogger(BaseLogger):
         if not self.detailed_logging and not is_main_metric:
             return
 
-        t = step if event != LogEvent.EVAL else eval_step
-        self.logger[f"{event.value}/{key}"].log(value, step=t)
+        self.logger[f"{event.value}/{key}"].log(value, step=step)
 
     def stop(self) -> None:
         if self.upload_json_data:
