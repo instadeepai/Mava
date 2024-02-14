@@ -97,7 +97,8 @@ def get_final_step_metrics(metrics: Dict[str, chex.Array]) -> Dict[str, chex.Arr
     """Get the metrics for the final step of an episode.
 
     Note: this is not a jittable method. We need to return variable length arrays, since
-    we don't know how many episodes have been run.
+    we don't know how many episodes have been run. This is done since the logger
+    expects arrays for computing summary statistics on the episode metrics.
     """
     is_final_ep = metrics.pop("is_terminal_step")
 
