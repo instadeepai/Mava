@@ -28,7 +28,7 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava.evaluator import evaluator_setup
+from mava.evaluator import make_eval_fns
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardCritic as Critic
 from mava.types import (
@@ -44,7 +44,11 @@ from mava.types import (
 )
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import merge_leading_dims, unreplicate_learner_state
+from mava.utils.jax import (
+    merge_leading_dims,
+    unreplicate_batch_dim,
+    unreplicate_learner_state,
+)
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import make_learning_rate
@@ -460,6 +464,8 @@ def run_experiment(_config: DictConfig) -> None:
     """Runs experiment."""
     config = copy.deepcopy(_config)
 
+    n_devices = len(jax.devices())
+
     # Create the enviroments for train and eval.
     env, eval_env = environments.make(config=config, add_global_state=True)
 
@@ -474,16 +480,11 @@ def run_experiment(_config: DictConfig) -> None:
     )
 
     # Setup evaluator.
-    evaluator, absolute_metric_evaluator, (trained_params, eval_keys) = evaluator_setup(
-        eval_env=eval_env,
-        key_e=key_e,
-        network=actor_network,
-        params=learner_state.params.actor_params,
-        config=config,
-    )
+    # One key per device for evaluation.
+    eval_keys = jax.random.split(key_e, n_devices)
+    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network, config)
 
     # Calculate total timesteps.
-    n_devices = len(jax.devices())
     config = check_total_timesteps(config)
     assert (
         config.system.num_updates > config.arch.num_evaluation
@@ -537,10 +538,8 @@ def run_experiment(_config: DictConfig) -> None:
 
         # Prepare for evaluation.
         start_time = time.time()
-        trained_params = jax.tree_util.tree_map(
-            lambda x: x[:, 0, ...],
-            learner_output.learner_state.params.actor_params,  # Select only actor params
-        )
+
+        trained_params = unreplicate_batch_dim(learner_state.params.actor_params)
         key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
