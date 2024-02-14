@@ -235,7 +235,7 @@ def get_rnn_evaluator_fn(
 
         # Initialise hidden state.
         init_hstate = scanned_rnn.initialize_carry(
-            eval_batch, config.network.actor_network.pre_torso_layer_sizes[-1]
+            eval_batch, config.network.actor_network.pre_torso.layer_sizes[-1]
         )
         init_hstate = jnp.expand_dims(init_hstate, axis=1)
         init_hstate = jnp.expand_dims(init_hstate, axis=2)
