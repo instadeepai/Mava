@@ -86,12 +86,15 @@ class AgentIDWrapper(Wrapper):
         agents_view = specs.Array((self._env.num_agents, num_obs_features), dtype, "agents_view")
 
         if self.has_global_state:
-            wrapped_state_shape = obs_spec.global_state.shape
+            state_spec = obs_spec.global_state
+            state_shape = state_spec.shape
+            state_dtype = state_spec.dtype
+
             state_shape = (
-                *wrapped_state_shape[:-1],
-                wrapped_state_shape[-1] + self._env.num_agents,
+                *state_shape[:-1],
+                state_shape[-1] + self._env.num_agents,
             )
-            global_state = specs.Array(state_shape, dtype, "global_state")
+            global_state = specs.Array(state_shape, state_dtype, "global_state")
             return obs_spec.replace(agents_view=agents_view, global_state=global_state)
 
         return obs_spec.replace(agents_view=agents_view)
