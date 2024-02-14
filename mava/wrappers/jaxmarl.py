@@ -182,22 +182,22 @@ class JaxMarlWrapper(Wrapper):
         self, key: PRNGKey
     ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
         key, reset_key = jax.random.split(key)
-        obs, state = self._env.reset(reset_key)
+        obs, env_state = self._env.reset(reset_key)
 
         if self.has_global_state:
             obs = ObservationGlobalState(
                 agents_view=batchify(obs, self.agents),
-                action_mask=self.action_mask(state),
-                global_state=self.get_global_state(state, obs),
+                action_mask=self.action_mask(env_state),
+                global_state=self.get_global_state(env_state, obs),
                 step_count=jnp.zeros(self.num_agents, dtype=int),
             )
         else:
             obs = Observation(
                 agents_view=batchify(obs, self.agents),
-                action_mask=self.action_mask(state),
+                action_mask=self.action_mask(env_state),
                 step_count=jnp.zeros(self.num_agents, dtype=int),
             )
-        return JaxMarlState(state, key, 0), restart(obs, shape=(self.num_agents,))
+        return JaxMarlState(env_state, key, 0), restart(obs, shape=(self.num_agents,))
 
     def step(
         self, state: JaxMarlState, action: Array
@@ -212,7 +212,7 @@ class JaxMarlWrapper(Wrapper):
             obs = ObservationGlobalState(
                 agents_view=batchify(obs, self.agents),
                 action_mask=self.action_mask(env_state),
-                global_state=self.get_global_state(state, obs),
+                global_state=self.get_global_state(env_state, obs),
                 step_count=jnp.repeat(state.step, self.num_agents),
             )
         else:
