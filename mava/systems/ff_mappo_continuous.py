@@ -463,7 +463,7 @@ def learner_setup(
     return learn, actor_network, init_learner_state
 
 
-def run_experiment(_config: DictConfig) -> None:
+def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
     config = copy.deepcopy(_config)
 
@@ -595,20 +595,24 @@ def run_experiment(_config: DictConfig) -> None:
 
     # Stop the logger.
     logger.stop()
+    # Return the final evaluation episode return
+    return float(episode_return)
 
 
 @hydra.main(
     config_path="../configs", config_name="default_ff_mappo_continuous.yaml", version_base="1.2"
 )
-def hydra_entry_point(cfg: DictConfig) -> None:
+def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
 
     # Run experiment.
-    run_experiment(cfg)
+    # run_experiment(cfg)
+    episode_return = run_experiment(cfg)
 
     print(f"{Fore.CYAN}{Style.BRIGHT}MAPPO experiment completed{Style.RESET_ALL}")
+    return episode_return
 
 
 if __name__ == "__main__":

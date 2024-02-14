@@ -4,4 +4,17 @@ defaults:
   - system: ff_mappo
   - network: mlp_continuous
   - env: mabrax
+  - system/search_spaces@hydra.sweeper.params: ${system}
   - _self_
+  - override hydra/sweeper: optuna
+  - override hydra/sweeper/sampler: tpe
+
+hydra:
+    sweeper:
+        sampler:
+            seed: 234
+        direction: maximize
+        study_name: rec-mabrax-sweep
+        storage: null
+        n_trials: 20
+        n_jobs: 1
