@@ -315,11 +315,11 @@ class MabraxWrapper(JaxMarlWrapper):
             state_size if env.homogenisation_method != "max" else state_size + env.num_agents
         )
         super().__init__(env, has_global_state, state_size, timelimit)
+        self.action_shape = self.action_spec().shape
 
     def action_mask(self, state: JaxMarlState) -> Array:
         """Get action mask for each agent."""
-        action_shape = self.action_spec().shape
-        return jnp.ones(action_shape, dtype=jnp.float32)
+        return jnp.ones(self.action_shape, dtype=jnp.float32)
 
     def get_global_state(self, env_state: Array, obs: Dict[str, Array]) -> Array:
         """Get global state from observation and copy it for each agent."""
