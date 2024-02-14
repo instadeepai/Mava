@@ -14,8 +14,8 @@
 
 from typing import TYPE_CHECKING, Dict, Tuple
 
-import jax
 import chex
+import jax
 import jax.numpy as jnp
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
@@ -53,7 +53,7 @@ class RecordEpisodeMetrics(Wrapper):
         timestep.extras["episode_metrics"] = {
             "episode_return": 0.0,
             "episode_length": 0,
-            "final_step": False,
+            "is_terminal_step": False,
         }
         return state, timestep
 
@@ -79,7 +79,7 @@ class RecordEpisodeMetrics(Wrapper):
         timestep.extras["episode_metrics"] = {
             "episode_return": episode_return_info,
             "episode_length": episode_length_info,
-            "final_step": done,
+            "is_terminal_step": done,
         }
 
         state = RecordEpisodeMetricsState(
@@ -92,12 +92,13 @@ class RecordEpisodeMetrics(Wrapper):
         )
         return state, timestep
 
+
 def get_final_step_metrics(metrics: Dict[str, chex.Array]) -> Dict[str, chex.Array]:
     """Get the metrics for the final step of an episode.
 
     Note: this is not a jittable method.
     """
-    is_final_ep = metrics.pop("final_step")
+    is_final_ep = metrics.pop("is_terminal_step")
 
     final_metrics: Dict[str, chex.Array]
     # If it didn't make it to the final step, return zeros.
