@@ -33,20 +33,17 @@ from mava import networks
 from mava.evaluator import evaluator_setup
 from mava.networks import RecurrentActor as Actor
 from mava.networks import ScannedRNN
-from mava.types import (
-    ExperimentOutput,
+from mava.systems.ppo.types import (
     HiddenStates,
-    LearnerFn,
     OptStates,
     Params,
-    RecActorApply,
-    RecCriticApply,
     RNNLearnerState,
     RNNPPOTransition,
 )
+from mava.types import ExperimentOutput, LearnerFn, RecActorApply, RecCriticApply
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import unreplicate_learner_state
+from mava.utils.jax import unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import make_learning_rate
@@ -712,7 +709,7 @@ def run_experiment(_config: DictConfig) -> None:
             # Save checkpoint of learner state
             checkpointer.save(
                 timestep=steps_per_rollout * (eval_step + 1),
-                unreplicated_learner_state=unreplicate_learner_state(learner_output.learner_state),
+                unreplicated_learner_state=unreplicate_n_dims(learner_output.learner_state),
                 episode_return=episode_return,
             )
 
@@ -744,7 +741,7 @@ def run_experiment(_config: DictConfig) -> None:
     logger.stop()
 
 
-@hydra.main(config_path="../configs", config_name="default_rec_ippo.yaml", version_base="1.2")
+@hydra.main(config_path="../../configs", config_name="default_rec_ippo.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
     # Allow dynamic attributes.

@@ -15,7 +15,7 @@
 import os
 import warnings
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Type, Union
 
 import absl.logging as absl_logging
 import orbax.checkpoint
@@ -24,7 +24,8 @@ from flax.core.frozen_dict import FrozenDict
 from jax.tree_util import tree_map
 from omegaconf import DictConfig, OmegaConf
 
-from mava.types import HiddenStates, LearnerState, Params, RNNLearnerState
+from mava.systems.ppo.types import HiddenStates, Params
+from mava.types import MavaState
 
 # Keep track of the version of the checkpointer
 # Any breaking API changes should be reflected in the major version (e.g. v0.1 -> v1.0)
@@ -114,7 +115,7 @@ class Checkpointer:
     def save(
         self,
         timestep: int,
-        unreplicated_learner_state: Union[LearnerState, RNNLearnerState],
+        unreplicated_learner_state: MavaState,
         episode_return: Numeric = 0.0,
     ) -> bool:
         """Save the learner state.
@@ -122,7 +123,7 @@ class Checkpointer:
         Args:
             timestep (int):
                 timestep at which the state is being saved.
-            unreplicated_learner_state (Union[LearnerState, RNNLearnerState]):
+            unreplicated_learner_state (MavaState)
                 a Mava LearnerState (must be unreplicated)
             episode_return (Numeric, optional):
                 Optional value to determine whether this is the 'best' model to save.
@@ -146,6 +147,8 @@ class Checkpointer:
         input_params: Params,
         timestep: Optional[int] = None,
         restore_hstates: bool = False,
+        TParams: Type[Params] = Params,  # noqa: N803
+        THiddenState: Type[HiddenStates] = HiddenStates,  # noqa: N803
     ) -> Tuple[Params, Union[HiddenStates, None]]:
         """Restore the params and the hidden state (in case of RNNs)
 
@@ -157,7 +160,7 @@ class Checkpointer:
             restore_hstates (bool, optional): Whether to restore the hidden states.
 
         Returns:
-            Tuple[Params,Union[HiddenStates, None]]: the restored params and hidden states.
+            Tuple[Params,Union[HiddenState, None]]: the restored params and hidden states.
         """
         # We want to ensure `major` versions match, but allow `minor` versions to differ
         # i.e. v0.1 and 0.2 are compatible, but v1.0 and v2.0 are not
@@ -179,17 +182,17 @@ class Checkpointer:
         # In Flax 0.6.11, parameters were typically of the `FrozenDict` type,
         # but in later versions, a regular dictionary is used.
         if isinstance(input_params.actor_params, FrozenDict):
-            restored_params = Params(**FrozenDict(restored_learner_state_raw["params"]))
+            restored_params = TParams(**FrozenDict(restored_learner_state_raw["params"]))
         else:
-            restored_params = Params(**restored_learner_state_raw["params"])
+            restored_params = TParams(**restored_learner_state_raw["params"])
 
         # Restore hidden states if required
         restored_hstates = None
         if restore_hstates:
             if isinstance(input_params.actor_params, FrozenDict):
-                restored_hstates = HiddenStates(**FrozenDict(restored_learner_state_raw["hstates"]))
+                restored_hstates = THiddenState(**FrozenDict(restored_learner_state_raw["hstates"]))
             else:
-                restored_hstates = HiddenStates(**restored_learner_state_raw["hstates"])
+                restored_hstates = THiddenState(**restored_learner_state_raw["hstates"])
 
         return restored_params, restored_hstates
 
