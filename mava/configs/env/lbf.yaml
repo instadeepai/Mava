@@ -8,5 +8,9 @@ env_name: LevelBasedForaging-v0
 # Choose whether to aggregate the list of individual rewards and use the team reward (default setting) OR use_individual_rewards=True.
 use_individual_rewards: False  # If True, use the list of individual rewards.
 
+# Defines the metric that will be used to evaluate the performance of the agent.
+# This metric is returned at the end of an experiment and can be used for hyperparameter tuning.
+eval_metric: episode_return
+
 kwargs:
   time_limit: 100
