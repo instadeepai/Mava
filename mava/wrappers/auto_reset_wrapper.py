@@ -69,6 +69,9 @@ class AutoResetWrapper(Wrapper):
 
         return state, timestep
 
+    def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep[Observation]]:
+        return self._obs_in_extras(*super().reset(key))
+
     def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep[Observation]]:
         """Step the environment, with automatic resetting if the episode terminates."""
         state, timestep = self._env.step(state, action)

@@ -30,9 +30,9 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava import networks
-from mava.evaluator import evaluator_setup
+from mava.evaluator import make_eval_fns
 from mava.networks import FeedForwardActor as Actor
+from mava.networks import FeedForwardCritic as Critic
 from mava.types import (
     ActorApply,
     CriticApply,
@@ -44,7 +44,11 @@ from mava.types import (
     PPOTransition,
 )
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import merge_leading_dims, unreplicate_learner_state
+from mava.utils.jax import (
+    merge_leading_dims,
+    unreplicate_batch_dim,
+    unreplicate_learner_state,
+)
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.make_env import make
 
@@ -364,9 +368,13 @@ def learner_setup(
     key, key_p = keys
 
     # Define network and optimiser.
-    actor_network, critic_network = networks.make(
-        config=config, network="feedforward", centralised_critic=False
-    )
+    actor_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
+    actor_action_head = hydra.utils.instantiate(config.network.action_head, action_dim=num_actions)
+    critic_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
+
+    actor_network = Actor(torso=actor_torso, action_head=actor_action_head)
+    critic_network = Critic(torso=critic_torso)
+
     actor_optim = optax.chain(
         optax.clip_by_global_norm(config.system.max_grad_norm),
         optax.adam(config.system.actor_lr, eps=1e-5),
@@ -468,6 +476,8 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     config = copy.deepcopy(_config)
     logger = MavaLogger(config)
 
+    n_devices = len(jax.devices())
+
     # Create the enviroments for train and eval.
     env, eval_env = make(config=config)
 
@@ -478,16 +488,8 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     learn, actor_network, learner_state = learner_setup(env, (key, key_p), config)
 
     # Setup evaluator.
-    evaluator, absolute_metric_evaluator, (trained_params, eval_keys) = evaluator_setup(
-        eval_env=eval_env,
-        key=key_e,
-        network=actor_network,
-        params=learner_state.params.actor_params,
-        config=config,
-    )
-
-    # Calculate total timesteps.
-    n_devices = len(jax.devices())
+    eval_keys = jax.random.split(key_e, n_devices)
+    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network, config)
 
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
     steps_per_rollout = (
@@ -627,10 +629,8 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
 
         # Prepare for evaluation.
         start_time = time.time()
-        trained_params = jax.tree_util.tree_map(
-            lambda x: x[:, 0, ...],
-            learner_output.learner_state.params.actor_params,  # Select only actor params
-        )
+
+        trained_params = unreplicate_batch_dim(learner_state.params.actor_params)
         key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)

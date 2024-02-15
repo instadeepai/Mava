@@ -53,7 +53,7 @@ class RecordEpisodeMetrics(Wrapper):
         timestep.extras["episode_metrics"] = {
             "episode_return": 0.0,
             "episode_length": 0,
-            "final_episode": False,
+            "is_terminal_step": False,
         }
         return state, timestep
 
@@ -79,7 +79,7 @@ class RecordEpisodeMetrics(Wrapper):
         timestep.extras["episode_metrics"] = {
             "episode_return": episode_return_info,
             "episode_length": episode_length_info,
-            "final_episode": done,
+            "is_terminal_step": done,
         }
 
         state = RecordEpisodeMetricsState(
@@ -94,8 +94,13 @@ class RecordEpisodeMetrics(Wrapper):
 
 
 def get_final_step_metrics(metrics: Dict[str, chex.Array]) -> Dict[str, chex.Array]:
-    """Get the metrics for the final step of the episode."""
-    is_final_ep = metrics.pop("final_episode")
+    """Get the metrics for the final step of an episode.
+
+    Note: this is not a jittable method. We need to return variable length arrays, since
+    we don't know how many episodes have been run. This is done since the logger
+    expects arrays for computing summary statistics on the episode metrics.
+    """
+    is_final_ep = metrics.pop("is_terminal_step")
 
     final_metrics: Dict[str, chex.Array]
     # If it didn't make it to the final step, return zeros.
