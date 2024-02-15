@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 import chex
 import jax
 import jax.numpy as jnp
+from brax.envs import State as BraxState
 from chex import Array, PRNGKey
 from gymnax.environments import spaces as gymnax_spaces
 from jaxmarl.environments import spaces as jaxmarl_spaces
@@ -283,7 +284,7 @@ class JaxMarlWrapper(Wrapper):
         """Get action mask for each agent."""
         pass
 
-    def get_global_state(self, env_state: Array, obs: Dict[str, Array]) -> Array:
+    def get_global_state(self, env_state: BraxState, obs: Dict[str, Array]) -> Array:
         """Get global state from observation for each agent."""
         pass
 
@@ -300,7 +301,7 @@ class SmaxWrapper(JaxMarlWrapper):
         avail_actions = self._env.get_avail_actions(state)
         return jnp.array(batchify(avail_actions, self.agents), dtype=jnp.float32)
 
-    def get_global_state(self, env_state: Array, obs: Dict[str, Array]) -> Array:
+    def get_global_state(self, env_state: BraxState, obs: Dict[str, Array]) -> Array:
         """Get global state from observation and copy it for each agent."""
         return jnp.tile(jnp.array(obs["world_state"]), (self.num_agents, 1))
 
@@ -321,15 +322,10 @@ class MabraxWrapper(JaxMarlWrapper):
         """Get action mask for each agent."""
         return jnp.ones(self.action_shape, dtype=jnp.float32)
 
-    def get_global_state(self, env_state: Array, obs: Dict[str, Array]) -> Array:
-        """Get global state from observation and copy it for each agent."""
-        # Use the global state of brax.
-        global_state = jnp.tile(env_state.obs, (self.num_agents, 1))
+    def get_global_state(self, env_state: BraxState, obs: Dict[str, Array]) -> Array:
+        """Get global state from the brax env and copy it for each agent."""
+        brax_state = env_state.pipeline_state
+        brax_env = self._env.env
 
-        #  In this case, add_agent_id=False so the agent's ID must be added to the global state.
-        if self._env.homogenisation_method == "max":
-            agent_ids = jnp.eye(self.num_agents)
-            global_state = jnp.tile(env_state.obs, (self.num_agents, 1))
-            global_state = jnp.concatenate([agent_ids, global_state], axis=-1)
-
-        return global_state
+        global_state = brax_env._get_obs(brax_state)
+        return jnp.tile(global_state, (self.num_agents, 1))
