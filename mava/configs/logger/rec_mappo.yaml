@@ -2,7 +2,3 @@ defaults:
     - base_logger
 
 system_name: rec_mappo
-
-# --- Other logger kwargs ---
-kwargs:
-  neptune_tag: [rec-mappo]
