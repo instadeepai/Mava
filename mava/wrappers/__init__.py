@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from mava.wrappers.auto_reset_wrapper import AutoResetWrapper
 from mava.wrappers.episode_metrics import RecordEpisodeMetrics
 from mava.wrappers.jaxmarl import MabraxWrapper, SmaxWrapper
 from mava.wrappers.jumanji import LbfWrapper, RwareWrapper

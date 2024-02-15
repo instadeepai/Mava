@@ -29,9 +29,9 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava import networks
-from mava.evaluator import evaluator_setup
+from mava.evaluator import make_eval_fns
 from mava.networks import RecurrentActor as Actor
+from mava.networks import RecurrentCritic as Critic
 from mava.networks import ScannedRNN
 from mava.types import (
     ExperimentOutput,
@@ -47,10 +47,11 @@ from mava.types import (
 )
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import unreplicate_learner_state
+from mava.utils.jax import unreplicate_batch_dim, unreplicate_learner_state
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import make_learning_rate
+from mava.wrappers.episode_metrics import get_final_step_metrics
 
 
 def get_learner_fn(
@@ -464,14 +465,23 @@ def learner_setup(
     num_actions = int(env.action_spec().num_values[0])
     num_agents = env.action_spec().shape[0]
     config.system.num_agents = num_agents
-    config.system.num_actions = num_actions
+    config.system.action_dim = num_actions
 
     # PRNG keys.
     key, actor_net_key, critic_net_key = keys
 
     # Define network and optimiser.
-    actor_network, critic_network = networks.make(
-        config=config, network="recurrent", centralised_critic=True
+    actor_pre_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
+    actor_post_torso = hydra.utils.instantiate(config.network.actor_network.post_torso)
+    actor_action_head = hydra.utils.instantiate(config.network.action_head, action_dim=num_actions)
+    critic_pre_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
+    critic_post_torso = hydra.utils.instantiate(config.network.critic_network.post_torso)
+
+    actor_network = Actor(
+        pre_torso=actor_pre_torso, post_torso=actor_post_torso, action_head=actor_action_head
+    )
+    critic_network = Critic(
+        pre_torso=critic_pre_torso, post_torso=critic_post_torso, centralised_critic=True
     )
 
     actor_lr = make_learning_rate(config.system.actor_lr, config)
@@ -507,7 +517,7 @@ def learner_setup(
     init_single = (init_obs_single, init_done)
 
     # Initialise hidden state.
-    hidden_size = config.network.actor_network.pre_torso_layer_sizes[-1]
+    hidden_size = config.network.actor_network.pre_torso.layer_sizes[-1]
     init_policy_hstate = ScannedRNN.initialize_carry((config.arch.num_envs), hidden_size)
     init_critic_hstate = ScannedRNN.initialize_carry((config.arch.num_envs), hidden_size)
 
@@ -607,9 +617,11 @@ def learner_setup(
     return learn, actor_network, init_learner_state
 
 
-def run_experiment(_config: DictConfig) -> None:
+def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
     config = copy.deepcopy(_config)
+
+    n_devices = len(jax.devices())
 
     # Set recurrent chunk size.
     if config.system.recurrent_chunk_size is None:
@@ -633,18 +645,17 @@ def run_experiment(_config: DictConfig) -> None:
     )
 
     # Setup evaluator.
-    evaluator, absolute_metric_evaluator, (trained_params, eval_keys) = evaluator_setup(
+    # One key per device for evaluation.
+    eval_keys = jax.random.split(key_e, n_devices)
+    evaluator, absolute_metric_evaluator = make_eval_fns(
         eval_env=eval_env,
-        key_e=key_e,
         network=actor_network,
-        params=learner_state.params.actor_params,
         config=config,
         use_recurrent_net=True,
         scanned_rnn=ScannedRNN,
     )
 
     # Calculate total timesteps.
-    n_devices = len(jax.devices())
     config = check_total_timesteps(config)
     assert (
         config.system.num_updates > config.arch.num_evaluation
@@ -686,19 +697,19 @@ def run_experiment(_config: DictConfig) -> None:
         # Log the results of the training.
         elapsed_time = time.time() - start_time
         t = int(steps_per_rollout * (eval_step + 1))
-        learner_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        episode_metrics = get_final_step_metrics(learner_output.episode_metrics)
+        episode_return = jnp.mean(episode_metrics["episode_return"])
+        episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
 
         # Separately log timesteps, actoring metrics and training metrics.
         logger.log({"timestep": t}, t, eval_step, LogEvent.MISC)
-        logger.log(learner_output.episode_metrics, t, eval_step, LogEvent.ACT)
+        logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
         logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
 
         # Prepare for evaluation.
         start_time = time.time()
-        trained_params = jax.tree_util.tree_map(
-            lambda x: x[:, 0, ...],
-            learner_output.learner_state.params.actor_params,  # Select only actor params
-        )
+
+        trained_params = unreplicate_batch_dim(learner_state.params.actor_params)
         key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
@@ -729,6 +740,9 @@ def run_experiment(_config: DictConfig) -> None:
         # Update runner state to continue training.
         learner_state = learner_output.learner_state
 
+    # Record the performance for the final evaluation run.
+    eval_performance = float(jnp.mean(evaluator_output.episode_metrics[config.env.eval_metric]))
+
     # Measure absolute metric.
     if config.arch.absolute_metric:
         start_time = time.time()
@@ -749,17 +763,19 @@ def run_experiment(_config: DictConfig) -> None:
     # Stop the logger.
     logger.stop()
 
+    return eval_performance
+
 
 @hydra.main(config_path="../configs", config_name="default_rec_mappo.yaml", version_base="1.2")
-def hydra_entry_point(cfg: DictConfig) -> None:
+def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
 
     # Run experiment.
-    run_experiment(cfg)
-
+    eval_performance = run_experiment(cfg)
     print(f"{Fore.CYAN}{Style.BRIGHT}Recurrent MAPPO experiment completed{Style.RESET_ALL}")
+    return eval_performance
 
 
 if __name__ == "__main__":
