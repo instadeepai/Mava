@@ -247,11 +247,7 @@ class JaxMarlWrapper(Wrapper):
         )
 
         if self.has_global_state:
-            global_state = specs.Array(
-                (self.num_agents, self.state_size),
-                jnp.int32,
-                "global_state",
-            )
+            global_state = specs.Array((self.state_size,), agents_view.dtype, "global_state")
 
             return specs.Spec(
                 ObservationGlobalState,
@@ -326,11 +322,12 @@ class MabraxWrapper(JaxMarlWrapper):
     @property
     def state_size(self) -> chex.Array:
         state_size = self._env.env.observation_size
-        return (
-            state_size
-            if self._env.homogenisation_method != "max"
-            else state_size + self._env.num_agents
-        )
+        return state_size
+        # return (
+        #     state_size
+        #     if self._env.homogenisation_method != "max"
+        #     else state_size + self._env.num_agents
+        # )
 
     def action_mask(self, state: JaxMarlState) -> Array:
         """Get action mask for each agent."""
@@ -339,12 +336,12 @@ class MabraxWrapper(JaxMarlWrapper):
     def get_global_state(self, env_state: BraxState, obs: Dict[str, Array]) -> Array:
         """Get global state from observation and copy it for each agent."""
         # Use the global state of brax.
-        global_state = jnp.tile(env_state.obs, (self.num_agents, 1))
+        global_state = env_state.obs
 
         #  In this case, add_agent_id=False so the agent's ID must be added to the global state.
-        if self._env.homogenisation_method == "max":
-            agent_ids = jnp.eye(self.num_agents)
-            global_state = jnp.tile(env_state.obs, (self.num_agents, 1))
-            global_state = jnp.concatenate([agent_ids, global_state], axis=-1)
+        # if self._env.homogenisation_method == "max":
+        #     agent_ids = jnp.eye(self.num_agents)
+        #     global_state = jnp.tile(env_state.obs, (self.num_agents, 1))
+        #     global_state = jnp.concatenate([agent_ids, global_state], axis=-1)
 
         return global_state

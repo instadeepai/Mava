@@ -3,13 +3,13 @@ seed: 1
 n_envs: 128 # number of environments to run in parallel (vmapped)
 
 # --- Agent observations ---
-add_agent_id: True
+add_agent_id: False
 
 # --- RL hyperparameters ---
 # step related
 total_timesteps: 3e8
 explore_steps: 5000  # number of steps to take with random actions at the start of training
-update_batch_size: 2 # Number of vectorised gradient updates per device.
+update_batch_size: 1 # Number of vectorised gradient updates per device.
 
 rollout_length: 2 # Number of environment steps per vectorised environment.
 epochs: 1 # Number of learn epochs per training data batch.
