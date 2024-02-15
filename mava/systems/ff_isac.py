@@ -220,21 +220,21 @@ def init(
 
     key, actor_key, q1_key, q2_key, q1_target_key, q2_target_key = jax.random.split(key, 6)
 
-    init_acts = env.action_spec().generate_value()
-    init_acts_batched = init_acts[jnp.newaxis, ...]
-    init_obs = env.observation_spec().generate_value()
-    init_obs_batched = jax.tree_map(lambda x: x[jnp.newaxis, ...], init_obs)
+    acts = env.action_spec().generate_value()  # all agents actions
+    act_single_batched = acts[0][jnp.newaxis, ...]  # batch single agent action
+    obs = env.observation_spec().generate_value()
+    obs_single_batched = jax.tree_map(lambda x: x[0][jnp.newaxis, ...], obs)
 
     # Making actor network
     actor = Actor(action_dim, act_high, act_low)
-    actor_params = actor.init(actor_key, init_obs_batched)
+    actor_params = actor.init(actor_key, obs_single_batched)
 
     # Making Q networks
     q = QNetwork()
-    q1_params = q.init(q1_key, init_obs_batched, init_acts_batched)
-    q2_params = q.init(q2_key, init_obs_batched, init_acts_batched)
-    q1_target_params = q.init(q1_target_key, init_obs_batched, init_acts_batched)
-    q2_target_params = q.init(q2_target_key, init_obs_batched, init_acts_batched)
+    q1_params = q.init(q1_key, obs_single_batched, act_single_batched)
+    q2_params = q.init(q2_key, obs_single_batched, act_single_batched)
+    q1_target_params = q.init(q1_target_key, obs_single_batched, act_single_batched)
+    q2_target_params = q.init(q2_target_key, obs_single_batched, act_single_batched)
 
     # Automatic entropy tuning
     target_entropy = -cfg.system.target_entropy_scale * action_dim
@@ -271,12 +271,12 @@ def init(
 
     # Create replay buffer
     init_transition = Transition(
-        obs=init_obs,
-        action=init_acts,
+        obs=obs,
+        action=acts,
         # todo: n agents rewards/discounts
         reward=jnp.zeros((), dtype=float),
         done=jnp.zeros((), dtype=bool),
-        next_obs=init_obs,
+        next_obs=obs,
     )
 
     rb = fbx.make_item_buffer(
