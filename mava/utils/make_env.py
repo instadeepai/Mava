@@ -30,10 +30,11 @@ from mava.wrappers import (
     AgentIDWrapper,
     AutoResetWrapper,
     GlobalStateWrapper,
-    JaxMarlWrapper,
     LbfWrapper,
+    MabraxWrapper,
     RecordEpisodeMetrics,
     RwareWrapper,
+    SmaxWrapper,
 )
 
 # Registry mapping environment names to their generator and wrapper classes.
@@ -41,6 +42,8 @@ _jumanji_registry = {
     "RobotWarehouse-v0": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper},
     "LevelBasedForaging-v0": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
 }
+
+_jaxmarl_wrappers = {"SMAX": SmaxWrapper, "MABRAX": MabraxWrapper}
 
 
 def add_optional_wrappers(
@@ -106,12 +109,16 @@ def make_jaxmarl_env(
     """
 
     kwargs = dict(config.env.kwargs)
-    if "smax" in env_name.lower():
+    if env_name == "SMAX":
         kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
 
     # Create jaxmarl envs.
-    env = JaxMarlWrapper(jaxmarl.make(env_name, **kwargs), add_global_state)
-    eval_env = JaxMarlWrapper(jaxmarl.make(env_name, **kwargs), add_global_state)
+    env = _jaxmarl_wrappers[env_name](
+        jaxmarl.make(config.env.scenario.name, **kwargs), add_global_state
+    )
+    eval_env = _jaxmarl_wrappers[env_name](
+        jaxmarl.make(config.env.scenario.name, **kwargs), add_global_state
+    )
 
     # Add optional wrappers.
     if config.system.add_agent_id:
@@ -139,7 +146,7 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[Environmen
 
     if env_name in _jumanji_registry:
         return make_jumanji_env(env_name, config, add_global_state)
-    elif env_name in jaxmarl.registered_envs:
+    elif env_name in _jaxmarl_wrappers:
         return make_jaxmarl_env(env_name, config, add_global_state)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")

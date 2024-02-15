@@ -2,12 +2,14 @@
 defaults:
   - _self_
 
-env_name: halfcheetah_6x1  # todo: list all env names
-
-# do we have scenarios here?
-# scenario:
-#   task_name: 2s3z
+# Possible envs: [ant_4x2, halfcheetah_6x1, hopper_3x1, humanoid_9|8, walker2d_2x3]
+env_name: MABRAX
+scenario:
+  name: ant_4x2
+  task_name: ant_4x2  # In this case: env_name = task_name
 
 kwargs:
-  homogenisation_method: max  # [max|concat] how to make the reward homogenous across agents
-  auto_reset: False
+  episode_length: 1000
+  homogenisation_method: max #Default is None. [max, concat] if the dims of observations and actions are not homegenous across agents.
+  # Note: "max" adds one-hot for the agent's ID so the system.add_agent_id should be False. In this case, the agent's ID will be
+  # added to the global_state within the wrapper.
