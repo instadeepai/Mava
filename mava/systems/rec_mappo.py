@@ -686,7 +686,7 @@ def run_experiment(_config: DictConfig) -> float:
         )
 
     # Run experiment for a total number of evaluations.
-    max_episode_return = jnp.float32(0.0)
+    max_episode_return = jnp.float32(-jnp.inf)
     best_params = None
     for eval_step in range(config.arch.num_evaluation):
         # Train.
