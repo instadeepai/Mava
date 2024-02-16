@@ -61,7 +61,7 @@ class GigastepWrapper(Wrapper):
         assert (
             get_adversary_actions is False and get_adversary_obs is False
         ) or has_global_state is True, (
-            "For a customized global observation set has_global_state = True"
+            "For a customized global observation, set has_global_state to True"
         )
 
         super().__init__(env)
