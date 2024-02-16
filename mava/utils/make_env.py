@@ -43,7 +43,7 @@ _jumanji_registry = {
     "LevelBasedForaging-v0": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
 }
 
-_jaxmarl_wrappers = {"Smax": SmaxWrapper, "Mabrax": MabraxWrapper}
+_jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 
 
 def add_optional_wrappers(

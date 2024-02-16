@@ -2,7 +2,7 @@
 defaults:
   - _self_
 
-env_name: Mabrax
+env_name: MaBrax
 scenario:
   name: ant_4x2   # [ant_4x2, halfcheetah_6x1, hopper_3x1, humanoid_9|8, walker2d_2x3]
 
