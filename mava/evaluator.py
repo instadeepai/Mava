@@ -93,7 +93,12 @@ def get_ff_evaluator_fn(
         }
         # Log won episode if win rate is required.
         if log_win_rate:
-            eval_metrics["won_episode"] = jnp.all(final_state.timestep.reward >= 1.0).astype(int)
+            if "won_episode" not in final_state.timestep.extras:
+                eval_metrics["won_episode"] = jnp.all(final_state.timestep.reward >= 1.0).astype(
+                    int
+                )
+            else:
+                eval_metrics["won_episode"] = final_state.timestep.extras["won_episode"]
 
         return eval_metrics
 
@@ -213,7 +218,12 @@ def get_rnn_evaluator_fn(
         }
         # Log won episode if win rate is required.
         if log_win_rate:
-            eval_metrics["won_episode"] = jnp.all(final_state.timestep.reward >= 1.0).astype(int)
+            if "won_episode" not in final_state.timestep.extras:
+                eval_metrics["won_episode"] = jnp.all(final_state.timestep.reward >= 1.0).astype(
+                    int
+                )
+            else:
+                eval_metrics["won_episode"] = final_state.timestep.extras["won_episode"]
         return eval_metrics
 
     def evaluator_fn(
@@ -284,7 +294,11 @@ def make_eval_fns(
 ) -> Tuple[EvalFn, EvalFn]:
     """Initialise evaluator_fn."""
     # Check if win rate is required for evaluation.
-    log_win_rate = config.env.env_name in ["HeuristicEnemySMAX", "LearnedPolicyEnemySMAX"]
+    log_win_rate = config.env.env_name in [
+        "HeuristicEnemySMAX",
+        "LearnedPolicyEnemySMAX",
+        "Gigastep",
+    ]
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
         assert scanned_rnn is not None
