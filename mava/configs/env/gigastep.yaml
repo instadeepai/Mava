@@ -1,0 +1,13 @@
+# ---Environment Configs---
+defaults:
+  - _self_
+  - scenario: hide_and_seek_5_vs_5 # [hide_and_seek_5_vs_5, identical_5_vs_5, waypoint_5_vs_5]
+
+env_name: Gigastep
+
+eval_metric: win_rate
+
+kwargs:
+  time_limit: 500
+  get_adversary_obs: False
+  get_adversary_actions: False
