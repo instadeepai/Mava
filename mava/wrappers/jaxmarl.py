@@ -158,9 +158,25 @@ def jaxmarl_space_to_jumanji_spec(space: jaxmarl_spaces.Space) -> specs.Spec:
 
 
 class JaxMarlWrapper(Wrapper):
-    """Wraps a JaxMarl environment so that its API is compatible with Jumanji environments."""
+    """
+    A wrapper for JaxMarl environments to make their API compatible with Jumanji environments.
+    """
 
-    def __init__(self, env: MultiAgentEnv, has_global_state: bool, timelimit: int) -> None:
+    def __init__(
+        self,
+        env: MultiAgentEnv,
+        has_global_state: bool,
+        timelimit: int,
+        add_agent_ids_to_state: bool = False,
+    ) -> None:
+        """
+        Initialize the JaxMarlWrapper.
+
+        Args:
+        - env (MultiAgentEnv): The JaxMarl environment to wrap.
+        - has_global_state (bool): Whether the environment has global state.
+        - timelimit (int): The time limit for each episode.
+        """
         # Check that all specs are the same as we only support homogeneous environments, for now ;)
         homogenous_error = (
             f"Mava only supports environments with homogeneous agents, "
@@ -174,7 +190,6 @@ class JaxMarlWrapper(Wrapper):
         self.agents = self._env.agents
         self.num_agents = self._env.num_agents
         self.has_global_state = has_global_state
-
         self.has_action_mask = hasattr(self._env, "get_avail_actions")
 
     def reset(
@@ -233,12 +248,9 @@ class JaxMarlWrapper(Wrapper):
 
     def observation_spec(self) -> specs.Spec:
         agents_view = jaxmarl_space_to_jumanji_spec(merge_space(self._env.observation_spaces))
-        single_agent_action_space = self._env.action_space(self.agents[0])
 
-        # we can't mask continuous actions, so we return a mask of shape 0.
-        n_actions = single_agent_action_space.n if _is_discrete(single_agent_action_space) else 0
         action_mask = specs.BoundedArray(
-            (self.num_agents, n_actions), bool, False, True, "action_mask"
+            (self.num_agents, self.n_actions), bool, False, True, "action_mask"
         )
         step_count = specs.BoundedArray(
             (self.num_agents,), jnp.int32, 0, self._timelimit, "step_count"
@@ -247,7 +259,7 @@ class JaxMarlWrapper(Wrapper):
         if self.has_global_state:
             global_state = specs.Array(
                 (self.num_agents, self.state_size),
-                jnp.int32,
+                agents_view.dtype,
                 "global_state",
             )
 
@@ -290,18 +302,39 @@ class JaxMarlWrapper(Wrapper):
 
     @property
     @abstractmethod
+    def n_actions(self) -> chex.Array:
+        "Get the number of actions for each agent."
+        ...
+
+    @property
+    @abstractmethod
     def state_size(self) -> chex.Array:
+        "Get the sate size of the global observation"
         ...
 
 
 class SmaxWrapper(JaxMarlWrapper):
     """WWrapper for SMAX environment"""
 
-    def __init__(self, env: MultiAgentEnv, has_global_state: bool = False, timelimit: int = 500):
+    def __init__(
+        self,
+        env: MultiAgentEnv,
+        has_global_state: bool = False,
+        timelimit: int = 500,
+        add_agent_ids_to_state: bool = False,
+    ):
         super().__init__(env, has_global_state, timelimit)
 
+    @property
     def state_size(self) -> chex.Array:
+        "Get the sate size of the global observation"
         return self._env.state_size
+
+    @property
+    def n_actions(self) -> chex.Array:
+        "Get the number of actions for each agent."
+        single_agent_action_space = self._env.action_space(self.agents[0])
+        return single_agent_action_space.n
 
     def action_mask(self, state: JaxMarlState) -> Array:
         """Get action mask for each agent."""
@@ -316,29 +349,43 @@ class SmaxWrapper(JaxMarlWrapper):
 class MabraxWrapper(JaxMarlWrapper):
     """Wrraper for the Mabrax environment."""
 
-    def __init__(self, env: MABraxEnv, has_global_state: bool = False, timelimit: int = 1000):
+    def __init__(
+        self,
+        env: MABraxEnv,
+        has_global_state: bool = False,
+        timelimit: int = 1000,
+        add_agent_ids_to_state: bool = False,
+    ):
         super().__init__(env, has_global_state, timelimit)
-        self.action_shape = self.action_spec().shape
+        self.add_agent_ids = add_agent_ids_to_state
 
+    @property
     def state_size(self) -> chex.Array:
+        "Get the sate size of the global observation"
         state_size = self._env.env.observation_size
         return (
-            state_size
-            if self._env.homogenisation_method != "max"
-            else state_size + self._env.num_agents
+            state_size + self._env.num_agents
+            if self._env.homogenisation_method == "max" and self.add_agent_ids
+            else state_size
         )
+
+    @property
+    def n_actions(self) -> chex.Array:
+        "Get the number of actions for each agent."
+        return self.action_spec().shape[0]
 
     def action_mask(self, state: JaxMarlState) -> Array:
         """Get action mask for each agent."""
-        return jnp.ones(self.action_shape, dtype=jnp.float32)
+        return jnp.ones((self.n_actions), dtype=jnp.float32)
 
     def get_global_state(self, env_state: BraxState, obs: Dict[str, Array]) -> Array:
         """Get global state from observation and copy it for each agent."""
         # Use the global state of brax.
         global_state = jnp.tile(env_state.obs, (self.num_agents, 1))
 
-        #  In this case, add_agent_id=False so the agent's ID must be added to the global state.
-        if self._env.homogenisation_method == "max":
+        #  Including IDs in the global state can be generally beneficial.
+        # In this case, add_agent_id=False so the agent's ID must be added to the global state.
+        if self._env.homogenisation_method == "max" and self.add_agent_ids:
             agent_ids = jnp.eye(self.num_agents)
             global_state = jnp.tile(env_state.obs, (self.num_agents, 1))
             global_state = jnp.concatenate([agent_ids, global_state], axis=-1)

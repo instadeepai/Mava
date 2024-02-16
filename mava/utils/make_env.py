@@ -43,7 +43,7 @@ _jumanji_registry = {
     "LevelBasedForaging-v0": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
 }
 
-_jaxmarl_wrappers = {"SMAX": SmaxWrapper, "MABRAX": MabraxWrapper}
+_jaxmarl_wrappers = {"Smax": SmaxWrapper, "Mabrax": MabraxWrapper}
 
 
 def add_optional_wrappers(
@@ -109,16 +109,13 @@ def make_jaxmarl_env(
     """
 
     kwargs = dict(config.env.kwargs)
-    if env_name == "SMAX":
+    if "smax" in env_name.lower():
         kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
 
     # Create jaxmarl envs.
-    env = _jaxmarl_wrappers[env_name](
-        jaxmarl.make(config.env.scenario.name, **kwargs), add_global_state
-    )
-    eval_env = _jaxmarl_wrappers[env_name](
-        jaxmarl.make(config.env.scenario.name, **kwargs), add_global_state
-    )
+    wrapper_name = config.env.env_name
+    env = _jaxmarl_wrappers[wrapper_name](jaxmarl.make(env_name, **kwargs), add_global_state)
+    eval_env = _jaxmarl_wrappers[wrapper_name](jaxmarl.make(env_name, **kwargs), add_global_state)
 
     # Add optional wrappers.
     if config.system.add_agent_id:
@@ -142,11 +139,11 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[Environmen
     Returns:
         A tuple of the environments.
     """
-    env_name = config.env.env_name
+    env_name = config.env.scenario.name
 
     if env_name in _jumanji_registry:
         return make_jumanji_env(env_name, config, add_global_state)
-    elif env_name in _jaxmarl_wrappers:
+    elif env_name in jaxmarl.registered_envs:
         return make_jaxmarl_env(env_name, config, add_global_state)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")

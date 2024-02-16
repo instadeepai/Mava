@@ -1,4 +1,5 @@
 # The config of the 15x15-4p-5f scenario with the VectorObserver set as default
+name: LevelBasedForaging-v0
 task_name: 15x15-4p-5f
 
 task_config:
