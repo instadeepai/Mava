@@ -314,7 +314,7 @@ class JaxMarlWrapper(Wrapper):
 
 
 class SmaxWrapper(JaxMarlWrapper):
-    """WWrapper for SMAX environment"""
+    """Wrapper for SMAX environment"""
 
     def __init__(
         self,

@@ -18,4 +18,4 @@ kwargs:
   walls_cause_death: True # Whether to kill the agent if it collides with a wall.
   attack_mode: "closest" # "closest" or "random". Whether to attack the closest enemy or a random enemy.
 
-add_agent_ids_to_state: False # This should still be False for now.
+add_agent_ids_to_state: False # Currently has no effect.

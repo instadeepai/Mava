@@ -113,14 +113,11 @@ def make_jaxmarl_env(
         kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
 
     # Create jaxmarl envs.
-    wrapper_name = config.env.env_name
-    add_agent_ids_to_state = config.env.add_agent_ids_to_state
-
-    env = _jaxmarl_wrappers[wrapper_name](
-        jaxmarl.make(env_name, **kwargs), add_global_state, add_agent_ids_to_state
+    env = _jaxmarl_wrappers[config.env.env_name](
+        jaxmarl.make(env_name, **kwargs), add_global_state, config.env.add_agent_ids_to_state
     )
-    eval_env = _jaxmarl_wrappers[wrapper_name](
-        jaxmarl.make(env_name, **kwargs), add_global_state, add_agent_ids_to_state
+    eval_env = _jaxmarl_wrappers[config.env.env_name](
+        jaxmarl.make(env_name, **kwargs), add_global_state, config.env.add_agent_ids_to_state
     )
 
     # Add optional wrappers.
