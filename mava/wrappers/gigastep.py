@@ -78,10 +78,10 @@ class GigastepWrapper(Wrapper):
 
         assert (
             env.discrete_actions
-        ), "Only discrete action spaces are currenty supported for Gigastep environments"
+        ), "Only discrete action spaces are currently supported for Gigastep environments"
         assert (
             env._obs_type == "vector"
-        ), "Only Vector observations are currenty supported for Gigastep environments"
+        ), "Only Vector observations are currently supported for Gigastep environments"
         assert (
             get_adversary_actions is False and get_adversary_obs is False
         ) or has_global_state is True, (
