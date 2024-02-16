@@ -49,40 +49,21 @@ from mava.wrappers import episode_metrics
 
 # todo: types.py
 class Qs(NamedTuple):
-    # q1: FrozenVariableDict
-    # q2: FrozenVariableDict
-    q: FrozenVariableDict
+    online: FrozenVariableDict
+    target: FrozenVariableDict
 
-class QsAndTarget(NamedTuple):
-    online: Qs
-    targets: Qs
-
-
-# class SacParams(NamedTuple):
-#     actor: FrozenVariableDict
-#     q: QsAndTarget
-#     log_alpha: Array
-    
 class QLearnParams(NamedTuple):
-    dqns:QsAndTarget
+    dqns:Qs
     # NOTE (Louise) later add Qmix network
-
-
-class OptStates(NamedTuple):
-    # actor: optax.OptState
-    q: optax.OptState
-    # alpha: optax.OptState
-
 
 class LearnerState(NamedTuple):
     obs: Array
     env_state: State
     buffer_state: TrajectoryBuffer
     params: QLearnParams
-    opt_states: OptStates
+    opt_state: optax.OptState
     t: Array
     key: PRNGKey
-
 
 class Transition(NamedTuple):
     obs: Array
@@ -99,12 +80,6 @@ Optimisers: TypeAlias = Tuple[
     optax.GradientTransformation#, optax.GradientTransformation, optax.GradientTransformation
 ]
 
-
-# todo: jumanji PR
-
-
-# todo: should this contain both networks?
-num_actions = ... # TODO (Claude) we need to pass the number of actions at setup time NOTE (Louise) done! From your other code
 class QNetwork(nn.Module):
     num_actions:int
     def setup(self) -> None:
@@ -114,52 +89,9 @@ class QNetwork(nn.Module):
 
     @nn.compact
     def __call__(self, obs: Observation) -> Array:
-        x = obs.agents_view
-        return self.net(x)
+        x = obs.agents_view #NOTE (Louise) this prevents batching?
+        return self.net(obs)
 
-
-# rlax does: 0, -4 NOTE (Claude) we dont need this stuff. Its for stocastic policies
-# LOG_STD_MAX = 2
-# LOG_STD_MIN = -5
-
-
-# class Actor(nn.Module):
-#     n_actions: int
-#     maximum: Array
-#     minimum: Array
-
-#     def setup(self) -> None:
-#         self.torso = nn.Sequential([nn.Dense(256), nn.relu, nn.Dense(256), nn.relu])
-#         self.mean_nn = nn.Dense(self.n_actions)
-#         self.logstd_nn = nn.Dense(self.n_actions)
-
-#         scale = 0.5 * (self.maximum - self.minimum)
-#         self.bijector = distrax.Chain(
-#             [
-#                 distrax.ScalarAffine(shift=self.minimum, scale=scale),
-#                 distrax.ScalarAffine(shift=1.0),
-#                 distrax.Tanh(),
-#             ]
-#         )
-
-#     @nn.compact
-#     def __call__(self, obs: Observation) -> distrax.Distribution:
-#         x = self.torso(obs.agents_view)
-
-#         mean = self.mean_nn(x)
-
-#         log_std = self.logstd_nn(x)
-#         log_std = jnp.tanh(log_std)
-#         # From SpinUp / Denis Yarats
-#         log_std = LOG_STD_MIN + 0.5 * (LOG_STD_MAX - LOG_STD_MIN) * (log_std + 1)
-#         std = jnp.exp(log_std)
-
-#         pi = distrax.Transformed(
-#             distribution=distrax.MultivariateNormalDiag(loc=mean, scale_diag=std),
-#             bijector=distrax.Block(self.bijector, ndims=1),
-#         )
-
-#         return pi
 
 
 # # todo: inside actor? NOTE (Claude) we need to make a method like this that uses Q-values to select actions
@@ -220,12 +152,8 @@ def init(
 
     env, eval_env = environments.make(cfg)
 
-    # n_agents = env.action_spec().shape[0]
-    # action_dim = env.action_spec().shape[1] # TODO (CLaude) get the number of actions here
     num_actions = int(env.action_spec().num_values[0]) # NOTE (Claude) got this from the PPO systems
 
-    # act_high = jnp.zeros(env.action_spec().shape) + env.action_spec().maximum
-    # act_low = jnp.zeros(env.action_spec().shape) + env.action_spec().minimum
 
     # key, q1_key, q2_key, q1_target_key, q2_target_key = jax.random.split(key, 5) # TODO (Claude) remove the second q function
     key, q_key, q_target_key = jax.random.split(key, 3)
@@ -235,49 +163,21 @@ def init(
     init_obs_batched = jax.tree_map(lambda x: x[0][jnp.newaxis, ...], init_obs)
     # init_act_batched = jax.tree_map(lambda x: x[jnp.newaxis, ...], init_acts)
 
-    # Making actor network
-    # actor = Actor(action_dim, act_high, act_low)
-    # actor_params = actor.init(actor_key, init_obs_batched)
-
     # Making Q networks
     q = QNetwork(num_actions)
     q_params = q.init(q_key, init_obs_batched)
-    # q2_params = q.init(q2_key, init_obs_batched, init_acts_batched)
     q_target_params = q.init(q_target_key, init_obs_batched)
-    # q2_target_params = q.init(q2_target_key, init_obs_batched, init_acts_batched)
-
-    # Automatic entropy tuning
-    # target_entropy = -cfg.system.target_entropy_scale * action_dim
-    # target_entropy = jnp.repeat(target_entropy, n_agents).astype(float)
-    # making sure we have dim=3 so broacasting works fine
-    # target_entropy = target_entropy[jnp.newaxis, :, jnp.newaxis]
-    # if cfg.system.autotune:
-    #     log_alpha = jnp.zeros_like(target_entropy)
-    # else:
-    #     log_alpha = jnp.log(cfg.system.init_alpha)
-    #     log_alpha = jnp.broadcast_to(log_alpha, target_entropy.shape)
 
     # Pack params
-    params = QLearnParams(QsAndTarget(Qs(q_params), Qs(q_target_params)))
-    # target_q_params = Qs(q1_target_params, q2_target_params)
-    # params = SacParams(actor_params, QsAndTarget(online_q_params, target_q_params), log_alpha)
-
-    # # Make opt states.
-    # actor_opt = optax.adam(cfg.system.policy_lr)
-    # actor_opt_state = actor_opt.init(params.actor)
+    params = QLearnParams(Qs(q_params, q_target_params))
 
     q_opt = optax.adam(cfg.system.q_lr)
     q_opt_state = q_opt.init(params.dqns.online)
 
-    # alpha_opt = optax.adam(cfg.system.q_lr)  # todo: alpha lr?
-    # alpha_opt_state = alpha_opt.init(params.log_alpha)
-
-    # # Pack opt states
-    opt_states = OptStates(q_opt_state)
 
     # Distribute params and opt states across all devices
     params = replicate(params)
-    opt_states = replicate(opt_states)
+    q_opt_state = replicate(q_opt_state)
 
     # Create replay buffer
     init_transition = Transition(
@@ -291,14 +191,13 @@ def init(
 
     rb = fbx.make_item_buffer(
         max_length=cfg.system.buffer_size,
-        min_length=cfg.system.explore_steps,
+        min_length=cfg.system.buffer_min_size,
         sample_batch_size=cfg.system.batch_size,
         add_batches=True,
     )
     buffer_state = replicate(rb.init(init_transition))
 
     nns = (q, q) # NOTE (Louise) replace a q with mixer params later
-    # opts = (actor_opt, q_opt, alpha_opt)
 
     # Reset env.
     n_keys = cfg.system.n_envs * n_devices * cfg.system.update_batch_size
@@ -324,9 +223,9 @@ def init(
 
     # Initial learner state.
     learner_state = LearnerState(
-        first_obs, env_state, buffer_state, params, opt_states, t, first_keys
+        first_obs, env_state, buffer_state, params, q_opt_state, t, first_keys
     )
-    return (env, eval_env), nns, opt_states, rb, learner_state, logger, key # NOTE (Louise) deleted some things here, so need to refactor expected outputs
+    return (env, eval_env), nns, q_opt, rb, learner_state, logger, key # NOTE (Louise) deleted some things here, so need to refactor expected outputs
 
 
 def make_update_fns(
@@ -363,8 +262,8 @@ def make_update_fns(
         return next_obs, env_state, buffer_state, infos["episode_metrics"]
 
     # losses:
-    def q_loss_fn(q_params: QsAndTarget, obs: Array, action: Array, target: Array) -> Tuple[Array, Metrics]:
-        q_online = q.apply(q_params.online, obs).reshape(-1)
+    def q_loss_fn(q_online_params: FrozenVariableDict, obs: Array, action: Array, target: Array) -> Tuple[Array, Metrics]:
+        q_online = q.apply(q_online_params, obs).reshape(-1)
         q_loss = jnp.mean((q_online - target) ** 2)
 
         loss_info = {
@@ -374,37 +273,18 @@ def make_update_fns(
 
         return q_loss, loss_info
 
-    # def actor_loss_fn(
-    #     actor_params: FrozenVariableDict, obs: Array, alpha: Array, q_params: Qs, key: chex.PRNGKey
-    # ) -> Array:
-    #     pi = actor.apply(actor_params, obs)
-    #     action, log_prob = pi.sample_and_log_prob(seed=key)
-    #     log_prob = log_prob[..., jnp.newaxis]
-
-    #     qf1_pi = q.apply(q_params.q1, obs, action)
-    #     qf2_pi = q.apply(q_params.q2, obs, action)
-    #     min_qf_pi = jnp.minimum(qf1_pi, qf2_pi)
-
-    #     return ((alpha * log_prob) - min_qf_pi).mean()
-
-    # def alpha_loss_fn(log_alpha: Array, log_pi: Array, target_entropy: Array) -> Array:
-    #     return jnp.mean(-jnp.exp(log_alpha) * (log_pi + target_entropy))
 
     # Update functions:
     def update_q(
-        params: QsAndTarget, opt_states: OptStates, data: Transition, key: chex.PRNGKey
-    ) -> Tuple[QsAndTarget, OptStates, Metrics]:
+        params: QLearnParams, opt_states: optax.OptState, data: Transition, key: chex.PRNGKey
+    ) -> Tuple[QLearnParams, optax.OptState, Metrics]:
         """Update the Q parameters."""
         # Calculate Q target values.
         rewards = data.reward[..., jnp.newaxis, jnp.newaxis]
         dones = data.done[..., jnp.newaxis, jnp.newaxis]
 
-        # pi = actor.apply(params.actor, data.next_obs)
-        # next_action, next_log_prob = pi.sample_and_log_prob(seed=key)
-        # next_log_prob = next_log_prob[..., jnp.newaxis]
-
-        next_q_vals_online = q.apply(params.online, data.next_obs) #NOTE (Louise) not superduper efficient
-        next_q_vals_target = q.apply(params.target, data.next_obs)
+        next_q_vals_online = q.apply(params.dqns.online, data.next_obs) #NOTE (Louise) not superduper efficient
+        next_q_vals_target = q.apply(params.dqns.target, data.next_obs)
 
         # TODO (Claude) do double q-value selection here...
         next_action = jnp.argmax(next_q_vals_online)
@@ -414,73 +294,29 @@ def make_update_fns(
 
         # Update Q function.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
-        q_grads, q_loss_info = q_grad_fn(params.online, data.obs, data.action, target_q_val)
+        q_grads, q_loss_info = q_grad_fn(params.dqns.online, data.obs, data.action, target_q_val)
         # Mean over the device and batch dimension.
         q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="device")
         q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="batch")
-        q_updates, new_q_opt_state = q_opt.update(q_grads, opt_states.q)
-        new_online_q_params = optax.apply_updates(params.q.online, q_updates)
+        q_updates, new_q_opt_state = q_opt.update(q_grads, opt_states)
+        new_online_q_params = optax.apply_updates(params.dqns.online, q_updates)
 
         # Target network polyak update.
         new_target_q_params = optax.incremental_update(
-            new_online_q_params, params.target, cfg.system.tau
+            new_online_q_params, params.dqns.target, cfg.system.tau
         )
 
         # Repack params and opt_states.
-        q_and_target = QsAndTarget(Qs(new_online_q_params), Qs(new_target_q_params))
-        params = params._replace(q=q_and_target)
-        opt_states = opt_states._replace(q=new_q_opt_state)
+        q_and_target = Qs(new_online_q_params, new_target_q_params)
+        params = params._replace(dqns=q_and_target)
+        #opt_states = opt_states._replace(q=new_q_opt_state)
 
-        return params, opt_states, q_loss_info
-
-    # def update_actor_and_alpha(
-    #     params: SacParams, opt_states: OptStates, data: Transition, key: chex.PRNGKey
-    # ) -> Tuple[SacParams, OptStates, Metrics]:
-    #     """Update the actor and alpha parameters. Compensated for the delay in policy updates."""
-    #     # compensate for the delay by doing `policy_frequency` updates instead of 1.
-    #     assert cfg.system.policy_frequency > 0, "Need to have a policy frequency > 0."
-    #     for _ in range(cfg.system.policy_frequency):
-    #         actor_key, alpha_key = jax.random.split(key)
-
-    #         # Update actor.
-    #         actor_grad_fn = jax.value_and_grad(actor_loss_fn)
-    #         actor_loss, act_grads = actor_grad_fn(
-    #             params.actor, data.obs, jnp.exp(params.log_alpha), params.q.online, actor_key
-    #         )
-    #         # Mean over the device and batch dimensions.
-    #         actor_loss, act_grads = lax.pmean((actor_loss, act_grads), axis_name="device")
-    #         actor_loss, act_grads = lax.pmean((actor_loss, act_grads), axis_name="batch")
-    #         actor_updates, new_actor_opt_state = actor_opt.update(act_grads, opt_states.actor)
-    #         new_actor_params = optax.apply_updates(params.actor, actor_updates)
-
-    #         params = params._replace(actor=new_actor_params)
-    #         opt_states = opt_states._replace(actor=new_actor_opt_state)
-
-    #         # Update alpha if autotuning
-    #         alpha_loss = 0.0  # loss is 0 if autotune is off
-    #         if cfg.system.autotune:
-    #             # Get log prob for alpha loss
-    #             pi = actor.apply(params.actor, data.obs)
-    #             _, log_prob = pi.sample_and_log_prob(seed=alpha_key)
-    #             log_prob = log_prob[..., jnp.newaxis]
-
-    #             alpha_grad_fn = jax.value_and_grad(alpha_loss_fn)
-    #             alpha_loss, alpha_grads = alpha_grad_fn(params.log_alpha, log_prob, target_entropy)
-    #             alpha_loss, alpha_grads = lax.pmean((alpha_loss, alpha_grads), axis_name="device")
-    #             alpha_loss, alpha_grads = lax.pmean((alpha_loss, alpha_grads), axis_name="batch")
-    #             alpha_updates, new_alpha_opt_state = alpha_opt.update(alpha_grads, opt_states.alpha)
-    #             new_log_alpha = optax.apply_updates(params.log_alpha, alpha_updates)
-
-    #             params = params._replace(log_alpha=new_log_alpha)
-    #             opt_states = opt_states._replace(alpha=new_alpha_opt_state)
-
-    #     loss_info = {"actor_loss": actor_loss, "alpha_loss": alpha_loss}
-    #     return params, opt_states, loss_info
+        return params, new_q_opt_state, q_loss_info
 
     # Act/learn loops:
     def update_epoch(
-        carry: Tuple[BufferState, QsAndTarget, OptStates, int, chex.PRNGKey], _: Any
-    ) -> Tuple[Tuple[BufferState, QsAndTarget, OptStates, int, chex.PRNGKey], Metrics]:
+        carry: Tuple[BufferState, QLearnParams, optax.OptState, int, chex.PRNGKey], _: Any
+    ) -> Tuple[Tuple[BufferState, QLearnParams, optax.OptState, int, chex.PRNGKey], Metrics]:
         """Update the Q function and optionally policy/alpha with TD3 delayed update."""
         buffer_state, params, opt_states, t, key = carry
         key, buff_key, q_key, actor_key = jax.random.split(key, 4)
@@ -491,48 +327,59 @@ def make_update_fns(
         # learn
         params, opt_states, q_loss_info = update_q(params, opt_states, data, q_key)
 
-        # params, opt_states, act_loss_info = lax.cond(
-        #     t % cfg.system.policy_frequency == 0,  # TD 3 Delayed update support
-        #     update_actor_and_alpha,
-        #     # just return same params and opt_states and 0 for losses
-        #     lambda params, opt_states, *_: (
-        #         params,
-        #         opt_states,
-        #         {"actor_loss": 0.0, "alpha_loss": 0.0},
-        #     ),
-        #     params,
-        #     opt_states,
-        #     data,
-        #     actor_key,
-        # )
 
         return (buffer_state, params, opt_states, t, key), q_loss_info
+    
+
+    def get_epsilon(t:int):
+        """Calculate epsilon for exploration rate using config variables."""
+        eps = jax.numpy.maximum(
+            cfg.system.eps_min,
+            1-(t/cfg.system.eps_decay)*(1-cfg.system.eps_min)
+            )
+        return eps
+    
+    def select_random_action(key, num_actions):
+        action = jax.random.randint(key,(),minval=0,maxval=num_actions)
+        return action
+
+    def greedy(q_vals):
+        action = jnp.argmax(q_vals)
+        return action
+
+# NOTE (Louise) Make more efficient by shifting things around. No nw evals for exploration
+    def select_eps_greedy_action(online_params:FrozenVariableDict, obs:Array, t:int, key:chex.PRNGKey):
+        """Select action to take in eps-greedy way."""
+
+        #obs = jnp.expand_dims(jnp.array(obs), axis=0) # add dummy batch dim
+        q_values = q.apply(online_params, obs) # remove batch dim
+        epsilon = get_epsilon(t)
+        num_actions = len(q_values) # number of available actions
+        key,key_1 = jax.random.split(key,2)
+
+        should_explore = jax.random.uniform(key)<epsilon 
+
+        action = jax.lax.select(
+            should_explore,
+            select_random_action(key_1, num_actions), 
+            greedy(q_values)
+        )
+
+        return action
 
     def act( # TODO we will need to implement epsilon greedy exploration. We can start with a fixed epsilon (e.g. 0.1) and implement epsilon decay later.
-        carry: Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey], _: Any
-    ) -> Tuple[Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey], Dict]:
+        carry: Tuple[FrozenVariableDict, Array, State, BufferState, int, chex.PRNGKey], _: Any
+    ) -> Tuple[Tuple[FrozenVariableDict, Array, State, BufferState, int, chex.PRNGKey], Dict]:
         """Acting loop: select action, step env, add to buffer."""
-        actor_params, obs, env_state, buffer_state, key = carry
+        online_params, obs, env_state, buffer_state, t, key = carry
 
-        action = jax.numpy.zeros((128,5)) #  NOTE (Louise) make this better. This needs to be better
-        # pi = actor.apply(actor_params, obs)
-        # action = pi.sample(seed=key)
+        # action = jax.numpy.zeros((128,5),dtype="int32") #  NOTE (Louise) make this better. This needs to be better
+        action = select_eps_greedy_action(online_params,obs,t,key)
 
         next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
-        return (actor_params, next_obs, env_state, buffer_state, key), metrics
 
-    # def explore(carry: LearnerState, _: Any) -> Tuple[LearnerState, Metrics]:
-    #     """Take random actions to fill up buffer at the start of training."""
-    #     obs, env_state, buffer_state, _, _, t, key = carry
-    #     key, explore_key = jax.random.split(key)
-    #     action = jax.random.uniform(explore_key, full_action_shape)
-    #     next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
+        return (online_params, next_obs, env_state, buffer_state, t , key), metrics
 
-    #     t += cfg.system.n_envs
-    #     learner_state = carry._replace(
-    #         obs=next_obs, env_state=env_state, buffer_state=buffer_state, t=t, key=key
-    #     )
-    #     return learner_state, metrics
 
     scanned_update = lambda state: lax.scan(update_epoch, state, None, length=cfg.system.epochs)
     scanned_act = lambda state: lax.scan(act, state, None, length=cfg.system.rollout_length)
@@ -544,7 +391,7 @@ def make_update_fns(
         obs, env_state, buffer_state, params, opt_states, t, key = carry
         key, act_key, learn_key = jax.random.split(key, 3)
         # Act
-        act_state = (params.dqns.online, obs, env_state, buffer_state, act_key)
+        act_state = (params.dqns.online, obs, env_state, buffer_state, t, act_key)
         (_, next_obs, env_state, buffer_state, _), metrics = scanned_act(act_state)
 
         # Sample and learn
@@ -557,17 +404,6 @@ def make_update_fns(
             (metrics, losses),
         )
 
-    # pmap and scan over explore and update_step
-    # Make sure to not do n_envs explore steps (could fill up the buffer too much).
-    # explore_steps = cfg.system.explore_steps // cfg.system.n_envs
-    # pmaped_explore = jax.pmap(
-    #     jax.vmap(
-    #         lambda state: lax.scan(explore, state, None, length=explore_steps),
-    #         axis_name="batch",
-    #     ),
-    #     axis_name="device",
-    #     donate_argnums=0,
-    # )
     
     pmaped_steps = 1024  # todo: config option # NOTE (Claude) this is related to steps between logging.
 
@@ -614,20 +450,10 @@ def run_experiment(cfg: DictConfig) -> float:
 
     start_time = time.time()
 
-    # Fill up buffer/explore.
-    # learner_state, metrics = explore(learner_state)
-
-    # # Log explore metrics.
-    # final_metrics = episode_metrics.get_final_step_metrics(metrics)
-    # t = int(jnp.sum(learner_state.t))
-    # sps = t / (time.time() - start_time)
-    # logger.log({"step": t, "steps per second": sps}, t, 0, LogEvent.MISC)
-    # logger.log(final_metrics, cfg.system.explore_steps, 0, LogEvent.ACT)
-
     # Main loop:
     # We want start to align with the final step of the first pmaped_learn,
     # where we've done explore_steps and 1 full learn step.
-    start = cfg.system.explore_steps + steps_per_rollout
+    start = steps_per_rollout
     for eval_idx, t in enumerate(range(start, int(cfg.system.total_timesteps), steps_per_rollout)):
         # Learn loop:
         learner_state, (metrics, losses) = update(learner_state)
@@ -639,52 +465,52 @@ def run_experiment(cfg: DictConfig) -> float:
         # in the loop counter.
         sps = t * cfg.system.epochs / (time.time() - start_time)
         final_metrics = episode_metrics.get_final_step_metrics(metrics)
-        loss_metrics = losses | {"log_alpha": learner_state.params.log_alpha}
+        loss_metrics = losses #| {"log_alpha": learner_state.params.log_alpha}
         logger.log({"step": t, "steps_per_second": sps}, t, eval_idx, LogEvent.MISC)
         logger.log(final_metrics, t, eval_idx, LogEvent.ACT)
         logger.log(loss_metrics, t, eval_idx, LogEvent.TRAIN)
 
         # Evaluate:
-        key, eval_key = jax.random.split(key)
-        eval_keys = jax.random.split(eval_key, n_devices)
-        # todo: bug likely here -> don't have batch vmap yet so shouldn't unreplicate_batch_dim
-        eval_output = evaluator(unreplicate_batch_dim(learner_state.params.actor), eval_keys)
-        jax.block_until_ready(eval_output)
+    #     key, eval_key = jax.random.split(key)
+    #     eval_keys = jax.random.split(eval_key, n_devices)
+    #     # todo: bug likely here -> don't have batch vmap yet so shouldn't unreplicate_batch_dim
+    #     eval_output = evaluator(unreplicate_batch_dim(learner_state.params.actor), eval_keys)
+    #     jax.block_until_ready(eval_output)
 
-        # Log:
-        episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
-        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
+    #     # Log:
+    #     episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
+    #     logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
 
-        # Save best actor params.
-        if cfg.arch.absolute_metric and max_episode_return <= episode_return:
-            best_params = copy.deepcopy(unreplicate_batch_dim(learner_state.params.actor))
-            max_episode_return = episode_return
+    #     # Save best actor params.
+    #     if cfg.arch.absolute_metric and max_episode_return <= episode_return:
+    #         best_params = copy.deepcopy(unreplicate_batch_dim(learner_state.params.actor))
+    #         max_episode_return = episode_return
 
-        # Checkpoint:
-        if cfg.logger.checkpointing.save_model:
-            # Save checkpoint of learner state
-            unreplicated_learner_state = unreplicate_learner_state(learner_state)  # type: ignore
-            checkpointer.save(
-                timestep=t,
-                unreplicated_learner_state=unreplicated_learner_state,
-                episode_return=episode_return,
-            )
+    #     # Checkpoint:
+    #     if cfg.logger.checkpointing.save_model:
+    #         # Save checkpoint of learner state
+    #         unreplicated_learner_state = unreplicate_learner_state(learner_state)  # type: ignore
+    #         checkpointer.save(
+    #             timestep=t,
+    #             unreplicated_learner_state=unreplicated_learner_state,
+    #             episode_return=episode_return,
+    #         )
 
-    # Measure absolute metric.
-    if cfg.arch.absolute_metric:
-        eval_keys = jax.random.split(key, n_devices)
+    # # Measure absolute metric.
+    # if cfg.arch.absolute_metric:
+    #     eval_keys = jax.random.split(key, n_devices)
 
-        eval_output = absolute_metric_evaluator(best_params, eval_keys)
-        jax.block_until_ready(eval_output)
+    #     eval_output = absolute_metric_evaluator(best_params, eval_keys)
+    #     jax.block_until_ready(eval_output)
 
-        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.ABSOLUTE)
+    #     logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.ABSOLUTE)
 
     logger.stop()
 
     return float(max_episode_return)
 
 
-@hydra.main(config_path="../configs", config_name="default_ff_isac.yaml", version_base="1.2")
+@hydra.main(config_path="../configs", config_name="default_ff_idqn.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
