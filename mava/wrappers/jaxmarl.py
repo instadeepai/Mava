@@ -227,23 +227,23 @@ class JaxMarlWrapper(Wrapper):
     def _create_observation(
         self,
         obs: Dict[str, Array],
-        env_state: State,
+        brax_state: BraxState,
         jaxmarl_state: Optional[JaxMarlState] = None,
         reset: bool = False,
     ) -> Union[Observation, ObservationGlobalState]:
-        """
-        Create an observation from the raw observation and environment state."""
+        """Create an observation from the raw observation and environment state."""
         obs_data = {
             "agents_view": batchify(obs, self.agents),
-            "action_mask": self.action_mask(env_state),
+            "action_mask": self.action_mask(brax_state),
+            "step_count": jnp.zeros(self.num_agents, dtype=int),
         }
         if reset:
             obs_data["step_count"] = jnp.zeros(self.num_agents, dtype=int)
-        elif jaxmarl_state is not None:
-            obs_data["step_count"] = jnp.repeat(jaxmarl_state.step, self.num_agents)
+        else:
+            obs_data["step_count"] = jnp.repeat(jaxmarl_state.step, self.num_agents)  # type: ignore
 
         if self.has_global_state:
-            obs_data["global_state"] = self.get_global_state(env_state, obs)
+            obs_data["global_state"] = self.get_global_state(brax_state, obs)
             return ObservationGlobalState(**obs_data)
         else:
             return Observation(**obs_data)
