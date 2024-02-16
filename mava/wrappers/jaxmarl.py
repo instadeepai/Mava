@@ -298,7 +298,7 @@ class JaxMarlWrapper(Wrapper):
         ...
 
     @abstractmethod
-    def get_global_state(self, env_state: Array, obs: Dict[str, Array]) -> Array:
+    def get_global_state(self, brax_state: BraxState, obs: Dict[str, Array]) -> Array:
         """Get global state from observation for each agent."""
         ...
 
@@ -343,7 +343,7 @@ class SmaxWrapper(JaxMarlWrapper):
         avail_actions = self._env.get_avail_actions(state)
         return jnp.array(batchify(avail_actions, self.agents), dtype=bool)
 
-    def get_global_state(self, env_state: Array, obs: Dict[str, Array]) -> Array:
+    def get_global_state(self, brax_state: BraxState, obs: Dict[str, Array]) -> Array:
         """Get global state from observation and copy it for each agent."""
         return jnp.tile(jnp.array(obs["world_state"]), (self.num_agents, 1))
 
@@ -379,16 +379,16 @@ class MabraxWrapper(JaxMarlWrapper):
         """Get action mask for each agent."""
         return jnp.ones((self.n_actions), dtype=jnp.float32)
 
-    def get_global_state(self, env_state: BraxState, obs: Dict[str, Array]) -> Array:
+    def get_global_state(self, brax_state: BraxState, obs: Dict[str, Array]) -> Array:
         """Get global state from observation and copy it for each agent."""
         # Use the global state of brax.
-        global_state = jnp.tile(env_state.obs, (self.num_agents, 1))
+        global_state = jnp.tile(brax_state.obs, (self.num_agents, 1))
 
         # Including IDs in the global state can be generally beneficial.
         # In this case, add_agent_id=False so the agent's ID must be added to the global state.
         if self._env.homogenisation_method == "max" and self.add_agent_ids:
             agent_ids = jnp.eye(self.num_agents)
-            global_state = jnp.tile(env_state.obs, (self.num_agents, 1))
+            global_state = jnp.tile(brax_state.obs, (self.num_agents, 1))
             global_state = jnp.concatenate([agent_ids, global_state], axis=-1)
 
         return global_state
