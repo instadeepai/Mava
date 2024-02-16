@@ -138,14 +138,14 @@ def make_gigastep_env(
         add_global_state (bool): Whether to add the global state to the observation.
 
     Returns:
-        A GIGASTEP environment.
+        A tuple of the environments.
     """
     kwargs = dict(config.env.kwargs)
 
     scenario_config = dict(config.env.scenario)
     scenario = ScenarioBuilder.from_config(scenario_config)
 
-    env = GigastepWrapper(
+    train_env = GigastepWrapper(
         scenario.make(discrete_actions=True, obs_type="vector"),
         **kwargs,
         has_global_state=add_global_state,
@@ -156,9 +156,9 @@ def make_gigastep_env(
         has_global_state=add_global_state,
     )
 
-    env = AutoResetWrapper(env)
-    env = RecordEpisodeMetrics(env)
-    return env, eval_env
+    train_env = AutoResetWrapper(train_env)
+    train_env = RecordEpisodeMetrics(train_env)
+    return train_env, eval_env
 
 
 def make(config: DictConfig, add_global_state: bool = False) -> Tuple[Environment, Environment]:
