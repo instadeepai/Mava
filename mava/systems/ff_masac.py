@@ -33,7 +33,7 @@ from flax.core.scope import FrozenVariableDict
 from jax import Array
 from jax.typing import ArrayLike
 
-jax.config.update("jax_platform_name", "cpu")
+# jax.config.update("jax_platform_name", "cpu")
 
 from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
