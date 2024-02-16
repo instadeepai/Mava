@@ -1,4 +1,5 @@
 # The config of the 10x10-3p-3f scenario with the VectorObserver set as default
+name: LevelBasedForaging-v0
 task_name: 10x10-3p-3f
 
 task_config:

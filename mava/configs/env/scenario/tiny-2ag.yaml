@@ -1,4 +1,5 @@
 # The config of the tiny-2ag environment
+name: RobotWarehouse-v0
 task_name: tiny-2ag
 
 task_config:
