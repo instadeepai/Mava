@@ -234,7 +234,6 @@ class JaxMarlWrapper(Wrapper):
         obs_data = {
             "agents_view": batchify(obs, self.agents),
             "action_mask": self.action_mask(brax_state),
-            "step_count": jnp.zeros(self.num_agents, dtype=int),
         }
         if reset:
             obs_data["step_count"] = jnp.zeros(self.num_agents, dtype=int)

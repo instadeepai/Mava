@@ -2,7 +2,7 @@
 defaults:
   - _self_
 
-env_name: MaBrax
+env_name: MaBrax  # Used for logging purposes and selection of the corresponding wrapper.
 scenario:
   name: ant_4x2   # [ant_4x2, halfcheetah_6x1, hopper_3x1, humanoid_9|8, walker2d_2x3]
 

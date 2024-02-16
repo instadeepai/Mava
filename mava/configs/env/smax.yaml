@@ -2,7 +2,7 @@
 defaults:
   - _self_
 
-env_name: Smax
+env_name: Smax  # Used for logging purposes and selection of the corresponding wrapper.
 # Possible tasks:
 # 2s3z | 3s5z | 5m_vs_6m | 10m_vs_11m | 27m_vs_30m | 3s5z_vs_3s6z | 3s_vs_5z | 6h_vs_8z | smacv2_5_units | smacv2_10_units | smacv2_20_units
 scenario:
@@ -17,3 +17,5 @@ kwargs:
   see_enemy_actions: True # Whether to enable enemy vision. If True, the enemy will be able to see the actions of the agent.
   walls_cause_death: True # Whether to kill the agent if it collides with a wall.
   attack_mode: "closest" # "closest" or "random". Whether to attack the closest enemy or a random enemy.
+
+add_agent_ids_to_state: False # This should still be False for now.
