@@ -30,6 +30,7 @@ from omegaconf import DictConfig
 
 from mava.wrappers import (
     AgentIDWrapper,
+    AutoResetWrapper,
     GigastepWrapper,
     GlobalStateWrapper,
     JaxMarlWrapper,
