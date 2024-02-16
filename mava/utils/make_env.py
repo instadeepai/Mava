@@ -25,7 +25,6 @@ from jumanji.environments.routing.lbf.generator import (
 from jumanji.environments.routing.robot_warehouse.generator import (
     RandomGenerator as RwareRandomGenerator,
 )
-
 from omegaconf import DictConfig
 
 from mava.wrappers import (
