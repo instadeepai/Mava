@@ -114,8 +114,17 @@ def make_jaxmarl_env(
 
     # Create jaxmarl envs.
     wrapper_name = config.env.env_name
-    env = _jaxmarl_wrappers[wrapper_name](jaxmarl.make(env_name, **kwargs), add_global_state)
-    eval_env = _jaxmarl_wrappers[wrapper_name](jaxmarl.make(env_name, **kwargs), add_global_state)
+    add_agent_ids_to_state = (
+        config.env.add_agent_ids_to_state
+        if hasattr(config.env, "add_agent_ids_to_state")
+        else False
+    )
+    env = _jaxmarl_wrappers[wrapper_name](
+        jaxmarl.make(env_name, **kwargs), add_global_state, add_agent_ids_to_state
+    )
+    eval_env = _jaxmarl_wrappers[wrapper_name](
+        jaxmarl.make(env_name, **kwargs), add_global_state, add_agent_ids_to_state
+    )
 
     # Add optional wrappers.
     if config.system.add_agent_id:
