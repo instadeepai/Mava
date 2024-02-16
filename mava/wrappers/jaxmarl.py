@@ -173,10 +173,10 @@ class JaxMarlWrapper(Wrapper):
         Initialize the JaxMarlWrapper.
 
         Args:
-        - env (MultiAgentEnv): The JaxMarl environment to wrap.
-        - has_global_state (bool): Whether the environment has global state.
-        - timelimit (int): The time limit for each episode.
-        - add_agent_ids_to_state (bool): whether to add the agent ids to the global state.
+        - env: The JaxMarl environment to wrap.
+        - has_global_state: Whether the environment has global state.
+        - timelimit: The time limit for each episode.
+        - add_agent_ids_to_state: Whether to add the agent ids to the global state.
         """
         # Check that all specs are the same as we only support homogeneous environments, for now ;)
         homogenous_error = (
@@ -191,7 +191,6 @@ class JaxMarlWrapper(Wrapper):
         self.agents = self._env.agents
         self.num_agents = self._env.num_agents
         self.has_global_state = has_global_state
-        self.has_action_mask = hasattr(self._env, "get_avail_actions")
         self.add_agent_ids_to_state = add_agent_ids_to_state
 
     def reset(
