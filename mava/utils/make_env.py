@@ -135,7 +135,7 @@ def make_gigastep_env(
     Args:
         env_name (str): The name of the environment to create.
         config (Dict): The configuration of the environment.
-        add_global_state (bool): Whether to add the global state to the observation.
+        add_global_state (bool): Whether to add the global state to the observation. Default False.
 
     Returns:
         A GIGASTEP environment.
