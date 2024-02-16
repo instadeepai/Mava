@@ -15,7 +15,7 @@
 import copy
 from abc import abstractmethod
 from collections import namedtuple
-from typing import TYPE_CHECKING, Dict, List, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 import chex
 import jax
@@ -198,19 +198,7 @@ class JaxMarlWrapper(Wrapper):
         key, reset_key = jax.random.split(key)
         obs, env_state = self._env.reset(reset_key)
 
-        if self.has_global_state:
-            obs = ObservationGlobalState(
-                agents_view=batchify(obs, self.agents),
-                action_mask=self.action_mask(env_state),
-                global_state=self.get_global_state(env_state, obs),
-                step_count=jnp.zeros(self.num_agents, dtype=int),
-            )
-        else:
-            obs = Observation(
-                agents_view=batchify(obs, self.agents),
-                action_mask=self.action_mask(env_state),
-                step_count=jnp.zeros(self.num_agents, dtype=int),
-            )
+        obs = self._create_observation(obs, env_state, None, True)
         return JaxMarlState(env_state, key, 0), restart(obs, shape=(self.num_agents,))
 
     def step(
@@ -222,19 +210,7 @@ class JaxMarlWrapper(Wrapper):
             step_key, state.state, unbatchify(action, self.agents)
         )
 
-        if self.has_global_state:
-            obs = ObservationGlobalState(
-                agents_view=batchify(obs, self.agents),
-                action_mask=self.action_mask(env_state),
-                global_state=self.get_global_state(env_state, obs),
-                step_count=jnp.repeat(state.step, self.num_agents),
-            )
-        else:
-            obs = Observation(
-                agents_view=batchify(obs, self.agents),
-                action_mask=self.action_mask(env_state),
-                step_count=jnp.repeat(state.step, self.num_agents),
-            )
+        obs = self._create_observation(obs, env_state, state, False)
 
         step_type = jax.lax.select(done["__all__"], StepType.LAST, StepType.MID)
         ts = TimeStep(
@@ -245,6 +221,30 @@ class JaxMarlWrapper(Wrapper):
         )
 
         return JaxMarlState(env_state, key, state.step + 1), ts
+
+    def _create_observation(
+        self,
+        obs: Dict[str, Array],
+        env_state: State,
+        jaxmarl_state: Optional[JaxMarlState] = None,
+        reset: bool = False,
+    ) -> Union[Observation, ObservationGlobalState]:
+        """
+        Create an observation from the raw observation and environment state."""
+        obs_data = {
+            "agents_view": batchify(obs, self.agents),
+            "action_mask": self.action_mask(env_state),
+        }
+        if reset:
+            obs_data["step_count"] = jnp.zeros(self.num_agents, dtype=int)
+        elif jaxmarl_state is not None:
+            obs_data["step_count"] = jnp.repeat(jaxmarl_state.step, self.num_agents)
+
+        if self.has_global_state:
+            obs_data["global_state"] = self.get_global_state(env_state, obs)
+            return ObservationGlobalState(**obs_data)
+        else:
+            return Observation(**obs_data)
 
     def observation_spec(self) -> specs.Spec:
         agents_view = jaxmarl_space_to_jumanji_spec(merge_space(self._env.observation_spaces))
