@@ -36,7 +36,7 @@ from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
 from typing_extensions import TypeAlias
 
-from mava.evaluator import evaluator_setup
+from mava.evaluator_idqn import evaluator_setup
 from mava.types import Observation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
@@ -92,40 +92,6 @@ class QNetwork(nn.Module):
         return self.net(x)
 
 
-
-# # todo: inside actor? NOTE (Claude) we need to make a method like this that uses Q-values to select actions
-# def sample_action(
-#     mean: ArrayLike,
-#     log_std: ArrayLike,
-#     key: PRNGKey,
-#     action_scale: Array,
-#     action_bias: Array,
-#     eval: bool = False,
-# ) -> Tuple[Array, Array]:
-#     std = jnp.exp(log_std)
-#     # normal = distrax.Normal(mean, std)
-#     normal = distrax.MultivariateNormalDiag(mean, std)
-
-#     sampled_action = lax.cond(
-#         eval,
-#         lambda: mean,
-#         lambda: normal.sample(seed=key),
-#     )
-#     bound_action = jnp.tanh(sampled_action)
-#     scaled_action = bound_action * action_scale + action_bias
-
-#     # log_prob = normal.log_prob(unbound_action)
-#     # rescale_term = jnp.log(action_scale * (1 - bound_action**2) + 1e-6).sum(axis=-1)
-#     # log_prob = log_prob - rescale_term
-
-#     # todo: scale
-#     log_prob = normal.log_prob(sampled_action)
-#     rescal_term = 2 * (jnp.log(2) - sampled_action - jax.nn.softplus(-2 * sampled_action))
-#     log_prob = log_prob - jnp.sum(rescal_term, axis=-1)
-
-#     return scaled_action, log_prob[..., jnp.newaxis]
-
-
 def init(
     cfg: DictConfig,
 ) -> Tuple[
@@ -158,7 +124,6 @@ def init(
     init_obs = env.observation_spec().generate_value()
     init_acts = env.action_spec().generate_value()
     init_obs_batched = jax.tree_map(lambda x: x[0][jnp.newaxis, ...], init_obs)
-    # init_act_batched = jax.tree_map(lambda x: x[jnp.newaxis, ...], init_acts)
 
     # Making Q networks
     q = QNetwork(num_actions)
@@ -270,7 +235,6 @@ def make_update_fns(
 
         return q_loss, loss_info
 
-
     # Update functions:
     def update_q(
         params: QLearnParams, opt_states: optax.OptState, data: Transition, key: chex.PRNGKey
@@ -324,24 +288,25 @@ def make_update_fns(
         # learn
         params, opt_states, q_loss_info = update_q(params, opt_states, data, q_key)
 
-
         return (buffer_state, params, opt_states, t, key), q_loss_info
     
 
     def get_epsilon(t:int):
-        """Calculate epsilon for exploration rate using config variables."""
+        """Calculate epsilon for exploration rate using config hyperparameters."""
         eps = jax.numpy.maximum(
             cfg.system.eps_min,
             1-(t/cfg.system.eps_decay)*(1-cfg.system.eps_min)
             )
         return eps
     
+    # Using probability values allows for non-ragged masking - must be done per row because of "choice".
     def select_single_action(key, action_options, p_values):
+        """Select one action per row with probabilities given by p_values."""
         action = jax.random.choice(key,action_options,p=p_values)
         return action
     
     def select_random_action_batch(key, action_mask):
-        """Select actions randomly with masking"""
+        """Select actions randomly with masking."""
         batch_size, n_agents, n_actions = action_mask.shape
 
         keys = jax.random.split(key,batch_size*n_agents)
@@ -365,18 +330,19 @@ def make_update_fns(
         # greedy argmax
         action = jnp.argmax(q_vals_masked, axis=-1)#.reshape(q_values.shape[0],q_values.shape[1],1)
         return action
+    
+    
 
-# NOTE (Louise) Make more efficient by shifting things around. No nw evals for exploration
     def select_eps_greedy_action(online_params:FrozenVariableDict, obs:Array, t:int, key:chex.PRNGKey):
-        """Select action to take in eps-greedy way."""
-
+        """Select action to take in eps-greedy way. Batch and agent dims are included."""
+        # get exploration rate
         epsilon = get_epsilon(t)
 
-        #num_actions = obs.action_mask.shape[-1] # number of available actions
+        # decide whether to explore
         key,key_1 = jax.random.split(key,2)
-
         should_explore = jax.random.uniform(key)<epsilon 
 
+        # choose actions accordingly
         action = jax.lax.select(
             should_explore,
             select_random_action_batch(key_1, obs.action_mask), #is it general enough?
@@ -391,7 +357,9 @@ def make_update_fns(
         """Acting loop: select action, step env, add to buffer."""
         online_params, obs, env_state, buffer_state, t, key = carry
 
-        action = select_eps_greedy_action(online_params,obs,t,key)
+        action = jnp.zeros((128,3),dtype="int32")
+
+        #action = select_eps_greedy_action(online_params,obs,t,key)
 
         next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
 
@@ -434,7 +402,7 @@ def make_update_fns(
         donate_argnums=0,
     )
 
-    return pmaped_updated_step
+    return pmaped_updated_step, greedy
 
 
 def run_experiment(cfg: DictConfig) -> float:
@@ -445,7 +413,7 @@ def run_experiment(cfg: DictConfig) -> float:
     max_episode_return = -jnp.inf
 
     (env, eval_env), nns, opts, rb, learner_state, logger, key = init(cfg)
-    update = make_update_fns(cfg, env, nns, opts, rb)
+    update, greedy = make_update_fns(cfg, env, nns, opts, rb)
 
     _,q = nns
     key, eval_key = jax.random.split(key)
@@ -456,6 +424,7 @@ def run_experiment(cfg: DictConfig) -> float:
         network=q, #NOTE (Louise) this part needs redoing with that replacement actor function
         params=learner_state.params.dqns.online,
         config=cfg,
+        greedy=greedy
     )
 
     if cfg.logger.checkpointing.save_model:
@@ -490,8 +459,6 @@ def run_experiment(cfg: DictConfig) -> float:
         # But we want to make sure we're counting env steps correctly so it's not included
         # in the loop counter.
 
-
-
         sps = t * cfg.system.epochs / (time.time() - start_time)
         final_metrics = episode_metrics.get_final_step_metrics(metrics)
         loss_metrics = losses #| {"log_alpha": learner_state.params.log_alpha}
@@ -501,39 +468,39 @@ def run_experiment(cfg: DictConfig) -> float:
         logger.log({"epsilon":get_epsilon(t)}, t, eval_idx, LogEvent.MISC)
 
         # Evaluate:
-    #     key, eval_key = jax.random.split(key)
-    #     eval_keys = jax.random.split(eval_key, n_devices)
-    #     # todo: bug likely here -> don't have batch vmap yet so shouldn't unreplicate_batch_dim
-    #     eval_output = evaluator(unreplicate_batch_dim(learner_state.params.actor), eval_keys)
-    #     jax.block_until_ready(eval_output)
+        key, eval_key = jax.random.split(key)
+        eval_keys = jax.random.split(eval_key, n_devices)
+        # todo: bug likely here -> don't have batch vmap yet so shouldn't unreplicate_batch_dim
+        eval_output = evaluator(unreplicate_batch_dim(learner_state.params.dqns.online), eval_keys)
+        jax.block_until_ready(eval_output)
 
-    #     # Log:
-    #     episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
-    #     logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
+        # Log:
+        episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
+        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
 
-    #     # Save best actor params.
-    #     if cfg.arch.absolute_metric and max_episode_return <= episode_return:
-    #         best_params = copy.deepcopy(unreplicate_batch_dim(learner_state.params.actor))
-    #         max_episode_return = episode_return
+        # Save best actor params.
+        if cfg.arch.absolute_metric and max_episode_return <= episode_return:
+            best_params = copy.deepcopy(unreplicate_batch_dim(learner_state.params.dqns.online))
+            max_episode_return = episode_return
 
-    #     # Checkpoint:
-    #     if cfg.logger.checkpointing.save_model:
-    #         # Save checkpoint of learner state
-    #         unreplicated_learner_state = unreplicate_learner_state(learner_state)  # type: ignore
-    #         checkpointer.save(
-    #             timestep=t,
-    #             unreplicated_learner_state=unreplicated_learner_state,
-    #             episode_return=episode_return,
-    #         )
+        # Checkpoint:
+        if cfg.logger.checkpointing.save_model:
+            # Save checkpoint of learner state
+            unreplicated_learner_state = unreplicate_learner_state(learner_state)  # type: ignore
+            checkpointer.save(
+                timestep=t,
+                unreplicated_learner_state=unreplicated_learner_state,
+                episode_return=episode_return,
+            )
 
-    # # Measure absolute metric.
-    # if cfg.arch.absolute_metric:
-    #     eval_keys = jax.random.split(key, n_devices)
+    # Measure absolute metric.
+    if cfg.arch.absolute_metric:
+        eval_keys = jax.random.split(key, n_devices)
 
-    #     eval_output = absolute_metric_evaluator(best_params, eval_keys)
-    #     jax.block_until_ready(eval_output)
+        eval_output = absolute_metric_evaluator(best_params, eval_keys)
+        jax.block_until_ready(eval_output)
 
-    #     logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.ABSOLUTE)
+        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.ABSOLUTE)
 
     logger.stop()
 
@@ -549,7 +516,7 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     # Run experiment.
     final_return = run_experiment(cfg)
 
-    print(f"{Fore.CYAN}{Style.BRIGHT}ISAC experiment completed{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}IDQN experiment completed{Style.RESET_ALL}")
 
     return float(final_return)
 

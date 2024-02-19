@@ -7,16 +7,16 @@ add_agent_id: True
 
 # --- RL hyperparameters ---
 # step related
-total_timesteps: 3e8
+total_timesteps: 2e7
 buffer_min_size: 132  # number of steps to take with random actions at the start of training
 update_batch_size: 2 # Number of vectorised gradient updates per device.
 
 rollout_length: 2 # Number of environment steps per vectorised environment.
 epochs: 2 # Number of learn epochs per training data batch.
-policy_frequency: 4  # the frequency of training policy - every n q learning steps the policy is trained once
+
 # sizes
 buffer_size: 100_000  # size of the replay buffer. Note: total size is this * num_devices
-batch_size: 64
+batch_size: 32 #as in jaxmarl paper
 # learning rates
 q_lr: 1e-3  # the learning rate of the Q network network optimizer
 # other
