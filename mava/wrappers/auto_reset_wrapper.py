@@ -13,6 +13,7 @@
 # limitations under the License.
 
 # Note this is only here until this is merged into jumanji
+# PR: https://github.com/instadeepai/jumanji/pull/223
 
 from typing import Tuple
 
@@ -68,6 +69,9 @@ class AutoResetWrapper(Wrapper):
         timestep = timestep.replace(observation=reset_timestep.observation)  # type: ignore
 
         return state, timestep
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep[Observation]]:
+        return self._obs_in_extras(*super().reset(key))
 
     def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep[Observation]]:
         """Step the environment, with automatic resetting if the episode terminates."""
