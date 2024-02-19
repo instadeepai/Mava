@@ -284,10 +284,16 @@ class GigastepWrapper(Wrapper):
         team1_obs, team2_obs = obs[: self.num_agents], obs[self.num_agents :]
 
         # split each sub elemnt in the tuple
-        team1_state = jax.tree_util.tree_map(lambda x: x[: self.num_agents], state[0])
-        team2_state = jax.tree_util.tree_map(lambda x: x[self.num_agents :], state[0])
+        per_agent_info, general_state_info = state
+        team1_state = jax.tree_util.tree_map(lambda x: x[: self.num_agents], per_agent_info)
+        team2_state = jax.tree_util.tree_map(lambda x: x[self.num_agents :], per_agent_info)
 
-        return team1_obs, (team1_state, state[1]), team2_obs, (team2_state, state[1])
+        return (
+            team1_obs,
+            (team1_state, general_state_info),
+            team2_obs,
+            (team2_state, general_state_info),
+        )
 
     def get_wining_team(self, state: Tuple[Dict, Dict]) -> Array:
         """
