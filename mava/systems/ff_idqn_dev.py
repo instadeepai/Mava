@@ -77,20 +77,19 @@ Metrics = Dict[str, Array]
 BufferState: TypeAlias = TrajectoryBufferState[Transition]
 Networks: TypeAlias = Tuple[nn.Module, nn.Module]
 Optimisers: TypeAlias = Tuple[
-    optax.GradientTransformation#, optax.GradientTransformation, optax.GradientTransformation
+    optax.GradientTransformation
 ]
 
 class QNetwork(nn.Module):
     num_actions:int
     def setup(self) -> None:
-        # self.net = nn.Sequential([nn.Dense(256), nn.relu, nn.Dense(256), nn.relu, nn.Dense(1)])
         self.net = nn.Sequential([nn.Dense(256), nn.relu, nn.Dense(256), nn.relu, nn.Dense(self.num_actions)])
 
 
     @nn.compact
     def __call__(self, obs: Observation) -> Array:
-        x = obs.agents_view #NOTE (Louise) this prevents batching?
-        return self.net(obs)
+        x = obs.agents_view
+        return self.net(x)
 
 
 
@@ -154,8 +153,6 @@ def init(
 
     num_actions = int(env.action_spec().num_values[0]) # NOTE (Claude) got this from the PPO systems
 
-
-    # key, q1_key, q2_key, q1_target_key, q2_target_key = jax.random.split(key, 5) # TODO (Claude) remove the second q function
     key, q_key, q_target_key = jax.random.split(key, 3)
 
     init_obs = env.observation_spec().generate_value()
@@ -225,7 +222,7 @@ def init(
     learner_state = LearnerState(
         first_obs, env_state, buffer_state, params, q_opt_state, t, first_keys
     )
-    return (env, eval_env), nns, q_opt, rb, learner_state, logger, key # NOTE (Louise) deleted some things here, so need to refactor expected outputs
+    return (env, eval_env), nns, q_opt, rb, learner_state, logger, key 
 
 
 def make_update_fns(
@@ -263,7 +260,7 @@ def make_update_fns(
 
     # losses:
     def q_loss_fn(q_online_params: FrozenVariableDict, obs: Array, action: Array, target: Array) -> Tuple[Array, Metrics]:
-        q_online = q.apply(q_online_params, obs).reshape(-1)
+        q_online = q.apply(q_online_params, obs)
         q_loss = jnp.mean((q_online - target) ** 2)
 
         loss_info = {
@@ -287,10 +284,10 @@ def make_update_fns(
         next_q_vals_target = q.apply(params.dqns.target, data.next_obs)
 
         # TODO (Claude) do double q-value selection here...
-        next_action = jnp.argmax(next_q_vals_online)
-        next_q_val = next_q_vals_target[next_action]
+        next_action = jnp.argmax(next_q_vals_online, axis=-1)
+        next_q_val = jnp.take(next_q_vals_target, next_action[...,jnp.newaxis])
 
-        target_q_val = (rewards + (1.0 - dones) * cfg.system.gamma * next_q_val).reshape(-1)
+        target_q_val = (rewards + (1.0 - dones) * cfg.system.gamma * next_q_val)
 
         # Update Q function.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
@@ -339,41 +336,61 @@ def make_update_fns(
             )
         return eps
     
-    def select_random_action(key, num_actions):
-        action = jax.random.randint(key,(),minval=0,maxval=num_actions)
+    def select_single_action(key, action_options, p_values):
+        action = jax.random.choice(key,action_options,p=p_values)
         return action
+    
+    def select_random_action_batch(key, action_mask):
+        """Select actions randomly with masking"""
+        batch_size, n_agents, n_actions = action_mask.shape
 
-    def greedy(q_vals):
-        action = jnp.argmax(q_vals)
+        keys = jax.random.split(key,batch_size*n_agents)
+        action_options = jnp.arange(n_actions)
+
+        num_avail_per_agent = jnp.sum(action_mask,axis=-1)[...,jnp.newaxis]
+
+        p_vals = action_mask.astype("int32")/num_avail_per_agent
+        p_vals = jnp.reshape(p_vals,(batch_size*n_agents,n_actions))
+
+        actions = jax.vmap(select_single_action, (0,None,0))(keys,action_options,p_vals)
+        actions = jnp.reshape(actions,(batch_size,n_agents))#,1))
+
+        return actions
+
+    def greedy(online_params:FrozenVariableDict, obs:Array):
+        # get q values
+        q_values = q.apply(online_params, obs)
+        # make unavailable actions quite negative
+        q_vals_masked = jnp.where(obs.action_mask,q_values,jnp.zeros(q_values.shape)-1000) #make more general
+        # greedy argmax
+        action = jnp.argmax(q_vals_masked, axis=-1)#.reshape(q_values.shape[0],q_values.shape[1],1)
         return action
 
 # NOTE (Louise) Make more efficient by shifting things around. No nw evals for exploration
     def select_eps_greedy_action(online_params:FrozenVariableDict, obs:Array, t:int, key:chex.PRNGKey):
         """Select action to take in eps-greedy way."""
 
-        #obs = jnp.expand_dims(jnp.array(obs), axis=0) # add dummy batch dim
-        q_values = q.apply(online_params, obs) # remove batch dim
         epsilon = get_epsilon(t)
-        num_actions = len(q_values) # number of available actions
+
+        #num_actions = obs.action_mask.shape[-1] # number of available actions
         key,key_1 = jax.random.split(key,2)
 
         should_explore = jax.random.uniform(key)<epsilon 
 
         action = jax.lax.select(
             should_explore,
-            select_random_action(key_1, num_actions), 
-            greedy(q_values)
+            select_random_action_batch(key_1, obs.action_mask), #is it general enough?
+            greedy(online_params, obs)
         )
 
         return action
 
-    def act( # TODO we will need to implement epsilon greedy exploration. We can start with a fixed epsilon (e.g. 0.1) and implement epsilon decay later.
+    def act( 
         carry: Tuple[FrozenVariableDict, Array, State, BufferState, int, chex.PRNGKey], _: Any
     ) -> Tuple[Tuple[FrozenVariableDict, Array, State, BufferState, int, chex.PRNGKey], Dict]:
         """Acting loop: select action, step env, add to buffer."""
         online_params, obs, env_state, buffer_state, t, key = carry
 
-        # action = jax.numpy.zeros((128,5),dtype="int32") #  NOTE (Louise) make this better. This needs to be better
         action = select_eps_greedy_action(online_params,obs,t,key)
 
         next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
@@ -392,7 +409,7 @@ def make_update_fns(
         key, act_key, learn_key = jax.random.split(key, 3)
         # Act
         act_state = (params.dqns.online, obs, env_state, buffer_state, t, act_key)
-        (_, next_obs, env_state, buffer_state, _), metrics = scanned_act(act_state)
+        (_, next_obs, env_state, buffer_state, t, _), metrics = scanned_act(act_state)
 
         # Sample and learn
         learn_state = (buffer_state, params, opt_states, t, learn_key)
@@ -450,6 +467,15 @@ def run_experiment(cfg: DictConfig) -> float:
 
     start_time = time.time()
 
+
+    def get_epsilon(t:int):
+        """Calculate epsilon for exploration rate using config variables."""
+        eps = jax.numpy.maximum(
+            cfg.system.eps_min,
+            1-(t/cfg.system.eps_decay)*(1-cfg.system.eps_min)
+            )
+        return eps
+
     # Main loop:
     # We want start to align with the final step of the first pmaped_learn,
     # where we've done explore_steps and 1 full learn step.
@@ -463,12 +489,16 @@ def run_experiment(cfg: DictConfig) -> float:
         # Multiply by learn steps here because anakin steps per second is learn + act steps
         # But we want to make sure we're counting env steps correctly so it's not included
         # in the loop counter.
+
+
+
         sps = t * cfg.system.epochs / (time.time() - start_time)
         final_metrics = episode_metrics.get_final_step_metrics(metrics)
         loss_metrics = losses #| {"log_alpha": learner_state.params.log_alpha}
         logger.log({"step": t, "steps_per_second": sps}, t, eval_idx, LogEvent.MISC)
         logger.log(final_metrics, t, eval_idx, LogEvent.ACT)
         logger.log(loss_metrics, t, eval_idx, LogEvent.TRAIN)
+        logger.log({"epsilon":get_epsilon(t)}, t, eval_idx, LogEvent.MISC)
 
         # Evaluate:
     #     key, eval_key = jax.random.split(key)

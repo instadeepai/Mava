@@ -12,10 +12,10 @@ buffer_min_size: 132  # number of steps to take with random actions at the start
 update_batch_size: 2 # Number of vectorised gradient updates per device.
 
 rollout_length: 2 # Number of environment steps per vectorised environment.
-epochs: 1 # Number of learn epochs per training data batch.
+epochs: 2 # Number of learn epochs per training data batch.
 policy_frequency: 4  # the frequency of training policy - every n q learning steps the policy is trained once
 # sizes
-buffer_size: 1000000  # size of the replay buffer. Note: total size is this * num_devices
+buffer_size: 100_000  # size of the replay buffer. Note: total size is this * num_devices
 batch_size: 64
 # learning rates
 q_lr: 1e-3  # the learning rate of the Q network network optimizer
@@ -24,5 +24,5 @@ tau: 0.005  # smoothing coefficient for target networks
 gamma: 0.99  # discount factor
 
 eps_min: 0.05
-eps_decay: 1e4
+eps_decay: 1e6
 

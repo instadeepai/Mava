@@ -3,7 +3,7 @@ defaults:
   - logger: ff_isac
   - arch: anakin
   - system: ff_isac
-  - env: smax
+  - env: mabrax
 #   - system/search_spaces@hydra.sweeper.params: ${system}
 #   - override hydra/sweeper: optuna
 #   - override hydra/sweeper/sampler: tpe
