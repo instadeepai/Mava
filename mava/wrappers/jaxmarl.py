@@ -191,9 +191,7 @@ class JaxMarlWrapper(Wrapper):
         self.agents = self._env.agents
         self.num_agents = self._env.num_agents
         self.has_global_state = has_global_state
-
         self.add_agent_ids_to_state = add_agent_ids_to_state
-
 
     def reset(
         self, key: PRNGKey
@@ -203,7 +201,6 @@ class JaxMarlWrapper(Wrapper):
 
         obs = self._create_observation(obs, env_state, None, True)
         return JaxMarlState(env_state, key, 0), restart(obs, shape=(self.num_agents,))
-
 
     def step(
         self, state: JaxMarlState, action: Array
@@ -218,14 +215,9 @@ class JaxMarlWrapper(Wrapper):
 
         step_type = jax.lax.select(done["__all__"], StepType.LAST, StepType.MID)
 
-        batchified_rewards = batchify(reward, self.agents)
-        infos["won_episode"] = jax.lax.select(
-            done["__all__"], jnp.all(batchified_rewards >= 1.0), False
-        )
-
         ts = TimeStep(
             step_type=step_type,
-            reward=batchified_rewards,
+            reward=batchify(reward, self.agents),
             discount=1.0 - batchify(done, self.agents),
             observation=obs,
         )
@@ -333,6 +325,26 @@ class SmaxWrapper(JaxMarlWrapper):
         add_agent_ids_to_state: bool = False,
     ):
         super().__init__(env, has_global_state, timelimit, add_agent_ids_to_state)
+        self.log_win_rate = self._env.name in ["HeuristicEnemySMAX", "LearnedPolicyEnemySMAX"]
+
+    def reset(
+        self, key: PRNGKey
+    ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
+        state, ts = super().reset(key)
+        extras = {"won_episode": False} if self.log_win_rate else {}
+        ts = ts.replace(extras=extras)
+        return state, ts
+
+    def step(
+        self, state: JaxMarlState, action: Array
+    ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
+        state, ts = super().step(state, action)
+        current_winner = jax.lax.select(
+            ts.step_type == StepType.LAST, jnp.all(ts.reward >= 1.0), False
+        )
+        extras = {"won_episode": current_winner} if self.log_win_rate else {}
+        ts = ts.replace(extras=extras)
+        return state, ts
 
     @property
     def state_size(self) -> chex.Array:

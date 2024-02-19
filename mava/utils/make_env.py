@@ -149,7 +149,7 @@ def make_gigastep_env(
     """
     kwargs = config.env.kwargs
 
-    scenario_config = config.env.scenario
+    scenario_config = config.env.scenario.task_config
     scenario = ScenarioBuilder.from_config(scenario_config)
 
     train_env = GigastepWrapper(

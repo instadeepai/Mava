@@ -92,7 +92,9 @@ def get_ff_evaluator_fn(
             "episode_length": final_state.step_count,
         }
         # Log won episode if win rate is required.
+
         if log_win_rate:
+
             eval_metrics["won_episode"] = final_state.timestep.extras["won_episode"]
 
         return eval_metrics
@@ -285,7 +287,7 @@ def make_eval_fns(
 ) -> Tuple[EvalFn, EvalFn]:
     """Initialise evaluator_fn."""
     # Check if win rate is required for evaluation.
-    log_win_rate = config.env.env_name in [
+    log_win_rate = config.env.scenario.name in [
         "HeuristicEnemySMAX",
         "LearnedPolicyEnemySMAX",
         "Gigastep",

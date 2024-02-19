@@ -1,4 +1,8 @@
-team_0:
-  default: 5
-team_1:
-  default: 5
+name: Gigastep
+task_name: identical_5_vs_5
+
+task_config:
+  team_0:
+    default: 5
+  team_1:
+    default: 5
