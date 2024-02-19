@@ -130,7 +130,7 @@ def make_gigastep_env(
     env_name: str, config: DictConfig, add_global_state: bool = False
 ) -> Tuple[Environment, Environment]:
     """
-     Create a GIGASTEP environment.
+     Create a Gigastep environment.
 
     Args:
         env_name (str): The name of the environment to create.

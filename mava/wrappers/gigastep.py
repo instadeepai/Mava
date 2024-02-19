@@ -31,42 +31,16 @@ else:
 
 
 @dataclass
-class GigasteplState:
+class GigastepState:
     """Wrapper around a Gigastep state to provide necessary attributes for jumanji environments."""
 
     state: State
     key: PRNGKey
     step: int
-    Adverseary_action: Array
+    adversary_action: Array
 
 
 class GigastepWrapper(Wrapper):
-    """
-    Wraps a GigaStep environment so that its API is compatible with Jumanji environments.
-
-    Args:
-        env: The GigaStep environment to be wrapped.
-        time_limit (int): The maximum duration of each episode, in seconds. Defaults to 500.
-        has_global_state (bool): Whether the environment has a global state. Defaults to False.
-        get_adversary_obs (bool): Whether to retrieve adversary observations for the global state.
-        Defaults to False.
-        get_adversary_actions (bool): Whether to retrieve adversary actions for the global state.
-        Defaults to False.
-
-    Methods:
-        reset: Resets the environment and returns a GigasteplState and the restart.
-        step: Takes an action and returns the next GigasteplState and timestep.
-        action_mask: Returns the action mask for each agent.
-        get_global_state: Returns the global state of the environment.
-        observation_spec: Returns the observation spec for the environment.
-        action_spec: Returns the action spec for the environment.
-        reward_spec: Returns the reward spec for the environment.
-        discount_spec: Returns the discount spec for the environment.
-        _split_obs_and_state: Splits the observation and state into separate arrays for each team.
-        get_wining_team: Returns the winning team based on the number of alive agents.
-        adversary_policy: Chooses an action for the adversary.
-    """
-
     def __init__(
         self,
         env: GigastepEnv,
@@ -75,6 +49,18 @@ class GigastepWrapper(Wrapper):
         get_adversary_obs: bool = False,
         get_adversary_actions: bool = False,
     ):
+        """
+        Wraps a Gigastep environment so that its API is compatible with Jumanji environments.
+
+        Args:
+            env: The Gigastep environment to be wrapped.
+            time_limit (int): The maximum duration of each episode, in seconds. Defaults to 500.
+            has_global_state (bool): Whether the environment has a global state. Defaults to False.
+            get_adversary_obs (bool): Whether to retrieve adversary observations for
+            the global state. Defaults to False.
+            get_adversary_actions (bool): Whether to retrieve adversary actions for
+            the global state. Defaults to False.
+        """
 
         assert (
             env.discrete_actions
@@ -98,15 +84,15 @@ class GigastepWrapper(Wrapper):
         self.get_adversary_obs = get_adversary_obs
         self.get_adversary_actions = get_adversary_actions
 
-    def reset(self, key: PRNGKey) -> Tuple[GigasteplState, TimeStep]:
+    def reset(self, key: PRNGKey) -> Tuple[GigastepState, TimeStep]:
         """
-        Reset the GIGASTEP environment.
+        Reset the Gigastep environment.
 
         Args:
             key (PRNGKey): The PRNGKey.
 
         Returns:
-            GigasteplState : the state of the environment.
+            GigastepState : the state of the environment.
             TimeStep : the first time step.
 
         """
@@ -132,37 +118,39 @@ class GigastepWrapper(Wrapper):
                 step_count=jnp.zeros(self.num_agents, dtype=int),
             )
 
-        return GigasteplState(state, key, 0, adversary_actions), restart(
-            obs, shape=(self.num_agents,), extras={"won_episode": jnp.nan}
-        )
+        state = GigastepState(state, key, 0, adversary_actions)
+        timestep = restart(obs, shape=(self.num_agents,), extras={"won_episode": False})
+        return state, timestep
 
-    def step(self, state: GigasteplState, action: Array) -> Tuple[GigasteplState, TimeStep]:
+    def step(self, state: GigastepState, action: Array) -> Tuple[GigastepState, TimeStep]:
         """
-        Takes a step in the Gigastepl environment.
+        Takes a step in the Gigastep environment.
 
         Args:
-            state (GigasteplState): The current state of the environment.
+            state (GigastepState): The current state of the environment.
             action (Array): The actions for controllable agents.
 
         Returns:
-            Tuple[GigasteplState, TimeStep]: A tuple containing the next state of the environment
+            Tuple[GigastepState, TimeStep]: A tuple containing the next state of the environment
             and the next time step.
 
         """
         key, step_key, adversary_key = jax.random.split(state.key, 3)
 
-        action = jnp.concatenate([action, state.Adverseary_action], axis=0, dtype=jnp.int16)
+        action = jnp.concatenate([action, state.adversary_action], axis=0, dtype=jnp.int16)
 
         obs, env_state, rewards, dones, ep_done = self._env.step(state.state, action, step_key)
 
+        # cut out the rewards,dones of the adversary
         rewards, dones = (
             rewards[: self.num_agents],
             dones[: self.num_agents],
-        )  # cut out the rewards,dones of the adversary
+        )
+
         team1_obs, team1_state, team2_obs, team2_state = self._split_obs_and_state(obs, env_state)
-        adversary_actions = self.adversary_policy(
-            team2_obs, team2_state, adversary_key
-        )  # take the actions of the adversary and cache it befor returning the new state
+
+        # take the actions of the adversary and cache it before returning the new state
+        adversary_actions = self.adversary_policy(team2_obs, team2_state, adversary_key)
 
         if self.has_global_state:
             obs = ObservationGlobalState(
@@ -180,7 +168,7 @@ class GigastepWrapper(Wrapper):
 
         step_type = jax.lax.select(ep_done, StepType.LAST, StepType.MID)
 
-        current_winner = jnp.where(ep_done, self.get_wining_team(env_state), jnp.nan)
+        current_winner = jnp.where(ep_done, self.get_wining_team(env_state), False)
 
         ts = TimeStep(
             step_type=step_type,
@@ -189,7 +177,7 @@ class GigastepWrapper(Wrapper):
             observation=obs,
             extras={"won_episode": current_winner},
         )
-        return GigasteplState(env_state, key, state.step + 1, adversary_actions), ts
+        return GigastepState(env_state, key, state.step + 1, adversary_actions), ts
 
     def action_mask(self) -> Array:
         """Get action mask for each agent."""
@@ -214,7 +202,7 @@ class GigastepWrapper(Wrapper):
         if self.get_adversary_actions:
             global_obs = jnp.concatenate(
                 [global_obs, adversary_actions], axis=0
-            )  # add the adversery actions to the end of the global observation
+            )  # add the adversary actions to the end of the global observation
 
         return jnp.tile(global_obs, (self.num_agents, 1))
 
