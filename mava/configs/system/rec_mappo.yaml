@@ -5,7 +5,8 @@ num_updates: 1000 # Number of updates
 seed: 42
 
 # --- Agent observations ---
-add_agent_id: True
+add_ids_to_agent_view: True # Whether or not to add the agent IDs to agent view.
+add_ids_to_global_state: True # Whether or not to add the agent IDs to global state.
 
 # --- RL hyperparameters ---
 actor_lr: 2.5e-4 # Learning rate for actor network

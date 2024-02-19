@@ -27,35 +27,47 @@ from mava.types import Observation, ObservationGlobalState, State
 class AgentIDWrapper(Wrapper):
     """Add onehot agent IDs to observation."""
 
-    def __init__(self, env: Environment, has_global_state: bool = False):
+    def __init__(
+        self,
+        env: Environment,
+        add_ids_to_agent_view: bool = True,
+        has_global_state: bool = False,
+        add_ids_to_global_state: bool = False,
+    ):
         super().__init__(env)
+        self.add_ids_to_agent_view = add_ids_to_agent_view
         self.has_global_state = has_global_state
+        self.add_ids_to_global_state = add_ids_to_global_state
 
     def _add_agent_ids(
         self, timestep: TimeStep, num_agents: int
     ) -> Union[Observation, ObservationGlobalState]:
+
+        obs_data = {
+            "agents_view": timestep.observation.agents_view,
+            "action_mask": timestep.observation.action_mask,
+            "step_count": timestep.observation.step_count,
+        }
         agent_ids = jnp.eye(num_agents)
-        new_agents_view = jnp.concatenate([agent_ids, timestep.observation.agents_view], axis=-1)
 
+        # Add agent IDs to the agent view if requested
+        if self.add_ids_to_agent_view:
+            obs_data["agents_view"] = jnp.concatenate(
+                [agent_ids, timestep.observation.agents_view], axis=-1
+            )
+
+        # If global state exists, add agent IDs to it if requested
         if self.has_global_state:
-            # Add the agent IDs to the global state
-            new_global_state = jnp.concatenate(
-                [agent_ids, timestep.observation.global_state], axis=-1
-            )
-
-            return ObservationGlobalState(
-                agents_view=new_agents_view,
-                action_mask=timestep.observation.action_mask,
-                step_count=timestep.observation.step_count,
-                global_state=new_global_state,
-            )
-
+            if self.add_ids_to_global_state:
+                new_global_state = jnp.concatenate(
+                    [agent_ids, timestep.observation.global_state], axis=-1
+                )
+                obs_data["global_state"] = new_global_state
+            else:
+                obs_data["global_state"] = timestep.observation.global_state
+            return ObservationGlobalState(**obs_data)
         else:
-            return Observation(
-                agents_view=new_agents_view,
-                action_mask=timestep.observation.action_mask,
-                step_count=timestep.observation.step_count,
-            )
+            return Observation(**obs_data)
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment."""
@@ -87,14 +99,13 @@ class AgentIDWrapper(Wrapper):
 
         if self.has_global_state:
             wrapped_state_spec = obs_spec.global_state
-            wrapped_state_shape = wrapped_state_spec.shape
-            wrapped_state_dtype = wrapped_state_spec.dtype
-
             wrapped_state_shape = (
-                *wrapped_state_shape[:-1],
-                wrapped_state_shape[-1] + self._env.num_agents,
+                *wrapped_state_spec.shape[:-1],
+                wrapped_state_spec.shape[-1] + self._env.num_agents,
             )
-            global_state = specs.Array(wrapped_state_shape, wrapped_state_dtype, "global_state")
+            global_state = specs.Array(
+                wrapped_state_shape, wrapped_state_spec.dtype, "global_state"
+            )
             return obs_spec.replace(agents_view=agents_view, global_state=global_state)
 
         return obs_spec.replace(agents_view=agents_view)

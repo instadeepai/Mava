@@ -15,7 +15,7 @@
 import copy
 from abc import abstractmethod
 from collections import namedtuple
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 
 import chex
 import jax
@@ -167,7 +167,6 @@ class JaxMarlWrapper(Wrapper):
         env: MultiAgentEnv,
         has_global_state: bool,
         timelimit: int,
-        add_agent_ids_to_state: bool = False,
     ) -> None:
         """
         Initialize the JaxMarlWrapper.
@@ -176,7 +175,6 @@ class JaxMarlWrapper(Wrapper):
         - env: The JaxMarl environment to wrap.
         - has_global_state: Whether the environment has global state.
         - timelimit: The time limit for each episode.
-        - add_agent_ids_to_state: Whether to add the agent ids to the global state.
         """
         # Check that all specs are the same as we only support homogeneous environments, for now ;)
         homogenous_error = (
@@ -191,7 +189,6 @@ class JaxMarlWrapper(Wrapper):
         self.agents = self._env.agents
         self.num_agents = self._env.num_agents
         self.has_global_state = has_global_state
-        self.add_agent_ids_to_state = add_agent_ids_to_state
 
     def reset(
         self, key: PRNGKey
@@ -199,7 +196,7 @@ class JaxMarlWrapper(Wrapper):
         key, reset_key = jax.random.split(key)
         obs, env_state = self._env.reset(reset_key)
 
-        obs = self._create_observation(obs, env_state, None, True)
+        obs = self._create_observation(obs, env_state)
         return JaxMarlState(env_state, key, 0), restart(obs, shape=(self.num_agents,))
 
     def step(
@@ -211,7 +208,8 @@ class JaxMarlWrapper(Wrapper):
             step_key, state.state, unbatchify(action, self.agents)
         )
 
-        obs = self._create_observation(obs, env_state, state, False)
+        obs = self._create_observation(obs, env_state)
+        obs._replace(step_count=jnp.repeat(state.step, self.num_agents))
 
         step_type = jax.lax.select(done["__all__"], StepType.LAST, StepType.MID)
         ts = TimeStep(
@@ -227,19 +225,13 @@ class JaxMarlWrapper(Wrapper):
         self,
         obs: Dict[str, Array],
         brax_state: BraxState,
-        jaxmarl_state: Optional[JaxMarlState] = None,
-        reset: bool = False,
     ) -> Union[Observation, ObservationGlobalState]:
         """Create an observation from the raw observation and environment state."""
         obs_data = {
             "agents_view": batchify(obs, self.agents),
             "action_mask": self.action_mask(brax_state),
+            "step_count": jnp.zeros(self.num_agents, dtype=int),
         }
-        if reset:
-            obs_data["step_count"] = jnp.zeros(self.num_agents, dtype=int)
-        else:
-            obs_data["step_count"] = jnp.repeat(jaxmarl_state.step, self.num_agents)  # type: ignore
-
         if self.has_global_state:
             obs_data["global_state"] = self.get_global_state(brax_state, obs)
             return ObservationGlobalState(**obs_data)
@@ -321,9 +313,8 @@ class SmaxWrapper(JaxMarlWrapper):
         env: MultiAgentEnv,
         has_global_state: bool = False,
         timelimit: int = 500,
-        add_agent_ids_to_state: bool = False,
     ):
-        super().__init__(env, has_global_state, timelimit, add_agent_ids_to_state)
+        super().__init__(env, has_global_state, timelimit)
 
     @property
     def state_size(self) -> chex.Array:
@@ -354,19 +345,13 @@ class MabraxWrapper(JaxMarlWrapper):
         env: MABraxEnv,
         has_global_state: bool = False,
         timelimit: int = 1000,
-        add_agent_ids_to_state: bool = False,
     ):
-        super().__init__(env, has_global_state, timelimit, add_agent_ids_to_state)
+        super().__init__(env, has_global_state, timelimit)
 
     @property
     def state_size(self) -> chex.Array:
         "Get the sate size of the global observation"
-        state_size = self._env.env.observation_size
-        return (
-            state_size + self._env.num_agents
-            if self._env.homogenisation_method == "max" and self.add_agent_ids
-            else state_size
-        )
+        return self._env.env.observation_size
 
     @property
     def n_actions(self) -> chex.Array:
@@ -379,14 +364,4 @@ class MabraxWrapper(JaxMarlWrapper):
 
     def get_global_state(self, brax_state: BraxState, obs: Dict[str, Array]) -> Array:
         """Get global state from observation and copy it for each agent."""
-        # Use the global state of brax.
-        global_state = jnp.tile(brax_state.obs, (self.num_agents, 1))
-
-        # Including IDs in the global state can be generally beneficial.
-        # In this case, add_agent_id=False so the agent's ID must be added to the global state.
-        if self._env.homogenisation_method == "max" and self.add_agent_ids:
-            agent_ids = jnp.eye(self.num_agents)
-            global_state = jnp.tile(brax_state.obs, (self.num_agents, 1))
-            global_state = jnp.concatenate([agent_ids, global_state], axis=-1)
-
-        return global_state
+        return jnp.tile(brax_state.obs, (self.num_agents, 1))

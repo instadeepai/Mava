@@ -47,15 +47,24 @@ _jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 
 
 def add_optional_wrappers(
-    env: Environment, config: DictConfig, add_global_state: bool = False
+    env: Environment,
+    config: DictConfig,
+    add_global_state: bool = False,
 ) -> Environment:
     # Add the global state to observation.
     if add_global_state:
         env = GlobalStateWrapper(env)
 
     # Add agent id to observation.
-    if config.system.add_agent_id:
-        env = AgentIDWrapper(env, add_global_state)
+    add_ids_to_view = config.system.add_ids_to_agent_view
+    add_ids_to_state = (
+        config.system.add_ids_to_global_state
+        if hasattr(config.system, "add_ids_to_global_state")
+        else False
+    )
+
+    if add_ids_to_view or add_ids_to_state:
+        env = AgentIDWrapper(env, add_ids_to_view, add_global_state, add_ids_to_state)
 
     return env
 
@@ -114,16 +123,17 @@ def make_jaxmarl_env(
 
     # Create jaxmarl envs.
     env = _jaxmarl_wrappers[config.env.env_name](
-        jaxmarl.make(env_name, **kwargs), add_global_state, config.env.add_agent_ids_to_state
+        jaxmarl.make(env_name, **kwargs),
+        add_global_state,
     )
     eval_env = _jaxmarl_wrappers[config.env.env_name](
-        jaxmarl.make(env_name, **kwargs), add_global_state, config.env.add_agent_ids_to_state
+        jaxmarl.make(env_name, **kwargs),
+        add_global_state,
     )
 
-    # Add optional wrappers.
-    if config.system.add_agent_id:
-        env = AgentIDWrapper(env, add_global_state)
-        eval_env = AgentIDWrapper(eval_env, add_global_state)
+    # Add agent id to observation.
+    env = add_optional_wrappers(env, config)
+    eval_env = add_optional_wrappers(eval_env, config)
 
     env = AutoResetWrapper(env)
     env = RecordEpisodeMetrics(env)
