@@ -31,11 +31,12 @@ from mava.wrappers import (
     AgentIDWrapper,
     AutoResetWrapper,
     GlobalStateWrapper,
-    JaxMarlWrapper,
     LbfWrapper,
+    MabraxWrapper,
     MatraxWrapper,
     RecordEpisodeMetrics,
     RwareWrapper,
+    SmaxWrapper,
 )
 
 # Registry mapping environment names to their generator and wrapper classes.
@@ -48,6 +49,8 @@ _jumanji_registry = {
 _matrax_registry = {
     "Matrax": {"wrapper": MatraxWrapper},
 }
+
+_jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 
 
 def add_optional_wrappers(
@@ -117,8 +120,12 @@ def make_jaxmarl_env(
         kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
 
     # Create jaxmarl envs.
-    env = JaxMarlWrapper(jaxmarl.make(env_name, **kwargs), add_global_state)
-    eval_env = JaxMarlWrapper(jaxmarl.make(env_name, **kwargs), add_global_state)
+    env = _jaxmarl_wrappers[config.env.env_name](
+        jaxmarl.make(env_name, **kwargs), add_global_state, config.env.add_agent_ids_to_state
+    )
+    eval_env = _jaxmarl_wrappers[config.env.env_name](
+        jaxmarl.make(env_name, **kwargs), add_global_state, config.env.add_agent_ids_to_state
+    )
 
     # Add optional wrappers.
     if config.system.add_agent_id:
@@ -174,7 +181,7 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[Environmen
     Returns:
         A tuple of the environments.
     """
-    env_name = config.env.env_name
+    env_name = config.env.scenario.name
 
     if env_name in _jumanji_registry:
         return make_jumanji_env(env_name, config, add_global_state)
