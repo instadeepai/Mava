@@ -168,7 +168,7 @@ class GigastepWrapper(Wrapper):
 
         step_type = jax.lax.select(ep_done, StepType.LAST, StepType.MID)
 
-        current_winner = jnp.where(ep_done, self.get_wining_team(env_state), False)
+        current_winner = jax.lax.select(ep_done, self.get_wining_team(env_state), False)
 
         ts = TimeStep(
             step_type=step_type,
@@ -280,7 +280,7 @@ class GigastepWrapper(Wrapper):
             Tuple[Array, Tuple[Dict, Dict], Array, Tuple[Dict, Dict]]: Two tuples
             representing observations and states for each team.
         """
-        # The first n_agents_team1 elemnts in each array belong to team1
+        # The first n_agents_team1 elements in each array belong to team1
         team1_obs, team2_obs = obs[: self.num_agents], obs[self.num_agents :]
 
         # split each sub elemnt in the tuple

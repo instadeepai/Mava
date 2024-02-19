@@ -172,6 +172,7 @@ class JaxMarlWrapper(Wrapper):
         self.agents = list(self._env.observation_spaces.keys())
         self.has_action_mask = hasattr(self._env, "get_avail_actions")
         self.has_global_state = has_global_state
+        self.log_win_rate = self._env.name in ["HeuristicEnemySMAX", "LearnedPolicyEnemySMAX"]
 
     def reset(
         self, key: PRNGKey
@@ -192,7 +193,8 @@ class JaxMarlWrapper(Wrapper):
                 action_mask=self.action_mask(state),
                 step_count=jnp.zeros(self._env.num_agents, dtype=int),
             )
-        return JaxMarlState(state, key, 0), restart(obs, shape=(self.num_agents,))
+        extras = {"won_episode": False} if self.log_win_rate else {}
+        return JaxMarlState(state, key, 0), restart(obs, shape=(self.num_agents,), extras=extras)
 
     def step(
         self, state: JaxMarlState, action: Array
@@ -218,9 +220,15 @@ class JaxMarlWrapper(Wrapper):
             )
 
         step_type = jax.lax.select(done["__all__"], StepType.LAST, StepType.MID)
+
+        batchified_rewards = batchify(reward, self.agents)
+        infos["won_episode"] = jax.lax.select(
+            done["__all__"], jnp.all(batchified_rewards >= 1.0), False
+        )
+
         ts = TimeStep(
             step_type=step_type,
-            reward=batchify(reward, self.agents),
+            reward=batchified_rewards,
             discount=1.0 - batchify(done, self.agents),
             observation=obs,
             extras=infos,
