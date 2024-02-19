@@ -16,6 +16,7 @@ from typing import Tuple
 
 import jaxmarl
 import jumanji
+from gigastep import ScenarioBuilder
 from jaxmarl.environments.smax import map_name_to_scenario
 from jumanji.env import Environment
 from jumanji.environments.routing.lbf.generator import (
@@ -29,6 +30,7 @@ from omegaconf import DictConfig
 from mava.wrappers import (
     AgentIDWrapper,
     AutoResetWrapper,
+    GigastepWrapper,
     GlobalStateWrapper,
     LbfWrapper,
     MabraxWrapper,
@@ -131,6 +133,41 @@ def make_jaxmarl_env(
     return env, eval_env
 
 
+def make_gigastep_env(
+    env_name: str, config: DictConfig, add_global_state: bool = False
+) -> Tuple[Environment, Environment]:
+    """
+     Create a Gigastep environment.
+
+    Args:
+        env_name (str): The name of the environment to create.
+        config (Dict): The configuration of the environment.
+        add_global_state (bool): Whether to add the global state to the observation. Default False.
+
+    Returns:
+        A tuple of the environments.
+    """
+    kwargs = config.env.kwargs
+
+    scenario_config = config.env.scenario
+    scenario = ScenarioBuilder.from_config(scenario_config)
+
+    train_env = GigastepWrapper(
+        scenario.make(discrete_actions=True, obs_type="vector"),
+        **kwargs,
+        has_global_state=add_global_state,
+    )
+    eval_env = GigastepWrapper(
+        scenario.make(discrete_actions=True, obs_type="vector"),
+        **kwargs,
+        has_global_state=add_global_state,
+    )
+
+    train_env = AutoResetWrapper(train_env)
+    train_env = RecordEpisodeMetrics(train_env)
+    return train_env, eval_env
+
+
 def make(config: DictConfig, add_global_state: bool = False) -> Tuple[Environment, Environment]:
     """
     Create environments for training and evaluation..
@@ -148,5 +185,7 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[Environmen
         return make_jumanji_env(env_name, config, add_global_state)
     elif env_name in jaxmarl.registered_envs:
         return make_jaxmarl_env(env_name, config, add_global_state)
+    elif env_name == "Gigastep":
+        return make_gigastep_env(env_name, config, add_global_state)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")

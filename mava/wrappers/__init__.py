@@ -15,5 +15,6 @@
 from mava.wrappers.auto_reset_wrapper import AutoResetWrapper
 from mava.wrappers.episode_metrics import RecordEpisodeMetrics
 from mava.wrappers.jaxmarl import MabraxWrapper, SmaxWrapper
+from mava.wrappers.gigastep import GigastepWrapper
 from mava.wrappers.jumanji import LbfWrapper, RwareWrapper
 from mava.wrappers.observation import AgentIDWrapper, GlobalStateWrapper

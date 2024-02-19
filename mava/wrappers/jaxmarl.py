@@ -191,7 +191,9 @@ class JaxMarlWrapper(Wrapper):
         self.agents = self._env.agents
         self.num_agents = self._env.num_agents
         self.has_global_state = has_global_state
+
         self.add_agent_ids_to_state = add_agent_ids_to_state
+
 
     def reset(
         self, key: PRNGKey
@@ -201,6 +203,7 @@ class JaxMarlWrapper(Wrapper):
 
         obs = self._create_observation(obs, env_state, None, True)
         return JaxMarlState(env_state, key, 0), restart(obs, shape=(self.num_agents,))
+
 
     def step(
         self, state: JaxMarlState, action: Array
@@ -214,9 +217,15 @@ class JaxMarlWrapper(Wrapper):
         obs = self._create_observation(obs, env_state, state, False)
 
         step_type = jax.lax.select(done["__all__"], StepType.LAST, StepType.MID)
+
+        batchified_rewards = batchify(reward, self.agents)
+        infos["won_episode"] = jax.lax.select(
+            done["__all__"], jnp.all(batchified_rewards >= 1.0), False
+        )
+
         ts = TimeStep(
             step_type=step_type,
-            reward=batchify(reward, self.agents),
+            reward=batchified_rewards,
             discount=1.0 - batchify(done, self.agents),
             observation=obs,
         )
