@@ -194,6 +194,10 @@ class JaxMarlWrapper(Wrapper):
         self.has_global_state = has_global_state
         self.add_agent_ids_to_state = add_agent_ids_to_state
 
+        # Calling these on init to cache the values in a non-jitted context.
+        self.state_size
+        self.n_actions
+
     def reset(
         self, key: PRNGKey
     ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
@@ -361,19 +365,20 @@ class MabraxWrapper(JaxMarlWrapper):
         super().__init__(env, has_global_state, timelimit, add_agent_ids_to_state)
 
     @cached_property
-    def state_size(self) -> chex.Array:
-        "Get the sate size of the global observation"
-        state_size = self._env.env.observation_size
-        return (
-            state_size + self._env.num_agents
-            if self._env.homogenisation_method == "max" and self.add_agent_ids
-            else state_size
-        )
-
-    @cached_property
     def n_actions(self) -> chex.Array:
         "Get the number of actions for each agent."
         return self.action_spec().shape[0]
+
+    @cached_property
+    def state_size(self) -> chex.Array:
+        "Get the sate size of the global observation"
+        brax_env = self._env.env
+        state_size = brax_env.observation_size
+        return (
+            state_size + self._env.num_agents
+            if self._env.homogenisation_method == "max" and self.add_agent_ids_to_state
+            else state_size
+        )
 
     def action_mask(self, state: JaxMarlState) -> Array:
         """Get action mask for each agent."""
@@ -386,7 +391,7 @@ class MabraxWrapper(JaxMarlWrapper):
 
         # Including IDs in the global state can be generally beneficial.
         # In this case, add_agent_id=False so the agent's ID must be added to the global state.
-        if self._env.homogenisation_method == "max" and self.add_agent_ids:
+        if self._env.homogenisation_method == "max" and self.add_agent_ids_to_state:
             agent_ids = jnp.eye(self.num_agents)
             global_state = jnp.tile(brax_state.obs, (self.num_agents, 1))
             global_state = jnp.concatenate([agent_ids, global_state], axis=-1)
