@@ -145,12 +145,12 @@ def make_matrax_env(
     Creates Matrax environments for training and evaluation.
 
     Args:
-        env_name (str): The name of the environment to create.
-        config (Dict): The configuration of the environment.
-        add_global_state (bool): Whether to add the global state to the observation.
+        env_name: The name of the environment to create.
+        config: The configuration of the environment.
+        add_global_state: Whether to add the global state to the observation.
 
     Returns:
-        A tuple of the Matrax environments.
+        A tuple containing a train and evaluation Matrax environment.
     """
     # Select the Matrax wrapper.
     wrapper = _matrax_registry[env_name]["wrapper"]

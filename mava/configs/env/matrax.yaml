@@ -2,12 +2,7 @@
 defaults:
   - _self_
 
-env_name: Matrax
-
-scenario:
-  task_name: Climbing-stateless-v0
-
-eval_metric: episode_return
+env_name: Matrax  # Used for logging purposes.
 
 # Possible scenarios:
 #   1. Penalty-{k}-{state}-v0
@@ -21,6 +16,11 @@ eval_metric: episode_return
 #   4. Conflict-{id}-{state}-v0
 #       4.1. id = {1, 2, 3, ..., 56, 57}
 #       4.2. state = {stateful, stateless}
+scenario:
+  task_name: Climbing-stateless-v0
+  name: Matrax
+
+eval_metric: episode_return
 
 kwargs:
   time_limit: 500

@@ -32,7 +32,7 @@ class MatraxWrapper(Wrapper):
         self._num_actions = self._env.num_actions
         self.num_obs_features = self._env.observation_spec().agent_obs.shape[-1]
 
-    def modify_timestep_step(self, timestep: TimeStep) -> TimeStep[Observation]:
+    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for `step` and `reset`."""
         observation = Observation(
             agents_view=timestep.observation.agent_obs,
@@ -41,37 +41,22 @@ class MatraxWrapper(Wrapper):
         )
         return timestep.replace(
             observation=observation,
-            reward=timestep.reward * 1.0,
-            discount=timestep.discount,
-        )
-
-    def modify_timestep_reset(self, timestep: TimeStep) -> TimeStep[Observation]:
-        """Modify the timestep for `step` and `reset`."""
-        observation = Observation(
-            agents_view=timestep.observation.agent_obs,
-            action_mask=jnp.ones((self._num_agents, self._num_actions), dtype=bool),
-            step_count=jnp.repeat(timestep.observation.step_count, self._num_agents),
-        )
-        reward = jnp.repeat(timestep.reward, self._num_agents)
-        return timestep.replace(
-            observation=observation,
-            reward=reward,
+            reward=timestep.reward,
             discount=timestep.discount,
         )
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment."""
         state, timestep = self._env.reset(key)
-        return state, self.modify_timestep_reset(timestep)
+        return state, self.modify_timestep(timestep)
 
     def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
         """Step the environment."""
         state, timestep = self._env.step(state, action)
-        return state, self.modify_timestep_step(timestep)
+        return state, self.modify_timestep(timestep)
 
     def observation_spec(self) -> specs.Spec[Observation]:
         """Specification of the observation of the environment."""
-        env_observation_spec = self._env.observation_spec().agent_obs
         step_count = specs.BoundedArray(
             (self._num_agents,),
             jnp.int32,
@@ -81,13 +66,13 @@ class MatraxWrapper(Wrapper):
         )
         action_mask = specs.Array(
             (self._num_agents, self._num_actions),
-            jnp.bool_,
+            bool,
             "action_mask",
         )
         return specs.Spec(
             Observation,
             "ObservationSpec",
-            agents_view=env_observation_spec,
+            agents_view=self._env.observation_spec().agent_obs,
             action_mask=action_mask,
             step_count=step_count,
         )
