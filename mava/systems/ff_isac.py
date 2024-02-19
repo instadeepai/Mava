@@ -36,7 +36,7 @@ from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
 from typing_extensions import TypeAlias
 
-from mava.evaluator import evaluator_setup
+from mava.evaluator import make_eval_fns
 from mava.types import Observation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
@@ -549,7 +549,7 @@ def run_experiment(cfg: DictConfig) -> float:
     # How many steps to do in the scanned update method (how many anakin steps).
     cfg.system.scan_steps = int(steps_per_rollout / anakin_steps)
 
-    pprint(OmegaConf.to_container(cfg, resolve=True), indent=2, width=100)
+    pprint(OmegaConf.to_container(cfg, resolve=True))
 
     # Initialize system and make learning functions.
     (env, eval_env), nns, opts, rb, learner_state, target_entropy, logger, key = init(cfg)
@@ -557,14 +557,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     actor, _ = nns
     key, eval_key = jax.random.split(key)
-    # todo: don't need to return trained_params or eval keys
-    evaluator, absolute_metric_evaluator, (trained_params, eval_keys) = evaluator_setup(
-        eval_env=eval_env,
-        key=eval_key,
-        network=actor,
-        params=learner_state.params.actor,
-        config=cfg,
-    )
+    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor, cfg)
 
     if cfg.logger.checkpointing.save_model:
         checkpointer = Checkpointer(

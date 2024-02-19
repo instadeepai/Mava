@@ -15,6 +15,7 @@
 import copy
 from abc import abstractmethod
 from collections import namedtuple
+from functools import cached_property
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 import chex
@@ -27,7 +28,6 @@ from jaxmarl.environments import spaces as jaxmarl_spaces
 from jaxmarl.environments.mabrax.mabrax_env import MABraxEnv
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
 from jumanji import specs
-from jumanji.env import Environment
 from jumanji.types import StepType, TimeStep, restart
 from jumanji.wrappers import Wrapper
 
@@ -302,13 +302,13 @@ class JaxMarlWrapper(Wrapper):
         """Get global state from observation for each agent."""
         ...
 
-    @property
+    @cached_property
     @abstractmethod
     def n_actions(self) -> chex.Array:
         "Get the number of actions for each agent."
         ...
 
-    @property
+    @cached_property
     @abstractmethod
     def state_size(self) -> chex.Array:
         "Get the sate size of the global observation"
@@ -327,12 +327,12 @@ class SmaxWrapper(JaxMarlWrapper):
     ):
         super().__init__(env, has_global_state, timelimit, add_agent_ids_to_state)
 
-    @property
+    @cached_property
     def state_size(self) -> chex.Array:
         "Get the sate size of the global observation"
         return self._env.state_size
 
-    @property
+    @cached_property
     def n_actions(self) -> chex.Array:
         "Get the number of actions for each agent."
         single_agent_action_space = self._env.action_space(self.agents[0])
@@ -360,7 +360,7 @@ class MabraxWrapper(JaxMarlWrapper):
     ):
         super().__init__(env, has_global_state, timelimit, add_agent_ids_to_state)
 
-    @property
+    @cached_property
     def state_size(self) -> chex.Array:
         "Get the sate size of the global observation"
         state_size = self._env.env.observation_size
@@ -370,14 +370,14 @@ class MabraxWrapper(JaxMarlWrapper):
             else state_size
         )
 
-    @property
+    @cached_property
     def n_actions(self) -> chex.Array:
         "Get the number of actions for each agent."
         return self.action_spec().shape[0]
 
     def action_mask(self, state: JaxMarlState) -> Array:
         """Get action mask for each agent."""
-        return jnp.ones((self.n_actions), dtype=jnp.float32)
+        return jnp.ones((self.num_agents, self.n_actions), dtype=bool)
 
     def get_global_state(self, brax_state: BraxState, obs: Dict[str, Array]) -> Array:
         """Get global state from observation and copy it for each agent."""
