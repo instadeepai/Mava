@@ -143,12 +143,12 @@ def init(
 
     # Create replay buffer
     init_transition = Transition(
-        obs=init_obs,
+        obs=Observation(*init_obs),
         action=init_acts,
         # todo: n agents rewards/discounts
         reward=jnp.zeros((), dtype=float),
         done=jnp.zeros((), dtype=bool),
-        next_obs=init_obs,
+        next_obs=Observation(*init_obs),
     )
 
     rb = fbx.make_item_buffer(
@@ -219,6 +219,19 @@ def make_update_fns(
         real_next_obs = infos["real_next_obs"]
 
         transition = Transition(obs, action, rewards, terms, real_next_obs)
+        # transition = jax.tree_map(lambda x: jnp.expand_dims(x, axis=1), transition)
+
+        # obs_ = Observation(
+        #     jnp.int32(obs.agents_view),
+        #     obs.action_mask,
+        #     obs.step_count,
+        # )
+        # real_next_obs_ = Observation(
+        #     jnp.int32(real_next_obs.agents_view),
+        #     real_next_obs.action_mask,
+        #     real_next_obs.step_count,
+        # )
+        # transition_ = Transition(obs_, action, rewards, terms, real_next_obs_)
         buffer_state = rb.add(buffer_state, transition)
 
         return next_obs, env_state, buffer_state, infos["episode_metrics"]
@@ -357,9 +370,7 @@ def make_update_fns(
         """Acting loop: select action, step env, add to buffer."""
         online_params, obs, env_state, buffer_state, t, key = carry
 
-        action = jnp.zeros((128,3),dtype="int32")
-
-        #action = select_eps_greedy_action(online_params,obs,t,key)
+        action = select_eps_greedy_action(online_params,obs,t,key)
 
         next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
 

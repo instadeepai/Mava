@@ -35,7 +35,12 @@ class AgentIDWrapper(Wrapper):
         self, timestep: TimeStep, num_agents: int
     ) -> Union[Observation, ObservationGlobalState]:
         agent_ids = jnp.eye(num_agents)
-        new_agents_view = jnp.concatenate([agent_ids, timestep.observation.agents_view], axis=-1)
+        new_agents_view = jnp.concatenate([
+            agent_ids,
+            timestep.observation.agents_view],
+            axis=-1,
+            dtype=timestep.observation.agents_view.dtype,
+        )
 
         if self.has_global_state:
             # Add the agent IDs to the global state

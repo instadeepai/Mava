@@ -3,5 +3,5 @@ defaults:
   - arch: anakin
   - system: ff_ippo
   - network: mlp
-  - env: smax
+  - env: lbf
   - _self_
