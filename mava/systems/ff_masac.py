@@ -398,6 +398,8 @@ def make_update_fns(
         next_q1_val = q.apply(params.q.targets.q1, data.next_obs, joint_next_actions)
         next_q2_val = q.apply(params.q.targets.q2, data.next_obs, joint_next_actions)
         next_q_val = jnp.minimum(next_q1_val, next_q2_val)
+        # todo: try out one entropy term.
+        # then call alpha loss n_agents times and mean the grads.
         entropy_term = jnp.mean(jnp.exp(params.log_alpha), axis=1) * jnp.sum(next_log_prob, axis=1)
         next_q_val = next_q_val - entropy_term
 
