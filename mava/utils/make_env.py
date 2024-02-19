@@ -140,9 +140,9 @@ def make_gigastep_env(
     Returns:
         A tuple of the environments.
     """
-    kwargs = dict(config.env.kwargs)
+    kwargs = config.env.kwargs
 
-    scenario_config = dict(config.env.scenario)
+    scenario_config = config.env.scenario
     scenario = ScenarioBuilder.from_config(scenario_config)
 
     train_env = GigastepWrapper(
