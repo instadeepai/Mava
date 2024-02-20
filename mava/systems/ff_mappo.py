@@ -37,7 +37,6 @@ from mava.types import (
     ExperimentOutput,
     LearnerFn,
     LearnerState,
-    ObservationGlobalState,
     OptStates,
     Params,
     PPOTransition,
@@ -376,14 +375,7 @@ def learner_setup(
 
     # Initialise observation.
     obs = env.observation_spec().generate_value()
-    # Select only obs for a single agent.
-    init_x = ObservationGlobalState(
-        agents_view=obs.agents_view[0],
-        action_mask=obs.action_mask[0],
-        global_state=obs.global_state[0],
-        step_count=obs.step_count[0],
-    )
-    init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
+    init_x = jax.tree_util.tree_map(lambda x: x[None, ...], obs)
 
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(actor_net_key, init_x)
@@ -397,16 +389,8 @@ def learner_setup(
     params = Params(actor_params, critic_params)
 
     # Vmap network apply function over number of agents.
-    vmapped_actor_network_apply_fn = jax.vmap(
-        actor_network.apply,
-        in_axes=(None, 1),
-        out_axes=(1),
-    )
-    vmapped_critic_network_apply_fn = jax.vmap(
-        critic_network.apply,
-        in_axes=(None, 1),
-        out_axes=(1),
-    )
+    vmapped_actor_network_apply_fn = actor_network.apply
+    vmapped_critic_network_apply_fn = critic_network.apply
 
     # Pack apply and update functions.
     apply_fns = (vmapped_actor_network_apply_fn, vmapped_critic_network_apply_fn)
