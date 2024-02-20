@@ -45,7 +45,9 @@ class AgentIDWrapper(Wrapper):
         if self.has_global_state:
             # Add the agent IDs to the global state
             new_global_state = jnp.concatenate(
-                [agent_ids, timestep.observation.global_state], axis=-1
+                [agent_ids, timestep.observation.global_state], 
+                axis=-1,
+                dtype=timestep.observation.global_state.dtype
             )
 
             return ObservationGlobalState(
