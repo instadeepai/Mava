@@ -46,9 +46,7 @@ _jumanji_registry = {
 }
 
 # Define a different registry for Matrax since it has no generator.
-_matrax_registry = {
-    "Matrax": {"wrapper": MatraxWrapper},
-}
+_matrax_registry = {"Matrax": MatraxWrapper}
 
 _jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 
@@ -153,7 +151,7 @@ def make_matrax_env(
         A tuple containing a train and evaluation Matrax environment.
     """
     # Select the Matrax wrapper.
-    wrapper = _matrax_registry[env_name]["wrapper"]
+    wrapper = _matrax_registry[env_name]
 
     # Create envs.
     task_name = config["env"]["scenario"]["task_name"]

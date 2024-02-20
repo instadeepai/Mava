@@ -25,18 +25,19 @@ from mava.types import Observation, State
 
 
 class MatraxWrapper(Wrapper):
+    """Multi-agent wrapper for the Matrax environment."""
+
     def __init__(self, env: Environment):
         super().__init__(env)
         self._num_agents = self._env.num_agents
-        self.time_limit = self._env.time_limit
         self._num_actions = self._env.num_actions
-        self.num_obs_features = self._env.observation_spec().agent_obs.shape[-1]
+        self.action_mask = jnp.ones((self._num_agents, self._num_actions), dtype=bool)
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for `step` and `reset`."""
         observation = Observation(
             agents_view=timestep.observation.agent_obs,
-            action_mask=jnp.ones((self._num_agents, self._num_actions), dtype=bool),
+            action_mask=self.action_mask,
             step_count=jnp.repeat(timestep.observation.step_count, self._num_agents),
         )
         return timestep.replace(
@@ -61,7 +62,7 @@ class MatraxWrapper(Wrapper):
             (self._num_agents,),
             jnp.int32,
             [0] * self._num_agents,
-            [self.time_limit] * self._num_agents,
+            [self._env.time_limit] * self._num_agents,
             "step_count",
         )
         action_mask = specs.Array(
