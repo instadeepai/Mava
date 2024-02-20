@@ -1,0 +1,6 @@
+# The config of the 15x15-4p-5f scenario with the VectorObserver set as default
+task_name: con-10x10x5a
+
+task_config:
+  grid_size: 10
+  num_agents: 5

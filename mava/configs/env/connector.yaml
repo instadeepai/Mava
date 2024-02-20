@@ -1,0 +1,9 @@
+# ---Environment Configs---
+defaults:
+  - _self_
+  - scenario: con-10x10x5a
+
+env_name: MaConnector-v2
+
+kwargs:
+  time_limit: 100
