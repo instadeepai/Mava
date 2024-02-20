@@ -157,13 +157,13 @@ class GigastepWrapper(Wrapper):
                 agents_view=team1_obs,
                 action_mask=self.action_mask(),
                 global_state=self.get_global_state(obs, adversary_actions),
-                step_count=jnp.zeros(self.num_agents, dtype=int),
+                step_count=jnp.repeat(state.step, self.num_agents),
             )
         else:
             obs = Observation(
                 agents_view=team1_obs,
                 action_mask=self.action_mask(),
-                step_count=jnp.zeros(self.num_agents, dtype=int),
+                step_count=jnp.repeat(state.step, self.num_agents),
             )
 
         step_type = jax.lax.select(ep_done, StepType.LAST, StepType.MID)
