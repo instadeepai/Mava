@@ -16,7 +16,7 @@ import copy
 from abc import abstractmethod
 from collections import namedtuple
 from functools import cached_property
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import chex
 import jax
@@ -24,8 +24,9 @@ import jax.numpy as jnp
 from brax.envs import State as BraxState
 from chex import Array, PRNGKey
 from gymnax.environments import spaces as gymnax_spaces
+from jaxmarl.environments import SMAX
 from jaxmarl.environments import spaces as jaxmarl_spaces
-from jaxmarl.environments.mabrax.mabrax_env import MABraxEnv
+from jaxmarl.environments.mabrax import MABraxEnv
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
 from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
@@ -231,14 +232,14 @@ class JaxMarlWrapper(Wrapper):
     def _create_observation(
         self,
         obs: Dict[str, Array],
-        brax_state: BraxState,
+        wrapped_env_state: Any,
         jaxmarl_state: Optional[JaxMarlState] = None,
         reset: bool = False,
     ) -> Union[Observation, ObservationGlobalState]:
         """Create an observation from the raw observation and environment state."""
         obs_data = {
             "agents_view": batchify(obs, self.agents),
-            "action_mask": self.action_mask(brax_state),
+            "action_mask": self.action_mask(wrapped_env_state),
         }
         if reset:
             obs_data["step_count"] = jnp.zeros(self.num_agents, dtype=int)
@@ -246,7 +247,7 @@ class JaxMarlWrapper(Wrapper):
             obs_data["step_count"] = jnp.repeat(jaxmarl_state.step, self.num_agents)  # type: ignore
 
         if self.has_global_state:
-            obs_data["global_state"] = self.get_global_state(brax_state, obs)
+            obs_data["global_state"] = self.get_global_state(wrapped_env_state, obs)
             return ObservationGlobalState(**obs_data)
         else:
             return Observation(**obs_data)
@@ -297,12 +298,12 @@ class JaxMarlWrapper(Wrapper):
         )
 
     @abstractmethod
-    def action_mask(self, state: JaxMarlState) -> Array:
+    def action_mask(self, wrapped_env_state: Any) -> Array:
         """Get action mask for each agent."""
         ...
 
     @abstractmethod
-    def get_global_state(self, brax_state: BraxState, obs: Dict[str, Array]) -> Array:
+    def get_global_state(self, wrapped_env_state: Any, obs: Dict[str, Array]) -> Array:
         """Get global state from observation for each agent."""
         ...
 
@@ -330,6 +331,7 @@ class SmaxWrapper(JaxMarlWrapper):
         add_agent_ids_to_state: bool = False,
     ):
         super().__init__(env, has_global_state, timelimit, add_agent_ids_to_state)
+        self._env: SMAX
 
     @cached_property
     def state_size(self) -> chex.Array:
@@ -342,12 +344,12 @@ class SmaxWrapper(JaxMarlWrapper):
         single_agent_action_space = self._env.action_space(self.agents[0])
         return single_agent_action_space.n
 
-    def action_mask(self, state: JaxMarlState) -> Array:
+    def action_mask(self, wrapped_env_state: Any) -> Array:
         """Get action mask for each agent."""
-        avail_actions = self._env.get_avail_actions(state)
+        avail_actions = self._env.get_avail_actions(wrapped_env_state)
         return jnp.array(batchify(avail_actions, self.agents), dtype=bool)
 
-    def get_global_state(self, brax_state: BraxState, obs: Dict[str, Array]) -> Array:
+    def get_global_state(self, wrapped_env_state: Any, obs: Dict[str, Array]) -> Array:
         """Get global state from observation and copy it for each agent."""
         return jnp.tile(jnp.array(obs["world_state"]), (self.num_agents, 1))
 
@@ -363,6 +365,7 @@ class MabraxWrapper(JaxMarlWrapper):
         add_agent_ids_to_state: bool = False,
     ):
         super().__init__(env, has_global_state, timelimit, add_agent_ids_to_state)
+        self._env: MABraxEnv
 
     @cached_property
     def n_actions(self) -> chex.Array:
@@ -380,20 +383,20 @@ class MabraxWrapper(JaxMarlWrapper):
             else state_size
         )
 
-    def action_mask(self, state: JaxMarlState) -> Array:
+    def action_mask(self, wrapped_env_state: BraxState) -> Array:
         """Get action mask for each agent."""
         return jnp.ones((self.num_agents, self.n_actions), dtype=bool)
 
-    def get_global_state(self, brax_state: BraxState, obs: Dict[str, Array]) -> Array:
+    def get_global_state(self, wrapped_env_state: BraxState, obs: Dict[str, Array]) -> Array:
         """Get global state from observation and copy it for each agent."""
         # Use the global state of brax.
-        global_state = jnp.tile(brax_state.obs, (self.num_agents, 1))
+        global_state = jnp.tile(wrapped_env_state.obs, (self.num_agents, 1))
 
         # Including IDs in the global state can be generally beneficial.
         # In this case, add_agent_id=False so the agent's ID must be added to the global state.
         if self._env.homogenisation_method == "max" and self.add_agent_ids_to_state:
             agent_ids = jnp.eye(self.num_agents)
-            global_state = jnp.tile(brax_state.obs, (self.num_agents, 1))
+            global_state = jnp.tile(wrapped_env_state.obs, (self.num_agents, 1))
             global_state = jnp.concatenate([agent_ids, global_state], axis=-1)
 
         return global_state
