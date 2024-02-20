@@ -129,7 +129,7 @@ class ConnectorWrapper(MultiAgentWrapper):
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for the Connector environment."""
 
-        def convert_obs(grid):
+        def create_agents_view(grid: chex.Array):
             positions = jnp.where(grid % 3 == 2, True, False)   
             targets = jnp.where((grid % 3 == 0) & (grid != 0), True, False)
             paths = jnp.where(grid % 3 == 1, True, False)
@@ -138,7 +138,7 @@ class ConnectorWrapper(MultiAgentWrapper):
             agents_view = jnp.stack((positions, targets, paths, my_position, my_target), -1)
             return agents_view
         
-        def convert_global(grid):
+        def create_global_state(grid: chex.Array):
             positions = jnp.where(grid % 3 == 2, True, False)   
             targets = jnp.where((grid % 3 == 0) & (grid[0] != 0), True, False)
             paths = jnp.where(grid % 3 == 1, True, False)
@@ -146,8 +146,8 @@ class ConnectorWrapper(MultiAgentWrapper):
             return global_state
         
         observation = ObservationGlobalState(
-            global_state = convert_global(timestep.observation.grid),
-            agents_view= convert_obs(timestep.observation.grid),
+            global_state = create_agents_view(timestep.observation.grid),
+            agents_view= create_global_state(timestep.observation.grid),
             action_mask=timestep.observation.action_mask,
             step_count=jnp.repeat(timestep.observation.step_count, self._num_agents),
         ) 
