@@ -117,7 +117,7 @@ def init(
 
     env, eval_env = environments.make(cfg)
 
-    num_actions = int(env.action_spec().num_values[0]) # NOTE (Claude) got this from the PPO systems
+    num_actions = int(env.action_spec().num_values[0])
 
     key, q_key, q_target_key = jax.random.split(key, 3)
 
@@ -204,8 +204,6 @@ def make_update_fns(
     _, q = nns # NOTE (Louise) put mixer later
     q_opt = opts
 
-    # full_action_shape = (cfg.system.n_envs, *env.action_spec().shape) # NOTE (Claude) I dont think this is right since we have discrete actions
-
     def step(
         action: Array, obs: Observation, env_state: State, buffer_state: BufferState
     ) -> Tuple[Array, State, BufferState, Dict]:
@@ -219,19 +217,7 @@ def make_update_fns(
         real_next_obs = infos["real_next_obs"]
 
         transition = Transition(obs, action, rewards, terms, real_next_obs)
-        # transition = jax.tree_map(lambda x: jnp.expand_dims(x, axis=1), transition)
 
-        # obs_ = Observation(
-        #     jnp.int32(obs.agents_view),
-        #     obs.action_mask,
-        #     obs.step_count,
-        # )
-        # real_next_obs_ = Observation(
-        #     jnp.int32(real_next_obs.agents_view),
-        #     real_next_obs.action_mask,
-        #     real_next_obs.step_count,
-        # )
-        # transition_ = Transition(obs_, action, rewards, terms, real_next_obs_)
         buffer_state = rb.add(buffer_state, transition)
 
         return next_obs, env_state, buffer_state, infos["episode_metrics"]
@@ -239,6 +225,7 @@ def make_update_fns(
     # losses:
     def q_loss_fn(q_online_params: FrozenVariableDict, obs: Array, action: Array, target: Array) -> Tuple[Array, Metrics]:
         q_online = q.apply(q_online_params, obs)
+        q_online = jnp.take(q_online, action[...,jnp.newaxis])
         q_loss = jnp.mean((q_online - target) ** 2)
 
         loss_info = {
@@ -343,7 +330,6 @@ def make_update_fns(
         # greedy argmax
         action = jnp.argmax(q_vals_masked, axis=-1)#.reshape(q_values.shape[0],q_values.shape[1],1)
         return action
-    
     
 
     def select_eps_greedy_action(online_params:FrozenVariableDict, obs:Array, t:int, key:chex.PRNGKey):
