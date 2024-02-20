@@ -1,0 +1,10 @@
+# ---Environment Configs---
+defaults:
+  - _self_
+  - scenario: 2v-20c #2v-20c
+
+
+env_name: MultiCVRP-v0
+
+eval_metric: episode_return
+

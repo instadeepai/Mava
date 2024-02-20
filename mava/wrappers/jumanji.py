@@ -20,8 +20,12 @@ from jumanji import specs
 from jumanji.env import Environment
 from jumanji.environments.routing.lbf import LevelBasedForaging
 from jumanji.environments.routing.robot_warehouse import RobotWarehouse
-from jumanji.types import TimeStep
+from jumanji.types import TimeStep, StepType
 from jumanji.wrappers import Wrapper
+  
+import jax
+from jax import tree_util
+from jumanji.environments.routing.multi_cvrp import MultiCVRP
 
 from mava.types import Observation, State
 
@@ -117,3 +121,86 @@ class LbfWrapper(MultiAgentWrapper):
 
         # Aggregate the list of individual rewards and use a single team_reward.
         return self.aggregate_rewards(timestep, modified_observation)
+  
+class multiCVRPWrapper(Wrapper):
+    def __init__(self, env: MultiCVRP):
+        self.num_agents = env._num_vehicles
+        self._env = env
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[State | TimeStep]:
+        state , timestep = self._env.reset(key)
+        timestep = self.modify_timestep(timestep, state.step_count)    # handeling the step_count is wrong in both gigastep / here it's allways set to 0
+        return state, timestep
+    
+    def step(self, state: State, action: chex.Array) -> Tuple[State | TimeStep]:
+        state, timestep = self._env.step(state,action)
+        timestep = self.modify_timestep(timestep, state.step_count)
+        return state,timestep
+
+    def modify_timestep(self, timestep: TimeStep, step_count : chex.Array) -> TimeStep[Observation]:
+
+        observation = self._format_observation(timestep.observation)
+        reward = jnp.repeat(timestep.reward, (self.num_agents))
+        discount = jnp.repeat(timestep.discount, (self.num_agents))
+        step_count = jnp.repeat(step_count, (self.num_agents))
+        observation = Observation(
+            agents_view=observation,
+            action_mask=timestep.observation.action_mask,
+            step_count=step_count,
+        )
+        
+
+        timestep = timestep.replace(observation=observation, reward=reward, discount=discount)
+        return timestep
+    
+    def _format_observation(self, observation):
+        #flatten and concat all of the observations for now
+        customers_info, _ = tree_util.tree_flatten((observation.nodes,observation.windows,observation.coeffs))
+        vehicles_info , _ = tree_util.tree_flatten(observation.vehicles)
+        
+        #this results in c1-info1-c2,info2
+        customers_info = jnp.column_stack(customers_info).ravel()
+        #each agents needs to get the customers_info in their observation , alot of compute is wasted this way
+        customers_info = jnp.tile(customers_info, (self.num_agents, 1) )
+
+        vehicles_info = jnp.column_stack(vehicles_info)
+
+        #(num_vechials, obs) with obs (vechial_obs + costumer_obs) if the costumer obs doest change much woudn't be better to pass it thought it's own network once?
+        observations =  jnp.column_stack((vehicles_info, customers_info))
+
+        return observations 
+    
+    def observation_spec(self) -> specs.Spec[Observation]:
+        step_count = specs.BoundedArray(
+            (self.num_agents,), jnp.int32,0, self._env._num_customers + 1 ,"step_count" 
+        )
+        action_mask = specs.BoundedArray(
+            (self.num_agents, self._env._num_customers + 1), bool, False, True, "action_mask"
+        )
+        agents_view = specs.BoundedArray(
+            (self.num_agents, (self._env._num_customers + 1) * 7 + 4), #7 is  broken into 2 for cords, 1 each of demands,start,end,early,late and the 4 is the cords,capacity of the veichale
+            jnp.float32,
+            -jnp.inf,
+            jnp.inf,
+            "agents_view",
+        )
+        return specs.Spec(
+            Observation,
+            "ObservationSpec",
+            agents_view=agents_view,
+            action_mask=action_mask,
+            step_count=step_count,
+        )
+
+    def reward_spec(self) -> specs.Array:
+        return specs.Array(shape=(self.num_agents,), dtype=float, name="reward")
+
+    def discount_spec(self) -> specs.BoundedArray:
+        return specs.BoundedArray(
+            shape=(self.num_agents,), dtype=float, minimum=0.0, maximum=1.0, name="discount"
+        )
+    
+    def action_spec(self) -> specs.Spec:
+        return specs.MultiDiscreteArray(num_values=jnp.full(self.num_agents, self._env._num_customers + 1))
+
+

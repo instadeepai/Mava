@@ -24,6 +24,9 @@ from jumanji.environments.routing.lbf.generator import (
 from jumanji.environments.routing.robot_warehouse.generator import (
     RandomGenerator as RwareRandomGenerator,
 )
+from jumanji.environments.routing.multi_cvrp.generator import (
+    UniformRandomGenerator as MultiCVRPRandomGenerator,
+)
 from omegaconf import DictConfig
 
 from mava.wrappers import (
@@ -34,12 +37,14 @@ from mava.wrappers import (
     LbfWrapper,
     RecordEpisodeMetrics,
     RwareWrapper,
+    multiCVRPWrapper,
 )
 
 # Registry mapping environment names to their generator and wrapper classes.
 _jumanji_registry = {
     "RobotWarehouse-v0": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper},
     "LevelBasedForaging-v0": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
+    "MultiCVRP-v0": {"generator": MultiCVRPRandomGenerator, "wrapper": multiCVRPWrapper},
 }
 
 
@@ -77,8 +82,13 @@ def make_jumanji_env(
     wrapper = _jumanji_registry[env_name]["wrapper"]
 
     # Create envs.
-    env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
-    eval_env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
+    if "kwargs" in config.env:
+        env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
+        eval_env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
+    else:
+        env = jumanji.make(env_name, generator=generator)
+        eval_env = jumanji.make(env_name, generator=generator)
+        
     env, eval_env = wrapper(env), wrapper(eval_env)
 
     env = add_optional_wrappers(env, config, add_global_state)

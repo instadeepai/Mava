@@ -1,0 +1,7 @@
+task_name: 2v-6c
+
+task_config:
+  num_customers : 6
+  num_vehicles : 2
+
+

@@ -510,7 +510,7 @@ def run_experiment(_config: DictConfig) -> float:
         )
 
     # Run experiment for a total number of evaluations.
-    max_episode_return = jnp.float32(0.0)
+    max_episode_return = jnp.float32("-inf")
     best_params = None
     for eval_step in range(config.arch.num_evaluation):
         # Train.
@@ -574,7 +574,7 @@ def run_experiment(_config: DictConfig) -> float:
         key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
-
+        
         evaluator_output = absolute_metric_evaluator(best_params, eval_keys)
         jax.block_until_ready(evaluator_output)
 

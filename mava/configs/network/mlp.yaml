@@ -2,7 +2,7 @@
 actor_network:
   pre_torso:
     _target_: mava.networks.MLPTorso
-    layer_sizes: [128, 128]
+    layer_sizes: [128, 512, 1024, 1024, 512, 512, 64, 64]
     use_layer_norm: False
     activation: relu
 
