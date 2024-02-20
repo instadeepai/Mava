@@ -376,7 +376,6 @@ def learner_setup(
 
     # Initialise observation: Select only obs for a single agent.
     init_x = env.observation_spec().generate_value()
-    init_x = jax.tree_util.tree_map(lambda x: x[0], init_x)
     init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
 
     # Initialise actor params and optimiser state.
@@ -391,16 +390,8 @@ def learner_setup(
     params = Params(actor_params, critic_params)
 
     # Vmap network apply function over number of agents.
-    vmapped_actor_network_apply_fn = jax.vmap(
-        actor_network.apply,
-        in_axes=(None, 1),
-        out_axes=(1),
-    )
-    vmapped_critic_network_apply_fn = jax.vmap(
-        critic_network.apply,
-        in_axes=(None, 1),
-        out_axes=(1),
-    )
+    vmapped_actor_network_apply_fn = actor_network.apply
+    vmapped_critic_network_apply_fn = critic_network.apply
 
     # Pack apply and update functions.
     apply_fns = (vmapped_actor_network_apply_fn, vmapped_critic_network_apply_fn)
