@@ -346,7 +346,7 @@ def learner_setup(
     n_devices = len(jax.devices())
 
     # Get number of actions and agents.
-    num_actions = int(env.action_spec().num_values[0])
+    num_actions = env.action_spec().shape[1]
     num_agents = env.action_spec().shape[0]
     config.system.num_agents = num_agents
     config.system.action_dim = num_actions
