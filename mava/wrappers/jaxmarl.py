@@ -15,6 +15,7 @@
 import copy
 from abc import abstractmethod
 from collections import namedtuple
+from functools import cached_property
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 import chex
@@ -193,6 +194,10 @@ class JaxMarlWrapper(Wrapper):
         self.has_global_state = has_global_state
         self.add_agent_ids_to_state = add_agent_ids_to_state
 
+        # Calling these on init to cache the values in a non-jitted context.
+        self.state_size
+        self.n_actions
+
     def reset(
         self, key: PRNGKey
     ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
@@ -271,6 +276,7 @@ class JaxMarlWrapper(Wrapper):
                 global_state=global_state,
                 step_count=step_count,
             )
+
         return specs.Spec(
             Observation,
             "ObservationSpec",
@@ -300,13 +306,13 @@ class JaxMarlWrapper(Wrapper):
         """Get global state from observation for each agent."""
         ...
 
-    @property
+    @cached_property
     @abstractmethod
     def n_actions(self) -> chex.Array:
         "Get the number of actions for each agent."
         ...
 
-    @property
+    @cached_property
     @abstractmethod
     def state_size(self) -> chex.Array:
         "Get the sate size of the global observation"
@@ -325,12 +331,12 @@ class SmaxWrapper(JaxMarlWrapper):
     ):
         super().__init__(env, has_global_state, timelimit, add_agent_ids_to_state)
 
-    @property
+    @cached_property
     def state_size(self) -> chex.Array:
         "Get the sate size of the global observation"
         return self._env.state_size
 
-    @property
+    @cached_property
     def n_actions(self) -> chex.Array:
         "Get the number of actions for each agent."
         single_agent_action_space = self._env.action_space(self.agents[0])
@@ -358,24 +364,25 @@ class MabraxWrapper(JaxMarlWrapper):
     ):
         super().__init__(env, has_global_state, timelimit, add_agent_ids_to_state)
 
-    @property
-    def state_size(self) -> chex.Array:
-        "Get the sate size of the global observation"
-        state_size = self._env.env.observation_size
-        return (
-            state_size + self._env.num_agents
-            if self._env.homogenisation_method == "max" and self.add_agent_ids
-            else state_size
-        )
-
-    @property
+    @cached_property
     def n_actions(self) -> chex.Array:
         "Get the number of actions for each agent."
         return self.action_spec().shape[0]
 
+    @cached_property
+    def state_size(self) -> chex.Array:
+        "Get the sate size of the global observation"
+        brax_env = self._env.env
+        state_size = brax_env.observation_size
+        return (
+            state_size + self._env.num_agents
+            if self._env.homogenisation_method == "max" and self.add_agent_ids_to_state
+            else state_size
+        )
+
     def action_mask(self, state: JaxMarlState) -> Array:
         """Get action mask for each agent."""
-        return jnp.ones((self.n_actions), dtype=jnp.float32)
+        return jnp.ones((self.num_agents, self.n_actions), dtype=bool)
 
     def get_global_state(self, brax_state: BraxState, obs: Dict[str, Array]) -> Array:
         """Get global state from observation and copy it for each agent."""
@@ -384,7 +391,7 @@ class MabraxWrapper(JaxMarlWrapper):
 
         # Including IDs in the global state can be generally beneficial.
         # In this case, add_agent_id=False so the agent's ID must be added to the global state.
-        if self._env.homogenisation_method == "max" and self.add_agent_ids:
+        if self._env.homogenisation_method == "max" and self.add_agent_ids_to_state:
             agent_ids = jnp.eye(self.num_agents)
             global_state = jnp.tile(brax_state.obs, (self.num_agents, 1))
             global_state = jnp.concatenate([agent_ids, global_state], axis=-1)
