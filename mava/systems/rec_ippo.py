@@ -526,13 +526,8 @@ def learner_setup(
     critic_params = critic_network.init(critic_net_key, init_critic_hstate, init_x)
     critic_opt_state = critic_optim.init(critic_params)
 
-    # Vmap network apply function over number of agents.
-    vmapped_actor_network_apply_fn = actor_network.apply
-    # Vmap network apply function over number of agents.
-    vmapped_critic_network_apply_fn = critic_network.apply
-
     # Get network apply functions and optimiser updates.
-    apply_fns = (vmapped_actor_network_apply_fn, vmapped_critic_network_apply_fn)
+    apply_fns = (actor_network.apply, critic_network.apply)
     update_fns = (actor_optim.update, critic_optim.update)
 
     # Get batched iterated update and replicate it to pmap it over cores.

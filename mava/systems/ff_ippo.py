@@ -389,12 +389,8 @@ def learner_setup(
     # Pack params.
     params = Params(actor_params, critic_params)
 
-    # Vmap network apply function over number of agents.
-    vmapped_actor_network_apply_fn = actor_network.apply
-    vmapped_critic_network_apply_fn = critic_network.apply
-
     # Pack apply and update functions.
-    apply_fns = (vmapped_actor_network_apply_fn, vmapped_critic_network_apply_fn)
+    apply_fns = (actor_network.apply, critic_network.apply)
     update_fns = (actor_optim.update, critic_optim.update)
 
     # Get batched iterated update and replicate it to pmap it over cores.
