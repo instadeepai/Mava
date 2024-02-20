@@ -235,9 +235,8 @@ def init(
     init_transition = Transition(
         obs=obs,
         action=acts,
-        # todo: n agents rewards/discounts
-        reward=jnp.zeros((), dtype=float),
-        done=jnp.zeros((), dtype=bool),
+        reward=jnp.zeros((n_agents,), dtype=float),
+        done=jnp.zeros((n_agents,), dtype=bool),
         next_obs=obs,
     )
 
@@ -303,8 +302,8 @@ def make_update_fns(
         """Given an action, step the environment and add to the buffer."""
         env_state, timestep = jax.vmap(env.step)(env_state, action)
         next_obs = timestep.observation
-        rewards = timestep.reward[:, 0]
-        terms = ~(timestep.discount).astype(bool)[:, 0]
+        rewards = timestep.reward
+        terms = ~timestep.discount.astype(bool)
         infos = timestep.extras
 
         real_next_obs = infos["real_next_obs"]
@@ -356,8 +355,8 @@ def make_update_fns(
     ) -> Tuple[SacParams, OptStates, Metrics]:
         """Update the Q parameters."""
         # Calculate Q target values.
-        rewards = data.reward[..., jnp.newaxis, jnp.newaxis]
-        dones = data.done[..., jnp.newaxis, jnp.newaxis]
+        rewards = data.reward[..., jnp.newaxis]
+        dones = data.done[..., jnp.newaxis]
 
         pi = actor.apply(params.actor, data.next_obs)
         next_action, next_log_prob = pi.sample_and_log_prob(seed=key)
