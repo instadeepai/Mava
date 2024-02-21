@@ -14,6 +14,7 @@
 
 import copy
 import time
+from pprint import pprint
 from typing import Any, Callable, Dict, NamedTuple, Tuple
 
 import chex
@@ -31,12 +32,11 @@ from flashbax.buffers.flat_buffer import TrajectoryBuffer
 from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.scope import FrozenVariableDict
 from jax import Array
-from jax.typing import ArrayLike
 from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
 from typing_extensions import TypeAlias
 
-from mava.evaluator import evaluator_setup
+from mava.evaluator import make_eval_fns
 from mava.types import Observation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
@@ -96,10 +96,6 @@ Optimisers: TypeAlias = Tuple[
 ]
 
 
-# todo: jumanji PR
-
-
-# todo: should this contain both networks?
 class QNetwork(nn.Module):
     def setup(self) -> None:
         self.net = nn.Sequential([nn.Dense(256), nn.relu, nn.Dense(256), nn.relu, nn.Dense(1)])
@@ -154,39 +150,6 @@ class Actor(nn.Module):
         return pi
 
 
-# todo: inside actor?
-def sample_action(
-    mean: ArrayLike,
-    log_std: ArrayLike,
-    key: PRNGKey,
-    action_scale: Array,
-    action_bias: Array,
-    eval: bool = False,
-) -> Tuple[Array, Array]:
-    std = jnp.exp(log_std)
-    # normal = distrax.Normal(mean, std)
-    normal = distrax.MultivariateNormalDiag(mean, std)
-
-    sampled_action = lax.cond(
-        eval,
-        lambda: mean,
-        lambda: normal.sample(seed=key),
-    )
-    bound_action = jnp.tanh(sampled_action)
-    scaled_action = bound_action * action_scale + action_bias
-
-    # log_prob = normal.log_prob(unbound_action)
-    # rescale_term = jnp.log(action_scale * (1 - bound_action**2) + 1e-6).sum(axis=-1)
-    # log_prob = log_prob - rescale_term
-
-    # todo: scale
-    log_prob = normal.log_prob(sampled_action)
-    rescal_term = 2 * (jnp.log(2) - sampled_action - jax.nn.softplus(-2 * sampled_action))
-    log_prob = log_prob - jnp.sum(rescal_term, axis=-1)
-
-    return scaled_action, log_prob[..., jnp.newaxis]
-
-
 def init(
     cfg: DictConfig,
 ) -> Tuple[
@@ -203,7 +166,6 @@ def init(
 
     key = jax.random.PRNGKey(cfg.system.seed)
     devices = jax.devices()
-    n_devices = len(devices)
 
     def replicate(x: Any) -> Any:
         """First replicate the update batch dim then put on devices."""
@@ -220,21 +182,21 @@ def init(
 
     key, actor_key, q1_key, q2_key, q1_target_key, q2_target_key = jax.random.split(key, 6)
 
-    init_acts = env.action_spec().generate_value()
-    init_acts_batched = init_acts[jnp.newaxis, ...]
-    init_obs = env.observation_spec().generate_value()
-    init_obs_batched = jax.tree_map(lambda x: x[jnp.newaxis, ...], init_obs)
+    acts = env.action_spec().generate_value()  # all agents actions
+    act_single_batched = acts[0][jnp.newaxis, ...]  # batch single agent action
+    obs = env.observation_spec().generate_value()
+    obs_single_batched = jax.tree_map(lambda x: x[0][jnp.newaxis, ...], obs)
 
     # Making actor network
     actor = Actor(action_dim, act_high, act_low)
-    actor_params = actor.init(actor_key, init_obs_batched)
+    actor_params = actor.init(actor_key, obs_single_batched)
 
     # Making Q networks
     q = QNetwork()
-    q1_params = q.init(q1_key, init_obs_batched, init_acts_batched)
-    q2_params = q.init(q2_key, init_obs_batched, init_acts_batched)
-    q1_target_params = q.init(q1_target_key, init_obs_batched, init_acts_batched)
-    q2_target_params = q.init(q2_target_key, init_obs_batched, init_acts_batched)
+    q1_params = q.init(q1_key, obs_single_batched, act_single_batched)
+    q2_params = q.init(q2_key, obs_single_batched, act_single_batched)
+    q1_target_params = q.init(q1_target_key, obs_single_batched, act_single_batched)
+    q2_target_params = q.init(q2_target_key, obs_single_batched, act_single_batched)
 
     # Automatic entropy tuning
     target_entropy = -cfg.system.target_entropy_scale * action_dim
@@ -259,7 +221,7 @@ def init(
     q_opt = optax.adam(cfg.system.q_lr)
     q_opt_state = q_opt.init(params.q.online)
 
-    alpha_opt = optax.adam(cfg.system.q_lr)  # todo: alpha lr?
+    alpha_opt = optax.adam(cfg.system.alpha_lr)
     alpha_opt_state = alpha_opt.init(params.log_alpha)
 
     # Pack opt states
@@ -271,12 +233,11 @@ def init(
 
     # Create replay buffer
     init_transition = Transition(
-        obs=init_obs,
-        action=init_acts,
-        # todo: n agents rewards/discounts
-        reward=jnp.zeros((), dtype=float),
-        done=jnp.zeros((), dtype=bool),
-        next_obs=init_obs,
+        obs=obs,
+        action=acts,
+        reward=jnp.zeros((n_agents,), dtype=float),
+        done=jnp.zeros((n_agents,), dtype=bool),
+        next_obs=obs,
     )
 
     rb = fbx.make_item_buffer(
@@ -291,15 +252,15 @@ def init(
     opts = (actor_opt, q_opt, alpha_opt)
 
     # Reset env.
-    n_keys = cfg.system.n_envs * n_devices * cfg.system.update_batch_size
-    key_shape = (n_devices, cfg.system.update_batch_size, cfg.system.n_envs, -1)
+    n_keys = cfg.system.n_envs * cfg.arch.n_devices * cfg.system.update_batch_size
+    key_shape = (cfg.arch.n_devices, cfg.system.update_batch_size, cfg.system.n_envs, -1)
     key, reset_key = jax.random.split(key)
     reset_keys = jax.random.split(reset_key, n_keys)
     reset_keys = jnp.reshape(reset_keys, key_shape)
 
     # Keys passed to learner
-    first_keys = jax.random.split(key, (n_devices * cfg.system.update_batch_size))
-    first_keys = first_keys.reshape((n_devices, cfg.system.update_batch_size, -1))
+    first_keys = jax.random.split(key, (cfg.arch.n_devices * cfg.system.update_batch_size))
+    first_keys = first_keys.reshape((cfg.arch.n_devices, cfg.system.update_batch_size, -1))
 
     env_state, first_timestep = jax.pmap(  # devices
         jax.vmap(  # update_batch_size
@@ -310,7 +271,7 @@ def init(
     )(reset_keys)
     first_obs = first_timestep.observation
 
-    t = jnp.zeros((n_devices, cfg.system.update_batch_size), dtype=int)
+    t = jnp.zeros((cfg.arch.n_devices, cfg.system.update_batch_size), dtype=int)
 
     # Initial learner state.
     learner_state = LearnerState(
@@ -341,8 +302,8 @@ def make_update_fns(
         """Given an action, step the environment and add to the buffer."""
         env_state, timestep = jax.vmap(env.step)(env_state, action)
         next_obs = timestep.observation
-        rewards = timestep.reward[:, 0]
-        terms = ~(timestep.discount).astype(bool)[:, 0]
+        rewards = timestep.reward
+        terms = ~timestep.discount.astype(bool)
         infos = timestep.extras
 
         real_next_obs = infos["real_next_obs"]
@@ -394,8 +355,8 @@ def make_update_fns(
     ) -> Tuple[SacParams, OptStates, Metrics]:
         """Update the Q parameters."""
         # Calculate Q target values.
-        rewards = data.reward[..., jnp.newaxis, jnp.newaxis]
-        dones = data.done[..., jnp.newaxis, jnp.newaxis]
+        rewards = data.reward[..., jnp.newaxis]
+        dones = data.done[..., jnp.newaxis]
 
         pi = actor.apply(params.actor, data.next_obs)
         next_action, next_log_prob = pi.sample_and_log_prob(seed=key)
@@ -555,7 +516,6 @@ def make_update_fns(
 
     # pmap and scan over explore and update_step
     # Make sure to not do n_envs explore steps (could fill up the buffer too much).
-    pmaped_steps = 1024  # todo: config option
     explore_steps = cfg.system.explore_steps // cfg.system.n_envs
     pmaped_explore = jax.pmap(
         jax.vmap(
@@ -567,7 +527,7 @@ def make_update_fns(
     )
     pmaped_updated_step = jax.pmap(
         jax.vmap(
-            lambda state: lax.scan(update_step, state, None, length=pmaped_steps),
+            lambda state: lax.scan(update_step, state, None, length=cfg.system.scan_steps),
             axis_name="batch",
         ),
         axis_name="device",
@@ -578,25 +538,25 @@ def make_update_fns(
 
 
 def run_experiment(cfg: DictConfig) -> float:
-    n_devices = len(jax.devices())
+    # Add runtime variables to config
+    cfg.arch.n_devices = len(jax.devices())
 
-    pmaped_steps = 1024  # todo: config option
-    steps_per_rollout = n_devices * cfg.system.n_envs * cfg.system.rollout_length * pmaped_steps
-    max_episode_return = -jnp.inf
+    # Number of env steps before evaluating/logging.
+    steps_per_rollout = int(cfg.system.total_timesteps // cfg.arch.num_evaluation)
+    # How many env steps in one anakin style update.
+    anakin_steps = cfg.arch.n_devices * cfg.system.n_envs * cfg.system.rollout_length
+    # How many steps to do in the scanned update method (how many anakin steps).
+    cfg.system.scan_steps = int(steps_per_rollout / anakin_steps)
 
+    pprint(OmegaConf.to_container(cfg, resolve=True))
+
+    # Initialize system and make learning functions.
     (env, eval_env), nns, opts, rb, learner_state, target_entropy, logger, key = init(cfg)
     explore, update = make_update_fns(cfg, env, nns, opts, rb, target_entropy)
 
     actor, _ = nns
     key, eval_key = jax.random.split(key)
-    # todo: don't need to return trained_params or eval keys
-    evaluator, absolute_metric_evaluator, (trained_params, eval_keys) = evaluator_setup(
-        eval_env=eval_env,
-        key=eval_key,
-        network=actor,
-        params=learner_state.params.actor,
-        config=cfg,
-    )
+    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor, cfg)
 
     if cfg.logger.checkpointing.save_model:
         checkpointer = Checkpointer(
@@ -605,6 +565,7 @@ def run_experiment(cfg: DictConfig) -> float:
             **cfg.logger.checkpointing.save_args,  # Checkpoint args
         )
 
+    max_episode_return = -jnp.inf
     start_time = time.time()
 
     # Fill up buffer/explore.
@@ -639,8 +600,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
         # Evaluate:
         key, eval_key = jax.random.split(key)
-        eval_keys = jax.random.split(eval_key, n_devices)
-        # todo: bug likely here -> don't have batch vmap yet so shouldn't unreplicate_batch_dim
+        eval_keys = jax.random.split(eval_key, cfg.arch.n_devices)
         eval_output = evaluator(unreplicate_batch_dim(learner_state.params.actor), eval_keys)
         jax.block_until_ready(eval_output)
 
@@ -665,7 +625,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     # Measure absolute metric.
     if cfg.arch.absolute_metric:
-        eval_keys = jax.random.split(key, n_devices)
+        eval_keys = jax.random.split(key, cfg.arch.n_devices)
 
         eval_output = absolute_metric_evaluator(best_params, eval_keys)
         jax.block_until_ready(eval_output)

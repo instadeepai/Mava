@@ -4,7 +4,8 @@ defaults:
   - scenario: 2s-8x8-2p-2f-coop # [2s-8x8-2p-2f-coop, 8x8-2p-2f-coop, 2s-10x10-3p-3f, 10x10-3p-3f, 15x15-4p-3f, 15x15-4p-5f]
 # Further environment config details in "2s-8x8-2p-2f-coop" file.
 
-env_name: LevelBasedForaging-v0
+env_name: LevelBasedForaging # Used for logging purposes.
+
 # Choose whether to aggregate the list of individual rewards and use the team reward (default setting) OR use_individual_rewards=True.
 use_individual_rewards: False  # If True, use the list of individual rewards.
 

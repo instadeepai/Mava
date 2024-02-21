@@ -13,6 +13,7 @@
 # limitations under the License.
 
 # Note this is only here until this is merged into jumanji
+# PR: https://github.com/instadeepai/jumanji/pull/223
 
 from typing import Tuple
 
