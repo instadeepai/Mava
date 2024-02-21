@@ -33,21 +33,23 @@ from mava.evaluator import make_eval_fns
 from mava.networks import RecurrentActor as Actor
 from mava.networks import RecurrentCritic as Critic
 from mava.networks import ScannedRNN
-from mava.types import (
-    ExperimentOutput,
+from mava.systems.ppo.types import (
     HiddenStates,
-    LearnerFn,
-    ObservationGlobalState,
     OptStates,
     Params,
-    RecActorApply,
-    RecCriticApply,
     RNNLearnerState,
     RNNPPOTransition,
 )
+from mava.types import (
+    ExperimentOutput,
+    LearnerFn,
+    ObservationGlobalState,
+    RecActorApply,
+    RecCriticApply,
+)
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import unreplicate_batch_dim, unreplicate_learner_state
+from mava.utils.jax import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import make_learning_rate
@@ -567,7 +569,7 @@ def learner_setup(
         )
         # Restore the learner state from the checkpoint
         restored_params, restored_hstates = loaded_checkpoint.restore_params(
-            input_params=params, restore_hstates=True
+            input_params=params, restore_hstates=True, THiddenState=HiddenStates
         )
         # Update the params and hstates
         params = restored_params
@@ -729,7 +731,7 @@ def run_experiment(_config: DictConfig) -> float:
             # Save checkpoint of learner state
             checkpointer.save(
                 timestep=steps_per_rollout * (eval_step + 1),
-                unreplicated_learner_state=unreplicate_learner_state(learner_output.learner_state),
+                unreplicated_learner_state=unreplicate_n_dims(learner_output.learner_state),
                 episode_return=episode_return,
             )
 
@@ -766,7 +768,7 @@ def run_experiment(_config: DictConfig) -> float:
     return eval_performance
 
 
-@hydra.main(config_path="../configs", config_name="default_rec_mappo.yaml", version_base="1.2")
+@hydra.main(config_path="../../configs", config_name="default_rec_mappo.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
