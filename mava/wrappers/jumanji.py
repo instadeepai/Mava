@@ -18,13 +18,13 @@ import chex
 import jax.numpy as jnp
 from jumanji import specs
 from jumanji.env import Environment
+from jumanji.environments.routing.connector import MaConnector
 from jumanji.environments.routing.lbf import LevelBasedForaging
 from jumanji.environments.routing.robot_warehouse import RobotWarehouse
-from jumanji.environments.routing.connector import MaConnector
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
 
-from mava.types import Observation, State, ObservationGlobalState
+from mava.types import Observation, ObservationGlobalState, State
 
 
 class MultiAgentWrapper(Wrapper):
@@ -118,7 +118,7 @@ class LbfWrapper(MultiAgentWrapper):
 
         # Aggregate the list of individual rewards and use a single team_reward.
         return self.aggregate_rewards(timestep, modified_observation)
-    
+
 
 class ConnectorWrapper(MultiAgentWrapper):
     """Multi-agent wrapper for the MA Connector environment."""
@@ -130,30 +130,29 @@ class ConnectorWrapper(MultiAgentWrapper):
         """Modify the timestep for the Connector environment."""
 
         def create_agents_view(grid: chex.Array) -> chex.Array:
-            positions = jnp.where(grid % 3 == 2, True, False)   
+            positions = jnp.where(grid % 3 == 2, True, False)
             targets = jnp.where((grid % 3 == 0) & (grid != 0), True, False)
             paths = jnp.where(grid % 3 == 1, True, False)
             my_position = jnp.where(grid == 2, True, False)
             my_target = jnp.where(grid == 3, True, False)
             agents_view = jnp.stack((positions, targets, paths, my_position, my_target), -1)
             return agents_view
-        
+
         def create_global_state(grid: chex.Array) -> chex.Array:
-            positions = jnp.where(grid % 3 == 2, True, False)   
+            positions = jnp.where(grid % 3 == 2, True, False)
             targets = jnp.where((grid % 3 == 0) & (grid[0] != 0), True, False)
             paths = jnp.where(grid % 3 == 1, True, False)
             global_state = jnp.stack((positions, targets, paths), -1)
             return global_state
-        
+
         observation = ObservationGlobalState(
-            global_state = create_agents_view(timestep.observation.grid),
-            agents_view= create_global_state(timestep.observation.grid),
+            global_state=create_agents_view(timestep.observation.grid),
+            agents_view=create_global_state(timestep.observation.grid),
             action_mask=timestep.observation.action_mask,
             step_count=jnp.repeat(timestep.observation.step_count, self._num_agents),
-        ) 
+        )
         return timestep.replace(observation=observation)
-    
-    
+
     def observation_spec(self) -> specs.Spec[Observation]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(

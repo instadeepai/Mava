@@ -5,18 +5,18 @@ default_language_version:
 
 repos:
   - repo: https://github.com/timothycrosley/isort
-    rev: 5.11.5
+    rev: 5.13.2
     hooks:
       - id: isort
 
   - repo: https://github.com/psf/black
-    rev: 22.3.0
+    rev: 24.2.0
     hooks:
       - id: black
         name: "Code formatter"
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.1.0
+    rev: v4.5.0
     hooks:
       - id: end-of-file-fixer
         name: "End of file fixer"
@@ -33,7 +33,7 @@ repos:
         name: "Trailing whitespace fixer"
 
   - repo: https://github.com/PyCQA/flake8
-    rev: 6.1.0
+    rev: 7.0.0
     hooks:
       - id: flake8
         name: "Linter"
@@ -57,7 +57,7 @@ repos:
         pass_filenames: false
 
   - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
-    rev: v4.1.0
+    rev: v9.11.0
     hooks:
       - id: commitlint
         name: "Commit linter"
