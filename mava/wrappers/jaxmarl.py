@@ -333,13 +333,12 @@ class SmaxWrapper(JaxMarlWrapper):
     ):
         super().__init__(env, has_global_state, timelimit, add_agent_ids_to_state)
         self._env: SMAX
-        self.log_win_rate = self._env.name in ["HeuristicEnemySMAX", "LearnedPolicyEnemySMAX"]
 
     def reset(
         self, key: PRNGKey
     ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
         state, ts = super().reset(key)
-        extras = {"won_episode": False} if self.log_win_rate else {}
+        extras = {"won_episode": False} 
         ts = ts.replace(extras=extras)
         return state, ts
 
@@ -349,9 +348,9 @@ class SmaxWrapper(JaxMarlWrapper):
         state, ts = super().step(state, action)
 
         current_winner = (
-            self.log_win_rate & (ts.step_type == StepType.LAST) & jnp.all(ts.reward >= 1.0)
+            (ts.step_type == StepType.LAST) & jnp.all(ts.reward >= 1.0)
         )
-        extras = {"won_episode": current_winner} if self.log_win_rate else {}
+        extras = {"won_episode": current_winner} 
         ts = ts.replace(extras=extras)
         return state, ts
 
