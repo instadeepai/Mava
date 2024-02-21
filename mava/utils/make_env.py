@@ -190,13 +190,11 @@ def make_gigastep_env(
     scenario = ScenarioBuilder.from_config(scenario_config)
 
     train_env = GigastepWrapper(
-        scenario.make(discrete_actions=True, obs_type="vector"),
-        **kwargs,
+        scenario.make(**kwargs),
         has_global_state=add_global_state,
     )
     eval_env = GigastepWrapper(
-        scenario.make(discrete_actions=True, obs_type="vector"),
-        **kwargs,
+        scenario.make(**kwargs),
         has_global_state=add_global_state,
     )
 

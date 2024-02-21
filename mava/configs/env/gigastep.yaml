@@ -8,4 +8,6 @@ env_name: Gigastep
 eval_metric: win_rate
 
 kwargs:
-  time_limit: 500
+  max_episode_length: 500 #equivalent to time_limit
+  discrete_actions : True
+  obs_type : vector # options: rgb, vector, rgb_vector)

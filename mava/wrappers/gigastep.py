@@ -44,7 +44,6 @@ class GigastepWrapper(Wrapper):
     def __init__(
         self,
         env: GigastepEnv,
-        time_limit: int = 500,
         has_global_state: bool = False,
     ):
         """
@@ -65,7 +64,7 @@ class GigastepWrapper(Wrapper):
         ), "Only Vector observations are currently supported for Gigastep environments"
 
         self._env: GigastepEnv
-        self._env.max_episode_length = time_limit
+        self._timelimit = self._env.max_episode_length
         self.num_agents = self._env.n_agents_team1
         self.num_actions = self._env.n_actions
 
