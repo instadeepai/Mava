@@ -1,4 +1,3 @@
-# The config of the 15x15-4p-5f scenario with the VectorObserver set as default
 task_name: con-5x5x3a
 
 task_config:
