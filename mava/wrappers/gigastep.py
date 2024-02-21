@@ -155,7 +155,7 @@ class GigastepWrapper(Wrapper):
 
         step_type = jax.lax.select(ep_done, StepType.LAST, StepType.MID)
 
-        current_winner = jax.lax.select(ep_done, self.get_wining_team(env_state), False)
+        current_winner = ep_done & self.won_episode(env_state)
 
         ts = TimeStep(
             step_type=step_type,
@@ -273,7 +273,7 @@ class GigastepWrapper(Wrapper):
             (team2_state, general_state_info),
         )
 
-    def get_wining_team(self, state: Tuple[Dict, Dict]) -> Array:
+    def won_episode(self, state: Tuple[Dict, Dict]) -> Array:
         """
         Determines the winning team.
 
