@@ -8,6 +8,7 @@ jax
 jaxlib
 jaxmarl
 jumanji @ git+https://github.com/sash-a/jumanji
+matrax @ git+https://github.com/instadeepai/matrax
 neptune
 numpy
 omegaconf

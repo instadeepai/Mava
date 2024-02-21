@@ -16,6 +16,7 @@ from typing import Tuple
 
 import jaxmarl
 import jumanji
+import matrax
 from gigastep import ScenarioBuilder
 from jaxmarl.environments.smax import map_name_to_scenario
 from jumanji.env import Environment
@@ -34,6 +35,7 @@ from mava.wrappers import (
     GlobalStateWrapper,
     LbfWrapper,
     MabraxWrapper,
+    MatraxWrapper,
     RecordEpisodeMetrics,
     RwareWrapper,
     SmaxWrapper,
@@ -44,6 +46,9 @@ _jumanji_registry = {
     "RobotWarehouse-v0": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper},
     "LevelBasedForaging-v0": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
 }
+
+# Define a different registry for Matrax since it has no generator.
+_matrax_registry = {"Matrax": MatraxWrapper}
 
 _jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 
@@ -133,6 +138,38 @@ def make_jaxmarl_env(
     return env, eval_env
 
 
+def make_matrax_env(
+    env_name: str, config: DictConfig, add_global_state: bool = False
+) -> Tuple[Environment, Environment]:
+    """
+    Creates Matrax environments for training and evaluation.
+
+    Args:
+        env_name: The name of the environment to create.
+        config: The configuration of the environment.
+        add_global_state: Whether to add the global state to the observation.
+
+    Returns:
+        A tuple containing a train and evaluation Matrax environment.
+    """
+    # Select the Matrax wrapper.
+    wrapper = _matrax_registry[env_name]
+
+    # Create envs.
+    task_name = config["env"]["scenario"]["task_name"]
+    env = matrax.make(task_name, **config.env.kwargs)
+    eval_env = matrax.make(task_name, **config.env.kwargs)
+    env, eval_env = wrapper(env), wrapper(eval_env)
+
+    env = add_optional_wrappers(env, config, add_global_state)
+    eval_env = add_optional_wrappers(eval_env, config, add_global_state)
+
+    env = AutoResetWrapper(env)
+    env = RecordEpisodeMetrics(env)
+
+    return env, eval_env
+
+
 def make_gigastep_env(
     env_name: str, config: DictConfig, add_global_state: bool = False
 ) -> Tuple[Environment, Environment]:
@@ -185,6 +222,8 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[Environmen
         return make_jumanji_env(env_name, config, add_global_state)
     elif env_name in jaxmarl.registered_envs:
         return make_jaxmarl_env(env_name, config, add_global_state)
+    elif env_name in _matrax_registry:
+        return make_matrax_env(env_name, config, add_global_state)
     elif env_name == "Gigastep":
         return make_gigastep_env(env_name, config, add_global_state)
     else:
