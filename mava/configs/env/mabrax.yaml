@@ -1,0 +1,22 @@
+
+# --- Environment Configs---
+defaults:
+  - _self_
+
+env_name: MaBrax  # Used for logging purposes and selection of the corresponding wrapper.
+scenario:
+  name: ant_4x2   # [ant_4x2, halfcheetah_6x1, hopper_3x1, humanoid_9|8, walker2d_2x3]
+  task_name: ant_4x2   # For logging purposes.
+
+
+# Defines the metric that will be used to evaluate the performance of the agent.
+# This metric is returned at the end of an experiment and can be used for hyperparameter tuning.
+eval_metric: episode_return
+
+kwargs:
+  episode_length: 1000
+  homogenisation_method: max # Default is None. Options: [max, concat] if dimensions of observations and actions are not homogeneous across agents,
+  # "max" adds one-hot for the agent's ID. In this case, system.add_agent_id should be set to False.
+  # Note: In this case, the agent's ID will be added to the global state within the wrapper if `add_agent_ids_to_state` is True.
+
+add_agent_ids_to_state: True # Adds the agent IDs to the global state.
