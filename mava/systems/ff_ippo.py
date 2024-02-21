@@ -374,9 +374,9 @@ def learner_setup(
         optax.adam(critic_lr, eps=1e-5),
     )
 
-    # Initialise observation: Select only obs for a single agent.
-    init_x = env.observation_spec().generate_value()
-    init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
+    # Initialise observation: Select only obs for a single agent + batch dim.
+    obs = env.observation_spec().generate_value()
+    init_x = jax.tree_util.tree_map(lambda x: x[0][jnp.newaxis, ...], obs)
 
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(actor_net_key, init_x)
