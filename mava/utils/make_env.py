@@ -61,16 +61,9 @@ def add_optional_wrappers(
         env = GlobalStateWrapper(env)
 
     # Add agent id to observation.
-    add_ids_to_view = config.system.add_ids_to_agent_view
-    add_ids_to_state = (
-        config.system.add_ids_to_global_state
-        if hasattr(config.system, "add_ids_to_global_state")
-        else False
-    )
 
-    if add_ids_to_view or add_ids_to_state:
-        env = AgentIDWrapper(env, add_ids_to_view, add_global_state, add_ids_to_state)
-
+    if config.system.add_agent_id:
+        env = AgentIDWrapper(env, add_global_state)
     return env
 
 

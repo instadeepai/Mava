@@ -25,46 +25,25 @@ from mava.types import Observation, ObservationGlobalState, State
 
 
 class AgentIDWrapper(Wrapper):
-    """Add onehot agent IDs to observation."""
+    """A wrapper to add a one-hot vector as an agent IDs to the original observation."""
 
-    def __init__(
-        self,
-        env: Environment,
-        add_ids_to_agent_view: bool = True,
-        has_global_state: bool = False,
-        add_ids_to_global_state: bool = False,
-    ):
+    def __init__(self, env: Environment, has_global_state: bool = False):
         super().__init__(env)
-        self.add_ids_to_agent_view = add_ids_to_agent_view
         self.has_global_state = has_global_state
-        self.add_ids_to_global_state = add_ids_to_global_state
 
     def _add_agent_ids(
         self, timestep: TimeStep, num_agents: int
     ) -> Union[Observation, ObservationGlobalState]:
 
+        agent_ids = jnp.eye(num_agents)
         obs_data = {
-            "agents_view": timestep.observation.agents_view,
+            "agents_view": jnp.concatenate([agent_ids, timestep.observation.agents_view], axis=-1),
             "action_mask": timestep.observation.action_mask,
             "step_count": timestep.observation.step_count,
         }
-        agent_ids = jnp.eye(num_agents)
 
-        # Add agent IDs to the agent view if requested
-        if self.add_ids_to_agent_view:
-            obs_data["agents_view"] = jnp.concatenate(
-                [agent_ids, timestep.observation.agents_view], axis=-1
-            )
-
-        # If global state exists, add agent IDs to it if requested
         if self.has_global_state:
-            if self.add_ids_to_global_state:
-                new_global_state = jnp.concatenate(
-                    [agent_ids, timestep.observation.global_state], axis=-1
-                )
-                obs_data["global_state"] = new_global_state
-            else:
-                obs_data["global_state"] = timestep.observation.global_state
+            obs_data["global_state"] = timestep.observation.global_state
             return ObservationGlobalState(**obs_data)
         else:
             return Observation(**obs_data)
@@ -99,12 +78,9 @@ class AgentIDWrapper(Wrapper):
 
         if self.has_global_state:
             wrapped_state_spec = obs_spec.global_state
-            wrapped_state_shape = (
-                *wrapped_state_spec.shape[:-1],
-                wrapped_state_spec.shape[-1] + self._env.num_agents,
-            )
+
             global_state = specs.Array(
-                wrapped_state_shape, wrapped_state_spec.dtype, "global_state"
+                wrapped_state_spec.shape, wrapped_state_spec.dtype, "global_state"
             )
             return obs_spec.replace(agents_view=agents_view, global_state=global_state)
 
