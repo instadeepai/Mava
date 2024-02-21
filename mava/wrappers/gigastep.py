@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Dict, Tuple
+from typing import TYPE_CHECKING, Dict, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -87,25 +87,15 @@ class GigastepWrapper(Wrapper):
         key, reset_key, adversary_key = jax.random.split(key, 3)
         obs, state = self._env.reset(reset_key)
 
-        team1_obs, team1_state, team2_obs, team2_state = self._split_obs_and_state(obs, state)
+        obs_team1, state_team1, obs_team2, state_team2 = self._split_obs_and_state(obs, state)
 
-        adversary_actions = self.adversary_policy(team2_obs, team2_state, adversary_key)
-
-        if self.has_global_state:
-            obs = ObservationGlobalState(
-                agents_view=team1_obs,
-                action_mask=self.action_mask(),
-                global_state=self.get_global_state(obs, adversary_actions),
-                step_count=jnp.zeros(self.num_agents, dtype=int),
-            )
-        else:
-            obs = Observation(
-                agents_view=team1_obs,
-                action_mask=self.action_mask(),
-                step_count=jnp.zeros(self.num_agents, dtype=int),
-            )
+        adversary_actions = self.adversary_policy(obs_team2, state_team2, adversary_key)
 
         state = GigastepState(state, key, 0, adversary_actions)
+
+        obs = self._create_observation(obs_team1, adversary_actions, obs, state)
+
+        
         timestep = restart(obs, shape=(self.num_agents,), extras={"won_episode": False})
         return state, timestep
 
@@ -134,24 +124,12 @@ class GigastepWrapper(Wrapper):
             dones[: self.num_agents],
         )
 
-        team1_obs, team1_state, team2_obs, team2_state = self._split_obs_and_state(obs, env_state)
+        obs_team1, state_team1, obs_team2, state_team2 = self._split_obs_and_state(obs, env_state)
 
         # take the actions of the adversary and cache it before returning the new state
-        adversary_actions = self.adversary_policy(team2_obs, team2_state, adversary_key)
+        adversary_actions = self.adversary_policy(obs_team2, state_team2, adversary_key)
 
-        if self.has_global_state:
-            obs = ObservationGlobalState(
-                agents_view=team1_obs,
-                action_mask=self.action_mask(),
-                global_state=self.get_global_state(obs, adversary_actions),
-                step_count=jnp.repeat(state.step, self.num_agents),
-            )
-        else:
-            obs = Observation(
-                agents_view=team1_obs,
-                action_mask=self.action_mask(),
-                step_count=jnp.repeat(state.step, self.num_agents),
-            )
+        obs = self._create_observation(obs_team1, adversary_actions, obs, state)
 
         step_type = jax.lax.select(ep_done, StepType.LAST, StepType.MID)
 
@@ -165,6 +143,26 @@ class GigastepWrapper(Wrapper):
             extras={"won_episode": current_winner},
         )
         return GigastepState(env_state, key, state.step + 1, adversary_actions), ts
+    
+    def _create_observation(
+        self,
+        obs: Array,
+        adversary_actions: Array,
+        obs_full : Array,
+        state : GigastepState,
+    ) -> Union[Observation, ObservationGlobalState]:
+        """Create an observation from the raw observation and environment state."""
+        obs_data = {
+            "agents_view": obs,
+            "action_mask": self.action_mask(),
+            "step_count" : jnp.repeat(state.step, self.num_agents)
+        }
+
+        if self.has_global_state:
+            obs_data["global_state"] = self.get_global_state(obs_full, adversary_actions)
+            return ObservationGlobalState(**obs_data)
+        else:
+            return Observation(**obs_data)
 
     def action_mask(self) -> Array:
         """Get action mask for each agent."""
