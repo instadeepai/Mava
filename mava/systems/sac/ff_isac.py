@@ -15,7 +15,7 @@
 import copy
 import time
 from pprint import pprint
-from typing import Any, Callable, Dict, NamedTuple, Tuple
+from typing import Any, Callable, Dict, Tuple
 
 import chex
 import distrax
@@ -26,74 +26,32 @@ import jax
 import jax.lax as lax
 import jax.numpy as jnp
 import optax
-from chex import PRNGKey
 from colorama import Fore, Style
 from flashbax.buffers.flat_buffer import TrajectoryBuffer
-from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.scope import FrozenVariableDict
 from jax import Array
 from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
-from typing_extensions import TypeAlias
 
 from mava.evaluator import make_eval_fns
+from mava.systems.sac.types import (
+    BufferState,
+    LearnerState,
+    Metrics,
+    Networks,
+    Optimisers,
+    OptStates,
+    Qs,
+    QsAndTarget,
+    SacParams,
+    Transition,
+)
 from mava.types import Observation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import unreplicate_batch_dim, unreplicate_learner_state
+from mava.utils.jax import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers import episode_metrics
-
-# jax.config.update("jax_platform_name", "cpu")
-
-
-# todo: types.py
-class Qs(NamedTuple):
-    q1: FrozenVariableDict
-    q2: FrozenVariableDict
-
-
-class QsAndTarget(NamedTuple):
-    online: Qs
-    targets: Qs
-
-
-class SacParams(NamedTuple):
-    actor: FrozenVariableDict
-    q: QsAndTarget
-    log_alpha: Array
-
-
-class OptStates(NamedTuple):
-    actor: optax.OptState
-    q: optax.OptState
-    alpha: optax.OptState
-
-
-class LearnerState(NamedTuple):
-    obs: Array
-    env_state: State
-    buffer_state: TrajectoryBuffer
-    params: SacParams
-    opt_states: OptStates
-    t: Array
-    key: PRNGKey
-
-
-class Transition(NamedTuple):
-    obs: Array
-    action: Array
-    reward: Array
-    done: Array
-    next_obs: Array
-
-
-Metrics = Dict[str, Array]
-BufferState: TypeAlias = TrajectoryBufferState[Transition]
-Networks: TypeAlias = Tuple[nn.Module, nn.Module]
-Optimisers: TypeAlias = Tuple[
-    optax.GradientTransformation, optax.GradientTransformation, optax.GradientTransformation
-]
 
 
 class QNetwork(nn.Module):
@@ -616,7 +574,7 @@ def run_experiment(cfg: DictConfig) -> float:
         # Checkpoint:
         if cfg.logger.checkpointing.save_model:
             # Save checkpoint of learner state
-            unreplicated_learner_state = unreplicate_learner_state(learner_state)  # type: ignore
+            unreplicated_learner_state = unreplicate_n_dims(learner_state)  # type: ignore
             checkpointer.save(
                 timestep=t,
                 unreplicated_learner_state=unreplicated_learner_state,
@@ -637,7 +595,7 @@ def run_experiment(cfg: DictConfig) -> float:
     return float(max_episode_return)
 
 
-@hydra.main(config_path="../configs", config_name="default_ff_isac.yaml", version_base="1.2")
+@hydra.main(config_path="../../configs", config_name="default_ff_isac.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.

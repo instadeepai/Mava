@@ -18,7 +18,6 @@ import chex
 from distrax import Distribution
 from flax.core.frozen_dict import FrozenDict
 from jumanji.types import TimeStep
-from optax._src.base import OptState
 from typing_extensions import NamedTuple, TypeAlias
 
 Action: TypeAlias = chex.Array
@@ -57,78 +56,6 @@ RNNObservation: TypeAlias = Tuple[Observation, Done]
 RNNGlobalObservation: TypeAlias = Tuple[ObservationGlobalState, Done]
 
 
-class Params(NamedTuple):
-    """Parameters of an actor critic network."""
-
-    actor_params: FrozenDict
-    critic_params: FrozenDict
-
-
-class OptStates(NamedTuple):
-    """OptStates of actor critic learner."""
-
-    actor_opt_state: OptState
-    critic_opt_state: OptState
-
-
-class HiddenStates(NamedTuple):
-    """Hidden states for an actor critic learner."""
-
-    policy_hidden_state: HiddenState
-    critic_hidden_state: HiddenState
-
-
-TParams = TypeVar("TParams")
-TOptStates = TypeVar("TOptStates")
-
-
-class LearnerState(NamedTuple, Generic[TParams, TOptStates]):
-    """State of the learner."""
-
-    params: TParams
-    opt_states: TOptStates
-    key: chex.PRNGKey
-    env_state: State
-    timestep: TimeStep
-
-
-class RNNLearnerState(NamedTuple):
-    """State of the `Learner` for recurrent architectures."""
-
-    params: Params
-    opt_states: OptStates
-    key: chex.PRNGKey
-    env_state: State
-    timestep: TimeStep
-    dones: Done
-    hstates: HiddenStates
-
-
-class PPOTransition(NamedTuple):
-    """Transition tuple for PPO."""
-
-    done: Done
-    action: Action
-    value: Value
-    reward: chex.Array
-    log_prob: chex.Array
-    obs: chex.Array
-    info: Dict
-
-
-class RNNPPOTransition(NamedTuple):
-    """Transition tuple for PPO."""
-
-    done: Done
-    action: Action
-    value: Value
-    reward: chex.Array
-    log_prob: chex.Array
-    obs: chex.Array
-    hstates: HiddenStates
-    info: Dict
-
-
 class EvalState(NamedTuple):
     """State of the evaluator."""
 
@@ -151,7 +78,9 @@ class RNNEvalState(NamedTuple):
     episode_return: chex.Array
 
 
-MavaState = TypeVar("MavaState", LearnerState, RNNLearnerState, EvalState, RNNEvalState)
+# `MavaState` is the main type passed around in our systems. It is often used as a scan carry.
+# Types like: `EvalState` | `LearnerState` (mava/systems/<system_name>/types.py) are `MavaState`s.
+MavaState = TypeVar("MavaState")
 
 
 class ExperimentOutput(NamedTuple, Generic[MavaState]):

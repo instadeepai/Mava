@@ -14,14 +14,12 @@
 
 # TODO: Rewrite this file to handle only JAX arrays.
 
-from typing import Any, Union
+from typing import Any
 
 import chex
 import jax
 import jax.numpy as jnp
 import numpy as np
-
-from mava.types import LearnerState, RNNLearnerState
 
 
 def ndim_at_least(x: chex.Array, num_dims: chex.Numeric) -> chex.Array:
@@ -48,17 +46,14 @@ def merge_leading_dims(x: chex.Array, num_dims: chex.Numeric) -> chex.Array:
     return x.reshape(new_shape)
 
 
-def unreplicate_learner_state(
-    learner_state: Union[LearnerState, RNNLearnerState],
-    unreplicate_depth: int = 2,
-) -> Union[LearnerState, RNNLearnerState]:
-    """Unreplicates a learner state.
+def unreplicate_n_dims(x: Any, unreplicate_depth: int = 2) -> Any:
+    """Unreplicates a pytree by removing the first `unreplicate_depth` axes.
 
-    This function takes a learner state and removes some number of axes, associated
-    with parameter duplication. This is typically one axis for device replication,
-    and one for the `update batch size`.
+    This function takes a pytree and removes some number of axes, associated with parameter
+    duplication for running multiple updates across devices and in parallel with `vmap`.
+    This is typically one axis for device replication, and one for the `update batch size`.
     """
-    return jax.tree_map(lambda x: x[(0,) * unreplicate_depth], learner_state)  # type: ignore
+    return jax.tree_map(lambda x: x[(0,) * unreplicate_depth], x)  # type: ignore
 
 
 def unreplicate_batch_dim(x: Any) -> Any:
