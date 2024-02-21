@@ -95,7 +95,6 @@ class GigastepWrapper(Wrapper):
 
         obs = self._create_observation(obs_team1, adversary_actions, obs, state)
 
-        
         timestep = restart(obs, shape=(self.num_agents,), extras={"won_episode": False})
         return state, timestep
 
@@ -143,19 +142,19 @@ class GigastepWrapper(Wrapper):
             extras={"won_episode": current_winner},
         )
         return GigastepState(env_state, key, state.step + 1, adversary_actions), ts
-    
+
     def _create_observation(
         self,
         obs: Array,
         adversary_actions: Array,
-        obs_full : Array,
-        state : GigastepState,
+        obs_full: Array,
+        state: GigastepState,
     ) -> Union[Observation, ObservationGlobalState]:
         """Create an observation from the raw observation and environment state."""
         obs_data = {
             "agents_view": obs,
             "action_mask": self.action_mask(),
-            "step_count" : jnp.repeat(state.step, self.num_agents)
+            "step_count": jnp.repeat(state.step, self.num_agents),
         }
 
         if self.has_global_state:
