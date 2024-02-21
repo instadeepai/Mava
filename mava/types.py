@@ -78,7 +78,9 @@ class RNNEvalState(NamedTuple):
     episode_return: chex.Array
 
 
-MavaState = TypeVar("MavaState")  # Types like: LearnerState | EvalState.
+# `MavaState` is the main type passed around in our systems. It is often used as a scan carry.
+# Types like: `EvalState` | `LearnerState` (mava/systems/<system_name>/types.py) are `MavaState`s.
+MavaState = TypeVar("MavaState")
 
 
 class ExperimentOutput(NamedTuple, Generic[MavaState]):
