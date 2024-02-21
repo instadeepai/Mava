@@ -215,8 +215,7 @@ class JaxMarlWrapper(Wrapper):
         )
 
         obs = self._create_observation(obs, env_state)
-        obs._replace(step_count=jnp.repeat(state.step, self.num_agents))
-
+        obs = obs._replace(step_count=jnp.repeat(state.step, self.num_agents))
         step_type = jax.lax.select(done["__all__"], StepType.LAST, StepType.MID)
         ts = TimeStep(
             step_type=step_type,
@@ -241,8 +240,8 @@ class JaxMarlWrapper(Wrapper):
         if self.has_global_state:
             obs_data["global_state"] = self.get_global_state(wrapped_env_state, obs)
             return ObservationGlobalState(**obs_data)
-        else:
-            return Observation(**obs_data)
+
+        return Observation(**obs_data)
 
     def observation_spec(self) -> specs.Spec:
         agents_view = jaxmarl_space_to_jumanji_spec(merge_space(self._env.observation_spaces))
