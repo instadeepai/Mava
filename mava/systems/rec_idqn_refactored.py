@@ -50,7 +50,7 @@ from flax.linen.initializers import orthogonal
 
 
 class ActionSelectionParams(NamedTuple):
-    select_params: FrozenVariableDict
+    nw_params: FrozenVariableDict
     hidden_state: chex.Array
     terms: chex.Array
     t: int
@@ -65,8 +65,7 @@ class InteractionParams(NamedTuple):
 
 Metrics = Dict[str, Array]
 
-# todo: types.py
-class Qs(NamedTuple):
+class QNetParams(NamedTuple):
     online: FrozenVariableDict
     target: FrozenVariableDict
 
@@ -74,9 +73,9 @@ class HiddenStates(NamedTuple):
     online: chex.Array
     target: chex.Array
 
-class QLearnParams(NamedTuple):
-    dqns:Qs
-    # NOTE (Louise) later add Qmix network
+# class QLearnParams(NamedTuple):
+#     dqns:Qs
+#     # NOTE (Louise) later add Qmix network
 
 class Networks(NamedTuple):
     q: nn.Module
@@ -110,20 +109,24 @@ class RecQNetwork(nn.Module):
     post_torso: MLPTorso = MLPTorso((256,), nn.relu, False)
 
     @nn.compact
-    def __call__(self, hidden_state: chex.Array, observation_done: RNNObservation,) -> Array:
-        x, dones = observation_done
+    def __call__(self, hidden_state: chex.Array, observation_term: RNNObservation,) -> Array:
+        # unpack consumed parameters
+        obs, term = observation_term
 
-        embedding = self.pre_torso(x.agents_view)
+        embedding = self.pre_torso(obs.agents_view)
 
-        rnn_input = (embedding, dones)
+        # pack consumed parameters
+        rnn_input = (embedding, term)
         hidden_state, embedding = ScannedRNN()(hidden_state, rnn_input)
+
         embedding = self.post_torso(embedding)
+
         q_values = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01))(embedding)
 
         return hidden_state, q_values
 
 class NetworkInput(NamedTuple):
-    hidden_state:HiddenState
+    hidden_state: chex.Array
     obs: Observation
     done: bool
 
@@ -199,7 +202,7 @@ def init(
     init_x = (init_obs_batched, init_done)
     # Initialise hidden states.
     hidden_size = 256
-    init_hstate = ScannedRNN.initialize_carry((1,cfg.system.n_envs, num_agents), hidden_size)
+    init_hstate = ScannedRNN.initialize_carry((cfg.system.n_envs, 1, num_agents), hidden_size)
 
     # Making recurrent Q network
     q = RecQNetwork(num_actions)
@@ -284,34 +287,121 @@ def make_update_fns(
     
     q = nns.q 
     q_opt = opts.q
-
+    #___________________________________________________________________________________________________
     # INTERACTION FUNCTIONS
     #
-    # - select_step_store (overarching)
-    #
-    # - get_epsilon 
-    #   -returns the exploration rate eps, 
-    #   -given timestep t, global cfg hyperparams
-    #
-    # - 
+    # - 1. select_step_store (overarching)
+    #    - 1.1 make_transition
+    #    - 1.2 (select_eps_greedy_action)
+    #        - 1.2.1 get_epsilon
+    #        - 1.2.2 greedy
+    #        - 1.2.3 select_random_action_batch
+    #            - 1.2.3.1 select_single_random_action
 
-    def store(
-            buffer_state:TrajectoryBufferState,timestep,obs:Observation, action
-            ) -> TrajectoryBufferState:
+    # INTERACT LEVEL 4 (1.2.3.1)
+    # Using probability values allows for non-ragged masking - must be done per row because of "choice".
+    def select_single_random_action(key, action_options, p_values):
+        """Select one action per row with probabilities used for masking."""
+        action = jax.random.choice(key,action_options,p=p_values)
+        return action
+    
+    # INTERACT LEVEL 3 (1.2.3)
+    def select_random_action_batch(
+            key: chex.PRNGKey, action_mask: chex.Array, hidden_state: chex.Array
+            ) -> Tuple[chex.Array, chex.Array]:
+        """Select actions randomly with masking."""
+
+        batch_size, n_agents, n_actions = action_mask.shape
+
+        # get one key per agent
+        keys = jax.random.split(key,batch_size*n_agents)
+        # base of action indexes
+        action_options = jnp.arange(n_actions)
+        # get num avail actions to generate probabilities for choosing
+        num_avail_per_agent = jnp.sum(action_mask,axis=-1)[...,jnp.newaxis]
+        # get probabilities (uniform with "masking")
+        p_vals = action_mask.astype("int32")/num_avail_per_agent
+        # flatten so that we only need one vmap over batch, agent dim
+        p_vals = jnp.reshape(p_vals,(batch_size*n_agents,n_actions))
+        # vmap random selection
+        actions = jax.vmap(select_single_random_action, (0,None,0))(keys,action_options,p_vals)
+        # unflatten to mtch expected action block size
+        actions = jnp.reshape(actions,(batch_size,n_agents))#,1))
+
+        return actions, hidden_state
+
+    # INTERACT LEVEL 3 (1.2.2)
+    def greedy(
+            online_params:FrozenVariableDict, hidden_state: chex.Array, obs:Array,terms: Array
+            ) -> Tuple[chex.Array,chex.Array]:
+        """Uses online q values to greedily select the best action."""
+        # get q values
+        new_hidden_state, q_values = q.apply(online_params, hidden_state, obs, terms) #TODO: Make nw compatible
+        # make unavailable actions quite negative
+        q_vals_masked = jnp.where(obs.action_mask,q_values,jnp.zeros(q_values.shape)-1000) #TODO: action masking in nw
+        # greedy argmax over inner dimension
+        action = jnp.argmax(q_vals_masked, axis=-1)
+
+        return action, new_hidden_state
+    
+    # INTERACT LEVEL 3 (1.2.1)
+    def get_epsilon(t:int):
+        """Calculate epsilon for exploration rate using config hyperparameters."""
+        eps = jax.numpy.maximum(
+            cfg.system.eps_min,
+            1-(t/cfg.system.eps_decay)*(1-cfg.system.eps_min)
+            )
+        return eps
+
+    # INTERACT LEVEL 2 (1.2)
+    def select_eps_greedy_action(
+            select_params:ActionSelectionParams,obs: Observation
+            ) -> Tuple[ActionSelectionParams,chex.Array]:
+        """Select action to take in eps-greedy way. Batch and agent dims are included."""
+
+        # unpacking and create keys
+        nw_params, hidden_state, terms, t, key = select_params
+        new_key, explore_key, selection_key = jax.random.split(key,3)
+
+        # get exploration rate
+        epsilon = get_epsilon(t)
+
+        # decide whether to explore
+        should_explore = jax.random.uniform(explore_key)<epsilon 
+
+        # choose action selection method accordingly
+        action, new_hidden_state = jax.lax.select(
+            should_explore,
+            select_random_action_batch(selection_key, obs.action_mask, hidden_state), #is it general enough?
+            greedy(nw_params, hidden_state,obs, terms)
+        )
+
+        # repack new selection params
+        new_select_params = (nw_params, new_hidden_state, terms, t, new_key)
+
+        return new_select_params, action
+    
+    # INTERACT LEVEL 2->1
+    # decide that yes, this is how we select actions
+    select_action = select_eps_greedy_action
+
+    # INTERACT LEVEL 2 (1.1)
+    def make_transition(
+            timestep,obs:Observation, action
+            ) -> Transition:
         
         # preprocessing timestep data
         rewards = timestep.reward[:, 0]
-        terms = ~(timestep.discount).astype(bool)[:, 0]
+        terms = ~(timestep.discount).astype(bool)[:, 0] #inverts discounts with ~
         transition = Transition(obs, action, rewards, terms)
 
-        # add transition
-        new_buffer_state = rb.add(buffer_state, transition)
+        return transition
 
-        return new_buffer_state
-
+    # INTERACT LEVEL 1 (1.)
     def select_step_store(
             interact_state:InteractionParams,_:Any
             ) -> Tuple[InteractionParams,Dict]:
+        """Selects an action, steps global env, stores timesteps in global rb and repacks the parameters for the next step."""
         
         # light unpacking
         selection_params, env_state, buffer_state, obs = interact_state
@@ -322,145 +412,112 @@ def make_update_fns(
         # step env with selected actions
         new_env_state, timestep = jax.vmap(env.step)(env_state, action)
 
-        # store timestep
-        new_buffer_state = store(buffer_state,timestep,obs, action)
+        # make and store transition
+        transition = make_transition(timestep,obs,action)
+        new_buffer_state = rb.add(buffer_state, transition)
 
         # repack and update interact state's dones
-        new_obs = timestep.observation
-        new_selection_params.terms = ~(timestep.discount).astype(bool)[:, 0] # generate terms in the same way as for storage
+        new_obs = timestep.observation # NB step!!
+        new_selection_params.terms = transition.terms # to keep the format the same as in storage
         new_interact_state = (new_selection_params, new_env_state, new_buffer_state, new_obs)
 
         return new_interact_state, timestep.extras.infos["episode_metrics"]
     
+    #___________________________________________________________________________________________________
+    # TRAIN FUNCTIONS
+    #
+    # - 2. train (overarching)
+    #    - 2.1 update_q
+    #        - 1.2.1 get_epsilon
+    #        - 1.2.2 greedy
+    #        - 1.2.3 select_random_action_batch
+    #            - 1.2.3.1 select_single_random_action
+    # 
 
 
-    def step(
-        action: Array, obs: Observation, env_state: State, buffer_state: BufferState
-    ) -> Tuple[Array, State, BufferState, Array, Dict]:
-        """Given an action, step the environment and add to the buffer."""
-        env_state, timestep = jax.vmap(env.step)(env_state, action)
-        next_obs = timestep.observation
-        rewards = timestep.reward[:, 0]
-        terms = ~(timestep.discount).astype(bool)[:, 0]
-        infos = timestep.extras
 
-        transition = Transition(obs, action, rewards, terms)
+    # Update functions:
+    def update_q(
+        params: QNetParams, opt_states: optax.OptState, data: Transition
+    ) -> Tuple[QNetParams, optax.OptState, Metrics]:
+        """Update the Q parameters."""
 
-        buffer_state = rb.add(buffer_state, transition)
+        # Make all data blocks the same num dims and prep for RNN
 
-        return next_obs, env_state, buffer_state, terms, infos["episode_metrics"]
-    
-    def act( 
-        carry: Tuple[FrozenVariableDict, HiddenState, Array, State, BufferState, int, chex.PRNGKey, Array], _: Any
-    ) -> Tuple[Tuple[FrozenVariableDict, HiddenState, Array, State, BufferState, int, chex.PRNGKey, Array], Dict]:
-        """Acting loop: select action, step env, add to buffer."""
-        online_params, hidden_state, obs, env_state, buffer_state, t, key, terms = carry
+        # Separate obs vs next obs
+        obs = data.obs[:,:-1,:,:] #(B,T,A,x (we assume one dim obs))
+        next_obs = data.obs[:,1:,:,:] #(B,T,A,x (we assume one dim obs))
 
-        act_hidden = select_eps_greedy_action(online_params, hidden_state, obs,t,key, terms)
-
-        action, hidden_state = act_hidden
-
-        next_obs, env_state, buffer_state, terms, metrics = step(action, obs, env_state, buffer_state)
-
-        return (online_params, hidden_state, next_obs, env_state, buffer_state, t , key, terms), metrics
-
-
-    def get_epsilon(t:int):
-        """Calculate epsilon for exploration rate using config hyperparameters."""
-        eps = jax.numpy.maximum(
-            cfg.system.eps_min,
-            1-(t/cfg.system.eps_decay)*(1-cfg.system.eps_min)
-            )
-        return eps
-    
-    def choose_action():
-        return
-    
-    
-
-    # Using probability values allows for non-ragged masking - must be done per row because of "choice".
-    def select_single_action(key, action_options, p_values):
-        """Select one action per row with probabilities given by p_values."""
-        action = jax.random.choice(key,action_options,p=p_values)
-        return action
-    
-    def select_random_action_batch(key, action_mask, hidden_state):
-        """Select actions randomly with masking."""
-        batch_size, n_agents, n_actions = action_mask.shape
-
-        keys = jax.random.split(key,batch_size*n_agents)
-        action_options = jnp.arange(n_actions)
-
-        num_avail_per_agent = jnp.sum(action_mask,axis=-1)[...,jnp.newaxis]
-
-        p_vals = action_mask.astype("int32")/num_avail_per_agent
-        p_vals = jnp.reshape(p_vals,(batch_size*n_agents,n_actions))
-
-        actions = jax.vmap(select_single_action, (0,None,0))(keys,action_options,p_vals)
-        actions = jnp.reshape(actions,(batch_size,n_agents))#,1))
-
-        return actions, hidden_state
-
-    def greedy(online_params:FrozenVariableDict, hidden_state, obs:Array,terms: Array):
+        # Remove last reward/term because of recurrence and transition structs
+        rewards = data.reward[:,:-1] # (B,T) no A because team rewards, and is only one deep
+        rewards = rewards[..., jnp.newaxis, jnp.newaxis] # makes B,T,1,1
+        terms = data.terms[:,:-1]
         terms = terms[..., jnp.newaxis, jnp.newaxis]
-        obs_done = [obs, terms]
-        # get q values
-        new_hidden_state, q_values = q.apply(online_params, hidden_state, obs_done)
-        # make unavailable actions quite negative
-        q_vals_masked = jnp.where(obs.action_mask,q_values,jnp.zeros(q_values.shape)-1000) #make more general
-        # greedy argmax
-        action = jnp.argmax(q_vals_masked, axis=-1)#.reshape(q_values.shape[0],q_values.shape[1],1)
-        return action, new_hidden_state
-    
 
-    def select_eps_greedy_action(online_params:FrozenVariableDict, hidden_state:HiddenState,obs:Array, t:int, key:chex.PRNGKey, terms:Array):
-        """Select action to take in eps-greedy way. Batch and agent dims are included."""
-        # get exploration rate
-        epsilon = get_epsilon(t)
+        # init the hidden states
+        hidden_size = 256
+        hidden_state = ScannedRNN.initialize_carry((cfg.system.n_envs, 1, obs.shape[2]), hidden_size)
 
-        # decide whether to explore
-        key,key_1 = jax.random.split(key,2)
-        should_explore = jax.random.uniform(key)<epsilon 
 
-        # choose actions accordingly
-        act_hidden = jax.lax.select(
-            should_explore,
-            select_random_action_batch(key_1, obs.action_mask, hidden_state), #is it general enough?
-            greedy(online_params, hidden_state,obs, terms)
+        next_obs_terms = (next_obs,terms)
+        new_hidden_state, next_q_vals_online = jax.lax.scan(q.apply(params=params.online))(hidden_state,next_obs_terms)
+
+
+        # TODO make scanned application
+
+
+         # make sim. to apply fn
+
+        next_q_vals_online = q.apply(params.online, data.next_obs) #TODO (Louise) not superduper efficient
+        next_q_vals_target = q.apply(params.target, data.next_obs) # TODO
+
+        # TODO (Claude) do double q-value selection here...
+        next_action = jnp.argmax(next_q_vals_online, axis=-1)
+        next_q_val = jnp.take(next_q_vals_target, next_action[...,jnp.newaxis])
+
+        target_q_val = (rewards + (1.0 - terms) * cfg.system.gamma * next_q_val)
+
+        # Update Q function.
+        q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
+        q_grads, q_loss_info = q_grad_fn(params.online, data.obs, data.done, data.action, target_q_val)
+        # Mean over the device and batch dimension.
+        q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="device")
+        q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="batch")
+        q_updates, new_q_opt_state = q_opt.update(q_grads, opt_states)
+        new_online_q_params = optax.apply_updates(params.online, q_updates)
+
+        # Target network polyak update.
+        new_target_q_params = optax.incremental_update(
+            new_online_q_params, params.target, cfg.system.tau
         )
 
-        return act_hidden
+        # Repack params and opt_states.
+        new_params = QNetParams(new_online_q_params, new_target_q_params)
+        #opt_states = opt_states._replace(q=new_q_opt_state)
 
-    def act( 
-        carry: Tuple[FrozenVariableDict, HiddenState, Array, State, BufferState, int, chex.PRNGKey, Array], _: Any
-    ) -> Tuple[Tuple[FrozenVariableDict, HiddenState, Array, State, BufferState, int, chex.PRNGKey, Array], Dict]:
-        """Acting loop: select action, step env, add to buffer."""
-        online_params, hidden_state, obs, env_state, buffer_state, t, key, terms = carry
-
-        act_hidden = select_eps_greedy_action(online_params, hidden_state, obs,t,key, terms)
-
-        action, hidden_state = act_hidden
-
-        next_obs, env_state, buffer_state, terms, metrics = step(action, obs, env_state, buffer_state)
-
-        return (online_params, hidden_state, next_obs, env_state, buffer_state, t , key, terms), metrics
+        return new_params, new_q_opt_state, q_loss_info
 
 
-    def step(
-        action: Array, obs: Observation, env_state: State, buffer_state: BufferState
-    ) -> Tuple[Array, State, BufferState, Array, Dict]:
-        """Given an action, step the environment and add to the buffer."""
-        env_state, timestep = jax.vmap(env.step)(env_state, action)
-        next_obs = timestep.observation
-        rewards = timestep.reward[:, 0]
-        terms = ~(timestep.discount).astype(bool)[:, 0]
-        infos = timestep.extras
 
-        transition = Transition(obs, action, rewards, terms)
+    # TRAIN LEVEL 1 (2.)
+    def train(
+        train_carry: Tuple[BufferState, QNetParams, optax.OptState, chex.PRNGKey], _: Any
+    ) -> Tuple[Tuple[BufferState, QNetParams, optax.OptState, chex.PRNGKey], Metrics]:
+        """Sample, train and repack."""
 
-        buffer_state = rb.add(buffer_state, transition)
+        # unpack and get keys
+        buffer_state, params, opt_states, key = train_carry
+        new_key, buff_key = jax.random.split(key, 2)
 
-        return next_obs, env_state, buffer_state, terms, infos["episode_metrics"]
+        # sample
+        data = rb.sample(buffer_state, buff_key).experience
+
+        # learn
+        new_params, new_opt_states, q_loss_info = update_q(params, opt_states, data)
+
+        return (buffer_state, new_params, new_opt_states, new_key), q_loss_info
+
+
 
     # losses:
     def q_loss_fn(q_online_params: FrozenVariableDict, obs: Array,terms: Array, action: Array, target: Array) -> Tuple[Array, Metrics]:
@@ -476,66 +533,7 @@ def make_update_fns(
 
         return q_loss, loss_info
 
-    # Update functions:
-    def update_q(
-        params: QLearnParams, opt_states: optax.OptState, data: Transition, key: chex.PRNGKey
-    ) -> Tuple[QLearnParams, optax.OptState, Metrics]:
-        """Update the Q parameters."""
-
-        # Separate obs vs next obs
-        obs = data.obs[:,:-1,:,:]
-        next_obs = data.obs[:,1:,:,:]
-
-
-        # Calculate Q target values.
-        rewards = data.reward[..., jnp.newaxis, jnp.newaxis]
-        dones = data.done[..., jnp.newaxis, jnp.newaxis]
-
-        next_q_vals_online = q.apply(params.dqns.online, data.next_obs) #TODO (Louise) not superduper efficient
-        next_q_vals_target = q.apply(params.dqns.target, data.next_obs) # TODO
-
-        # TODO (Claude) do double q-value selection here...
-        next_action = jnp.argmax(next_q_vals_online, axis=-1)
-        next_q_val = jnp.take(next_q_vals_target, next_action[...,jnp.newaxis])
-
-        target_q_val = (rewards + (1.0 - dones) * cfg.system.gamma * next_q_val)
-
-        # Update Q function.
-        q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
-        q_grads, q_loss_info = q_grad_fn(params.dqns.online, data.obs, data.done, data.action, target_q_val)
-        # Mean over the device and batch dimension.
-        q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="device")
-        q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="batch")
-        q_updates, new_q_opt_state = q_opt.update(q_grads, opt_states)
-        new_online_q_params = optax.apply_updates(params.dqns.online, q_updates)
-
-        # Target network polyak update.
-        new_target_q_params = optax.incremental_update(
-            new_online_q_params, params.dqns.target, cfg.system.tau
-        )
-
-        # Repack params and opt_states.
-        q_and_target = Qs(new_online_q_params, new_target_q_params)
-        params = params._replace(dqns=q_and_target)
-        #opt_states = opt_states._replace(q=new_q_opt_state)
-
-        return params, new_q_opt_state, q_loss_info
-
-    # Act/learn loops:
-    def update_epoch(
-        carry: Tuple[BufferState, QLearnParams, optax.OptState, int, chex.PRNGKey], _: Any
-    ) -> Tuple[Tuple[BufferState, QLearnParams, optax.OptState, int, chex.PRNGKey], Metrics]:
-        """Update the Q function and optionally policy/alpha with TD3 delayed update."""
-        buffer_state, params, opt_states, t, key = carry
-        key, buff_key, q_key, actor_key = jax.random.split(key, 4)
-
-        # sample
-        data = rb.sample(buffer_state, buff_key).experience
-
-        # learn
-        params, opt_states, q_loss_info = update_q(params, opt_states, data, q_key)
-
-        return (buffer_state, params, opt_states, t, key), q_loss_info
+    
     
     
 
