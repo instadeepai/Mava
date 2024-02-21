@@ -9,5 +9,3 @@ eval_metric: win_rate
 
 kwargs:
   time_limit: 500
-  get_adversary_obs: False
-  get_adversary_actions: False

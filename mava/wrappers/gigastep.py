@@ -46,8 +46,6 @@ class GigastepWrapper(Wrapper):
         env: GigastepEnv,
         time_limit: int = 500,
         has_global_state: bool = False,
-        get_adversary_obs: bool = False,
-        get_adversary_actions: bool = False,
     ):
         """
         Wraps a Gigastep environment so that its API is compatible with Jumanji environments.
@@ -56,10 +54,6 @@ class GigastepWrapper(Wrapper):
             env: The Gigastep environment to be wrapped.
             time_limit (int): The maximum duration of each episode, in seconds. Defaults to 500.
             has_global_state (bool): Whether the environment has a global state. Defaults to False.
-            get_adversary_obs (bool): Whether to retrieve adversary observations for
-            the global state. Defaults to False.
-            get_adversary_actions (bool): Whether to retrieve adversary actions for
-            the global state. Defaults to False.
         """
 
         assert (
@@ -68,11 +62,6 @@ class GigastepWrapper(Wrapper):
         assert (
             env._obs_type == "vector"
         ), "Only Vector observations are currently supported for Gigastep environments"
-        assert (
-            get_adversary_actions is False and get_adversary_obs is False
-        ) or has_global_state is True, (
-            "For a customized global observation, set has_global_state to True"
-        )
 
         super().__init__(env)
         self._env: GigastepEnv
@@ -81,8 +70,6 @@ class GigastepWrapper(Wrapper):
         self.num_actions = self._env.n_actions
 
         self.has_global_state = has_global_state
-        self.get_adversary_obs = get_adversary_obs
-        self.get_adversary_actions = get_adversary_actions
 
     def reset(self, key: PRNGKey) -> Tuple[GigastepState, TimeStep]:
         """
@@ -186,7 +173,7 @@ class GigastepWrapper(Wrapper):
     def get_global_state(self, obs: Array, adversary_actions: Array) -> Array:
         """
         Combines observations from all agents,
-        optionally adding adversary actions, and adversary observations
+        adversary actions, and adversary observations
         to create a global state for the environment.
 
         Args:
@@ -196,13 +183,10 @@ class GigastepWrapper(Wrapper):
         Returns:
             global_obs (Array): The global observation.
         """
+        global_obs = jnp.concatenate(obs, axis=0)
         global_obs = jnp.concatenate(
-            obs if self.get_adversary_obs else obs[: self.num_agents], axis=0
-        )
-        if self.get_adversary_actions:
-            global_obs = jnp.concatenate(
-                [global_obs, adversary_actions], axis=0
-            )  # add the adversary actions to the end of the global observation
+            [global_obs, adversary_actions], axis=0
+        )  # add the adversary actions to the end of the global observation
 
         return jnp.tile(global_obs, (self.num_agents, 1))
 
@@ -221,17 +205,11 @@ class GigastepWrapper(Wrapper):
             (self.num_agents,), jnp.int32, 0, self._env.max_episode_length, "step_count"
         )
         if self.has_global_state:
-            number_of_agents_in_obs = (
-                self._env.n_agents if self.get_adversary_obs else self._env.n_agents_team1
-            )  # either the total num of agents or only team1 depending on the flag
-            adversary_action_sizes = (
-                self._env.n_agents_team2 if self.get_adversary_actions else 0
-            )  # consider the added space of the adversary actions
             global_state = specs.BoundedArray(
                 (
                     self.num_agents,
-                    self._env.observation_space.shape[0] * number_of_agents_in_obs
-                    + adversary_action_sizes,
+                    self._env.observation_space.shape[0] * self._env.n_agents
+                    + self._env.n_agents_team2,
                 ),
                 jnp.int32,
                 0,
