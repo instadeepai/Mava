@@ -32,7 +32,7 @@ else:
 
 @dataclass
 class GigastepState:
-    """Wrapper around a Gigastep state to provide necessary attributes for jumanji environments."""
+    """Wrapper around a Gigastep state to provide necessary attributes for Jumanji environments."""
 
     state: State
     key: PRNGKey
@@ -56,6 +56,7 @@ class GigastepWrapper(Wrapper):
             has_global_state (bool): Whether the environment has a global state. Defaults to False.
         """
 
+        super().__init__(env)
         assert (
             env.discrete_actions
         ), "Only discrete action spaces are currently supported for Gigastep environments"
@@ -63,7 +64,6 @@ class GigastepWrapper(Wrapper):
             env._obs_type == "vector"
         ), "Only Vector observations are currently supported for Gigastep environments"
 
-        super().__init__(env)
         self._env: GigastepEnv
         self._env.max_episode_length = time_limit
         self.num_agents = self._env.n_agents_team1
