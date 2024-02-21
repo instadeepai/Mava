@@ -569,7 +569,7 @@ def learner_setup(
         )
         # Restore the learner state from the checkpoint
         restored_params, restored_hstates = loaded_checkpoint.restore_params(
-            input_params=params, restore_hstates=True
+            input_params=params, restore_hstates=True, THiddenState=HiddenStates
         )
         # Update the params and hstates
         params = restored_params

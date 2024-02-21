@@ -144,20 +144,20 @@ class Checkpointer:
 
     def restore_params(
         self,
-        input_params: Params,
+        input_params: Any,
         timestep: Optional[int] = None,
         restore_hstates: bool = False,
-        TParams: Type[Params] = Params,  # noqa: N803
-        THiddenState: Type[HiddenStates] = HiddenStates,  # noqa: N803
+        THiddenState: Optional[Type] = None,  # noqa: N803
     ) -> Tuple[Params, Union[HiddenStates, None]]:
         """Restore the params and the hidden state (in case of RNNs)
 
         Args:
-            input_params (Params): the params of the learner.
-            timestep (Optional[int], optional):
+            input_params (Any): A pytree of FrozenDict params of the learner.
+            timestep (Optional[int]):
                 Specific timestep for restoration (of course, only if that timestep exists).
                 Defaults to None, in which case the latest step will be used.
             restore_hstates (bool, optional): Whether to restore the hidden states.
+            THiddenState (Type): The type of the hidden states to be restored.
 
         Returns:
             Tuple[Params,Union[HiddenState, None]]: the restored params and hidden states.
@@ -177,6 +177,9 @@ class Checkpointer:
         # Dictionary of the restored learner state
         restored_learner_state_raw = restored_checkpoint["learner_state"]
 
+        # The type of params to restore is the same type as the `input_params`
+        TParams = type(input_params)  # noqa: N806
+
         # Check the type of `input_params` for compatibility.
         # This is a sanity check to ensure correct handling of parameter types.
         # In Flax 0.6.11, parameters were typically of the `FrozenDict` type,
@@ -188,7 +191,7 @@ class Checkpointer:
 
         # Restore hidden states if required
         restored_hstates = None
-        if restore_hstates:
+        if restore_hstates and THiddenState is not None:
             if isinstance(input_params.actor_params, FrozenDict):
                 restored_hstates = THiddenState(**FrozenDict(restored_learner_state_raw["hstates"]))
             else:
