@@ -1,7 +1,7 @@
 # ---Environment Configs---
 defaults:
   - _self_
-  - scenario: hide_and_seek_5_vs_5 # [hide_and_seek_5_vs_5, identical_5_vs_5, waypoint_5_vs_5]
+  - scenario: hide_and_seek_5_vs_5_pobs # [hide_and_seek_5_vs_5_fobs, hide_and_seek_5_vs_5_pobs, waypoint_5_vs_5_fobs, waypoint_5_vs_5_pobs]
 
 env_name: Gigastep
 
