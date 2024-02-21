@@ -29,26 +29,18 @@ class AgentIDWrapper(Wrapper):
     It can be useful in multi-agent environments where agents require unique identification.
     """
 
-    def __init__(self, env: Environment, has_global_state: bool = False):
+    def __init__(self, env: Environment):
         super().__init__(env)
-        self.has_global_state = has_global_state
 
     def _add_agent_ids(
         self, timestep: TimeStep, num_agents: int
     ) -> Union[Observation, ObservationGlobalState]:
         """Adds agent IDs to the observation."""
+        obs = timestep.observation
         agent_ids = jnp.eye(num_agents)
-        obs_data = {
-            "agents_view": jnp.concatenate([agent_ids, timestep.observation.agents_view], axis=-1),
-            "action_mask": timestep.observation.action_mask,
-            "step_count": timestep.observation.step_count,
-        }
+        agents_view = jnp.concatenate([agent_ids, obs.agents_view], axis=-1)
 
-        if self.has_global_state:
-            obs_data["global_state"] = timestep.observation.global_state
-            return ObservationGlobalState(**obs_data)
-        else:
-            return Observation(**obs_data)
+        return obs._replace(agents_view=agents_view)  # type: ignore
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment."""
@@ -75,16 +67,7 @@ class AgentIDWrapper(Wrapper):
         obs_spec = self._env.observation_spec()
         num_obs_features = obs_spec.agents_view.shape[-1] + self._env.num_agents
         dtype = obs_spec.agents_view.dtype
-
         agents_view = specs.Array((self._env.num_agents, num_obs_features), dtype, "agents_view")
-
-        if self.has_global_state:
-            wrapped_state_spec = obs_spec.global_state
-
-            global_state = specs.Array(
-                wrapped_state_spec.shape, wrapped_state_spec.dtype, "global_state"
-            )
-            return obs_spec.replace(agents_view=agents_view, global_state=global_state)
 
         return obs_spec.replace(agents_view=agents_view)
 

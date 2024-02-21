@@ -60,7 +60,7 @@ def add_optional_wrappers(
 
     # Add agent id to observation.
     if config.system.add_agent_id:
-        env = AgentIDWrapper(env, add_global_state)
+        env = AgentIDWrapper(env)
     return env
 
 
