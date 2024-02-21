@@ -52,16 +52,13 @@ _jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 
 
 def add_optional_wrappers(
-    env: Environment,
-    config: DictConfig,
-    add_global_state: bool = False,
+    env: Environment, config: DictConfig, add_global_state: bool = False
 ) -> Environment:
     # Add the global state to observation.
     if add_global_state:
         env = GlobalStateWrapper(env)
 
     # Add agent id to observation.
-
     if config.system.add_agent_id:
         env = AgentIDWrapper(env, add_global_state)
     return env

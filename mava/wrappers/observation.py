@@ -25,7 +25,9 @@ from mava.types import Observation, ObservationGlobalState, State
 
 
 class AgentIDWrapper(Wrapper):
-    """A wrapper to add a one-hot vector as an agent IDs to the original observation."""
+    """A wrapper to add a one-hot vector as agent IDs to the original observation.
+    It can be useful in multi-agent environments where agents require unique identification.
+    """
 
     def __init__(self, env: Environment, has_global_state: bool = False):
         super().__init__(env)
@@ -34,7 +36,7 @@ class AgentIDWrapper(Wrapper):
     def _add_agent_ids(
         self, timestep: TimeStep, num_agents: int
     ) -> Union[Observation, ObservationGlobalState]:
-
+        """Adds agent IDs to the observation."""
         agent_ids = jnp.eye(num_agents)
         obs_data = {
             "agents_view": jnp.concatenate([agent_ids, timestep.observation.agents_view], axis=-1),
@@ -69,7 +71,7 @@ class AgentIDWrapper(Wrapper):
     def observation_spec(
         self,
     ) -> Union[specs.Spec[Observation], specs.Spec[ObservationGlobalState]]:
-        """Specification of the observation of the `RobotWarehouse` environment."""
+        """Specification of the observation of the selected environment."""
         obs_spec = self._env.observation_spec()
         num_obs_features = obs_spec.agents_view.shape[-1] + self._env.num_agents
         dtype = obs_spec.agents_view.dtype
@@ -119,7 +121,7 @@ class GlobalStateWrapper(Wrapper):
         return state, self.modify_timestep(timestep)
 
     def observation_spec(self) -> specs.Spec[ObservationGlobalState]:
-        """Specification of the observation of the `RobotWarehouse` environment."""
+        """Specification of the observation of the selected environment."""
 
         obs_spec = self._env.observation_spec()
         num_obs_features = obs_spec.agents_view.shape[-1]
