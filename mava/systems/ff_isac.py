@@ -40,7 +40,7 @@ from mava.evaluator import make_eval_fns
 from mava.types import Observation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import unreplicate_batch_dim, unreplicate_learner_state
+from mava.utils.jax import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers import episode_metrics
 
@@ -616,7 +616,7 @@ def run_experiment(cfg: DictConfig) -> float:
         # Checkpoint:
         if cfg.logger.checkpointing.save_model:
             # Save checkpoint of learner state
-            unreplicated_learner_state = unreplicate_learner_state(learner_state)  # type: ignore
+            unreplicated_learner_state = unreplicate_n_dims(learner_state)  # type: ignore
             checkpointer.save(
                 timestep=t,
                 unreplicated_learner_state=unreplicated_learner_state,
