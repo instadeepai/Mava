@@ -106,7 +106,7 @@ class MavaLogger:
 class BaseLogger(abc.ABC):
     @abc.abstractmethod
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
-        ...
+        pass
 
     @abc.abstractmethod
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
