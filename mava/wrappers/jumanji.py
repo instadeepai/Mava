@@ -29,7 +29,8 @@ from mava.types import Observation, State
 class MultiAgentWrapper(Wrapper):
     def __init__(self, env: Environment):
         super().__init__(env)
-        self._num_agents = self._env.num_agents
+        self.num_agents = self._env.num_agents
+        self.num_actions = int(self._env.action_spec().num_values[0])
         self.time_limit = self._env.time_limit
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
@@ -49,10 +50,10 @@ class MultiAgentWrapper(Wrapper):
     def observation_spec(self) -> specs.Spec[Observation]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
-            (self._num_agents,),
+            (self.num_agents,),
             jnp.int32,
-            [0] * self._num_agents,
-            [self.time_limit] * self._num_agents,
+            [0] * self.num_agents,
+            [self.time_limit] * self.num_agents,
             "step_count",
         )
         return self._env.observation_spec().replace(step_count=step_count)
@@ -69,10 +70,10 @@ class RwareWrapper(MultiAgentWrapper):
         observation = Observation(
             agents_view=timestep.observation.agents_view,
             action_mask=timestep.observation.action_mask,
-            step_count=jnp.repeat(timestep.observation.step_count, self._num_agents),
+            step_count=jnp.repeat(timestep.observation.step_count, self.num_agents),
         )
-        reward = jnp.repeat(timestep.reward, self._num_agents)
-        discount = jnp.repeat(timestep.discount, self._num_agents)
+        reward = jnp.repeat(timestep.reward, self.num_agents)
+        discount = jnp.repeat(timestep.discount, self.num_agents)
         return timestep.replace(observation=observation, reward=reward, discount=discount)
 
 
@@ -98,7 +99,7 @@ class LbfWrapper(MultiAgentWrapper):
         team_reward = jnp.sum(timestep.reward)
 
         # Repeat the aggregated reward for each agent.
-        reward = jnp.repeat(team_reward, self._num_agents)
+        reward = jnp.repeat(team_reward, self.num_agents)
         return timestep.replace(observation=observation, reward=reward)
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
@@ -109,7 +110,7 @@ class LbfWrapper(MultiAgentWrapper):
         modified_observation = Observation(
             agents_view=timestep.observation.agents_view,
             action_mask=timestep.observation.action_mask,
-            step_count=jnp.repeat(timestep.observation.step_count, self._num_agents),
+            step_count=jnp.repeat(timestep.observation.step_count, self.num_agents),
         )
         if self._use_individual_rewards:
             # The environment returns a list of individual rewards and these are used as is.

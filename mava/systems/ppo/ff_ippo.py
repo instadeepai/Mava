@@ -334,8 +334,11 @@ def learner_setup(
     n_devices = len(jax.devices())
 
     # Get number of actions and agents.
-    num_actions = int(env.action_spec().num_values[0])
-    num_agents = env.action_spec().shape[0]
+    # TODO: do we need to add this to config? else can do this to point on the same thing?
+    # (1) config.system.num_agents = num_agents = env.num_actions
+    # (2) config.system.num_agents, num_agents = (env.num_actions,) * 2
+    num_actions = env.num_actions
+    num_agents = env.num_agents
     config.system.num_agents = num_agents
     config.system.action_dim = num_actions
 
@@ -362,9 +365,9 @@ def learner_setup(
         optax.adam(critic_lr, eps=1e-5),
     )
 
-    # Initialise observation: Select only obs for a single agent.
-    init_x = env.observation_spec().generate_value()
-    init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
+    # Initialise observation: Select only obs for a single agent + batch dim.
+    obs = env.observation_spec().generate_value()
+    init_x = jax.tree_util.tree_map(lambda x: x[0][jnp.newaxis, ...], obs)
 
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(actor_net_key, init_x)

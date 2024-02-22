@@ -466,8 +466,8 @@ def learner_setup(
     n_devices = len(jax.devices())
 
     # Get number of actions and agents.
-    num_actions = int(env.action_spec().num_values[0])
-    num_agents = env.action_spec().shape[0]
+    num_actions = env.num_actions
+    num_agents = env.num_agents
     config.system.num_agents = num_agents
     config.system.action_dim = num_actions
 
@@ -510,8 +510,12 @@ def learner_setup(
 
     # Initialise hidden states.
     hidden_size = config.network.actor_network.pre_torso.layer_sizes[-1]
-    init_policy_hstate = ScannedRNN.initialize_carry((config.arch.num_envs), hidden_size)
-    init_critic_hstate = ScannedRNN.initialize_carry((config.arch.num_envs), hidden_size)
+    init_policy_hstate = ScannedRNN.initialize_carry(
+        (config.arch.num_envs, num_agents), hidden_size
+    )
+    init_critic_hstate = ScannedRNN.initialize_carry(
+        (config.arch.num_envs, num_agents), hidden_size
+    )
 
     # initialise params and optimiser state.
     actor_params = actor_network.init(actor_net_key, init_policy_hstate, init_x)

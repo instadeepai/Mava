@@ -40,13 +40,7 @@ from mava.systems.ppo.types import (
     RNNLearnerState,
     RNNPPOTransition,
 )
-from mava.types import (
-    ExperimentOutput,
-    LearnerFn,
-    ObservationGlobalState,
-    RecActorApply,
-    RecCriticApply,
-)
+from mava.types import ExperimentOutput, LearnerFn, RecActorApply, RecCriticApply
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import unreplicate_batch_dim, unreplicate_n_dims
@@ -464,8 +458,8 @@ def learner_setup(
     n_devices = len(jax.devices())
 
     # Get number of actions and agents.
-    num_actions = int(env.action_spec().num_values[0])
-    num_agents = env.action_spec().shape[0]
+    num_actions = env.num_actions
+    num_agents = env.num_agents
     config.system.num_agents = num_agents
     config.system.action_dim = num_actions
 
