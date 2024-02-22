@@ -81,6 +81,8 @@ def get_learner_fn(
             key, policy_key = jax.random.split(key)
             actor_policy = actor_apply_fn(params.actor_params, last_timestep.observation)
             value = critic_apply_fn(params.critic_params, last_timestep.observation)
+            # sample,log_prob= actor_policy._sample_and_log_prob(
+            # seed=seed, sample_shape=(num_actions,))
             action = actor_policy.sample(seed=policy_key)
             log_prob = actor_policy.log_prob(action)
 
@@ -173,7 +175,7 @@ def get_learner_fn(
                     )
                     loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
                     loss_actor = loss_actor.mean()
-                    entropy = actor_policy.entropy().mean()
+                    entropy = actor_policy.distribution.entropy().mean()
 
                     total_loss_actor = loss_actor - config.system.ent_coef * entropy
                     return total_loss_actor, (loss_actor, entropy)

@@ -110,48 +110,9 @@ class DiscreteActionHead(nn.Module):
             jnp.finfo(jnp.float32).min,
         )
 
-        return distrax.Categorical(logits=masked_logits)
-
-
-class ContinuousDistribution:
-    def __init__(self, min: float = -1, max: float = 1):
-        scale = 0.5 * (max - min)
-        self.bijector = tfb.Chain(
-            [tfb.Shift(min), tfb.Scale(scale=scale), tfb.Shift(1), tfb.Tanh()]
-        )  # These transformations still under discussion.
-
-    def __call__(self, loc, scale):
-        self.transformed_distribution = tfd.TransformedDistribution(
-            distribution=tfd.MultivariateNormalDiag(
-                loc=self._mu_activation(loc), scale_diag=self._sigma_activation(scale)
-            ),
-            bijector=self.bijector,
+        return tfd.TransformedDistribution(
+            distribution=tfd.Categorical(logits=masked_logits), bijector=tfb.Identity()
         )
-
-    def _sigma_activation(self, sigma, sigma_min=-4, sigma_max=0):
-        return jnp.exp(sigma_min + 0.5 * (sigma_max - sigma_min) * (jnp.tanh(sigma) + 1.0))
-
-    def _mu_activation(self, mean):
-        # not sure if this is correct?
-        return mean  # jnp.tanh(mean)
-
-    def sample_and_log_prob(self, seed):
-        sample = self.transformed_distribution.sample(seed=seed)
-        log_prob = self.transformed_distribution.log_prob(sample)
-        return sample, log_prob
-
-    def sample(self, seed):
-        return self.transformed_distribution.sample(seed=seed)
-
-    def log_prob(self, sample):
-        return self.transformed_distribution.log_prob(sample)
-
-    def entropy(self):
-        return (
-            self.transformed_distribution.distribution.entropy()
-        )  # Get the entropy of original distribution.
-        # add the feeded samples for the log_prob
-        # return -self.transformed_distribution.log_prob(sample)
 
 
 class ContinuousActionHead(nn.Module):
@@ -164,7 +125,16 @@ class ContinuousActionHead(nn.Module):
     def setup(self) -> None:
         self.actor_mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))
         self.actor_log_std = self.param("log_std", nn.initializers.zeros, (self.action_dim,))
-        self.distribution = ContinuousDistribution(self.minimum, self.maximum)
+        scale = 0.5 * (self.maximum - self.minimum)
+        self.bijector = tfb.Chain(
+            [tfb.Shift(self.minimum), tfb.Scale(scale=scale), tfb.Shift(1), tfb.Tanh()]
+        )
+
+    def _sigma_activation(
+        self, sigma: chex.Array, sigma_min: float = -4, sigma_max: float = 0
+    ) -> chex.Array:
+        # Not sure if this is the right way also for sigma_min and max?
+        return jnp.exp(sigma_min + 0.5 * (sigma_max - sigma_min) * (jnp.tanh(sigma) + 1.0))
 
     @nn.compact
     def __call__(
@@ -182,8 +152,12 @@ class ContinuousActionHead(nn.Module):
         """
 
         mean = self.actor_mean(obs_embedding)
-        self.distribution(mean, self.actor_log_std)  # Returns None.
-        return self.distribution
+        return tfd.TransformedDistribution(
+            distribution=tfd.MultivariateNormalDiag(
+                loc=mean, scale_diag=self._sigma_activation(self.actor_log_std)
+            ),
+            bijector=self.bijector,
+        )
 
 
 class FeedForwardActor(nn.Module):
