@@ -40,13 +40,7 @@ from mava.systems.ppo.types import (
     RNNLearnerState,
     RNNPPOTransition,
 )
-from mava.types import (
-    ExperimentOutput,
-    LearnerFn,
-    ObservationGlobalState,
-    RecActorApply,
-    RecCriticApply,
-)
+from mava.types import ExperimentOutput, LearnerFn, RecActorApply, RecCriticApply
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import unreplicate_batch_dim, unreplicate_n_dims
@@ -498,17 +492,13 @@ def learner_setup(
         optax.adam(critic_lr, eps=1e-5),
     )
 
-    # Initialise observation: Select only obs for a single agent.
+    # Initialise observation for all agents.
     init_obs = env.observation_spec().generate_value()
-
-    # init_obs = jax.tree_util.tree_map(lambda x: x[0], init_obs)
     init_obs = jax.tree_util.tree_map(
         lambda x: jnp.repeat(x[jnp.newaxis, ...], config.arch.num_envs, axis=0),
         init_obs,
     )
-    init_obs = jax.tree_util.tree_map(lambda x: x[None, ...], init_obs)
-
-    # Select only a single agent
+    init_obs = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], init_obs)
     init_done = jnp.zeros((1, config.arch.num_envs, num_agents), dtype=bool)
     init_obs_done = (init_obs, init_done)
 
