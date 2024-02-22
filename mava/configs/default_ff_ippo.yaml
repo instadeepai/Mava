@@ -3,5 +3,5 @@ defaults:
   - arch: anakin
   - system: ff_ippo
   - network: mlp
-  - env: mabrax
+  - env: rware
   - _self_
