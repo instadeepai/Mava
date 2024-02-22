@@ -59,47 +59,41 @@ class ActionSelectionParams(NamedTuple):
 class InteractionParams(NamedTuple):
     select_params: ActionSelectionParams
     env_state: State
-    buffer_state: TrajectoryBufferState
     obs: Observation
+    buffer_state: TrajectoryBufferState
 
-
-Metrics = Dict[str, Array]
 
 class QNetParams(NamedTuple):
     online: FrozenVariableDict
     target: FrozenVariableDict
 
-class HiddenStates(NamedTuple):
-    online: chex.Array
-    target: chex.Array
+class RNNQLearnerState(NamedTuple):
+    """State of the `Learner` for recurrent architectures for Q-learning."""
+    # purely interaction vars
+    hidden_state: chex.Array
+    terms: chex.Array
+    t: int
+    env_state: State
+    obs: Observation
 
-# class QLearnParams(NamedTuple):
-#     dqns:Qs
-#     # NOTE (Louise) later add Qmix network
+    # shared vars
+    buffer_state: TrajectoryBufferState
+    params: QNetParams
+    key: chex.PRNGKey
 
-class Networks(NamedTuple):
-    q: nn.Module
+    # purely training vars
+    opt_state: optax.OptState
+
+Metrics = Dict[str, Array]
 
 class Optimisers(NamedTuple):
     q: optax.GradientTransformation
-
-class RNNQLearnerState(NamedTuple):
-    """State of the `Learner` for recurrent architectures for Q-learning."""
-    obs: Array
-    env_state: State
-    buffer_state: TrajectoryBufferState
-    params: QLearnParams
-    opt_state: optax.OptState
-    t: Array
-    key: PRNGKey
-    hstates: HiddenStates
-
 
 class Transition(NamedTuple):
     obs: Array
     action: Array
     reward: Array
-    done: Array
+    term: Array
 
 BufferState: TypeAlias = TrajectoryBufferState[Transition]
 
@@ -125,10 +119,15 @@ class RecQNetwork(nn.Module):
 
         return hidden_state, q_values
 
+
+
+class Networks(NamedTuple):
+    q: RecQNetwork
+
 class NetworkInput(NamedTuple):
     hidden_state: chex.Array
     obs: Observation
-    done: bool
+    terms: bool
 
 # How we initialise the Networks in PPO
 """
@@ -186,54 +185,60 @@ def init(
     num_actions = int(env.action_spec().num_values[0])
     num_agents = env.action_spec().shape[0]
 
-    key, q_key, q_target_key = jax.random.split(key, 3)
+    key, q_key = jax.random.split(key, 2)
 
+
+    # ALL INITS TO MAKE NETWORK
     # initialise observation for the sizes
-    init_obs = env.observation_spec().generate_value()
+    init_obs = env.observation_spec().generate_value() # A,x
     init_obs_batched = jax.tree_util.tree_map(
         lambda x: jnp.repeat(x[jnp.newaxis, ...], cfg.system.n_envs, axis=0),
         init_obs,
-    )
-    init_obs_batched = jax.tree_util.tree_map(lambda x: x[None, ...], init_obs_batched)
-    init_done = jnp.zeros((1, cfg.system.n_envs,num_agents), dtype=bool)
+    ) # n_envs, A ,x
+    init_obs_batched = jax.tree_util.tree_map(lambda x: x[:,jnp.newaxis, ...], init_obs_batched) # add time dim (n_envs,1,A,x)
+    init_terms = jnp.zeros(( cfg.system.n_envs,1,num_agents), dtype=bool) # (n_envs,1,A)
 
-    init_acts = env.action_spec().generate_value()
-
-    init_x = (init_obs_batched, init_done)
+    init_x = (init_obs_batched, init_terms)
     # Initialise hidden states.
     hidden_size = 256
-    init_hstate = ScannedRNN.initialize_carry((cfg.system.n_envs, 1, num_agents), hidden_size)
+    init_hstate = ScannedRNN.initialize_carry((cfg.system.n_envs,1, num_agents), hidden_size) #(n_envs,1, A,x)
 
     # Making recurrent Q network
     q = RecQNetwork(num_actions)
     q_params = q.init(q_key, init_hstate, init_x) 
-    q_target_params = q.init(q_target_key, init_hstate, init_x)
-
-
-    #init_hstate = HiddenStates(init_hstate,init_hstate)
 
     # Pack params
-    params = QLearnParams(Qs(q_params, q_target_params))
+    params = QNetParams(q_params, q_params)
 
+    # OPTIMISER
     q_opt = optax.adam(cfg.system.q_lr)
-    q_opt_state = q_opt.init(params.dqns.online)
-
+    q_opt_state = q_opt.init(params.online)
 
     # Distribute params and opt states across all devices
     params = replicate(params)
     q_opt_state = replicate(q_opt_state)
+
     h_state = replicate(init_hstate)
+
+    # BUFFER CREATION INITS
+    init_acts = env.action_spec().generate_value() #A,
+    init_acts_batched = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], init_acts)
+    init_obs = env.observation_spec().generate_value() # A,x
+    init_obs_batched = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], init_obs)
 
     # Create replay buffer
     init_transition = Transition(
-        obs=Observation(*init_obs),
-        action=init_acts,
-        reward=jnp.zeros((), dtype=float),
-        done=jnp.zeros((), dtype=bool)
+        obs=Observation(*init_obs_batched),
+        action=init_acts_batched,
+        reward=jnp.zeros((num_agents,), dtype=float),
+        term=jnp.zeros((num_agents,), dtype=bool)
     )
 
-    try: rec_chunk_size = cfg.system.recurrent_chunk_size
-    except: rec_chunk_size = cfg.system.rollout_length
+    # default use rollout length of trajectories
+    if cfg.system.recurrent_chunk_size:
+        rec_chunk_size = cfg.system.recurrent_chunk_size
+    else: 
+        rec_chunk_size = cfg.system.rollout_length
 
     rb = fbx.make_trajectory_buffer(
         sample_sequence_length = rec_chunk_size,
@@ -245,7 +250,7 @@ def init(
     )
     buffer_state = replicate(rb.init(init_transition))
 
-    nns = (q) 
+    nns = Networks(q) 
 
     # Reset env.
     n_keys = cfg.system.n_envs * n_devices * cfg.system.update_batch_size
@@ -265,15 +270,17 @@ def init(
         ),
         axis_name="device",
     )(reset_keys)
+
     first_obs = first_timestep.observation
+    first_terms = ~(first_timestep.discount).astype(bool)#[:,0,:,0] # SAME AS BELOW #BTAx
 
     t = jnp.zeros((n_devices, cfg.system.update_batch_size), dtype=int)
 
     # Initial learner state.
     learner_state = RNNQLearnerState(
-        first_obs, env_state, buffer_state, params, q_opt_state, t, first_keys, h_state
+        h_state, first_terms, t, env_state, first_obs, buffer_state, params, first_keys, q_opt_state
     )
-    return (env, eval_env), nns, q_opt, rb, learner_state, logger, key 
+    return (env, eval_env), nns, Optimisers(q_opt), rb, learner_state, logger, key 
 
 
 def make_update_fns(
@@ -283,10 +290,14 @@ def make_update_fns(
     opts: Optimisers,
     rb: TrajectoryBuffer,
     # target_entropy: chex.Array,
-) -> Callable[[RNNQLearnerState], Tuple[RNNQLearnerState, Metrics]]:
+) -> Callable[[RNNQLearnerState], Tuple[RNNQLearnerState, Tuple[Metrics,Metrics]]]:
     
     q = nns.q 
     q_opt = opts.q
+
+    # used everywhere a new hidden state needs to be initialised
+    hidden_size = 256 #standardise and get from nw
+
     #___________________________________________________________________________________________________
     # INTERACTION FUNCTIONS
     #
@@ -336,7 +347,7 @@ def make_update_fns(
             ) -> Tuple[chex.Array,chex.Array]:
         """Uses online q values to greedily select the best action."""
         # get q values
-        new_hidden_state, q_values = q.apply(online_params, hidden_state, obs, terms) #TODO: Make nw compatible
+        new_hidden_state, q_values = q.apply(online_params, hidden_state, (obs, terms)) #TODO: Make nw compatible
         # make unavailable actions quite negative
         q_vals_masked = jnp.where(obs.action_mask,q_values,jnp.zeros(q_values.shape)-1000) #TODO: action masking in nw
         # greedy argmax over inner dimension
@@ -391,8 +402,8 @@ def make_update_fns(
             ) -> Transition:
         
         # preprocessing timestep data
-        rewards = timestep.reward[:, 0]
-        terms = ~(timestep.discount).astype(bool)[:, 0] #inverts discounts with ~
+        rewards = timestep.reward
+        terms = ~(timestep.discount).astype(bool) #inverts discounts with ~
         transition = Transition(obs, action, rewards, terms)
 
         return transition
@@ -428,58 +439,78 @@ def make_update_fns(
     #
     # - 2. train (overarching)
     #    - 2.1 update_q
-    #        - 1.2.1 get_epsilon
-    #        - 1.2.2 greedy
-    #        - 1.2.3 select_random_action_batch
-    #            - 1.2.3.1 select_single_random_action
+    #        - 1.2.1 q_loss_fn
+    #        - 1.2.2 scan_apply
     # 
 
+    # TRAIN LEVEL 3 (2.1.1)
+    def q_loss_fn(
+            q_online_params: FrozenVariableDict, obs: Array,terms: Array, action: Array, target: Array
+            ) -> Tuple[Array, Metrics]:
+        """The portion of the calculation to grad, namely online apply and mse with target."""
+        q_online = scan_apply(q_online_params,obs,terms)
+        q_online = jnp.take(q_online, action[...,jnp.newaxis])
+        q_loss = jnp.mean((q_online - target) ** 2)
 
+        loss_info = {
+            "q_loss": q_loss,
+            "mean_q": jnp.mean(q_online),
+        }
 
-    # Update functions:
+        return q_loss, loss_info
+    
+    # TRAIN LEVEL 3 and 4 (2.1.2, 2.1.1.1)
+    def scan_apply(params, obs:Observation, terms):
+        """Applies RNN to a batch of trajectories by scanning over batch dim."""
+        hidden_state = ScannedRNN.initialize_carry((cfg.system.n_envs, 1, obs.shape[2]), hidden_size)
+        obs_terms = (obs,terms)
+        new_hidden_state, next_q_vals_online = jax.lax.scan(q.apply(params=params))(hidden_state,obs_terms)
+        return next_q_vals_online
+
+    # TRAIN LEVEL 2 (2.1)
     def update_q(
         params: QNetParams, opt_states: optax.OptState, data: Transition
     ) -> Tuple[QNetParams, optax.OptState, Metrics]:
         """Update the Q parameters."""
 
         # Make all data blocks the same num dims and prep for RNN
+        data.rewards = data.rewards[...,jnp.newaxis]
+        #data.terms = data.terms[...,jnp.newaxis,jnp.newaxis] #do we need this?
 
-        # Separate obs vs next obs
-        obs = data.obs[:,:-1,:,:] #(B,T,A,x (we assume one dim obs))
-        next_obs = data.obs[:,1:,:,:] #(B,T,A,x (we assume one dim obs))
+        # get the data associated with obs
+        data_first: Dict[str, chex.Array] = jax.tree_map(
+              lambda x: x[:, :-1, ...], data
+          )
+        # get the data associated with next_obs
+        data_next: Dict[str, chex.Array] = jax.tree_map(
+              lambda x: x[:,1:, ...], data
+          )
+        # get the final obs data - i.e. the actual goal (since the rest of the trajectory is basically consumed for prep)
+        data_first_end: Dict[str, chex.Array] = jax.tree_map(
+              lambda x: x[:, -1, ...], data_first
+          )
 
-        # Remove last reward/term because of recurrence and transition structs
-        rewards = data.reward[:,:-1] # (B,T) no A because team rewards, and is only one deep
-        rewards = rewards[..., jnp.newaxis, jnp.newaxis] # makes B,T,1,1
-        terms = data.terms[:,:-1]
-        terms = terms[..., jnp.newaxis, jnp.newaxis]
+        # scan over each sample
+        next_q_vals_online = scan_apply(params.online, data_next.obs, data_next.terms)
+        next_q_vals_target = scan_apply(params.target, data_next.obs, data_next.terms)
 
-        # init the hidden states
-        hidden_size = 256
-        hidden_state = ScannedRNN.initialize_carry((cfg.system.n_envs, 1, obs.shape[2]), hidden_size)
-
-
-        next_obs_terms = (next_obs,terms)
-        new_hidden_state, next_q_vals_online = jax.lax.scan(q.apply(params=params.online))(hidden_state,next_obs_terms)
-
-
-        # TODO make scanned application
-
-
-         # make sim. to apply fn
-
-        next_q_vals_online = q.apply(params.online, data.next_obs) #TODO (Louise) not superduper efficient
-        next_q_vals_target = q.apply(params.target, data.next_obs) # TODO
-
-        # TODO (Claude) do double q-value selection here...
+        # double q-value selection
         next_action = jnp.argmax(next_q_vals_online, axis=-1)
         next_q_val = jnp.take(next_q_vals_target, next_action[...,jnp.newaxis])
 
-        target_q_val = (rewards + (1.0 - terms) * cfg.system.gamma * next_q_val)
+
+        target_q_val = (data_first_end.rewards + (1.0 - data_first_end.terms) * cfg.system.gamma * next_q_val)
 
         # Update Q function.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
-        q_grads, q_loss_info = q_grad_fn(params.online, data.obs, data.done, data.action, target_q_val)
+        q_grads, q_loss_info = q_grad_fn(
+            params.online, 
+            data_first.obs, #is scanned over
+            data_first.terms, # is scanned over
+            data_first_end.actions, # should only be final value in each traj, B,A (adds axis in fn)
+            target_q_val # B,A -> add dim?
+            )
+
         # Mean over the device and batch dimension.
         q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="device")
         q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="batch")
@@ -493,11 +524,8 @@ def make_update_fns(
 
         # Repack params and opt_states.
         new_params = QNetParams(new_online_q_params, new_target_q_params)
-        #opt_states = opt_states._replace(q=new_q_opt_state)
 
         return new_params, new_q_opt_state, q_loss_info
-
-
 
     # TRAIN LEVEL 1 (2.)
     def train(
@@ -516,55 +544,37 @@ def make_update_fns(
         new_params, new_opt_states, q_loss_info = update_q(params, opt_states, data)
 
         return (buffer_state, new_params, new_opt_states, new_key), q_loss_info
-
-
-
-    # losses:
-    def q_loss_fn(q_online_params: FrozenVariableDict, obs: Array,terms: Array, action: Array, target: Array) -> Tuple[Array, Metrics]:
-        obs_dones = (obs,terms)
-        q_online = q.apply(q_online_params, obs_dones)
-        q_online = jnp.take(q_online, action[...,jnp.newaxis])
-        q_loss = jnp.mean((q_online - target) ** 2)
-
-        loss_info = {
-            "q_loss": q_loss,
-            "mean_q": jnp.mean(q_online),
-        }
-
-        return q_loss, loss_info
-
     
-    
-    
+    #___________________________________________________________________________________________________
+    # INTERACT-TRAIN LOOP
 
-    scanned_update = lambda state: lax.scan(update_epoch, state, None, length=cfg.system.epochs)
-    scanned_act = lambda state: lax.scan(act, state, None, length=cfg.system.rollout_length)
+    scanned_interact = lambda state: lax.scan(select_step_store, state, None, length=cfg.system.rollout_length)
+    scanned_train = lambda state: lax.scan(train, state, None, length=cfg.system.epochs)
 
-    # Act loop -> sample -> update loop
+    #interact and train
     def update_step(carry: RNNQLearnerState, _: Any) -> Tuple[RNNQLearnerState, Tuple[Metrics, Metrics]]:
-        """Act, sample, learn."""
+        """Interact, then learn. The _ at the end of a var means updated."""
 
-        obs, env_state, buffer_state, params, opt_states, t, key, hidden_states = carry
-        key, act_key, learn_key = jax.random.split(key, 3)
+        # unpack and get random keys
+        hidden_state, terms, t, env_state, obs, buffer_state, params, key, opt_state = carry
+        key, interact_key, train_key = jax.random.split(key, 3)
 
-        terms = jnp.zeros(obs.agents_view.shape[:-1],dtype=bool)
-        # Act
-        act_state = (params.dqns.online, hidden_states, obs, env_state, buffer_state, t, act_key,terms)
-        (_, hidden_states, next_obs, env_state, buffer_state, t, _), metrics = scanned_act(act_state)
+        # Select actions, step env and store transitions
+        selection_params = (params.online, hidden_state, terms, t, interact_key)
+        interact_carry = (selection_params, env_state, buffer_state, obs)
+        ((_, hidden_state_, terms_, _, _), env_state_, buffer_state_, obs_), metrics = scanned_interact(interact_carry)
 
         # Sample and learn
-        learn_state = (buffer_state, params, opt_states, t, learn_key)
-        (buffer_state, params, opt_states, _, _), losses = scanned_update(learn_state)
+        train_carry = (buffer_state_, params, opt_state, train_key)
+        (_, params_, opt_state_, _), losses = scanned_train(train_carry)
 
         t += cfg.system.n_envs * cfg.system.rollout_length
         return (
-            RNNQLearnerState(next_obs, env_state, buffer_state, params, opt_states, t, key),
+            RNNQLearnerState(hidden_state_, terms_, t, env_state_, obs_, buffer_state_, params_, key, opt_state_),
             (metrics, losses),
         )
 
-    
     pmaped_steps = 1024  # todo: config option # NOTE (Claude) this is related to steps between logging.
-
 
     pmaped_updated_step = jax.pmap(
         jax.vmap(
@@ -588,14 +598,13 @@ def run_experiment(cfg: DictConfig) -> float:
     (env, eval_env), nns, opts, rb, learner_state, logger, key = init(cfg)
     update, greedy = make_update_fns(cfg, env, nns, opts, rb)
 
-    _,q = nns
     key, eval_key = jax.random.split(key)
     # todo: don't need to return trained_params or eval keys
     evaluator, absolute_metric_evaluator, (trained_params, eval_keys) = evaluator_setup(
         eval_env=eval_env,
         key=eval_key,
-        network=q, #NOTE (Louise) this part needs redoing with that replacement actor function
-        params=learner_state.params.dqns.online,
+        network=nns, #NOTE (Louise) this part needs redoing with that replacement actor function
+        params=learner_state.params.online,
         config=cfg,
         greedy=greedy
     )
@@ -680,7 +689,7 @@ def run_experiment(cfg: DictConfig) -> float:
     return float(max_episode_return)
 
 
-@hydra.main(config_path="../configs", config_name="default_ff_idqn.yaml", version_base="1.2")
+@hydra.main(config_path="../configs", config_name="default_rec_idqn.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.

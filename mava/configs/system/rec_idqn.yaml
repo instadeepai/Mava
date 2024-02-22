@@ -9,7 +9,7 @@ add_agent_id: True
 # step related
 total_timesteps: 2e7
 buffer_min_size: 132  # number of steps to take with random actions at the start of training
-update_batch_size: 2 # Number of vectorised gradient updates per device.
+update_batch_size: 1 # Number of vectorised gradient updates per device.
 
 rollout_length: 2 # Number of environment steps per vectorised environment.
 epochs: 4 # Number of learn epochs per training data batch.
