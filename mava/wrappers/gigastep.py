@@ -67,7 +67,6 @@ class GigastepWrapper(Wrapper):
         self._timelimit = self._env.max_episode_length
         self.num_agents = self._env.n_agents_team1
         self.num_actions = self._env.n_actions
-
         self.has_global_state = has_global_state
 
     def reset(self, key: PRNGKey) -> Tuple[GigastepState, TimeStep]:

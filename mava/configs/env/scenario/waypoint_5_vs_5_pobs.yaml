@@ -3,9 +3,9 @@ task_name: waypoint_5_vs_5_pobs
 #the enable_waypoints in the kwargs must be set to True and the reward_hit_waypoint should be higher than 0.
 task_config:
   team_0:
-    default: 5 # Number of default type agents
+    default: 5 # Number of `default` agents
   team_1:
-    default: 5 # Number of default type agents
+    default: 5 # Number of `default` agents
   kwargs:
     damage_cone_depth: 0.0
     episode_ends_one_team_dead: False
@@ -19,9 +19,3 @@ task_config:
     reward_collision_agent: 0
     reward_collision_obstacle: 0
     reward_hit_waypoint: 50
-    #to make it partially observable
-    use_stochastic_obs : False
-    use_stochastic_comm: False
-    cone_depth : 100
-    cone_angle : 6.28318530718
-    reward_detection : 0
