@@ -27,21 +27,9 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = [
-    "matplotlib.*",
-    "mpl_toolkits.*",
-    "gym.*",
-    "pytest_mock.*",
     "numpy.*",
-    "dm_env.*",
-    "tree.*",
-    "pytest.*",
-    "IPython.*",
     "optax.*",
-    "tqdm.*",
-    "rlax.*",
     "neptune.*",
-    "tensorboardX.*",
-    "scipy.*",
     "hydra.*",
     "omegaconf.*",
 ]
