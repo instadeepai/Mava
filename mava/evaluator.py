@@ -94,7 +94,6 @@ def get_ff_evaluator_fn(
         # Log won episode if win rate is required.
 
         if log_win_rate:
-
             eval_metrics["won_episode"] = final_state.timestep.extras["won_episode"]
 
         return eval_metrics

@@ -41,14 +41,14 @@ class GigastepState:
 
 
 class GigastepWrapper(Wrapper):
+    """Wraps a Gigastep environment so that its API is compatible with Jumanji environments."""
+
     def __init__(
         self,
         env: GigastepEnv,
         has_global_state: bool = False,
     ):
         """
-        Wraps a Gigastep environment so that its API is compatible with Jumanji environments.
-
         Args:
             env: The Gigastep environment to be wrapped.
             time_limit (int): The maximum duration of each episode, in seconds. Defaults to 500.
@@ -179,10 +179,11 @@ class GigastepWrapper(Wrapper):
         Returns:
             global_obs (Array): The global observation.
         """
+        # todo: still unsure if adversary actions and observations is too much information in
+        # the global Needs to be tested once we have better heuristics for adversaries.
         global_obs = jnp.concatenate(obs, axis=0)
-        global_obs = jnp.concatenate(
-            [global_obs, adversary_actions], axis=0
-        )  # add the adversary actions to the end of the global observation
+        # add the adversary actions to the end of the global observation
+        global_obs = jnp.concatenate([global_obs, adversary_actions], axis=0)
 
         return jnp.tile(global_obs, (self.num_agents, 1))
 

@@ -15,4 +15,4 @@ omegaconf
 optax
 protobuf~=3.20
 tensorboard_logger
-type_enforced
+type_enforced # needed because gigastep is missing this dependency

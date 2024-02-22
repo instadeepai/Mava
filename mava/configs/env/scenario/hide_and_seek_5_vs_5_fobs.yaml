@@ -3,9 +3,9 @@ task_name: hide_and_seek_5_vs_5_fobs
 #the teams must be made up of hider/seeker agents
 task_config:
   team_0:
-    seeker: 5
+    seeker: 5 # Number of seeker type agents
   team_1:
-    hider: 5
+    hider: 5 # Number of hider type agents
   kwargs:
     damage_per_second: 10
     damage_cone_depth: 1.0

@@ -1,4 +1,5 @@
 # ---Environment Configs---
+#_pobs makes the environment partially observable, _fobs makes the environment fully observable
 defaults:
   - _self_
   - scenario: hide_and_seek_5_vs_5_pobs # [hide_and_seek_5_vs_5_fobs, hide_and_seek_5_vs_5_pobs, waypoint_5_vs_5_fobs, waypoint_5_vs_5_pobs]

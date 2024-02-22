@@ -186,17 +186,13 @@ def make_gigastep_env(
     """
     kwargs = config.env.kwargs
 
-    scenario_config = config.env.scenario.task_config
-    scenario = ScenarioBuilder.from_config(scenario_config)
+    scenario = ScenarioBuilder.from_config(config.env.scenario.task_config)
 
-    train_env = GigastepWrapper(
-        scenario.make(**kwargs),
-        has_global_state=add_global_state,
-    )
-    eval_env = GigastepWrapper(
-        scenario.make(**kwargs),
-        has_global_state=add_global_state,
-    )
+    train_env = GigastepWrapper(scenario.make(**kwargs), has_global_state=add_global_state)
+    eval_env = GigastepWrapper(scenario.make(**kwargs), has_global_state=add_global_state)
+
+    train_env = add_optional_wrappers(train_env, config)
+    eval_env = add_optional_wrappers(eval_env, config)
 
     train_env = AutoResetWrapper(train_env)
     train_env = RecordEpisodeMetrics(train_env)

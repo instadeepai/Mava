@@ -3,9 +3,9 @@ task_name: waypoint_5_vs_5_pobs
 #the enable_waypoints in the kwargs must be set to True and the reward_hit_waypoint should be higher than 0.
 task_config:
   team_0:
-    default: 5
+    default: 5 # Number of default type agents
   team_1:
-    default: 5
+    default: 5 # Number of default type agents
   kwargs:
     damage_cone_depth: 0.0
     episode_ends_one_team_dead: False
