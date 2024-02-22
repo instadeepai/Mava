@@ -22,6 +22,9 @@ import flashbax as fbx
 import flax.linen as nn
 import hydra
 import jax
+
+# jax.config.update("jax_platform_name", "cpu")
+
 import jax.lax as lax
 import jax.numpy as jnp
 import optax
@@ -33,8 +36,6 @@ from flax.core.scope import FrozenVariableDict
 from jax import Array
 from jax.typing import ArrayLike
 
-# jax.config.update("jax_platform_name", "cpu")
-
 from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
 from typing_extensions import TypeAlias
@@ -43,7 +44,7 @@ from mava.evaluator import make_eval_fns
 from mava.types import Observation, ObservationGlobalState
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import unreplicate_batch_dim, unreplicate_learner_state
+from mava.utils.jax import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers import episode_metrics
 
@@ -100,6 +101,10 @@ Optimisers: TypeAlias = Tuple[
 def get_joint_action(actions: Array) -> Array:
     return jnp.reshape(actions, (actions.shape[0], -1))
 
+def get_single_global_state(obs: ObservationGlobalState) -> ObservationGlobalState:
+    # In mava we repeat the global state over the agent dim. But often SAC only
+    # needs a single global state, so this method removes the repitition.
+    return obs._replace(global_state=obs.global_state[:,0,...])
 
 # todo: should this contain both networks?
 class QNetwork(nn.Module):
@@ -194,9 +199,9 @@ def init(
     concat_acts = jnp.concatenate([init_act_single for _ in range(n_agents)], axis=0)
     concat_acts_batched = concat_acts[jnp.newaxis, ...]  # batch + concat of all agents actions
     init_obs = env.observation_spec().generate_value()
-    global_state = init_obs.global_state  # global state is already single item
+    # global_state = init_obs.global_state  # global state is already single item
     init_obs_single = jax.tree_map(lambda x: x[0], init_obs)
-    init_obs_single = init_obs_single._replace(global_state=global_state)
+    # init_obs_single = init_obs_single._replace(global_state=global_state)
     init_obs_single_batched = jax.tree_map(lambda x: x[jnp.newaxis, ...], init_obs_single)
 
     # Making actor network
@@ -212,9 +217,12 @@ def init(
 
     # Automatic entropy tuning
     target_entropy = -cfg.system.target_entropy_scale * action_dim
-    target_entropy = jnp.repeat(target_entropy, n_agents).astype(float)
+    # target_entropy = jnp.repeat(target_entropy, n_agents).astype(float)
+    target_entropy = jnp.asarray(target_entropy).astype(float)
     # making sure we have dim=3 so broacasting works fine
-    target_entropy = target_entropy[jnp.newaxis, :, jnp.newaxis]
+    # target_entropy = target_entropy[jnp.newaxis, :, jnp.newaxis]
+    target_entropy = target_entropy.reshape((1,1,1))
+
     if cfg.system.autotune:
         log_alpha = jnp.zeros_like(target_entropy)
     else:
@@ -333,6 +341,8 @@ def make_update_fns(
         q1_params, q2_params = q_params
         joint_action = get_joint_action(action)
 
+        # select the 0th obs as we only care about global state
+
         q1_a_values = q.apply(q1_params, obs, joint_action).reshape(-1)
         q2_a_values = q.apply(q2_params, obs, joint_action).reshape(-1)
 
@@ -369,9 +379,6 @@ def make_update_fns(
         spliced_actions = actions_repeated.at[:, inds[0], inds[1], :].set(new_action)
         updated_joint_actions = spliced_actions.reshape((*spliced_actions.shape[:2], -1))
 
-        repeated_gs = jnp.tile(obs.global_state[:, jnp.newaxis, :], (1, n_agents, 1))
-        obs = obs._replace(global_state=repeated_gs)
-
         qf1_pi = q.apply(q_params.q1, obs, updated_joint_actions)
         qf2_pi = q.apply(q_params.q2, obs, updated_joint_actions)
         min_qf_pi = jnp.minimum(qf1_pi, qf2_pi)
@@ -389,25 +396,28 @@ def make_update_fns(
         # Calculate Q target values.
         rewards = data.reward[..., jnp.newaxis]
         dones = data.done[..., jnp.newaxis]
+        obs = get_single_global_state(data.obs)
+        next_obs = get_single_global_state(data.next_obs)
 
-        pi = actor.apply(params.actor, data.next_obs)
+        pi = actor.apply(params.actor, next_obs)
         next_action, next_log_prob = pi.sample_and_log_prob(seed=key)
         next_log_prob = next_log_prob[..., jnp.newaxis]
 
         joint_next_actions = get_joint_action(next_action)
-        next_q1_val = q.apply(params.q.targets.q1, data.next_obs, joint_next_actions)
-        next_q2_val = q.apply(params.q.targets.q2, data.next_obs, joint_next_actions)
+        next_q1_val = q.apply(params.q.targets.q1, next_obs, joint_next_actions)
+        next_q2_val = q.apply(params.q.targets.q2, next_obs, joint_next_actions)
         next_q_val = jnp.minimum(next_q1_val, next_q2_val)
         # todo: try out one entropy term.
         # then call alpha loss n_agents times and mean the grads.
-        entropy_term = jnp.mean(jnp.exp(params.log_alpha), axis=1) * jnp.sum(next_log_prob, axis=1)
+        # entropy_term = jnp.mean(jnp.exp(params.log_alpha), axis=1) * jnp.sum(next_log_prob, axis=1)
+        entropy_term = params.log_alpha * jnp.sum(next_log_prob, axis=1)
         next_q_val = next_q_val - entropy_term
 
         target_q_val = (rewards + (1.0 - dones) * cfg.system.gamma * next_q_val).reshape(-1)
 
         # Update Q function.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
-        q_grads, q_loss_info = q_grad_fn(params.q.online, data.obs, data.action, target_q_val)
+        q_grads, q_loss_info = q_grad_fn(params.q.online, obs, data.action, target_q_val)
         # Mean over the device and batch dimension.
         q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="device")
         q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="batch")
@@ -656,7 +666,7 @@ def run_experiment(cfg: DictConfig) -> float:
         # Checkpoint:
         if cfg.logger.checkpointing.save_model:
             # Save checkpoint of learner state
-            unreplicated_learner_state = unreplicate_learner_state(learner_state)  # type: ignore
+            unreplicated_learner_state = unreplicate_n_dims(learner_state)  # type: ignore
             checkpointer.save(
                 timestep=t,
                 unreplicated_learner_state=unreplicated_learner_state,
