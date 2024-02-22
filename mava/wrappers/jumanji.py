@@ -129,7 +129,8 @@ class LbfWrapper(MultiAgentWrapper):
 class ConnectorWrapper(MultiAgentWrapper):
     """Multi-agent wrapper for the MA Connector environment.
 
-    Do not use an agentID wrapper with this env"""
+    Do not use the AgentID wrapper with this env, it has implicit agent IDs.
+    """
 
     def __init__(self, env: MaConnector, has_global_state: bool = False):
         super().__init__(env)
