@@ -127,9 +127,11 @@ class LbfWrapper(MultiAgentWrapper):
 
 
 class ConnectorWrapper(MultiAgentWrapper):
-    """Multi-agent wrapper for the MA Connector environment."""
+    """Multi-agent wrapper for the MA Connector environment.
 
-    def __init__(self, env: MaConnector, has_global_state: bool = True):
+    Do not use an agentID wrapper with this env"""
+
+    def __init__(self, env: MaConnector, has_global_state: bool = False):
         super().__init__(env)
         self.has_global_state = has_global_state
 
@@ -138,6 +140,7 @@ class ConnectorWrapper(MultiAgentWrapper):
     ) -> TimeStep[Union[Observation, ObservationGlobalState]]:
         """Modify the timestep for the Connector environment."""
 
+        # TARGET = 3 = The number of different types of items on the grid.
         def create_agents_view(grid: chex.Array) -> chex.Array:
             positions = jnp.where(grid % TARGET == POSITION, True, False)
             targets = jnp.where((grid % TARGET == 0) & (grid != EMPTY), True, False)
