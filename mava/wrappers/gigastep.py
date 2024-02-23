@@ -166,13 +166,11 @@ class GigastepWrapper(Wrapper):
 
     def get_global_state(self, obs: Array) -> Array:
         """
-        Combines observations from all agents,
-        adversary actions, and adversary observations
+        Combines observations from all agents and adversaries
         to create a global state for the environment.
 
         Args:
-            obs (Array): The observations of all agents.
-            adversary_actions (Array): The actions for the adversary.
+            obs (Array): The observations of all agents and adversaries.
 
         Returns:
             global_obs (Array): The global observation.
