@@ -129,8 +129,12 @@ class LbfWrapper(MultiAgentWrapper):
 class ConnectorWrapper(MultiAgentWrapper):
     """Multi-agent wrapper for the MA Connector environment.
 
+<<<<<<< HEAD
     Do not use the AgentID wrapper with this env, it has implicit agent IDs.
     """
+=======
+    Do not use the AgentID wrapper with this env, it has implicit agent IDs."""
+>>>>>>> 1bbaa2ce (chore: add config comments and rename variables)
 
     def __init__(self, env: MaConnector, has_global_state: bool = False):
         super().__init__(env)
@@ -146,9 +150,11 @@ class ConnectorWrapper(MultiAgentWrapper):
             positions = jnp.where(grid % TARGET == POSITION, True, False)
             targets = jnp.where((grid % TARGET == 0) & (grid != EMPTY), True, False)
             paths = jnp.where(grid % TARGET == PATH, True, False)
-            my_position = jnp.where(grid == POSITION, True, False)
-            my_target = jnp.where(grid == TARGET, True, False)
-            agents_view = jnp.stack((positions, targets, paths, my_position, my_target), -1)
+            position_per_agent = jnp.where(grid == POSITION, True, False)
+            target_per_agent = jnp.where(grid == TARGET, True, False)
+            agents_view = jnp.stack(
+                (positions, targets, paths, position_per_agent, target_per_agent), -1
+            )
             return agents_view
 
         def create_global_state(grid: chex.Array) -> chex.Array:
