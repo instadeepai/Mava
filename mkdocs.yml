@@ -1,9 +1,20 @@
 
 # yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
-site_name: Mava Documentation
+site_name: Mava
 site_author: InstaDeep Research
 site_url: https://instadeepai.github.io/Mava/
 site_dir: public
+
+nav:
+  - Overview: 'index.md'
+  - Installation: 'install.md'
+  - User Guide: 'user_guide.md'
+  - Performance Evaluation: 'performance_evaluation.md'
+  - Our Benchmarks: 'benchmarks.md'
+  - Contributing: 'contributing.md'
+  - FAQs: 'faq.md'
+  - Other:
+    - Jumanji Robot Warehouse Comparison: 'jumanji_rware_comparison.md'
 
 theme:
   name: material
@@ -37,11 +48,6 @@ theme:
         icon: material/weather-night
         name: Switch to light mode
 
-nav:
-  - Overview: 'index.md'
-  - Installation: 'DETAILED_INSTALL.md'
-  - Contributing: 'CONTRIBUTING.md'
-
 markdown_extensions:
   - attr_list
   - md_in_html
@@ -59,9 +65,16 @@ markdown_extensions:
   - pymdownx.highlight:
       linenums: true
   - pymdownx.inlinehilite
+  - pymdownx.arithmatex:
+      generic: true
   - def_list
   - admonition
   - pymdownx.details
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 # Git repo
 repo_name: instadeepai/Mava
@@ -70,3 +83,7 @@ edit_uri: edit/develop/docs/
 
 # Copyright
 copyright: InstaDeep © 2024 Copyright, all rights reserved.
+
+watch:
+  - "."
+  - "docs"
