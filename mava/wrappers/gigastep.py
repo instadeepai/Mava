@@ -175,7 +175,7 @@ class GigastepWrapper(Wrapper):
         Returns:
             global_obs (Array): The global observation.
         """
-        # the global Needs to be tested once we have better heuristics for adversaries.
+        # the global observation needs to be tested once we have better heuristics for adversaries.
         global_obs = jnp.concatenate(obs, axis=0)
         return jnp.tile(global_obs, (self.num_agents, 1))
 
