@@ -362,7 +362,7 @@ def learner_setup(
         optax.adam(critic_lr, eps=1e-5),
     )
 
-    # Initialise observation for with all agent observations.
+    # Initialise observation with obs of all agents.
     obs = env.observation_spec().generate_value()
     init_x = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], obs)
 
