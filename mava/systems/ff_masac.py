@@ -14,7 +14,7 @@
 
 import copy
 import time
-from typing import Any, Callable, Dict, NamedTuple, Tuple
+from typing import Any, Callable, Dict, Tuple
 
 import chex
 import distrax
@@ -25,76 +25,32 @@ import jax
 import jax.lax as lax
 import jax.numpy as jnp
 import optax
-from chex import PRNGKey
 from colorama import Fore, Style
 from flashbax.buffers.flat_buffer import TrajectoryBuffer
-from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.scope import FrozenVariableDict
 from jax import Array
-from jax.typing import ArrayLike
-
-# jax.config.update("jax_platform_name", "cpu")
-
 from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
-from typing_extensions import TypeAlias
 
 from mava.evaluator import make_eval_fns
+from mava.systems.sac.types import (
+    BufferState,
+    LearnerState,
+    Metrics,
+    Networks,
+    Optimisers,
+    OptStates,
+    Qs,
+    QsAndTarget,
+    SacParams,
+    Transition,
+)
 from mava.types import Observation, ObservationGlobalState
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import unreplicate_batch_dim, unreplicate_learner_state
+from mava.utils.jax import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers import episode_metrics
-
-
-# todo: types.py
-class Qs(NamedTuple):
-    q1: FrozenVariableDict
-    q2: FrozenVariableDict
-
-
-class QsAndTarget(NamedTuple):
-    online: Qs
-    targets: Qs
-
-
-class SacParams(NamedTuple):
-    actor: FrozenVariableDict
-    q: QsAndTarget
-    log_alpha: Array
-
-
-class OptStates(NamedTuple):
-    actor: optax.OptState
-    q: optax.OptState
-    alpha: optax.OptState
-
-
-class LearnerState(NamedTuple):
-    obs: Array
-    env_state: State
-    buffer_state: TrajectoryBuffer
-    params: SacParams
-    opt_states: OptStates
-    t: Array
-    key: PRNGKey
-
-
-class Transition(NamedTuple):
-    obs: Array
-    action: Array
-    reward: Array
-    done: Array
-    next_obs: Array
-
-
-Metrics = Dict[str, Array]
-BufferState: TypeAlias = TrajectoryBufferState[Transition]
-Networks: TypeAlias = Tuple[nn.Module, nn.Module]
-Optimisers: TypeAlias = Tuple[
-    optax.GradientTransformation, optax.GradientTransformation, optax.GradientTransformation
-]
 
 
 def get_joint_action(actions: Array) -> Array:
@@ -172,7 +128,6 @@ def init(
 
     key = jax.random.PRNGKey(cfg.system.seed)
     devices = jax.devices()
-    n_devices = len(devices)
 
     def replicate(x: Any) -> Any:
         """First replicate the update batch dim then put on devices."""
@@ -194,9 +149,9 @@ def init(
     concat_acts = jnp.concatenate([init_act_single for _ in range(n_agents)], axis=0)
     concat_acts_batched = concat_acts[jnp.newaxis, ...]  # batch + concat of all agents actions
     init_obs = env.observation_spec().generate_value()
-    global_state = init_obs.global_state  # global state is already single item
+    # global_state = init_obs.global_state  # global state is already single item
     init_obs_single = jax.tree_map(lambda x: x[0], init_obs)
-    init_obs_single = init_obs_single._replace(global_state=global_state)
+    # init_obs_single = init_obs_single._replace(global_state=global_state)
     init_obs_single_batched = jax.tree_map(lambda x: x[jnp.newaxis, ...], init_obs_single)
 
     # Making actor network
@@ -233,7 +188,7 @@ def init(
     q_opt = optax.adam(cfg.system.q_lr)
     q_opt_state = q_opt.init(params.q.online)
 
-    alpha_opt = optax.adam(cfg.system.q_lr)  # todo: alpha lr?
+    alpha_opt = optax.adam(cfg.system.alpha_lr)
     alpha_opt_state = alpha_opt.init(params.log_alpha)
 
     # Pack opt states
@@ -247,9 +202,8 @@ def init(
     init_transition = Transition(
         obs=init_obs,
         action=init_acts,
-        # todo: n agents rewards/discounts
-        reward=jnp.zeros((), dtype=float),
-        done=jnp.zeros((), dtype=bool),
+        reward=jnp.zeros((n_agents,), dtype=float),
+        done=jnp.zeros((n_agents,), dtype=bool),
         next_obs=init_obs,
     )
 
@@ -265,15 +219,15 @@ def init(
     opts = (actor_opt, q_opt, alpha_opt)
 
     # Reset env.
-    n_keys = cfg.system.n_envs * n_devices * cfg.system.update_batch_size
-    key_shape = (n_devices, cfg.system.update_batch_size, cfg.system.n_envs, -1)
+    n_keys = cfg.system.n_envs * cfg.arch.n_devices * cfg.system.update_batch_size
+    key_shape = (cfg.arch.n_devices, cfg.system.update_batch_size, cfg.system.n_envs, -1)
     key, reset_key = jax.random.split(key)
     reset_keys = jax.random.split(reset_key, n_keys)
     reset_keys = jnp.reshape(reset_keys, key_shape)
 
     # Keys passed to learner
-    first_keys = jax.random.split(key, (n_devices * cfg.system.update_batch_size))
-    first_keys = first_keys.reshape((n_devices, cfg.system.update_batch_size, -1))
+    first_keys = jax.random.split(key, (cfg.arch.n_devices * cfg.system.update_batch_size))
+    first_keys = first_keys.reshape((cfg.arch.n_devices, cfg.system.update_batch_size, -1))
 
     env_state, first_timestep = jax.pmap(  # devices
         jax.vmap(  # update_batch_size
@@ -284,7 +238,7 @@ def init(
     )(reset_keys)
     first_obs = first_timestep.observation
 
-    t = jnp.zeros((n_devices, cfg.system.update_batch_size), dtype=int)
+    t = jnp.zeros((cfg.arch.n_devices, cfg.system.update_batch_size), dtype=int)
 
     # Initial learner state.
     learner_state = LearnerState(
@@ -317,8 +271,8 @@ def make_update_fns(
         """Given an action, step the environment and add to the buffer."""
         env_state, timestep = jax.vmap(env.step)(env_state, action)
         next_obs = timestep.observation
-        rewards = timestep.reward[:, 0]
-        terms = ~(timestep.discount).astype(bool)[:, 0]
+        rewards = timestep.reward
+        terms = ~(timestep.discount).astype(bool)
         infos = timestep.extras
 
         real_next_obs = infos["real_next_obs"]
@@ -369,8 +323,8 @@ def make_update_fns(
         spliced_actions = actions_repeated.at[:, inds[0], inds[1], :].set(new_action)
         updated_joint_actions = spliced_actions.reshape((*spliced_actions.shape[:2], -1))
 
-        repeated_gs = jnp.tile(obs.global_state[:, jnp.newaxis, :], (1, n_agents, 1))
-        obs = obs._replace(global_state=repeated_gs)
+        # repeated_gs = jnp.tile(obs.global_state[:, jnp.newaxis, :], (1, n_agents, 1))
+        # obs = obs._replace(global_state=repeated_gs)
 
         qf1_pi = q.apply(q_params.q1, obs, updated_joint_actions)
         qf2_pi = q.apply(q_params.q2, obs, updated_joint_actions)
@@ -387,27 +341,29 @@ def make_update_fns(
     ) -> Tuple[SacParams, OptStates, Metrics]:
         """Update the Q parameters."""
         # Calculate Q target values.
-        rewards = data.reward[..., jnp.newaxis]
-        dones = data.done[..., jnp.newaxis]
+        rewards = data.reward
+        dones = data.done
+        obs = data.next_obs._replace(global_state=data.obs.global_state[:, 0, ...])
+        next_obs = data.next_obs._replace(global_state=data.next_obs.global_state[:, 0, ...])
 
-        pi = actor.apply(params.actor, data.next_obs)
+        pi = actor.apply(params.actor, next_obs)
         next_action, next_log_prob = pi.sample_and_log_prob(seed=key)
         next_log_prob = next_log_prob[..., jnp.newaxis]
 
         joint_next_actions = get_joint_action(next_action)
-        next_q1_val = q.apply(params.q.targets.q1, data.next_obs, joint_next_actions)
-        next_q2_val = q.apply(params.q.targets.q2, data.next_obs, joint_next_actions)
+        next_q1_val = q.apply(params.q.targets.q1, next_obs, joint_next_actions)
+        next_q2_val = q.apply(params.q.targets.q2, next_obs, joint_next_actions)
         next_q_val = jnp.minimum(next_q1_val, next_q2_val)
-        # todo: try out one entropy term.
-        # then call alpha loss n_agents times and mean the grads.
+
         entropy_term = jnp.mean(jnp.exp(params.log_alpha), axis=1) * jnp.sum(next_log_prob, axis=1)
         next_q_val = next_q_val - entropy_term
 
+        # todo: why is this the wrong shape?
         target_q_val = (rewards + (1.0 - dones) * cfg.system.gamma * next_q_val).reshape(-1)
 
         # Update Q function.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
-        q_grads, q_loss_info = q_grad_fn(params.q.online, data.obs, data.action, target_q_val)
+        q_grads, q_loss_info = q_grad_fn(params.q.online, obs, data.action, target_q_val)
         # Mean over the device and batch dimension.
         q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="device")
         q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="batch")
@@ -557,7 +513,6 @@ def make_update_fns(
 
     # pmap and scan over explore and update_step
     # Make sure to not do n_envs explore steps (could fill up the buffer too much).
-    pmaped_steps = 1024  # todo: config option
     explore_steps = cfg.system.explore_steps // cfg.system.n_envs
     pmaped_explore = jax.pmap(
         jax.vmap(
@@ -569,7 +524,7 @@ def make_update_fns(
     )
     pmaped_updated_step = jax.pmap(
         jax.vmap(
-            lambda state: lax.scan(update_step, state, None, length=pmaped_steps),
+            lambda state: lax.scan(update_step, state, None, length=cfg.system.scan_steps),
             axis_name="batch",
         ),
         axis_name="device",
@@ -580,18 +535,23 @@ def make_update_fns(
 
 
 def run_experiment(cfg: DictConfig) -> float:
-    n_devices = len(jax.devices())
+    # Add runtime variables to config
+    cfg.arch.n_devices = len(jax.devices())
 
-    pmaped_steps = 1024  # todo: config option
-    steps_per_rollout = n_devices * cfg.system.n_envs * cfg.system.rollout_length * pmaped_steps
-    max_episode_return = -jnp.inf
+    # Number of env steps before evaluating/logging.
+    steps_per_rollout = int(cfg.system.total_timesteps // cfg.arch.num_evaluation)
+    # Multiplier for a single env/learn step in an anakin system
+    anakin_steps = cfg.arch.n_devices * cfg.system.update_batch_size
+    # Number of env steps in one anakin style update.
+    anakin_act_steps = anakin_steps * cfg.system.n_envs * cfg.system.rollout_length
+    # Number of steps to do in the scanned update method (how many anakin steps).
+    cfg.system.scan_steps = int(steps_per_rollout / anakin_act_steps)
 
     (env, eval_env), nns, opts, rb, learner_state, target_entropy, logger, key = init(cfg)
     explore, update = make_update_fns(cfg, env, nns, opts, rb, target_entropy)
 
     actor, _ = nns
     key, eval_key = jax.random.split(key)
-    # todo: don't need to return trained_params or eval keys
     evaluator, absolute_metric_evaluator = make_eval_fns(
         eval_env=eval_env,
         network=actor,
@@ -605,6 +565,7 @@ def run_experiment(cfg: DictConfig) -> float:
             **cfg.logger.checkpointing.save_args,  # Checkpoint args
         )
 
+    max_episode_return = -jnp.inf
     start_time = time.time()
 
     # Fill up buffer/explore.
@@ -627,10 +588,11 @@ def run_experiment(cfg: DictConfig) -> float:
         jax.block_until_ready(learner_state)
 
         # Log:
-        # Multiply by learn steps here because anakin steps per second is learn + act steps
-        # But we want to make sure we're counting env steps correctly so it's not included
-        # in the loop counter.
-        sps = t * cfg.system.epochs / (time.time() - start_time)
+        # Add learn steps here because anakin steps per second is learn + act steps
+        # But we also want to make sure we're counting env steps correctly so
+        # learn steps is not included in the loop counter.
+        learn_steps = anakin_steps * cfg.system.epochs
+        sps = (t + learn_steps) / (time.time() - start_time)
         final_metrics = episode_metrics.get_final_step_metrics(metrics)
         loss_metrics = losses | {"log_alpha": learner_state.params.log_alpha}
         logger.log({"step": t, "steps_per_second": sps}, t, eval_idx, LogEvent.MISC)
@@ -639,8 +601,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
         # Evaluate:
         key, eval_key = jax.random.split(key)
-        eval_keys = jax.random.split(eval_key, n_devices)
-        # todo: bug likely here -> don't have batch vmap yet so shouldn't unreplicate_batch_dim
+        eval_keys = jax.random.split(eval_key, cfg.arch.n_devices)
         eval_output = evaluator(unreplicate_batch_dim(learner_state.params.actor), eval_keys)
         jax.block_until_ready(eval_output)
 
@@ -656,7 +617,7 @@ def run_experiment(cfg: DictConfig) -> float:
         # Checkpoint:
         if cfg.logger.checkpointing.save_model:
             # Save checkpoint of learner state
-            unreplicated_learner_state = unreplicate_learner_state(learner_state)  # type: ignore
+            unreplicated_learner_state = unreplicate_n_dims(learner_state)  # type: ignore
             checkpointer.save(
                 timestep=t,
                 unreplicated_learner_state=unreplicated_learner_state,
@@ -665,7 +626,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     # Measure absolute metric.
     if cfg.arch.absolute_metric:
-        eval_keys = jax.random.split(key, n_devices)
+        eval_keys = jax.random.split(key, cfg.arch.n_devices)
 
         eval_output = absolute_metric_evaluator(best_params, eval_keys)
         jax.block_until_ready(eval_output)

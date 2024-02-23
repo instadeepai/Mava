@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Union
 
 import flax.linen as nn
 import optax
@@ -21,7 +21,7 @@ from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.scope import FrozenVariableDict
 from typing_extensions import NamedTuple, TypeAlias
 
-from mava.types import State
+from mava.types import Observation, ObservationGlobalState, State
 
 Metrics: TypeAlias = Dict[str, Array]
 Networks: TypeAlias = Tuple[nn.Module, nn.Module]
@@ -53,11 +53,11 @@ class OptStates(NamedTuple):
 
 
 class Transition(NamedTuple):
-    obs: Array
+    obs: Union[Observation, ObservationGlobalState]
     action: Array
     reward: Array
     done: Array
-    next_obs: Array
+    next_obs: Union[Observation, ObservationGlobalState]
 
 
 BufferState: TypeAlias = TrajectoryBufferState[Transition]

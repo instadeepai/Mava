@@ -501,10 +501,12 @@ def run_experiment(cfg: DictConfig) -> float:
 
     # Number of env steps before evaluating/logging.
     steps_per_rollout = int(cfg.system.total_timesteps // cfg.arch.num_evaluation)
-    # How many env steps in one anakin style update.
-    anakin_steps = cfg.arch.n_devices * cfg.system.n_envs * cfg.system.rollout_length
-    # How many steps to do in the scanned update method (how many anakin steps).
-    cfg.system.scan_steps = int(steps_per_rollout / anakin_steps)
+    # Multiplier for a single env/learn step in an anakin system
+    anakin_steps = cfg.arch.n_devices * cfg.system.update_batch_size
+    # Number of env steps in one anakin style update.
+    anakin_act_steps = anakin_steps * cfg.system.n_envs * cfg.system.rollout_length
+    # Number of steps to do in the scanned update method (how many anakin steps).
+    cfg.system.scan_steps = int(steps_per_rollout / anakin_act_steps)
 
     pprint(OmegaConf.to_container(cfg, resolve=True))
 
@@ -546,10 +548,11 @@ def run_experiment(cfg: DictConfig) -> float:
         jax.block_until_ready(learner_state)
 
         # Log:
-        # Multiply by learn steps here because anakin steps per second is learn + act steps
-        # But we want to make sure we're counting env steps correctly so it's not included
-        # in the loop counter.
-        sps = t * cfg.system.epochs / (time.time() - start_time)
+        # Add learn steps here because anakin steps per second is learn + act steps
+        # But we also want to make sure we're counting env steps correctly so
+        # learn steps is not included in the loop counter.
+        learn_steps = anakin_steps * cfg.system.epochs
+        sps = (t + learn_steps) / (time.time() - start_time)
         final_metrics = episode_metrics.get_final_step_metrics(metrics)
         loss_metrics = losses | {"log_alpha": learner_state.params.log_alpha}
         logger.log({"step": t, "steps_per_second": sps}, t, eval_idx, LogEvent.MISC)
