@@ -15,15 +15,15 @@ rollout_length: 1 # Number of environment steps per vectorised environment. brea
 epochs: 4 # Number of learn epochs per training data batch.
 
 # sizes
-buffer_size: 100_000  # size of the replay buffer. Note: total size is this * num_devices
+buffer_size: 10_000  # size of the replay buffer. Note: total size is this * num_devices
 batch_size: 32 #as in jaxmarl paper
 # learning rates
 q_lr: 3e-4  # the learning rate of the Q network network optimizer
 # other
-tau: 0.05  # smoothing coefficient for target networks
+tau: 0.005  # smoothing coefficient for target networks
 gamma: 0.99  # discount factor
 
 eps_min: 0.05
-eps_decay: 4e5
+eps_decay: 5e5
 
-recurrent_chunk_size: 20 # TODO if unspecified, use rollout length
+recurrent_chunk_size: 10 # TODO if unspecified, use rollout length

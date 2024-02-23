@@ -448,6 +448,7 @@ def make_update_fns(
         """The portion of the calculation to grad, namely online apply and mse with target."""
         q_online = scan_apply(q_online_params,obs,terms)
         q_online = jnp.take(q_online, action[...,jnp.newaxis])
+        q_online = jnp.sum(q_online, -2, keepdims=True)
         q_loss = jnp.mean((q_online - target) ** 2)
 
         loss_info = {
@@ -475,7 +476,7 @@ def make_update_fns(
 
         new_hidden_state, next_q_vals_online = q.apply(params,hidden_state,obs_terms) #TODO: DOES THIS SCAN??
         #new_hidden_state, next_q_vals_online = jax.lax.scan(q.apply(params=params))(hidden_state,obs_terms)
-        return BT_to_TB(next_q_vals_online)
+        return BT_to_TB(next_q_vals_online) # rename to switch_leading_dims
 
     # TRAIN LEVEL 2 (2.1)
     def update_q(
@@ -496,8 +497,8 @@ def make_update_fns(
         
         # TODO make rewards and terms with extra dim
         #next_term = data_next.term[...,jnp.newaxis]
-        first_end_reward = data_first.reward[...,jnp.newaxis]
-        first_end_term = data_first.term[...,jnp.newaxis]
+        first_reward = data_first.reward[...,jnp.newaxis] # grab agent zeros assumes same for all agents
+        first_term = data_first.term[...,jnp.newaxis] # grab agent zeros
         #first_term = data_first.term[...,jnp.newaxis]
 
 
@@ -508,9 +509,10 @@ def make_update_fns(
         # double q-value selection
         next_action = jnp.argmax(next_q_vals_online, axis=-1)
         next_q_val = jnp.take(next_q_vals_target, next_action[...,jnp.newaxis])
+        next_q_val = jnp.sum(next_q_val, -2, keepdims=True)
 
 
-        target_q_val = (first_end_reward + (1.0 - first_end_term) * cfg.system.gamma * next_q_val)
+        target_q_val = (first_reward + (1.0 - first_term) * cfg.system.gamma * next_q_val)
 
         # Update Q function.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)

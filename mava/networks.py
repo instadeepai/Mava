@@ -111,12 +111,14 @@ class ScannedRNN(nn.Module):
         """Applies the module."""
         rnn_state = carry
         ins, resets = x
-        rnn_state = jnp.where(
+
+        new_rnn_state, y = nn.GRUCell(features=ins.shape[-1])(rnn_state, ins)
+
+        new_rnn_state = jnp.where( # TODO: (Claude) is this reset not a timestep too early? 
             resets[:, :, jnp.newaxis],
             self.initialize_carry((ins.shape[0], ins.shape[1]), ins.shape[-1]),
-            rnn_state,
+            new_rnn_state,
         )
-        new_rnn_state, y = nn.GRUCell(features=ins.shape[-1])(rnn_state, ins)
         return new_rnn_state, y
 
     @staticmethod
