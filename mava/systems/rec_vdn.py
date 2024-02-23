@@ -14,7 +14,8 @@
 
 import copy
 import time
-from typing import Any, Callable, Dict, NamedTuple, Tuple
+from typing import Any, Callable, Dict, NamedTuple, Sequence, Tuple
+import functools
 
 import chex
 import distrax
@@ -43,12 +44,41 @@ from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import unreplicate_batch_dim, unreplicate_learner_state
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers import episode_metrics
-from mava.networks import MLPTorso, ScannedRNN
+from mava.networks import MLPTorso
 from mava.types import RNNObservation
 from flax.linen.initializers import orthogonal
 
 
+class ScannedRNN(nn.Module):
+    @functools.partial(
+        nn.scan,
+        variable_broadcast="params",
+        in_axes=0,
+        out_axes=0,
+        split_rngs={"params": False},
+    )
+    @nn.compact
+    def __call__(self, carry: chex.Array, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
+        """Applies the module."""
+        rnn_state = carry
+        ins, resets = x
 
+        new_rnn_state, y = nn.GRUCell(features=ins.shape[-1])(rnn_state, ins)
+
+        new_rnn_state = jnp.where( # TODO: (Claude) is this reset not a timestep too early? 
+            resets[:, :, jnp.newaxis],
+            self.initialize_carry((ins.shape[0], ins.shape[1]), ins.shape[-1]),
+            new_rnn_state,
+        )
+        return new_rnn_state, y
+
+    @staticmethod
+    def initialize_carry(batch_size: Sequence[int], hidden_size: int) -> chex.Array:
+        """Initializes the carry state."""
+        # Use a dummy key since the default state init fn is just zeros.
+        cell = nn.GRUCell(features=hidden_size)
+        return cell.initialize_carry(jax.random.PRNGKey(0), (*batch_size, hidden_size))
+    
 class ActionSelectionParams(NamedTuple):
     nw_params: FrozenVariableDict
     hidden_state: chex.Array
@@ -317,7 +347,7 @@ def make_update_fns(
         # unflatten to mtch expected action block size
         actions = jnp.reshape(actions,(batch_size,n_agents))#,1))
 
-        return (actions, hidden_state)
+        return actions
     
     # INTERACT LEVEL 3 (1.2.2)
     def greedy(
@@ -373,13 +403,22 @@ def make_update_fns(
         # need to make it a cond, so matching operands
         operands = (selection_key, hidden_state, nw_params, obs, terms)
 
-        # choose action selection method accordingly
-        (action, new_hidden_state) = jax.lax.cond(
+        (greedy_action, new_hidden_state) = greedy(operands)
+        random_action = select_random_action_batch(operands)
+
+        action = jax.lax.select(
             get_should_explore(explore_key,epsilon),
-            select_random_action_batch, #is it general enough?
-            greedy,
-            operands
+            random_action,
+            greedy_action
         )
+
+        # # choose action selection method accordingly
+        # (action, new_hidden_state) = jax.lax.cond(
+        #     get_should_explore(explore_key,epsilon),
+        #     select_random_action_batch, #is it general enough?
+        #     greedy,
+        #     operands
+        # )
 
         # repack new selection params
         new_select_params = ActionSelectionParams(nw_params, new_hidden_state, terms, t, new_key)
@@ -504,6 +543,8 @@ def make_update_fns(
 
         # scan over each sample
         next_q_vals_online = scan_apply(params.online, data_next.obs, data_next.term)
+        next_q_vals_online = jnp.where(data_next.obs.action_mask, next_q_vals_online, jnp.zeros(next_q_vals_online.shape)-9999999) #TODO: action masking in nw
+
         next_q_vals_target = scan_apply(params.target, data_next.obs, data_next.term)
 
         # double q-value selection
