@@ -16,7 +16,4 @@ eval_metric: episode_return
 kwargs:
   episode_length: 1000
   homogenisation_method: max # Default is None. Options: [max, concat] if dimensions of observations and actions are not homogeneous across agents,
-  # "max" adds one-hot for the agent's ID. In this case, system.add_agent_id should be set to False.
-  # Note: In this case, the agent's ID will be added to the global state within the wrapper if `add_agent_ids_to_state` is True.
-
-add_agent_ids_to_state: True # Adds the agent IDs to the global state.
+  # "max" adds one-hot for the agent's ID. In this case, system.add_ids_to_agent_view should be set to False.
