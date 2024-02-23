@@ -11,7 +11,7 @@ total_timesteps: 2e7
 buffer_min_size: 132  # number of steps to take with random actions at the start of training
 update_batch_size: 1 # Number of vectorised gradient updates per device.
 
-rollout_length: 2 # Number of environment steps per vectorised environment.
+rollout_length: 1 # Number of environment steps per vectorised environment. breaks code - traj buffer receives this
 epochs: 4 # Number of learn epochs per training data batch.
 
 # sizes
@@ -26,4 +26,4 @@ gamma: 0.99  # discount factor
 eps_min: 0.05
 eps_decay: 4e5
 
-recurrent_chunk_size: ~ # TODO if unspecified, use rollout length
+recurrent_chunk_size: 20 # TODO if unspecified, use rollout length
