@@ -52,6 +52,8 @@ _matrax_registry = {"Matrax": MatraxWrapper}
 
 _jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 
+_gigastep_registry = {"Gigastep": GigastepWrapper}
+
 
 def add_optional_wrappers(
     env: Environment, config: DictConfig, add_global_state: bool = False
@@ -184,12 +186,13 @@ def make_gigastep_env(
     Returns:
         A tuple of the environments.
     """
-    kwargs = config.env.kwargs
+    wrapper = _gigastep_registry[env_name]
 
+    kwargs = config.env.kwargs
     scenario = ScenarioBuilder.from_config(config.env.scenario.task_config)
 
-    train_env = GigastepWrapper(scenario.make(**kwargs), has_global_state=add_global_state)
-    eval_env = GigastepWrapper(scenario.make(**kwargs), has_global_state=add_global_state)
+    train_env = wrapper(scenario.make(**kwargs), has_global_state=add_global_state)
+    eval_env = wrapper(scenario.make(**kwargs), has_global_state=add_global_state)
 
     train_env = add_optional_wrappers(train_env, config)
     eval_env = add_optional_wrappers(eval_env, config)
@@ -218,7 +221,7 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[Environmen
         return make_jaxmarl_env(env_name, config, add_global_state)
     elif env_name in _matrax_registry:
         return make_matrax_env(env_name, config, add_global_state)
-    elif env_name == "Gigastep":
+    elif env_name in _gigastep_registry:
         return make_gigastep_env(env_name, config, add_global_state)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")

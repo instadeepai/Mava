@@ -91,7 +91,7 @@ class GigastepWrapper(Wrapper):
 
         state = GigastepState(state, key, 0, adversary_actions)
 
-        obs = self._create_observation(obs_team1, adversary_actions, obs, state)
+        obs = self._create_observation(obs_team1, obs, state)
 
         timestep = restart(obs, shape=(self.num_agents,), extras={"won_episode": False})
         return state, timestep
@@ -126,7 +126,7 @@ class GigastepWrapper(Wrapper):
         # take the actions of the adversary and cache it before returning the new state
         adversary_actions = self.adversary_policy(obs_team2, state_team2, adversary_key)
 
-        obs = self._create_observation(obs_team1, adversary_actions, obs, state)
+        obs = self._create_observation(obs_team1, obs, state)
 
         step_type = jax.lax.select(ep_done, StepType.LAST, StepType.MID)
 
@@ -144,7 +144,6 @@ class GigastepWrapper(Wrapper):
     def _create_observation(
         self,
         obs: Array,
-        adversary_actions: Array,
         obs_full: Array,
         state: GigastepState,
     ) -> Union[Observation, ObservationGlobalState]:
@@ -156,7 +155,7 @@ class GigastepWrapper(Wrapper):
         }
 
         if self.has_global_state:
-            obs_data["global_state"] = self.get_global_state(obs_full, adversary_actions)
+            obs_data["global_state"] = self.get_global_state(obs_full)
             return ObservationGlobalState(**obs_data)
         else:
             return Observation(**obs_data)
@@ -165,7 +164,7 @@ class GigastepWrapper(Wrapper):
         """Get action mask for each agent."""
         return jnp.ones((self.num_agents, self._env.n_actions))  # all actions are valid
 
-    def get_global_state(self, obs: Array, adversary_actions: Array) -> Array:
+    def get_global_state(self, obs: Array) -> Array:
         """
         Combines observations from all agents,
         adversary actions, and adversary observations
@@ -178,12 +177,8 @@ class GigastepWrapper(Wrapper):
         Returns:
             global_obs (Array): The global observation.
         """
-        # todo: still unsure if adversary actions and observations is too much information in
         # the global Needs to be tested once we have better heuristics for adversaries.
         global_obs = jnp.concatenate(obs, axis=0)
-        # add the adversary actions to the end of the global observation
-        global_obs = jnp.concatenate([global_obs, adversary_actions], axis=0)
-
         return jnp.tile(global_obs, (self.num_agents, 1))
 
     def observation_spec(self) -> specs.Spec:
@@ -202,11 +197,7 @@ class GigastepWrapper(Wrapper):
         )
         if self.has_global_state:
             global_state = specs.BoundedArray(
-                (
-                    self.num_agents,
-                    self._env.observation_space.shape[0] * self._env.n_agents
-                    + self._env.n_agents_team2,
-                ),
+                (self.num_agents, self._env.observation_space.shape[0] * self._env.n_agents),
                 jnp.int32,
                 0,
                 255,
