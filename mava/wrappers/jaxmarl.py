@@ -197,7 +197,7 @@ class JaxMarlWrapper(Wrapper):
 
         # Calling these on init to cache the values in a non-jitted context.
         self.state_size
-        self.num_actions
+        self.action_dim
         self.num_agents
 
     def reset(
@@ -257,7 +257,7 @@ class JaxMarlWrapper(Wrapper):
         agents_view = jaxmarl_space_to_jumanji_spec(merge_space(self._env.observation_spaces))
 
         action_mask = specs.BoundedArray(
-            (self.num_agents, self.num_actions), bool, False, True, "action_mask"
+            (self.num_agents, self.action_dim), bool, False, True, "action_mask"
         )
         step_count = specs.BoundedArray(
             (self.num_agents,), jnp.int32, 0, self._timelimit, "step_count"
@@ -311,12 +311,13 @@ class JaxMarlWrapper(Wrapper):
     @cached_property
     @abstractmethod
     def num_agents(self) -> chex.Array:
+        "Get the number of agents"
         ...
 
     @cached_property
     @abstractmethod
-    def num_actions(self) -> chex.Array:
-        "Get the number of actions for each agent."
+    def action_dim(self) -> chex.Array:
+        "Get the actions dim for each agent."
         ...
 
     @cached_property
@@ -346,12 +347,14 @@ class SmaxWrapper(JaxMarlWrapper):
 
     @cached_property
     def num_agents(self) -> chex.Array:
+        "Get the number of agents"
         return self._env.num_agents
 
     @cached_property
-    def num_actions(self) -> chex.Array:
-        "Get the number of actions for each agent."
-        return self.action_spec().shape[0]
+    def action_dim(self) -> chex.Array:
+        "Get the actions dim for each agent."
+        single_agent_action_space = self._env.action_space(self.agents[0])
+        return single_agent_action_space.n
 
     def action_mask(self, wrapped_env_state: Any) -> Array:
         """Get action mask for each agent."""
@@ -378,11 +381,12 @@ class MabraxWrapper(JaxMarlWrapper):
 
     @cached_property
     def num_agents(self) -> chex.Array:
+        "Get the number of agents"
         return self._env.num_agents
 
     @cached_property
-    def num_actions(self) -> chex.Array:
-        "Get the number of actions for each agent."
+    def action_dim(self) -> chex.Array:
+        "Get the actions dim for each agent."
         return self.action_spec().shape[0]
 
     @cached_property
@@ -398,7 +402,7 @@ class MabraxWrapper(JaxMarlWrapper):
 
     def action_mask(self, wrapped_env_state: BraxState) -> Array:
         """Get action mask for each agent."""
-        return jnp.ones((self.num_agents, self.num_actions), dtype=bool)
+        return jnp.ones((self.num_agents, self.action_dim), dtype=bool)
 
     def get_global_state(self, wrapped_env_state: BraxState, obs: Dict[str, Array]) -> Array:
         """Get global state from observation and copy it for each agent."""

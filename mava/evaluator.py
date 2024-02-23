@@ -178,9 +178,8 @@ def get_rnn_evaluator_fn(
             hstate, pi = apply_fn(params, hstate, ac_in)
 
             if config.arch.evaluation_greedy:
-                action = (
-                    pi._mode()
-                )  # Not valid for ContinuousActionHead (issue with: pi.distribution.mode())
+                # Not valid for ContinuousActionHead (issue with: pi.distribution.mode())
+                action = pi._mode()
             else:
                 action = pi.sample(seed=policy_key)
 

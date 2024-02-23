@@ -81,8 +81,7 @@ def get_learner_fn(
             key, policy_key = jax.random.split(key)
             actor_policy = actor_apply_fn(params.actor_params, last_timestep.observation)
             value = critic_apply_fn(params.critic_params, last_timestep.observation)
-            # sample,log_prob= actor_policy._sample_and_log_prob(
-            # seed=seed, sample_shape=(num_actions,))
+
             action = actor_policy.sample(seed=policy_key)
             log_prob = actor_policy.log_prob(action)
 
@@ -336,20 +335,21 @@ def learner_setup(
     n_devices = len(jax.devices())
 
     # Get number of actions and agents.
-    # TODO: do we need to add this to config? else can do this to point on the same thing?
-    # (1) config.system.num_agents = num_agents = env.num_actions
-    # (2) config.system.num_agents, num_agents = (env.num_actions,) * 2
-    num_actions = env.num_actions
+    # TODO: do we need to add this to config and it shouldn't be under`env`?
+    # else can do this to point on the same thing?
+    # (1) config.env.num_agents = num_agents = env.action_dim
+    # (2) config.env.num_agents, num_agents = (env.action_dim,) * 2
+    action_dim = env.action_dim
     num_agents = env.num_agents
     config.system.num_agents = num_agents
-    config.system.action_dim = num_actions
+    config.system.action_dim = action_dim
 
     # PRNG keys.
     key, actor_net_key, critic_net_key = keys
 
     # Define network and optimiser.
     actor_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
-    actor_action_head = hydra.utils.instantiate(config.network.action_head, action_dim=num_actions)
+    actor_action_head = hydra.utils.instantiate(config.network.action_head, action_dim=action_dim)
     critic_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
 
     actor_network = Actor(torso=actor_torso, action_head=actor_action_head)

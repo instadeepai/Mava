@@ -30,7 +30,7 @@ class MatraxWrapper(Wrapper):
     def __init__(self, env: Environment):
         super().__init__(env)
         self._num_agents = self._env.num_agents
-        self.num_actions = self._env.num_actions
+        self.action_dim = self._env.num_actions
         self.action_mask = jnp.ones((self._num_agents, self.num_actions), dtype=bool)
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:

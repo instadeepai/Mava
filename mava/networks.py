@@ -16,7 +16,6 @@ import functools
 from typing import Callable, Dict, Sequence, Tuple, Union
 
 import chex
-import distrax
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -86,7 +85,7 @@ class DiscreteActionHead(nn.Module):
     action_dim: int
 
     @nn.compact
-    def __call__(self, obs_embedding: chex.Array, observation: Observation) -> distrax.Categorical:
+    def __call__(self, obs_embedding: chex.Array, observation: Observation) -> tfd.Categorical:
         """Action selection for distrete action space environments.
 
         Args:
@@ -95,7 +94,7 @@ class DiscreteActionHead(nn.Module):
                 `step_count`.
 
         Returns:
-            A distrax.Categorical distribution over the action space for sampling actions from.
+            A transformed tfd.categorical distribution on the action space for action sampling.
 
         NOTE: We pass both the observation embedding and the observation object to the action head
         since the observation object contains the action mask and other potentially useful
@@ -110,6 +109,9 @@ class DiscreteActionHead(nn.Module):
             jnp.finfo(jnp.float32).min,
         )
 
+        # we transform this distribution with the `Identity()` transform to allow
+        # us to call `pi.distribution.entropy()` and keep the API the same as the
+        # continuous distribution.
         return tfd.TransformedDistribution(
             distribution=tfd.Categorical(logits=masked_logits), bijector=tfb.Identity()
         )
@@ -133,13 +135,13 @@ class ContinuousActionHead(nn.Module):
     def _sigma_activation(
         self, sigma: chex.Array, sigma_min: float = -4, sigma_max: float = 0
     ) -> chex.Array:
-        # Not sure if this is the right way also for sigma_min and max?
+        """Don't allow sigma to grow too large for numerical stability."""
         return jnp.exp(sigma_min + 0.5 * (sigma_max - sigma_min) * (jnp.tanh(sigma) + 1.0))
 
     @nn.compact
     def __call__(
         self, obs_embedding: chex.Array, observation: Observation
-    ) -> distrax.MultivariateNormalDiag:
+    ) -> tfd.MultivariateNormalDiag:
         """Action selection for continuous action space environments.
 
         Args:
@@ -148,14 +150,14 @@ class ContinuousActionHead(nn.Module):
                 `step_count`.
 
         Returns:
-            A distrax.MultivariateNormalDiag distribution.
+            A transformer tfd.MultivariateNormalDiag distribution.
         """
 
         mean = self.actor_mean(obs_embedding)
+        std = self._sigma_activation(self.actor_log_std)
+
         return tfd.TransformedDistribution(
-            distribution=tfd.MultivariateNormalDiag(
-                loc=mean, scale_diag=self._sigma_activation(self.actor_log_std)
-            ),
+            distribution=tfd.MultivariateNormalDiag(loc=mean, scale_diag=std),
             bijector=self.bijector,
         )
 
@@ -167,7 +169,7 @@ class FeedForwardActor(nn.Module):
     action_head: nn.Module
 
     @nn.compact
-    def __call__(self, observation: Observation) -> distrax.DistributionLike:
+    def __call__(self, observation: Observation) -> tfd.Distribution:
         """Forward pass."""
 
         obs_embedding = self.torso(observation.agents_view)
@@ -240,7 +242,7 @@ class RecurrentActor(nn.Module):
         self,
         policy_hidden_state: chex.Array,
         observation_done: RNNObservation,
-    ) -> Tuple[chex.Array, distrax.Categorical]:
+    ) -> Tuple[chex.Array, tfd.Distribution]:
         """Forward pass."""
         observation, done = observation_done
 

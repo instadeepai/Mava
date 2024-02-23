@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from abc import abstractmethod
 from typing import Tuple
 
 import chex
@@ -30,7 +31,6 @@ class MultiAgentWrapper(Wrapper):
     def __init__(self, env: Environment):
         super().__init__(env)
         self.num_agents = self._env.num_agents
-        self.num_actions = int(self._env.action_spec().num_values[0])
         self.time_limit = self._env.time_limit
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
@@ -52,11 +52,17 @@ class MultiAgentWrapper(Wrapper):
         step_count = specs.BoundedArray(
             (self.num_agents,),
             jnp.int32,
-            [0] * self.num_agents,
-            [self.time_limit] * self.num_agents,
+            jnp.zeros(self.num_agents, dtype=int),
+            jnp.repeat(self.time_limit, self.num_agents),
             "step_count",
         )
         return self._env.observation_spec().replace(step_count=step_count)
+
+    @property
+    @abstractmethod
+    def action_dim(self) -> chex.Array:
+        "Get the actions dim for each agent."
+        ...
 
 
 class RwareWrapper(MultiAgentWrapper):
@@ -75,6 +81,11 @@ class RwareWrapper(MultiAgentWrapper):
         reward = jnp.repeat(timestep.reward, self.num_agents)
         discount = jnp.repeat(timestep.discount, self.num_agents)
         return timestep.replace(observation=observation, reward=reward, discount=discount)
+
+    @property
+    def action_dim(self) -> chex.Array:
+        "Get the actions dim for each agent."
+        return int(self._env.action_spec().num_values[0])
 
 
 class LbfWrapper(MultiAgentWrapper):
@@ -118,3 +129,8 @@ class LbfWrapper(MultiAgentWrapper):
 
         # Aggregate the list of individual rewards and use a single team_reward.
         return self.aggregate_rewards(timestep, modified_observation)
+
+    @property
+    def action_dim(self) -> chex.Array:
+        "Get the actions dim for each agent."
+        return int(self._env.action_spec().num_values[0])
