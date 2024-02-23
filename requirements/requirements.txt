@@ -6,7 +6,8 @@ hydra-core==1.3.2
 jax
 jaxlib
 jaxmarl
-jumanji @ git+https://github.com/WiemKhlifi/jumanji@feat/lbf-truncate#egg=jumanji
+jumanji @ git+https://github.com/sash-a/jumanji
+matrax @ git+https://github.com/instadeepai/matrax
 neptune
 numpy
 omegaconf

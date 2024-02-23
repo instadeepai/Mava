@@ -235,7 +235,7 @@ def get_rnn_evaluator_fn(
 
         # Initialise hidden state.
         init_hstate = scanned_rnn.initialize_carry(
-            eval_batch, config.network.actor_network.pre_torso_layer_sizes[-1]
+            eval_batch, config.network.actor_network.pre_torso.layer_sizes[-1]
         )
         init_hstate = jnp.expand_dims(init_hstate, axis=1)
         init_hstate = jnp.expand_dims(init_hstate, axis=2)
@@ -275,20 +275,16 @@ def get_rnn_evaluator_fn(
     return evaluator_fn
 
 
-def evaluator_setup(
+def make_eval_fns(
     eval_env: Environment,
-    key_e: chex.PRNGKey,
     network: Any,
-    params: FrozenDict,
     config: DictConfig,
     use_recurrent_net: bool = False,
     scanned_rnn: Optional[nn.Module] = None,
-) -> Tuple[EvalFn, EvalFn, Tuple[FrozenDict, chex.Array]]:
+) -> Tuple[EvalFn, EvalFn]:
     """Initialise evaluator_fn."""
-    # Get available TPU cores.
-    n_devices = len(jax.devices())
     # Check if win rate is required for evaluation.
-    log_win_rate = config.env.env_name in ["HeuristicEnemySMAX", "LearnedPolicyEnemySMAX"]
+    log_win_rate = config.env.eval_metric == "win_rate"
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
         assert scanned_rnn is not None
@@ -311,25 +307,12 @@ def evaluator_setup(
             10,
         )
     else:
-        vmapped_eval_apply_fn = jax.vmap(
-            network.apply,
-            in_axes=(None, 0),
-        )
-        evaluator = get_ff_evaluator_fn(eval_env, vmapped_eval_apply_fn, config, log_win_rate)
+        evaluator = get_ff_evaluator_fn(eval_env, network.apply, config, log_win_rate)
         absolute_metric_evaluator = get_ff_evaluator_fn(
-            eval_env,
-            vmapped_eval_apply_fn,
-            config,
-            log_win_rate,
-            10,
+            eval_env, network.apply, config, log_win_rate, 10
         )
 
     evaluator = jax.pmap(evaluator, axis_name="device")
     absolute_metric_evaluator = jax.pmap(absolute_metric_evaluator, axis_name="device")
 
-    # Broadcast trained params to cores and split keys for each core.
-    trained_params = jax.tree_util.tree_map(lambda x: x[:, 0, ...], params)
-    key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
-    eval_keys = jnp.stack(eval_keys).reshape(n_devices, -1)
-
-    return evaluator, absolute_metric_evaluator, (trained_params, eval_keys)
+    return evaluator, absolute_metric_evaluator

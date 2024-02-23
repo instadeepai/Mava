@@ -1,12 +1,27 @@
 # ---Recurrent Structure Networks---
 actor_network:
-  use_layer_norm: True
-  activation: "relu"
-  pre_torso_layer_sizes: [128]
-  post_torso_layer_sizes: [128]
+  pre_torso:
+    _target_: mava.networks.MLPTorso
+    layer_sizes: [128]
+    use_layer_norm: False
+    activation: relu
+  post_torso:
+    _target_: mava.networks.MLPTorso
+    layer_sizes: [128]
+    use_layer_norm: False
+    activation: relu
+
+action_head:
+  _target_: mava.networks.DiscreteActionHead
 
 critic_network:
-  use_layer_norm: False
-  activation: "relu"
-  pre_torso_layer_sizes: [128]
-  post_torso_layer_sizes: [128]
+  pre_torso:
+    _target_: mava.networks.MLPTorso
+    layer_sizes: [128]
+    use_layer_norm: False
+    activation: relu
+  post_torso:
+    _target_: mava.networks.MLPTorso
+    layer_sizes: [128]
+    use_layer_norm: False
+    activation: relu

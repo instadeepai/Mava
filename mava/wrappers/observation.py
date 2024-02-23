@@ -25,37 +25,22 @@ from mava.types import Observation, ObservationGlobalState, State
 
 
 class AgentIDWrapper(Wrapper):
-    """Add onehot agent IDs to observation."""
+    """A wrapper to add a one-hot vector as agent IDs to the original observation.
+    It can be useful in multi-agent environments where agents require unique identification.
+    """
 
-    def __init__(self, env: Environment, has_global_state: bool = False):
+    def __init__(self, env: Environment):
         super().__init__(env)
-        self.has_global_state = has_global_state
 
     def _add_agent_ids(
         self, timestep: TimeStep, num_agents: int
     ) -> Union[Observation, ObservationGlobalState]:
+        """Adds agent IDs to the observation."""
+        obs = timestep.observation
         agent_ids = jnp.eye(num_agents)
-        new_agents_view = jnp.concatenate([agent_ids, timestep.observation.agents_view], axis=-1)
+        agents_view = jnp.concatenate([agent_ids, obs.agents_view], axis=-1)
 
-        if self.has_global_state:
-            # Add the agent IDs to the global state
-            new_global_state = jnp.concatenate(
-                [agent_ids, timestep.observation.global_state], axis=-1
-            )
-
-            return ObservationGlobalState(
-                agents_view=new_agents_view,
-                action_mask=timestep.observation.action_mask,
-                step_count=timestep.observation.step_count,
-                global_state=new_global_state,
-            )
-
-        else:
-            return Observation(
-                agents_view=new_agents_view,
-                action_mask=timestep.observation.action_mask,
-                step_count=timestep.observation.step_count,
-            )
+        return obs._replace(agents_view=agents_view)  # type: ignore
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment."""
@@ -78,22 +63,11 @@ class AgentIDWrapper(Wrapper):
     def observation_spec(
         self,
     ) -> Union[specs.Spec[Observation], specs.Spec[ObservationGlobalState]]:
-        """Specification of the observation of the `RobotWarehouse` environment."""
+        """Specification of the observation of the selected environment."""
         obs_spec = self._env.observation_spec()
         num_obs_features = obs_spec.agents_view.shape[-1] + self._env.num_agents
-
-        agents_view = specs.Array(
-            (self._env.num_agents, num_obs_features), jnp.int32, "agents_view"
-        )
-
-        if self.has_global_state:
-            wrapped_state_shape = obs_spec.global_state.shape
-            state_shape = (
-                *wrapped_state_shape[:-1],
-                wrapped_state_shape[-1] + self._env.num_agents,
-            )
-            global_state = specs.Array(state_shape, jnp.int32, "global_state")
-            return obs_spec.replace(agents_view=agents_view, global_state=global_state)
+        dtype = obs_spec.agents_view.dtype
+        agents_view = specs.Array((self._env.num_agents, num_obs_features), dtype, "agents_view")
 
         return obs_spec.replace(agents_view=agents_view)
 
@@ -130,13 +104,13 @@ class GlobalStateWrapper(Wrapper):
         return state, self.modify_timestep(timestep)
 
     def observation_spec(self) -> specs.Spec[ObservationGlobalState]:
-        """Specification of the observation of the `RobotWarehouse` environment."""
+        """Specification of the observation of the selected environment."""
 
         obs_spec = self._env.observation_spec()
         num_obs_features = obs_spec.agents_view.shape[-1]
         global_state = specs.Array(
             (self._env.num_agents, self._env.num_agents * num_obs_features),
-            jnp.int32,
+            obs_spec.agents_view.dtype,
             "global_state",
         )
 
