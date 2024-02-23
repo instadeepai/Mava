@@ -29,114 +29,26 @@
 
 ## Welcome to Mava! 🦁
 
-Mava provides simplified code for quickly iterating on ideas in multi-agent reinforcement learning (MARL) with useful implementations of MARL algorithms in JAX allowing for easy parallelisation across devices with JAX's `pmap`. Mava is a project originating in the Research Team at [InstaDeep](https://www.instadeep.com/).
+Mava provides simplified code for quickly iterating on ideas in multi-agent reinforcement learning (MARL) with useful implementations of MARL algorithms in JAX allowing for easy parallelisation across devices with JAX's `pmap`.
+Mava is a project originating in the Research Team at [InstaDeep](https://www.instadeep.com/).
+
+**If you are looking for documentation, benchmarks, contribution guidelines and more, you can find them [here](https://id-mava.readthedocs.io/)!**
 
 To join us in these efforts, please feel free to reach out, raise issues or read our [contribution guidelines](#contributing-) (or just star 🌟 to stay up to date with the latest developments)!
 
 ## Overview 🦜
 
+Mava offers single-file implementations of Reinforcement Learning (RL) algorithms inspired by [PureJaxRL][purejaxrl]and [CleanRL][cleanrl].
+These implementations are designed for clarity and ease of understanding while leveraging the advantages of JAX, such as `pmap` and `vmap`, to enhance efficiency and scalability in research and practice.
+
 Mava currently offers the following building blocks for MARL research:
 
-- 🥑 **Implementations of MARL algorithms**: Implementations of multi-agent PPO systems that follow both the Centralised Training with Decentralised Execution (CTDE) and Decentralised Training with Decentralised Execution (DTDE) MARL paradigms.
-- 🍬 **Environment Wrappers**: Example wrappers for mapping Jumanji environments to an environment that is compatible with Mava. At the moment, we support [Robotic Warehouse][jumanji_rware] and [Level-Based Foraging][jumanji_lbf] with plans to support more environments soon. We have also recently added support for the SMAX environment from [JaxMARL][jaxmarl].
-- 🎓 **Educational Material**: [Quickstart notebook][quickstart] to demonstrate how Mava can be used and to highlight the added value of JAX-based MARL.
-- 🧪 **Statistically robust evaluation**: Mava natively supports logging to json files which adhere to the standard suggested by [Gorsane et al. (2022)][toward_standard_eval]. This enables easy downstream experiment plotting and aggregation using the tools found in the [MARL-eval][marl_eval] library.
+- **MARL Algorithms**: Implementations of multi-agent PPO systems that follow both the Centralised Training with Decentralised Execution (CTDE) and Decentralised Training with Decentralised Execution (DTDE) MARL paradigms.
+- **Environment Wrappers**: Example wrappers for mapping Jumanji environments to an environment that is compatible with Mava. At the moment, we support [Robotic Warehouse][jumanji_rware] and [Level-Based Foraging][jumanji_lbf] with plans to support more environments soon. We have also recently added support for the SMAX environment from [JaxMARL][jaxmarl].
+- **Educational Material**: [Quickstart notebook][quickstart] to demonstrate how Mava can be used and to highlight the added value of JAX-based MARL.
+- **Statistically Robust Evaluation**: Mava natively supports logging to json files which adhere to the standard suggested by [Gorsane et al. (2022)][toward_standard_eval]. This enables easy downstream experiment plotting and aggregation using the tools found in the [MARL-eval][marl_eval] library.
 
-## Performance and Speed 🚀
-
-### SMAX
-For comparing Mava’s stability to other JAX-based baseline algorithms, we train Mava’s recurrent IPPO and MAPPO systems on a broad range of [SMAX][smax] tasks. In all cases we do not rerun baselines but instead take results for final win rates from the [JaxMARL technical report](https://arxiv.org/pdf/2311.10090.pdf). For the full SMAX experiments results, please see the following [page](docs/smax_benchmark.md).
-
-<p style="text-align: center;">
- <a href="docs/images/smax_results/legend.png">
-        <img src="docs/images/smax_results/legend.png" alt="legend" style="width: 40%;"/>
-</a>
-</p>
-
-<div style="text-align: center;">
-    <a href="docs/images/smax_results/3s5z.png">
-        <img src="docs/images/smax_results/3s5z.png" alt="Mava ff mappo tiny 2ag" style="width: 30%; display:inline-block; margin-right: 10px;"/>
-    </a>
-    <a href="docs/images/smax_results/6h_vs_8z.png">
-        <img src="docs/images/smax_results/6h_vs_8z.png" alt="Mava ff mappo tiny 4ag" style="width: 30%; display:inline-block; margin-right: 10px;"/>
-    </a>
-    <a href="docs/images/smax_results/3s5z_vs_3s6z.png">
-        <img src="docs/images/smax_results/3s5z_vs_3s6z.png" alt="Mava ff mappo small 4ag" style="width: 30%; display:inline-block; margin-right: 10px;"/>
-    </a>
-    <br>
-    <div style="text-align:center; margin-top: 10px;"> Mava Recurrent IPPO and MAPPO performance on the <code>3s5z</code>, <code>6h_vs_8z</code> and <code>3s5z_vs_3s6z</code> SMAX tasks.</div>
-</div>
-
-### Robotic Warehouse
-
-All of the experiments below were performed using an NVIDIA Quadro RTX 4000 GPU with 8GB Memory.
-
-In order to show the utility of end-to-end JAX-based MARL systems and JAX-based environments we compare the speed of Mava against [EPyMARL][epymarl] as measured in total training wallclock time on simple [Robotic Warehouse][rware] (RWARE) tasks with 2 and 4 agents. Our aim is to illustrate the speed increases that are possible with using end-to-end Jax-based systems and we do not necessarily make an effort to achieve optimal performance. For EPyMARL, we use the hyperparameters as recommended by [Papoudakis et al. (2020)](https://arxiv.org/pdf/2006.07869.pdf) and for Mava we performed a basic grid search. In both cases, systems were trained up to 20 million total environment steps using 16 vectorised environments.
-
-<p style="text-align: center;">
- <a href="docs/images/rware_results/ff_mappo/main_readme/legend.png">
-        <img src="docs/images/rware_results/ff_mappo/main_readme/legend.png" alt="legend" style="width: 80%;"/>
-</a>
-</p>
-
-<div style="text-align: center;">
-    <a href="docs/images/rware_results/ff_mappo/main_readme/tiny-2ag-1.png">
-        <img src="docs/images/rware_results/ff_mappo/main_readme/tiny-2ag-1.png" alt="Mava ff mappo tiny 2ag" style="width: 30%; display:inline-block; margin-right: 10px;"/>
-    </a>
-    <a href="docs/images/rware_results/ff_mappo/main_readme/tiny-4ag-1.png">
-        <img src="docs/images/rware_results/ff_mappo/main_readme/tiny-4ag-1.png" alt="Mava ff mappo tiny 4ag" style="width: 31%; display:inline-block; margin-right: 10px;"/>
-    </a>
-    <a href="docs/images/rware_results/ff_mappo/main_readme/small-4ag-1.png">
-        <img src="docs/images/rware_results/ff_mappo/main_readme/small-4ag-1.png" alt="Mava ff mappo small 4ag" style="width: 31%; display:inline-block; margin-right: 10px;"/>
-    </a>
-    <div style="margin-top: 10px;"> Mava feedforward MAPPO performance on the <code>tiny-2ag</code>, <code>tiny-4ag</code> and <code>small-4ag</code> RWARE tasks.</div>
-</div>
-
-
-### An important note on the differences in converged performance 📌
-
-In order to benefit from the wallclock speed-ups afforded by JAX-based systems it is required that environments also be written in JAX. It is for this reason that Mava does not use the exact same version of the RWARE environment as EPyMARL but instead uses a JAX-based implementation of RWARE found in [Jumanji][jumanji_rware], under the name RobotWarehouse. One of the notable differences in the underlying environment logic is that RobotWarehouse will not attempt to resolve agent collisions but will instead terminate an episode when agents do collide. In our experiments, this appeared to make the environment more challenging. For this reason we show the performance of Mava on Jumanji with and without termination upon collision indicated with `w/o collision` in the figure legends. For a more detailed discussion, please see the following [page](docs/jumanji_rware_comparison.md).
-
-### Level-Based Foraging 🌳
-Mava also supports [Jumanji][jumanji_lbf]'s LBF. We evaluate Mava's recurrent MAPPO system on LBF, against [EPyMARL][epymarl] (we used original [LBF](https://github.com/semitable/lb-foraging) for EPyMARL) in 2 and 4 agent settings up to 20 million timesteps. Both systems were trained using 16 vectorized environments. For the EPyMARL systems we use an NVIDIA A100 GPU and for the Mava systems we use a GeForce RTX 3050 laptop GPU with 4GB of memory. To show how Mava can generalise to different hardware, we also train the Mava systems on a TPU v3-8. We plan to publish comprehensive performance benchmarks for all Mava's algorithms across various LBF scenarios soon.
-
-<p style="text-align: center;">
- <a href="docs/images/lbf_results/legend_rec_mappo.png">
-        <img src="docs/images/lbf_results/legend_rec_mappo.png" alt="legend" style="width: 60%;"/>
-</a>
-</p>
-
-<div style="text-align: center;">
-    <a href="docs/images/lbf_results/2s-8x8-2p-2f-coop_rec_mappo.png">
-        <img src="docs/images/lbf_results/2s-8x8-2p-2f-coop_rec_mappo.png" alt="Mava ff mappo tiny 2ag" style="width: 30%; display:inline-block; margin-right: 10px;"/>
-    </a>
-    <a href="docs/images/lbf_results/15x15-4p-3f_rec_mappo.png">
-        <img src="docs/images/lbf_results/15x15-4p-3f_rec_mappo.png" alt="Mava ff mappo small 4ag" style="width: 30%; display:inline-block; margin-right: 10px;"/>
-    </a>
-    <br>
-    <div style="text-align:center; margin-top: 10px;"> Mava Recurrent MAPPO performance on the <code>2s-8x8-2p-2f-coop</code>, and <code>15x15-4p-3fz</code> Level-Based Foraging tasks.</div>
-</div>
-
-### Steps per second experiments using vectorised environments 🧨
-
-Furthermore, we illustrate the speed of Mava by showing the steps per second as the number of parallel environments is increased. These steps per second scaling plots were computed using a standard laptop GPU, specifically an RTX-3060 GPU with 6GB memory.
-
-<div style="text-align: center;">
-    <a href="docs/images/speed_results/mava_sps_results.png">
-        <img src="docs/images/speed_results/mava_sps_results.png" alt="Mava sps" style="width: 55%;"/>
-    </a>
-    <a href="docs/images/speed_results/ff_mappo_speed_comparison.png">
-        <img src="docs/images/speed_results/ff_mappo_speed_comparison.png" alt="Mava ff mappo speed comparison" style="width:39.33%; display:inline-block; margin-right: 10px;"/>
-    </a>
-    <br>
-    <div style="text-align:center; margin-top: 10px;"> Mava steps per second scaling with increased vectorised environments and total training run time for 20M environment steps.</div>
-</div>
-
-## Code Philosophy 🧘
-
-The current code in Mava is adapted from [PureJaxRL][purejaxrl] which provides high-quality single-file implementations with research-friendly features. In turn, PureJaxRL is inspired by the code philosophy from [CleanRL][cleanrl]. Along this vein of easy-to-use and understandable RL codebases, Mava is not designed to be a modular library and is not meant to be imported. Our repository focuses on simplicity and clarity in its implementations while utilising the advantages offered by JAX such as `pmap` and `vmap`, making it an excellent resource for researchers and practitioners to build upon.
-
-## Installation 🎬
+## Getting Started 🎬
 
 At the moment Mava is not meant to be installed as a library, but rather to be used as a research tool.
 
@@ -149,7 +61,7 @@ pip install -e .
 ```
 
 We have tested `Mava` on Python 3.9. Note that because the installation of JAX differs depending on your hardware accelerator,
-we advise users to explicitly install the correct JAX version (see the [official installation guide](https://github.com/google/jax#installation)). For more in-depth installation guides including Docker builds and virtual environments, please see our [detailed installation guide](docs/DETAILED_INSTALL.md).
+we advise users to explicitly install the correct JAX version (see the [official installation guide](https://github.com/google/jax#installation)). For more in-depth installation guides including Docker builds and virtual environments, please see our [detailed installation guide](docs/install).
 
 ## Quickstart ⚡
 
@@ -179,7 +91,7 @@ Mava can be used in a wide array of advanced systems. As an example, we demonstr
 
 ## Contributing 🤝
 
-Please read our [contributing docs](docs/CONTRIBUTING.md) for details on how to submit pull requests, our Contributor License Agreement and community guidelines.
+Please read our [contributing docs](docs/contributing) for details on how to submit pull requests, our Contributor License Agreement and community guidelines.
 
 ## Roadmap 🛤️
 
@@ -193,7 +105,7 @@ We plan to iteratively expand Mava in the following increments:
 
 Please do follow along as we develop this next phase!
 
-## TensorFlow 2 Mava:
+## TensorFlow 2 Mava ⚠️
 Originally Mava was written in Tensorflow 2. Support for the TF2-based framework and systems has now been fully **deprecated**. If you would still like to use it, please install `v0.1.3` of Mava (i.e. `pip install id-mava==0.1.3`).
 
 ## See Also 🔎
