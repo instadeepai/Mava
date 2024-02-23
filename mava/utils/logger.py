@@ -25,7 +25,7 @@ import neptune
 import numpy as np
 from colorama import Fore, Style
 from jax.typing import ArrayLike
-from marl_eval.json_tools import JsonWriter
+from marl_eval.json_tools import JsonLogger as MarlEvalJsonLogger
 from neptune.utils import stringify_unsupported
 from omegaconf import DictConfig
 from pandas.io.json._normalize import _simple_json_normalize as flatten_dict
@@ -221,7 +221,7 @@ class JsonLogger(BaseLogger):
                 cfg.logger.base_exp_path, "json", cfg.logger.kwargs.json_path
             )
 
-        self.logger = JsonWriter(
+        self.logger = MarlEvalJsonLogger(
             path=json_logs_path,
             algorithm_name=cfg.logger.system_name,
             task_name=cfg.env.scenario.task_name,
@@ -341,5 +341,4 @@ def describe(x: ArrayLike) -> Union[Dict[str, ArrayLike], ArrayLike]:
         return x
 
     # np instead of jnp because we don't jit here
-    return {"mean": np.mean(x), "std": np.std(x), "min": np.min(x), "max": np.max(x)}
     return {"mean": np.mean(x), "std": np.std(x), "min": np.min(x), "max": np.max(x)}
