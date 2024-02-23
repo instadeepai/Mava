@@ -324,10 +324,9 @@ def make_update_fns(
     
     # INTERACT LEVEL 3 (1.2.3)
     def select_random_action_batch(
-            operands:Any
+            selection_key:chex.PRNGKey,obs:Observation
             ) -> Tuple[chex.Array, chex.Array]:
         """Select actions randomly with masking."""
-        selection_key, hidden_state, nw_params, obs, terms = operands
         action_mask = obs.action_mask
 
         batch_size, n_agents, n_actions = action_mask.shape
@@ -351,10 +350,9 @@ def make_update_fns(
     
     # INTERACT LEVEL 3 (1.2.2)
     def greedy(
-            operands:Any
+            hidden_state, nw_params, obs, terms
             ) -> Tuple[chex.Array,chex.Array]:
         """Uses online q values to greedily select the best action."""
-        selection_key, hidden_state, nw_params, obs, terms = operands
 
         obs = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], obs)
         terms = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], terms)
@@ -371,6 +369,7 @@ def make_update_fns(
         action = action[0] #remove redundant first dim
 
         return (action, new_hidden_state)
+    
     
     # INTERACT LEVEL 3 (1.2.1)
     def get_epsilon(t:int):
@@ -397,28 +396,14 @@ def make_update_fns(
         # get exploration rate
         epsilon = get_epsilon(t)
 
-        # decide whether to explore
-        #should_explore = get_should_explore(explore_key,epsilon)
-
-        # need to make it a cond, so matching operands
-        operands = (selection_key, hidden_state, nw_params, obs, terms)
-
-        (greedy_action, new_hidden_state) = greedy(operands)
-        random_action = select_random_action_batch(operands)
+        greedy_action, new_hidden_state = greedy(hidden_state, nw_params, obs, terms)
+        random_action = select_random_action_batch(selection_key,obs)
 
         action = jax.lax.select(
             get_should_explore(explore_key,epsilon),
             random_action,
             greedy_action
         )
-
-        # # choose action selection method accordingly
-        # (action, new_hidden_state) = jax.lax.cond(
-        #     get_should_explore(explore_key,epsilon),
-        #     select_random_action_batch, #is it general enough?
-        #     greedy,
-        #     operands
-        # )
 
         # repack new selection params
         new_select_params = ActionSelectionParams(nw_params, new_hidden_state, terms, t, new_key)
@@ -707,8 +692,8 @@ def run_experiment(cfg: DictConfig) -> float:
         key, eval_key = jax.random.split(key)
         eval_keys = jax.random.split(eval_key, n_devices)
         # todo: bug likely here -> don't have batch vmap yet so shouldn't unreplicate_batch_dim
-        # eval_output = evaluator(unreplicate_batch_dim(learner_state.params.online), eval_keys)
-        # jax.block_until_ready(eval_output)
+        eval_output = evaluator(unreplicate_batch_dim(learner_state.params.online), eval_keys)
+        jax.block_until_ready(eval_output)
 
         # # Log:
         # episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
