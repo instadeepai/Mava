@@ -54,9 +54,11 @@ from mava.wrappers import episode_metrics
 
 
 def get_joint_action(actions: Array) -> Array:
-    n_agents = actions.shape[-2]
-    joint_action = jnp.reshape(actions, (actions.shape[0], -1))
-    return jnp.tile(joint_action[:, jnp.newaxis, ...], (1, n_agents, 1))
+    batch_size, num_agents, _ = actions.shape
+    repeated_action = jnp.tile(actions[:, jnp.newaxis, ...], (1, num_agents, 1, 1))
+    joint_action = jnp.reshape(repeated_action, (batch_size, num_agents, -1))
+
+    return joint_action
 
 
 # todo: should this contain both networks?
@@ -289,8 +291,8 @@ def make_update_fns(
         q1_params, q2_params = q_params
         joint_action = get_joint_action(action)
 
-        q1_a_values = q.apply(q1_params, obs, joint_action).reshape(-1)
-        q2_a_values = q.apply(q2_params, obs, joint_action).reshape(-1)
+        q1_a_values = q.apply(q1_params, obs, joint_action)
+        q2_a_values = q.apply(q2_params, obs, joint_action)
 
         q1_loss = jnp.mean((q1_a_values - target) ** 2)
         q2_loss = jnp.mean((q2_a_values - target) ** 2)
@@ -330,6 +332,7 @@ def make_update_fns(
 
         qf1_pi = q.apply(q_params.q1, obs, updated_joint_actions)
         qf2_pi = q.apply(q_params.q2, obs, updated_joint_actions)
+
         min_qf_pi = jnp.minimum(qf1_pi, qf2_pi)
 
         return ((alpha * log_prob) - min_qf_pi).mean()
@@ -345,27 +348,24 @@ def make_update_fns(
         # Calculate Q target values.
         rewards = data.reward[..., jnp.newaxis]
         dones = data.done[..., jnp.newaxis]
-        obs = data.next_obs  # ._replace(global_state=data.obs.global_state[:, 0, ...])
-        next_obs = data.next_obs  # ._replace(global_state=data.next_obs.global_state[:, 0, ...])
 
-        next_pi = actor.apply(params.actor, next_obs)
-        next_action, next_log_prob = next_pi.sample_and_log_prob(seed=key)
+        pi = actor.apply(params.actor, data.next_obs)
+        next_action, next_log_prob = pi.sample_and_log_prob(seed=key)
         next_log_prob = next_log_prob[..., jnp.newaxis]
 
         joint_next_actions = get_joint_action(next_action)
-        next_q1_val = q.apply(params.q.targets.q1, next_obs, joint_next_actions)
-        next_q2_val = q.apply(params.q.targets.q2, next_obs, joint_next_actions)
+        next_q1_val = q.apply(params.q.targets.q1, data.next_obs, joint_next_actions)
+        next_q2_val = q.apply(params.q.targets.q2, data.next_obs, joint_next_actions)
         next_q_val = jnp.minimum(next_q1_val, next_q2_val)
 
         entropy_term = jnp.mean(jnp.exp(params.log_alpha), axis=1) * jnp.sum(next_log_prob, axis=1)
         next_q_val = next_q_val - entropy_term[:, jnp.newaxis, ...]
 
-        # todo: why is this the wrong shape?
-        target_q_val = (rewards + (1.0 - dones) * cfg.system.gamma * next_q_val).reshape(-1)
+        target_q_val = rewards + (1.0 - dones) * cfg.system.gamma * next_q_val
 
         # Update Q function.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
-        q_grads, q_loss_info = q_grad_fn(params.q.online, obs, data.action, target_q_val)
+        q_grads, q_loss_info = q_grad_fn(params.q.online, data.obs, data.action, target_q_val)
         # Mean over the device and batch dimension.
         q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="device")
         q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="batch")
