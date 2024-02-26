@@ -289,8 +289,8 @@ def make_update_fns(
         q1_params, q2_params = q_params
         joint_action = get_joint_action(action)
 
-        q1_a_values = q.apply(q1_params, obs, joint_action)
-        q2_a_values = q.apply(q2_params, obs, joint_action)
+        q1_a_values = q.apply(q1_params, obs, joint_action).reshape(-1)
+        q2_a_values = q.apply(q2_params, obs, joint_action).reshape(-1)
 
         q1_loss = jnp.mean((q1_a_values - target) ** 2)
         q2_loss = jnp.mean((q2_a_values - target) ** 2)
@@ -357,11 +357,11 @@ def make_update_fns(
         next_q2_val = q.apply(params.q.targets.q2, next_obs, joint_next_actions)
         next_q_val = jnp.minimum(next_q1_val, next_q2_val)
 
-        entropy_term = jnp.exp(params.log_alpha) * next_log_prob
+        entropy_term = jnp.mean(jnp.exp(params.log_alpha), axis=1) * jnp.sum(next_log_prob, axis=1)
         next_q_val = next_q_val - entropy_term[:, jnp.newaxis, ...]
 
         # todo: why is this the wrong shape?
-        target_q_val = rewards + (1.0 - dones) * cfg.system.gamma * next_q_val
+        target_q_val = (rewards + (1.0 - dones) * cfg.system.gamma * next_q_val).reshape(-1)
 
         # Update Q function.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
