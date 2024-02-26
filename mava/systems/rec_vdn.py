@@ -92,7 +92,6 @@ class InteractionParams(NamedTuple):
     obs: Observation
     buffer_state: TrajectoryBufferState
 
-
 class QNetParams(NamedTuple):
     online: FrozenVariableDict
     target: FrozenVariableDict
@@ -113,6 +112,7 @@ class RNNQLearnerState(NamedTuple):
 
     # purely training vars
     opt_state: optax.OptState
+    t_train: int
 
 Metrics = Dict[str, Array]
 
@@ -148,8 +148,6 @@ class RecQNetwork(nn.Module):
         q_values = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01))(embedding)
 
         return hidden_state, q_values
-
-
 
 class Networks(NamedTuple):
     q: RecQNetwork
@@ -217,7 +215,11 @@ def init(
     params = QNetParams(q_params, q_params)
 
     # OPTIMISER
-    q_opt = optax.adam(cfg.system.q_lr)
+    q_opt = optax.chain(
+            optax.clip_by_global_norm(10),
+            optax.adam(learning_rate=cfg.system.q_lr, eps=1e-5),
+        )
+    #q_opt = optax.adam(learning_rate=cfg.system.q_lr, eps=1e-5)
     q_opt_state = q_opt.init(params.online)
 
     # Distribute params and opt states across all devices
@@ -284,7 +286,7 @@ def init(
 
     # Initial learner state.
     learner_state = RNNQLearnerState(
-        h_state, first_terms, t, env_state, first_obs, buffer_state, params, first_keys, q_opt_state
+        h_state, first_terms, t, env_state, first_obs, buffer_state, params, first_keys, q_opt_state, t
     )
     return (env, eval_env), nns, Optimisers(q_opt), rb, learner_state, logger, key 
 
@@ -357,7 +359,7 @@ def make_update_fns(
         obs = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], obs)
         terms = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], terms)
         # get q values
-        new_hidden_state, q_values = q.apply(nw_params, hidden_state, (obs, terms)) #TODO: Make nw compatible
+        new_hidden_state, q_values = q.apply(nw_params, hidden_state, (obs, terms)) 
 
         # right now q_values is 1,1,n_envs,A,x
         q_values = q_values[0]
@@ -380,8 +382,8 @@ def make_update_fns(
             )
         return eps
 
-    def get_should_explore(key,eps):
-        return jax.random.uniform(key)<eps
+    def get_should_explore(key,eps,shape):
+        return jax.random.uniform(key,shape)<eps
 
     # INTERACT LEVEL 2 (1.2)
     def select_eps_greedy_action(
@@ -400,7 +402,7 @@ def make_update_fns(
         random_action = select_random_action_batch(selection_key,obs)
 
         action = jax.lax.select(
-            get_should_explore(explore_key,epsilon),
+            get_should_explore(explore_key,epsilon,random_action.shape),
             random_action,
             greedy_action
         )
@@ -504,7 +506,7 @@ def make_update_fns(
 
     # TRAIN LEVEL 2 (2.1)
     def update_q(
-        params: QNetParams, opt_states: optax.OptState, data: Transition
+        params: QNetParams, opt_states: optax.OptState, data: Transition, t_train:int
     ) -> Tuple[QNetParams, optax.OptState, Metrics]:
         """Update the Q parameters."""
 
@@ -557,32 +559,39 @@ def make_update_fns(
         new_online_q_params = optax.apply_updates(params.online, q_updates)
 
         # Target network polyak update.
-        new_target_q_params = optax.incremental_update(
-            new_online_q_params, params.target, cfg.system.tau
-        )
+        # new_target_q_params = jax.lax.select(
+        #     cfg.system.hard_update,
+        #     optax.periodic_update(new_online_q_params, params.target, t_train, cfg.system.update_period),
+        #     optax.incremental_update(new_online_q_params, params.target, cfg.system.tau)
+        # )
+        # new_target_q_params = optax.incremental_update(
+        #     new_online_q_params, params.target, cfg.system.tau
+        # )
+
+        new_target_q_params = optax.periodic_update(new_online_q_params, params.target, t_train, cfg.system.update_period)
 
         # Repack params and opt_states.
         new_params = QNetParams(new_online_q_params, new_target_q_params)
 
-        return new_params, new_q_opt_state, q_loss_info
+        return new_params, new_q_opt_state, q_loss_info, t_train
 
     # TRAIN LEVEL 1 (2.)
     def train(
-        train_carry: Tuple[BufferState, QNetParams, optax.OptState, chex.PRNGKey], _: Any
-    ) -> Tuple[Tuple[BufferState, QNetParams, optax.OptState, chex.PRNGKey], Metrics]:
+        train_carry: Tuple[BufferState, QNetParams, optax.OptState, chex.PRNGKey,int], _: Any
+    ) -> Tuple[Tuple[BufferState, QNetParams, optax.OptState, chex.PRNGKey,int], Metrics]:
         """Sample, train and repack."""
 
         # unpack and get keys
-        buffer_state, params, opt_states, key = train_carry
+        buffer_state, params, opt_states, key, t_train = train_carry
         new_key, buff_key = jax.random.split(key, 2)
 
         # sample
         data = rb.sample(buffer_state, buff_key).experience
 
         # learn
-        new_params, new_opt_states, q_loss_info = update_q(params, opt_states, data)
+        new_params, new_opt_states, q_loss_info, t_train_ = update_q(params, opt_states, data,t_train)
 
-        return (buffer_state, new_params, new_opt_states, new_key), q_loss_info
+        return (buffer_state, new_params, new_opt_states, new_key, t_train_), q_loss_info
     
     #___________________________________________________________________________________________________
     # INTERACT-TRAIN LOOP
@@ -595,8 +604,8 @@ def make_update_fns(
         """Interact, then learn. The _ at the end of a var means updated."""
 
         # unpack and get random keys
-        hidden_state, terms, t, env_state, obs, buffer_state, params, key, opt_state = carry
-        key, interact_key, train_key = jax.random.split(key, 3)
+        hidden_state, terms, t, env_state, obs, buffer_state, params, key, opt_state, t_train = carry
+        new_key, interact_key, train_key = jax.random.split(key, 3)
 
         # Select actions, step env and store transitions
         selection_params = ActionSelectionParams(params.online, hidden_state, terms, t, interact_key)
@@ -604,12 +613,12 @@ def make_update_fns(
         ((_, hidden_state_, terms_, _, _), env_state_, buffer_state_, obs_), metrics = scanned_interact(interact_carry)
 
         # Sample and learn
-        train_carry = (buffer_state_, params, opt_state, train_key)
-        (_, params_, opt_state_, _), losses = scanned_train(train_carry)
+        train_carry = (buffer_state_, params, opt_state, train_key,t_train)
+        (_, params_, opt_state_, _,t_train_), losses = scanned_train(train_carry)
 
         t += cfg.system.n_envs * cfg.system.rollout_length
         return (
-            RNNQLearnerState(hidden_state_, terms_, t, env_state_, obs_, buffer_state_, params_, key, opt_state_),
+            RNNQLearnerState(hidden_state_, terms_, t, env_state_, obs_, buffer_state_, params_, new_key, opt_state_,t_train_),
             (metrics, losses),
         )
 
@@ -679,21 +688,21 @@ def run_experiment(cfg: DictConfig) -> float:
         # Multiply by learn steps here because anakin steps per second is learn + act steps
         # But we want to make sure we're counting env steps correctly so it's not included
         # in the loop counter.
-
-        sps = t * cfg.system.epochs / (time.time() - start_time)
+        t_frm_learnstate = learner_state.t[0][0]
+        sps = t_frm_learnstate * cfg.system.epochs / (time.time() - start_time)
         final_metrics = episode_metrics.get_final_step_metrics(metrics)
         loss_metrics = losses #| {"log_alpha": learner_state.params.log_alpha}
-        logger.log({"step": t, "steps_per_second": sps}, t, eval_idx, LogEvent.MISC)
-        logger.log(final_metrics, t, eval_idx, LogEvent.ACT)
-        logger.log(loss_metrics, t, eval_idx, LogEvent.TRAIN)
-        logger.log({"epsilon":get_epsilon(t)}, t, eval_idx, LogEvent.MISC)
+        logger.log({"step": t_frm_learnstate, "steps_per_second": sps}, t_frm_learnstate, eval_idx, LogEvent.MISC)
+        logger.log(final_metrics, t_frm_learnstate, eval_idx, LogEvent.ACT)
+        logger.log(loss_metrics, t_frm_learnstate, eval_idx, LogEvent.TRAIN)
+        logger.log({"epsilon":get_epsilon(t_frm_learnstate)}, t_frm_learnstate, eval_idx, LogEvent.MISC)
 
-        # Evaluate:
-        key, eval_key = jax.random.split(key)
-        eval_keys = jax.random.split(eval_key, n_devices)
-        # todo: bug likely here -> don't have batch vmap yet so shouldn't unreplicate_batch_dim
-        eval_output = evaluator(unreplicate_batch_dim(learner_state.params.online), eval_keys)
-        jax.block_until_ready(eval_output)
+        # # Evaluate:
+        # key, eval_key = jax.random.split(key)
+        # eval_keys = jax.random.split(eval_key, n_devices)
+        # # todo: bug likely here -> don't have batch vmap yet so shouldn't unreplicate_batch_dim
+        # eval_output = evaluator(unreplicate_batch_dim(learner_state.params.online), eval_keys)
+        # jax.block_until_ready(eval_output)
 
         # # Log:
         # episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
