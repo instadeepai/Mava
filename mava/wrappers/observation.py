@@ -38,7 +38,11 @@ class AgentIDWrapper(Wrapper):
         """Adds agent IDs to the observation."""
         obs = timestep.observation
         agent_ids = jnp.eye(num_agents)
-        agents_view = jnp.concatenate([agent_ids, obs.agents_view], axis=-1)
+        agents_view = jnp.concatenate(
+            [agent_ids, obs.agents_view],
+            axis=-1,
+            dtype=obs.agents_view.dtype,
+        )
 
         return obs._replace(agents_view=agents_view)  # type: ignore
 
