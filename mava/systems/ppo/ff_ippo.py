@@ -334,22 +334,15 @@ def learner_setup(
     # Get available TPU cores.
     n_devices = len(jax.devices())
 
-    # Get number of actions and agents.
-    # TODO: do we need to add this to config and it shouldn't be under`env`?
-    # else can do this to point on the same thing?
-    # (1) config.env.num_agents = num_agents = env.action_dim
-    # (2) config.env.num_agents, num_agents = (env.action_dim,) * 2
-    action_dim = env.action_dim
-    num_agents = env.num_agents
-    config.system.num_agents = num_agents
-    config.system.action_dim = action_dim
+    # Get number of agents.
+    config.system.num_agents = env.num_agents
 
     # PRNG keys.
     key, actor_net_key, critic_net_key = keys
 
     # Define network and optimiser.
     actor_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
-    actor_action_head = hydra.utils.instantiate(config.network.action_head, action_dim=action_dim)
+    actor_action_head = hydra.utils.instantiate(config.network.action_head, env=env)
     critic_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
 
     actor_network = Actor(torso=actor_torso, action_head=actor_action_head)

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from abc import abstractmethod
+from functools import cached_property
 from typing import Tuple
 
 import chex
@@ -58,7 +59,13 @@ class MultiAgentWrapper(Wrapper):
         )
         return self._env.observation_spec().replace(step_count=step_count)
 
-    @property
+    @cached_property
+    @abstractmethod
+    def min_max_action(self) -> Tuple[chex.Array, chex.Array]:
+        """Returns the minimum and maximum values from the action space"""
+        ...
+
+    @cached_property
     @abstractmethod
     def action_dim(self) -> chex.Array:
         "Get the actions dim for each agent."
@@ -82,7 +89,7 @@ class RwareWrapper(MultiAgentWrapper):
         discount = jnp.repeat(timestep.discount, self.num_agents)
         return timestep.replace(observation=observation, reward=reward, discount=discount)
 
-    @property
+    @cached_property
     def action_dim(self) -> chex.Array:
         "Get the actions dim for each agent."
         return int(self._env.action_spec().num_values[0])
@@ -130,7 +137,7 @@ class LbfWrapper(MultiAgentWrapper):
         # Aggregate the list of individual rewards and use a single team_reward.
         return self.aggregate_rewards(timestep, modified_observation)
 
-    @property
+    @cached_property
     def action_dim(self) -> chex.Array:
         "Get the actions dim for each agent."
         return int(self._env.action_spec().num_values[0])

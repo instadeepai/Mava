@@ -457,11 +457,9 @@ def learner_setup(
     # Get available TPU cores.
     n_devices = len(jax.devices())
 
-    # Get number of actions and agents.
-    action_dim = env.action_dim
+    # Get number of agents.
     num_agents = env.num_agents
     config.system.num_agents = num_agents
-    config.system.action_dim = action_dim
 
     # PRNG keys.
     key, actor_net_key, critic_net_key = keys
@@ -469,7 +467,7 @@ def learner_setup(
     # Define network and optimiser.
     actor_pre_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
     actor_post_torso = hydra.utils.instantiate(config.network.actor_network.post_torso)
-    actor_action_head = hydra.utils.instantiate(config.network.action_head, action_dim=action_dim)
+    actor_action_head = hydra.utils.instantiate(config.network.action_head, env=env)
     critic_pre_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
     critic_post_torso = hydra.utils.instantiate(config.network.critic_network.post_torso)
 

@@ -23,6 +23,7 @@ import tensorflow_probability.substrates.jax.bijectors as tfb
 import tensorflow_probability.substrates.jax.distributions as tfd
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
+from jumanji.env import Environment
 
 from mava.types import (
     Observation,
@@ -82,7 +83,9 @@ class CNNTorso(nn.Module):
 class DiscreteActionHead(nn.Module):
     """Discrete Action Head"""
 
-    action_dim: int
+    env: Environment
+    sigma_min: float
+    sigma_max: float
 
     @nn.compact
     def __call__(self, obs_embedding: chex.Array, observation: Observation) -> tfd.Categorical:
@@ -101,7 +104,7 @@ class DiscreteActionHead(nn.Module):
         information.
         """
 
-        actor_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(obs_embedding)
+        actor_logits = nn.Dense(self.env.action_dim, kernel_init=orthogonal(0.01))(obs_embedding)
 
         masked_logits = jnp.where(
             observation.action_mask,
@@ -109,9 +112,8 @@ class DiscreteActionHead(nn.Module):
             jnp.finfo(jnp.float32).min,
         )
 
-        # we transform this distribution with the `Identity()` transform to allow
-        # us to call `pi.distribution.entropy()` and keep the API the same as the
-        # continuous distribution.
+        #  We transform this distribution with the `Identity()` transformation to enable us to call
+        # `pi.distribution.entropy()` and keep the API identical to the ContinuousActionHead.
         return tfd.TransformedDistribution(
             distribution=tfd.Categorical(logits=masked_logits), bijector=tfb.Identity()
         )
@@ -120,23 +122,24 @@ class DiscreteActionHead(nn.Module):
 class ContinuousActionHead(nn.Module):
     """Continuous Action Head"""
 
-    action_dim: int
-    minimum: float = -1
-    maximum: float = 1
+    env: Environment
+    sigma_min: float
+    sigma_max: float
 
     def setup(self) -> None:
-        self.actor_mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))
-        self.actor_log_std = self.param("log_std", nn.initializers.zeros, (self.action_dim,))
-        scale = 0.5 * (self.maximum - self.minimum)
+        self.actor_mean = nn.Dense(self.env.action_dim, kernel_init=orthogonal(0.01))
+        self.actor_log_std = self.param("log_std", nn.initializers.zeros, (self.env.action_dim,))
+        min_action, max_action = self.env.min_max_action
+        scale = 0.5 * (max_action - min_action)
         self.bijector = tfb.Chain(
-            [tfb.Shift(self.minimum), tfb.Scale(scale=scale), tfb.Shift(1), tfb.Tanh()]
+            [tfb.Shift(min_action), tfb.Scale(scale=scale), tfb.Shift(1), tfb.Tanh()]
         )
 
-    def _sigma_activation(
-        self, sigma: chex.Array, sigma_min: float = -4, sigma_max: float = 0
-    ) -> chex.Array:
+    def _sigma_activation(self, sigma: chex.Array) -> chex.Array:
         """Don't allow sigma to grow too large for numerical stability."""
-        return jnp.exp(sigma_min + 0.5 * (sigma_max - sigma_min) * (jnp.tanh(sigma) + 1.0))
+        return jnp.exp(
+            self.sigma_min + 0.5 * (self.sigma_max - self.sigma_min) * (jnp.tanh(sigma) + 1.0)
+        )
 
     @nn.compact
     def __call__(
