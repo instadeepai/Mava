@@ -250,7 +250,7 @@ def get_rnn_evaluator_fn(
         )
 
         # Adding an extra batch dim for the vmapped eval functions.
-        init_hstate = jnp.expand_dims(init_hstate, axis=1)
+        init_hstate = init_hstate[:, jnp.newaxis, ...]
 
         eval_state = RNNEvalState(
             key=step_keys,
