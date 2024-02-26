@@ -54,7 +54,9 @@ from mava.wrappers import episode_metrics
 
 
 def get_joint_action(actions: Array) -> Array:
-    return jnp.reshape(actions, (actions.shape[0], -1))
+    n_agents = actions.shape[-2]
+    joint_action = jnp.reshape(actions, (actions.shape[0], -1))
+    return jnp.tile(joint_action[:, jnp.newaxis, ...], (1, n_agents, 1))
 
 
 # todo: should this contain both networks?
@@ -150,9 +152,9 @@ def init(
     concat_acts_batched = concat_acts[jnp.newaxis, ...]  # batch + concat of all agents actions
     init_obs = env.observation_spec().generate_value()
     # global_state = init_obs.global_state  # global state is already single item
-    init_obs_single = jax.tree_map(lambda x: x[0], init_obs)
+    init_obs_single_batched = jax.tree_map(lambda x: x[0][jnp.newaxis, ...], init_obs)
     # init_obs_single = init_obs_single._replace(global_state=global_state)
-    init_obs_single_batched = jax.tree_map(lambda x: x[jnp.newaxis, ...], init_obs_single)
+    # init_obs_single_batched = jax.tree_map(lambda x: x[jnp.newaxis, ...], init_obs_single)
 
     # Making actor network
     actor = Actor(action_dim, act_high, act_low)
@@ -287,8 +289,8 @@ def make_update_fns(
         q1_params, q2_params = q_params
         joint_action = get_joint_action(action)
 
-        q1_a_values = q.apply(q1_params, obs, joint_action).reshape(-1)
-        q2_a_values = q.apply(q2_params, obs, joint_action).reshape(-1)
+        q1_a_values = q.apply(q1_params, obs, joint_action)
+        q2_a_values = q.apply(q2_params, obs, joint_action)
 
         q1_loss = jnp.mean((q1_a_values - target) ** 2)
         q2_loss = jnp.mean((q2_a_values - target) ** 2)
@@ -341,13 +343,13 @@ def make_update_fns(
     ) -> Tuple[SacParams, OptStates, Metrics]:
         """Update the Q parameters."""
         # Calculate Q target values.
-        rewards = data.reward
-        dones = data.done
-        obs = data.next_obs._replace(global_state=data.obs.global_state[:, 0, ...])
-        next_obs = data.next_obs._replace(global_state=data.next_obs.global_state[:, 0, ...])
+        rewards = data.reward[..., jnp.newaxis]
+        dones = data.done[..., jnp.newaxis]
+        obs = data.next_obs  # ._replace(global_state=data.obs.global_state[:, 0, ...])
+        next_obs = data.next_obs  # ._replace(global_state=data.next_obs.global_state[:, 0, ...])
 
-        pi = actor.apply(params.actor, next_obs)
-        next_action, next_log_prob = pi.sample_and_log_prob(seed=key)
+        next_pi = actor.apply(params.actor, next_obs)
+        next_action, next_log_prob = next_pi.sample_and_log_prob(seed=key)
         next_log_prob = next_log_prob[..., jnp.newaxis]
 
         joint_next_actions = get_joint_action(next_action)
@@ -355,11 +357,11 @@ def make_update_fns(
         next_q2_val = q.apply(params.q.targets.q2, next_obs, joint_next_actions)
         next_q_val = jnp.minimum(next_q1_val, next_q2_val)
 
-        entropy_term = jnp.mean(jnp.exp(params.log_alpha), axis=1) * jnp.sum(next_log_prob, axis=1)
+        entropy_term = jnp.exp(params.log_alpha) * next_log_prob
         next_q_val = next_q_val - entropy_term
 
         # todo: why is this the wrong shape?
-        target_q_val = (rewards + (1.0 - dones) * cfg.system.gamma * next_q_val).reshape(-1)
+        target_q_val = rewards + (1.0 - dones) * cfg.system.gamma * next_q_val
 
         # Update Q function.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
