@@ -358,7 +358,7 @@ def make_update_fns(
         next_q_val = jnp.minimum(next_q1_val, next_q2_val)
 
         entropy_term = jnp.exp(params.log_alpha) * next_log_prob
-        next_q_val = next_q_val - entropy_term
+        next_q_val = next_q_val - entropy_term[:, jnp.newaxis, ...]
 
         # todo: why is this the wrong shape?
         target_q_val = rewards + (1.0 - dones) * cfg.system.gamma * next_q_val
