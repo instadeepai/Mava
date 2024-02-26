@@ -284,7 +284,7 @@ def make_eval_fns(
 ) -> Tuple[EvalFn, EvalFn]:
     """Initialise evaluator_fn."""
     # Check if win rate is required for evaluation.
-    log_win_rate = config.env.env_name in ["HeuristicEnemySMAX", "LearnedPolicyEnemySMAX"]
+    log_win_rate = config.env.eval_metric == "win_rate"
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
         assert scanned_rnn is not None

@@ -1,4 +1,5 @@
 # The config of the tiny-4ag-easy environment
+name: RobotWarehouse-v0
 task_name: tiny-4ag-easy
 
 task_config:

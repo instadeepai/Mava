@@ -33,22 +33,10 @@ from rich.pretty import pprint
 from mava.evaluator import make_eval_fns
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardCritic as Critic
-from mava.types import (
-    ActorApply,
-    CriticApply,
-    ExperimentOutput,
-    LearnerState,
-    MavaState,
-    OptStates,
-    Params,
-    PPOTransition,
-)
+from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
+from mava.types import ActorApply, CriticApply, ExperimentOutput, MavaState
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import (
-    merge_leading_dims,
-    unreplicate_batch_dim,
-    unreplicate_learner_state,
-)
+from mava.utils.jax import merge_leading_dims, unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.make_env import make
 
@@ -587,7 +575,7 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
         )
 
     # Run experiment for a total number of evaluations.
-    max_episode_return = jnp.float32(0.0)
+    max_episode_return = -jnp.inf
     best_params = None
     for eval_step in range(config.arch.num_evaluation):
         # Train.
@@ -650,7 +638,7 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
             # Save checkpoint of learner state
             checkpointer.save(
                 timestep=steps_per_rollout * (eval_step + 1),
-                unreplicated_learner_state=unreplicate_learner_state(learner_output.learner_state),
+                unreplicated_learner_state=unreplicate_n_dims(learner_output.learner_state),
                 episode_return=episode_return,
             )
 
