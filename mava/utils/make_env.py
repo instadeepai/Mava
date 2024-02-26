@@ -64,8 +64,7 @@ def add_optional_wrappers(
 
     # Add agent id to observation.
     if config.system.add_agent_id:
-        env = AgentIDWrapper(env, add_global_state)
-
+        env = AgentIDWrapper(env)
     return env
 
 
@@ -123,16 +122,17 @@ def make_jaxmarl_env(
 
     # Create jaxmarl envs.
     env = _jaxmarl_wrappers[config.env.env_name](
-        jaxmarl.make(env_name, **kwargs), add_global_state, config.env.add_agent_ids_to_state
+        jaxmarl.make(env_name, **kwargs),
+        add_global_state,
     )
     eval_env = _jaxmarl_wrappers[config.env.env_name](
-        jaxmarl.make(env_name, **kwargs), add_global_state, config.env.add_agent_ids_to_state
+        jaxmarl.make(env_name, **kwargs),
+        add_global_state,
     )
 
-    # Add optional wrappers.
-    if config.system.add_agent_id:
-        env = AgentIDWrapper(env, add_global_state)
-        eval_env = AgentIDWrapper(eval_env, add_global_state)
+    # Add agent id to observation.
+    env = add_optional_wrappers(env, config)
+    eval_env = add_optional_wrappers(eval_env, config)
 
     env = AutoResetWrapper(env)
     env = RecordEpisodeMetrics(env)

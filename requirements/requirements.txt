@@ -4,6 +4,7 @@ flashbax~=0.1.0
 flax~=0.7.5
 gigastep @ git+https://github.com/mlech26l/gigastep
 hydra-core==1.3.2
+id-marl-eval @ git+https://github.com/instadeepai/marl-eval
 jax
 jaxlib
 jaxmarl
