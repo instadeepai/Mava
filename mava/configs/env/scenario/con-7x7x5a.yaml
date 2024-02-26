@@ -1,0 +1,7 @@
+# The config of the 7x7x5a scenario
+name: MaConnector-v2
+task_name: con-7x7x5a
+
+task_config:
+  grid_size: 7
+  num_agents: 5

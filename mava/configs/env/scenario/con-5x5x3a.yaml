@@ -1,0 +1,7 @@
+# The config of the 5x5x3a scenario
+name: MaConnector-v2
+task_name: con-5x5x3a
+
+task_config:
+  grid_size: 5
+  num_agents: 3
