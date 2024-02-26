@@ -96,10 +96,14 @@ def make_jumanji_env(
         env = jumanji.make(env_name, generator=generator)
         eval_env = jumanji.make(env_name, generator=generator)
         
-    env, eval_env = wrapper(env), wrapper(eval_env)
-
-    env = add_optional_wrappers(env, config, add_global_state)
-    eval_env = add_optional_wrappers(eval_env, config, add_global_state)
+    if env_name == "MultiCVRP-v0":
+        env, eval_env = wrapper(env, add_global_state), wrapper(eval_env, add_global_state)
+        env = add_optional_wrappers(env, config )
+        eval_env = add_optional_wrappers(eval_env, config)
+    else:
+        env, eval_env = wrapper(env), wrapper(eval_env)
+        env = add_optional_wrappers(env, config, add_global_state)
+        eval_env = add_optional_wrappers(eval_env, config, add_global_state)
 
     env = AutoResetWrapper(env)
     env = RecordEpisodeMetrics(env)

@@ -22,12 +22,9 @@ from jumanji.environments.routing.lbf import LevelBasedForaging
 from jumanji.environments.routing.robot_warehouse import RobotWarehouse
 from jumanji.types import TimeStep, StepType
 from jumanji.wrappers import Wrapper
-  
-import jax
 from jax import tree_util
 from jumanji.environments.routing.multi_cvrp import MultiCVRP
-
-from mava.types import Observation, State
+from mava.types import Observation, ObservationGlobalState, State
 
 
 class MultiAgentWrapper(Wrapper):
@@ -123,13 +120,14 @@ class LbfWrapper(MultiAgentWrapper):
         return self.aggregate_rewards(timestep, modified_observation)
   
 class multiCVRPWrapper(Wrapper):
-    def __init__(self, env: MultiCVRP):
+    def __init__(self, env: MultiCVRP, has_global_state : bool = False):
         self.num_agents = env._num_vehicles
         self._env = env
+        self.has_global_state = has_global_state
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State | TimeStep]:
         state , timestep = self._env.reset(key)
-        timestep = self.modify_timestep(timestep, state.step_count)    # handeling the step_count is wrong in both gigastep / here it's allways set to 0
+        timestep = self.modify_timestep(timestep, state.step_count)    
         return state, timestep
     
     def step(self, state: State, action: chex.Array) -> Tuple[State | TimeStep]:
@@ -138,37 +136,41 @@ class multiCVRPWrapper(Wrapper):
         return state,timestep
 
     def modify_timestep(self, timestep: TimeStep, step_count : chex.Array) -> TimeStep[Observation]:
-
-        observation = self._format_observation(timestep.observation)
+        observation, global_observation = self._format_observation(timestep.observation)
+        obs_data = {
+            "agents_view": observation,
+            "action_mask": timestep.observation.action_mask,
+            "step_count": jnp.repeat(step_count, (self.num_agents)),
+        }
+        if self.has_global_state:
+            obs_data["global_state"] = global_observation
+            observation = ObservationGlobalState(**obs_data)
+        else:
+            observation = Observation(**obs_data)
+        
         reward = jnp.repeat(timestep.reward, (self.num_agents))
         discount = jnp.repeat(timestep.discount, (self.num_agents))
-        step_count = jnp.repeat(step_count, (self.num_agents))
-        observation = Observation(
-            agents_view=observation,
-            action_mask=timestep.observation.action_mask,
-            step_count=step_count,
-        )
-        
-
         timestep = timestep.replace(observation=observation, reward=reward, discount=discount)
         return timestep
     
     def _format_observation(self, observation):
+        global_observation = None 
         #flatten and concat all of the observations for now
         customers_info, _ = tree_util.tree_flatten((observation.nodes,observation.windows,observation.coeffs))
         vehicles_info , _ = tree_util.tree_flatten(observation.vehicles)
         
         #this results in c1-info1-c2,info2
         customers_info = jnp.column_stack(customers_info).ravel()
-        #each agents needs to get the customers_info in their observation , alot of compute is wasted this way
-        customers_info = jnp.tile(customers_info, (self.num_agents, 1) )
-
         vehicles_info = jnp.column_stack(vehicles_info)
 
-        #(num_vechials, obs) with obs (vechial_obs + costumer_obs) if the costumer obs doest change much woudn't be better to pass it thought it's own network once?
-        observations =  jnp.column_stack((vehicles_info, customers_info))
 
-        return observations 
+        if self.has_global_state:
+            global_observation = jnp.concat((customers_info, vehicles_info.ravel()))
+            global_observation = jnp.tile(global_observation, (self.num_agents, 1) )
+
+        customers_info = jnp.tile(customers_info, (self.num_agents, 1) )
+        observations =  jnp.column_stack((vehicles_info, customers_info))
+        return observations, global_observation
     
     def observation_spec(self) -> specs.Spec[Observation]:
         step_count = specs.BoundedArray(
@@ -184,6 +186,20 @@ class multiCVRPWrapper(Wrapper):
             jnp.inf,
             "agents_view",
         )
+        if self.has_global_state:
+            global_state = specs.Array(
+                (self.num_agents, (self._env._num_customers + 1) * 7 + 4 * self.num_agents),
+                jnp.float32,
+                "global_state",
+            )
+            return specs.Spec(
+                ObservationGlobalState,
+                "ObservationSpec",
+                agents_view=agents_view,
+                action_mask=action_mask,
+                global_state=global_state,
+                step_count=step_count,
+            )
         return specs.Spec(
             Observation,
             "ObservationSpec",
