@@ -1,10 +1,6 @@
 ## The Ecosystem
 
-<div style="text-align: center;">
-    <a href="images/diagrams/ecosystem.png">
-        <img src="images/diagrams/ecosystem.png" alt="Ecosystem" style="width: 100%;"/>
-    </a>
-</div>
+![Ecosystem](images/diagrams/ecosystem.png)
 
 ## Using Mava
 
@@ -15,11 +11,7 @@ It specifically supports the [Anakin architecture](https://arxiv.org/abs/2104.06
 
 Mava implements both recurrent and feedforward policy versions of multi-agent Proximal Policy Optimization (PPO) systems, following the paradigms of decentralised training with decentralised execution (DTDE) and centralised training with decentralised execution (CTDE).
 
-<div style="text-align: center;">
-    <a href="images/diagrams/anakin.png">
-        <img src="images/diagrams/anakin.png" alt="Anakin" style="width: 90%;"/>
-    </a>
-</div>
+![Anakin](images/diagrams/anakin.png)
 
 **Introduction**
 

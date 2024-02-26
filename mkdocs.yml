@@ -2,7 +2,7 @@
 # yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
 site_name: Mava
 site_author: InstaDeep Research
-site_url: https://instadeepai.github.io/Mava/
+site_url: https://instadeepai.github.io/Mava
 site_dir: public
 
 nav:
@@ -14,7 +14,8 @@ nav:
   - Contributing: 'contributing.md'
   - FAQs: 'faq.md'
   - Other:
-    - Jumanji Robot Warehouse Comparison: 'jumanji_rware_comparison.md'
+      - Advanced Usage: 'other/advanced_usage.md'
+      - RWARE Comparison: 'other/jumanji_rware_comparison.md'
 
 theme:
   name: material
@@ -56,9 +57,9 @@ markdown_extensions:
       emoji_index: !!python/name:pymdownx.emoji.gemoji
   - pymdownx.snippets:
       base_path: ./
-  - pymdownx.pathconverter:
-      base_path: ./
-      relative_path: docs
+#  - pymdownx.pathconverter:
+#      absolute: True
+#      base_path: ./Mava/
   - toc:
       permalink: "#"
       toc_depth: 3
