@@ -150,7 +150,9 @@ class NeptuneLogger(BaseLogger):
 
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
         tags = list(cfg.logger.kwargs.neptune_tag)
-        tags.extend((cfg.arch.device, f"{cfg.env.scenario.task_name.split('_')[0]}_new_params"))
+        tags.extend(
+            ("tpu", "tfp_vmap")
+        )  # f"{cfg.env.scenario.task_name.split('_')[0]}_new_params"))
         project = cfg.logger.kwargs.neptune_project
 
         self.logger = neptune.init_run(project=project, tags=tags)

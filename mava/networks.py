@@ -112,7 +112,6 @@ class ContinuousFFActor(nn.Module):
         x = self.torso(x)
         actor_mean = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01))(x)
         actor_log_std = self.param("log_std", nn.initializers.zeros, (self.num_actions,))
-        # actor_log_std = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(actor_logits)
 
         return actor_mean, actor_log_std
 

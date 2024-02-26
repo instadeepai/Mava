@@ -14,9 +14,12 @@
 
 from typing import Callable, Tuple, Union
 
+import chex
 import distrax
 import jax
 import jax.numpy as jnp
+import tensorflow_probability.substrates.jax.bijectors as tfb
+import tensorflow_probability.substrates.jax.distributions as tfd
 from chex import Array, PRNGKey
 from omegaconf import DictConfig
 
@@ -72,7 +75,19 @@ def get_actor_policy(mean: Array, log_std: Array) -> distrax.MultivariateNormalD
     Returns:
         distrax.MultivariateNormalDiag: The actor policy distribution.
     """
-    return distrax.MultivariateNormalDiag(mean, jnp.exp(log_std))
+    min_action, max_action = -1, 1
+    scale = 0.5 * (max_action - min_action)
+    bijector = tfb.Chain([tfb.Shift(min_action), tfb.Scale(scale=scale), tfb.Shift(1), tfb.Tanh()])
+
+    def sigma_activation(sigma: chex.Array) -> chex.Array:
+        """Don't allow sigma to grow too large for numerical stability."""
+        sigma_min, sigma_max = -4, 1
+        return jnp.exp(sigma_min + 0.5 * (sigma_max - sigma_min) * (jnp.tanh(sigma) + 1.0))
+
+    return tfd.TransformedDistribution(
+        distribution=tfd.MultivariateNormalDiag(loc=mean, scale_diag=sigma_activation(log_std)),
+        bijector=bijector,
+    )
 
 
 def select_action_cont_ppo(
@@ -93,9 +108,10 @@ def select_action_cont_ppo(
         Tuple[Array, Array, Array]: The unbound action, the clipped action, and the log prob.
     """
     actor_policy = get_actor_policy(mean, log_std)
-    unbound_action, log_prob = actor_policy.sample_and_log_prob(seed=key)
-    action, log_prob = transform_actions_log(unbound_action, log_prob)
-    return unbound_action, action, log_prob
+    unbound_action = actor_policy.sample(seed=key)
+    log_prob = actor_policy.log_prob(unbound_action)
+    # action, log_prob = transform_actions_log(unbound_action, log_prob)
+    return unbound_action, unbound_action, log_prob
 
 
 def get_logprob_entropy(
@@ -117,8 +133,8 @@ def get_logprob_entropy(
     """
     actor_policy = get_actor_policy(mean, log_std)
     log_prob = actor_policy.log_prob(action)
-    entropy = actor_policy.entropy().mean()
-    _, log_prob = transform_actions_log(action, log_prob)
+    entropy = actor_policy.distribution.entropy().mean()
+    # _, log_prob = transform_actions_log(action, log_prob)
     return log_prob, entropy
 
 
@@ -141,7 +157,8 @@ def select_action_eval_cont(
     """
     actor_policy = get_actor_policy(mean, log_std)
     unbound_action = actor_policy.sample(seed=key)
-    return transform_actions_log(unbound_action, None)
+    # return transform_actions_log(unbound_action, None)
+    return unbound_action
 
 
 def transform_actions_log(
