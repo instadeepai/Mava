@@ -86,7 +86,8 @@ class GigastepWrapper(Wrapper):
         obs, state = self._env.reset(reset_key)
 
         obs_team1, state_team1, obs_team2, state_team2 = self._split_obs_and_state(obs, state)
-
+        # Adversary actions are decided as soon as the observation is available
+        # since the old observations aren't available in the step function
         adversary_actions = self.adversary_policy(obs_team2, state_team2, adversary_key)
 
         state = GigastepState(state, key, 0, adversary_actions)
