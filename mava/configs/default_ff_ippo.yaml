@@ -1,7 +1,7 @@
 defaults:
   - logger: ff_ippo
   - arch: anakin
-  - system: ff_ippo
+  - system: ppo/ff_ippo
   - network: mlp
   - env: rware
   - _self_
