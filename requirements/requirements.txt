@@ -3,6 +3,7 @@ distrax @ git+https://github.com/google-deepmind/distrax  # distrax release does
 flashbax~=0.1.0
 flax~=0.7.5
 hydra-core==1.3.2
+id-marl-eval @ git+https://github.com/instadeepai/marl-eval
 jax
 jaxlib
 jaxmarl
