@@ -1,3 +1,4 @@
+# Copyright 2022 InstaD
 # Copyright 2022 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -358,8 +359,8 @@ def make_update_fns(
         next_q2_val = q.apply(params.q.targets.q2, data.next_obs, joint_next_actions)
         next_q_val = jnp.minimum(next_q1_val, next_q2_val)
 
-        entropy_term = jnp.mean(jnp.exp(params.log_alpha), axis=1) * jnp.sum(next_log_prob, axis=1)
-        next_q_val = next_q_val - entropy_term[:, jnp.newaxis, ...]
+        entropy_term = jnp.exp(params.log_alpha) * next_log_prob
+        next_q_val = next_q_val - entropy_term
 
         target_q_val = rewards + (1.0 - dones) * cfg.system.gamma * next_q_val
 
