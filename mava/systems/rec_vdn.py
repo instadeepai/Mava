@@ -63,13 +63,13 @@ class ScannedRNN(nn.Module):
         rnn_state = carry
         ins, resets = x
 
-        rnn_state = jnp.where( # TODO: (Claude) is this reset not a timestep too early? 
+        new_rnn_state, y = nn.GRUCell(features=ins.shape[-1])(rnn_state, ins)
+
+        new_rnn_state = jnp.where( # TODO: (Claude) is this reset not a timestep too early? 
             resets[:, :, jnp.newaxis],
             self.initialize_carry((ins.shape[0], ins.shape[1]), ins.shape[-1]),
-            rnn_state,
+            new_rnn_state,
         )
-
-        new_rnn_state, y = nn.GRUCell(features=ins.shape[-1])(rnn_state, ins)
 
         return new_rnn_state, y
 
@@ -304,6 +304,7 @@ def make_update_fns(
     
     q = nns.q 
     q_opt = opts.q
+    num_agents = env.action_spec().shape[0]
 
     # used everywhere a new hidden state needs to be initialised
     hidden_size = 256 #standardise and get from nw
@@ -396,6 +397,9 @@ def make_update_fns(
 
         # unpacking and create keys
         nw_params, hidden_state, terms, t, key = select_params
+
+
+
         new_key, explore_key, selection_key = jax.random.split(key,3)
 
         # get exploration rate
@@ -442,7 +446,7 @@ def make_update_fns(
         selection_params, env_state, buffer_state, obs = interact_state
 
         # select the actions to take
-        new_selection_params, action = select_action(selection_params,obs) # should update hidden state, key
+        new_selection_params, action = select_action(selection_params, obs) # should update hidden state, key
 
         # step env with selected actions
         new_env_state, next_timestep = jax.vmap(env.step)(env_state, action)
@@ -453,7 +457,12 @@ def make_update_fns(
 
         # repack and update interact state's dones
         new_obs = next_timestep.observation # NB step!!
-        new_selection_params = ActionSelectionParams(new_selection_params.nw_params,new_selection_params.hidden_state,~(next_timestep.discount).astype(bool),new_selection_params.t,new_selection_params.key)
+        terms = ~(next_timestep.discount).astype(bool)
+
+        next_hiddens = jnp.where(next_timestep.last()[...,jnp.newaxis,jnp.newaxis], ScannedRNN.initialize_carry((cfg.system.n_envs, num_agents), hidden_size), new_selection_params.hidden_state)
+        terms = jnp.where(next_timestep.last()[...,jnp.newaxis], jnp.zeros_like(terms), terms)
+
+        new_selection_params = ActionSelectionParams(new_selection_params.nw_params,next_hiddens, terms,new_selection_params.t,new_selection_params.key)
 
         new_interact_state = InteractionParams(new_selection_params, new_env_state, new_buffer_state, new_obs)
 
@@ -534,7 +543,7 @@ def make_update_fns(
 
         # scan over each sample
         next_q_vals_online = scan_apply(params.online, data_next.obs, data_next.term)
-        # next_q_vals_online = jnp.where(data_next.obs.action_mask, next_q_vals_online, jnp.zeros(next_q_vals_online.shape)-9999999) #TODO: action masking in nw
+        next_q_vals_online = jnp.where(data_next.obs.action_mask, next_q_vals_online, jnp.zeros(next_q_vals_online.shape)-9999999) #TODO: action masking in nw
 
         next_q_vals_target = scan_apply(params.target, data_next.obs, data_next.term)
 
@@ -578,9 +587,7 @@ def make_update_fns(
         #     new_online_q_params, params.target, cfg.system.tau
         # )
 
-        # TEMP!!!!!
         new_target_q_params = optax.periodic_update(new_online_q_params, params.target, t_train, cfg.system.update_period)
-        # new_target_q_params = params.target
 
         # Repack params and opt_states.
         new_params = QNetParams(new_online_q_params, new_target_q_params)

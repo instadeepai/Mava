@@ -15,7 +15,7 @@ rollout_length: 1 # Number of environment steps per vectorised environment.
 epochs: 1 # Number of learn epochs per training data batch.
 
 # sizes
-buffer_size: 100_000  # size of the replay buffer. Note: total size is this * num_devices
+buffer_size: 3_000  # size of the replay buffer. Note: total size is this * num_devices
 batch_size: 32 #as in jaxmarl paper
 # learning rates
 q_lr: 3e-4  # the learning rate of the Q network network optimizer
