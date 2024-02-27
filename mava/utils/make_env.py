@@ -25,6 +25,7 @@ from jumanji.environments.routing.robot_warehouse.generator import (
     RandomGenerator as RwareRandomGenerator,
 )
 from omegaconf import DictConfig
+from mava.wrappers.gymnax_wrapper import CartPole
 
 from mava.wrappers import (
     AgentIDWrapper,
@@ -123,6 +124,24 @@ def make_jaxmarl_env(
 
     return env, eval_env
 
+def make_cartpole(
+    env_name: str, config: DictConfig, add_global_state: bool = False
+) -> Tuple[Environment, Environment]:
+    
+    env = CartPole()
+    eval_env = CartPole()
+
+        # Add optional wrappers.
+    if config.system.add_agent_id:
+        env = AgentIDWrapper(env, add_global_state)
+        eval_env = AgentIDWrapper(eval_env, add_global_state)
+
+    env = AutoResetWrapper(env)
+    env = RecordEpisodeMetrics(env)
+
+    return env, eval_env
+
+
 
 def make(config: DictConfig, add_global_state: bool = False) -> Tuple[Environment, Environment]:
     """
@@ -141,5 +160,7 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[Environmen
         return make_jumanji_env(env_name, config, add_global_state)
     elif env_name in jaxmarl.registered_envs:
         return make_jaxmarl_env(env_name, config, add_global_state)
+    elif env_name == "CartPole-v0":
+        return make_cartpole(env_name, config, add_global_state)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")

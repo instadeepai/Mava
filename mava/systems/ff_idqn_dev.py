@@ -119,7 +119,7 @@ def init(
 
     num_actions = int(env.action_spec().num_values[0])
 
-    key, q_key, q_target_key = jax.random.split(key, 3)
+    key, q_key = jax.random.split(key, 2)
 
     init_obs = env.observation_spec().generate_value()
     init_acts = env.action_spec().generate_value()
@@ -128,7 +128,7 @@ def init(
     # Making Q networks
     q = QNetwork(num_actions)
     q_params = q.init(q_key, init_obs_batched)
-    q_target_params = q.init(q_target_key, init_obs_batched)
+    q_target_params = q.init(q_key, init_obs_batched)
 
     # Pack params
     params = QLearnParams(Qs(q_params, q_target_params))
@@ -179,6 +179,7 @@ def init(
         ),
         axis_name="device",
     )(reset_keys)
+
     first_obs = first_timestep.observation
 
     t = jnp.zeros((n_devices, cfg.system.update_batch_size), dtype=int)
@@ -225,7 +226,7 @@ def make_update_fns(
     # losses:
     def q_loss_fn(q_online_params: FrozenVariableDict, obs: Array, action: Array, target: Array) -> Tuple[Array, Metrics]:
         q_online = q.apply(q_online_params, obs)
-        q_online = jnp.take(q_online, action[...,jnp.newaxis])
+        q_online = jnp.take_along_axis(q_online, action[...,jnp.newaxis], axis=-1)
         q_loss = jnp.mean((q_online - target) ** 2)
 
         loss_info = {
@@ -249,7 +250,7 @@ def make_update_fns(
 
         # TODO (Claude) do double q-value selection here...
         next_action = jnp.argmax(next_q_vals_online, axis=-1)
-        next_q_val = jnp.take(next_q_vals_target, next_action[...,jnp.newaxis])
+        next_q_val = jnp.take_along_axis(next_q_vals_target, next_action[...,jnp.newaxis], axis=-1)
 
         target_q_val = (rewards + (1.0 - dones) * cfg.system.gamma * next_q_val)
 
@@ -413,16 +414,16 @@ def run_experiment(cfg: DictConfig) -> float:
     update, greedy = make_update_fns(cfg, env, nns, opts, rb)
 
     _,q = nns
-    key, eval_key = jax.random.split(key)
-    # todo: don't need to return trained_params or eval keys
-    evaluator, absolute_metric_evaluator, (trained_params, eval_keys) = evaluator_setup(
-        eval_env=eval_env,
-        key=eval_key,
-        network=q, #NOTE (Louise) this part needs redoing with that replacement actor function
-        params=learner_state.params.dqns.online,
-        config=cfg,
-        greedy=greedy
-    )
+    # key, eval_key = jax.random.split(key)
+    # # todo: don't need to return trained_params or eval keys
+    # evaluator, absolute_metric_evaluator, (trained_params, eval_keys) = evaluator_setup(
+    #     eval_env=eval_env,
+    #     key=eval_key,
+    #     network=q, #NOTE (Louise) this part needs redoing with that replacement actor function
+    #     params=learner_state.params.dqns.online,
+    #     config=cfg,
+    #     greedy=greedy
+    # )
 
     if cfg.logger.checkpointing.save_model:
         checkpointer = Checkpointer(
@@ -468,36 +469,36 @@ def run_experiment(cfg: DictConfig) -> float:
         key, eval_key = jax.random.split(key)
         eval_keys = jax.random.split(eval_key, n_devices)
         # todo: bug likely here -> don't have batch vmap yet so shouldn't unreplicate_batch_dim
-        eval_output = evaluator(unreplicate_batch_dim(learner_state.params.dqns.online), eval_keys)
-        jax.block_until_ready(eval_output)
+        # eval_output = evaluator(unreplicate_batch_dim(learner_state.params.dqns.online), eval_keys)
+        # jax.block_until_ready(eval_output)
 
-        # Log:
-        episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
-        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
+        # # Log:
+        # episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
+        # logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
 
-        # Save best actor params.
-        if cfg.arch.absolute_metric and max_episode_return <= episode_return:
-            best_params = copy.deepcopy(unreplicate_batch_dim(learner_state.params.dqns.online))
-            max_episode_return = episode_return
+        # # Save best actor params.
+        # if cfg.arch.absolute_metric and max_episode_return <= episode_return:
+        #     best_params = copy.deepcopy(unreplicate_batch_dim(learner_state.params.dqns.online))
+        #     max_episode_return = episode_return
 
-        # Checkpoint:
-        if cfg.logger.checkpointing.save_model:
-            # Save checkpoint of learner state
-            unreplicated_learner_state = unreplicate_learner_state(learner_state)  # type: ignore
-            checkpointer.save(
-                timestep=t,
-                unreplicated_learner_state=unreplicated_learner_state,
-                episode_return=episode_return,
-            )
+        # # Checkpoint:
+        # if cfg.logger.checkpointing.save_model:
+        #     # Save checkpoint of learner state
+        #     unreplicated_learner_state = unreplicate_learner_state(learner_state)  # type: ignore
+        #     checkpointer.save(
+        #         timestep=t,
+        #         unreplicated_learner_state=unreplicated_learner_state,
+        #         episode_return=episode_return,
+        #     )
 
-    # Measure absolute metric.
-    if cfg.arch.absolute_metric:
-        eval_keys = jax.random.split(key, n_devices)
+    # # Measure absolute metric.
+    # if cfg.arch.absolute_metric:
+    #     eval_keys = jax.random.split(key, n_devices)
 
-        eval_output = absolute_metric_evaluator(best_params, eval_keys)
-        jax.block_until_ready(eval_output)
+    #     eval_output = absolute_metric_evaluator(best_params, eval_keys)
+    #     jax.block_until_ready(eval_output)
 
-        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.ABSOLUTE)
+    #     logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.ABSOLUTE)
 
     logger.stop()
 

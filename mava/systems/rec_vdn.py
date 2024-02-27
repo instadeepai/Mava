@@ -63,13 +63,14 @@ class ScannedRNN(nn.Module):
         rnn_state = carry
         ins, resets = x
 
-        new_rnn_state, y = nn.GRUCell(features=ins.shape[-1])(rnn_state, ins)
-
-        new_rnn_state = jnp.where( # TODO: (Claude) is this reset not a timestep too early? 
+        rnn_state = jnp.where( # TODO: (Claude) is this reset not a timestep too early? 
             resets[:, :, jnp.newaxis],
             self.initialize_carry((ins.shape[0], ins.shape[1]), ins.shape[-1]),
-            new_rnn_state,
+            rnn_state,
         )
+
+        new_rnn_state, y = nn.GRUCell(features=ins.shape[-1])(rnn_state, ins)
+
         return new_rnn_state, y
 
     @staticmethod
@@ -209,10 +210,11 @@ def init(
 
     # Making recurrent Q network
     q = RecQNetwork(num_actions)
-    q_params = q.init(q_key, init_hstate, init_x) 
+    q_params = q.init(q_key, init_hstate, init_x)
+    q_target_params = q.init(q_key, init_hstate, init_x) 
 
     # Pack params
-    params = QNetParams(q_params, q_params)
+    params = QNetParams(q_params, q_target_params)
 
     # OPTIMISER
     q_opt = optax.chain(
@@ -239,7 +241,7 @@ def init(
         obs=Observation(*init_obs),
         action=init_acts,
         reward=jnp.zeros((num_agents,), dtype=float),
-        term=jnp.zeros((num_agents,), dtype=bool)
+        term=jnp.zeros((num_agents,), dtype=bool),
     )
 
     # default use rollout length of trajectories
@@ -250,7 +252,7 @@ def init(
 
     rb = fbx.make_trajectory_buffer(
         sample_sequence_length = rec_chunk_size,
-        period = rec_chunk_size,
+        period = 1, #rec_chunk_size,
         add_batch_size = n_devices, # is this accurate?
         sample_batch_size = cfg.system.batch_size,
         max_length_time_axis=cfg.system.buffer_size,
@@ -370,6 +372,7 @@ def make_update_fns(
         action = jnp.argmax(q_vals_masked, axis=-1)
         action = action[0] #remove redundant first dim
 
+        # jax.debug.print("{x}\n{y}", x=nw_params['params']['Dense_0']['kernel'][0], y=action)
         return (action, new_hidden_state)
     
     
@@ -418,13 +421,11 @@ def make_update_fns(
 
     # INTERACT LEVEL 2 (1.1)
     def make_transition(
-            timestep,obs:Observation, action
+            obs:Observation, action, next_timestep
             ) -> Transition:
         
         # preprocessing timestep data
-        rewards = timestep.reward
-        terms = ~(timestep.discount).astype(bool) #inverts discounts with ~
-        transition = Transition(obs, action, rewards, terms)
+        transition = Transition(obs, action, next_timestep.reward, ~next_timestep.discount.astype(bool))
 
         # TODO refactor code so this is unnecessary - add batch size should be what?
         transition = jax.tree_util.tree_map(lambda x: x[jnp.newaxis,:, ...], transition)
@@ -444,19 +445,19 @@ def make_update_fns(
         new_selection_params, action = select_action(selection_params,obs) # should update hidden state, key
 
         # step env with selected actions
-        new_env_state, timestep = jax.vmap(env.step)(env_state, action)
+        new_env_state, next_timestep = jax.vmap(env.step)(env_state, action)
+        
+        transition = make_transition(obs, action, next_timestep)
 
-        # make and store transition
-        transition = make_transition(timestep,obs,action)
         new_buffer_state = rb.add(buffer_state, transition)
 
         # repack and update interact state's dones
-        new_obs = timestep.observation # NB step!!
-        new_selection_params = ActionSelectionParams(new_selection_params.nw_params,new_selection_params.hidden_state,~(timestep.discount).astype(bool),new_selection_params.t,new_selection_params.key)
+        new_obs = next_timestep.observation # NB step!!
+        new_selection_params = ActionSelectionParams(new_selection_params.nw_params,new_selection_params.hidden_state,~(next_timestep.discount).astype(bool),new_selection_params.t,new_selection_params.key)
 
         new_interact_state = InteractionParams(new_selection_params, new_env_state, new_buffer_state, new_obs)
 
-        return new_interact_state, timestep.extras["episode_metrics"]
+        return new_interact_state, next_timestep.extras["episode_metrics"]
     
     #___________________________________________________________________________________________________
     # TRAIN FUNCTIONS
@@ -473,13 +474,16 @@ def make_update_fns(
             ) -> Tuple[Array, Metrics]:
         """The portion of the calculation to grad, namely online apply and mse with target."""
         q_online = scan_apply(q_online_params,obs,terms)
-        q_online = jnp.take(q_online, action[...,jnp.newaxis])
+        q_online = jnp.take_along_axis(q_online, action[...,jnp.newaxis], axis=-1)
         q_online = jnp.sum(q_online, -2, keepdims=True)
         q_loss = jnp.mean((q_online - target) ** 2)
 
         loss_info = {
             "q_loss": q_loss,
             "mean_q": jnp.mean(q_online),
+            "max_q_error": jnp.max(jnp.abs(q_online-target)**2),
+            "min_q_error": jnp.min(jnp.abs(q_online-target)**2),
+            "mean_target": jnp.mean(target),
         }
 
         return q_loss, loss_info
@@ -530,17 +534,20 @@ def make_update_fns(
 
         # scan over each sample
         next_q_vals_online = scan_apply(params.online, data_next.obs, data_next.term)
-        next_q_vals_online = jnp.where(data_next.obs.action_mask, next_q_vals_online, jnp.zeros(next_q_vals_online.shape)-9999999) #TODO: action masking in nw
+        # next_q_vals_online = jnp.where(data_next.obs.action_mask, next_q_vals_online, jnp.zeros(next_q_vals_online.shape)-9999999) #TODO: action masking in nw
 
         next_q_vals_target = scan_apply(params.target, data_next.obs, data_next.term)
 
         # double q-value selection
         next_action = jnp.argmax(next_q_vals_online, axis=-1)
-        next_q_val = jnp.take(next_q_vals_target, next_action[...,jnp.newaxis])
+        next_q_val = jnp.take_along_axis(next_q_vals_target, next_action[...,jnp.newaxis], axis=-1)
         next_q_val = jnp.sum(next_q_val, -2, keepdims=True)
 
 
-        target_q_val = (first_reward + (1.0 - first_term) * cfg.system.gamma * next_q_val)
+        target_q_val = (first_reward + (1.0 - jnp.array(first_term, dtype="float32")) * cfg.system.gamma * next_q_val)
+
+        # jax.debug.print("REWARD {x}",x=jnp.squeeze(first_reward))
+        # jax.debug.print("TERMS {x}",x=jnp.squeeze(first_term))
 
         # Update Q function.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
@@ -551,13 +558,16 @@ def make_update_fns(
             data_first.action, # should only be final value in each traj, B,A (adds axis in fn)
             target_q_val # B,A -> add dim?
             )
+        q_loss_info["mean_first_reward"] = jnp.mean(first_reward)
+        q_loss_info["mean_next_qval"] = jnp.mean(next_q_val)
+        q_loss_info["first_term"] = jnp.mean(first_term)
+
 
         # Mean over the device and batch dimension.
         q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="device")
         q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="batch")
         q_updates, new_q_opt_state = q_opt.update(q_grads, opt_states)
         new_online_q_params = optax.apply_updates(params.online, q_updates)
-
         # Target network polyak update.
         # new_target_q_params = jax.lax.select(
         #     cfg.system.hard_update,
@@ -568,11 +578,15 @@ def make_update_fns(
         #     new_online_q_params, params.target, cfg.system.tau
         # )
 
+        # TEMP!!!!!
         new_target_q_params = optax.periodic_update(new_online_q_params, params.target, t_train, cfg.system.update_period)
+        # new_target_q_params = params.target
 
         # Repack params and opt_states.
         new_params = QNetParams(new_online_q_params, new_target_q_params)
 
+        t_train += 1
+        # jax.debug.print("{x}", x=t_train)
         return new_params, new_q_opt_state, q_loss_info, t_train
 
     # TRAIN LEVEL 1 (2.)
