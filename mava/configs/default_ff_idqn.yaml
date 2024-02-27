@@ -3,7 +3,7 @@ defaults:
   - logger: ff_idqn
   - arch: anakin
   - system: ff_idqn
-  - env: lbf
+  - env: smax
 #   - system/search_spaces@hydra.sweeper.params: ${system}
 #   - override hydra/sweeper: optuna
 #   - override hydra/sweeper/sampler: tpe

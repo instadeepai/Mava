@@ -1,0 +1,5 @@
+# ---Environment Configs---
+defaults:
+  - _self_
+
+env_name: CartPole-v0
