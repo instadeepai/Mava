@@ -14,8 +14,8 @@ actor_network:
 action_head:
   _target_: mava.networks.DiscreteActionHead # [DiscreteActionHead, ContinuousActionHead]
   # Needed for ContinuousActionHead:
-  sigma_min: -4.0
-  sigma_max: 1.0
+  # sigma_min: -4.0
+  # sigma_max: 1.0
 
 critic_network:
   pre_torso:

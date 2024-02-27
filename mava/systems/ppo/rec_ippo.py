@@ -218,18 +218,15 @@ def get_learner_fn(
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
 
-                params, opt_states = train_state
-                (
-                    traj_batch,
-                    advantages,
-                    targets,
-                ) = batch_info
+                params, opt_states, entropy_key = train_state
+                traj_batch, advantages, targets = batch_info
 
                 def _actor_loss_fn(
                     actor_params: FrozenDict,
                     actor_opt_state: OptState,
                     traj_batch: RNNPPOTransition,
                     gae: chex.Array,
+                    entropy_key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate the actor loss."""
                     # RERUN NETWORK
@@ -253,7 +250,8 @@ def get_learner_fn(
                     )
                     loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
                     loss_actor = loss_actor.mean()
-                    entropy = actor_policy.distribution.entropy().mean()
+                    # The seed will be used in the TanhTransformedDistribution:
+                    entropy = actor_policy.entropy(seed=entropy_key).mean()
 
                     total_loss = loss_actor - config.system.ent_coef * entropy
                     return total_loss, (loss_actor, entropy)
@@ -285,7 +283,11 @@ def get_learner_fn(
                 # CALCULATE ACTOR LOSS
                 actor_grad_fn = jax.value_and_grad(_actor_loss_fn, has_aux=True)
                 actor_loss_info, actor_grads = actor_grad_fn(
-                    params.actor_params, opt_states.actor_opt_state, traj_batch, advantages
+                    params.actor_params,
+                    opt_states.actor_opt_state,
+                    traj_batch,
+                    advantages,
+                    entropy_key,
                 )
 
                 # CALCULATE CRITIC LOSS
@@ -341,18 +343,10 @@ def get_learner_fn(
                     "entropy": entropy,
                 }
 
-                return (new_params, new_opt_state), loss_info
+                return (new_params, new_opt_state, entropy_key), loss_info
 
-            (
-                params,
-                opt_states,
-                init_hstates,
-                traj_batch,
-                advantages,
-                targets,
-                key,
-            ) = update_state
-            key, shuffle_key = jax.random.split(key)
+            params, opt_states, init_hstates, traj_batch, advantages, targets, key = update_state
+            key, shuffle_key, entropy_key = jax.random.split(key, 3)
 
             # SHUFFLE MINIBATCHES
             batch = (traj_batch, advantages, targets)
@@ -382,8 +376,8 @@ def get_learner_fn(
             minibatches = jax.tree_util.tree_map(lambda x: jnp.swapaxes(x, 1, 0), reshaped_batch)
 
             # UPDATE MINIBATCHES
-            (params, opt_states), loss_info = jax.lax.scan(
-                _update_minibatch, (params, opt_states), minibatches
+            (params, opt_states, entropy_key), loss_info = jax.lax.scan(
+                _update_minibatch, (params, opt_states, entropy_key), minibatches
             )
 
             update_state = (
