@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple, Union, Dict
+from typing import Tuple, Union
 
 import chex
 import jax.numpy as jnp
+from jax import tree_util
 from jumanji import specs
 from jumanji.env import Environment
 from jumanji.environments.routing.connector import MaConnector
@@ -26,11 +27,12 @@ from jumanji.environments.routing.connector.constants import (
     TARGET,
 )
 from jumanji.environments.routing.lbf import LevelBasedForaging
-from jumanji.environments.routing.robot_warehouse import RobotWarehouse
-from jumanji.types import TimeStep, StepType
-from jumanji.wrappers import Wrapper
-from jax import tree_util
 from jumanji.environments.routing.multi_cvrp import MultiCVRP
+from jumanji.environments.routing.multi_cvrp.types import State as MultiCVRPState
+from jumanji.environments.routing.robot_warehouse import RobotWarehouse
+from jumanji.types import TimeStep
+from jumanji.wrappers import Wrapper
+
 from mava.types import Observation, ObservationGlobalState, State
 
 
@@ -218,27 +220,28 @@ class ConnectorWrapper(MultiAgentWrapper):
             )
 
         return spec
-  
-class multiCVRPWrapper(Wrapper):
-    """ Wrapper for MultiCVRP environment.  """
 
-    def __init__(self, env: MultiCVRP, has_global_state : bool = False):
+
+class MultiCVRPWrapper(Wrapper):
+    """Wrapper for MultiCVRP environment."""
+
+    def __init__(self, env: MultiCVRP, has_global_state: bool = False):
         self.num_agents = env._num_vehicles
         self._env = env
         self.has_global_state = has_global_state
 
-    def reset(self, key: chex.PRNGKey) -> Tuple[State | TimeStep]:
-        state , timestep = self._env.reset(key)
-        timestep = self.modify_timestep(timestep, state.step_count)    
-        return state, timestep
-    
-    def step(self, state: State, action: chex.Array) -> Tuple[State | TimeStep]:
-        state, timestep = self._env.step(state,action)
+    def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
+        state, timestep = self._env.reset(key)
         timestep = self.modify_timestep(timestep, state.step_count)
-        return state,timestep
-    
-    def modify_timestep(self, timestep: TimeStep, step_count : chex.Array) -> TimeStep[Observation]:
-        #avoided the MultiAgentWrapper wrapper to use the step_count provided by the environment 
+        return state, timestep
+
+    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
+        state, timestep = self._env.step(state, action)
+        timestep = self.modify_timestep(timestep, state.step_count)
+        return state, timestep
+
+    def modify_timestep(self, timestep: TimeStep, step_count: chex.Array) -> TimeStep[Observation]:
+        # avoided the MultiAgentWrapper wrapper to use the step_count provided by the environment
         observation, global_observation = self._format_observation(timestep.observation)
         obs_data = {
             "agents_view": observation,
@@ -250,13 +253,15 @@ class multiCVRPWrapper(Wrapper):
             observation = ObservationGlobalState(**obs_data)
         else:
             observation = Observation(**obs_data)
-        
+
         reward = jnp.repeat(timestep.reward, (self.num_agents))
         discount = jnp.repeat(timestep.discount, (self.num_agents))
         timestep = timestep.replace(observation=observation, reward=reward, discount=discount)
         return timestep
-    
-    def _format_observation(self, observation : Dict[str, chex.Array]) -> Tuple[chex.Array, Union[None, chex.Array]]:
+
+    def _format_observation(
+        self, observation: MultiCVRPState
+    ) -> Tuple[chex.Array, Union[None, chex.Array]]:
         """
         Formats the observation dictionary from the environment into a format suitable for mava.
 
@@ -267,37 +272,40 @@ class multiCVRPWrapper(Wrapper):
             observations (chex.Array): Concatenated individual observations for each agent,
                                       shaped (num_agents, vehicle_info + customer_info).
             global_observation (Union[None, chex.Array]): Concatenated global observation
-                                                          shaped (num_agents, global_info) if has_global_state = True,
+                                                          shaped (num_agents, global_info)
+                                                          if has_global_state = True,
                                                           None otherwise.
         """
-        global_observation = None 
-        #flatten and concat all of the observations for now
-        customers_info, _ = tree_util.tree_flatten((observation.nodes,observation.windows,observation.coeffs))
-        vehicles_info , _ = tree_util.tree_flatten(observation.vehicles)
-        
-        #this results in c1_info1-c2_info
+        global_observation = None
+        # flatten and concat all of the observations for now
+        customers_info, _ = tree_util.tree_flatten(
+            (observation.nodes, observation.windows, observation.coeffs)
+        )
+        vehicles_info, _ = tree_util.tree_flatten(observation.vehicles)
+
+        # this results in c1_info1-c2_info
         customers_info = jnp.column_stack(customers_info).ravel()
         vehicles_info = jnp.column_stack(vehicles_info)
 
-
         if self.has_global_state:
             global_observation = jnp.concat((customers_info, vehicles_info.ravel()))
-            global_observation = jnp.tile(global_observation, (self.num_agents, 1) )
+            global_observation = jnp.tile(global_observation, (self.num_agents, 1))
 
-        customers_info = jnp.tile(customers_info, (self.num_agents, 1) )
-        observations =  jnp.column_stack((vehicles_info, customers_info))
+        customers_info = jnp.tile(customers_info, (self.num_agents, 1))
+        observations = jnp.column_stack((vehicles_info, customers_info))
         return observations, global_observation
-    
+
     def observation_spec(self) -> specs.Spec[Observation]:
         step_count = specs.BoundedArray(
-            (self.num_agents,), jnp.int32,0, self._env._num_customers + 1 ,"step_count" 
+            (self.num_agents,), jnp.int32, 0, self._env._num_customers + 1, "step_count"
         )
         action_mask = specs.BoundedArray(
             (self.num_agents, self._env._num_customers + 1), bool, False, True, "action_mask"
         )
-        #7 is broken into 2 for cords, 1 each of demands,start,end,early,late and the 4 is the cords,capacity of the vehicle
+        # 7 is broken into 2 for cords, 1 each of demands,start,end,early,late
+        # and the 4 is the cords,capacity of the vehicle
         agents_view = specs.BoundedArray(
-            (self.num_agents, (self._env._num_customers + 1) * 7 + 4), 
+            (self.num_agents, (self._env._num_customers + 1) * 7 + 4),
             jnp.float32,
             -jnp.inf,
             jnp.inf,
@@ -332,8 +340,8 @@ class multiCVRPWrapper(Wrapper):
         return specs.BoundedArray(
             shape=(self.num_agents,), dtype=float, minimum=0.0, maximum=1.0, name="discount"
         )
-    
+
     def action_spec(self) -> specs.Spec:
-        return specs.MultiDiscreteArray(num_values=jnp.full(self.num_agents, self._env._num_customers + 1))
-
-
+        return specs.MultiDiscreteArray(
+            num_values=jnp.full(self.num_agents, self._env._num_customers + 1)
+        )

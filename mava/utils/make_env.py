@@ -25,11 +25,11 @@ from jumanji.environments.routing.connector.generator import (
 from jumanji.environments.routing.lbf.generator import (
     RandomGenerator as LbfRandomGenerator,
 )
-from jumanji.environments.routing.robot_warehouse.generator import (
-    RandomGenerator as RwareRandomGenerator,
-)
 from jumanji.environments.routing.multi_cvrp.generator import (
     UniformRandomGenerator as MultiCVRPRandomGenerator,
+)
+from jumanji.environments.routing.robot_warehouse.generator import (
+    RandomGenerator as RwareRandomGenerator,
 )
 from omegaconf import DictConfig
 
@@ -41,10 +41,10 @@ from mava.wrappers import (
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
+    MultiCVRPWrapper,
     RecordEpisodeMetrics,
     RwareWrapper,
     SmaxWrapper,
-    multiCVRPWrapper,
 )
 
 # Registry mapping environment names to their generator and wrapper classes.
@@ -52,7 +52,7 @@ _jumanji_registry = {
     "RobotWarehouse-v0": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper},
     "LevelBasedForaging-v0": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
     "MaConnector-v2": {"generator": ConnectorRandomGenerator, "wrapper": ConnectorWrapper},
-    "MultiCVRP-v0": {"generator": MultiCVRPRandomGenerator, "wrapper": multiCVRPWrapper},
+    "MultiCVRP-v0": {"generator": MultiCVRPRandomGenerator, "wrapper": MultiCVRPWrapper},
 }
 
 # Define a different registry for Matrax since it has no generator.
