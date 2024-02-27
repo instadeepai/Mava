@@ -1,0 +1,8 @@
+# The config of the 10x10x3a scenario
+name: Cleaner-v0
+task_name: clean-10x10x3a
+
+task_config:
+  num_rows: 10
+  num_cols: 10
+  num_agents: 3
