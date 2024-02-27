@@ -66,7 +66,10 @@ def add_optional_wrappers(
 ) -> Environment:
     # Add the global state to observation.
     if add_global_state:
-        env = GlobalStateWrapper(env)
+        if hasattr(env, "has_global_state"):
+            env.has_global_state = True
+        else:
+            env = GlobalStateWrapper(env)
 
     # Add agent id to observation.
     if config.system.add_agent_id:
@@ -94,21 +97,12 @@ def make_jumanji_env(
     wrapper = _jumanji_registry[env_name]["wrapper"]
 
     # Create envs.
-    if "kwargs" in config.env:
-        env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
-        eval_env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
-    else:
-        env = jumanji.make(env_name, generator=generator)
-        eval_env = jumanji.make(env_name, generator=generator)
-        
-    if env_name == "MultiCVRP-v0":
-        env, eval_env = wrapper(env, add_global_state), wrapper(eval_env, add_global_state)
-        env = add_optional_wrappers(env, config )
-        eval_env = add_optional_wrappers(eval_env, config)
-    else:
-        env, eval_env = wrapper(env), wrapper(eval_env)
-        env = add_optional_wrappers(env, config, add_global_state)
-        eval_env = add_optional_wrappers(eval_env, config, add_global_state)
+    env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
+    eval_env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
+
+    env, eval_env = wrapper(env), wrapper(eval_env)
+    env = add_optional_wrappers(env, config, add_global_state)
+    eval_env = add_optional_wrappers(eval_env, config, add_global_state)
 
     env = AutoResetWrapper(env)
     env = RecordEpisodeMetrics(env)

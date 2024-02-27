@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple, Union
+from typing import Tuple, Union, Dict
 
 import chex
 import jax.numpy as jnp
@@ -220,6 +220,8 @@ class ConnectorWrapper(MultiAgentWrapper):
         return spec
   
 class multiCVRPWrapper(Wrapper):
+    """ Wrapper for MultiCVRP environment.  """
+
     def __init__(self, env: MultiCVRP, has_global_state : bool = False):
         self.num_agents = env._num_vehicles
         self._env = env
@@ -234,8 +236,9 @@ class multiCVRPWrapper(Wrapper):
         state, timestep = self._env.step(state,action)
         timestep = self.modify_timestep(timestep, state.step_count)
         return state,timestep
-
+    
     def modify_timestep(self, timestep: TimeStep, step_count : chex.Array) -> TimeStep[Observation]:
+        #avoided the MultiAgentWrapper wrapper to use the step_count provided by the environment 
         observation, global_observation = self._format_observation(timestep.observation)
         obs_data = {
             "agents_view": observation,
@@ -253,13 +256,26 @@ class multiCVRPWrapper(Wrapper):
         timestep = timestep.replace(observation=observation, reward=reward, discount=discount)
         return timestep
     
-    def _format_observation(self, observation):
+    def _format_observation(self, observation : Dict[str, chex.Array]) -> Tuple[chex.Array, Union[None, chex.Array]]:
+        """
+        Formats the observation dictionary from the environment into a format suitable for mava.
+
+        Args:
+            observation (Dict[chex.Array]): The raw observation dict provided by jumanji
+
+        Returns:
+            observations (chex.Array): Concatenated individual observations for each agent,
+                                      shaped (num_agents, vehicle_info + customer_info).
+            global_observation (Union[None, chex.Array]): Concatenated global observation
+                                                          shaped (num_agents, global_info) if has_global_state = True,
+                                                          None otherwise.
+        """
         global_observation = None 
         #flatten and concat all of the observations for now
         customers_info, _ = tree_util.tree_flatten((observation.nodes,observation.windows,observation.coeffs))
         vehicles_info , _ = tree_util.tree_flatten(observation.vehicles)
         
-        #this results in c1-info1-c2,info2
+        #this results in c1_info1-c2_info
         customers_info = jnp.column_stack(customers_info).ravel()
         vehicles_info = jnp.column_stack(vehicles_info)
 
@@ -279,8 +295,9 @@ class multiCVRPWrapper(Wrapper):
         action_mask = specs.BoundedArray(
             (self.num_agents, self._env._num_customers + 1), bool, False, True, "action_mask"
         )
+        #7 is broken into 2 for cords, 1 each of demands,start,end,early,late and the 4 is the cords,capacity of the vehicle
         agents_view = specs.BoundedArray(
-            (self.num_agents, (self._env._num_customers + 1) * 7 + 4), #7 is  broken into 2 for cords, 1 each of demands,start,end,early,late and the 4 is the cords,capacity of the veichale
+            (self.num_agents, (self._env._num_customers + 1) * 7 + 4), 
             jnp.float32,
             -jnp.inf,
             jnp.inf,

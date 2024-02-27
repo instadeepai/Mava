@@ -1,5 +1,5 @@
 name: MultiCVRP-v0
-task_name: 2v-6c
+task_name: multicvrp-2v-6c
 
 task_config:
   num_customers : 6
