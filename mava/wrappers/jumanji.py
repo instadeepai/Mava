@@ -36,35 +36,82 @@ from mava.types import Observation, ObservationGlobalState, State
 
 
 class MultiAgentWrapper(Wrapper):
-    def __init__(self, env: Environment):
+    def __init__(self, env: Environment, has_global_state: bool = False):
         super().__init__(env)
         self._num_agents = self._env.num_agents
         self.time_limit = self._env.time_limit
+        self.has_global_state = has_global_state
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for `step` and `reset`."""
-        pass
+        return timestep
+
+    def get_global_state(self, obs: Observation) -> chex.Array:
+        """Add global state to observations"""
+        global_state = jnp.concatenate(obs.agents_view, axis=0)
+        global_state = jnp.tile(global_state, (self._env.num_agents, 1))
+        return global_state
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment."""
         state, timestep = self._env.reset(key)
-        return state, self.modify_timestep(timestep)
+        timestep = self.modify_timestep(timestep)
+        if self.has_global_state:
+            global_state = self.get_global_state(timestep.observation)
+            observation = ObservationGlobalState(
+                global_state=global_state,
+                agents_view=timestep.observation.agents_view,
+                action_mask=timestep.observation.action_mask,
+                step_count=timestep.observation.step_count,
+            )
+            return state, timestep.replace(observation=observation)
+        else:
+            return state, timestep
 
     def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
         """Step the environment."""
         state, timestep = self._env.step(state, action)
-        return state, self.modify_timestep(timestep)
+        timestep = self.modify_timestep(timestep)
+        if self.has_global_state:
+            global_state = self.get_global_state(timestep.observation)
+            observation = ObservationGlobalState(
+                global_state=global_state,
+                agents_view=timestep.observation.agents_view,
+                action_mask=timestep.observation.action_mask,
+                step_count=timestep.observation.step_count,
+            )
+            return state, timestep.replace(observation=observation)
+        else:
+            return state, timestep
 
-    def observation_spec(self) -> specs.Spec[Observation]:
+    def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         """Specification of the observation of the environment."""
-        step_count = specs.BoundedArray(
-            (self._num_agents,),
-            int,
-            jnp.zeros(self._num_agents, dtype=int),
-            jnp.repeat(self.time_limit, self._num_agents),
-            "step_count",
-        )
-        return self._env.observation_spec().replace(step_count=step_count)
+        if self.has_global_state:
+            obs_spec = self._env.observation_spec()
+            num_obs_features = obs_spec.agents_view.shape[-1]
+            global_state = specs.Array(
+                (self._env.num_agents, self._env.num_agents * num_obs_features),
+                obs_spec.agents_view.dtype,
+                "global_state",
+            )
+
+            return specs.Spec(
+                ObservationGlobalState,
+                "ObservationSpec",
+                agents_view=obs_spec.agents_view,
+                action_mask=obs_spec.action_mask,
+                global_state=global_state,
+                step_count=obs_spec.step_count,
+            )
+        else:
+            step_count = specs.BoundedArray(
+                (self._num_agents,),
+                int,
+                jnp.zeros(self._num_agents, dtype=int),
+                jnp.repeat(self.time_limit, self._num_agents),
+                "step_count",
+            )
+            return self._env.observation_spec().replace(step_count=step_count)
 
 
 class RwareWrapper(MultiAgentWrapper):
@@ -138,9 +185,7 @@ class ConnectorWrapper(MultiAgentWrapper):
         super().__init__(env)
         self.has_global_state = has_global_state
 
-    def modify_timestep(
-        self, timestep: TimeStep
-    ) -> TimeStep[Union[Observation, ObservationGlobalState]]:
+    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for the Connector environment."""
 
         # TARGET = 3 = The number of different types of items on the grid.
@@ -155,24 +200,13 @@ class ConnectorWrapper(MultiAgentWrapper):
             )
             return agents_view
 
-        def create_global_state(grid: chex.Array) -> chex.Array:
-            positions = jnp.where(grid % TARGET == POSITION, True, False)
-            targets = jnp.where((grid % TARGET == 0) & (grid != EMPTY), True, False)
-            paths = jnp.where(grid % TARGET == PATH, True, False)
-            global_state = jnp.stack((positions, targets, paths), -1)
-            return global_state
-
         obs_data = {
             "agents_view": create_agents_view(timestep.observation.grid),
             "action_mask": timestep.observation.action_mask,
             "step_count": jnp.repeat(timestep.observation.step_count, self._num_agents),
         }
 
-        if self.has_global_state:
-            obs_data["global_state"] = create_global_state(timestep.observation.grid)
-            return timestep.replace(observation=ObservationGlobalState(**obs_data))
-        else:
-            return timestep.replace(observation=Observation(**obs_data))
+        return timestep.replace(observation=Observation(**obs_data))
 
     def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         """Specification of the observation of the environment."""
@@ -219,6 +253,10 @@ class ConnectorWrapper(MultiAgentWrapper):
             )
 
         return spec
+
+    def get_global_state(self, obs: Observation) -> chex.Array:
+        global_state = obs.agents_view[..., :3]
+        return global_state
 
 
 class CleanerWrapper(MultiAgentWrapper):

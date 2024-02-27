@@ -38,7 +38,6 @@ from mava.wrappers import (
     AutoResetWrapper,
     CleanerWrapper,
     ConnectorWrapper,
-    GlobalStateWrapper,
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
@@ -64,10 +63,6 @@ _jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 def add_optional_wrappers(
     env: Environment, config: DictConfig, add_global_state: bool = False
 ) -> Environment:
-    # Add the global state to observation.
-    if add_global_state:
-        env = GlobalStateWrapper(env)
-
     # Add agent id to observation.
     if config.system.add_agent_id:
         env = AgentIDWrapper(env)
@@ -96,10 +91,12 @@ def make_jumanji_env(
     # Create envs.
     env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
     eval_env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
-    env, eval_env = wrapper(env), wrapper(eval_env)
+    env, eval_env = wrapper(env, has_global_state=add_global_state), wrapper(
+        eval_env, has_global_state=add_global_state
+    )
 
-    env = add_optional_wrappers(env, config, add_global_state)
-    eval_env = add_optional_wrappers(eval_env, config, add_global_state)
+    env = add_optional_wrappers(env, config)
+    eval_env = add_optional_wrappers(eval_env, config)
 
     env = AutoResetWrapper(env)
     env = RecordEpisodeMetrics(env)
