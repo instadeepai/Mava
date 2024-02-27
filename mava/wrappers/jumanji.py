@@ -58,10 +58,10 @@ class MultiAgentWrapper(Wrapper):
     def observation_spec(self) -> specs.Spec[Observation]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
-            (self._num_agents,),
+            (self.num_agents,),
             int,
-            jnp.zeros(self._num_agents, dtype=int),
-            jnp.repeat(self.time_limit, self._num_agents),
+            jnp.zeros(self.num_agents, dtype=int),
+            jnp.repeat(self.time_limit, self.num_agents),
             "step_count",
         )
         return self._env.observation_spec().replace(step_count=step_count)
@@ -187,7 +187,7 @@ class ConnectorWrapper(MultiAgentWrapper):
         obs_data = {
             "agents_view": create_agents_view(timestep.observation.grid),
             "action_mask": timestep.observation.action_mask,
-            "step_count": jnp.repeat(timestep.observation.step_count, self._num_agents),
+            "step_count": jnp.repeat(timestep.observation.step_count, self.num_agents),
         }
 
         if self.has_global_state:
@@ -199,10 +199,10 @@ class ConnectorWrapper(MultiAgentWrapper):
     def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
-            (self._num_agents,),
+            (self.num_agents,),
             int,
-            jnp.zeros(self._num_agents, dtype=int),
-            jnp.repeat(self.time_limit, self._num_agents),
+            jnp.zeros(self.num_agents, dtype=int),
+            jnp.repeat(self.time_limit, self.num_agents),
             "step_count",
         )
 
@@ -213,7 +213,11 @@ class ConnectorWrapper(MultiAgentWrapper):
             minimum=False,
             maximum=True,
         )
-
+        obs_data = {
+            "agents_view": agents_view,
+            "action_mask": self._env.observation_spec().action_mask,
+            "step_count": step_count,
+        }
         if self.has_global_state:
             global_state = specs.BoundedArray(
                 shape=(self._env.num_agents, self._env.grid_size, self._env.grid_size, 3),
@@ -222,22 +226,12 @@ class ConnectorWrapper(MultiAgentWrapper):
                 minimum=False,
                 maximum=True,
             )
-            spec = specs.Spec(
-                ObservationGlobalState,
-                "ObservationSpec",
-                agents_view=agents_view,
-                action_mask=self._env.observation_spec().action_mask,
-                global_state=global_state,
-                step_count=step_count,
-            )
+            obs_data["global_state"] = global_state
+            return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
 
-        else:
-            spec = specs.Spec(
-                Observation,
-                "ObservationSpec",
-                agents_view=agents_view,
-                action_mask=self._env.observation_spec().action_mask,
-                step_count=step_count,
-            )
+        return specs.Spec(Observation, "ObservationSpec", **obs_data)
 
-        return spec
+    @cached_property
+    def action_dim(self) -> chex.Array:
+        "Get the actions dim for each agent."
+        return int(self._env.action_spec().num_values[0])
