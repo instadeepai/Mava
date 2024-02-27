@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import functools
-from typing import Callable, Dict, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import chex
 import jax
@@ -116,6 +116,87 @@ class DiscreteActionHead(nn.Module):
         # `pi.distribution.entropy()` and keep the API identical to the ContinuousActionHead.
         return tfd.TransformedDistribution(
             distribution=tfd.Categorical(logits=masked_logits), bijector=tfb.Identity()
+        )
+
+
+class TanhTransformedDistribution(tfd.TransformedDistribution):
+    """Distribution followed by tanh."""
+
+    def __init__(
+        self, distribution: tfd.Distribution, threshold: float = 0.999, validate_args: bool = False
+    ) -> None:
+        """Initialize the distribution.
+
+        Args:
+          distribution: The distribution to transform.
+          threshold: Clipping value of the action when computing the logprob.
+          validate_args: Passed to super class.
+        """
+        super().__init__(
+            distribution=distribution, bijector=tfb.Tanh(), validate_args=validate_args
+        )
+        # Computes the log of the average probability distribution outside the
+        # clipping range, i.e. on the interval [-inf, -atanh(threshold)] for
+        # log_prob_left and [atanh(threshold), inf] for log_prob_right.
+        self._threshold = threshold
+        inverse_threshold = self.bijector.inverse(threshold)
+        # average(pdf) = p/epsilon
+        # So log(average(pdf)) = log(p) - log(epsilon)
+        log_epsilon = jnp.log(1.0 - threshold)
+        # Those 2 values are differentiable w.r.t. model parameters, such that the
+        # gradient is defined everywhere.
+        self._log_prob_left = self.distribution.log_cdf(-inverse_threshold) - log_epsilon
+        self._log_prob_right = (
+            self.distribution.log_survival_function(inverse_threshold) - log_epsilon
+        )
+
+    def log_prob(self, event: chex.Array) -> chex.Array:
+        # Without this clip there would be NaNs in the inner tf.where and that
+        # causes issues for some reasons.
+        event = jnp.clip(event, -self._threshold, self._threshold)
+        # The inverse image of {threshold} is the interval [atanh(threshold), inf]
+        # which has a probability of "log_prob_right" under the given distribution.
+        return jnp.where(
+            event <= -self._threshold,
+            self._log_prob_left,
+            jnp.where(event >= self._threshold, self._log_prob_right, super().log_prob(event)),
+        )
+
+    def mode(self) -> chex.Array:
+        return self.bijector.forward(self.distribution.mode())
+
+    def entropy(self, seed: chex.PRNGKey = None) -> chex.Array:
+        # We return an estimation using a single sample of the log_det_jacobian.
+        # We can still do some backpropagation with this estimate.
+        return self.distribution.entropy() + self.bijector.forward_log_det_jacobian(
+            self.distribution.sample(seed=seed), event_ndims=0
+        )
+
+    @classmethod
+    def _parameter_properties(cls, dtype: Optional[Any], num_classes: Any = None) -> Any:
+        td_properties = super()._parameter_properties(dtype, num_classes=num_classes)
+        del td_properties["bijector"]
+        return td_properties
+
+
+class NormalTanhDistributionHead(nn.Module):
+
+    env: Environment
+    sigma_min: float
+    sigma_max: float
+
+    @nn.compact
+    def __call__(self, embedding: chex.Array, observation: Observation) -> tfd.Independent:
+        min_scale = 1e-3
+        loc = nn.Dense(self.env.action_dim, kernel_init=orthogonal(0.01))(embedding)
+        scale = (
+            jax.nn.softplus(nn.Dense(self.env.action_dim, kernel_init=orthogonal(0.01))(embedding))
+            + min_scale
+        )
+        distribution = tfd.Normal(loc=loc, scale=scale)
+
+        return tfd.Independent(
+            TanhTransformedDistribution(distribution), reinterpreted_batch_ndims=1
         )
 
 

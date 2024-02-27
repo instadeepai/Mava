@@ -175,6 +175,8 @@ def get_learner_fn(
                     loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
                     loss_actor = loss_actor.mean()
                     entropy = actor_policy.distribution.entropy().mean()
+                    # For testing Edan's approach:
+                    # entropy = actor_policy.distribution.entropy(jax.random.PRNGKey(0)).mean()
 
                     total_loss_actor = loss_actor - config.system.ent_coef * entropy
                     return total_loss_actor, (loss_actor, entropy)

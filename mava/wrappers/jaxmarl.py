@@ -381,7 +381,7 @@ class MabraxWrapper(JaxMarlWrapper):
     @cached_property
     def action_dim(self) -> chex.Array:
         "Get the actions dim for each agent."
-        return self.action_spec().shape[0]
+        return self._env.action_space(self.agents[0]).shape[0]
 
     @cached_property
     def state_size(self) -> chex.Array:
