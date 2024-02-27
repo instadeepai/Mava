@@ -19,9 +19,6 @@ import jumanji
 import matrax
 from jaxmarl.environments.smax import map_name_to_scenario
 from jumanji.env import Environment
-from jumanji.environments.routing.cleaner.generator import (
-    RandomGenerator as CleanerRandomGenerator,
-)
 from jumanji.environments.routing.connector.generator import (
     RandomWalkGenerator as ConnectorRandomGenerator,
 )
@@ -36,7 +33,6 @@ from omegaconf import DictConfig
 from mava.wrappers import (
     AgentIDWrapper,
     AutoResetWrapper,
-    CleanerWrapper,
     ConnectorWrapper,
     LbfWrapper,
     MabraxWrapper,
@@ -51,7 +47,6 @@ _jumanji_registry = {
     "RobotWarehouse-v0": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper},
     "LevelBasedForaging-v0": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
     "MaConnector-v2": {"generator": ConnectorRandomGenerator, "wrapper": ConnectorWrapper},
-    "Cleaner-v0": {"generator": CleanerRandomGenerator, "wrapper": CleanerWrapper},
 }
 
 # Define a different registry for Matrax since it has no generator.
