@@ -25,5 +25,4 @@ scenario:
 eval_metric: episode_return
 
 kwargs:
-  # This value is in keeping with 'Benchmarking Multi-Agent Deep Reinforcement Learning Algorithms in Cooperative Tasks'
   time_limit: 25
