@@ -12,12 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple
+from typing import Tuple, Union
 
 import chex
 import jax.numpy as jnp
 from jumanji import specs
 from jumanji.env import Environment
+from jumanji.environments.routing.connector import MaConnector
+from jumanji.environments.routing.connector.constants import (
+    EMPTY,
+    PATH,
+    POSITION,
+    TARGET,
+)
 from jumanji.environments.routing.lbf import LevelBasedForaging
 from jumanji.environments.routing.robot_warehouse import RobotWarehouse
 from jumanji.types import TimeStep, StepType
@@ -51,9 +58,9 @@ class MultiAgentWrapper(Wrapper):
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
             (self._num_agents,),
-            jnp.int32,
-            [0] * self._num_agents,
-            [self.time_limit] * self._num_agents,
+            int,
+            jnp.zeros(self._num_agents, dtype=int),
+            jnp.repeat(self.time_limit, self._num_agents),
             "step_count",
         )
         return self._env.observation_spec().replace(step_count=step_count)
@@ -118,6 +125,99 @@ class LbfWrapper(MultiAgentWrapper):
 
         # Aggregate the list of individual rewards and use a single team_reward.
         return self.aggregate_rewards(timestep, modified_observation)
+
+
+class ConnectorWrapper(MultiAgentWrapper):
+    """Multi-agent wrapper for the MA Connector environment.
+
+    Do not use the AgentID wrapper with this env, it has implicit agent IDs.
+    """
+
+    def __init__(self, env: MaConnector, has_global_state: bool = False):
+        super().__init__(env)
+        self.has_global_state = has_global_state
+
+    def modify_timestep(
+        self, timestep: TimeStep
+    ) -> TimeStep[Union[Observation, ObservationGlobalState]]:
+        """Modify the timestep for the Connector environment."""
+
+        # TARGET = 3 = The number of different types of items on the grid.
+        def create_agents_view(grid: chex.Array) -> chex.Array:
+            positions = jnp.where(grid % TARGET == POSITION, True, False)
+            targets = jnp.where((grid % TARGET == 0) & (grid != EMPTY), True, False)
+            paths = jnp.where(grid % TARGET == PATH, True, False)
+            position_per_agent = jnp.where(grid == POSITION, True, False)
+            target_per_agent = jnp.where(grid == TARGET, True, False)
+            agents_view = jnp.stack(
+                (positions, targets, paths, position_per_agent, target_per_agent), -1
+            )
+            return agents_view
+
+        def create_global_state(grid: chex.Array) -> chex.Array:
+            positions = jnp.where(grid % TARGET == POSITION, True, False)
+            targets = jnp.where((grid % TARGET == 0) & (grid != EMPTY), True, False)
+            paths = jnp.where(grid % TARGET == PATH, True, False)
+            global_state = jnp.stack((positions, targets, paths), -1)
+            return global_state
+
+        obs_data = {
+            "agents_view": create_agents_view(timestep.observation.grid),
+            "action_mask": timestep.observation.action_mask,
+            "step_count": jnp.repeat(timestep.observation.step_count, self._num_agents),
+        }
+
+        if self.has_global_state:
+            obs_data["global_state"] = create_global_state(timestep.observation.grid)
+            return timestep.replace(observation=ObservationGlobalState(**obs_data))
+        else:
+            return timestep.replace(observation=Observation(**obs_data))
+
+    def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
+        """Specification of the observation of the environment."""
+        step_count = specs.BoundedArray(
+            (self._num_agents,),
+            int,
+            jnp.zeros(self._num_agents, dtype=int),
+            jnp.repeat(self.time_limit, self._num_agents),
+            "step_count",
+        )
+
+        agents_view = specs.BoundedArray(
+            shape=(self._env.num_agents, self._env.grid_size, self._env.grid_size, 5),
+            dtype=bool,
+            name="agents_view",
+            minimum=False,
+            maximum=True,
+        )
+
+        if self.has_global_state:
+            global_state = specs.BoundedArray(
+                shape=(self._env.num_agents, self._env.grid_size, self._env.grid_size, 3),
+                dtype=bool,
+                name="global_state",
+                minimum=False,
+                maximum=True,
+            )
+            spec = specs.Spec(
+                ObservationGlobalState,
+                "ObservationSpec",
+                agents_view=agents_view,
+                action_mask=self._env.observation_spec().action_mask,
+                global_state=global_state,
+                step_count=step_count,
+            )
+
+        else:
+            spec = specs.Spec(
+                Observation,
+                "ObservationSpec",
+                agents_view=agents_view,
+                action_mask=self._env.observation_spec().action_mask,
+                step_count=step_count,
+            )
+
+        return spec
   
 class multiCVRPWrapper(Wrapper):
     def __init__(self, env: MultiCVRP, has_global_state : bool = False):

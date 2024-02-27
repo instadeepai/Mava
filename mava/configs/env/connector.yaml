@@ -1,0 +1,14 @@
+# ---Environment Configs---
+defaults:
+  - _self_
+  - scenario: con-10x10x5a # [con-5x5x3a, con-7x7x5a, con-10x10x5a, con-15x15x10a]
+# Further environment config details in "con-10x10x5a" file.
+
+env_name: MaConnector # Used for logging purposes.
+
+# Defines the metric that will be used to evaluate the performance of the agent.
+# This metric is returned at the end of an experiment and can be used for hyperparameter tuning.
+eval_metric: episode_return
+
+kwargs:
+  time_limit: 100
