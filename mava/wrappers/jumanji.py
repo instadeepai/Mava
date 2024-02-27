@@ -18,17 +18,14 @@ import chex
 import jax.numpy as jnp
 from jumanji import specs
 from jumanji.env import Environment
+from jumanji.environments.routing.cleaner import Cleaner
+from jumanji.environments.routing.cleaner.constants import DIRTY, WALL
 from jumanji.environments.routing.connector import MaConnector
 from jumanji.environments.routing.connector.constants import (
     EMPTY,
     PATH,
     POSITION,
     TARGET,
-)
-from jumanji.environments.routing.cleaner import Cleaner
-from jumanji.environments.routing.cleaner.constants import (
-    DIRTY,
-    WALL,
 )
 from jumanji.environments.routing.lbf import LevelBasedForaging
 from jumanji.environments.routing.robot_warehouse import RobotWarehouse
@@ -222,7 +219,7 @@ class ConnectorWrapper(MultiAgentWrapper):
             )
 
         return spec
-    
+
 
 class CleanerWrapper(MultiAgentWrapper):
     """Multi-agent wrapper for the Cleaner environment.
@@ -237,13 +234,12 @@ class CleanerWrapper(MultiAgentWrapper):
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for the Cleaner environment."""
 
-        def create_agents_view(obs: Observation) -> chex.Array:
-            agents_locations = obs.agents_locations
+        def create_agents_view(grid: chex.Array, agents_locations: chex.Array) -> chex.Array:
+            agents_locations = agents_locations
             num_agents = agents_locations.shape[0]
-            grid = obs.grid
             dirty_channel = jnp.tile(jnp.where(grid == DIRTY, 1, 0), (num_agents, 1, 1))
             wall_channel = jnp.tile(jnp.where(grid == WALL, 1, 0), (num_agents, 1, 1))
-            xs, ys = agents_locations[:, 0], agents_locations[:, 1] 
+            xs, ys = agents_locations[:, 0], agents_locations[:, 1]
             pos_per_agent = jnp.repeat(jnp.zeros_like(grid)[None, :, :], num_agents, axis=0)
             pos_per_agent = pos_per_agent.at[jnp.arange(num_agents), xs, ys].set(1)
             agents_pos = jnp.tile(jnp.sum(pos_per_agent, axis=0), (num_agents, 1, 1))
@@ -252,13 +248,15 @@ class CleanerWrapper(MultiAgentWrapper):
                 [dirty_channel, wall_channel, agents_pos, pos_per_agent], axis=-1
             )
             return transformed
-        
-        def create_global_state(self, agents_view: chex.Array) -> chex.Array:
-            global_state = agents_view[...,:3]
+
+        def create_global_state(agents_view: chex.Array) -> chex.Array:
+            global_state = agents_view[..., :3]
             return global_state
-        
+
         obs_data = {
-            "agents_view": create_agents_view(timestep.observation),
+            "agents_view": create_agents_view(
+                timestep.observation.grid, timestep.observation.agents_locations
+            ),
             "action_mask": timestep.observation.action_mask,
             "step_count": jnp.repeat(timestep.observation.step_count, self._num_agents),
         }
@@ -266,12 +264,14 @@ class CleanerWrapper(MultiAgentWrapper):
         discount = jnp.repeat(timestep.discount, self._num_agents)
         if self.has_global_state:
             obs_data["global_state"] = create_global_state(timestep.observation.grid)
-            return timestep.replace(observation=ObservationGlobalState(**obs_data), reward=reward, discount=discount)
+            return timestep.replace(
+                observation=ObservationGlobalState(**obs_data), reward=reward, discount=discount
+            )
         else:
-            return timestep.replace(observation=Observation(**obs_data), reward=reward, discount=discount)
-        
-    
-    
+            return timestep.replace(
+                observation=Observation(**obs_data), reward=reward, discount=discount
+            )
+
     def observation_spec(self) -> specs.Spec[Observation]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
@@ -293,7 +293,7 @@ class CleanerWrapper(MultiAgentWrapper):
         if self.has_global_state:
             global_state = specs.BoundedArray(
                 shape=(self._env.num_agents, self._env.num_rows, self._env.num_cols, 3),
-                dtype= bool,
+                dtype=bool,
                 name="agents_view",
                 minimum=0,
                 maximum=self._env.num_agents,
