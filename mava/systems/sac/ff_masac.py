@@ -640,7 +640,7 @@ def run_experiment(cfg: DictConfig) -> float:
     return float(max_episode_return)
 
 
-@hydra.main(config_path="../configs", config_name="default_ff_isac.yaml", version_base="1.2")
+@hydra.main(config_path="../../configs", config_name="default_ff_isac.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
