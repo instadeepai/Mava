@@ -11,10 +11,10 @@ env_name: Matrax  # Used for logging purposes.
 #   2. Climbing-{state}-v0
 #       2.1. state = {stateful, stateless}
 #   3. NoConflict-{id}-{state}-v0
-#       3.1. id = {1, 2, 3, ..., 20, 21}
+#       3.1. id = {0, 1, 2, ..., 20}
 #       3.2. state = {stateful, stateless}
 #   4. Conflict-{id}-{state}-v0
-#       4.1. id = {1, 2, 3, ..., 56, 57}
+#       4.1. id = {0, 1, 2, ..., 56}
 #       4.2. state = {stateful, stateless}
 scenario:
   task_name: Climbing-stateless-v0
@@ -25,4 +25,4 @@ scenario:
 eval_metric: episode_return
 
 kwargs:
-  time_limit: 500
+  time_limit: 25
