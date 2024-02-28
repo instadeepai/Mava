@@ -55,15 +55,15 @@ _matrax_registry = {"Matrax": MatraxWrapper}
 _jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 
 
-def add_extra_wrappers(env: Environment, eval_env: Environment, config: DictConfig) -> Environment:
+def add_extra_wrappers(train_env: Environment, eval_env: Environment, config: DictConfig) -> Environment:
     # Add agent id to observation.
     if config.system.add_agent_id:
-        env = AgentIDWrapper(env)
-        eval_env = AgentIDWrapper(env)
+        train_env = AgentIDWrapper(train_env)
+        eval_env = AgentIDWrapper(eval_env)
 
-    env = AutoResetWrapper(env)
-    env = RecordEpisodeMetrics(env)
-    return env, eval_env
+    train_env = AutoResetWrapper(train_env)
+    train_env = RecordEpisodeMetrics(train_env)
+    return train_env, eval_env
 
 
 def make_jumanji_env(
