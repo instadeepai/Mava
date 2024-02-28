@@ -237,8 +237,8 @@ class ConnectorWrapper(MultiAgentWrapper):
             )
             obs_data["global_state"] = global_state
             return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
-        else:
-            return specs.Spec(Observation, "ObservationSpec", **obs_data)
+        
+        return specs.Spec(Observation, "ObservationSpec", **obs_data)
 
     def get_global_state(self, obs: Observation) -> chex.Array:
         """Constructs the global state from the global information
