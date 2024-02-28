@@ -54,7 +54,6 @@ class GigastepWrapper(Wrapper):
             time_limit (int): The maximum duration of each episode, in seconds. Defaults to 500.
             has_global_state (bool): Whether the environment has a global state. Defaults to False.
         """
-
         super().__init__(env)
         assert (
             env.discrete_actions
@@ -62,7 +61,6 @@ class GigastepWrapper(Wrapper):
         assert (
             env._obs_type == "vector"
         ), "Only Vector observations are currently supported for Gigastep environments"
-
         self._env: GigastepEnv
         self._timelimit = self._env.max_episode_length
         self.num_agents = self._env.n_agents_team1
@@ -81,20 +79,17 @@ class GigastepWrapper(Wrapper):
             TimeStep : the first time step.
 
         """
-
         key, reset_key, adversary_key = jax.random.split(key, 3)
         obs, state = self._env.reset(reset_key)
-
         obs_team1, state_team1, obs_team2, state_team2 = self._split_obs_and_state(obs, state)
         # Adversary actions are decided as soon as the observation is available
         # since the old observations aren't available in the step function
         adversary_actions = self.adversary_policy(obs_team2, state_team2, adversary_key)
-
         state = GigastepState(state, key, 0, adversary_actions)
-
         obs = self._create_observation(obs_team1, obs, state)
-
-        timestep = restart(obs, shape=(self.num_agents,), extras={"won_episode": False})
+        timestep = restart(
+            obs, shape=(self.num_agents,), extras={"episode_metrics": {"won_episode": False}}
+        )
         return state, timestep
 
     def step(self, state: GigastepState, action: Array) -> Tuple[GigastepState, TimeStep]:
@@ -111,34 +106,25 @@ class GigastepWrapper(Wrapper):
 
         """
         key, step_key, adversary_key = jax.random.split(state.key, 3)
-
         action = jnp.concatenate([action, state.adversary_action], axis=0, dtype=jnp.int16)
-
         obs, env_state, rewards, dones, ep_done = self._env.step(state.state, action, step_key)
-
         # cut out the rewards,dones of the adversary
         rewards, dones = (
             rewards[: self.num_agents],
             dones[: self.num_agents],
         )
-
         obs_team1, state_team1, obs_team2, state_team2 = self._split_obs_and_state(obs, env_state)
-
         # take the actions of the adversary and cache it before returning the new state
         adversary_actions = self.adversary_policy(obs_team2, state_team2, adversary_key)
-
         obs = self._create_observation(obs_team1, obs, state)
-
         step_type = jax.lax.select(ep_done, StepType.LAST, StepType.MID)
-
         current_winner = ep_done & self.won_episode(env_state)
-
         ts = TimeStep(
             step_type=step_type,
             reward=rewards,
             discount=1.0 - dones,
             observation=obs,
-            extras={"won_episode": current_winner},
+            extras={"episode_metrics": {"won_episode": current_winner}},
         )
         return GigastepState(env_state, key, state.step + 1, adversary_actions), ts
 
@@ -246,12 +232,10 @@ class GigastepWrapper(Wrapper):
         """
         # The first n_agents_team1 elements in each array belong to team1
         team1_obs, team2_obs = obs[: self.num_agents], obs[self.num_agents :]
-
         # split each sub elemnt in the tuple
         per_agent_info, general_state_info = state
         team1_state = jax.tree_util.tree_map(lambda x: x[: self.num_agents], per_agent_info)
         team2_state = jax.tree_util.tree_map(lambda x: x[self.num_agents :], per_agent_info)
-
         return (
             team1_obs,
             (team1_state, general_state_info),

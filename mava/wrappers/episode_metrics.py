@@ -48,9 +48,10 @@ class RecordEpisodeMetrics(Wrapper):
     def reset(self, key: chex.PRNGKey) -> Tuple[RecordEpisodeMetricsState, TimeStep]:
         """Reset the environment."""
         key, reset_key = jax.random.split(key)
-        state, timestep = self._env.reset(reset_key)
-        state = RecordEpisodeMetricsState(state, key, 0.0, 0, 0.0, 0)
-        timestep.extras["episode_metrics"] = {
+        env_state, timestep = self._env.reset(reset_key)
+        state = RecordEpisodeMetricsState(env_state, key, 0.0, 0, 0.0, 0)
+        timestep.extras.setdefault("episode_metrics", {})
+        timestep.extras["episode_metrics"] |= {
             "episode_return": 0.0,
             "episode_length": 0,
             "is_terminal_step": False,
@@ -76,7 +77,8 @@ class RecordEpisodeMetrics(Wrapper):
         episode_return_info = state.episode_return * not_done + new_episode_return * done
         episode_length_info = state.episode_length * not_done + new_episode_length * done
 
-        timestep.extras["episode_metrics"] = {
+        timestep.extras.setdefault("episode_metrics", {})
+        timestep.extras["episode_metrics"] |= {
             "episode_return": episode_return_info,
             "episode_length": episode_length_info,
             "is_terminal_step": done,

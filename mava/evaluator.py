@@ -36,7 +36,6 @@ def get_ff_evaluator_fn(
     env: Environment,
     apply_fn: ActorApply,
     config: DictConfig,
-    log_win_rate: bool = False,
     eval_multiplier: int = 1,
 ) -> EvalFn:
     """Get the evaluator function for feedforward networks.
@@ -86,15 +85,7 @@ def get_ff_evaluator_fn(
             return is_not_done
 
         final_state = jax.lax.while_loop(not_done, _env_step, init_eval_state)
-
-        eval_metrics = {
-            "episode_return": final_state.episode_return,
-            "episode_length": final_state.step_count,
-        }
-        # Log won episode if win rate is required.
-
-        if log_win_rate:
-            eval_metrics["won_episode"] = final_state.timestep.extras["won_episode"]
+        eval_metrics: dict = final_state.timestep.extras["episode_metrics"]
 
         return eval_metrics
 
@@ -143,7 +134,6 @@ def get_rnn_evaluator_fn(
     apply_fn: RecActorApply,
     config: DictConfig,
     scanned_rnn: nn.Module,
-    log_win_rate: bool = False,
     eval_multiplier: int = 1,
 ) -> EvalFn:
     """Get the evaluator function for recurrent networks."""
@@ -207,15 +197,7 @@ def get_rnn_evaluator_fn(
             return is_not_done
 
         final_state = jax.lax.while_loop(not_done, _env_step, init_eval_state)
-
-        eval_metrics = {
-            "episode_return": final_state.episode_return,
-            "episode_length": final_state.step_count,
-        }
-        # Log won episode if win rate is required.
-        if log_win_rate:
-            eval_metrics["won_episode"] = final_state.timestep.extras["won_episode"]
-
+        eval_metrics: dict = final_state.timestep.extras["episode_metrics"]
         return eval_metrics
 
     def evaluator_fn(
@@ -285,8 +267,6 @@ def make_eval_fns(
     scanned_rnn: Optional[nn.Module] = None,
 ) -> Tuple[EvalFn, EvalFn]:
     """Initialise evaluator_fn."""
-    # Check if win rate is required for evaluation.
-    log_win_rate = config.env.eval_metric == "win_rate"
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
         assert scanned_rnn is not None
@@ -298,21 +278,17 @@ def make_eval_fns(
             vmapped_eval_apply_fn,
             config,
             scanned_rnn,
-            log_win_rate,
         )
         absolute_metric_evaluator = get_rnn_evaluator_fn(
             eval_env,
             vmapped_eval_apply_fn,
             config,
             scanned_rnn,
-            log_win_rate,
             10,
         )
     else:
-        evaluator = get_ff_evaluator_fn(eval_env, network.apply, config, log_win_rate)
-        absolute_metric_evaluator = get_ff_evaluator_fn(
-            eval_env, network.apply, config, log_win_rate, 10
-        )
+        evaluator = get_ff_evaluator_fn(eval_env, network.apply, config)
+        absolute_metric_evaluator = get_ff_evaluator_fn(eval_env, network.apply, config, 10)
 
     evaluator = jax.pmap(evaluator, axis_name="device")
     absolute_metric_evaluator = jax.pmap(absolute_metric_evaluator, axis_name="device")

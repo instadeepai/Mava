@@ -328,7 +328,7 @@ class SmaxWrapper(JaxMarlWrapper):
         self, key: PRNGKey
     ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
         state, ts = super().reset(key)
-        extras = {"won_episode": False}
+        extras = {"episode_metrics": {"won_episode": False}}
         ts = ts.replace(extras=extras)
         return state, ts
 
@@ -338,7 +338,7 @@ class SmaxWrapper(JaxMarlWrapper):
         state, ts = super().step(state, action)
 
         current_winner = (ts.step_type == StepType.LAST) & jnp.all(ts.reward >= 1.0)
-        extras = {"won_episode": current_winner}
+        extras = {"episode_metrics": {"won_episode": current_winner}}
         ts = ts.replace(extras=extras)
         return state, ts
 

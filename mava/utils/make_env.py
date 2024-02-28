@@ -91,19 +91,18 @@ def make_jumanji_env(
     generator = _jumanji_registry[env_name]["generator"]
     generator = generator(**config.env.scenario.task_config)
     wrapper = _jumanji_registry[env_name]["wrapper"]
-
-    # Create envs.
-    env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
+    # Create training environment.
+    train_env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
+    train_env = wrapper(train_env)
+    train_env = add_optional_wrappers(train_env, config, add_global_state)
+    train_env = AutoResetWrapper(train_env)
+    train_env = RecordEpisodeMetrics(train_env)
+    # Create evaluation environment.
     eval_env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
-    env, eval_env = wrapper(env), wrapper(eval_env)
-
-    env = add_optional_wrappers(env, config, add_global_state)
+    eval_env = wrapper(eval_env)
     eval_env = add_optional_wrappers(eval_env, config, add_global_state)
-
-    env = AutoResetWrapper(env)
-    env = RecordEpisodeMetrics(env)
-
-    return env, eval_env
+    eval_env = RecordEpisodeMetrics(eval_env)
+    return train_env, eval_env
 
 
 def make_jaxmarl_env(
@@ -120,29 +119,20 @@ def make_jaxmarl_env(
     Returns:
         A JAXMARL environment.
     """
-
     kwargs = dict(config.env.kwargs)
     if "smax" in env_name.lower():
         kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
-
-    # Create jaxmarl envs.
-    env = _jaxmarl_wrappers[config.env.env_name](
-        jaxmarl.make(env_name, **kwargs),
-        add_global_state,
-    )
-    eval_env = _jaxmarl_wrappers[config.env.env_name](
-        jaxmarl.make(env_name, **kwargs),
-        add_global_state,
-    )
-
-    # Add agent id to observation.
-    env = add_optional_wrappers(env, config)
+    wrapper = _jaxmarl_wrappers[config.env.env_name]
+    # Create training environment.
+    train_env = wrapper(jaxmarl.make(env_name, **kwargs), add_global_state)
+    train_env = add_optional_wrappers(train_env, config)
+    train_env = AutoResetWrapper(train_env)
+    train_env = RecordEpisodeMetrics(train_env)
+    # Create evaluation environment.
+    eval_env = wrapper(jaxmarl.make(env_name, **kwargs), add_global_state)
     eval_env = add_optional_wrappers(eval_env, config)
-
-    env = AutoResetWrapper(env)
-    env = RecordEpisodeMetrics(env)
-
-    return env, eval_env
+    eval_env = RecordEpisodeMetrics(eval_env)
+    return train_env, eval_env
 
 
 def make_matrax_env(
@@ -161,20 +151,19 @@ def make_matrax_env(
     """
     # Select the Matrax wrapper.
     wrapper = _matrax_registry[env_name]
-
-    # Create envs.
     task_name = config["env"]["scenario"]["task_name"]
-    env = matrax.make(task_name, **config.env.kwargs)
+    # Create training environment.
+    train_env = matrax.make(task_name, **config.env.kwargs)
+    train_env = wrapper(train_env)
+    train_env = add_optional_wrappers(train_env, config, add_global_state)
+    train_env = AutoResetWrapper(train_env)
+    train_env = RecordEpisodeMetrics(train_env)
+    # Create evaluation environment.
     eval_env = matrax.make(task_name, **config.env.kwargs)
-    env, eval_env = wrapper(env), wrapper(eval_env)
-
-    env = add_optional_wrappers(env, config, add_global_state)
+    eval_env = wrapper(eval_env)
     eval_env = add_optional_wrappers(eval_env, config, add_global_state)
-
-    env = AutoResetWrapper(env)
-    env = RecordEpisodeMetrics(env)
-
-    return env, eval_env
+    train_env = RecordEpisodeMetrics(train_env)
+    return train_env, eval_env
 
 
 def make_gigastep_env(
@@ -192,18 +181,17 @@ def make_gigastep_env(
         A tuple of the environments.
     """
     wrapper = _gigastep_registry[env_name]
-
     kwargs = config.env.kwargs
     scenario = ScenarioBuilder.from_config(config.env.scenario.task_config)
-
+    # Create training environment.
     train_env = wrapper(scenario.make(**kwargs), has_global_state=add_global_state)
-    eval_env = wrapper(scenario.make(**kwargs), has_global_state=add_global_state)
-
     train_env = add_optional_wrappers(train_env, config)
-    eval_env = add_optional_wrappers(eval_env, config)
-
     train_env = AutoResetWrapper(train_env)
     train_env = RecordEpisodeMetrics(train_env)
+    # Create evaluation environment.
+    eval_env = wrapper(scenario.make(**kwargs), has_global_state=add_global_state)
+    eval_env = add_optional_wrappers(eval_env, config)
+    eval_env = RecordEpisodeMetrics(eval_env)
     return train_env, eval_env
 
 
@@ -219,7 +207,6 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[Environmen
         A tuple of the environments.
     """
     env_name = config.env.scenario.name
-
     if env_name in _jumanji_registry:
         return make_jumanji_env(env_name, config, add_global_state)
     elif env_name in jaxmarl.registered_envs:
