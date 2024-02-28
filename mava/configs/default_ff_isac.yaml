@@ -2,7 +2,7 @@ defaults:
   - _self_
   - logger: ff_isac
   - arch: anakin
-  - system: ff_isac
+  - system: sac/ff_isac
   - env: mabrax
 #   - system/search_spaces@hydra.sweeper.params: ${system}
 #   - override hydra/sweeper: optuna
