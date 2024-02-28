@@ -36,7 +36,6 @@ from mava.wrappers import (
     AutoResetWrapper,
     ConnectorWrapper,
     GigastepWrapper,
-    GlobalStateWrapper,
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
@@ -93,14 +92,14 @@ def make_jumanji_env(
     wrapper = _jumanji_registry[env_name]["wrapper"]
 
     # Create envs.
-    env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
+    train_env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
     eval_env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
-    env, eval_env = wrapper(env, add_global_state=add_global_state), wrapper(
+    train_env, eval_env = wrapper(train_env, add_global_state=add_global_state), wrapper(
         eval_env, add_global_state=add_global_state
     )
 
-    env, eval_env = add_extra_wrappers(env, eval_env, config)
-    return env, eval_env
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
+    return train_env, eval_env
 
 
 def make_jaxmarl_env(
@@ -123,7 +122,7 @@ def make_jaxmarl_env(
         kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
 
     # Create jaxmarl envs.
-    env = _jaxmarl_wrappers[config.env.env_name](
+    train_env = _jaxmarl_wrappers[config.env.env_name](
         jaxmarl.make(env_name, **kwargs),
         add_global_state,
     )
@@ -132,9 +131,9 @@ def make_jaxmarl_env(
         add_global_state,
     )
 
-    env, eval_env = add_extra_wrappers(env, eval_env, config)
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
 
-    return env, eval_env
+    return train_env, eval_env
 
 
 def make_matrax_env(
@@ -156,12 +155,12 @@ def make_matrax_env(
 
     # Create envs.
     task_name = config["env"]["scenario"]["task_name"]
-    env = matrax.make(task_name, **config.env.kwargs)
+    train_env = matrax.make(task_name, **config.env.kwargs)
     eval_env = matrax.make(task_name, **config.env.kwargs)
-    env, eval_env = wrapper(env), wrapper(eval_env)
+    train_env, eval_env = wrapper(train_env), wrapper(eval_env)
 
-    env, eval_env = add_extra_wrappers(env, eval_env, config)
-    return env, eval_env
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
+    return train_env, eval_env
 
 
 def make_gigastep_env(
@@ -186,11 +185,7 @@ def make_gigastep_env(
     train_env = wrapper(scenario.make(**kwargs), has_global_state=add_global_state)
     eval_env = wrapper(scenario.make(**kwargs), has_global_state=add_global_state)
 
-    train_env = add_optional_wrappers(train_env, config)
-    eval_env = add_optional_wrappers(eval_env, config)
-
-    train_env = AutoResetWrapper(train_env)
-    train_env = RecordEpisodeMetrics(train_env)
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
     return train_env, eval_env
 
 
