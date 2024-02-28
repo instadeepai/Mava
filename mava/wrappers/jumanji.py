@@ -34,11 +34,11 @@ from mava.types import Observation, ObservationGlobalState, State
 
 
 class MultiAgentWrapper(Wrapper):
-    def __init__(self, env: Environment, has_global_state: bool = False):
+    def __init__(self, env: Environment, add_global_state: bool = False):
         super().__init__(env)
         self._num_agents = self._env.num_agents
         self.time_limit = self._env.time_limit
-        self.has_global_state = has_global_state
+        self.add_global_state = add_global_state
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for `step` and `reset`."""
@@ -54,7 +54,7 @@ class MultiAgentWrapper(Wrapper):
         """Reset the environment."""
         state, timestep = self._env.reset(key)
         timestep = self.modify_timestep(timestep)
-        if self.has_global_state:
+        if self.add_global_state:
             global_state = self.get_global_state(timestep.observation)
             observation = ObservationGlobalState(
                 global_state=global_state,
@@ -70,7 +70,7 @@ class MultiAgentWrapper(Wrapper):
         """Step the environment."""
         state, timestep = self._env.step(state, action)
         timestep = self.modify_timestep(timestep)
-        if self.has_global_state:
+        if self.add_global_state:
             global_state = self.get_global_state(timestep.observation)
             observation = ObservationGlobalState(
                 global_state=global_state,
@@ -92,7 +92,7 @@ class MultiAgentWrapper(Wrapper):
             "step_count",
         )
 
-        if self.has_global_state:
+        if self.add_global_state:
             obs_spec = self._env.observation_spec()
             num_obs_features = obs_spec.agents_view.shape[-1]
             global_state = specs.Array(
@@ -179,9 +179,9 @@ class ConnectorWrapper(MultiAgentWrapper):
     Do not use the AgentID wrapper with this env, it has implicit agent IDs.
     """
 
-    def __init__(self, env: MaConnector, has_global_state: bool = False):
+    def __init__(self, env: MaConnector, add_global_state: bool = False):
         super().__init__(env)
-        self.has_global_state = has_global_state
+        self.add_global_state = add_global_state
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for the Connector environment."""
@@ -227,7 +227,7 @@ class ConnectorWrapper(MultiAgentWrapper):
             "action_mask": self._env.observation_spec().action_mask,
             "step_count": step_count,
         }
-        if self.has_global_state:
+        if self.add_global_state:
             global_state = specs.BoundedArray(
                 shape=(self._env.num_agents, self._env.grid_size, self._env.grid_size, 3),
                 dtype=bool,
@@ -241,5 +241,8 @@ class ConnectorWrapper(MultiAgentWrapper):
             return specs.Spec(Observation, "ObservationSpec", **obs_data)
 
     def get_global_state(self, obs: Observation) -> chex.Array:
+        """Constructs the global state from the global information
+        in the agent observations (positions, targets and paths.)"""
+
         global_state = obs.agents_view[..., :3]
         return global_state

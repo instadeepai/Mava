@@ -88,8 +88,8 @@ def make_jumanji_env(
     # Create envs.
     env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
     eval_env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
-    env, eval_env = wrapper(env, has_global_state=add_global_state), wrapper(
-        eval_env, has_global_state=add_global_state
+    env, eval_env = wrapper(env, add_global_state=add_global_state), wrapper(
+        eval_env, add_global_state=add_global_state
     )
 
     env, eval_env = add_extra_wrappers(env, eval_env, config)
