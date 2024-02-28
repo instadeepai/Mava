@@ -328,10 +328,10 @@ def make_update_fns(
         actions_repeated = jnp.tile(actions[:, jnp.newaxis, ...], (1, n_agents, 1, 1))
         inds = jnp.diag_indices_from(actions_repeated[0, ..., 0])
         spliced_actions = actions_repeated.at[:, inds[0], inds[1], :].set(new_action)
-        updated_joint_actions = spliced_actions.reshape((*spliced_actions.shape[:2], -1))
+        joint_actions = spliced_actions.reshape((*spliced_actions.shape[:2], -1))
 
-        qf1_pi = q.apply(q_params.q1, obs, updated_joint_actions)
-        qf2_pi = q.apply(q_params.q2, obs, updated_joint_actions)
+        qf1_pi = q.apply(q_params.q1, obs, joint_actions)
+        qf2_pi = q.apply(q_params.q2, obs, joint_actions)
 
         min_qf_pi = jnp.minimum(qf1_pi, qf2_pi)
 
