@@ -28,7 +28,9 @@ from jumanji.environments.routing.connector.constants import (
 )
 from jumanji.environments.routing.lbf import LevelBasedForaging
 from jumanji.environments.routing.multi_cvrp import MultiCVRP
-from jumanji.environments.routing.multi_cvrp.types import Observation as MultiCvrpObservation
+from jumanji.environments.routing.multi_cvrp.types import (
+    Observation as MultiCvrpObservation,
+)
 from jumanji.environments.routing.robot_warehouse import RobotWarehouse
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
@@ -224,7 +226,7 @@ class ConnectorWrapper(MultiAgentWrapper):
 
 class MultiCVRPWrapper(Wrapper):
     """Wrapper for MultiCVRP environment."""
-    
+
     def __init__(self, env: MultiCVRP, has_global_state: bool = False):
         super().__init__(env)
         self.num_agents = env._num_vehicles
@@ -232,7 +234,7 @@ class MultiCVRPWrapper(Wrapper):
         self.has_global_state = has_global_state
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
-        state, timestep = self._env.reset(key)  
+        state, timestep = self._env.reset(key)
         timestep = self.modify_timestep(timestep, state.step_count)
         return state, timestep
 
@@ -281,6 +283,7 @@ class MultiCVRPWrapper(Wrapper):
         # nodes are composed of (x, y, demands)
         # Windows are composed of (start_time, end_time)
         # Coeffs are composed of (early, late)
+        # Vehicles have ((x, y), local_time, capacity)
 
         # Tuple[(N, 3), (N, 2), (N, 2)]
         customers_info, _ = tree_util.tree_flatten(
@@ -295,9 +298,9 @@ class MultiCVRPWrapper(Wrapper):
         vehicles_info = jnp.column_stack(vehicles_info)
 
         if self.has_global_state:
-            #(V * 4 * N * 7, )
+            # (V * 4 * N * 7, )
             global_observation = jnp.concat((vehicles_info.ravel(), customers_info))
-            #(V, N * 7 * V * 4)
+            # (V, N * 7 * V * 4)
             global_observation = jnp.tile(global_observation, (self.num_agents, 1))
 
         # (V, N * 7)
