@@ -164,19 +164,21 @@ class ScannedRNN(nn.Module):
         rnn_state = carry
         ins, resets = x
         rnn_state = jnp.where(
-            resets[:, np.newaxis],
-            self.initialize_carry(ins.shape[0], ins.shape[1]),
+            resets[:, :, jnp.newaxis],  # NOTE (Louise) changes about to hit in mava
+            self.initialize_carry((ins.shape[0], ins.shape[1]), ins.shape[2]),
             rnn_state,
         )
-        new_rnn_state, y = nn.GRUCell(features=ins.shape[1])(rnn_state, ins)
+        new_rnn_state, y = nn.GRUCell(features=ins.shape[-1])(rnn_state, ins)
         return new_rnn_state, y
 
     @staticmethod
-    def initialize_carry(batch_size: int, hidden_size: int) -> chex.Array:
+    def initialize_carry(batch_size: Sequence[int], hidden_size: int) -> chex.Array:
         """Initializes the carry state."""
         # Use a dummy key since the default state init fn is just zeros.
         cell = nn.GRUCell(features=hidden_size)
-        return cell.initialize_carry(jax.random.PRNGKey(0), (batch_size, hidden_size))
+        return cell.initialize_carry(
+            jax.random.PRNGKey(0), (*batch_size, hidden_size)
+        )  # NOTE (Louise) this change has not yet been merged into develop, but is necessary to remove agent vmapping
 
 
 class RecurrentActor(nn.Module):
