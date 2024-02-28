@@ -217,6 +217,7 @@ class JaxMarlWrapper(Wrapper):
         obs = self._create_observation(obs, env_state)
         obs = obs._replace(step_count=jnp.repeat(state.step, self.num_agents))
         step_type = jax.lax.select(done["__all__"], StepType.LAST, StepType.MID)
+
         ts = TimeStep(
             step_type=step_type,
             reward=batchify(reward, self.agents),
@@ -322,6 +323,24 @@ class SmaxWrapper(JaxMarlWrapper):
     ):
         super().__init__(env, has_global_state, timelimit)
         self._env: SMAX
+
+    def reset(
+        self, key: PRNGKey
+    ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
+        state, ts = super().reset(key)
+        extras = {"won_episode": False}
+        ts = ts.replace(extras=extras)
+        return state, ts
+
+    def step(
+        self, state: JaxMarlState, action: Array
+    ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
+        state, ts = super().step(state, action)
+
+        current_winner = (ts.step_type == StepType.LAST) & jnp.all(ts.reward >= 1.0)
+        extras = {"won_episode": current_winner}
+        ts = ts.replace(extras=extras)
+        return state, ts
 
     @cached_property
     def state_size(self) -> chex.Array:
