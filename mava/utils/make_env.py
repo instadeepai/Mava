@@ -34,6 +34,8 @@ from mava.wrappers import (
     AgentIDWrapper,
     AutoResetWrapper,
     ConnectorWrapper,
+    GigastepWrapper,
+    GlobalStateWrapper,
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
@@ -55,7 +57,9 @@ _matrax_registry = {"Matrax": MatraxWrapper}
 _jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 
 
-def add_extra_wrappers(train_env: Environment, eval_env: Environment, config: DictConfig) -> Environment:
+def add_extra_wrappers(
+    train_env: Environment, eval_env: Environment, config: DictConfig
+) -> Environment:
     # Add agent id to observation.
     if config.system.add_agent_id:
         train_env = AgentIDWrapper(train_env)

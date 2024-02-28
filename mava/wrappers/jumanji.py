@@ -118,7 +118,7 @@ class MultiAgentWrapper(Wrapper):
 
 class RwareWrapper(MultiAgentWrapper):
     """Multi-agent wrapper for the Robotic Warehouse environment."""
-    
+
     def __init__(self, env: RobotWarehouse, add_global_state: False):
         super().__init__(env, add_global_state)
 
@@ -144,9 +144,13 @@ class LbfWrapper(MultiAgentWrapper):
         sum reward otherwise.
     """
 
-    def __init__(self, env: LevelBasedForaging, add_global_state:bool=False, use_individual_rewards: bool = False):
+    def __init__(
+        self,
+        env: LevelBasedForaging,
+        add_global_state: bool = False,
+        use_individual_rewards: bool = False,
+    ):
         super().__init__(env, add_global_state)
-        self._env: LevelBasedForaging
         self._use_individual_rewards = use_individual_rewards
 
     def aggregate_rewards(
@@ -182,7 +186,7 @@ class ConnectorWrapper(MultiAgentWrapper):
 
     Do not use the AgentID wrapper with this env, it has implicit agent IDs.
     """
-    
+
     def __init__(self, env: MaConnector, add_global_state: bool = True):
         super().__init__(env)
         self.add_global_state = add_global_state
