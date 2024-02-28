@@ -121,6 +121,7 @@ class RwareWrapper(MultiAgentWrapper):
 
     def __init__(self, env: RobotWarehouse, add_global_state: bool = False):
         super().__init__(env, add_global_state)
+        self._env: RobotWarehouse
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for the Robotic Warehouse environment."""
@@ -151,6 +152,7 @@ class LbfWrapper(MultiAgentWrapper):
         use_individual_rewards: bool = False,
     ):
         super().__init__(env, add_global_state)
+        self._env = (LevelBasedForaging,)
         self._use_individual_rewards = use_individual_rewards
 
     def aggregate_rewards(
@@ -188,8 +190,8 @@ class ConnectorWrapper(MultiAgentWrapper):
     """
 
     def __init__(self, env: MaConnector, add_global_state: bool = False):
-        super().__init__(env)
-        self.add_global_state = add_global_state
+        super().__init__(env, add_global_state)
+        self._env: MaConnector
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for the Connector environment."""
