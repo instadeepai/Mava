@@ -55,13 +55,15 @@ _matrax_registry = {"Matrax": MatraxWrapper}
 _jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 
 
-def add_optional_wrappers(
-    env: Environment, config: DictConfig, add_global_state: bool = False
-) -> Environment:
+def add_extra_wrappers(env: Environment, eval_env: Environment, config: DictConfig) -> Environment:
     # Add agent id to observation.
     if config.system.add_agent_id:
         env = AgentIDWrapper(env)
-    return env
+        eval_env = AgentIDWrapper(env)
+
+    env = AutoResetWrapper(env)
+    env = RecordEpisodeMetrics(env)
+    return env, eval_env
 
 
 def make_jumanji_env(
@@ -90,12 +92,7 @@ def make_jumanji_env(
         eval_env, has_global_state=add_global_state
     )
 
-    env = add_optional_wrappers(env, config)
-    eval_env = add_optional_wrappers(eval_env, config)
-
-    env = AutoResetWrapper(env)
-    env = RecordEpisodeMetrics(env)
-
+    env, eval_env = add_extra_wrappers(env, eval_env, config)
     return env, eval_env
 
 
@@ -128,12 +125,7 @@ def make_jaxmarl_env(
         add_global_state,
     )
 
-    # Add agent id to observation.
-    env = add_optional_wrappers(env, config)
-    eval_env = add_optional_wrappers(eval_env, config)
-
-    env = AutoResetWrapper(env)
-    env = RecordEpisodeMetrics(env)
+    env, eval_env = add_extra_wrappers(env, eval_env, config)
 
     return env, eval_env
 
@@ -161,12 +153,7 @@ def make_matrax_env(
     eval_env = matrax.make(task_name, **config.env.kwargs)
     env, eval_env = wrapper(env), wrapper(eval_env)
 
-    env = add_optional_wrappers(env, config, add_global_state)
-    eval_env = add_optional_wrappers(eval_env, config, add_global_state)
-
-    env = AutoResetWrapper(env)
-    env = RecordEpisodeMetrics(env)
-
+    env, eval_env = add_extra_wrappers(env, eval_env, config)
     return env, eval_env
 
 

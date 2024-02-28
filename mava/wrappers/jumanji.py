@@ -84,6 +84,14 @@ class MultiAgentWrapper(Wrapper):
 
     def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         """Specification of the observation of the environment."""
+        step_count = specs.BoundedArray(
+            (self._num_agents,),
+            int,
+            jnp.zeros(self._num_agents, dtype=int),
+            jnp.repeat(self.time_limit, self._num_agents),
+            "step_count",
+        )
+
         if self.has_global_state:
             obs_spec = self._env.observation_spec()
             num_obs_features = obs_spec.agents_view.shape[-1]
@@ -92,23 +100,15 @@ class MultiAgentWrapper(Wrapper):
                 obs_spec.agents_view.dtype,
                 "global_state",
             )
-
             return specs.Spec(
                 ObservationGlobalState,
                 "ObservationSpec",
                 agents_view=obs_spec.agents_view,
                 action_mask=obs_spec.action_mask,
                 global_state=global_state,
-                step_count=obs_spec.step_count,
+                step_count=step_count,
             )
         else:
-            step_count = specs.BoundedArray(
-                (self._num_agents,),
-                int,
-                jnp.zeros(self._num_agents, dtype=int),
-                jnp.repeat(self.time_limit, self._num_agents),
-                "step_count",
-            )
             return self._env.observation_spec().replace(step_count=step_count)
 
 
@@ -209,13 +209,12 @@ class ConnectorWrapper(MultiAgentWrapper):
     def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
-            (self._num_agents,),
+            (self.num_agents,),
             int,
-            jnp.zeros(self._num_agents, dtype=int),
-            jnp.repeat(self.time_limit, self._num_agents),
+            jnp.zeros(self.num_agents, dtype=int),
+            jnp.repeat(self.time_limit, self.num_agents),
             "step_count",
         )
-
         agents_view = specs.BoundedArray(
             shape=(self._env.num_agents, self._env.grid_size, self._env.grid_size, 5),
             dtype=bool,
@@ -223,7 +222,11 @@ class ConnectorWrapper(MultiAgentWrapper):
             minimum=False,
             maximum=True,
         )
-
+        obs_data = {
+            "agents_view": agents_view,
+            "action_mask": self._env.observation_spec().action_mask,
+            "step_count": step_count,
+        }
         if self.has_global_state:
             global_state = specs.BoundedArray(
                 shape=(self._env.num_agents, self._env.grid_size, self._env.grid_size, 3),
@@ -232,25 +235,10 @@ class ConnectorWrapper(MultiAgentWrapper):
                 minimum=False,
                 maximum=True,
             )
-            spec = specs.Spec(
-                ObservationGlobalState,
-                "ObservationSpec",
-                agents_view=agents_view,
-                action_mask=self._env.observation_spec().action_mask,
-                global_state=global_state,
-                step_count=step_count,
-            )
-
+            obs_data["global_state"] = global_state
+            return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
         else:
-            spec = specs.Spec(
-                Observation,
-                "ObservationSpec",
-                agents_view=agents_view,
-                action_mask=self._env.observation_spec().action_mask,
-                step_count=step_count,
-            )
-
-        return spec
+            return specs.Spec(Observation, "ObservationSpec", **obs_data)
 
     def get_global_state(self, obs: Observation) -> chex.Array:
         global_state = obs.agents_view[..., :3]
