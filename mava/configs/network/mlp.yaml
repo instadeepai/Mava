@@ -7,10 +7,7 @@ actor_network:
     activation: relu
 
 action_head:
-  _target_: mava.networks.DiscreteActionHead # [DiscreteActionHead, NormalTanhDistributionHead, ContinuousActionHead]
-  # Needed for ContinuousActionHead:
-  # sigma_min: -4.0
-  # sigma_max: 1.0
+  _target_: mava.networks.DiscreteActionHead # [DiscreteActionHead, ContinuousActionHead]
 
 critic_network:
   pre_torso:

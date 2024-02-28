@@ -21,21 +21,27 @@ import tensorflow_probability.substrates.jax.distributions as tfd
 
 
 class TanhTransformedDistribution(tfd.TransformedDistribution):
-    """Distribution followed by tanh."""
+    """A distribution transformed using the `tanh` function."""
 
     def __init__(
-        self, distribution: tfd.Distribution, threshold: float = 0.999, validate_args: bool = False
+        self,
+        distribution: tfd.Distribution,
+        bijector: tfb.Bijector = None,
+        threshold: float = 0.999,
+        validate_args: bool = False,
     ) -> None:
-        """Initialize the distribution.
+        """
+        Initialises the TanhTransformedDistribution.
 
         Args:
-          distribution: The distribution to transform.
-          threshold: Clipping value of the action when computing the logprob.
-          validate_args: Passed to super class.
+          distribution: The base distribution to be transformed.
+          bijector: The bijective transformation applied to the distribution.
+          threshold: Clipping value for the action when computing the log_prob.
+          validate_args: Whether to validate input with respect to distribution parameters.
         """
-        super().__init__(
-            distribution=distribution, bijector=tfb.Tanh(), validate_args=validate_args
-        )
+        if bijector is None:
+            bijector = tfb.Tanh()
+        super().__init__(distribution=distribution, bijector=bijector, validate_args=validate_args)
         # Computes the log of the average probability distribution outside the
         # clipping range, i.e. on the interval [-inf, -atanh(threshold)] for
         # log_prob_left and [atanh(threshold), inf] for log_prob_right.
@@ -52,8 +58,9 @@ class TanhTransformedDistribution(tfd.TransformedDistribution):
         )
 
     def log_prob(self, event: chex.Array) -> chex.Array:
-        # Without this clip there would be NaNs in the inner tf.where and that
-        # causes issues for some reasons.
+        """Computes the log probability of the event under the transformed distribution."""
+
+        # Without this clip, there would be NaNs in the internal tf.where.
         event = jnp.clip(event, -self._threshold, self._threshold)
         # The inverse image of {threshold} is the interval [atanh(threshold), inf]
         # which has a probability of "log_prob_right" under the given distribution.
@@ -64,11 +71,11 @@ class TanhTransformedDistribution(tfd.TransformedDistribution):
         )
 
     def mode(self) -> chex.Array:
+        """Returns the mode of the distribution."""
         return self.bijector.forward(self.distribution.mode())
 
     def entropy(self, seed: chex.PRNGKey = None) -> chex.Array:
-        # We return an estimation using a single sample of the log_det_jacobian.
-        # We can still do some backpropagation with this estimate.
+        """Computes an estimation of the entropy using a sample of the log_det_jacobian."""
         return self.distribution.entropy() + self.bijector.forward_log_det_jacobian(
             self.distribution.sample(seed=seed), event_ndims=0
         )
@@ -81,17 +88,19 @@ class TanhTransformedDistribution(tfd.TransformedDistribution):
 
 
 class IdentityTransformation(tfd.TransformedDistribution):
+    """
+    A distribution transformed using the `Identity()` bijector.
+
+    We transform this distribution with the `Identity()` bijector to enable us to call
+    `pi.entropy(seed)` and keep the API identical to the TanhTransformedDistribution.
+    """
+
     def __init__(self, distribution: tfd.Distribution) -> None:
-        """Initialize the distribution.
-        We transform this distribution with the `Identity()` transformation to enable us to call
-        `pi.entropy(seed)` and keep the API identical to the ContinuousActionHead.
-        Args:
-          distribution: The distribution to transform.
-        """
+        """Initialises the IdentityTransformation."""
         super().__init__(distribution=distribution, bijector=tfb.Identity())
 
     def entropy(self, seed: chex.PRNGKey = None) -> chex.Array:
-        """Generalize the entropy method"""
+        """Computes the entropy of the distribution."""
         return self.distribution.entropy()
 
     @classmethod

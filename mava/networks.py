@@ -116,75 +116,39 @@ class DiscreteActionHead(nn.Module):
         return IdentityTransformation(distribution=tfd.Categorical(logits=masked_logits))
 
 
-class NormalTanhDistributionHead(nn.Module):
-    """Continuous Action Head using NormalTanhDistribution"""
+class ContinuousActionHead(nn.Module):
+    """ContinuousActionHead using a transformed Normal distribution."""
 
     env: Environment
     min_scale: float = 1e-3
 
-    @nn.compact
-    def __call__(self, embedding: chex.Array, observation: Observation) -> tfd.Independent:
-        loc = nn.Dense(self.env.action_dim, kernel_init=orthogonal(0.01))(embedding)
-        scale = (
-            jax.nn.softplus(nn.Dense(self.env.action_dim, kernel_init=orthogonal(0.01))(embedding))
-            + self.min_scale
-        )
-        distribution = tfd.Normal(loc=loc, scale=scale)
-
-        return tfd.Independent(
-            TanhTransformedDistribution(distribution), reinterpreted_batch_ndims=1
-        )
-
-
-class ContinuousActionHead(nn.Module):
-    """Continuous Action Head using transformed MultivariateNormalDiag distribution"""
-
-    env: Environment
-    sigma_min: float = -4.0
-    sigma_max: float = 1.0
-
     def setup(self) -> None:
-        self.actor_mean = nn.Dense(self.env.action_dim, kernel_init=orthogonal(0.01))
-        self.actor_log_std = self.param("log_std", nn.initializers.zeros, (self.env.action_dim,))
+        self.mean = nn.Dense(self.env.action_dim, kernel_init=orthogonal(0.01))
+        self.log_std = self.param("log_std", nn.initializers.zeros, (self.env.action_dim,))
         min_action, max_action = self.env.min_max_action
         scale = 0.5 * (max_action - min_action)
         self.bijector = tfb.Chain(
-            [
-                tfb.Shift(min_action),
-                tfb.Scale(scale=scale),
-                tfb.Shift(1),
-                tfb.SoftClip(-0.999, 0.999),
-                tfb.Tanh(),
-            ]
-        )
-
-    def _sigma_activation(self, sigma: chex.Array) -> chex.Array:
-        """Don't allow sigma to grow too large for numerical stability."""
-        return jnp.exp(
-            self.sigma_min + 0.5 * (self.sigma_max - self.sigma_min) * (jnp.tanh(sigma) + 1.0)
+            [tfb.Shift(min_action), tfb.Scale(scale=scale), tfb.Shift(1), tfb.Tanh()]
         )
 
     @nn.compact
-    def __call__(
-        self, obs_embedding: chex.Array, observation: Observation
-    ) -> tfd.MultivariateNormalDiag:
+    def __call__(self, obs_embedding: chex.Array, observation: Observation) -> tfd.Independent:
         """Action selection for continuous action space environments.
 
         Args:
-            obs_embedding: Observation embedding from network torso.
-            observation: Observation object containing `agents_view`, `action_mask` and
-                `step_count`.
+            obs_embedding (chex.Array): Observation embedding.
+            observation (Observation): Observation object.
 
         Returns:
-            A transformer tfd.MultivariateNormalDiag distribution.
+            tfd.Independent: Independent transformed distribution.
         """
+        loc = self.mean(obs_embedding)
+        scale = jax.nn.softplus(self.log_std) + self.min_scale
+        distribution = tfd.Normal(loc=loc, scale=scale)
 
-        mean = self.actor_mean(obs_embedding)
-        std = self._sigma_activation(self.actor_log_std)
-
-        return tfd.TransformedDistribution(
-            distribution=tfd.MultivariateNormalDiag(loc=mean, scale_diag=std),
-            bijector=self.bijector,
+        return tfd.Independent(
+            TanhTransformedDistribution(distribution, bijector=self.bijector),
+            reinterpreted_batch_ndims=1,
         )
 
 
