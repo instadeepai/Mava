@@ -63,13 +63,13 @@ class ScannedRNN(nn.Module):
         rnn_state = carry
         ins, resets = x
 
-        new_rnn_state, y = nn.GRUCell(features=ins.shape[-1])(rnn_state, ins)
-
-        new_rnn_state = jnp.where( # TODO: (Claude) is this reset not a timestep too early? 
+        rnn_state = jnp.where(
             resets[:, :, jnp.newaxis],
             self.initialize_carry((ins.shape[0], ins.shape[1]), ins.shape[-1]),
-            new_rnn_state,
+            rnn_state,
         )
+
+        new_rnn_state, y = nn.GRUCell(features=ins.shape[-1])(rnn_state, ins)
 
         return new_rnn_state, y
 
@@ -83,7 +83,7 @@ class ScannedRNN(nn.Module):
 class ActionSelectionParams(NamedTuple):
     nw_params: FrozenVariableDict
     hidden_state: chex.Array
-    terms: chex.Array
+    resets: chex.Array
     t: int
     key: chex.PRNGKey
 
@@ -125,6 +125,7 @@ class Transition(NamedTuple):
     action: Array
     reward: Array
     term: Array
+    resets: Array
 
 BufferState: TypeAlias = TrajectoryBufferState[Transition]
 
@@ -203,6 +204,7 @@ def init(
     ) # n_envs, A ,x
     init_obs_batched = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], init_obs_batched) # add time dim (1,n_envs,A,x)
     init_terms = jnp.zeros((1, cfg.system.n_envs,num_agents), dtype=bool) # (1,n_envs,A)
+    init_lasts = jnp.zeros((1, cfg.system.n_envs,1), dtype=bool)
 
     init_x = (init_obs_batched, init_terms)
     # Initialise hidden states.
@@ -242,6 +244,7 @@ def init(
         action=init_acts,
         reward=jnp.zeros((num_agents,), dtype=float),
         term=jnp.zeros((num_agents,), dtype=bool),
+        resets=jnp.zeros((1,), dtype=bool)
     )
 
     # default use rollout length of trajectories
@@ -282,7 +285,7 @@ def init(
     )(reset_keys)
 
     first_obs = first_timestep.observation
-    first_terms = ~(first_timestep.discount).astype(bool)#[:,0,:,0] # SAME AS BELOW #BTAx
+    first_terms = first_timestep.first()[...,jnp.newaxis]#[:,0,:,0] # SAME AS BELOW #BTAx
 
     t = jnp.zeros((n_devices, cfg.system.update_batch_size), dtype=int)
 
@@ -355,20 +358,20 @@ def make_update_fns(
     
     # INTERACT LEVEL 3 (1.2.2)
     def greedy(
-            hidden_state, nw_params, obs, terms
+            hidden_state, nw_params, obs, resets
             ) -> Tuple[chex.Array,chex.Array]:
         """Uses online q values to greedily select the best action."""
 
         obs = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], obs)
-        terms = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], terms)
+        resets = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], resets)
         # get q values
-        new_hidden_state, q_values = q.apply(nw_params, hidden_state, (obs, terms)) 
+        new_hidden_state, q_values = q.apply(nw_params, hidden_state, (obs, resets)) 
 
         # right now q_values is 1,1,n_envs,A,x
         q_values = q_values[0]
 
         # make unavailable actions quite negative
-        q_vals_masked = jnp.where(obs.action_mask,q_values,jnp.zeros(q_values.shape)-1000) #TODO: action masking in nw
+        q_vals_masked = jnp.where(obs.action_mask,q_values,jnp.zeros(q_values.shape)-9999999) #TODO: action masking in nw
         # greedy argmax over inner dimension
         action = jnp.argmax(q_vals_masked, axis=-1)
         action = action[0] #remove redundant first dim
@@ -396,7 +399,7 @@ def make_update_fns(
         """Select action to take in eps-greedy way. Batch and agent dims are included."""
 
         # unpacking and create keys
-        nw_params, hidden_state, terms, t, key = select_params
+        nw_params, hidden_state, resets, t, key = select_params
 
 
 
@@ -405,7 +408,7 @@ def make_update_fns(
         # get exploration rate
         epsilon = get_epsilon(t)
 
-        greedy_action, new_hidden_state = greedy(hidden_state, nw_params, obs, terms)
+        greedy_action, new_hidden_state = greedy(hidden_state, nw_params, obs, resets)
         random_action = select_random_action_batch(selection_key,obs)
 
         action = jax.lax.select(
@@ -415,7 +418,7 @@ def make_update_fns(
         )
 
         # repack new selection params
-        new_select_params = ActionSelectionParams(nw_params, new_hidden_state, terms, t, new_key)
+        new_select_params = ActionSelectionParams(nw_params, new_hidden_state, resets, t, new_key)
 
         return new_select_params, action
     
@@ -425,11 +428,11 @@ def make_update_fns(
 
     # INTERACT LEVEL 2 (1.1)
     def make_transition(
-            obs:Observation, action, next_timestep
+            obs:Observation, action, next_timestep, resets
             ) -> Transition:
         
         # preprocessing timestep data
-        transition = Transition(obs, action, next_timestep.reward, ~next_timestep.discount.astype(bool))
+        transition = Transition(obs, action, next_timestep.reward, ~next_timestep.discount.astype(bool), resets)
 
         # TODO refactor code so this is unnecessary - add batch size should be what?
         transition = jax.tree_util.tree_map(lambda x: x[jnp.newaxis,:, ...], transition)
@@ -451,19 +454,17 @@ def make_update_fns(
         # step env with selected actions
         new_env_state, next_timestep = jax.vmap(env.step)(env_state, action)
         
-        transition = make_transition(obs, action, next_timestep)
+        transition = make_transition(obs, action, next_timestep, new_selection_params.resets)
 
         new_buffer_state = rb.add(buffer_state, transition)
 
         # repack and update interact state's dones
         new_obs = next_timestep.observation # NB step!!
-        terms = ~(next_timestep.discount).astype(bool)
+        # terms = ~(next_timestep.discount).astype(bool)
+        # terms = next_timestep.last()[...,jnp.newaxis]
+        resets = next_timestep.last()[...,jnp.newaxis]
 
-        next_hiddens = jnp.where(next_timestep.last()[...,jnp.newaxis,jnp.newaxis], ScannedRNN.initialize_carry((cfg.system.n_envs, num_agents), hidden_size), new_selection_params.hidden_state)
-        terms = jnp.where(next_timestep.last()[...,jnp.newaxis], jnp.zeros_like(terms), terms)
-
-        new_selection_params = ActionSelectionParams(new_selection_params.nw_params,next_hiddens, terms,new_selection_params.t,new_selection_params.key)
-
+        new_selection_params = ActionSelectionParams(new_selection_params.nw_params, selection_params.hidden_state, resets, new_selection_params.t, new_selection_params.key)
         new_interact_state = InteractionParams(new_selection_params, new_env_state, new_buffer_state, new_obs)
 
         return new_interact_state, next_timestep.extras["episode_metrics"]
@@ -538,14 +539,17 @@ def make_update_fns(
         #next_term = data_next.term[...,jnp.newaxis]
         first_reward = data_first.reward[...,jnp.newaxis] # grab agent zeros assumes same for all agents
         first_term = data_first.term[...,jnp.newaxis] # grab agent zeros
+
+        next_resets = data_next.resets
+        first_resets = data_first.resets
         #first_term = data_first.term[...,jnp.newaxis]
 
 
         # scan over each sample
-        next_q_vals_online = scan_apply(params.online, data_next.obs, data_next.term)
+        next_q_vals_online = scan_apply(params.online, data_next.obs, next_resets)
         next_q_vals_online = jnp.where(data_next.obs.action_mask, next_q_vals_online, jnp.zeros(next_q_vals_online.shape)-9999999) #TODO: action masking in nw
 
-        next_q_vals_target = scan_apply(params.target, data_next.obs, data_next.term)
+        next_q_vals_target = scan_apply(params.target, data_next.obs, next_resets)
 
         # double q-value selection
         next_action = jnp.argmax(next_q_vals_online, axis=-1)
@@ -563,7 +567,7 @@ def make_update_fns(
         q_grads, q_loss_info = q_grad_fn(
             params.online, 
             data_first.obs, #is scanned over
-            data_first.term, # is scanned over
+            first_resets, # is scanned over
             data_first.action, # should only be final value in each traj, B,A (adds axis in fn)
             target_q_val # B,A -> add dim?
             )
