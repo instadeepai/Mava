@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from abc import abstractmethod
 from typing import Tuple, Union
 
 import chex
@@ -40,12 +41,15 @@ class MultiAgentWrapper(Wrapper):
         self.time_limit = self._env.time_limit
         self.add_global_state = add_global_state
 
+    @abstractmethod
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for `step` and `reset`."""
-        return timestep
+        pass
 
     def get_global_state(self, obs: Observation) -> chex.Array:
-        """Add global state to observations"""
+        """The default way to create a global state for an environment if it has no
+        available global state - concatenate all observations
+        """
         global_state = jnp.concatenate(obs.agents_view, axis=0)
         global_state = jnp.tile(global_state, (self._env.num_agents, 1))
         return global_state
@@ -63,8 +67,8 @@ class MultiAgentWrapper(Wrapper):
                 step_count=timestep.observation.step_count,
             )
             return state, timestep.replace(observation=observation)
-        else:
-            return state, timestep
+
+        return state, timestep
 
     def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
         """Step the environment."""
@@ -79,8 +83,8 @@ class MultiAgentWrapper(Wrapper):
                 step_count=timestep.observation.step_count,
             )
             return state, timestep.replace(observation=observation)
-        else:
-            return state, timestep
+
+        return state, timestep
 
     def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         """Specification of the observation of the environment."""
@@ -108,8 +112,8 @@ class MultiAgentWrapper(Wrapper):
                 global_state=global_state,
                 step_count=step_count,
             )
-        else:
-            return self._env.observation_spec().replace(step_count=step_count)
+
+        return self._env.observation_spec().replace(step_count=step_count)
 
 
 class RwareWrapper(MultiAgentWrapper):
@@ -237,7 +241,7 @@ class ConnectorWrapper(MultiAgentWrapper):
             )
             obs_data["global_state"] = global_state
             return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
-        
+
         return specs.Spec(Observation, "ObservationSpec", **obs_data)
 
     def get_global_state(self, obs: Observation) -> chex.Array:
