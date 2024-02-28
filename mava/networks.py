@@ -23,7 +23,7 @@ import tensorflow_probability.substrates.jax.bijectors as tfb
 import tensorflow_probability.substrates.jax.distributions as tfd
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
-from jumanji.env import Environment
+from jumanji import specs
 
 from mava.distributions import IdentityTransformation, TanhTransformedDistribution
 from mava.types import (
@@ -84,10 +84,13 @@ class CNNTorso(nn.Module):
 class DiscreteActionHead(nn.Module):
     """Discrete Action Head"""
 
-    env: Environment
+    action_dim: int
+    action_spec: specs.Spec
 
     @nn.compact
-    def __call__(self, obs_embedding: chex.Array, observation: Observation) -> tfd.Categorical:
+    def __call__(
+        self, obs_embedding: chex.Array, observation: Observation
+    ) -> tfd.TransformedDistribution:
         """Action selection for distrete action space environments.
 
         Args:
@@ -103,7 +106,7 @@ class DiscreteActionHead(nn.Module):
         information.
         """
 
-        actor_logits = nn.Dense(self.env.action_dim, kernel_init=orthogonal(0.01))(obs_embedding)
+        actor_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(obs_embedding)
 
         masked_logits = jnp.where(
             observation.action_mask,
@@ -119,16 +122,18 @@ class DiscreteActionHead(nn.Module):
 class ContinuousActionHead(nn.Module):
     """ContinuousActionHead using a transformed Normal distribution."""
 
-    env: Environment
+    action_dim: int
+    action_spec: specs.Spec
     min_scale: float = 1e-3
 
     def setup(self) -> None:
-        self.mean = nn.Dense(self.env.action_dim, kernel_init=orthogonal(0.01))
-        self.log_std = self.param("log_std", nn.initializers.zeros, (self.env.action_dim,))
-        min_action, max_action = self.env.min_max_action
-        scale = 0.5 * (max_action - min_action)
+        self.mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))
+        self.log_std = self.param("log_std", nn.initializers.zeros, (self.action_dim,))
+
+        minimum, maximum = self.action_spec.minimum, self.action_spec.maximum
+        scale = 0.5 * (maximum - minimum)
         self.bijector = tfb.Chain(
-            [tfb.Shift(min_action), tfb.Scale(scale=scale), tfb.Shift(1), tfb.Tanh()]
+            [tfb.Shift(minimum), tfb.Scale(scale=scale), tfb.Shift(1), tfb.Tanh()]
         )
 
     @nn.compact

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import abstractmethod
 from functools import cached_property
 from typing import Tuple, Union
 
@@ -67,16 +66,9 @@ class MultiAgentWrapper(Wrapper):
         return self._env.observation_spec().replace(step_count=step_count)
 
     @cached_property
-    @abstractmethod
-    def min_max_action(self) -> Tuple[chex.Array, chex.Array]:
-        """Returns the minimum and maximum values from the action space"""
-        ...
-
-    @cached_property
-    @abstractmethod
     def action_dim(self) -> chex.Array:
         "Get the actions dim for each agent."
-        ...
+        return int(self._env.action_spec().num_values[0])
 
 
 class RwareWrapper(MultiAgentWrapper):
@@ -95,11 +87,6 @@ class RwareWrapper(MultiAgentWrapper):
         reward = jnp.repeat(timestep.reward, self.num_agents)
         discount = jnp.repeat(timestep.discount, self.num_agents)
         return timestep.replace(observation=observation, reward=reward, discount=discount)
-
-    @cached_property
-    def action_dim(self) -> chex.Array:
-        "Get the actions dim for each agent."
-        return int(self._env.action_spec().num_values[0])
 
 
 class LbfWrapper(MultiAgentWrapper):
@@ -143,11 +130,6 @@ class LbfWrapper(MultiAgentWrapper):
 
         # Aggregate the list of individual rewards and use a single team_reward.
         return self.aggregate_rewards(timestep, modified_observation)
-
-    @cached_property
-    def action_dim(self) -> chex.Array:
-        "Get the actions dim for each agent."
-        return int(self._env.action_spec().num_values[0])
 
 
 class ConnectorWrapper(MultiAgentWrapper):
@@ -230,8 +212,3 @@ class ConnectorWrapper(MultiAgentWrapper):
             return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
 
         return specs.Spec(Observation, "ObservationSpec", **obs_data)
-
-    @cached_property
-    def action_dim(self) -> chex.Array:
-        "Get the actions dim for each agent."
-        return int(self._env.action_spec().num_values[0])

@@ -226,7 +226,7 @@ def get_learner_fn(
                     actor_opt_state: OptState,
                     traj_batch: RNNPPOTransition,
                     gae: chex.Array,
-                    entropy_key: chex.PRNGKey,
+                    key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate the actor loss."""
                     # RERUN NETWORK
@@ -251,7 +251,7 @@ def get_learner_fn(
                     loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
                     loss_actor = loss_actor.mean()
                     # The seed will be used in the TanhTransformedDistribution:
-                    entropy = actor_policy.entropy(seed=entropy_key).mean()
+                    entropy = actor_policy.entropy(seed=key).mean()
 
                     total_loss = loss_actor - config.system.ent_coef * entropy
                     return total_loss, (loss_actor, entropy)
@@ -469,7 +469,9 @@ def learner_setup(
     # Define network and optimisers.
     actor_pre_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
     actor_post_torso = hydra.utils.instantiate(config.network.actor_network.post_torso)
-    actor_action_head = hydra.utils.instantiate(config.network.action_head, env=env)
+    actor_action_head = hydra.utils.instantiate(
+        config.network.action_head, action_dim=env.action_dim, action_spec=env.action_spec()
+    )
     critic_pre_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
     critic_post_torso = hydra.utils.instantiate(config.network.critic_network.post_torso)
 
@@ -557,7 +559,7 @@ def learner_setup(
 
     # Define params to be replicated across devices and batches.
     dones = jnp.zeros(
-        (config.arch.num_envs, config.system.num_agents),
+        (config.arch.num_envs, num_agents),
         dtype=bool,
     )
     key, step_keys = jax.random.split(key)

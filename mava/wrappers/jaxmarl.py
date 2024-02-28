@@ -281,11 +281,6 @@ class JaxMarlWrapper(Wrapper):
     def action_spec(self) -> specs.Spec:
         return jaxmarl_space_to_jumanji_spec(merge_space(self._env.action_spaces))
 
-    @cached_property
-    def min_max_action(self) -> Tuple[chex.Array, chex.Array]:
-        """Returns the minimum and maximum values from the action space"""
-        return self.action_spec().minimum, self.action_spec().maximum
-
     def reward_spec(self) -> specs.Array:
         return specs.Array(shape=(self.num_agents,), dtype=float, name="reward")
 
