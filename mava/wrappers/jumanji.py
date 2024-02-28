@@ -28,7 +28,7 @@ from jumanji.environments.routing.connector.constants import (
 )
 from jumanji.environments.routing.lbf import LevelBasedForaging
 from jumanji.environments.routing.multi_cvrp import MultiCVRP
-from jumanji.environments.routing.multi_cvrp.types import State as MultiCVRPState
+from jumanji.environments.routing.multi_cvrp.types import Observation as MultiCvrpObservation
 from jumanji.environments.routing.robot_warehouse import RobotWarehouse
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
@@ -224,14 +224,15 @@ class ConnectorWrapper(MultiAgentWrapper):
 
 class MultiCVRPWrapper(Wrapper):
     """Wrapper for MultiCVRP environment."""
-
+    
     def __init__(self, env: MultiCVRP, has_global_state: bool = False):
+        super().__init__(env)
         self.num_agents = env._num_vehicles
         self._env = env
         self.has_global_state = has_global_state
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
-        state, timestep = self._env.reset(key)
+        state, timestep = self._env.reset(key)  
         timestep = self.modify_timestep(timestep, state.step_count)
         return state, timestep
 
@@ -242,7 +243,7 @@ class MultiCVRPWrapper(Wrapper):
 
     def modify_timestep(self, timestep: TimeStep, step_count: chex.Array) -> TimeStep[Observation]:
         # avoided the MultiAgentWrapper wrapper to use the step_count provided by the environment
-        observation, global_observation = self._format_observation(timestep.observation)
+        observation, global_observation = self._flatten_observation(timestep.observation)
         obs_data = {
             "agents_view": observation,
             "action_mask": timestep.observation.action_mask,
@@ -259,39 +260,49 @@ class MultiCVRPWrapper(Wrapper):
         timestep = timestep.replace(observation=observation, reward=reward, discount=discount)
         return timestep
 
-    def _format_observation(
-        self, observation: MultiCVRPState
+    def _flatten_observation(
+        self, observation: MultiCvrpObservation
     ) -> Tuple[chex.Array, Union[None, chex.Array]]:
         """
-        Formats the observation dictionary from the environment into a format suitable for mava.
+        Concatenates all observation fields into a single array.
 
         Args:
-            observation (Dict[chex.Array]): The raw observation dict provided by jumanji
+            observation (MultiCvrpObservation): The raw observation NamedTuple provided by jumanji.
 
         Returns:
             observations (chex.Array): Concatenated individual observations for each agent,
-                                      shaped (num_agents, vehicle_info + customer_info).
+                shaped (num_agents, vehicle_info + customer_info).
             global_observation (Union[None, chex.Array]): Concatenated global observation
-                                                          shaped (num_agents, global_info)
-                                                          if has_global_state = True,
-                                                          None otherwise.
+                shaped (num_agents, global_info) if has_global_state = True, None otherwise.
         """
         global_observation = None
-        # flatten and concat all of the observations for now
+        # N: number of nodes, same as _num_customers + 1
+        # V: number of vehicles, same as num_agents
+        # nodes are composed of (x, y, demands)
+        # Windows are composed of (start_time, end_time)
+        # Coeffs are composed of (early, late)
+
+        # Tuple[(N, 3), (N, 2), (N, 2)]
         customers_info, _ = tree_util.tree_flatten(
             (observation.nodes, observation.windows, observation.coeffs)
         )
+        # Tuple[(V, 2), (V, 1), (V, 1)]
         vehicles_info, _ = tree_util.tree_flatten(observation.vehicles)
 
-        # this results in c1_info1-c2_info
+        # (N * 7, )
         customers_info = jnp.column_stack(customers_info).ravel()
+        # (V, 4)
         vehicles_info = jnp.column_stack(vehicles_info)
 
         if self.has_global_state:
-            global_observation = jnp.concat((customers_info, vehicles_info.ravel()))
+            #(V * 4 * N * 7, )
+            global_observation = jnp.concat((vehicles_info.ravel(), customers_info))
+            #(V, N * 7 * V * 4)
             global_observation = jnp.tile(global_observation, (self.num_agents, 1))
 
+        # (V, N * 7)
         customers_info = jnp.tile(customers_info, (self.num_agents, 1))
+        # (V, 4 + N * 7)
         observations = jnp.column_stack((vehicles_info, customers_info))
         return observations, global_observation
 
@@ -302,8 +313,7 @@ class MultiCVRPWrapper(Wrapper):
         action_mask = specs.BoundedArray(
             (self.num_agents, self._env._num_customers + 1), bool, False, True, "action_mask"
         )
-        # 7 is broken into 2 for cords, 1 each of demands,start,end,early,late
-        # and the 4 is the cords,capacity of the vehicle
+
         agents_view = specs.BoundedArray(
             (self.num_agents, (self._env._num_customers + 1) * 7 + 4),
             jnp.float32,
