@@ -1,0 +1,27 @@
+name: Gigastep
+task_name: hide_and_seek_5_vs_5_fobs
+#the teams must be made up of hider/seeker agents
+task_config:
+  team_0:
+    seeker: 5 # Number of `seeker` agents
+  team_1:
+    hider: 5 # Number of `hider` agents
+  kwargs:
+    damage_per_second: 10
+    damage_cone_depth: 1.0
+    damage_cone_angle: 3.141592653589793
+    collision_range: 0.0
+    reward_game_won: 50
+    reward_defeat_one_opponent: 5
+    reward_detection: 0
+    reward_damage: 10
+    reward_idle: 0
+    reward_agent_disabled: 10
+    reward_collision_agent: 0
+    reward_collision_obstacle: 10
+    #to make it fully observable
+    use_stochastic_obs : False
+    use_stochastic_comm: False
+    cone_depth : 100
+    cone_angle : 6.28318530718
+    reward_detection : 0

@@ -1,0 +1,21 @@
+name: Gigastep
+task_name: waypoint_5_vs_5_pobs
+#the enable_waypoints in the kwargs must be set to True and the reward_hit_waypoint should be higher than 0.
+task_config:
+  team_0:
+    default: 5 # Number of `default` agents
+  team_1:
+    default: 5 # Number of `default` agents
+  kwargs:
+    damage_cone_depth: 0.0
+    episode_ends_one_team_dead: False
+    max_episode_length: 500
+    enable_waypoints: true
+    reward_game_won: 0
+    reward_defeat_one_opponent: 0
+    reward_damage: 0
+    reward_idle: 0
+    reward_agent_disabled: 0
+    reward_collision_agent: 0
+    reward_collision_obstacle: 0
+    reward_hit_waypoint: 50

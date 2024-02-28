@@ -1,0 +1,15 @@
+# ---Environment Configs---
+#`_pobs` and `_fobs` stand for partially observable and fully observable environment respectively.
+defaults:
+  - _self_
+  - scenario: hide_and_seek_5_vs_5_pobs # [hide_and_seek_5_vs_5_fobs, hide_and_seek_5_vs_5_pobs, waypoint_5_vs_5_fobs, waypoint_5_vs_5_pobs]
+
+env_name: Gigastep
+
+eval_metric: win_rate
+
+# Currently we only support discrete actions and vector observations.
+kwargs:
+  max_episode_length: 500
+  discrete_actions: True
+  obs_type : vector # Options: [vector, rgb, rgb_vector]
