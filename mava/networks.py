@@ -19,10 +19,10 @@ import chex
 import jax
 import jax.numpy as jnp
 import numpy as np
-import tensorflow_probability.substrates.jax.bijectors as tfb
 import tensorflow_probability.substrates.jax.distributions as tfd
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
+from jax.experimental import checkify
 from jumanji import specs
 
 from mava.distributions import IdentityTransformation, TanhTransformedDistribution
@@ -85,7 +85,6 @@ class DiscreteActionHead(nn.Module):
     """Discrete Action Head"""
 
     action_dim: int
-    action_spec: specs.Spec
 
     @nn.compact
     def __call__(
@@ -131,10 +130,11 @@ class ContinuousActionHead(nn.Module):
         self.log_std = self.param("log_std", nn.initializers.zeros, (self.action_dim,))
 
         minimum, maximum = self.action_spec.minimum, self.action_spec.maximum
-        scale = 0.5 * (maximum - minimum)
-        self.bijector = tfb.Chain(
-            [tfb.Shift(minimum), tfb.Scale(scale=scale), tfb.Shift(1), tfb.Tanh()]
+        space_act_checker = lambda min, max: checkify.check(
+            min + max == 0,
+            "This network only deals with the case where actions lie in the interval [-1, 1]",
         )
+        checkify.checkify(space_act_checker)(minimum, maximum)
 
     @nn.compact
     def __call__(self, obs_embedding: chex.Array, observation: Observation) -> tfd.Independent:
@@ -152,7 +152,7 @@ class ContinuousActionHead(nn.Module):
         distribution = tfd.Normal(loc=loc, scale=scale)
 
         return tfd.Independent(
-            TanhTransformedDistribution(distribution, bijector=self.bijector),
+            TanhTransformedDistribution(distribution),
             reinterpreted_batch_ndims=1,
         )
 

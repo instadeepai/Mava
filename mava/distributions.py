@@ -26,7 +26,6 @@ class TanhTransformedDistribution(tfd.TransformedDistribution):
     def __init__(
         self,
         distribution: tfd.Distribution,
-        bijector: tfb.Bijector = None,
         threshold: float = 0.999,
         validate_args: bool = False,
     ) -> None:
@@ -39,9 +38,9 @@ class TanhTransformedDistribution(tfd.TransformedDistribution):
           threshold: Clipping value for the action when computing the log_prob.
           validate_args: Whether to validate input with respect to distribution parameters.
         """
-        if bijector is None:
-            bijector = tfb.Tanh()
-        super().__init__(distribution=distribution, bijector=bijector, validate_args=validate_args)
+        super().__init__(
+            distribution=distribution, bijector=tfb.Tanh(), validate_args=validate_args
+        )
         # Computes the log of the average probability distribution outside the
         # clipping range, i.e. on the interval [-inf, -atanh(threshold)] for
         # log_prob_left and [atanh(threshold), inf] for log_prob_right.
