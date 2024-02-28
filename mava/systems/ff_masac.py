@@ -321,15 +321,14 @@ def make_update_fns(
         new_action, log_prob = pi.sample_and_log_prob(seed=key)
         log_prob = log_prob[..., jnp.newaxis]
 
-        # todo: check reshapes + inds put things in correct places
-        # Repeat the actions such that you have (B, Ag, Ag, Ac)
+        # Repeat the actions from the replay buffer such that you have (B, Ag, Ag, Ac).
+        # This gives you n_agent joint actions with the action dim kept separate.
+        # Then replace along the diagonal with the new action from the policy.
+        # This replacement means that joint_action_i will have the new action for agent_i.
         actions_repeated = jnp.tile(actions[:, jnp.newaxis, ...], (1, n_agents, 1, 1))
         inds = jnp.diag_indices_from(actions_repeated[0, ..., 0])
         spliced_actions = actions_repeated.at[:, inds[0], inds[1], :].set(new_action)
         updated_joint_actions = spliced_actions.reshape((*spliced_actions.shape[:2], -1))
-
-        # repeated_gs = jnp.tile(obs.global_state[:, jnp.newaxis, :], (1, n_agents, 1))
-        # obs = obs._replace(global_state=repeated_gs)
 
         qf1_pi = q.apply(q_params.q1, obs, updated_joint_actions)
         qf2_pi = q.apply(q_params.q2, obs, updated_joint_actions)
