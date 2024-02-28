@@ -1,9 +1,9 @@
 defaults:
   - _self_
-  - logger: rec_idqn
+  - logger: rec_iql
   - arch: anakin
-  - system: rec_idqn
-  - env: cartpole
+  - system: rec_iql
+  - env: smax
 #   - system/search_spaces@hydra.sweeper.params: ${system}
 #   - override hydra/sweeper: optuna
 #   - override hydra/sweeper/sampler: tpe
