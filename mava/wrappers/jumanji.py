@@ -254,5 +254,4 @@ class ConnectorWrapper(MultiAgentWrapper):
         """Constructs the global state from the global information
         in the agent observations (positions, targets and paths.)"""
 
-        global_state = obs.agents_view[..., :3]
-        return global_state
+        return obs.agents_view[..., :3]
