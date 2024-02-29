@@ -85,6 +85,7 @@ class DiscreteActionHead(nn.Module):
     """Discrete Action Head"""
 
     action_dim: int
+    action_spec: specs.Spec
 
     @nn.compact
     def __call__(
@@ -131,8 +132,8 @@ class ContinuousActionHead(nn.Module):
 
         minimum, maximum = self.action_spec.minimum, self.action_spec.maximum
         space_act_checker = lambda min, max: checkify.check(
-            min + max == 0,
-            "This network only deals with the case where actions lie in the interval [-1, 1]",
+            max - min == 2,
+            "This network only handles the case where actions lie in the interval [-1, 1].",
         )
         checkify.checkify(space_act_checker)(minimum, maximum)
 
