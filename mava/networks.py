@@ -132,7 +132,7 @@ class ContinuousActionHead(nn.Module):
 
         minimum, maximum = self.action_spec.minimum, self.action_spec.maximum
         space_act_checker = lambda min, max: checkify.check(
-            max - min == 2,
+            (max == 1) & (min == -1),
             "This network only handles the case where actions lie in the interval [-1, 1].",
         )
         checkify.checkify(space_act_checker)(minimum, maximum)
