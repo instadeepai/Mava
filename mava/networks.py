@@ -150,6 +150,8 @@ class FeedForwardCritic(nn.Module):
         return jnp.squeeze(critic_output, axis=-1)
 
 
+# NOTE (Louise) this change has not yet been merged into develop,
+# but is necessary to remove agent vmapping
 class ScannedRNN(nn.Module):
     @functools.partial(
         nn.scan,
@@ -176,9 +178,7 @@ class ScannedRNN(nn.Module):
         """Initializes the carry state."""
         # Use a dummy key since the default state init fn is just zeros.
         cell = nn.GRUCell(features=hidden_size)
-        return cell.initialize_carry(
-            jax.random.PRNGKey(0), (*batch_size, hidden_size)
-        )  # NOTE (Louise) this change has not yet been merged into develop, but is necessary to remove agent vmapping
+        return cell.initialize_carry(jax.random.PRNGKey(0), (*batch_size, hidden_size))
 
 
 class RecurrentActor(nn.Module):

@@ -12,13 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
-import functools
 import time
-from typing import Any, Callable, Dict, NamedTuple, Sequence, Tuple
+from typing import Any, Dict, NamedTuple, Tuple
 
 import chex
-import distrax
 import flashbax as fbx
 import flax.linen as nn
 import hydra
@@ -33,7 +30,6 @@ from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.scope import FrozenVariableDict
 from flax.linen.initializers import orthogonal
 from jax import Array
-from jax.typing import ArrayLike
 from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
 from typing_extensions import TypeAlias
@@ -41,7 +37,8 @@ from typing_extensions import TypeAlias
 from mava.networks import MLPTorso, ScannedRNN
 from mava.types import Observation, RNNObservation
 from mava.utils import make_env as environments
-from mava.utils.checkpointing import Checkpointer
+
+# from mava.utils.checkpointing import Checkpointer
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers import episode_metrics
 
@@ -281,15 +278,15 @@ def make_update_fns(
     rb: TrajectoryBuffer,
 ) -> Any:  # TODO typing
 
-    num_agents = env.action_spec().shape[0]
+    # num_agents = env.action_spec().shape[0]
     hidden_size = 256  # TODO dynamically get this
 
-    def select_random_action_batch(
-        selection_key: chex.PRNGKey, obs: Observation
-    ) -> Tuple[chex.Array, chex.Array]:
+    def select_random_action_batch(selection_key: chex.PRNGKey, obs: Observation) -> chex.Array:
         """Select actions randomly with masking."""
 
-        def select_single_random_action(key, action_options, p_values):
+        def select_single_random_action(
+            key: chex.PRNGKey, action_options: Array, p_values: Array
+        ) -> Array:
             """Select one action per row with probabilities used for masking."""
             action = jax.random.choice(key, action_options, p=p_values)
             return action
@@ -316,7 +313,9 @@ def make_update_fns(
         return actions
 
     # INTERACT LEVEL 3 (1.2.2)
-    def greedy(hidden_state, params, obs, done) -> Tuple[chex.Array, chex.Array]:
+    def greedy(
+        hidden_state: chex.Array, params: FrozenVariableDict, obs: Observation, done: chex.Array
+    ) -> Tuple[chex.Array, chex.Array]:
         """Uses online q values to greedily select the best action."""
 
         # Add dummy time dimension
@@ -346,7 +345,7 @@ def make_update_fns(
     ) -> Tuple[ActionSelectionState, Array]:
         """Select action to take in eps-greedy way. Batch and agent dims are included."""
 
-        def get_should_explore(key, t, shape):
+        def get_should_explore(key: chex.PRNGKey, t: int, shape: Tuple) -> chex.Array:
             eps = jax.numpy.maximum(
                 cfg.system.eps_min, 1 - (t / cfg.system.eps_decay) * (1 - cfg.system.eps_min)
             )
@@ -377,7 +376,7 @@ def make_update_fns(
     def interaction_step(
         interaction_state: InteractionState, _: Any
     ) -> Tuple[InteractionState, Dict]:
-        """Selects an action, steps global env, stores timesteps in global rb and repacks the parameters for the next step."""
+        """Selects action, steps global env, stores timesteps in rb and repacks the parameters."""
 
         # light unpacking
         action_selection_state, env_state, buffer_state, obs, done = interaction_state
@@ -442,11 +441,11 @@ def make_update_fns(
         return q_loss, loss_info
 
     # TRAIN LEVEL 3 and 4 (2.1.2, 2.1.1.1)
-    def scan_apply(params, obs: Observation, done):
+    def scan_apply(params: FrozenVariableDict, obs: Observation, done: chex.Array) -> chex.Array:
         """Applies RNN to a batch of trajectories by scanning over batch dim."""
 
         # B,T... -> T,B...
-        def switch_leading_axis(arr: chex.Array):
+        def switch_leading_axis(arr: chex.Array) -> chex.Array:
             arr: Dict[str, chex.Array] = jax.tree_map(lambda x: jax.numpy.swapaxes(x, 0, 1), arr)
             return arr
 
@@ -467,9 +466,9 @@ def make_update_fns(
         """Update the Q parameters."""
 
         # Get the data associated with obs
-        data_first: Dict[str, chex.Array] = jax.tree_map(lambda x: x[:, :-1, ...], data)
+        data_first = jax.tree_map(lambda x: x[:, :-1, ...], data)
         # Get the data associated with next_obs
-        data_next: Dict[str, chex.Array] = jax.tree_map(lambda x: x[:, 1:, ...], data)
+        data_next = jax.tree_map(lambda x: x[:, 1:, ...], data)
 
         # next_term = data_next.term[...,jnp.newaxis]
         first_reward = data_first.reward
@@ -526,7 +525,7 @@ def make_update_fns(
         return next_params, next_opt_state, q_loss_info
 
     # TRAIN LEVEL 1 (2.)
-    def train(train_state: TrainState, _: Any) -> TrainState:
+    def train(train_state: TrainState, _: Any) -> Tuple[TrainState, Metrics]:
         """Sample, train and repack."""
 
         # unpack and get keys
@@ -641,27 +640,27 @@ def run_experiment(cfg: DictConfig) -> float:
     #     greedy=greedy
     # )
 
-    if cfg.logger.checkpointing.save_model:
-        checkpointer = Checkpointer(
-            metadata=cfg,  # Save all config as metadata in the checkpoint
-            model_name=cfg.logger.system_name,
-            **cfg.logger.checkpointing.save_args,  # Checkpoint args
-        )
+    # if cfg.logger.checkpointing.save_model:
+    #     checkpointer = Checkpointer(
+    #         metadata=cfg,  # Save all config as metadata in the checkpoint
+    #         model_name=cfg.logger.system_name,
+    #         **cfg.logger.checkpointing.save_args,  # Checkpoint args
+    #     )
 
     start_time = time.time()
 
-    def get_epsilon(t: int):
+    def get_epsilon(t: int) -> float:
         """Calculate epsilon for exploration rate using config variables."""
         eps = jax.numpy.maximum(
             cfg.system.eps_min, 1 - (t / cfg.system.eps_decay) * (1 - cfg.system.eps_min)
         )
-        return eps
+        return float(eps)
 
     # Main loop:
     # We want start to align with the final step of the first pmaped_learn,
     # where we've done explore_steps and 1 full learn step.
     start = steps_per_rollout
-    for eval_idx, t in enumerate(range(start, int(cfg.system.total_timesteps), steps_per_rollout)):
+    for eval_idx, _ in enumerate(range(start, int(cfg.system.total_timesteps), steps_per_rollout)):
         # Learn loop:
         learner_state, (metrics, losses) = update(learner_state)
         jax.block_until_ready(learner_state)
