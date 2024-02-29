@@ -216,6 +216,12 @@ class ConnectorWrapper(MultiAgentWrapper):
 
         return timestep.replace(observation=Observation(**obs_data))
 
+    def get_global_state(self, obs: Observation) -> chex.Array:
+        """Constructs the global state from the global information
+        in the agent observations (positions, targets and paths.)"""
+
+        return obs.agents_view[..., :3]
+
     def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
@@ -249,9 +255,3 @@ class ConnectorWrapper(MultiAgentWrapper):
             return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
 
         return specs.Spec(Observation, "ObservationSpec", **obs_data)
-
-    def get_global_state(self, obs: Observation) -> chex.Array:
-        """Constructs the global state from the global information
-        in the agent observations (positions, targets and paths.)"""
-
-        return obs.agents_view[..., :3]
