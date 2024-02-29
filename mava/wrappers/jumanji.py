@@ -35,7 +35,7 @@ from mava.types import Observation, ObservationGlobalState, State
 
 
 class MultiAgentWrapper(Wrapper):
-    def __init__(self, env: Environment, add_global_state: bool = False):
+    def __init__(self, env: Environment, add_global_state: bool):
         super().__init__(env)
         self._num_agents = self._env.num_agents
         self.time_limit = self._env.time_limit
