@@ -273,6 +273,7 @@ def make_update_fns(
     rb: TrajectoryBuffer,
 ) -> Any:  # Callable:  # [[LearnerState, Tuple[Metrics, Metrics]],]:  # TODO typing
 
+    # INTERACT LEVEL 3
     def select_random_action_batch(selection_key: chex.PRNGKey, obs: Observation) -> chex.Array:
         """Select actions randomly with masking."""
 
@@ -304,7 +305,7 @@ def make_update_fns(
 
         return actions
 
-    # INTERACT LEVEL 3 (1.2.2)
+    # INTERACT LEVEL 3
     def greedy(
         hidden_state: chex.Array, params: FrozenVariableDict, obs: Observation, done: chex.Array
     ) -> Tuple[chex.Array, chex.Array]:
@@ -323,21 +324,22 @@ def make_update_fns(
         # Make unavailable actions quite negative
         q_vals_masked = jnp.where(
             obs.action_mask, q_values, jnp.zeros(q_values.shape) - 9999999
-        )  # TODO: action masking in nw
+        )  # TODO: action masking in nw?
 
         # Greedy argmax over action-value dim
         action = jnp.argmax(q_vals_masked, axis=-1)
-        action = action[0]  # TODO check what dim this is... remove redundant first dim
+        action = action[0]
 
         return action, new_hidden_state
 
-    # INTERACT LEVEL 2 (1.2)
+    # INTERACT LEVEL 2
     def select_eps_greedy_action(
         action_selection_state: ActionSelectionState, obs: Observation, done: Array
     ) -> Tuple[ActionSelectionState, Array]:
         """Select action to take in eps-greedy way. Batch and agent dims are included."""
 
         def get_should_explore(key: chex.PRNGKey, t: int, shape: Tuple) -> chex.Array:
+            """Uses the number of env steps taken so far to calculate rate of exploration."""
             eps = jax.numpy.maximum(
                 cfg.system.eps_min, 1 - (t / cfg.system.eps_decay) * (1 - cfg.system.eps_min)
             )
@@ -349,6 +351,7 @@ def make_update_fns(
         # Random key splitting
         new_key, explore_key, selection_key = jax.random.split(key, 3)
 
+        # Greedy actions always calculated to get new hidden state
         greedy_action, next_hidden_state = greedy(hidden_state, params, obs, done)
 
         action = jax.lax.select(
@@ -364,7 +367,7 @@ def make_update_fns(
 
         return next_action_selection_state, action
 
-    # INTERACT LEVEL 1 (1.)
+    # INTERACT LEVEL 1
     def interaction_step(
         interaction_state: InteractionState, _: Any
     ) -> Tuple[InteractionState, Dict]:
@@ -392,52 +395,47 @@ def make_update_fns(
         )  # Add dummy time dim
         next_buffer_state = rb.add(buffer_state, transition)
 
-        # Nexts
+        # Next obs and done for learner state
         next_obs = next_timestep.observation  # NB step!!
-        next_done = next_timestep.last()[..., jnp.newaxis]
+        next_done = next_timestep.last()[
+            ..., jnp.newaxis
+        ]  # make compatible with network input and transition storage in next step
 
+        # Repack
         new_interact_state = InteractionState(
             next_action_selection_state, next_env_state, next_buffer_state, next_obs, next_done
         )
 
         return new_interact_state, next_timestep.extras["episode_metrics"]
 
-    # ___________________________________________________________________________________________________
-    # TRAIN FUNCTIONS
-    #
-    # - 2. train (overarching)
-    #    - 2.1 update_q
-    #        - 1.2.1 q_loss_fn
-    #        - 1.2.2 scan_apply
-    #
-
-    # TRAIN LEVEL 3 (2.1.1)
+    # TRAIN LEVEL 3
     def q_loss_fn(
         q_online_params: FrozenVariableDict, obs: Array, done: Array, action: Array, target: Array
     ) -> Tuple[Array, Metrics]:
         """The portion of the calculation to grad, namely online apply and mse with target."""
-        q_online = scan_apply(q_online_params, obs, done)
+        q_online = scan_apply(q_online_params, obs, done)  # get online q values of all actions
         q_online = jnp.squeeze(
             jnp.take_along_axis(q_online, action[..., jnp.newaxis], axis=-1), axis=-1
-        )
-        q_loss = jnp.mean((q_online - target) ** 2)
+        )  # get the q values of the taken actions and remove extra dim
+        q_loss = jnp.mean((q_online - target) ** 2)  # mse
 
+        # pack metrics for logging
         loss_info = {
             "q_loss": q_loss,
             "mean_q": jnp.mean(q_online),
-            "max_q_error": jnp.max(jnp.abs(q_online - target) ** 2),
-            "min_q_error": jnp.min(jnp.abs(q_online - target) ** 2),
-            "mean_target": jnp.mean(target),
+            "max_q_error": jnp.max(jnp.abs(q_online - target) ** 2),  # mainly for debugging
+            "min_q_error": jnp.min(jnp.abs(q_online - target) ** 2),  # mainly for debugging
+            "mean_target": jnp.mean(target),  # mainly for debugging
         }
 
         return q_loss, loss_info
 
-    # TRAIN LEVEL 3 and 4 (2.1.2, 2.1.1.1)
+    # TRAIN LEVEL 3 and 4
     def scan_apply(params: FrozenVariableDict, obs: Observation, done: chex.Array) -> chex.Array:
         """Applies RNN to a batch of trajectories by scanning over batch dim."""
 
-        # B,T... -> T,B...
         def switch_leading_axis(arr: chex.Array) -> chex.Array:
+            """Switches the first two axes, generally used for BT -> TB."""
             arr: Dict[str, chex.Array] = jax.tree_map(lambda x: jax.numpy.swapaxes(x, 0, 1), arr)
             return arr
 
@@ -445,13 +443,30 @@ def make_update_fns(
             (cfg.system.batch_size, obs.agents_view.shape[2]), cfg.system.hidden_size
         )
         obs = switch_leading_axis(obs)  # B, T -> T, B
-        done = switch_leading_axis(done)
-        obs_done = (obs, done)
+        done = switch_leading_axis(done)  # B, T -> T, B
+        obs_done = (obs, done)  # RNN inputs
 
         _, next_q_vals_online = q_net.apply(params, hidden_state, obs_done)
-        return switch_leading_axis(next_q_vals_online)  # swap time and batch again
+        return switch_leading_axis(next_q_vals_online)  # T, B -> B, T
 
-    # TRAIN LEVEL 2 (2.1)
+    # Standardise the update function inputs for a cond
+    def hard_update(
+        next_online_params: FrozenVariableDict, target_params: FrozenVariableDict, t_train: int
+    ) -> FrozenVariableDict:
+        next_target_params = optax.periodic_update(
+            next_online_params, target_params, t_train, cfg.system.update_period
+        )
+        return next_target_params
+
+    def soft_update(
+        next_online_params: FrozenVariableDict, target_params: FrozenVariableDict, t_train: int
+    ) -> FrozenVariableDict:
+        next_target_params = optax.incremental_update(
+            next_online_params, target_params, cfg.system.tau
+        )
+        return next_target_params
+
+    # TRAIN LEVEL 2
     def update_q(
         params: IQLParams, opt_states: optax.OptState, data: Transition, t_train: int
     ) -> Tuple[IQLParams, optax.OptState, Metrics]:
@@ -462,7 +477,6 @@ def make_update_fns(
         # Get the data associated with next_obs
         data_next = jax.tree_map(lambda x: x[:, 1:, ...], data)
 
-        # next_term = data_next.term[...,jnp.newaxis]
         first_reward = data_first.reward
         next_done = data_next.done
 
@@ -472,7 +486,7 @@ def make_update_fns(
             data.obs.action_mask, next_q_vals_online, jnp.zeros(next_q_vals_online.shape) - 9999999
         )[
             :, 1:, ...
-        ]  # TODO: action masking in nw
+        ]  # TODO: action masking in nw?
         next_q_vals_target = scan_apply(params.target, data.obs, data.done)[:, 1:, ...]
 
         # Double q-value selection
@@ -502,13 +516,18 @@ def make_update_fns(
         q_updates, next_opt_state = opt.update(q_grads, opt_states)
         next_online_params = optax.apply_updates(params.online, q_updates)
 
-        # # Target network polyak update.
-        # next_target_params = jax.lax.select(
-        #     cfg.system.hard_update,
-        next_target_params = optax.periodic_update(
-            next_online_params, params.target, t_train, cfg.system.update_period
+        target_update_params = (next_online_params, params.target, t_train)
+
+        # Depending on choice of target network strategy, update target weights.
+        next_target_params = jax.lax.cond(
+            cfg.system.hard_update,
+            hard_update,
+            soft_update,
+            *target_update_params,
         )
-        #     optax.incremental_update(next_online_params, params.target, cfg.system.tau)
+
+        # next_target_params = optax.periodic_update(
+        #     next_online_params, params.target, t_train, cfg.system.update_period
         # )
 
         # Repack params and opt_states.
@@ -516,7 +535,7 @@ def make_update_fns(
 
         return next_params, next_opt_state, q_loss_info
 
-    # TRAIN LEVEL 1 (2.)
+    # TRAIN LEVEL 1
     def train(train_state: TrainState, _: Any) -> Tuple[TrainState, Metrics]:
         """Sample, train and repack."""
 
@@ -530,6 +549,7 @@ def make_update_fns(
         # learn
         next_params, next_opt_states, q_loss_info = update_q(params, opt_states, data, t_train)
 
+        # Repack.
         next_train_state = TrainState(
             buffer_state, next_params, next_opt_states, t_train + 1, next_key
         )
@@ -544,7 +564,6 @@ def make_update_fns(
     )
     scanned_train = lambda state: lax.scan(train, state, None, length=cfg.system.epochs)
 
-    # interact and train
     def update_step(
         learner_state: LearnerState, _: Any
     ) -> Tuple[LearnerState, Tuple[Metrics, Metrics]]:
@@ -595,9 +614,7 @@ def make_update_fns(
 
         return next_learner_state, (metrics, losses)
 
-    pmaped_steps = (
-        1024  # todo: config option # NOTE (Claude) this is related to steps between logging.
-    )
+    pmaped_steps = cfg.system.total_timesteps // cfg.arch.num_evaluation
 
     pmaped_updated_step = jax.pmap(
         jax.vmap(
@@ -614,7 +631,11 @@ def make_update_fns(
 def run_experiment(cfg: DictConfig) -> float:
     n_devices = len(jax.devices())
 
-    pmaped_steps = 1024  # todo: config option
+    pmaped_steps = (
+        cfg.system.total_timesteps // cfg.arch.num_evaluation
+    )  # seems to be then total timesteps per device per env...
+    # means we get many more timesteps than we want...
+
     steps_per_rollout = n_devices * cfg.system.n_envs * cfg.system.rollout_length * pmaped_steps
     max_episode_return = -jnp.inf
 
