@@ -1,0 +1,5 @@
+# ---Environment Configs---
+defaults:
+  - _self_
+
+env_name: Acrobot-v1 #MountainCar-v0 #CartPole-v1 #Acrobot-v1
