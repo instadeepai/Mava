@@ -21,7 +21,8 @@ import tensorflow_probability.substrates.jax.distributions as tfd
 
 
 class TanhTransformedDistribution(tfd.TransformedDistribution):
-    """A distribution transformed using the `tanh` function."""
+    """A distribution transformed using the `tanh` function.
+    This transformation was adapted from acme repo: http://tinyurl.com/2x5xea57"""
 
     def __init__(
         self,
