@@ -92,8 +92,9 @@ def get_ff_evaluator_fn(
             "episode_length": final_state.step_count,
         }
         # Log won episode if win rate is required.
+
         if log_win_rate:
-            eval_metrics["won_episode"] = jnp.all(final_state.timestep.reward >= 1.0).astype(int)
+            eval_metrics["won_episode"] = final_state.timestep.extras["won_episode"]
 
         return eval_metrics
 
@@ -214,7 +215,8 @@ def get_rnn_evaluator_fn(
         }
         # Log won episode if win rate is required.
         if log_win_rate:
-            eval_metrics["won_episode"] = jnp.all(final_state.timestep.reward >= 1.0).astype(int)
+            eval_metrics["won_episode"] = final_state.timestep.extras["won_episode"]
+
         return eval_metrics
 
     def evaluator_fn(
