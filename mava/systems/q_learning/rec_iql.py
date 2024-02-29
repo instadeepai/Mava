@@ -687,12 +687,12 @@ def run_experiment(cfg: DictConfig) -> float:
         final_metrics = episode_metrics.get_final_step_metrics(metrics)
         loss_metrics = losses
         logger.log(
-            {"step": t_frm_learnstate, "steps_per_second": sps},
+            Metrics({"step": t_frm_learnstate, "steps_per_second": sps}),
             t_frm_learnstate,
             eval_idx,
             LogEvent.MISC,
         )
-        logger.log(final_metrics, t_frm_learnstate, eval_idx, LogEvent.ACT)
+        logger.log(final_metrics[0], t_frm_learnstate, eval_idx, LogEvent.ACT)
         logger.log(loss_metrics, t_frm_learnstate, eval_idx, LogEvent.TRAIN)
         logger.log(
             {"epsilon": get_epsilon(t_frm_learnstate)}, t_frm_learnstate, eval_idx, LogEvent.MISC
