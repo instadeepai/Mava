@@ -39,6 +39,7 @@ from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import merge_leading_dims, unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.make_env import make
+from mava.wrappers.episode_metrics import get_final_step_metrics
 
 StoreExpLearnerFn = Callable[[MavaState], Tuple[ExperimentOutput[MavaState], PPOTransition]]
 
@@ -609,10 +610,13 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
         # Log the results of the training.
         elapsed_time = time.time() - start_time
         t = int(steps_per_rollout * (eval_step + 1))
-        learner_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
-        learner_output.episode_metrics["timestep"] = t
+        episode_metrics, ep_completed = get_final_step_metrics(learner_output.episode_metrics)
+        episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
 
-        logger.log(learner_output.episode_metrics, t, eval_step, LogEvent.ACT)
+        # Separately log timesteps, actoring metrics and training metrics.
+        logger.log({"timestep": t}, t, eval_step, LogEvent.MISC)
+        if ep_completed:
+            logger.log(learner_output.episode_metrics, t, eval_step, LogEvent.ACT)
         logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
 
         # Prepare for evaluation.
