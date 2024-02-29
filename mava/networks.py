@@ -150,8 +150,6 @@ class FeedForwardCritic(nn.Module):
         return jnp.squeeze(critic_output, axis=-1)
 
 
-# NOTE (Louise) this change has not yet been merged into develop,
-# but is necessary to remove agent vmapping
 class ScannedRNN(nn.Module):
     @functools.partial(
         nn.scan,
@@ -166,7 +164,7 @@ class ScannedRNN(nn.Module):
         rnn_state = carry
         ins, resets = x
         rnn_state = jnp.where(
-            resets[:, :, jnp.newaxis],  # NOTE (Louise) changes about to hit in mava
+            resets[:, :, jnp.newaxis],
             self.initialize_carry((ins.shape[0], ins.shape[1]), ins.shape[2]),
             rnn_state,
         )
