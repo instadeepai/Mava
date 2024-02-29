@@ -1,6 +1,6 @@
-# --- Defaults FF-IDQN ---
+# --- Defaults REC-IDQN ---
 seed: 1
-n_envs: 32 # number of environments to run in parallel (vmapped)
+n_envs: 32 # Number of environments to run in parallel (vmapped).
 
 # --- Agent observations ---
 add_agent_id: True
@@ -8,24 +8,26 @@ add_agent_id: True
 # --- RL hyperparameters ---
 # step related
 total_timesteps: 2e7
-buffer_min_size: 132  # number of steps to take with random actions at the start of training
+buffer_min_size: 132  # Number of steps to take with random actions at the start of training.
 update_batch_size: 1 # Number of vectorised gradient updates per device.
 
-rollout_length: 2 # Number of environment steps per vectorised environment. breaks code - traj buffer receives this
+rollout_length: 2 # Number of environment steps per vectorised environment.
 epochs: 2 # Number of learn epochs per training data batch.
 
 # sizes
 buffer_size: 5_000  # size of the replay buffer. Note: total size is this * num_devices
 batch_size: 32 #as in jaxmarl paper
+
 # learning rates
 q_lr: 3e-4  # the learning rate of the Q network network optimizer
 # other
 hard_update: True
 update_period: 200
-# tau: 0.01  # smoothing coefficient for target networks
+tau: 0.01  # smoothing coefficient for target networks
 gamma: 0.99  # discount factor
 
 eps_min: 0.05
 eps_decay: 1e5
 
 recurrent_chunk_size: 20 # TODO if unspecified, use rollout length
+hidden_size: 256 # Embedding layers width as well as RNN hidden dimension
