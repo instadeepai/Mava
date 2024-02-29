@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple
+from typing import Tuple, Union
 
 import chex
 import jax.numpy as jnp
@@ -21,30 +21,33 @@ from jumanji.env import Environment
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
 
-from mava.types import Observation, State
+from mava.types import Observation, ObservationGlobalState, State
 
 
 class MatraxWrapper(Wrapper):
     """Multi-agent wrapper for the Matrax environment."""
 
-    def __init__(self, env: Environment):
+    def __init__(self, env: Environment, add_global_state: bool):
         super().__init__(env)
         self._num_agents = self._env.num_agents
         self._num_actions = self._env.num_actions
         self.action_mask = jnp.ones((self._num_agents, self._num_actions), dtype=bool)
+        self.add_global_state = add_global_state
 
-    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
+    def modify_timestep(
+        self, timestep: TimeStep
+    ) -> TimeStep[Union[Observation, ObservationGlobalState]]:
         """Modify the timestep for `step` and `reset`."""
-        observation = Observation(
-            agents_view=timestep.observation.agent_obs,
-            action_mask=self.action_mask,
-            step_count=jnp.repeat(timestep.observation.step_count, self._num_agents),
-        )
-        return timestep.replace(
-            observation=observation,
-            reward=timestep.reward,
-            discount=timestep.discount,
-        )
+        obs_data = {
+            "agents_view": timestep.observation.agent_obs,
+            "action_mask": self.action_mask,
+            "step_count": jnp.repeat(timestep.observation.step_count, self._num_agents),
+        }
+        if self.add_global_state:
+            obs_data["global_state"] = timestep.observation.agent_obs
+            return timestep.replace(observation=ObservationGlobalState(**obs_data))
+
+        return timestep.replace(observation=Observation(**obs_data))
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment."""
@@ -56,7 +59,7 @@ class MatraxWrapper(Wrapper):
         state, timestep = self._env.step(state, action)
         return state, self.modify_timestep(timestep)
 
-    def observation_spec(self) -> specs.Spec[Observation]:
+    def observation_spec(self) -> specs.Spec[Union[Observation][ObservationGlobalState]]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
             (self._num_agents,),
@@ -70,10 +73,13 @@ class MatraxWrapper(Wrapper):
             bool,
             "action_mask",
         )
-        return specs.Spec(
-            Observation,
-            "ObservationSpec",
-            agents_view=self._env.observation_spec().agent_obs,
-            action_mask=action_mask,
-            step_count=step_count,
-        )
+        obs_data = {
+            "agents_view": self._env.observation_spec().agent_obs,
+            "action_mask": action_mask,
+            "step_count": step_count,
+        }
+        if self.add_global_state:
+            obs_data["global_state"] = (self._env.observation_spec().agent_obs,)
+            return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
+
+        return specs.Spec(Observation, "ObservationSpec", **obs_data)

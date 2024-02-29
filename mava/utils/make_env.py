@@ -156,7 +156,8 @@ def make_matrax_env(
     task_name = config["env"]["scenario"]["task_name"]
     train_env = matrax.make(task_name, **config.env.kwargs)
     eval_env = matrax.make(task_name, **config.env.kwargs)
-    train_env, eval_env = wrapper(train_env), wrapper(eval_env)
+    train_env = wrapper(train_env, add_global_state)
+    eval_env = wrapper(eval_env, add_global_state)
 
     train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
     return train_env, eval_env
