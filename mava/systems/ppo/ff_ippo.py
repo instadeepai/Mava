@@ -362,10 +362,9 @@ def learner_setup(
         optax.adam(critic_lr, eps=1e-5),
     )
 
-    # Initialise observation: Select only obs for a single agent.
-    init_x = env.observation_spec().generate_value()
-    init_x = jax.tree_util.tree_map(lambda x: x[0], init_x)
-    init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
+    # Initialise observation with obs of all agents.
+    obs = env.observation_spec().generate_value()
+    init_x = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], obs)
 
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(actor_net_key, init_x)
@@ -378,20 +377,8 @@ def learner_setup(
     # Pack params.
     params = Params(actor_params, critic_params)
 
-    # Vmap network apply function over number of agents.
-    vmapped_actor_network_apply_fn = jax.vmap(
-        actor_network.apply,
-        in_axes=(None, 1),
-        out_axes=(1),
-    )
-    vmapped_critic_network_apply_fn = jax.vmap(
-        critic_network.apply,
-        in_axes=(None, 1),
-        out_axes=(1),
-    )
-
     # Pack apply and update functions.
-    apply_fns = (vmapped_actor_network_apply_fn, vmapped_critic_network_apply_fn)
+    apply_fns = (actor_network.apply, critic_network.apply)
     update_fns = (actor_optim.update, critic_optim.update)
 
     # Get batched iterated update and replicate it to pmap it over cores.
@@ -510,12 +497,13 @@ def run_experiment(_config: DictConfig) -> float:
         # Log the results of the training.
         elapsed_time = time.time() - start_time
         t = int(steps_per_rollout * (eval_step + 1))
-        episode_metrics = get_final_step_metrics(learner_output.episode_metrics)
+        episode_metrics, ep_completed = get_final_step_metrics(learner_output.episode_metrics)
         episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
 
         # Separately log timesteps, actoring metrics and training metrics.
         logger.log({"timestep": t}, t, eval_step, LogEvent.MISC)
-        logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
+        if ep_completed:  # only log episode metrics if an episode was completed in the rollout.
+            logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
         logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
 
         # Prepare for evaluation.

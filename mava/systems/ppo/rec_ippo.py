@@ -103,7 +103,7 @@ def get_learner_fn(
             )
             ac_in = (
                 batched_observation,
-                last_done[:, 0][jnp.newaxis, :],
+                last_done[jnp.newaxis, :],
             )
 
             # Run the network.
@@ -174,7 +174,7 @@ def get_learner_fn(
         )
         ac_in = (
             batched_last_observation,
-            last_done[:, 0][jnp.newaxis, :],
+            last_done[jnp.newaxis, :],
         )
 
         # Run the network.
@@ -234,7 +234,7 @@ def get_learner_fn(
                     """Calculate the actor loss."""
                     # RERUN NETWORK
 
-                    obs_and_done = (traj_batch.obs, traj_batch.done[:, :, 0])
+                    obs_and_done = (traj_batch.obs, traj_batch.done)
                     _, actor_policy = actor_apply_fn(
                         actor_params, traj_batch.hstates.policy_hidden_state[0], obs_and_done
                     )
@@ -266,7 +266,7 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate the critic loss."""
                     # RERUN NETWORK
-                    obs_and_done = (traj_batch.obs, traj_batch.done[:, :, 0])
+                    obs_and_done = (traj_batch.obs, traj_batch.done)
                     _, value = critic_apply_fn(
                         critic_params, traj_batch.hstates.critic_hidden_state[0], obs_and_done
                     )
@@ -498,21 +498,24 @@ def learner_setup(
         optax.adam(critic_lr, eps=1e-5),
     )
 
-    # Initialise observation: Select only obs for a single agent.
+    # Initialise observation with obs of all agents.
     init_obs = env.observation_spec().generate_value()
-    init_obs = jax.tree_util.tree_map(lambda x: x[0], init_obs)
     init_obs = jax.tree_util.tree_map(
         lambda x: jnp.repeat(x[jnp.newaxis, ...], config.arch.num_envs, axis=0),
         init_obs,
     )
-    init_obs = jax.tree_util.tree_map(lambda x: x[None, ...], init_obs)
-    init_done = jnp.zeros((1, config.arch.num_envs), dtype=bool)
+    init_obs = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], init_obs)
+    init_done = jnp.zeros((1, config.arch.num_envs, num_agents), dtype=bool)
     init_x = (init_obs, init_done)
 
     # Initialise hidden states.
     hidden_size = config.network.actor_network.pre_torso.layer_sizes[-1]
-    init_policy_hstate = ScannedRNN.initialize_carry((config.arch.num_envs), hidden_size)
-    init_critic_hstate = ScannedRNN.initialize_carry((config.arch.num_envs), hidden_size)
+    init_policy_hstate = ScannedRNN.initialize_carry(
+        (config.arch.num_envs, num_agents), hidden_size
+    )
+    init_critic_hstate = ScannedRNN.initialize_carry(
+        (config.arch.num_envs, num_agents), hidden_size
+    )
 
     # initialise params and optimiser state.
     actor_params = actor_network.init(actor_net_key, init_policy_hstate, init_x)
@@ -520,29 +523,13 @@ def learner_setup(
     critic_params = critic_network.init(critic_net_key, init_critic_hstate, init_x)
     critic_opt_state = critic_optim.init(critic_params)
 
-    # Vmap network apply function over number of agents.
-    vmapped_actor_network_apply_fn = jax.vmap(
-        actor_network.apply, in_axes=(None, 1, (2, None)), out_axes=(1, 2)
-    )
-    # Vmap network apply function over number of agents.
-    vmapped_critic_network_apply_fn = jax.vmap(
-        critic_network.apply, in_axes=(None, 1, (2, None)), out_axes=(1, 2)
-    )
-
     # Get network apply functions and optimiser updates.
-    apply_fns = (vmapped_actor_network_apply_fn, vmapped_critic_network_apply_fn)
+    apply_fns = (actor_network.apply, critic_network.apply)
     update_fns = (actor_optim.update, critic_optim.update)
 
     # Get batched iterated update and replicate it to pmap it over cores.
     learn = get_learner_fn(env, apply_fns, update_fns, config)
     learn = jax.pmap(learn, axis_name="device")
-
-    # Duplicate the hidden state for each agent.
-    init_policy_hstate = jnp.expand_dims(init_policy_hstate, axis=1)
-    init_policy_hstate = jnp.tile(init_policy_hstate, (1, config.system.num_agents, 1))
-
-    init_critic_hstate = jnp.expand_dims(init_critic_hstate, axis=1)
-    init_critic_hstate = jnp.tile(init_critic_hstate, (1, config.system.num_agents, 1))
 
     # Pack params and initial states.
     params = Params(actor_params, critic_params)
@@ -606,7 +593,7 @@ def learner_setup(
     return learn, actor_network, init_learner_state
 
 
-def run_experiment(_config: DictConfig) -> float:
+def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
     """Runs experiment."""
     config = copy.deepcopy(_config)
 
@@ -687,13 +674,14 @@ def run_experiment(_config: DictConfig) -> float:
         # Log the results of the training.
         elapsed_time = time.time() - start_time
         t = int(steps_per_rollout * (eval_step + 1))
-        episode_metrics = get_final_step_metrics(learner_output.episode_metrics)
+        episode_metrics, ep_completed = get_final_step_metrics(learner_output.episode_metrics)
         episode_return = jnp.mean(episode_metrics["episode_return"])
         episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
 
         # Separately log timesteps, actoring metrics and training metrics.
         logger.log({"timestep": t}, t, eval_step, LogEvent.MISC)
-        logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
+        if ep_completed:  # only log episode metrics if an episode was completed in the rollout.
+            logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
         logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
 
         # Prepare for evaluation.

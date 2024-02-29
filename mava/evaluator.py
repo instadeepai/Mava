@@ -92,8 +92,9 @@ def get_ff_evaluator_fn(
             "episode_length": final_state.step_count,
         }
         # Log won episode if win rate is required.
+
         if log_win_rate:
-            eval_metrics["won_episode"] = jnp.all(final_state.timestep.reward >= 1.0).astype(int)
+            eval_metrics["won_episode"] = final_state.timestep.extras["won_episode"]
 
         return eval_metrics
 
@@ -171,7 +172,7 @@ def get_rnn_evaluator_fn(
             )
             ac_in = (
                 batched_observation,
-                last_done[jnp.newaxis, jnp.newaxis, :][..., 0],
+                last_done[jnp.newaxis, jnp.newaxis, :],
             )
 
             # Run the network.
@@ -213,7 +214,8 @@ def get_rnn_evaluator_fn(
         }
         # Log won episode if win rate is required.
         if log_win_rate:
-            eval_metrics["won_episode"] = jnp.all(final_state.timestep.reward >= 1.0).astype(int)
+            eval_metrics["won_episode"] = final_state.timestep.extras["won_episode"]
+
         return eval_metrics
 
     def evaluator_fn(
@@ -235,11 +237,9 @@ def get_rnn_evaluator_fn(
 
         # Initialise hidden state.
         init_hstate = scanned_rnn.initialize_carry(
-            eval_batch, config.network.actor_network.pre_torso.layer_sizes[-1]
+            (eval_batch, config.system.num_agents),
+            config.network.actor_network.pre_torso.layer_sizes[-1],
         )
-        init_hstate = jnp.expand_dims(init_hstate, axis=1)
-        init_hstate = jnp.expand_dims(init_hstate, axis=2)
-        init_hstate = jnp.tile(init_hstate, (1, config.system.num_agents, 1))
 
         # Initialise dones.
         dones = jnp.zeros(
@@ -249,6 +249,9 @@ def get_rnn_evaluator_fn(
             ),
             dtype=bool,
         )
+
+        # Adding an extra batch dim for the vmapped eval functions.
+        init_hstate = init_hstate[:, jnp.newaxis, ...]
 
         eval_state = RNNEvalState(
             key=step_keys,
@@ -288,19 +291,16 @@ def make_eval_fns(
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
         assert scanned_rnn is not None
-        vmapped_eval_apply_fn = jax.vmap(
-            network.apply, in_axes=(None, 1, (2, None)), out_axes=(1, 2)
-        )
         evaluator = get_rnn_evaluator_fn(
             eval_env,
-            vmapped_eval_apply_fn,
+            network.apply,
             config,
             scanned_rnn,
             log_win_rate,
         )
         absolute_metric_evaluator = get_rnn_evaluator_fn(
             eval_env,
-            vmapped_eval_apply_fn,
+            network.apply,
             config,
             scanned_rnn,
             log_win_rate,
