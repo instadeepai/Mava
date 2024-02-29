@@ -93,20 +93,22 @@ class RecordEpisodeMetrics(Wrapper):
         return state, timestep
 
 
-def get_final_step_metrics(metrics: Dict[str, chex.Array]) -> Dict[str, chex.Array]:
-    """Get the metrics for the final step of an episode.
+def get_final_step_metrics(metrics: Dict[str, chex.Array]) -> Tuple[Dict[str, chex.Array], bool]:
+    """Get the metrics for the final step of an episode and check if there was a final step
+    within the provided metrics.
 
     Note: this is not a jittable method. We need to return variable length arrays, since
     we don't know how many episodes have been run. This is done since the logger
     expects arrays for computing summary statistics on the episode metrics.
     """
     is_final_ep = metrics.pop("is_terminal_step")
+    has_final_ep_step = bool(jnp.any(is_final_ep))
 
     final_metrics: Dict[str, chex.Array]
     # If it didn't make it to the final step, return zeros.
-    if not jnp.any(is_final_ep):
+    if not has_final_ep_step:
         final_metrics = jax.tree_util.tree_map(jnp.zeros_like, metrics)
     else:
         final_metrics = jax.tree_util.tree_map(lambda x: x[is_final_ep], metrics)
 
-    return final_metrics
+    return final_metrics, has_final_ep_step
