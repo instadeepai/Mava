@@ -16,7 +16,7 @@ import time
 from typing import Any, Callable, Dict, NamedTuple, Tuple  # noqa
 
 import chex
-import distrax
+import distrax  # noqa
 import flashbax as fbx
 import flax.linen as nn
 import hydra
@@ -29,13 +29,13 @@ from colorama import Fore, Style
 from flashbax.buffers.flat_buffer import TrajectoryBuffer
 from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.scope import FrozenVariableDict
-from flax.linen.initializers import orthogonal
+from flax.linen.initializers import orthogonal  # noqa
 from jax import Array
 from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
 from typing_extensions import TypeAlias
 
-from mava.evaluator import make_eval_fns
+from mava.evaluator import make_eval_fns  # noqa
 from mava.networks import DiscreteActionEpsGreedyMaskedHead, MLPTorso, ScannedRNN
 from mava.types import Observation, RNNObservation
 from mava.utils import make_env as environments
@@ -563,22 +563,9 @@ def make_update_fns(
 
         return next_learner_state, (metrics, losses)
 
-    # def apply_eval(
-    #     params: FrozenVariableDict, hstate: chex.Array, ac_in: Any
-    # ) -> Any:  # TODO fix typing
-
-    #     obs, done = ac_in
-
-    #     greedy_action, next_hstate = greedy(hstate, params, obs, done)
-    #     probs = jax.nn.one_hot(
-    #         greedy_action, jnp.max(greedy_action) + 1, dtype=int, axis=-1
-    #     )  # make prob of action
-
-    #     pi = distrax.Categorical(probs=probs)
-
-    #     return next_hstate, pi
-
-    pmaped_steps = cfg.system.total_timesteps // cfg.arch.num_evaluation
+    pmaped_steps = (
+        cfg.system.total_timesteps // cfg.arch.num_evaluation // cfg.system.n_envs
+    )  # // cfg.n_devices TODO
 
     pmaped_updated_step = jax.pmap(
         jax.vmap(
@@ -596,11 +583,20 @@ def run_experiment(cfg: DictConfig) -> float:
     n_devices = len(jax.devices())
 
     pmaped_steps = (
-        cfg.system.total_timesteps // cfg.arch.num_evaluation
-    )  # seems to be then total timesteps per device per env...
-    # means we get many more timesteps than we want...
+        cfg.system.total_timesteps
+        // cfg.arch.num_evaluation
+        // cfg.system.n_envs
+        // n_devices
+        // cfg.system.rollout_length
+    )
 
-    steps_per_rollout = n_devices * cfg.system.n_envs * cfg.system.rollout_length * pmaped_steps
+    env_steps_per_rollout = (  # noqa
+        n_devices * cfg.system.n_envs * cfg.system.rollout_length * pmaped_steps  # noqa
+    )  # noqa
+    train_steps_per_rollout = (  # noqa
+        n_devices * cfg.system.n_envs * cfg.system.epochs * pmaped_steps  # noqa
+    )  # noqa
+
     max_episode_return = -jnp.inf
 
     (env, eval_env), learner_state, q_net, opts, rb, logger, key = init(cfg)
@@ -610,20 +606,14 @@ def run_experiment(cfg: DictConfig) -> float:
     # todo: don't need to return trained_params or eval keys
     # evaluator, absolute_metric_evaluator = make_eval_fns(
     #     eval_env=eval_env,
-    #     network=q_net,  # TODO this needs to be a NEW network which outputs a categorical and hstate
+    #     network=q_net,  # TODO
     #     config=cfg,
     #     use_recurrent_net=True,
     #     scanned_rnn=ScannedRNN(),  # TODO change what I pass here
     # )
 
-    # if cfg.logger.checkpointing.save_model:
-    #     checkpointer = Checkpointer(
-    #         metadata=cfg,  # Save all config as metadata in the checkpoint
-    #         model_name=cfg.logger.system_name,
-    #         **cfg.logger.checkpointing.save_args,  # Checkpoint args
-    #     )
-
-    start_time = time.time()
+    start_time = time.time()  # noqa
+    tic = time.time()
 
     def get_epsilon(t: int) -> float:
         """Calculate epsilon for exploration rate using config variables."""
@@ -635,22 +625,21 @@ def run_experiment(cfg: DictConfig) -> float:
     # Main loop:
     # We want start to align with the final step of the first pmaped_learn,
     # where we've done explore_steps and 1 full learn step.
-    start = steps_per_rollout
-    for eval_idx, _ in enumerate(range(start, int(cfg.system.total_timesteps), steps_per_rollout)):
+
+    for eval_idx in range(cfg.arch.num_evaluation):
         # Learn loop:
         learner_state, (metrics, losses) = update(learner_state)
         jax.block_until_ready(learner_state)
+        toc = time.time()
 
-        # Log:
-        # Multiply by learn steps here because anakin steps per second is learn + act steps
-        # But we want to make sure we're counting env steps correctly so it's not included
-        # in the loop counter.
         t_frm_learnstate = learner_state.time_steps[0][0]
-        sps = t_frm_learnstate * cfg.system.epochs / (time.time() - start_time)
+        sps = cfg.system.total_timesteps // cfg.arch.num_evaluation / (toc - tic)
+        tic = toc
         final_metrics = episode_metrics.get_final_step_metrics(metrics)
         loss_metrics = losses
+
         logger.log(
-            Metrics({"step": t_frm_learnstate, "steps_per_second": sps}),
+            ({"step": t_frm_learnstate, "steps_per_second": sps}),
             t_frm_learnstate,
             eval_idx,
             LogEvent.MISC,
