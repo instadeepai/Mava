@@ -118,7 +118,9 @@ class DiscreteActionHead(nn.Module):
 
 class ContinuousActionHead(nn.Module):
     """ContinuousActionHead using a transformed Normal distribution.
-    Note: This network only handles the case where actions lie in the interval [-1, 1]."""
+
+    Note: This network only handles the case where actions lie in the interval [-1, 1].
+    """
 
     action_dim: int
     min_scale: float = 1e-3
