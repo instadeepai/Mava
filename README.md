@@ -182,7 +182,7 @@ python mava/systems/ppo/ff_ippo.py env=rware env/scenario=tiny-4ag
 To toggle between continuous and discrete systems, simply select the continuous action space network head. To run the same system on an `MaBrax` environment make the follow config updates from the terminal:
 
 ```bash
-python mava/systems/ppo/ff_ippo.py env=mabrax network.action_head._target_="mava.networks.DiscreteActionHead"
+python mava/systems/ppo/ff_ippo.py env=mabrax network.action_head._target_="mava.networks.ContinuousActionHead"
 ```
 
 Additionally, we also have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-agent system.
