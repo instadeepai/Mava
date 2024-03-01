@@ -44,7 +44,9 @@ class MatraxWrapper(Wrapper):
             "step_count": jnp.repeat(timestep.observation.step_count, self._num_agents),
         }
         if self.add_global_state:
-            obs_data["global_state"] = timestep.observation.agent_obs
+            global_state = jnp.concatenate(timestep.observation.agent_obs, axis=0)
+            global_state = jnp.tile(global_state, (self._num_agents, 1))
+            obs_data["global_state"] = global_state
             return timestep.replace(observation=ObservationGlobalState(**obs_data))
 
         return timestep.replace(observation=Observation(**obs_data))
@@ -63,9 +65,9 @@ class MatraxWrapper(Wrapper):
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
             (self._num_agents,),
-            jnp.int32,
-            [0] * self._num_agents,
-            [self._env.time_limit] * self._num_agents,
+            int,
+            jnp.zeros(self._num_agents, dtype=int),
+            jnp.repeat(self.time_limit, self._num_agents),
             "step_count",
         )
         action_mask = specs.Array(
@@ -73,13 +75,20 @@ class MatraxWrapper(Wrapper):
             bool,
             "action_mask",
         )
+        obs_spec = self._env.observation_spec()
         obs_data = {
-            "agents_view": self._env.observation_spec().agent_obs,
+            "agents_view": obs_spec.agent_obs,
             "action_mask": action_mask,
             "step_count": step_count,
         }
         if self.add_global_state:
-            obs_data["global_state"] = (self._env.observation_spec().agent_obs,)
+            num_obs_features = obs_spec.agent_obs.shape[-1]
+            global_state = specs.Array(
+                (self._env.num_agents, self._env.num_agents * num_obs_features),
+                obs_spec.agent_obs.dtype,
+                "global_state",
+            )
+            obs_data["global_state"] = global_state
             return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
 
         return specs.Spec(Observation, "ObservationSpec", **obs_data)
