@@ -30,7 +30,7 @@ class MatraxWrapper(Wrapper):
     def __init__(self, env: Environment, add_global_state: bool):
         super().__init__(env)
         self._num_agents = self._env.num_agents
-        self._num_actions = self._env.num_actions
+        self.action_dim = self._env.num_actions
         self.action_mask = jnp.ones((self._num_agents, self.num_actions), dtype=bool)
         self.add_global_state = add_global_state
 
