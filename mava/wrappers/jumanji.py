@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from functools import cached_property
 from typing import Tuple, Union
 
 import chex
@@ -36,7 +37,7 @@ from mava.types import Observation, ObservationGlobalState, State
 class MultiAgentWrapper(Wrapper):
     def __init__(self, env: Environment):
         super().__init__(env)
-        self._num_agents = self._env.num_agents
+        self.num_agents = self._env.num_agents
         self.time_limit = self._env.time_limit
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
@@ -56,13 +57,18 @@ class MultiAgentWrapper(Wrapper):
     def observation_spec(self) -> specs.Spec[Observation]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
-            (self._num_agents,),
+            (self.num_agents,),
             int,
-            jnp.zeros(self._num_agents, dtype=int),
-            jnp.repeat(self.time_limit, self._num_agents),
+            jnp.zeros(self.num_agents, dtype=int),
+            jnp.repeat(self.time_limit, self.num_agents),
             "step_count",
         )
         return self._env.observation_spec().replace(step_count=step_count)
+
+    @cached_property
+    def action_dim(self) -> chex.Array:
+        "Get the actions dim for each agent."
+        return int(self._env.action_spec().num_values[0])
 
 
 class RwareWrapper(MultiAgentWrapper):
@@ -76,10 +82,10 @@ class RwareWrapper(MultiAgentWrapper):
         observation = Observation(
             agents_view=timestep.observation.agents_view,
             action_mask=timestep.observation.action_mask,
-            step_count=jnp.repeat(timestep.observation.step_count, self._num_agents),
+            step_count=jnp.repeat(timestep.observation.step_count, self.num_agents),
         )
-        reward = jnp.repeat(timestep.reward, self._num_agents)
-        discount = jnp.repeat(timestep.discount, self._num_agents)
+        reward = jnp.repeat(timestep.reward, self.num_agents)
+        discount = jnp.repeat(timestep.discount, self.num_agents)
         return timestep.replace(observation=observation, reward=reward, discount=discount)
 
 
@@ -105,7 +111,7 @@ class LbfWrapper(MultiAgentWrapper):
         team_reward = jnp.sum(timestep.reward)
 
         # Repeat the aggregated reward for each agent.
-        reward = jnp.repeat(team_reward, self._num_agents)
+        reward = jnp.repeat(team_reward, self.num_agents)
         return timestep.replace(observation=observation, reward=reward)
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
@@ -116,7 +122,7 @@ class LbfWrapper(MultiAgentWrapper):
         modified_observation = Observation(
             agents_view=timestep.observation.agents_view,
             action_mask=timestep.observation.action_mask,
-            step_count=jnp.repeat(timestep.observation.step_count, self._num_agents),
+            step_count=jnp.repeat(timestep.observation.step_count, self.num_agents),
         )
         if self._use_individual_rewards:
             # The environment returns a list of individual rewards and these are used as is.
@@ -163,7 +169,7 @@ class ConnectorWrapper(MultiAgentWrapper):
         obs_data = {
             "agents_view": create_agents_view(timestep.observation.grid),
             "action_mask": timestep.observation.action_mask,
-            "step_count": jnp.repeat(timestep.observation.step_count, self._num_agents),
+            "step_count": jnp.repeat(timestep.observation.step_count, self.num_agents),
         }
 
         if self.has_global_state:
@@ -175,10 +181,10 @@ class ConnectorWrapper(MultiAgentWrapper):
     def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
-            (self._num_agents,),
+            (self.num_agents,),
             int,
-            jnp.zeros(self._num_agents, dtype=int),
-            jnp.repeat(self.time_limit, self._num_agents),
+            jnp.zeros(self.num_agents, dtype=int),
+            jnp.repeat(self.time_limit, self.num_agents),
             "step_count",
         )
 
@@ -189,7 +195,11 @@ class ConnectorWrapper(MultiAgentWrapper):
             minimum=False,
             maximum=True,
         )
-
+        obs_data = {
+            "agents_view": agents_view,
+            "action_mask": self._env.observation_spec().action_mask,
+            "step_count": step_count,
+        }
         if self.has_global_state:
             global_state = specs.BoundedArray(
                 shape=(self._env.num_agents, self._env.grid_size, self._env.grid_size, 3),
@@ -198,22 +208,7 @@ class ConnectorWrapper(MultiAgentWrapper):
                 minimum=False,
                 maximum=True,
             )
-            spec = specs.Spec(
-                ObservationGlobalState,
-                "ObservationSpec",
-                agents_view=agents_view,
-                action_mask=self._env.observation_spec().action_mask,
-                global_state=global_state,
-                step_count=step_count,
-            )
+            obs_data["global_state"] = global_state
+            return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
 
-        else:
-            spec = specs.Spec(
-                Observation,
-                "ObservationSpec",
-                agents_view=agents_view,
-                action_mask=self._env.observation_spec().action_mask,
-                step_count=step_count,
-            )
-
-        return spec
+        return specs.Spec(Observation, "ObservationSpec", **obs_data)
