@@ -44,8 +44,8 @@ To join us in these efforts, please feel free to reach out, raise issues or read
 
 Mava currently offers the following building blocks for MARL research:
 
-- 🥑 **Implementations of MARL algorithms**: Implementations of multi-agent PPO systems that follow both the Centralised Training with Decentralised Execution (CTDE) and Decentralised Training with Decentralised Execution (DTDE) MARL paradigms.
-- 🍬 **Environment Wrappers**: Example wrappers for mapping Jumanji environments to an environment that is compatible with Mava. At the moment, we support [Robotic Warehouse][jumanji_rware] and [Level-Based Foraging][jumanji_lbf] with plans to support more environments soon. We have also recently added support for the SMAX environment from [JaxMARL][jaxmarl].
+- 🥑 **Implementations of MARL algorithms**: Implementations of multi-agent PPO systems that follow both the Centralised Training with Decentralised Execution (CTDE) and Decentralised Training with Decentralised Execution (DTDE) MARL paradigms with support for continuous and discrete action space environments.
+- 🍬 **Environment Wrappers**: Example wrappers for mapping Jumanji environments to an environment that is compatible with Mava. At the moment, we support [Robotic Warehouse][jumanji_rware] and [Level-Based Foraging][jumanji_lbf] with plans to support more environments soon. We have also recently added support for the SMAX and MaBrax environments from [JaxMARL][jaxmarl].
 - 🎓 **Educational Material**: [Quickstart notebook][quickstart] to demonstrate how Mava can be used and to highlight the added value of JAX-based MARL.
 - 🧪 **Statistically robust evaluation**: Mava natively supports logging to json files which adhere to the standard suggested by [Gorsane et al. (2022)][toward_standard_eval]. This enables easy downstream experiment plotting and aggregation using the tools found in the [MARL-eval][marl_eval] library.
 
@@ -142,7 +142,7 @@ Furthermore, we illustrate the speed of Mava by showing the steps per second as 
 
 ## Code Philosophy 🧘
 
-The current code in Mava is adapted from [PureJaxRL][purejaxrl] which provides high-quality single-file implementations with research-friendly features. In turn, PureJaxRL is inspired by the code philosophy from [CleanRL][cleanrl]. Along this vein of easy-to-use and understandable RL codebases, Mava is not designed to be a modular library and is not meant to be imported. Our repository focuses on simplicity and clarity in its implementations while utilising the advantages offered by JAX such as `pmap` and `vmap`, making it an excellent resource for researchers and practitioners to build upon.
+The current code in Mava is adapted from [PureJaxRL][purejaxrl] which provides high-quality single-file implementations with research-friendly features. In turn, PureJaxRL is inspired by the code philosophy from [CleanRL][cleanrl]. Along this vein of easy-to-use and understandable RL codebases, Mava is not designed to be a modular library and is not meant to be imported. Our repository focuses on simplicity and clarity in its implementations while utilising the advantages offered by JAX such as `pmap` and `vmap`, making it an excellent resource for researchers and practitioners to build upon. A notable difference between Mava and other single-file libraries is that Mava makes use of abstraction where relevant notably for network and environment creation.
 
 ## Installation 🎬
 
