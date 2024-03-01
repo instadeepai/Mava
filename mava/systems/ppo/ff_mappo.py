@@ -347,7 +347,7 @@ def learner_setup(
     # Define network and optimiser.
     actor_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
     actor_action_head = hydra.utils.instantiate(
-        config.network.action_head, action_dim=env.action_dim
+        config.network.action_head, action_dim=env.action_dim, action_spec=env.action_spec()
     )
     critic_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
 

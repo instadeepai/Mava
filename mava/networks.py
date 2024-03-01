@@ -22,6 +22,7 @@ import numpy as np
 import tensorflow_probability.substrates.jax.distributions as tfd
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
+from jumanji import specs
 
 from mava.distributions import IdentityTransformation, TanhTransformedDistribution
 from mava.types import (
@@ -83,6 +84,7 @@ class DiscreteActionHead(nn.Module):
     """Discrete Action Head"""
 
     action_dim: int
+    action_spec: specs.Spec
 
     @nn.compact
     def __call__(
@@ -121,7 +123,12 @@ class ContinuousActionHead(nn.Module):
     Note: This network only handles the case where actions lie in the interval [-1, 1]."""
 
     action_dim: int
+    action_spec: specs.Spec
     min_scale: float = 1e-3
+
+    def setup(self) -> None:
+        self.mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))
+        self.log_std = self.param("log_std", nn.initializers.zeros, (self.action_dim,))
 
     @nn.compact
     def __call__(self, obs_embedding: chex.Array, observation: Observation) -> tfd.Independent:
@@ -134,9 +141,8 @@ class ContinuousActionHead(nn.Module):
         Returns:
             tfd.Independent: Independent transformed distribution.
         """
-        loc = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(obs_embedding)
-        log_std = self.param("log_std", nn.initializers.zeros, (self.action_dim,))
-        scale = jax.nn.softplus(log_std) + self.min_scale
+        loc = self.mean(obs_embedding)
+        scale = jax.nn.softplus(self.log_std) + self.min_scale
         distribution = tfd.Normal(loc=loc, scale=scale)
 
         return tfd.Independent(
