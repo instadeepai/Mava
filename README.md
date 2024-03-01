@@ -164,19 +164,25 @@ we advise users to explicitly install the correct JAX version (see the [official
 To get started with training your first Mava system, simply run one of the system files. e.g.,
 
 ```bash
-python mava/systems/ff_ippo.py
+python mava/systems/ppo/ff_ippo.py
 ```
 
 Mava makes use of Hydra for config management. In order to see our default system configs please see the `mava/configs/` directory. A benefit of Hydra is that configs can either be set in config yaml files or overwritten from the terminal on the fly. For an example of running a system on the LBF environment, the above code can simply be adapted as follows:
 
 ```bash
-python mava/systems/ff_ippo.py env=lbf
+python mava/systems/ppo/ff_ippo.py env=lbf
 ```
 
 Different scenarios can also be run by making the following config updates from the terminal:
 
 ```bash
-python mava/systems/ff_ippo.py env=rware env/scenario=tiny-4ag
+python mava/systems/ppo/ff_ippo.py env=rware env/scenario=tiny-4ag
+```
+
+To toggle between continuous and discrete systems, simply select the continuous action space network head. To run the same system on an `MaBrax` environment make the follow config updates from the terminal:
+
+```bash
+python mava/systems/ppo/ff_ippo.py env=mabrax network.action_head._target_="mava.networks.DiscreteActionHead"
 ```
 
 Additionally, we also have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-agent system.
@@ -194,10 +200,8 @@ Please read our [contributing docs](docs/CONTRIBUTING.md) for details on how to 
 We plan to iteratively expand Mava in the following increments:
 
 - 🌴 Support for more environments.
-- 🔁 More robust recurrent systems.
 - 🌳 Support for non JAX-based environments.
 - 🦾 Support for off-policy algorithms.
-- 🎛 Continuous action space environments and algorithms.
 
 Please do follow along as we develop this next phase!
 
