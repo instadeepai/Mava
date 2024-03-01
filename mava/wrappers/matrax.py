@@ -31,7 +31,7 @@ class MatraxWrapper(Wrapper):
         super().__init__(env)
         self._num_agents = self._env.num_agents
         self._num_actions = self._env.num_actions
-        self.action_mask = jnp.ones((self._num_agents, self._num_actions), dtype=bool)
+        self.action_mask = jnp.ones((self._num_agents, self.num_actions), dtype=bool)
         self.add_global_state = add_global_state
 
     def modify_timestep(
@@ -71,7 +71,7 @@ class MatraxWrapper(Wrapper):
             "step_count",
         )
         action_mask = specs.Array(
-            (self._num_agents, self._num_actions),
+            (self._num_agents, self.num_actions),
             bool,
             "action_mask",
         )
