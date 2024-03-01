@@ -7,7 +7,7 @@ add_agent_id: True
 
 # --- RL hyperparameters ---
 # step related
-total_timesteps: 2e7
+total_timesteps: 20_000_000
 buffer_min_size: 132  # Number of steps to take with random actions at the start of training.
 update_batch_size: 1 # Number of vectorised gradient updates per device.
 

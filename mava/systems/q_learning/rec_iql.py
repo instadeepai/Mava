@@ -16,6 +16,7 @@ import time
 from typing import Any, Callable, Dict, NamedTuple, Tuple  # noqa
 
 import chex
+import distrax
 import flashbax as fbx
 import flax.linen as nn
 import hydra
@@ -34,6 +35,7 @@ from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
 from typing_extensions import TypeAlias
 
+from mava.evaluator import make_eval_fns
 from mava.networks import MLPTorso, ScannedRNN
 from mava.types import Observation, RNNObservation
 from mava.utils import make_env as environments
@@ -614,6 +616,21 @@ def make_update_fns(
 
         return next_learner_state, (metrics, losses)
 
+    def apply_eval(
+        params: FrozenVariableDict, hstate: chex.Array, ac_in: Any
+    ) -> Any:  # TODO fix typing
+
+        obs, done = ac_in
+
+        greedy_action, next_hstate = greedy(hstate, params, obs, done)
+        probs = jax.nn.one_hot(
+            greedy_action, jnp.max(greedy_action) + 1, dtype=int, axis=-1
+        )  # make prob of action
+
+        pi = distrax.Categorical(probs=probs)
+
+        return next_hstate, pi
+
     pmaped_steps = cfg.system.total_timesteps // cfg.arch.num_evaluation
 
     pmaped_updated_step = jax.pmap(
@@ -625,7 +642,7 @@ def make_update_fns(
         donate_argnums=0,
     )
 
-    return pmaped_updated_step
+    return pmaped_updated_step, apply_eval
 
 
 def run_experiment(cfg: DictConfig) -> float:
@@ -640,18 +657,17 @@ def run_experiment(cfg: DictConfig) -> float:
     max_episode_return = -jnp.inf
 
     (env, eval_env), learner_state, q_net, opts, rb, logger, key = init(cfg)
-    update = make_update_fns(cfg, env, q_net, opts, rb)
+    update, apply_eval = make_update_fns(cfg, env, q_net, opts, rb)
 
     key, eval_key = jax.random.split(key)
     # todo: don't need to return trained_params or eval keys
-    # evaluator, absolute_metric_evaluator, (trained_params, eval_keys) = evaluator_setup(
-    #     eval_env=eval_env,
-    #     key=eval_key,
-    #     network=nns, #NOTE (Louise) this part needs redoing with that replacement actor function
-    #     params=learner_state.params.online,
-    #     config=cfg,
-    #     greedy=greedy
-    # )
+    evaluator, absolute_metric_evaluator = make_eval_fns(
+        eval_env=eval_env,
+        network=q_net,  # TODO this needs to be a NEW network which outputs a categorical and hstate
+        config=cfg,
+        use_recurrent_net=True,
+        scanned_rnn=ScannedRNN(),  # TODO change what I pass here
+    )
 
     # if cfg.logger.checkpointing.save_model:
     #     checkpointer = Checkpointer(
