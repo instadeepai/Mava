@@ -36,7 +36,7 @@ from omegaconf import DictConfig, OmegaConf
 from typing_extensions import TypeAlias
 
 from mava.evaluator import make_eval_fns
-from mava.networks import MLPTorso, ScannedRNN
+from mava.networks import DiscreteActionEpsGreedyMaskedHead, MLPTorso, ScannedRNN
 from mava.types import Observation, RNNObservation
 from mava.utils import make_env as environments
 
@@ -116,6 +116,7 @@ class RecQNetwork(nn.Module):
         self,
         hidden_state: chex.Array,
         observations_resets: RNNObservation,
+        eps: float,
     ) -> Array:
         # unpack consumed parameters
         obs, resets = observations_resets
@@ -128,9 +129,11 @@ class RecQNetwork(nn.Module):
 
         embedding = self.post_torso(embedding)
 
-        q_values = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01))(embedding)
+        q_values, eps_greedy_dist = DiscreteActionEpsGreedyMaskedHead(self.num_actions)(
+            embedding, obs, eps
+        )
 
-        return hidden_state, q_values
+        return hidden_state, q_values, eps_greedy_dist
 
 
 def init(
@@ -182,8 +185,10 @@ def init(
 
     # Make recurrent Q network
     q_net = RecQNetwork(num_actions, cfg.system.hidden_size)
-    q_params = q_net.init(q_key, init_hidden_state, init_x)
-    q_target_params = q_net.init(q_key, init_hidden_state, init_x)  # ensure parameters are separate
+    q_params = q_net.init(q_key, init_hidden_state, init_x, 0)
+    q_target_params = q_net.init(
+        q_key, init_hidden_state, init_x, 0
+    )  # ensure parameters are separate
 
     # Pack params
     params = IQLParams(q_params, q_target_params)
@@ -275,92 +280,32 @@ def make_update_fns(
     rb: TrajectoryBuffer,
 ) -> Any:  # Callable:  # [[LearnerState, Tuple[Metrics, Metrics]],]:  # TODO typing
 
-    # INTERACT LEVEL 3
-    def select_random_action_batch(selection_key: chex.PRNGKey, obs: Observation) -> chex.Array:
-        """Select actions randomly with masking."""
-
-        def select_single_random_action(
-            key: chex.PRNGKey, action_options: Array, p_values: Array
-        ) -> Array:
-            """Select one action per row with probabilities used for masking."""
-            action = jax.random.choice(key, action_options, p=p_values)
-            return action
-
-        action_mask = obs.action_mask
-
-        batch_size, n_agents, n_actions = action_mask.shape
-
-        # get one key per agent
-        keys = jax.random.split(selection_key, batch_size * n_agents)
-        # base of action indexes
-        action_options = jnp.arange(n_actions)
-        # get num avail actions to generate probabilities for choosing
-        num_avail_per_agent = jnp.sum(action_mask, axis=-1)[..., jnp.newaxis]
-        # get probabilities (uniform with "masking")
-        p_vals = action_mask.astype("int32") / num_avail_per_agent
-        # flatten so that we only need one vmap over batch, agent dim
-        p_vals = jnp.reshape(p_vals, (batch_size * n_agents, n_actions))
-        # vmap random selection
-        actions = jax.vmap(select_single_random_action, (0, None, 0))(keys, action_options, p_vals)
-        # unflatten to mtch expected action block size
-        actions = jnp.reshape(actions, (batch_size, n_agents))
-
-        return actions
-
-    # INTERACT LEVEL 3
-    def greedy(
-        hidden_state: chex.Array, params: FrozenVariableDict, obs: Observation, done: chex.Array
-    ) -> Tuple[chex.Array, chex.Array]:
-        """Uses online q values to greedily select the best action."""
-
-        # Add dummy time dimension
-        obs = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], obs)
-        done = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], done)
-
-        # Get q values
-        new_hidden_state, q_values = q_net.apply(params, hidden_state, (obs, done))
-
-        # Remove the dummy time dimension
-        q_values = q_values[0]
-
-        # Make unavailable actions quite negative
-        q_vals_masked = jnp.where(
-            obs.action_mask, q_values, jnp.zeros(q_values.shape) - 9999999
-        )  # TODO: action masking in nw?
-
-        # Greedy argmax over action-value dim
-        action = jnp.argmax(q_vals_masked, axis=-1)
-        action = action[0]
-
-        return action, new_hidden_state
-
     # INTERACT LEVEL 2
     def select_eps_greedy_action(
         action_selection_state: ActionSelectionState, obs: Observation, done: Array
     ) -> Tuple[ActionSelectionState, Array]:
         """Select action to take in eps-greedy way. Batch and agent dims are included."""
 
-        def get_should_explore(key: chex.PRNGKey, t: int, shape: Tuple) -> chex.Array:
-            """Uses the number of env steps taken so far to calculate rate of exploration."""
-            eps = jax.numpy.maximum(
-                cfg.system.eps_min, 1 - (t / cfg.system.eps_decay) * (1 - cfg.system.eps_min)
-            )
-            return jax.random.uniform(key, shape) < eps
-
         # Unpacking
         params, hidden_state, t, key = action_selection_state
 
-        # Random key splitting
-        new_key, explore_key, selection_key = jax.random.split(key, 3)
-
-        # Greedy actions always calculated to get new hidden state
-        greedy_action, next_hidden_state = greedy(hidden_state, params, obs, done)
-
-        action = jax.lax.select(
-            get_should_explore(explore_key, t, greedy_action.shape),
-            select_random_action_batch(selection_key, obs),
-            greedy_action,
+        eps = jax.numpy.maximum(
+            cfg.system.eps_min, 1 - (t / cfg.system.eps_decay) * (1 - cfg.system.eps_min)
         )
+
+        obs = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], obs)
+        done = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], done)
+
+        # Get q values
+        next_hidden_state, q_values, eps_greedy_dist = q_net.apply(
+            params, hidden_state, (obs, done), eps
+        )
+
+        # Random key splitting
+        new_key, explore_key = jax.random.split(key, 2)
+
+        action = eps_greedy_dist.sample(seed=explore_key)
+        action = jnp.squeeze(action)
 
         # repack new selection params
         next_action_selection_state = ActionSelectionState(
@@ -415,7 +360,10 @@ def make_update_fns(
         q_online_params: FrozenVariableDict, obs: Array, done: Array, action: Array, target: Array
     ) -> Tuple[Array, Metrics]:
         """The portion of the calculation to grad, namely online apply and mse with target."""
-        q_online = scan_apply(q_online_params, obs, done)  # get online q values of all actions
+        q_online, greedy_dist = scan_apply(
+            q_online_params, obs, done
+        )  # get online q values of all actions
+        q_online = switch_leading_axis(q_online)  # TB... -> BT...
         q_online = jnp.squeeze(
             jnp.take_along_axis(q_online, action[..., jnp.newaxis], axis=-1), axis=-1
         )  # get the q values of the taken actions and remove extra dim
@@ -432,14 +380,14 @@ def make_update_fns(
 
         return q_loss, loss_info
 
+    def switch_leading_axis(arr: chex.Array) -> chex.Array:
+        """Switches the first two axes, generally used for BT -> TB."""
+        arr: Dict[str, chex.Array] = jax.tree_map(lambda x: jax.numpy.swapaxes(x, 0, 1), arr)
+        return arr
+
     # TRAIN LEVEL 3 and 4
     def scan_apply(params: FrozenVariableDict, obs: Observation, done: chex.Array) -> chex.Array:
         """Applies RNN to a batch of trajectories by scanning over batch dim."""
-
-        def switch_leading_axis(arr: chex.Array) -> chex.Array:
-            """Switches the first two axes, generally used for BT -> TB."""
-            arr: Dict[str, chex.Array] = jax.tree_map(lambda x: jax.numpy.swapaxes(x, 0, 1), arr)
-            return arr
 
         hidden_state = ScannedRNN.initialize_carry(
             (cfg.system.batch_size, obs.agents_view.shape[2]), cfg.system.hidden_size
@@ -448,8 +396,8 @@ def make_update_fns(
         done = switch_leading_axis(done)  # B, T -> T, B
         obs_done = (obs, done)  # RNN inputs
 
-        _, next_q_vals_online = q_net.apply(params, hidden_state, obs_done)
-        return switch_leading_axis(next_q_vals_online)  # T, B -> B, T
+        _, next_q_vals_online, greedy_dist = q_net.apply(params, hidden_state, obs_done, 0)
+        return next_q_vals_online, greedy_dist  # does it matter if we never switch back
 
     # Standardise the update function inputs for a cond
     def hard_update(
@@ -483,19 +431,18 @@ def make_update_fns(
         next_done = data_next.done
 
         # Scan over each sample and discard first timestep
-        next_q_vals_online = scan_apply(params.online, data.obs, data.done)
-        next_q_vals_online = jnp.where(
-            data.obs.action_mask, next_q_vals_online, jnp.zeros(next_q_vals_online.shape) - 9999999
-        )[
-            :, 1:, ...
-        ]  # TODO: action masking in nw?
-        next_q_vals_target = scan_apply(params.target, data.obs, data.done)[:, 1:, ...]
+        next_q_vals_online, next_online_greedy_dist = scan_apply(params.online, data.obs, data.done)
+
+        next_q_vals_target, _ = scan_apply(params.target, data.obs, data.done)
+        next_q_vals_target = next_q_vals_target[1:, ...]  # TB...
 
         # Double q-value selection
-        next_action = jnp.argmax(next_q_vals_online, axis=-1)
+        next_action = next_online_greedy_dist.mode()[1:, ...]  # TB...
         next_q_val = jnp.squeeze(
             jnp.take_along_axis(next_q_vals_target, next_action[..., jnp.newaxis], axis=-1), axis=-1
         )
+
+        next_q_val = switch_leading_axis(next_q_val)  # TB... -> BT...
 
         # TD Target
         target_q_val = (
@@ -616,20 +563,20 @@ def make_update_fns(
 
         return next_learner_state, (metrics, losses)
 
-    def apply_eval(
-        params: FrozenVariableDict, hstate: chex.Array, ac_in: Any
-    ) -> Any:  # TODO fix typing
+    # def apply_eval(
+    #     params: FrozenVariableDict, hstate: chex.Array, ac_in: Any
+    # ) -> Any:  # TODO fix typing
 
-        obs, done = ac_in
+    #     obs, done = ac_in
 
-        greedy_action, next_hstate = greedy(hstate, params, obs, done)
-        probs = jax.nn.one_hot(
-            greedy_action, jnp.max(greedy_action) + 1, dtype=int, axis=-1
-        )  # make prob of action
+    #     greedy_action, next_hstate = greedy(hstate, params, obs, done)
+    #     probs = jax.nn.one_hot(
+    #         greedy_action, jnp.max(greedy_action) + 1, dtype=int, axis=-1
+    #     )  # make prob of action
 
-        pi = distrax.Categorical(probs=probs)
+    #     pi = distrax.Categorical(probs=probs)
 
-        return next_hstate, pi
+    #     return next_hstate, pi
 
     pmaped_steps = cfg.system.total_timesteps // cfg.arch.num_evaluation
 
@@ -642,7 +589,7 @@ def make_update_fns(
         donate_argnums=0,
     )
 
-    return pmaped_updated_step, apply_eval
+    return pmaped_updated_step
 
 
 def run_experiment(cfg: DictConfig) -> float:
@@ -657,17 +604,17 @@ def run_experiment(cfg: DictConfig) -> float:
     max_episode_return = -jnp.inf
 
     (env, eval_env), learner_state, q_net, opts, rb, logger, key = init(cfg)
-    update, apply_eval = make_update_fns(cfg, env, q_net, opts, rb)
+    update = make_update_fns(cfg, env, q_net, opts, rb)
 
     key, eval_key = jax.random.split(key)
     # todo: don't need to return trained_params or eval keys
-    evaluator, absolute_metric_evaluator = make_eval_fns(
-        eval_env=eval_env,
-        network=q_net,  # TODO this needs to be a NEW network which outputs a categorical and hstate
-        config=cfg,
-        use_recurrent_net=True,
-        scanned_rnn=ScannedRNN(),  # TODO change what I pass here
-    )
+    # evaluator, absolute_metric_evaluator = make_eval_fns(
+    #     eval_env=eval_env,
+    #     network=q_net,  # TODO this needs to be a NEW network which outputs a categorical and hstate
+    #     config=cfg,
+    #     use_recurrent_net=True,
+    #     scanned_rnn=ScannedRNN(),  # TODO change what I pass here
+    # )
 
     # if cfg.logger.checkpointing.save_model:
     #     checkpointer = Checkpointer(
