@@ -22,7 +22,6 @@ import numpy as np
 import tensorflow_probability.substrates.jax.distributions as tfd
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
-from jax.experimental import checkify
 from jumanji import specs
 
 from mava.distributions import IdentityTransformation, TanhTransformedDistribution
@@ -120,7 +119,8 @@ class DiscreteActionHead(nn.Module):
 
 
 class ContinuousActionHead(nn.Module):
-    """ContinuousActionHead using a transformed Normal distribution."""
+    """ContinuousActionHead using a transformed Normal distribution.
+    Note: This network only handles the case where actions lie in the interval [-1, 1]."""
 
     action_dim: int
     action_spec: specs.Spec
@@ -129,13 +129,6 @@ class ContinuousActionHead(nn.Module):
     def setup(self) -> None:
         self.mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))
         self.log_std = self.param("log_std", nn.initializers.zeros, (self.action_dim,))
-
-        minimum, maximum = self.action_spec.minimum, self.action_spec.maximum
-        space_act_checker = lambda min, max: checkify.check(
-            (max == 1) & (min == -1),
-            "This network only handles the case where actions lie in the interval [-1, 1].",
-        )
-        checkify.checkify(space_act_checker)(minimum, maximum)
 
     @nn.compact
     def __call__(self, obs_embedding: chex.Array, observation: Observation) -> tfd.Independent:

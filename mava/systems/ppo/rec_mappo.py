@@ -210,7 +210,8 @@ def get_learner_fn(
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
 
-                params, opt_states, entropy_key = train_state
+                # UNPACK TRAIN STATE AND BATCH INFO
+                params, opt_states, key = train_state
                 traj_batch, advantages, targets = batch_info
 
                 def _actor_loss_fn(
@@ -272,6 +273,7 @@ def get_learner_fn(
                     return total_loss, (value_loss)
 
                 # CALCULATE ACTOR LOSS
+                key, entropy_key = jax.random.split(key)
                 actor_grad_fn = jax.value_and_grad(_actor_loss_fn, has_aux=True)
                 actor_loss_info, actor_grads = actor_grad_fn(
                     params.actor_params,
