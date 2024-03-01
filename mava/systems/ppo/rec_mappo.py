@@ -210,7 +210,8 @@ def get_learner_fn(
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
 
-                params, opt_states, entropy_key = train_state
+                # UNPACK TRAIN STATE AND BATCH INFO
+                params, opt_states, key = train_state
                 traj_batch, advantages, targets = batch_info
 
                 def _actor_loss_fn(
@@ -272,6 +273,7 @@ def get_learner_fn(
                     return total_loss, (value_loss)
 
                 # CALCULATE ACTOR LOSS
+                key, entropy_key = jax.random.split(key)
                 actor_grad_fn = jax.value_and_grad(_actor_loss_fn, has_aux=True)
                 actor_loss_info, actor_grads = actor_grad_fn(
                     params.actor_params,
@@ -461,7 +463,7 @@ def learner_setup(
     actor_pre_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
     actor_post_torso = hydra.utils.instantiate(config.network.actor_network.post_torso)
     actor_action_head = hydra.utils.instantiate(
-        config.network.action_head, action_dim=env.action_dim, action_spec=env.action_spec()
+        config.network.action_head, action_dim=env.action_dim
     )
     critic_pre_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
     critic_post_torso = hydra.utils.instantiate(config.network.critic_network.post_torso)
