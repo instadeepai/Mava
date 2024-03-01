@@ -179,7 +179,7 @@ def get_rnn_evaluator_fn(
             hstate, pi = apply_fn(params, hstate, ac_in)
 
             if config.arch.evaluation_greedy:
-                action = pi._mode()
+                action = pi.mode()
             else:
                 action = pi.sample(seed=policy_key)
 
