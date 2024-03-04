@@ -515,11 +515,11 @@ def run_experiment(cfg: DictConfig) -> float:
     # Log explore metrics.
     t = int(jnp.sum(learner_state.t))
     sps = t / (time.time() - start_time)
+    logger.log({"step": t, "steps_per_second": sps}, t, 0, LogEvent.MISC)
+
     # Don't mind if episode isn't completed here, nice to have the graphs start near 0.
     # So we ignore the second return value.
     final_metrics, _ = episode_metrics.get_final_step_metrics(metrics)
-
-    logger.log({"step": t, "steps_per_second": sps}, t, 0, LogEvent.MISC)
     logger.log(final_metrics, cfg.system.explore_steps, 0, LogEvent.ACT)
 
     # Main loop:
@@ -584,7 +584,7 @@ def run_experiment(cfg: DictConfig) -> float:
     return float(max_episode_return)
 
 
-@hydra.main(config_path="../../configs", config_name="default_ff_isac.yaml", version_base="1.2")
+@hydra.main(config_path="../../configs", config_name="default_ff_masac.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.

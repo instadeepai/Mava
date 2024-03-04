@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - logger: ff_isac
+  - logger: ff_masac
   - arch: anakin
   - system: sac/ff_masac
   - env: mabrax
