@@ -8,11 +8,11 @@ site_dir: public
 nav:
   - Overview: 'index.md'
   - Installation: 'install.md'
-  - User Guide: 'user_guide.md'
-  - Performance Evaluation: 'performance_evaluation.md'
+#  - User Guide: 'user_guide.md'
+#  - Performance Evaluation: 'performance_evaluation.md'
   - Our Benchmarks: 'benchmarks.md'
   - Contributing: 'contributing.md'
-  - FAQs: 'faq.md'
+#  - FAQs: 'faq.md'
   - Other:
       - Advanced Usage: 'other/advanced_usage.md'
       - RWARE Comparison: 'other/jumanji_rware_comparison.md'
