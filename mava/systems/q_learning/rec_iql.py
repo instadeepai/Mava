@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import time
-from typing import Any, Callable, Dict, NamedTuple, Tuple  # noqa
+from typing import Any, Callable, Dict, Tuple  # noqa
 
 import chex
 import distrax  # noqa
@@ -27,80 +27,27 @@ import optax
 from chex import PRNGKey
 from colorama import Fore, Style
 from flashbax.buffers.flat_buffer import TrajectoryBuffer
-from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.scope import FrozenVariableDict
 from flax.linen.initializers import orthogonal  # noqa
 from jax import Array
-from jumanji.env import Environment, State
+from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
-from typing_extensions import TypeAlias
 
 from mava.evaluator import make_eval_fns  # noqa
 from mava.networks import DiscreteActionEpsGreedyMaskedHead, MLPTorso, ScannedRNN
+from mava.systems.q_learning.types import (  # BufferState,
+    ActionSelectionState,
+    DDQNParams,
+    InteractionState,
+    LearnerState,
+    Metrics,
+    TrainState,
+    Transition,
+)
 from mava.types import Observation, RNNObservation
 from mava.utils import make_env as environments
-
-# from mava.utils.checkpointing import Checkpointer
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers import episode_metrics
-
-Metrics = Dict[str, Array]
-
-
-class Transition(NamedTuple):
-    obs: Array
-    action: Array
-    reward: Array
-    done: Array
-
-
-BufferState: TypeAlias = TrajectoryBufferState[Transition]
-
-
-class IQLParams(NamedTuple):
-    online: FrozenVariableDict
-    target: FrozenVariableDict
-
-
-class LearnerState(NamedTuple):
-    # Interaction vars
-    obs: Array
-    done: Array
-    hidden_state: Array
-    env_state: State
-    time_steps: Array
-
-    # Train vars
-    train_steps: Array
-    opt_state: optax.OptState
-
-    # Shared vars
-    buffer_state: TrajectoryBufferState
-    params: IQLParams
-    key: PRNGKey
-
-
-class ActionSelectionState(NamedTuple):
-    online_params: FrozenVariableDict
-    hidden_state: chex.Array
-    time_steps: int
-    key: chex.PRNGKey
-
-
-class InteractionState(NamedTuple):  # 'carry' in interaction loop
-    action_selection_state: ActionSelectionState
-    env_state: State
-    buffer_state: BufferState
-    obs: Observation
-    done: Array
-
-
-class TrainState(NamedTuple):  # 'carry' in training loop
-    buffer_state: BufferState
-    params: IQLParams
-    opt_state: optax.OptState
-    train_steps: Array
-    key: chex.PRNGKey
 
 
 class RecQNetwork(nn.Module):
@@ -145,13 +92,13 @@ def init(
     optax.GradientTransformation,
     TrajectoryBuffer,
     MavaLogger,
-    chex.PRNGKey,
+    PRNGKey,
 ]:
 
     logger = MavaLogger(cfg)
 
     # init key, get devices available
-    key = jax.random.PRNGKey(cfg.system.seed)
+    key = PRNGKey(cfg.system.seed)
     devices = jax.devices()
     n_devices = len(devices)
 
@@ -191,7 +138,7 @@ def init(
     )  # ensure parameters are separate
 
     # Pack params
-    params = IQLParams(q_params, q_target_params)
+    params = DDQNParams(q_params, q_target_params)
 
     # OPTIMISER
     opt = optax.chain(
@@ -418,8 +365,8 @@ def make_update_fns(
 
     # TRAIN LEVEL 2
     def update_q(
-        params: IQLParams, opt_states: optax.OptState, data: Transition, t_train: int
-    ) -> Tuple[IQLParams, optax.OptState, Metrics]:
+        params: DDQNParams, opt_states: optax.OptState, data: Transition, t_train: int
+    ) -> Tuple[DDQNParams, optax.OptState, Metrics]:
         """Update the Q parameters."""
 
         # Get the data associated with obs
@@ -480,7 +427,7 @@ def make_update_fns(
         # )
 
         # Repack params and opt_states.
-        next_params = IQLParams(next_online_params, next_target_params)
+        next_params = DDQNParams(next_online_params, next_target_params)
 
         return next_params, next_opt_state, q_loss_info
 

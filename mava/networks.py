@@ -158,7 +158,7 @@ class DiscreteActionEpsGreedyMaskedHead(nn.Module):
     @nn.compact
     def __call__(
         self, obs_embedding: chex.Array, observation: Observation, epsilon: float
-    ) -> Tuple[chex.Array, distrax.Categorical]:
+    ) -> Tuple[chex.Array, tfd.Categorical]:
         """Action selection for distrete action space environments.
 
         Args:
@@ -218,7 +218,7 @@ class DiscreteActionEpsGreedyMaskedHead(nn.Module):
         # then options are:
         # -to renormalise and risk erasing an option, (not preferable)
         # -or revert to the system that doesn't mix eps-greedy into one distribution
-        eps_greedy_dist = distrax.Categorical(probs=mixed_eps_greedy_probs)
+        eps_greedy_dist = tfd.Categorical(probs=mixed_eps_greedy_probs)
 
         # q values must be returned for q learning, else we can't double-q-learning-select
         return q_values, eps_greedy_dist
