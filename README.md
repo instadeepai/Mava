@@ -1,14 +1,14 @@
-<div style="text-align: center;">
+<div align="center">
     <a href="docs/images/logos/mava_full_logo.png">
         <img src="docs/images/logos/mava_full_logo.png" alt="Mava logo" style="width: 50%;"/>
     </a>
 </div>
 
-<h2 style="text-align: center;">
+<h2 align="center">
     <p>Distributed Multi-Agent Reinforcement Learning in JAX</p>
 </h2>
 
-<div style="text-align: center;">
+<div align="center">
 <a href="https://www.python.org/doc/versions/">
       <img src="https://img.shields.io/badge/python-3.9-blue" alt="Python Versions">
 </a>
