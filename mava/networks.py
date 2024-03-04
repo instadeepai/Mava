@@ -167,7 +167,8 @@ class DiscreteActionEpsGreedyMaskedHead(nn.Module):
                 `step_count`.
 
         Returns:
-            A distrax.Categorical distribution over the action space for sampling actions from.
+            Q values for double Q-learning selection
+            A tfd.Categorical distribution over the action space for sampling actions from.
 
         NOTE: We pass both the observation embedding and the observation object to the action head
         since the observation object contains the action mask and other potentially useful
@@ -195,11 +196,11 @@ class DiscreteActionEpsGreedyMaskedHead(nn.Module):
         masked_uniform_action_probs = masked_uniform_action_probs.astype("int32") / inner_sum
 
         # GREEDY PART (1-eps %)
-        # set masked actions to smol
+        # set masked actions to value not chosen by argmax
         q_vals_masked = jnp.where(
             observation.action_mask,
             q_values,
-            jnp.finfo(jnp.float32).min,  # I assume this puts a min so that it is never chosen
+            jnp.finfo(jnp.float32).min,
         )
 
         # greedy argmax over action-value dim

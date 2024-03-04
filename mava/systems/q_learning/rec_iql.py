@@ -511,14 +511,16 @@ def make_update_fns(
         )
 
         return next_learner_state, (metrics, losses)
+    
+    devices = jax.devices()
+    n_devices = len(devices)
 
-    pmaped_steps = (
-        cfg.system.total_timesteps // cfg.arch.num_evaluation // cfg.system.n_envs
-    )  # // cfg.n_devices TODO
+    n_updates = cfg.system.total_timesteps / cfg.system.n_envs / n_devices / cfg.system.rollout_length
+    updates_between_logs = (n_updates) // cfg.system.num_evaluations # overall num updates / num of evals
 
     pmaped_updated_step = jax.pmap(
         jax.vmap(
-            lambda state: lax.scan(update_step, state, None, length=pmaped_steps),
+            lambda state: lax.scan(update_step, state, None, length=updates_between_logs),
             axis_name="batch",
         ),
         axis_name="device",
