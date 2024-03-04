@@ -18,9 +18,7 @@ import time
 from typing import Any, Callable, Dict, Tuple
 
 import chex
-import distrax
 import flashbax as fbx
-import flax.linen as nn
 import hydra
 import jax
 import jax.lax as lax
@@ -34,6 +32,8 @@ from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
 
 from mava.evaluator import make_eval_fns
+from mava.networks import FeedForwardActor as Actor
+from mava.networks import FeedForwardQNet as QNetwork
 from mava.systems.sac.types import (
     BufferState,
     LearnerState,
@@ -60,61 +60,6 @@ def get_joint_action(actions: Array) -> Array:
     joint_action = jnp.reshape(repeated_action, (batch_size, num_agents, -1))
 
     return joint_action
-
-
-# todo: should this contain both networks?
-class QNetwork(nn.Module):
-    def setup(self) -> None:
-        self.net = nn.Sequential([nn.Dense(256), nn.relu, nn.Dense(256), nn.relu, nn.Dense(1)])
-
-    @nn.compact
-    def __call__(self, obs: ObservationGlobalState, actions: Array) -> Array:
-        x = jnp.concatenate([obs.global_state, actions], axis=-1)
-        return self.net(x)
-
-
-# rlax does: 0, -4
-LOG_STD_MAX = 2
-LOG_STD_MIN = -5
-
-
-class Actor(nn.Module):
-    n_actions: int
-    maximum: Array
-    minimum: Array
-
-    def setup(self) -> None:
-        self.torso = nn.Sequential([nn.Dense(256), nn.relu, nn.Dense(256), nn.relu])
-        self.mean_nn = nn.Dense(self.n_actions)
-        self.logstd_nn = nn.Dense(self.n_actions)
-
-        scale = 0.5 * (self.maximum - self.minimum)
-        self.bijector = distrax.Chain(
-            [
-                distrax.ScalarAffine(shift=self.minimum, scale=scale),
-                distrax.ScalarAffine(shift=1.0),
-                distrax.Tanh(),
-            ]
-        )
-
-    @nn.compact
-    def __call__(self, obs: Observation) -> distrax.Distribution:
-        x = self.torso(obs.agents_view)
-
-        mean = self.mean_nn(x)
-
-        log_std = self.logstd_nn(x)
-        log_std = jnp.tanh(log_std)
-        # From SpinUp / Denis Yarats
-        log_std = LOG_STD_MIN + 0.5 * (LOG_STD_MAX - LOG_STD_MIN) * (log_std + 1)
-        std = jnp.exp(log_std)
-
-        pi = distrax.Transformed(
-            distribution=distrax.MultivariateNormalDiag(loc=mean, scale_diag=std),
-            bijector=distrax.Block(self.bijector, ndims=1),
-        )
-
-        return pi
 
 
 def init(
@@ -144,37 +89,36 @@ def init(
     n_agents = env.action_spec().shape[0]
     action_dim = env.action_spec().shape[1]
 
-    act_high = jnp.zeros(env.action_spec().shape) + env.action_spec().maximum
-    act_low = jnp.zeros(env.action_spec().shape) + env.action_spec().minimum
-
     key, actor_key, q1_key, q2_key, q1_target_key, q2_target_key = jax.random.split(key, 6)
 
-    init_acts = env.action_spec().generate_value()  # all agents actions
-    init_act_single = init_acts[0]  # single agents action
-    concat_acts = jnp.concatenate([init_act_single for _ in range(n_agents)], axis=0)
+    acts = env.action_spec().generate_value()  # all agents actions
+    act_single = acts[0]  # single agents action
+    concat_acts = jnp.concatenate([act_single for _ in range(n_agents)], axis=0)
     concat_acts_batched = concat_acts[jnp.newaxis, ...]  # batch + concat of all agents actions
-    init_obs = env.observation_spec().generate_value()
-    # global_state = init_obs.global_state  # global state is already single item
-    init_obs_single_batched = jax.tree_map(lambda x: x[0][jnp.newaxis, ...], init_obs)
-    # init_obs_single = init_obs_single._replace(global_state=global_state)
-    # init_obs_single_batched = jax.tree_map(lambda x: x[jnp.newaxis, ...], init_obs_single)
+    obs = env.observation_spec().generate_value()
+    obs_single_batched = jax.tree_map(lambda x: x[0][jnp.newaxis, ...], obs)
 
     # Making actor network
-    actor = Actor(action_dim, act_high, act_low)
-    actor_params = actor.init(actor_key, init_obs_single_batched)
+    actor_torso = hydra.utils.instantiate(cfg.network.actor_network.pre_torso)
+    actor_action_head = hydra.utils.instantiate(
+        cfg.network.action_head, action_dim=env.action_dim, independent_std=False
+    )
+    actor = Actor(actor_torso, actor_action_head)
+    actor_params = actor.init(actor_key, obs_single_batched)
 
     # Making Q networks
-    q = QNetwork()
-    q1_params = q.init(q1_key, init_obs_single_batched, concat_acts_batched)
-    q2_params = q.init(q2_key, init_obs_single_batched, concat_acts_batched)
-    q1_target_params = q.init(q1_target_key, init_obs_single_batched, concat_acts_batched)
-    q2_target_params = q.init(q2_target_key, init_obs_single_batched, concat_acts_batched)
+    critic_torso = hydra.utils.instantiate(cfg.network.critic_network.pre_torso)
+    q = QNetwork(critic_torso, centralised_critic=True)
+    q1_params = q.init(q1_key, obs_single_batched, concat_acts_batched)
+    q2_params = q.init(q2_key, obs_single_batched, concat_acts_batched)
+    q1_target_params = q.init(q1_target_key, obs_single_batched, concat_acts_batched)
+    q2_target_params = q.init(q2_target_key, obs_single_batched, concat_acts_batched)
 
     # Automatic entropy tuning
     target_entropy = -cfg.system.target_entropy_scale * action_dim
     target_entropy = jnp.repeat(target_entropy, n_agents).astype(float)
     # making sure we have dim=3 so broacasting works fine
-    target_entropy = target_entropy[jnp.newaxis, :, jnp.newaxis]
+    target_entropy = target_entropy[jnp.newaxis, :]
     if cfg.system.autotune:
         log_alpha = jnp.zeros_like(target_entropy)
     else:
@@ -205,11 +149,11 @@ def init(
 
     # Create replay buffer
     init_transition = Transition(
-        obs=init_obs,
-        action=init_acts,
+        obs=obs,
+        action=acts,
         reward=jnp.zeros((n_agents,), dtype=float),
         done=jnp.zeros((n_agents,), dtype=bool),
-        next_obs=init_obs,
+        next_obs=obs,
     )
 
     rb = fbx.make_item_buffer(
@@ -318,8 +262,8 @@ def make_update_fns(
         key: chex.PRNGKey,
     ) -> Array:
         pi = actor.apply(actor_params, obs)
-        new_action, log_prob = pi.sample_and_log_prob(seed=key)
-        log_prob = log_prob[..., jnp.newaxis]
+        new_action = pi.sample(seed=key)
+        log_prob = pi.log_prob(new_action)
 
         # Repeat the actions from the replay buffer such that you have (B, Ag, Ag, Ac).
         # This gives you n_agent joint actions with the action dim kept separate.
@@ -346,22 +290,17 @@ def make_update_fns(
     ) -> Tuple[SacParams, OptStates, Metrics]:
         """Update the Q parameters."""
         # Calculate Q target values.
-        rewards = data.reward[..., jnp.newaxis]
-        dones = data.done[..., jnp.newaxis]
-
         pi = actor.apply(params.actor, data.next_obs)
-        next_action, next_log_prob = pi.sample_and_log_prob(seed=key)
-        next_log_prob = next_log_prob[..., jnp.newaxis]
+        next_action = pi.sample(seed=key)
+        next_log_prob = pi.log_prob(next_action)
 
         joint_next_actions = get_joint_action(next_action)
         next_q1_val = q.apply(params.q.targets.q1, data.next_obs, joint_next_actions)
         next_q2_val = q.apply(params.q.targets.q2, data.next_obs, joint_next_actions)
         next_q_val = jnp.minimum(next_q1_val, next_q2_val)
+        next_q_val = next_q_val - jnp.exp(params.log_alpha) * next_log_prob
 
-        entropy_term = jnp.exp(params.log_alpha) * next_log_prob
-        next_q_val = next_q_val - entropy_term
-
-        target_q_val = rewards + (1.0 - dones) * cfg.system.gamma * next_q_val
+        target_q_val = data.reward + (1.0 - data.done) * cfg.system.gamma * next_q_val
 
         # Update Q function.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
@@ -417,8 +356,8 @@ def make_update_fns(
             if cfg.system.autotune:
                 # Get log prob for alpha loss
                 pi = actor.apply(params.actor, data.obs)
-                _, log_prob = pi.sample_and_log_prob(seed=alpha_key)
-                log_prob = log_prob[..., jnp.newaxis]
+                action = pi.sample(seed=key)
+                log_prob = pi.log_prob(action)
 
                 alpha_grad_fn = jax.value_and_grad(alpha_loss_fn)
                 alpha_loss, alpha_grads = alpha_grad_fn(params.log_alpha, log_prob, target_entropy)
@@ -574,11 +513,13 @@ def run_experiment(cfg: DictConfig) -> float:
     learner_state, metrics = explore(learner_state)
 
     # Log explore metrics.
-    final_metrics = episode_metrics.get_final_step_metrics(metrics)
     t = int(jnp.sum(learner_state.t))
     sps = t / (time.time() - start_time)
+    final_metrics, ep_completed = episode_metrics.get_final_step_metrics(metrics)
+
     logger.log({"step": t, "steps per second": sps}, t, 0, LogEvent.MISC)
-    logger.log(final_metrics, cfg.system.explore_steps, 0, LogEvent.ACT)
+    if ep_completed:
+        logger.log(final_metrics, cfg.system.explore_steps, 0, LogEvent.ACT)
 
     # Main loop:
     # We want start to align with the final step of the first pmaped_learn,
@@ -595,10 +536,12 @@ def run_experiment(cfg: DictConfig) -> float:
         # learn steps is not included in the loop counter.
         learn_steps = anakin_steps * cfg.system.epochs
         sps = (t + learn_steps) / (time.time() - start_time)
-        final_metrics = episode_metrics.get_final_step_metrics(metrics)
+        final_metrics, ep_completed = episode_metrics.get_final_step_metrics(metrics)
         loss_metrics = losses | {"log_alpha": learner_state.params.log_alpha}
+
         logger.log({"step": t, "steps_per_second": sps}, t, eval_idx, LogEvent.MISC)
-        logger.log(final_metrics, t, eval_idx, LogEvent.ACT)
+        if ep_completed:
+            logger.log(final_metrics, t, eval_idx, LogEvent.ACT)
         logger.log(loss_metrics, t, eval_idx, LogEvent.TRAIN)
 
         # Evaluate:
