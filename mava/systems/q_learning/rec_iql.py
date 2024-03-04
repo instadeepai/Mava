@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import time
 from typing import Any, Callable, Dict, Tuple  # noqa
 
@@ -32,7 +33,6 @@ from flax.linen.initializers import orthogonal  # noqa
 from jax import Array
 from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
-import copy
 
 from mava.evaluator import make_eval_fns  # noqa
 from mava.networks import DiscreteActionEpsGreedyMaskedHead, MLPTorso, ScannedRNN
@@ -47,9 +47,9 @@ from mava.systems.q_learning.types import (  # BufferState,
 )
 from mava.types import Observation, RNNObservation
 from mava.utils import make_env as environments
+from mava.utils.checkpointing import Checkpointer  # noqa
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers import episode_metrics
-from mava.utils.checkpointing import Checkpointer
 
 
 class RecQNetwork(nn.Module):
@@ -343,10 +343,13 @@ def make_update_fns(
         )
         obs = switch_leading_axis(obs)  # B, T -> T, B
         done = switch_leading_axis(done)  # B, T -> T, B
-        obs_done = (obs, done)  # RNN inputs
+        obs_done = (obs, done)  # RNN inputs TODO ask RNNObservation
 
         _, next_q_vals_online, greedy_dist = q_net.apply(params, hidden_state, obs_done, 0)
-        return next_q_vals_online, greedy_dist  # does it matter if we never switch back
+        return (
+            next_q_vals_online,
+            greedy_dist,
+        )  # switch back for com[atibility with everything else out of the rb
 
     # Standardise the update function inputs for a cond
     def hard_update(
@@ -423,10 +426,6 @@ def make_update_fns(
             soft_update,
             *target_update_params,
         )
-
-        # next_target_params = optax.periodic_update(
-        #     next_online_params, params.target, t_train, cfg.system.update_period
-        # )
 
         # Repack params and opt_states.
         next_params = DDQNParams(next_online_params, next_target_params)
@@ -511,16 +510,26 @@ def make_update_fns(
         )
 
         return next_learner_state, (metrics, losses)
-    
+
     devices = jax.devices()
     n_devices = len(devices)
 
-    n_updates = cfg.system.total_timesteps / cfg.system.n_envs / n_devices / cfg.system.rollout_length
-    updates_between_logs = (n_updates) // cfg.system.num_evaluations # overall num updates / num of evals
+    env_steps_per_update = (
+        cfg.system.n_envs * n_devices * cfg.system.rollout_length
+    )  # TODO add batch size?
+
+    if cfg.system.total_timesteps:
+        n_updates = cfg.system.total_timesteps // env_steps_per_update
+    else:
+        n_updates = cfg.system.num_updates
+
+    n_updates_between_logs = (
+        n_updates
+    ) // cfg.system.num_evaluations  # overall num updates / num of evals
 
     pmaped_updated_step = jax.pmap(
         jax.vmap(
-            lambda state: lax.scan(update_step, state, None, length=updates_between_logs),
+            lambda state: lax.scan(update_step, state, None, length=n_updates_between_logs),
             axis_name="batch",
         ),
         axis_name="device",
@@ -541,10 +550,16 @@ def run_experiment(cfg: DictConfig) -> float:
         // cfg.system.rollout_length
     )
 
-    env_steps_per_rollout = (  # noqa
-        n_devices * cfg.system.n_envs * cfg.system.rollout_length * pmaped_steps  # noqa
-    )  # noqa
-    train_steps_per_rollout = (  # noqa
+    # TODO code duplication
+    env_steps_per_update = cfg.system.n_envs * n_devices * cfg.system.rollout_length
+
+    if cfg.system.total_timesteps:
+        n_updates = cfg.system.total_timesteps // env_steps_per_update
+    else:
+        n_updates = cfg.system.num_updates
+
+    updates_between_logs = (n_updates) // cfg.system.num_evaluations  # noqa
+    train_steps_per_update = (  # noqa
         n_devices * cfg.system.n_envs * cfg.system.epochs * pmaped_steps  # noqa
     )  # noqa
 
@@ -566,6 +581,7 @@ def run_experiment(cfg: DictConfig) -> float:
     start_time = time.time()  # noqa
     tic = time.time()
 
+    # TODO code duplication
     def get_epsilon(t: int) -> float:
         """Calculate epsilon for exploration rate using config variables."""
         eps = jax.numpy.maximum(
@@ -574,9 +590,6 @@ def run_experiment(cfg: DictConfig) -> float:
         return float(eps)
 
     # Main loop:
-    # We want start to align with the final step of the first pmaped_learn,
-    # where we've done explore_steps and 1 full learn step.
-
     for eval_idx in range(cfg.arch.num_evaluation):
         # Learn loop:
         learner_state, (metrics, losses) = update(learner_state)
@@ -620,7 +633,8 @@ def run_experiment(cfg: DictConfig) -> float:
         # # Checkpoint:
         # if cfg.logger.checkpointing.save_model:
         #     # Save checkpoint of learner state
-        #     unreplicated_learner_state = unreplicate_learner_state(unreplicate_batch_dim(learner_state))  # type: ignore
+        #     unreplicated_learner_state =
+        # unreplicate_learner_state(unreplicate_batch_dim(learner_state))  # type: ignore
         #     checkpointer.save(
         #         timestep=t_frm_learnstate,
         #         unreplicated_learner_state=unreplicated_learner_state,
