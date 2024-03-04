@@ -280,7 +280,7 @@ def get_rnn_evaluator_fn(
 
 def make_eval_fns(
     eval_env: Environment,
-    network: Any,
+    network_apply_fn: Any,
     config: DictConfig,
     use_recurrent_net: bool = False,
     scanned_rnn: Optional[nn.Module] = None,
@@ -293,23 +293,23 @@ def make_eval_fns(
         assert scanned_rnn is not None
         evaluator = get_rnn_evaluator_fn(
             eval_env,
-            network.apply,
+            network_apply_fn,
             config,
             scanned_rnn,
             log_win_rate,
         )
         absolute_metric_evaluator = get_rnn_evaluator_fn(
             eval_env,
-            network.apply,
+            network_apply_fn,
             config,
             scanned_rnn,
             log_win_rate,
             10,
         )
     else:
-        evaluator = get_ff_evaluator_fn(eval_env, network.apply, config, log_win_rate)
+        evaluator = get_ff_evaluator_fn(eval_env, network_apply_fn, config, log_win_rate)
         absolute_metric_evaluator = get_ff_evaluator_fn(
-            eval_env, network.apply, config, log_win_rate, 10
+            eval_env, network_apply_fn, config, log_win_rate, 10
         )
 
     evaluator = jax.pmap(evaluator, axis_name="device")
