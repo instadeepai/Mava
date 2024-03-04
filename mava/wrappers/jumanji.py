@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple, Union, Optional
+from typing import Tuple, Union
 
 import chex
 import jax.numpy as jnp
@@ -44,7 +44,7 @@ class MultiAgentWrapper(Wrapper):
         self._num_agents = self._env.num_agents
         self.time_limit = self._env.time_limit
 
-    def modify_timestep(self, timestep: TimeStep, state: Optional[State] = None) -> TimeStep[Observation]:
+    def modify_timestep(self, timestep: TimeStep, state: State) -> TimeStep[Observation]:
         """Modify the timestep for `step` and `reset`."""
         pass
 
@@ -76,7 +76,7 @@ class RwareWrapper(MultiAgentWrapper):
     def __init__(self, env: RobotWarehouse):
         super().__init__(env)
 
-    def modify_timestep(self, timestep: TimeStep, state : State) -> TimeStep[Observation]:
+    def modify_timestep(self, timestep: TimeStep, state: State) -> TimeStep[Observation]:
         """Modify the timestep for the Robotic Warehouse environment."""
         observation = Observation(
             agents_view=timestep.observation.agents_view,
@@ -113,7 +113,7 @@ class LbfWrapper(MultiAgentWrapper):
         reward = jnp.repeat(team_reward, self._num_agents)
         return timestep.replace(observation=observation, reward=reward)
 
-    def modify_timestep(self, timestep: TimeStep, state : State) -> TimeStep[Observation]:
+    def modify_timestep(self, timestep: TimeStep, state: State) -> TimeStep[Observation]:
         """Modify the timestep for Level-Based Foraging environment and update
         the reward based on the specified reward handling strategy."""
 
@@ -229,7 +229,7 @@ class MultiCVRPWrapper(MultiAgentWrapper):
 
     def __init__(self, env: MultiCVRP, has_global_state: bool = False):
         env.num_agents = env._num_vehicles
-        env.time_limit = env._num_customers + 1 #added for consistency
+        env.time_limit = env._num_customers + 1  # added for consistency
         super().__init__(env)
         self._env = env
         self.has_global_state = has_global_state
@@ -289,7 +289,7 @@ class MultiCVRPWrapper(MultiAgentWrapper):
 
         if self.has_global_state:
             # (V * 4 * N * 7, )
-            global_observation = jnp.concat((vehicles_info.ravel(), customers_info))
+            global_observation = jnp.concatenate((vehicles_info.ravel(), customers_info))
             # (V, N * 7 * V * 4)
             global_observation = jnp.tile(global_observation, (self.num_agents, 1))
 
