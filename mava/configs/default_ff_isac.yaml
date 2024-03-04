@@ -3,4 +3,5 @@ defaults:
   - logger: ff_isac
   - arch: anakin
   - system: sac/ff_isac
+  - network: mlp
   - env: mabrax
