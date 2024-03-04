@@ -32,6 +32,7 @@ from flax.linen.initializers import orthogonal  # noqa
 from jax import Array
 from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
+import copy
 
 from mava.evaluator import make_eval_fns  # noqa
 from mava.networks import DiscreteActionEpsGreedyMaskedHead, MLPTorso, ScannedRNN
@@ -48,6 +49,7 @@ from mava.types import Observation, RNNObservation
 from mava.utils import make_env as environments
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers import episode_metrics
+from mava.utils.checkpointing import Checkpointer
 
 
 class RecQNetwork(nn.Module):
@@ -98,7 +100,7 @@ def init(
     logger = MavaLogger(cfg)
 
     # init key, get devices available
-    key = PRNGKey(cfg.system.seed)
+    key = jax.random.PRNGKey(cfg.system.seed)
     devices = jax.devices()
     n_devices = len(devices)
 
@@ -551,13 +553,13 @@ def run_experiment(cfg: DictConfig) -> float:
 
     key, eval_key = jax.random.split(key)
     # todo: don't need to return trained_params or eval keys
-    # evaluator, absolute_metric_evaluator = make_eval_fns(
-    #     eval_env=eval_env,
-    #     network=q_net,  # TODO
-    #     config=cfg,
-    #     use_recurrent_net=True,
-    #     scanned_rnn=ScannedRNN(),  # TODO change what I pass here
-    # )
+    evaluator, absolute_metric_evaluator = make_eval_fns(
+        eval_env=eval_env,
+        network=q_net,  # TODO
+        config=cfg,
+        use_recurrent_net=True,
+        scanned_rnn=ScannedRNN(),  # TODO change what I pass here
+    )
 
     start_time = time.time()  # noqa
     tic = time.time()
@@ -597,42 +599,42 @@ def run_experiment(cfg: DictConfig) -> float:
             {"epsilon": get_epsilon(t_frm_learnstate)}, t_frm_learnstate, eval_idx, LogEvent.MISC
         )
 
-        # # Evaluate:
-        # key, eval_key = jax.random.split(key)
-        # eval_keys = jax.random.split(eval_key, n_devices)
-        # # todo: bug likely here -> don't have batch vmap yet so shouldn't unreplicate_batch_dim
-        # eval_output = evaluator(unreplicate_batch_dim(learner_state.params.online), eval_keys)
-        # jax.block_until_ready(eval_output)
+        # Evaluate:
+        key, eval_key = jax.random.split(key)
+        eval_keys = jax.random.split(eval_key, n_devices)
+        # todo: bug likely here -> don't have batch vmap yet so shouldn't unreplicate_batch_dim
+        eval_output = evaluator(learner_state.params.online, eval_keys)
+        jax.block_until_ready(eval_output)
 
-        # # Log:
-        # episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
-        # logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
+        # Log:
+        episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
+        logger.log(eval_output.episode_metrics, t_frm_learnstate, eval_idx, LogEvent.EVAL)
 
-        # # Save best actor params.
-        # if cfg.arch.absolute_metric and max_episode_return <= episode_return:
-        #     best_params = copy.deepcopy(unreplicate_batch_dim(learner_state.params.online))
-        #     max_episode_return = episode_return
+        # Save best actor params.
+        if cfg.arch.absolute_metric and max_episode_return <= episode_return:
+            best_params = copy.deepcopy(learner_state.params.online)
+            max_episode_return = episode_return
 
         # # Checkpoint:
         # if cfg.logger.checkpointing.save_model:
         #     # Save checkpoint of learner state
-        #     unreplicated_learner_state = unreplicate_learner_state(learner_state)  # type: ignore
+        #     unreplicated_learner_state = unreplicate_learner_state(unreplicate_batch_dim(learner_state))  # type: ignore
         #     checkpointer.save(
-        #         timestep=t,
+        #         timestep=t_frm_learnstate,
         #         unreplicated_learner_state=unreplicated_learner_state,
         #         episode_return=episode_return,
         #     )
 
-    # # Measure absolute metric.
-    # if cfg.arch.absolute_metric:
-    #     eval_keys = jax.random.split(key, n_devices)
+    # Measure absolute metric.
+    if cfg.arch.absolute_metric:
+        eval_keys = jax.random.split(key, n_devices)
 
-    #     eval_output = absolute_metric_evaluator(best_params, eval_keys)
-    #     jax.block_until_ready(eval_output)
+        eval_output = absolute_metric_evaluator(best_params, eval_keys)
+        jax.block_until_ready(eval_output)
 
-    #     logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.ABSOLUTE)
+        logger.log(eval_output.episode_metrics, t_frm_learnstate, eval_idx, LogEvent.ABSOLUTE)
 
-    # logger.stop()
+    logger.stop()
 
     return float(max_episode_return)
 
