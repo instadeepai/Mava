@@ -150,6 +150,81 @@ class ContinuousActionHead(nn.Module):
         )
 
 
+class DiscreteActionEpsGreedyMaskedHead(nn.Module):
+    """Discrete Action Head With Epsilon Greedy Selection And Action Masking"""
+
+    action_dim: int
+
+    @nn.compact
+    def __call__(
+        self, obs_embedding: chex.Array, observation: Observation, epsilon: float
+    ) -> Tuple[chex.Array, tfd.Categorical]:
+        """Action selection for distrete action space environments.
+
+        Args:
+            obs_embedding: Observation embedding from network torso.
+            observation: Observation object containing `agents_view`, `action_mask` and
+                `step_count`.
+
+        Returns:
+            Q values for double Q-learning selection
+            A tfd.Categorical distribution over the action space for sampling actions from.
+
+        NOTE: We pass both the observation embedding and the observation object to the action head
+        since the observation object contains the action mask and other potentially useful
+        information.
+        """
+
+        # q values
+        q_values = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(obs_embedding)
+
+        # action mask needs to fit onto the array of action q-vals
+        chex.assert_equal_shape([q_values, observation.action_mask])
+
+        # UNIFORM PART (eps %)
+        # generate uniform probabilities across all allowable actions at most granular level
+        # maybe I should just make a uniform categorical and sample its probs. Anyways
+        uniform_action_probs = jnp.ones_like(q_values)
+        masked_uniform_action_probs = jnp.where(
+            observation.action_mask,
+            uniform_action_probs,
+            jnp.zeros_like(q_values),
+        )
+        # get num avail actions to generate probabilities for choosing
+        inner_sum = jnp.sum(masked_uniform_action_probs, axis=-1)[..., jnp.newaxis]
+        # divide with sum along axis to get uniform per action choice
+        masked_uniform_action_probs = masked_uniform_action_probs.astype("int32") / inner_sum
+
+        # GREEDY PART (1-eps %)
+        # set masked actions to value not chosen by argmax
+        q_vals_masked = jnp.where(
+            observation.action_mask,
+            q_values,
+            jnp.finfo(jnp.float32).min, 
+        )
+
+        # greedy argmax over action-value dim
+        greedy_actions = jnp.argmax(q_vals_masked, axis=-1)
+        # get one-hot so that shapes are equal again and ready to be made into a prob
+        oh_greedy_actions = jax.nn.one_hot(greedy_actions, self.action_dim)
+        # two probability masks need to fit one another, and why not check consistency
+        chex.assert_equal_shape([oh_greedy_actions, q_vals_masked, q_values])
+
+        mixed_eps_greedy_probs = (
+            epsilon * masked_uniform_action_probs + (1 - epsilon) * oh_greedy_actions
+        )
+
+        # if we get a normalisation error here that means
+        # machine error likely creates a discrepancy in the sum
+        # then options are:
+        # -to renormalise and risk erasing an option, (not preferable)
+        # -or revert to the system that doesn't mix eps-greedy into one distribution
+        eps_greedy_dist = tfd.Categorical(probs=mixed_eps_greedy_probs)
+
+        # q values must be returned for q learning, else we can't double-q-learning-select
+        return q_values, eps_greedy_dist
+
+
 class FeedForwardActor(nn.Module):
     """Feed Forward Actor Network."""
 
