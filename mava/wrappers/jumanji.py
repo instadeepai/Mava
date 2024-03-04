@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple, Union
+from typing import Tuple, Union, Optional
 
 import chex
 import jax.numpy as jnp
@@ -44,27 +44,27 @@ class MultiAgentWrapper(Wrapper):
         self._num_agents = self._env.num_agents
         self.time_limit = self._env.time_limit
 
-    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
+    def modify_timestep(self, timestep: TimeStep, state: Optional[State] = None) -> TimeStep[Observation]:
         """Modify the timestep for `step` and `reset`."""
         pass
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment."""
         state, timestep = self._env.reset(key)
-        return state, self.modify_timestep(timestep)
+        return state, self.modify_timestep(timestep, state)
 
     def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
         """Step the environment."""
         state, timestep = self._env.step(state, action)
-        return state, self.modify_timestep(timestep)
+        return state, self.modify_timestep(timestep, state)
 
     def observation_spec(self) -> specs.Spec[Observation]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
             (self._num_agents,),
-            int,
-            jnp.zeros(self._num_agents, dtype=int),
-            jnp.repeat(self.time_limit, self._num_agents),
+            jnp.int32,
+            [0] * self._num_agents,
+            [self.time_limit] * self._num_agents,
             "step_count",
         )
         return self._env.observation_spec().replace(step_count=step_count)
@@ -76,7 +76,7 @@ class RwareWrapper(MultiAgentWrapper):
     def __init__(self, env: RobotWarehouse):
         super().__init__(env)
 
-    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
+    def modify_timestep(self, timestep: TimeStep, state : State) -> TimeStep[Observation]:
         """Modify the timestep for the Robotic Warehouse environment."""
         observation = Observation(
             agents_view=timestep.observation.agents_view,
@@ -113,7 +113,7 @@ class LbfWrapper(MultiAgentWrapper):
         reward = jnp.repeat(team_reward, self._num_agents)
         return timestep.replace(observation=observation, reward=reward)
 
-    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
+    def modify_timestep(self, timestep: TimeStep, state : State) -> TimeStep[Observation]:
         """Modify the timestep for Level-Based Foraging environment and update
         the reward based on the specified reward handling strategy."""
 
@@ -142,7 +142,7 @@ class ConnectorWrapper(MultiAgentWrapper):
         self.has_global_state = has_global_state
 
     def modify_timestep(
-        self, timestep: TimeStep
+        self, timestep: TimeStep, state: State
     ) -> TimeStep[Union[Observation, ObservationGlobalState]]:
         """Modify the timestep for the Connector environment."""
 
@@ -224,32 +224,22 @@ class ConnectorWrapper(MultiAgentWrapper):
         return spec
 
 
-class MultiCVRPWrapper(Wrapper):
+class MultiCVRPWrapper(MultiAgentWrapper):
     """Wrapper for MultiCVRP environment."""
 
     def __init__(self, env: MultiCVRP, has_global_state: bool = False):
+        env.num_agents = env._num_vehicles
+        env.time_limit = env._num_customers + 1 #added for consistency
         super().__init__(env)
-        self.num_agents = env._num_vehicles
         self._env = env
         self.has_global_state = has_global_state
 
-    def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
-        state, timestep = self._env.reset(key)
-        timestep = self.modify_timestep(timestep, state.step_count)
-        return state, timestep
-
-    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
-        state, timestep = self._env.step(state, action)
-        timestep = self.modify_timestep(timestep, state.step_count)
-        return state, timestep
-
-    def modify_timestep(self, timestep: TimeStep, step_count: chex.Array) -> TimeStep[Observation]:
-        # avoided the MultiAgentWrapper wrapper to use the step_count provided by the environment
+    def modify_timestep(self, timestep: TimeStep, state: State) -> TimeStep[Observation]:
         observation, global_observation = self._flatten_observation(timestep.observation)
         obs_data = {
             "agents_view": observation,
             "action_mask": timestep.observation.action_mask,
-            "step_count": jnp.repeat(step_count, (self.num_agents)),
+            "step_count": jnp.repeat(state.step_count, (self.num_agents)),
         }
         if self.has_global_state:
             obs_data["global_state"] = global_observation
