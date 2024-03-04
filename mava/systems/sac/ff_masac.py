@@ -1,4 +1,3 @@
-# Copyright 2022 InstaD
 # Copyright 2022 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,6 +14,7 @@
 
 import copy
 import time
+from pprint import pprint
 from typing import Any, Callable, Dict, Tuple
 
 import chex
@@ -46,7 +46,7 @@ from mava.systems.sac.types import (
     SacParams,
     Transition,
 )
-from mava.types import Observation, ObservationGlobalState
+from mava.types import ObservationGlobalState
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import unreplicate_batch_dim, unreplicate_n_dims
@@ -117,7 +117,7 @@ def init(
     # Automatic entropy tuning
     target_entropy = -cfg.system.target_entropy_scale * action_dim
     target_entropy = jnp.repeat(target_entropy, n_agents).astype(float)
-    # making sure we have dim=3 so broacasting works fine
+    # making sure we have shape=(B, A) so broacasting works fine
     target_entropy = target_entropy[jnp.newaxis, :]
     if cfg.system.autotune:
         log_alpha = jnp.zeros_like(target_entropy)
@@ -215,13 +215,13 @@ def make_update_fns(
     n_agents = env.action_spec().shape[0]
 
     def step(
-        action: Array, obs: Observation, env_state: State, buffer_state: BufferState
+        action: Array, obs: ObservationGlobalState, env_state: State, buffer_state: BufferState
     ) -> Tuple[Array, State, BufferState, Dict]:
         """Given an action, step the environment and add to the buffer."""
         env_state, timestep = jax.vmap(env.step)(env_state, action)
         next_obs = timestep.observation
         rewards = timestep.reward
-        terms = ~(timestep.discount).astype(bool)
+        terms = ~timestep.discount.astype(bool)
         infos = timestep.extras
 
         real_next_obs = infos["real_next_obs"]
@@ -239,8 +239,8 @@ def make_update_fns(
         q1_a_values = q.apply(q1_params, obs, joint_action)
         q2_a_values = q.apply(q2_params, obs, joint_action)
 
-        q1_loss = jnp.mean((q1_a_values - target) ** 2)
-        q2_loss = jnp.mean((q2_a_values - target) ** 2)
+        q1_loss = jnp.mean(jnp.square(q1_a_values - target))
+        q2_loss = jnp.mean(jnp.square(q2_a_values - target))
 
         loss = q1_loss + q2_loss
         loss_info = {
@@ -488,16 +488,15 @@ def run_experiment(cfg: DictConfig) -> float:
     # Number of steps to do in the scanned update method (how many anakin steps).
     cfg.system.scan_steps = int(steps_per_rollout / anakin_act_steps)
 
+    pprint(OmegaConf.to_container(cfg, resolve=True))
+
+    # Initialize system and make learning functions.
     (env, eval_env), nns, opts, rb, learner_state, target_entropy, logger, key = init(cfg)
     explore, update = make_update_fns(cfg, env, nns, opts, rb, target_entropy)
 
     actor, _ = nns
     key, eval_key = jax.random.split(key)
-    evaluator, absolute_metric_evaluator = make_eval_fns(
-        eval_env=eval_env,
-        network=actor,
-        config=cfg,
-    )
+    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor, cfg)
 
     if cfg.logger.checkpointing.save_model:
         checkpointer = Checkpointer(

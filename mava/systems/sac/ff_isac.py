@@ -479,7 +479,7 @@ def run_experiment(cfg: DictConfig) -> float:
     # Log explore metrics.
     t = int(jnp.sum(learner_state.t))
     sps = t / (time.time() - start_time)
-    logger.log({"step": t, "steps per second": sps}, t, 0, LogEvent.MISC)
+    logger.log({"step": t, "steps_per_second": sps}, t, 0, LogEvent.MISC)
 
     final_metrics, ep_completed = episode_metrics.get_final_step_metrics(metrics)
     if ep_completed:
@@ -502,6 +502,7 @@ def run_experiment(cfg: DictConfig) -> float:
         sps = (t + learn_steps) / (time.time() - start_time)
         final_metrics, ep_completed = episode_metrics.get_final_step_metrics(metrics)
         loss_metrics = losses | {"log_alpha": learner_state.params.log_alpha}
+
         logger.log({"step": t, "steps_per_second": sps}, t, eval_idx, LogEvent.MISC)
         if ep_completed:
             logger.log(final_metrics, t, eval_idx, LogEvent.ACT)
