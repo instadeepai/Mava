@@ -200,7 +200,7 @@ class DiscreteActionEpsGreedyMaskedHead(nn.Module):
         q_vals_masked = jnp.where(
             observation.action_mask,
             q_values,
-            jnp.finfo(jnp.float32).min, 
+            jnp.finfo(jnp.float32).min,
         )
 
         # greedy argmax over action-value dim
