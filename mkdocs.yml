@@ -33,6 +33,7 @@ theme:
     - toc.integrate
     - toc.follow
     - content.code.annotate
+    - content.code.copy
     - navigation.tabs
     - navigation.top
   palette:
@@ -64,10 +65,13 @@ markdown_extensions:
       permalink: "#"
       toc_depth: 3
   - pymdownx.highlight:
-      linenums: true
+      linenums: false
+      line_spans: __span
+      pygments_lang_class: true
   - pymdownx.inlinehilite
   - pymdownx.arithmatex:
       generic: true
+  - pymdownx.superfences
   - def_list
   - admonition
   - pymdownx.details
