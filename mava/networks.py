@@ -184,16 +184,11 @@ class DiscreteActionEpsGreedyMaskedHead(nn.Module):
         # UNIFORM PART (eps %)
         # generate uniform probabilities across all allowable actions at most granular level
         # maybe I should just make a uniform categorical and sample its probs. Anyways
-        uniform_action_probs = jnp.ones_like(q_values)
-        masked_uniform_action_probs = jnp.where(
-            observation.action_mask,
-            uniform_action_probs,
-            jnp.zeros_like(q_values),
-        )
+        masked_uniform_action_probs = observation.action_mask.astype(int)
         # get num avail actions to generate probabilities for choosing
         n_available_actions = jnp.sum(masked_uniform_action_probs, axis=-1)[..., jnp.newaxis]
         # divide with sum along axis to get uniform per action choice
-        masked_uniform_action_probs = masked_uniform_action_probs.astype(int) / inner_sum
+        masked_uniform_action_probs = masked_uniform_action_probs / n_available_actions
 
         # GREEDY PART (1-eps %)
         # set masked actions to value not chosen by argmax
@@ -204,21 +199,16 @@ class DiscreteActionEpsGreedyMaskedHead(nn.Module):
         )
 
         # greedy argmax over action-value dim
-        greedy_actions = jnp.argmax(q_vals_masked, axis=-1)
+        greedy_actions = jnp.argmax(masked_q_vals, axis=-1)
         # get one-hot so that shapes are equal again and ready to be made into a prob
         greedy_actions = jax.nn.one_hot(greedy_actions, self.action_dim)
         # two probability masks need to fit one another, and why not check consistency
-        chex.assert_equal_shape([oh_greedy_actions, q_vals_masked, q_values])
+        chex.assert_equal_shape([greedy_actions, masked_q_vals, q_values])
 
         mixed_eps_greedy_probs = (
-            epsilon * masked_uniform_action_probs + (1 - epsilon) * oh_greedy_actions
+            epsilon * masked_uniform_action_probs + (1 - epsilon) * greedy_actions
         )
 
-        # if we get a normalisation error here that means
-        # machine error likely creates a discrepancy in the sum
-        # then options are:
-        # -to renormalise and risk erasing an option, (not preferable)
-        # -or revert to the system that doesn't mix eps-greedy into one distribution
         eps_greedy_dist = tfd.Categorical(probs=mixed_eps_greedy_probs)
 
         # q values must be returned for q learning, else we can't double-q-learning-select
