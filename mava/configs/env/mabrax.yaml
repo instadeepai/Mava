@@ -1,4 +1,3 @@
-
 # --- Environment Configs---
 defaults:
   - _self_
@@ -14,11 +13,10 @@ scenario:
 eval_metric: episode_return
 
 # Whether the environment observations encode implicit agent IDs. If True, the AgentID wrapper is not used.
-# This should not be changed.
-implicit_agent_id: False
+# Note: When using homogenisation_method = "max", a one-shot vector representing the agent ID is added.
+# If the homogenisation method is changed, set this to False.
+implicit_agent_id: True
 
 kwargs:
   episode_length: 1000
   homogenisation_method: max # Default is None. Options: [max, concat] if dimensions of observations and actions are not homogeneous across agents.
-  # Note: When using "max", a one-shot vector representing the agent ID is added. Therefore ensure that the `system.add_agent_ids=False`
-  # to avoid adding redundant agent IDs to the view.
