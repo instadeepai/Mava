@@ -507,27 +507,36 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
         )
 
     dummy_flashbax_transition = {
-        "done": jnp.zeros((config.system.num_agents,), dtype=bool),
-        "action": jnp.zeros((config.system.num_agents,), dtype=jnp.int32),
-        "reward": jnp.zeros((config.system.num_agents,), dtype=jnp.float32),
-        "observation": jnp.zeros(
+        "terminals": jnp.zeros((config.system.num_agents,), dtype=bool),
+        "actions": jnp.zeros((config.system.num_agents,), dtype=jnp.int32),
+        "rewards": jnp.zeros((config.system.num_agents,), dtype=jnp.float32),
+        "observations": jnp.zeros(
             (
                 config.system.num_agents,
-                env.observation_spec().agents_view.shape[1],
+                env.observation_spec().agents_view.shape[1] - config.system.num_agents,
             ),
             dtype=jnp.int32,
         ),
-        "legal_action_mask": jnp.zeros(
-            (
-                config.system.num_agents,
-                config.system.action_dim,
+        "infos": {
+            "legals": jnp.zeros(
+                (
+                    config.system.num_agents,
+                    config.system.action_dim,
+                ),
+                dtype=bool,
             ),
-            dtype=bool,
-        ),
+            "env_state": jnp.zeros(
+                (
+                    config.system.num_agents
+                    * (env.observation_spec().agents_view.shape[1] - config.system.num_agents),
+                ),
+                dtype=jnp.int32,
+            ),
+        },
     }
 
     buffer = fbx.make_flat_buffer(
-        max_length=int(5e5),  # Max number of transitions to store
+        max_length=int(5e6),  # Max number of transitions to store
         min_length=int(1),
         sample_batch_size=1,
         add_sequences=True,
@@ -586,11 +595,21 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
             flashbax_transition = _reshape_experience(
                 {
                     # (D, NU, UB, T, NE, ...)
-                    "done": experience_to_store.done,
-                    "action": experience_to_store.action,
-                    "reward": experience_to_store.reward,
-                    "observation": experience_to_store.obs.agents_view,
-                    "legal_action_mask": experience_to_store.obs.action_mask,
+                    "terminals": experience_to_store.done,
+                    "actions": experience_to_store.action,
+                    "rewards": experience_to_store.reward,
+                    "observations": experience_to_store.obs.agents_view[
+                        ..., config.system.num_agents :
+                    ],
+                    "infos": {
+                        "legals": experience_to_store.obs.action_mask,
+                        "env_state": experience_to_store.obs.agents_view[
+                            ..., config.system.num_agents :
+                        ].reshape(
+                            *experience_to_store.obs.agents_view.shape[:-2],
+                            -1,
+                        ),
+                    },
                 }
             )
             # Add to fbx buffer
