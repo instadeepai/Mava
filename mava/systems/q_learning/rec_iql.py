@@ -120,16 +120,16 @@ def init(
     # Make dummy inputs to init recurrent Q network -> need format TBAx
     init_obs = env.observation_spec().generate_value()  # A,x
     init_obs_batched = jax.tree_util.tree_map(
-        lambda x: jnp.repeat(x[jnp.newaxis, ...], cfg.system.n_envs, axis=0),
+        lambda x: jnp.repeat(x[jnp.newaxis, ...], cfg.arch.num_envs, axis=0),
         init_obs,
     )  # B, A , x
     init_obs_batched = jax.tree_util.tree_map(
         lambda x: x[jnp.newaxis, ...], init_obs_batched
     )  # add time dim (1,B,A,x)
-    init_done = jnp.zeros((1, cfg.system.n_envs, 1), dtype=bool)  # (1,B,1)
+    init_done = jnp.zeros((1, cfg.arch.num_envs, 1), dtype=bool)  # (1,B,1)
     init_x = (init_obs_batched, init_done)  # pack the RNN dummy inputs
     init_hidden_state = ScannedRNN.initialize_carry(
-        (cfg.system.n_envs, num_agents), cfg.system.hidden_size
+        (cfg.arch.num_envs, num_agents), cfg.system.hidden_size
     )  # (B, A, x)
 
     # Make recurrent Q network
@@ -169,8 +169,8 @@ def init(
         sample_sequence_length=cfg.system.recurrent_chunk_size
         + 1,  # n transitions gives n-1 full data points # TODO: rename
         period=1,  # sample any unique trajectory
-        add_batch_size=cfg.system.n_envs,
-        sample_batch_size=cfg.system.batch_size,
+        add_batch_size=cfg.arch.num_envs,
+        sample_batch_size=cfg.system.sample_batch_size,
         max_length_time_axis=cfg.system.buffer_size,
         min_length_time_axis=cfg.system.buffer_min_size,
     )
@@ -180,8 +180,8 @@ def init(
     # Produce inputs to first learner state
 
     # Keys to reset env
-    n_keys = cfg.system.n_envs * n_devices * cfg.system.update_batch_size
-    key_shape = (n_devices, cfg.system.update_batch_size, cfg.system.n_envs, -1)
+    n_keys = cfg.arch.num_envs * n_devices * cfg.system.update_batch_size
+    key_shape = (n_devices, cfg.system.update_batch_size, cfg.arch.num_envs, -1)
     key, reset_key = jax.random.split(key)
     reset_keys = jax.random.split(reset_key, n_keys)
     reset_keys = jnp.reshape(reset_keys, key_shape)
@@ -189,7 +189,7 @@ def init(
     # Get initial state and timestep per-device
     env_state, first_timestep = jax.pmap(  # devices
         jax.vmap(  # update_batch_size
-            jax.vmap(env.reset),  # n_envs
+            jax.vmap(env.reset),  # num_envs
             axis_name="batch",
         ),
         axis_name="device",
@@ -258,7 +258,7 @@ def make_update_fns(
 
         # repack new selection params
         next_action_selection_state = ActionSelectionState(
-            params, next_hidden_state, t + cfg.system.n_envs, new_key
+            params, next_hidden_state, t + cfg.arch.num_envs, new_key
         )  # TODO check t increment
 
         return next_action_selection_state, action
@@ -339,7 +339,7 @@ def make_update_fns(
         """Applies RNN to a batch of trajectories by scanning over batch dim."""
 
         hidden_state = ScannedRNN.initialize_carry(
-            (cfg.system.batch_size, obs.agents_view.shape[2]), cfg.system.hidden_size
+            (cfg.system.sample_batch_size, obs.agents_view.shape[2]), cfg.system.hidden_size
         )
         obs = switch_leading_axis(obs)  # B, T -> T, B
         done = switch_leading_axis(done)  # B, T -> T, B
@@ -515,7 +515,7 @@ def make_update_fns(
     n_devices = len(devices)
 
     env_steps_per_update = (
-        cfg.system.n_envs * n_devices * cfg.system.rollout_length
+        cfg.arch.num_envs * n_devices * cfg.system.rollout_length
     )  # TODO add batch size?
 
     if cfg.system.total_timesteps:
@@ -525,7 +525,7 @@ def make_update_fns(
 
     n_updates_between_logs = (
         n_updates
-    ) // cfg.system.num_evaluations  # overall num updates / num of evals
+    ) // cfg.arch.num_evaluation  # overall num updates / num of evals
 
     pmaped_updated_step = jax.pmap(
         jax.vmap(
@@ -536,7 +536,17 @@ def make_update_fns(
         donate_argnums=0,
     )
 
-    return pmaped_updated_step
+    # Callable[[FrozenDict, HiddenState, RNNObservation], Tuple[HiddenState, Distribution]
+    def eval_apply(params, hidden_state, obs_done):  # noqa
+        obs, done = obs_done
+        # obs = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], obs)
+        # done = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], done)
+        next_hidden_state, q_values, eps_greedy_dist = q_net.apply(
+            params, hidden_state, (obs, done), 0
+        )
+        return next_hidden_state, eps_greedy_dist
+
+    return pmaped_updated_step, eval_apply
 
 
 def run_experiment(cfg: DictConfig) -> float:
@@ -545,34 +555,34 @@ def run_experiment(cfg: DictConfig) -> float:
     pmaped_steps = (
         cfg.system.total_timesteps
         // cfg.arch.num_evaluation
-        // cfg.system.n_envs
+        // cfg.arch.num_envs
         // n_devices
         // cfg.system.rollout_length
     )
 
     # TODO code duplication
-    env_steps_per_update = cfg.system.n_envs * n_devices * cfg.system.rollout_length
+    env_steps_per_update = cfg.arch.num_envs * n_devices * cfg.system.rollout_length
 
     if cfg.system.total_timesteps:
         n_updates = cfg.system.total_timesteps // env_steps_per_update
     else:
         n_updates = cfg.system.num_updates
 
-    updates_between_logs = (n_updates) // cfg.system.num_evaluations  # noqa
+    updates_between_logs = (n_updates) // cfg.arch.num_evaluation  # noqa
     train_steps_per_update = (  # noqa
-        n_devices * cfg.system.n_envs * cfg.system.epochs * pmaped_steps  # noqa
+        n_devices * cfg.arch.num_envs * cfg.system.epochs * pmaped_steps  # noqa
     )  # noqa
 
     max_episode_return = -jnp.inf
 
     (env, eval_env), learner_state, q_net, opts, rb, logger, key = init(cfg)
-    update = make_update_fns(cfg, env, q_net, opts, rb)
+    update, eval_apply = make_update_fns(cfg, env, q_net, opts, rb)
 
     key, eval_key = jax.random.split(key)
     # todo: don't need to return trained_params or eval keys
     evaluator, absolute_metric_evaluator = make_eval_fns(
         eval_env=eval_env,
-        network=q_net,  # TODO
+        network_apply_fn=eval_apply,  # TODO
         config=cfg,
         use_recurrent_net=True,
         scanned_rnn=ScannedRNN(),  # TODO change what I pass here
@@ -603,6 +613,17 @@ def run_experiment(cfg: DictConfig) -> float:
         loss_metrics = losses
 
         logger.log(
+            (
+                {
+                    "step_calc": eval_idx * env_steps_per_update * updates_between_logs,
+                    "steps_per_second": sps,
+                }
+            ),
+            t_frm_learnstate,
+            eval_idx,
+            LogEvent.MISC,
+        )
+        logger.log(
             ({"step": t_frm_learnstate, "steps_per_second": sps}),
             t_frm_learnstate,
             eval_idx,
@@ -618,7 +639,11 @@ def run_experiment(cfg: DictConfig) -> float:
         key, eval_key = jax.random.split(key)
         eval_keys = jax.random.split(eval_key, n_devices)
         # todo: bug likely here -> don't have batch vmap yet so shouldn't unreplicate_batch_dim
-        eval_output = evaluator(learner_state.params.online, eval_keys)
+
+        # essentially squeeze
+        eval_params = jax.tree_util.tree_map(lambda x: x[0, ...], learner_state.params.online)
+
+        eval_output = evaluator(eval_params, eval_keys)
         jax.block_until_ready(eval_output)
 
         # Log:

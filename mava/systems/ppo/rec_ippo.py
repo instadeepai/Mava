@@ -621,7 +621,7 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
     eval_keys = jax.random.split(key_e, n_devices)
     evaluator, absolute_metric_evaluator = make_eval_fns(
         eval_env=eval_env,
-        network=actor_network,
+        network_apply_fn=actor_network.apply,
         config=config,
         use_recurrent_net=True,
         scanned_rnn=ScannedRNN,

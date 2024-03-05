@@ -148,6 +148,8 @@ def get_rnn_evaluator_fn(
 ) -> EvalFn:
     """Get the evaluator function for recurrent networks."""
 
+    num_agents = env.action_spec().shape[0]
+
     def eval_one_episode(params: FrozenDict, init_eval_state: RNNEvalState) -> Dict:
         """Evaluate one episode. It is vectorized over the number of evaluation episodes."""
 
@@ -193,7 +195,7 @@ def get_rnn_evaluator_fn(
                 key,
                 env_state,
                 timestep,
-                jnp.repeat(timestep.last(), config.system.num_agents),
+                jnp.repeat(timestep.last(), num_agents),
                 hstate,
                 step_count,
                 episode_return,
@@ -237,15 +239,15 @@ def get_rnn_evaluator_fn(
 
         # Initialise hidden state.
         init_hstate = scanned_rnn.initialize_carry(
-            (eval_batch, config.system.num_agents),
-            config.network.actor_network.pre_torso.layer_sizes[-1],
+            (eval_batch, num_agents),
+            config.system.hidden_size,
         )
 
         # Initialise dones.
         dones = jnp.zeros(
             (
                 eval_batch,
-                config.system.num_agents,
+                num_agents,
             ),
             dtype=bool,
         )
@@ -280,7 +282,7 @@ def get_rnn_evaluator_fn(
 
 def make_eval_fns(
     eval_env: Environment,
-    network: Any,
+    network_apply_fn: Any,
     config: DictConfig,
     use_recurrent_net: bool = False,
     scanned_rnn: Optional[nn.Module] = None,
@@ -293,23 +295,23 @@ def make_eval_fns(
         assert scanned_rnn is not None
         evaluator = get_rnn_evaluator_fn(
             eval_env,
-            network.apply,
+            network_apply_fn,
             config,
             scanned_rnn,
             log_win_rate,
         )
         absolute_metric_evaluator = get_rnn_evaluator_fn(
             eval_env,
-            network.apply,
+            network_apply_fn,
             config,
             scanned_rnn,
             log_win_rate,
             10,
         )
     else:
-        evaluator = get_ff_evaluator_fn(eval_env, network.apply, config, log_win_rate)
+        evaluator = get_ff_evaluator_fn(eval_env, network_apply_fn, config, log_win_rate)
         absolute_metric_evaluator = get_ff_evaluator_fn(
-            eval_env, network.apply, config, log_win_rate, 10
+            eval_env, network_apply_fn, config, log_win_rate, 10
         )
 
     evaluator = jax.pmap(evaluator, axis_name="device")
