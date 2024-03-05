@@ -12,3 +12,5 @@ eval_metric: episode_return
 
 kwargs:
   time_limit: 100
+
+# Note: Always set system.add_ids_to_agent_view=False when using this env, it has implicit agent IDs.

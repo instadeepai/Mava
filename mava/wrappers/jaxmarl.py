@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import copy
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections import namedtuple
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Dict, List, Tuple, Union
@@ -159,7 +159,7 @@ def jaxmarl_space_to_jumanji_spec(space: jaxmarl_spaces.Space) -> specs.Spec:
         raise ValueError(f"Unsupported JaxMarl space: {space}")
 
 
-class JaxMarlWrapper(Wrapper):
+class JaxMarlWrapper(Wrapper, ABC):
     """
     A wrapper for JaxMarl environments to make their API compatible with Jumanji environments.
     """

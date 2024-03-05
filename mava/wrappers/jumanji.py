@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from functools import cached_property
 from typing import Tuple, Union
 
@@ -36,7 +36,7 @@ from jumanji.wrappers import Wrapper
 from mava.types import Observation, ObservationGlobalState, State
 
 
-class MultiAgentWrapper(Wrapper):
+class MultiAgentWrapper(Wrapper, ABC):
     def __init__(self, env: Environment, add_global_state: bool):
         super().__init__(env)
         self.num_agents = self._env.num_agents
@@ -50,7 +50,7 @@ class MultiAgentWrapper(Wrapper):
 
     def get_global_state(self, obs: Observation) -> chex.Array:
         """The default way to create a global state for an environment if it has no
-        available global state - concatenate all observations
+        available global state - concatenate all observations.
         """
         global_state = jnp.concatenate(obs.agents_view, axis=0)
         global_state = jnp.tile(global_state, (self._env.num_agents, 1))
