@@ -76,7 +76,8 @@ class CNNTorso(nn.Module):
                 x = nn.LayerNorm(use_scale=False)(x)
             x = self.activation_fn(x)
 
-        return x.reshape((x.shape[0], -1))
+        # Reshape should keep the batch and agent dimensions unchanged.
+        return x.reshape((x.shape[0], x.shape[1], -1))
 
 
 class DiscreteActionHead(nn.Module):
