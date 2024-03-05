@@ -13,7 +13,7 @@ scenario:
 eval_metric: episode_return
 
 # Whether the environment observations encode implicit agent IDs. If True, the AgentID wrapper is not used.
-# Note: When using homogenisation_method = "max", a one-shot vector representing the agent ID is added.
+# Note: When using homogenisation_method = "max", a one-hot vector representing the agent ID is added.
 # If the homogenisation method is changed, set this to False.
 implicit_agent_id: True
 

@@ -174,7 +174,8 @@ class LbfWrapper(MultiAgentWrapper):
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for Level-Based Foraging environment and update
-        the reward based on the specified reward handling strategy."""
+        the reward based on the specified reward handling strategy.
+        """
 
         # Create a new observation with adjusted step count
         modified_observation = Observation(
@@ -225,7 +226,8 @@ class ConnectorWrapper(MultiAgentWrapper):
 
     def get_global_state(self, obs: Observation) -> chex.Array:
         """Constructs the global state from the global information
-        in the agent observations (positions, targets and paths.)"""
+        in the agent observations (positions, targets and paths.)
+        """
 
         return obs.agents_view[..., :3]
 

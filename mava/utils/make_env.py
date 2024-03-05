@@ -62,8 +62,12 @@ _gigastep_registry = {"Gigastep": GigastepWrapper}
 def add_extra_wrappers(
     train_env: Environment, eval_env: Environment, config: DictConfig
 ) -> Environment:
+
+    # Disable the AgentID wrapper if the environment has implicit agent IDs.
+    add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
+
     # Add agent id to observation.
-    if config.system.add_agent_id:
+    if add_agent_id:
         train_env = AgentIDWrapper(train_env)
         eval_env = AgentIDWrapper(eval_env)
 
@@ -96,9 +100,6 @@ def make_jumanji_env(
     eval_env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
     train_env = wrapper(train_env, add_global_state=add_global_state)
     eval_env = wrapper(eval_env, add_global_state=add_global_state)
-
-    # Disable the AgentID wrapper if the environment has implicit agent IDs.
-    config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
 
     train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
     return train_env, eval_env
