@@ -191,7 +191,7 @@ class DiscreteActionEpsGreedyMaskedHead(nn.Module):
             jnp.zeros_like(q_values),
         )
         # get num avail actions to generate probabilities for choosing
-        inner_sum = jnp.sum(masked_uniform_action_probs, axis=-1)[..., jnp.newaxis]
+        n_available_actions = jnp.sum(masked_uniform_action_probs, axis=-1)[..., jnp.newaxis]
         # divide with sum along axis to get uniform per action choice
         masked_uniform_action_probs = masked_uniform_action_probs.astype("int32") / inner_sum
 
