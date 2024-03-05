@@ -227,7 +227,10 @@ def make_update_fns(
     q_net: RecQNetwork,
     opt: optax.GradientTransformation,
     rb: TrajectoryBuffer,
-) -> Any:  # Callable:  # [[LearnerState, Tuple[Metrics, Metrics]],]:  # TODO typing
+) -> Any:
+    # ) -> Tuple[
+    #     Callable[[LearnerState], Tuple[LearnerState, Metrics]],
+    #     Callable[[LearnerState], Tuple[LearnerState, Tuple[Metrics, Metrics]]]]:  # TODO typing
 
     # INTERACT LEVEL 2
     def select_eps_greedy_action(
@@ -537,7 +540,9 @@ def make_update_fns(
     )
 
     # Callable[[FrozenDict, HiddenState, RNNObservation], Tuple[HiddenState, Distribution]
-    def eval_apply(params, hidden_state, obs_done):  # noqa
+    def eval_apply(
+        params: FrozenVariableDict, hidden_state: Array, obs_done: RNNObservation
+    ) -> Tuple[Array, distrax.Categorical]:  # noqa
         obs, done = obs_done
         # obs = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], obs)
         # done = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], done)
