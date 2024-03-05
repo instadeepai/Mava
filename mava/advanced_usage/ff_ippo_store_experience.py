@@ -656,7 +656,6 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
         jax.block_until_ready(evaluator_output)
 
         elapsed_time = time.time() - start_time
-
         steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
         t = int(steps_per_rollout * (eval_step + 1))
         evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
