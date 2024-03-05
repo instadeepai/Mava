@@ -63,12 +63,18 @@ def get_ff_evaluator_fn(
 
             # Select action.
             key, policy_key = jax.random.split(key)
-            pi = apply_fn(params, last_timestep.observation)
+            # Add a batch dimension to the observation.
+            pi = apply_fn(
+                params, jax.tree_map(lambda x: x[jnp.newaxis, ...], last_timestep.observation)
+            )
 
             if config.arch.evaluation_greedy:
                 action = pi.mode()
             else:
                 action = pi.sample(seed=policy_key)
+
+            # Remove batch dim for stepping the environment.
+            action = jnp.squeeze(action, axis=0)
 
             # Step environment.
             env_state, timestep = env.step(env_state, action)
