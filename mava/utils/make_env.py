@@ -97,6 +97,10 @@ def make_jumanji_env(
     train_env = wrapper(train_env, add_global_state=add_global_state)
     eval_env = wrapper(eval_env, add_global_state=add_global_state)
 
+    if env_name in {"MaConnector-v2"}:
+        # The environment has implicit agent IDs
+        config.system.add_agent_id = False
+
     train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
     return train_env, eval_env
 
