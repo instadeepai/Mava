@@ -206,7 +206,7 @@ class DiscreteActionEpsGreedyMaskedHead(nn.Module):
         # greedy argmax over action-value dim
         greedy_actions = jnp.argmax(q_vals_masked, axis=-1)
         # get one-hot so that shapes are equal again and ready to be made into a prob
-        oh_greedy_actions = jax.nn.one_hot(greedy_actions, self.action_dim)
+        greedy_actions = jax.nn.one_hot(greedy_actions, self.action_dim)
         # two probability masks need to fit one another, and why not check consistency
         chex.assert_equal_shape([oh_greedy_actions, q_vals_masked, q_values])
 
