@@ -13,6 +13,10 @@ scenario:
 # This metric is returned at the end of an experiment and can be used for hyperparameter tuning.
 eval_metric: episode_return
 
+# Whether the environment observations encode implicit agent IDs. If True, the AgentID wrapper is not used.
+# This should not be changed.
+implicit_agent_id: False
+
 kwargs:
   episode_length: 1000
   homogenisation_method: max # Default is None. Options: [max, concat] if dimensions of observations and actions are not homogeneous across agents.
