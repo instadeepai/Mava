@@ -197,7 +197,7 @@ class DiscreteActionEpsGreedyMaskedHead(nn.Module):
 
         # GREEDY PART (1-eps %)
         # set masked actions to value not chosen by argmax
-        q_vals_masked = jnp.where(
+        masked_q_vals = jnp.where(
             observation.action_mask,
             q_values,
             jnp.finfo(jnp.float32).min,
