@@ -695,7 +695,8 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
         elapsed_time = time.time() - start_time
         episode_return = jnp.mean(evaluator_output.episode_metrics["episode_return"])
 
-        evaluator_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
+        evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
         logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.EVAL)
 
         if save_checkpoint:
@@ -729,8 +730,9 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
 
         elapsed_time = time.time() - start_time
 
+        steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
         t = int(steps_per_rollout * (eval_step + 1))
-        evaluator_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
         logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.ABSOLUTE)
 
     # Stop the logger.
