@@ -39,6 +39,7 @@ from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import merge_leading_dims, unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.make_env import make
+from mava.wrappers.episode_metrics import get_final_step_metrics
 
 StoreExpLearnerFn = Callable[[MavaState], Tuple[ExperimentOutput[MavaState], PPOTransition]]
 
@@ -372,10 +373,9 @@ def learner_setup(
         optax.adam(config.system.critic_lr, eps=1e-5),
     )
 
-    # Initialise observation: Select only obs for a single agent.
-    init_x = env.observation_spec().generate_value()
-    init_x = jax.tree_util.tree_map(lambda x: x[0], init_x)
-    init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
+    # Initialise observation with obs of all agents.
+    obs = env.observation_spec().generate_value()
+    init_x = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], obs)
 
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(key_p, init_x)
@@ -398,20 +398,8 @@ def learner_setup(
         # Update the params
         actor_params, critic_params = restored_params.actor_params, restored_params.critic_params
 
-    # Vmap network apply function over number of agents.
-    vmapped_actor_network_apply_fn = jax.vmap(
-        actor_network.apply,
-        in_axes=(None, 1),
-        out_axes=(1),
-    )
-    vmapped_critic_network_apply_fn = jax.vmap(
-        critic_network.apply,
-        in_axes=(None, 1),
-        out_axes=(1),
-    )
-
     # Pack apply and update functions.
-    apply_fns = (vmapped_actor_network_apply_fn, vmapped_critic_network_apply_fn)
+    apply_fns = (actor_network.apply, critic_network.apply)
     update_fns = (actor_optim.update, critic_optim.update)
 
     # Get batched iterated update and replicate it to pmap it over cores.
@@ -609,10 +597,13 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
         # Log the results of the training.
         elapsed_time = time.time() - start_time
         t = int(steps_per_rollout * (eval_step + 1))
-        learner_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
-        learner_output.episode_metrics["timestep"] = t
+        episode_metrics, ep_completed = get_final_step_metrics(learner_output.episode_metrics)
+        episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
 
-        logger.log(learner_output.episode_metrics, t, eval_step, LogEvent.ACT)
+        # Separately log timesteps, actoring metrics and training metrics.
+        logger.log({"timestep": t}, t, eval_step, LogEvent.MISC)
+        if ep_completed:
+            logger.log(learner_output.episode_metrics, t, eval_step, LogEvent.ACT)
         logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
 
         # Prepare for evaluation.
@@ -631,7 +622,8 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
         elapsed_time = time.time() - start_time
         episode_return = jnp.mean(evaluator_output.episode_metrics["episode_return"])
 
-        evaluator_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
+        evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
         logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.EVAL)
 
         if save_checkpoint:
@@ -664,9 +656,9 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
         jax.block_until_ready(evaluator_output)
 
         elapsed_time = time.time() - start_time
-
+        steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
         t = int(steps_per_rollout * (eval_step + 1))
-        evaluator_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
         logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.ABSOLUTE)
 
     # Stop logger
