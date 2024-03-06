@@ -2,5 +2,5 @@ defaults:
   - _self_
   - logger: rec_iql
   - arch: anakin
-  - system: rec_iql
+  - system: q_learning/rec_iql
   - env: smax

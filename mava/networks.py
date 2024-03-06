@@ -23,7 +23,11 @@ import tensorflow_probability.substrates.jax.distributions as tfd
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
 
-from mava.distributions import IdentityTransformation, TanhTransformedDistribution
+from mava.distributions import (
+    IdentityTransformation,
+    MaskedEpsGreedyDistribution,
+    TanhTransformedDistribution,
+)
 from mava.types import (
     Observation,
     ObservationGlobalState,
@@ -182,35 +186,7 @@ class DiscreteActionEpsGreedyMaskedHead(nn.Module):
         # action mask needs to fit onto the array of action q-vals
         chex.assert_equal_shape([q_values, observation.action_mask])
 
-        # UNIFORM PART (eps %)
-        # generate uniform probabilities across all allowable actions at most granular level
-        # maybe I should just make a uniform categorical and sample its probs. Anyways
-        masked_uniform_action_probs = observation.action_mask.astype(int)
-        # get num avail actions to generate probabilities for choosing
-        n_available_actions = jnp.sum(masked_uniform_action_probs, axis=-1)[..., jnp.newaxis]
-        # divide with sum along axis to get uniform per action choice
-        masked_uniform_action_probs = masked_uniform_action_probs / n_available_actions
-
-        # GREEDY PART (1-eps %)
-        # set masked actions to value not chosen by argmax
-        masked_q_vals = jnp.where(
-            observation.action_mask,
-            q_values,
-            jnp.finfo(jnp.float32).min,
-        )
-
-        # greedy argmax over action-value dim
-        greedy_actions = jnp.argmax(masked_q_vals, axis=-1)
-        # get one-hot so that shapes are equal again and ready to be made into a prob
-        greedy_actions = jax.nn.one_hot(greedy_actions, self.action_dim)
-        # two probability masks need to fit one another, and why not check consistency
-        chex.assert_equal_shape([greedy_actions, masked_q_vals, q_values])
-
-        mixed_eps_greedy_probs = (
-            epsilon * masked_uniform_action_probs + (1 - epsilon) * greedy_actions
-        )
-
-        eps_greedy_dist = tfd.Categorical(probs=mixed_eps_greedy_probs)
+        eps_greedy_dist = MaskedEpsGreedyDistribution(q_values, epsilon, observation.action_mask)
 
         # q values must be returned for q learning, else we can't double-q-learning-select
         return q_values, eps_greedy_dist

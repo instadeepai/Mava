@@ -15,6 +15,7 @@
 from typing import Any, Optional
 
 import chex
+import jax
 import jax.numpy as jnp
 import tensorflow_probability.substrates.jax.bijectors as tfb
 import tensorflow_probability.substrates.jax.distributions as tfd
@@ -88,6 +89,46 @@ class TanhTransformedDistribution(tfd.TransformedDistribution):
     def _parameter_properties(cls, dtype: Optional[Any], num_classes: Any = None) -> Any:
         td_properties = super()._parameter_properties(dtype, num_classes=num_classes)
         del td_properties["bijector"]
+        return td_properties
+
+
+class MaskedEpsGreedyDistribution(tfd.Categorical):
+
+    def __init__(self, q_values: chex.Array, epsilon: float, mask: chex.Array):
+
+        # UNIFORM PART (eps %)
+        # generate uniform probabilities across all allowable actions at most granular level
+        # maybe I should just make a uniform categorical and sample its probs. Anyways
+        masked_uniform_action_probs = mask.astype(int)
+        # get num avail actions to generate probabilities for choosing
+        n_available_actions = jnp.sum(masked_uniform_action_probs, axis=-1)[..., jnp.newaxis]
+        # divide with sum along axis to get uniform per action choice
+        masked_uniform_action_probs = masked_uniform_action_probs / n_available_actions
+
+        # GREEDY PART (1-eps %)
+        # set masked actions to value not chosen by argmax
+        masked_q_vals = jnp.where(
+            mask,
+            q_values,
+            jnp.finfo(jnp.float32).min,
+        )
+
+        # greedy argmax over action-value dim
+        greedy_actions = jnp.argmax(masked_q_vals, axis=-1)
+        # get one-hot so that shapes are equal again and ready to be made into a prob
+        greedy_actions = jax.nn.one_hot(greedy_actions, q_values.shape[-1])
+        # two probability masks need to fit one another, and why not check consistency
+        chex.assert_equal_shape([greedy_actions, masked_q_vals, q_values])
+
+        mixed_eps_greedy_probs = (
+            epsilon * masked_uniform_action_probs + (1 - epsilon) * greedy_actions
+        )
+
+        super().__init__(probs=mixed_eps_greedy_probs)
+
+    @classmethod
+    def _parameter_properties(cls, dtype: Optional[Any], num_classes: Any = None) -> Any:
+        td_properties = super()._parameter_properties(dtype, num_classes=num_classes)
         return td_properties
 
 
