@@ -36,7 +36,6 @@ from mava.wrappers import (
     AutoResetWrapper,
     ConnectorWrapper,
     GigastepWrapper,
-    GlobalStateWrapper,
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
@@ -60,17 +59,21 @@ _jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 _gigastep_registry = {"Gigastep": GigastepWrapper}
 
 
-def add_optional_wrappers(
-    env: Environment, config: DictConfig, add_global_state: bool = False
+def add_extra_wrappers(
+    train_env: Environment, eval_env: Environment, config: DictConfig
 ) -> Environment:
-    # Add the global state to observation.
-    if add_global_state:
-        env = GlobalStateWrapper(env)
+
+    # Disable the AgentID wrapper if the environment has implicit agent IDs.
+    config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
 
     # Add agent id to observation.
     if config.system.add_agent_id:
-        env = AgentIDWrapper(env)
-    return env
+        train_env = AgentIDWrapper(train_env)
+        eval_env = AgentIDWrapper(eval_env)
+
+    train_env = AutoResetWrapper(train_env)
+    train_env = RecordEpisodeMetrics(train_env)
+    return train_env, eval_env
 
 
 def make_jumanji_env(
@@ -93,17 +96,13 @@ def make_jumanji_env(
     wrapper = _jumanji_registry[env_name]["wrapper"]
 
     # Create envs.
-    env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
+    train_env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
     eval_env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
-    env, eval_env = wrapper(env), wrapper(eval_env)
+    train_env = wrapper(train_env, add_global_state=add_global_state)
+    eval_env = wrapper(eval_env, add_global_state=add_global_state)
 
-    env = add_optional_wrappers(env, config, add_global_state)
-    eval_env = add_optional_wrappers(eval_env, config, add_global_state)
-
-    env = AutoResetWrapper(env)
-    env = RecordEpisodeMetrics(env)
-
-    return env, eval_env
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
+    return train_env, eval_env
 
 
 def make_jaxmarl_env(
@@ -126,7 +125,7 @@ def make_jaxmarl_env(
         kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
 
     # Create jaxmarl envs.
-    env = _jaxmarl_wrappers[config.env.env_name](
+    train_env = _jaxmarl_wrappers[config.env.env_name](
         jaxmarl.make(env_name, **kwargs),
         add_global_state,
     )
@@ -135,14 +134,9 @@ def make_jaxmarl_env(
         add_global_state,
     )
 
-    # Add agent id to observation.
-    env = add_optional_wrappers(env, config)
-    eval_env = add_optional_wrappers(eval_env, config)
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
 
-    env = AutoResetWrapper(env)
-    env = RecordEpisodeMetrics(env)
-
-    return env, eval_env
+    return train_env, eval_env
 
 
 def make_matrax_env(
@@ -164,17 +158,13 @@ def make_matrax_env(
 
     # Create envs.
     task_name = config["env"]["scenario"]["task_name"]
-    env = matrax.make(task_name, **config.env.kwargs)
+    train_env = matrax.make(task_name, **config.env.kwargs)
     eval_env = matrax.make(task_name, **config.env.kwargs)
-    env, eval_env = wrapper(env), wrapper(eval_env)
+    train_env = wrapper(train_env, add_global_state)
+    eval_env = wrapper(eval_env, add_global_state)
 
-    env = add_optional_wrappers(env, config, add_global_state)
-    eval_env = add_optional_wrappers(eval_env, config, add_global_state)
-
-    env = AutoResetWrapper(env)
-    env = RecordEpisodeMetrics(env)
-
-    return env, eval_env
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
+    return train_env, eval_env
 
 
 def make_gigastep_env(
@@ -199,11 +189,7 @@ def make_gigastep_env(
     train_env = wrapper(scenario.make(**kwargs), has_global_state=add_global_state)
     eval_env = wrapper(scenario.make(**kwargs), has_global_state=add_global_state)
 
-    train_env = add_optional_wrappers(train_env, config)
-    eval_env = add_optional_wrappers(eval_env, config)
-
-    train_env = AutoResetWrapper(train_env)
-    train_env = RecordEpisodeMetrics(train_env)
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
     return train_env, eval_env
 
 
