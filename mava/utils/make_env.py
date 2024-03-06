@@ -64,10 +64,10 @@ def add_extra_wrappers(
 ) -> Environment:
 
     # Disable the AgentID wrapper if the environment has implicit agent IDs.
-    add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
+    config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
 
     # Add agent id to observation.
-    if add_agent_id:
+    if config.system.add_agent_id:
         train_env = AgentIDWrapper(train_env)
         eval_env = AgentIDWrapper(eval_env)
 
