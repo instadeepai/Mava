@@ -21,6 +21,8 @@ import chex
 import jax.numpy as jnp
 from jumanji import specs
 from jumanji.env import Environment
+from jumanji.environments.routing.cleaner import Cleaner
+from jumanji.environments.routing.cleaner.constants import DIRTY, WALL
 from jumanji.environments.routing.connector import MaConnector
 from jumanji.environments.routing.connector.constants import (
     EMPTY,
@@ -263,34 +265,33 @@ class ConnectorWrapper(MultiAgentWrapper):
             )
             obs_data["global_state"] = global_state
             return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
-        
+
         return specs.Spec(Observation, "ObservationSpec", **obs_data)
 
-      
-class CleanerWrapper(MultiAgentWrapper):
-    """Multi-agent wrapper for the Cleaner environment.
-    """
 
-    def __init__(self, env: Cleaner, has_global_state: bool = False):
-        super().__init__(env, has_global_state)
+class CleanerWrapper(MultiAgentWrapper):
+    """Multi-agent wrapper for the Cleaner environment."""
+
+    def __init__(self, env: Cleaner, add_global_state: bool = False):
+        super().__init__(env, add_global_state)
         self._env: Cleaner
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for the Cleaner environment."""
 
         def create_agents_view(grid: chex.Array, agents_locations: chex.Array) -> chex.Array:
-            '''Create separate channels for dirty cells, wall cells and agent positions.
-            Also add a channel for marking an agent's own position.'''
+            """Create separate channels for dirty cells, wall cells and agent positions.
+            Also add a channel that marks an agent's own position."""
+
+            num_agents = self.num_agents
+
             # N: Number of agents
             # R: Number of grid rows
             # C: Number of grid columns
+            # grid: (R, C)
 
             # (N, 2)
             agents_locations = agents_locations
-
-            num_agents = self._num_agents
-
-            # grid: (R, C)
 
             # Get dirty / wall tiles from first agent's obs and tile.
             # (A, R, C)
@@ -299,7 +300,7 @@ class CleanerWrapper(MultiAgentWrapper):
 
             # (2, N)
             xs, ys = agents_locations[:, 0], agents_locations[:, 1]
-            
+
             # Mask each agent's position so an agent can idenfity itself.
             # Sum the masked grids together for global agent information.
             # (A, R, C)
@@ -319,11 +320,11 @@ class CleanerWrapper(MultiAgentWrapper):
                 timestep.observation.grid, timestep.observation.agents_locations
             ),
             "action_mask": timestep.observation.action_mask,
-            "step_count": jnp.repeat(timestep.observation.step_count, self._num_agents),
+            "step_count": jnp.repeat(timestep.observation.step_count, self.num_agents),
         }
 
-        reward = jnp.repeat(timestep.reward, self._num_agents)
-        discount = jnp.repeat(timestep.discount, self._num_agents)
+        reward = jnp.repeat(timestep.reward, self.num_agents)
+        discount = jnp.repeat(timestep.discount, self.num_agents)
 
         return timestep.replace(
             observation=Observation(**obs_data), reward=reward, discount=discount
@@ -333,35 +334,35 @@ class CleanerWrapper(MultiAgentWrapper):
         """Constructs the global state from the global information
         in the agent observations (dirty tiles, wall tiles and agent positions)."""
         return obs.agents_view[..., :3]
-    
+
     def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
-            (self._num_agents,),
+            (self.num_agents,),
             int,
-            jnp.zeros(self._num_agents, dtype=int),
-            jnp.repeat(self.time_limit, self._num_agents),
+            jnp.zeros(self.num_agents, dtype=int),
+            jnp.repeat(self.time_limit, self.num_agents),
             "step_count",
         )
         agents_view = specs.BoundedArray(
-            shape=(self._env.num_agents, self._env.num_rows, self._env.num_cols, 4),
+            shape=(self.num_agents, self._env.num_rows, self._env.num_cols, 4),
             dtype=bool,
             name="agents_view",
             minimum=0,
-            maximum=self._env.num_agents,
+            maximum=self.num_agents,
         )
         obs_data = {
             "agents_view": agents_view,
             "action_mask": self._env.observation_spec().action_mask,
             "step_count": step_count,
         }
-        if self.has_global_state:
+        if self.add_global_state:
             global_state = specs.BoundedArray(
-                shape=(self._env.num_agents, self._env.num_rows, self._env.num_cols, 3),
+                shape=(self.num_agents, self._env.num_rows, self._env.num_cols, 3),
                 dtype=bool,
                 name="agents_view",
                 minimum=0,
-                maximum=self._env.num_agents,
+                maximum=self.num_agents,
             )
             obs_data["global_state"] = global_state
             return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
