@@ -1,7 +1,7 @@
 # ---Environment Configs---
 defaults:
   - _self_
-  - scenario: clean-5x5x3a # [clean-10x10x10a, con-15x15x23a, con-20x20x40a]
+  - scenario: clean-5x5x3a # [clean-10x10x10a, clean-15x15x23a, clean-20x20x40a]
 # Further environment config details in "clean-5x5x3a" file.
 
 env_name: Cleaner # Used for logging purposes.
