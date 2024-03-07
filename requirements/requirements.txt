@@ -5,7 +5,7 @@ flax # ~=0.7.5 breaks marlin
 gigastep @ git+https://github.com/mlech26l/gigastep
 hydra-core==1.3.2
 id-marl-eval @ git+https://github.com/instadeepai/marl-eval
-jax[cuda12_pip]==0.4.21 # this is what Louise needs on her PC
+jax[cuda12_pip] # this is what Louise needs on her PC
 jaxlib
 jaxmarl
 jumanji @ git+https://github.com/sash-a/jumanji
