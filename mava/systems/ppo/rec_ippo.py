@@ -623,6 +623,7 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
         eval_env=eval_env,
         network_apply_fn=actor_network.apply,
         config=config,
+        hidden_carry_size=config.network.actor_network.pre_torso.layer_sizes[-1],
         use_recurrent_net=True,
         scanned_rnn=ScannedRNN,
     )
