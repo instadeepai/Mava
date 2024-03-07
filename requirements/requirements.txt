@@ -1,11 +1,11 @@
 colorama
 distrax @ git+https://github.com/google-deepmind/distrax  # distrax release doesn't support jax > 0.4.13
 flashbax~=0.1.0
-flax~=0.7.5
+flax # ~=0.7.5 breaks marlin
 gigastep @ git+https://github.com/mlech26l/gigastep
 hydra-core==1.3.2
 id-marl-eval @ git+https://github.com/instadeepai/marl-eval
-jax
+jax[cuda12_pip]==0.4.21 # this is what Louise needs on her PC
 jaxlib
 jaxmarl
 jumanji @ git+https://github.com/sash-a/jumanji
