@@ -14,6 +14,7 @@
 
 import copy
 import time
+from pprint import pprint
 from typing import Any, Callable, Dict, Tuple  # noqa
 
 import chex
@@ -514,25 +515,9 @@ def make_update_fns(
 
         return next_learner_state, (metrics, losses)
 
-    devices = jax.devices()
-    n_devices = len(devices)
-
-    env_steps_per_update = (
-        cfg.arch.num_envs * n_devices * cfg.system.rollout_length
-    )  # TODO add batch size?
-
-    if cfg.system.total_timesteps:
-        n_updates = cfg.system.total_timesteps // env_steps_per_update
-    else:
-        n_updates = cfg.system.num_updates
-
-    n_updates_between_logs = (
-        n_updates
-    ) // cfg.arch.num_evaluation  # overall num updates / num of evals
-
     pmaped_updated_step = jax.pmap(
         jax.vmap(
-            lambda state: lax.scan(update_step, state, None, length=n_updates_between_logs),
+            lambda state: lax.scan(update_step, state, None, length=cfg.system.scan_steps),
             axis_name="batch",
         ),
         axis_name="device",
@@ -555,50 +540,40 @@ def make_update_fns(
 
 
 def run_experiment(cfg: DictConfig) -> float:
-    n_devices = len(jax.devices())
+    # Add runtime variables to config
+    cfg.arch.n_devices = len(jax.devices())
 
-    pmaped_steps = (
-        cfg.system.total_timesteps
-        // cfg.arch.num_evaluation
-        // cfg.arch.num_envs
-        // n_devices
-        // cfg.system.rollout_length
-    )
+    # Number of env steps before evaluating/logging.
+    steps_per_rollout = int(cfg.system.total_timesteps // cfg.arch.num_evaluation)
+    # Multiplier for a single env/learn step in an anakin system
+    anakin_steps = cfg.arch.n_devices * cfg.system.update_batch_size
+    # Number of env steps in one anakin style update.
+    anakin_act_steps = anakin_steps * cfg.arch.num_envs * cfg.system.rollout_length
+    # Number of steps to do in the scanned update method (how many anakin steps).
+    cfg.system.scan_steps = int(steps_per_rollout / anakin_act_steps)
 
-    # TODO code duplication
-    env_steps_per_update = cfg.arch.num_envs * n_devices * cfg.system.rollout_length
+    pprint(OmegaConf.to_container(cfg, resolve=True))
 
-    if cfg.system.total_timesteps:
-        n_updates = cfg.system.total_timesteps // env_steps_per_update
-    else:
-        n_updates = cfg.system.num_updates
-
-    updates_between_logs = (n_updates) // cfg.arch.num_evaluation  # noqa
-    train_steps_per_update = (  # noqa
-        n_devices * cfg.arch.num_envs * cfg.system.epochs * pmaped_steps  # noqa
-    )  # noqa
-
-    max_episode_return = -jnp.inf
-
+    # Initialise system and make learning/evaluation functions
     (env, eval_env), learner_state, q_net, opts, rb, logger, key = init(cfg)
-
-    cfg.system.num_agents = env.action_spec().shape[0]  # TODO
-
     update, eval_apply = make_update_fns(cfg, env, q_net, opts, rb)
 
+    cfg.system.num_agents = env.action_spec().shape[0]
+    # TODO figure out where others do this
+
     key, eval_key = jax.random.split(key)
-    # todo: don't need to return trained_params or eval keys
     evaluator, absolute_metric_evaluator = make_eval_fns(
         eval_env=eval_env,
-        network_apply_fn=eval_apply,  # TODO
+        network_apply_fn=eval_apply,
         config=cfg,
         hidden_carry_size=cfg.network.q_network.pre_torso.layer_sizes[-1],
         use_recurrent_net=True,
-        scanned_rnn=ScannedRNN(),  # TODO change what I pass here
+        scanned_rnn=ScannedRNN(),
     )
 
+    max_episode_return = -jnp.inf
+
     start_time = time.time()  # noqa
-    tic = time.time()
 
     # TODO code duplication
     def get_epsilon(t: int) -> float:
@@ -609,55 +584,36 @@ def run_experiment(cfg: DictConfig) -> float:
         return float(eps)
 
     # Main loop:
-    for eval_idx in range(cfg.arch.num_evaluation):
+    for eval_idx, t in enumerate(range(0, int(cfg.system.total_timesteps), steps_per_rollout)):
         # Learn loop:
         learner_state, (metrics, losses) = update(learner_state)
         jax.block_until_ready(learner_state)
-        toc = time.time()
 
-        t_frm_learnstate = learner_state.time_steps[0][0]
-        sps = cfg.system.total_timesteps // cfg.arch.num_evaluation / (toc - tic)
-        tic = toc
-        final_metrics = episode_metrics.get_final_step_metrics(metrics)
+        # Log:
+        # Add learn steps here because anakin steps per second is learn + act steps
+        # But we also want to make sure we're counting env steps correctly so
+        # learn steps is not included in the loop counter.
+        learn_steps = anakin_steps * cfg.system.epochs
+        sps = (t + learn_steps) / (time.time() - start_time)
+        final_metrics, ep_completed = episode_metrics.get_final_step_metrics(metrics)
         loss_metrics = losses
-
-        logger.log(
-            (
-                {
-                    "step_calc": eval_idx * env_steps_per_update * updates_between_logs,
-                    "steps_per_second": sps,
-                }
-            ),
-            t_frm_learnstate,
-            eval_idx,
-            LogEvent.MISC,
-        )
-        logger.log(
-            ({"step": t_frm_learnstate, "steps_per_second": sps}),
-            t_frm_learnstate,
-            eval_idx,
-            LogEvent.MISC,
-        )
-        logger.log(final_metrics[0], t_frm_learnstate, eval_idx, LogEvent.ACT)
-        logger.log(loss_metrics, t_frm_learnstate, eval_idx, LogEvent.TRAIN)
-        logger.log(
-            {"epsilon": get_epsilon(t_frm_learnstate)}, t_frm_learnstate, eval_idx, LogEvent.MISC
-        )
+        logger.log({"step": t, "steps_per_second": sps}, t, eval_idx, LogEvent.MISC)
+        if ep_completed:
+            logger.log(final_metrics, t, eval_idx, LogEvent.ACT)
+        logger.log(loss_metrics, t, eval_idx, LogEvent.TRAIN)
+        logger.log({"epsilon": get_epsilon(t)}, t, eval_idx, LogEvent.MISC)
 
         # Evaluate:
         key, eval_key = jax.random.split(key)
-        eval_keys = jax.random.split(eval_key, n_devices)
-        # todo: bug likely here -> don't have batch vmap yet so shouldn't unreplicate_batch_dim
-
-        # essentially squeeze
+        eval_keys = jax.random.split(eval_key, cfg.arch.n_devices)
+        # essentially squeeze/unreplicate batch dim
         eval_params = jax.tree_util.tree_map(lambda x: x[0, ...], learner_state.params.online)
-
         eval_output = evaluator(eval_params, eval_keys)
         jax.block_until_ready(eval_output)
 
         # Log:
         episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
-        logger.log(eval_output.episode_metrics, t_frm_learnstate, eval_idx, LogEvent.EVAL)
+        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
 
         # Save best actor params.
         if cfg.arch.absolute_metric and max_episode_return <= episode_return:
@@ -677,12 +633,12 @@ def run_experiment(cfg: DictConfig) -> float:
 
     # Measure absolute metric.
     if cfg.arch.absolute_metric:
-        eval_keys = jax.random.split(key, n_devices)
+        eval_keys = jax.random.split(key, cfg.arch.n_devices)
 
         eval_output = absolute_metric_evaluator(best_params, eval_keys)
         jax.block_until_ready(eval_output)
 
-        logger.log(eval_output.episode_metrics, t_frm_learnstate, eval_idx, LogEvent.ABSOLUTE)
+        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.ABSOLUTE)
 
     logger.stop()
 
