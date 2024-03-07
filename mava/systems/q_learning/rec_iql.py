@@ -129,11 +129,11 @@ def init(
     init_done = jnp.zeros((1, cfg.arch.num_envs, 1), dtype=bool)  # (1,B,1)
     init_x = (init_obs_batched, init_done)  # pack the RNN dummy inputs
     init_hidden_state = ScannedRNN.initialize_carry(
-        (cfg.arch.num_envs, num_agents), cfg.network.q_learner_network.post_torso.layer_sizes[-1]
+        (cfg.arch.num_envs, num_agents), cfg.network.q_network.post_torso.layer_sizes[-1]
     )  # (B, A, x)
 
     # Make recurrent Q network
-    q_net = RecQNetwork(num_actions, cfg.network.q_learner_network.post_torso.layer_sizes[-1])
+    q_net = RecQNetwork(num_actions, cfg.network.q_network.post_torso.layer_sizes[-1])
     q_params = q_net.init(q_key, init_hidden_state, init_x, 0)
     q_target_params = q_net.init(
         q_key, init_hidden_state, init_x, 0
@@ -592,6 +592,7 @@ def run_experiment(cfg: DictConfig) -> float:
         eval_env=eval_env,
         network_apply_fn=eval_apply,  # TODO
         config=cfg,
+        hidden_carry_size=cfg.network.q_network.pre_torso.layer_sizes[-1],
         use_recurrent_net=True,
         scanned_rnn=ScannedRNN(),  # TODO change what I pass here
     )
