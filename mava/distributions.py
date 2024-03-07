@@ -15,6 +15,7 @@
 from typing import Any, Optional
 
 import chex
+import jax
 import jax.numpy as jnp
 import tensorflow_probability.substrates.jax.bijectors as tfb
 import tensorflow_probability.substrates.jax.distributions as tfd
@@ -88,6 +89,57 @@ class TanhTransformedDistribution(tfd.TransformedDistribution):
     def _parameter_properties(cls, dtype: Optional[Any], num_classes: Any = None) -> Any:
         td_properties = super()._parameter_properties(dtype, num_classes=num_classes)
         del td_properties["bijector"]
+        return td_properties
+
+
+class MaskedEpsGreedyDistribution(tfd.Categorical):
+    """
+    Computes an epsilon-greedy distribution for each action choice. There are two
+    components in the distribution:
+
+    A uniform component, where every action that is NOT masked out gets an even weighting.
+    A greedy component, where the action with the highest corresponding q-value that is
+    NOT masked out gets a probability of one.
+
+    Combining these two distributions per action choice in a ratio of eps:1-eps gives
+    the final distribution. This distribution can be sampled using mode() for a purely
+    greedy strategy, and sampled normally using sample() for an epsilon-greedy strategy.
+    """
+
+    def __init__(self, q_values: chex.Array, epsilon: float, mask: chex.Array):
+
+        # UNIFORM PART (eps %)
+        # generate uniform probabilities across all allowable actions at most granular level
+        masked_uniform_action_probs = mask.astype(int)
+        # get num avail actions to generate probabilities for choosing
+        n_available_actions = jnp.sum(masked_uniform_action_probs, axis=-1)[..., jnp.newaxis]
+        # divide with sum along axis to get uniform per action choice
+        masked_uniform_action_probs = masked_uniform_action_probs / n_available_actions
+
+        # GREEDY PART (1-eps %)
+        # set masked actions to value not chosen by argmax
+        masked_q_vals = jnp.where(
+            mask,
+            q_values,
+            jnp.finfo(jnp.float32).min,
+        )
+
+        # greedy argmax over action-value dim
+        greedy_actions = jnp.argmax(masked_q_vals, axis=-1)
+        # get one-hot so that shapes are equal again and ready to be made into a prob
+        greedy_actions = jax.nn.one_hot(greedy_actions, q_values.shape[-1])
+        # two probability masks need to fit one another, and why not check consistency
+        chex.assert_equal_shape([greedy_actions, masked_q_vals, q_values])
+
+        mixed_eps_greedy_probs = (
+            epsilon * masked_uniform_action_probs + (1 - epsilon) * greedy_actions
+        )
+
+        super().__init__(probs=mixed_eps_greedy_probs)
+
+    @classmethod
+    def _parameter_properties(cls, dtype: Optional[Any], num_classes: Any = None) -> Any:
+        td_properties = super()._parameter_properties(dtype, num_classes=num_classes)
         return td_properties
 
 
