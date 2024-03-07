@@ -172,15 +172,14 @@ class DiscreteActionEpsGreedyMaskedHead(nn.Module):
                 `step_count`.
 
         Returns:
-            Q values for double Q-learning selection.
-            A tfd.Categorical distribution over the action space for sampling actions from.
+            q_values: used for double Q-learning selection.
+            eps_greedy_dist: an eps-greedy initialised tfd.Categorical for sampling actions.
 
         NOTE: We pass both the observation embedding and the observation object to the action head
         since the observation object contains the action mask and other potentially useful
         information.
         """
 
-        # q values
         q_values = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(obs_embedding)
 
         # action mask needs to fit onto the array of action q-vals
