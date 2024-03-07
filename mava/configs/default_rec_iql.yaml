@@ -4,3 +4,4 @@ defaults:
   - arch: anakin
   - system: q_learning/rec_iql
   - env: smax
+  - network: rnn

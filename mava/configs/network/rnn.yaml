@@ -25,3 +25,15 @@ critic_network:
     layer_sizes: [128]
     use_layer_norm: False
     activation: relu
+
+q_learner_network:
+  pre_torso:
+    module: mava.networks.MLPTorso
+    layer_sizes: [256]
+    use_layer_norm: False
+    activation: relu
+  post_torso:
+    module: mava.networks.MLPTorso
+    layer_sizes: [256]
+    use_layer_norm: False
+    activation: relu

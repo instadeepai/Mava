@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union
 
 import chex
 import flax.linen as nn
@@ -42,7 +42,7 @@ def get_ff_evaluator_fn(
     """Get the evaluator function for feedforward networks.
 
     Args:
-        env (Environment): An evironment isntance for evaluation.
+        env (Environment): An evironment instance for evaluation.
         apply_fn (callable): Network forward pass method.
         config (dict): Experiment configuration.
         eval_multiplier (int): A scalar that will increase the number of evaluation
@@ -154,8 +154,6 @@ def get_rnn_evaluator_fn(
 ) -> EvalFn:
     """Get the evaluator function for recurrent networks."""
 
-    num_agents = env.action_spec().shape[0]
-
     def eval_one_episode(params: FrozenDict, init_eval_state: RNNEvalState) -> Dict:
         """Evaluate one episode. It is vectorized over the number of evaluation episodes."""
 
@@ -201,7 +199,7 @@ def get_rnn_evaluator_fn(
                 key,
                 env_state,
                 timestep,
-                jnp.repeat(timestep.last(), num_agents),
+                jnp.repeat(timestep.last(), config.system.num_agents),
                 hstate,
                 step_count,
                 episode_return,
@@ -245,15 +243,15 @@ def get_rnn_evaluator_fn(
 
         # Initialise hidden state.
         init_hstate = scanned_rnn.initialize_carry(
-            (eval_batch, num_agents),
-            config.system.hidden_size,
+            (eval_batch, config.system.num_agents),
+            config.network.actor_network.pre_torso.layer_sizes[-1],
         )
 
         # Initialise dones.
         dones = jnp.zeros(
             (
                 eval_batch,
-                num_agents,
+                config.system.num_agents,
             ),
             dtype=bool,
         )
@@ -288,12 +286,28 @@ def get_rnn_evaluator_fn(
 
 def make_eval_fns(
     eval_env: Environment,
-    network_apply_fn: Any,
+    network_apply_fn: Union[ActorApply, RecActorApply],
     config: DictConfig,
     use_recurrent_net: bool = False,
     scanned_rnn: Optional[nn.Module] = None,
 ) -> Tuple[EvalFn, EvalFn]:
-    """Initialise evaluator_fn."""
+    """ "Initialize evaluator functions for reinforcement learning.
+
+    Args:
+        eval_env (Environment): The environment used for evaluation.
+        network_apply_fn (Union[ActorApply,RecActorApply]): Creates a policy to sample.
+        config (DictConfig): The configuration settings for the evaluation.
+        use_recurrent_net (bool, optional): Whether to use a rnn. Defaults to False.
+        scanned_rnn (Optional[nn.Module], optional): The rnn module.
+            Required if `use_recurrent_net` is True. Defaults to None.
+
+    Returns:
+        Tuple[EvalFn, EvalFn]: A tuple of two evaluation functions:
+                            one for use during training and one for overall metrics.
+
+    Raises:
+        AssertionError: If `use_recurrent_net` is True but `scanned_rnn` is not provided.
+    """
     # Check if win rate is required for evaluation.
     log_win_rate = config.env.eval_metric == "win_rate"
     # Vmap it over number of agents and create evaluator_fn.
@@ -301,23 +315,25 @@ def make_eval_fns(
         assert scanned_rnn is not None
         evaluator = get_rnn_evaluator_fn(
             eval_env,
-            network_apply_fn,
+            network_apply_fn,  # type: ignore
             config,
             scanned_rnn,
             log_win_rate,
         )
         absolute_metric_evaluator = get_rnn_evaluator_fn(
             eval_env,
-            network_apply_fn,
+            network_apply_fn,  # type: ignore
             config,
             scanned_rnn,
             log_win_rate,
             10,
         )
     else:
-        evaluator = get_ff_evaluator_fn(eval_env, network_apply_fn, config, log_win_rate)
+        evaluator = get_ff_evaluator_fn(
+            eval_env, network_apply_fn, config, log_win_rate  # type: ignore
+        )
         absolute_metric_evaluator = get_ff_evaluator_fn(
-            eval_env, network_apply_fn, config, log_win_rate, 10
+            eval_env, network_apply_fn, config, log_win_rate, 10  # type: ignore
         )
 
     evaluator = jax.pmap(evaluator, axis_name="device")

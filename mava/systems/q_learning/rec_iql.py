@@ -54,11 +54,11 @@ from mava.wrappers import episode_metrics
 
 class RecQNetwork(nn.Module):
     num_actions: int
-    hidden_dim: int
+    hidden_size: int
 
     def setup(self) -> None:
-        self.pre_torso: MLPTorso = MLPTorso((self.hidden_dim,))
-        self.post_torso: MLPTorso = MLPTorso((self.hidden_dim,))
+        self.pre_torso: MLPTorso = MLPTorso((self.hidden_size,))
+        self.post_torso: MLPTorso = MLPTorso((self.hidden_size,))
 
     @nn.compact
     def __call__(
@@ -129,11 +129,11 @@ def init(
     init_done = jnp.zeros((1, cfg.arch.num_envs, 1), dtype=bool)  # (1,B,1)
     init_x = (init_obs_batched, init_done)  # pack the RNN dummy inputs
     init_hidden_state = ScannedRNN.initialize_carry(
-        (cfg.arch.num_envs, num_agents), cfg.system.hidden_size
+        (cfg.arch.num_envs, num_agents), cfg.network.q_learner_network.post_torso.layer_sizes[-1]
     )  # (B, A, x)
 
     # Make recurrent Q network
-    q_net = RecQNetwork(num_actions, cfg.system.hidden_size)
+    q_net = RecQNetwork(num_actions, cfg.network.q_learner_network.post_torso.layer_sizes[-1])
     q_params = q_net.init(q_key, init_hidden_state, init_x, 0)
     q_target_params = q_net.init(
         q_key, init_hidden_state, init_x, 0
@@ -581,6 +581,9 @@ def run_experiment(cfg: DictConfig) -> float:
     max_episode_return = -jnp.inf
 
     (env, eval_env), learner_state, q_net, opts, rb, logger, key = init(cfg)
+
+    cfg.system.num_agents = env.action_spec().shape[0]  # TODO
+
     update, eval_apply = make_update_fns(cfg, env, q_net, opts, rb)
 
     key, eval_key = jax.random.split(key)
