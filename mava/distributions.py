@@ -93,12 +93,23 @@ class TanhTransformedDistribution(tfd.TransformedDistribution):
 
 
 class MaskedEpsGreedyDistribution(tfd.Categorical):
+    """
+    Computes an epsilon-greedy distribution for each action choice. There are two
+    components in the distribution:
+
+    A uniform component, where every action that is NOT masked out gets an even weighting.
+    A greedy component, where the action with the highest corresponding q-value that is
+    NOT masked out gets a probability of one.
+
+    Combining these two distributions per action choice in a ratio of eps:1-eps gives
+    the final distribution. This distribution can be sampled using mode() for a purely
+    greedy strategy, and sampled normally using sample() for an epsilon-greedy strategy.
+    """
 
     def __init__(self, q_values: chex.Array, epsilon: float, mask: chex.Array):
 
         # UNIFORM PART (eps %)
         # generate uniform probabilities across all allowable actions at most granular level
-        # maybe I should just make a uniform categorical and sample its probs. Anyways
         masked_uniform_action_probs = mask.astype(int)
         # get num avail actions to generate probabilities for choosing
         n_available_actions = jnp.sum(masked_uniform_action_probs, axis=-1)[..., jnp.newaxis]

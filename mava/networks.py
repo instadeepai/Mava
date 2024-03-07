@@ -172,7 +172,7 @@ class DiscreteActionEpsGreedyMaskedHead(nn.Module):
                 `step_count`.
 
         Returns:
-            Q values for double Q-learning selection
+            Q values for double Q-learning selection.
             A tfd.Categorical distribution over the action space for sampling actions from.
 
         NOTE: We pass both the observation embedding and the observation object to the action head
