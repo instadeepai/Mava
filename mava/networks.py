@@ -188,7 +188,7 @@ class DiscreteActionEpsGreedyMaskedHead(nn.Module):
         eps_greedy_dist = MaskedEpsGreedyDistribution(q_values, epsilon, observation.action_mask)
 
         # q values must be returned for q learning, else we can't double-q-learning-select
-        return q_values, eps_greedy_dist
+        return eps_greedy_dist, q_values
 
 
 class FeedForwardActor(nn.Module):
