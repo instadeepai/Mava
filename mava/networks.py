@@ -191,6 +191,8 @@ class FeedForwardCritic(nn.Module):
 
 
 class ScannedRNN(nn.Module):
+    hidden_state_dim: int = 128
+
     @functools.partial(
         nn.scan,
         variable_broadcast="params",
@@ -205,7 +207,7 @@ class ScannedRNN(nn.Module):
         ins, resets = x
         rnn_state = jnp.where(
             resets[:, :, jnp.newaxis],
-            self.initialize_carry((ins.shape[0], ins.shape[1]), ins.shape[2]),
+            self.initialize_carry((ins.shape[0], ins.shape[1]), self.hidden_state_dim),
             rnn_state,
         )
         new_rnn_state, y = nn.GRUCell(features=ins.shape[-1])(rnn_state, ins)
@@ -225,6 +227,7 @@ class RecurrentActor(nn.Module):
     pre_torso: nn.Module
     post_torso: nn.Module
     action_head: nn.Module
+    hidden_state_dim: int = 128
 
     @nn.compact
     def __call__(
@@ -237,7 +240,9 @@ class RecurrentActor(nn.Module):
 
         policy_embedding = self.pre_torso(observation.agents_view)
         policy_rnn_input = (policy_embedding, done)
-        policy_hidden_state, policy_embedding = ScannedRNN()(policy_hidden_state, policy_rnn_input)
+        policy_hidden_state, policy_embedding = ScannedRNN(self.hidden_state_dim)(
+            policy_hidden_state, policy_rnn_input
+        )
         policy_embedding = self.post_torso(policy_embedding)
         pi = self.action_head(policy_embedding, observation)
 
@@ -250,6 +255,7 @@ class RecurrentCritic(nn.Module):
     pre_torso: nn.Module
     post_torso: nn.Module
     centralised_critic: bool = False
+    hidden_state_dim: int = 128
 
     @nn.compact
     def __call__(
@@ -271,7 +277,9 @@ class RecurrentCritic(nn.Module):
 
         critic_embedding = self.pre_torso(observation)
         critic_rnn_input = (critic_embedding, done)
-        critic_hidden_state, critic_embedding = ScannedRNN()(critic_hidden_state, critic_rnn_input)
+        critic_hidden_state, critic_embedding = ScannedRNN(self.hidden_state_dim)(
+            critic_hidden_state, critic_rnn_input
+        )
         critic_output = self.post_torso(critic_embedding)
         critic_output = nn.Dense(1, kernel_init=orthogonal(1.0))(critic_output)
 
