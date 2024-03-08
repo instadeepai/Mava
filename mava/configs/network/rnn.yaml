@@ -1,4 +1,6 @@
 # ---Recurrent Structure Networks---
+hidden_state_dim: 128 # The size of the RNN hiddenstate for each agent.
+
 actor_network:
   pre_torso:
     _target_: mava.networks.MLPTorso
