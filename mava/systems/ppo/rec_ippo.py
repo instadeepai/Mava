@@ -512,7 +512,6 @@ def learner_setup(
     init_x = (init_obs, init_done)
 
     # Initialise hidden states.
-    # hidden_size = config.network.actor_network.pre_torso.layer_sizes[-1]
     init_policy_hstate = ScannedRNN.initialize_carry(
         (config.arch.num_envs, num_agents), config.network.hidden_state_dim
     )
