@@ -35,8 +35,9 @@ from jax import Array
 from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
 
+from mava.distributions import MaskedEpsGreedyDistribution
 from mava.evaluator import make_eval_fns  # noqa
-from mava.networks import DiscreteActionEpsGreedyMaskedHead, MLPTorso, ScannedRNN
+from mava.networks import MLPTorso, ScannedRNN
 from mava.systems.q_learning.types import (  # BufferState,
     ActionSelectionState,
     DDQNParams,
@@ -62,11 +63,10 @@ class RecQNetwork(nn.Module):
         self.post_torso: MLPTorso = MLPTorso((self.hidden_size,))
 
     @nn.compact
-    def __call__(
+    def get_q_values(
         self,
         hidden_state: chex.Array,
         observations_resets: RNNObservation,
-        eps: float,
     ) -> Array:
         # unpack consumed parameters
         obs, resets = observations_resets
@@ -79,11 +79,24 @@ class RecQNetwork(nn.Module):
 
         embedding = self.post_torso(embedding)
 
-        q_values, eps_greedy_dist = DiscreteActionEpsGreedyMaskedHead(self.num_actions)(
-            embedding, obs, eps
-        )
+        q_values = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01))(embedding)
 
-        return hidden_state, q_values, eps_greedy_dist
+        return hidden_state, q_values
+
+    def __call__(
+        self,
+        hidden_state: chex.Array,
+        observations_resets: RNNObservation,
+        eps: float = 0,
+    ) -> Array:
+
+        obs, _ = observations_resets
+
+        hidden_state, q_values = self.get_q_values(hidden_state, observations_resets)
+
+        eps_greedy_dist = MaskedEpsGreedyDistribution(q_values, eps, obs.action_mask)
+
+        return hidden_state, eps_greedy_dist
 
 
 def init(
@@ -115,7 +128,7 @@ def init(
 
     # actions, agents, keysplits
     action_dim = env.action_dim
-    num_agents = env.action_spec.num_agents
+    num_agents = env.num_agents
     key, q_key = jax.random.split(key, 2)
 
     # Make dummy inputs to init recurrent Q network -> need format TBAx
@@ -250,9 +263,7 @@ def make_update_fns(
         done = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], done)
 
         # Get q values
-        next_hidden_state, eps_greedy_dist, q_values = q_net.apply(
-            params, hidden_state, (obs, done), eps
-        )
+        next_hidden_state, eps_greedy_dist = q_net.apply(params, hidden_state, (obs, done), eps)
 
         # Random key splitting
         new_key, explore_key = jax.random.split(key, 2)
@@ -313,8 +324,12 @@ def make_update_fns(
         q_online_params: FrozenVariableDict, obs: Array, done: Array, action: Array, target: Array
     ) -> Tuple[Array, Metrics]:
         """The portion of the calculation to grad, namely online apply and mse with target."""
-        greedy_dist, q_online = scan_apply(
-            q_online_params, obs, done
+        hidden_state, obs_done = prep_inputs_to_scannedrnn(
+            obs, done
+        )  # axes switched here to scan over time
+
+        _, q_online = q_net.apply(
+            q_online_params, hidden_state, obs_done, method=RecQNetwork.get_q_values
         )  # get online q values of all actions
         q_online = switch_leading_axis(q_online)  # TB... -> BT...
         q_online = jnp.squeeze(
@@ -339,21 +354,20 @@ def make_update_fns(
         return arr
 
     # TRAIN LEVEL 3 and 4
-    def scan_apply(params: FrozenVariableDict, obs: Observation, done: chex.Array) -> chex.Array:
-        """Applies RNN to a batch of trajectories by scanning over batch dim."""
+    def prep_inputs_to_scannedrnn(obs: Observation, done: chex.Array) -> chex.Array:
+        """
+        Prepares the inputs to the RNN network for either
+        getting q values or the eps-greedy distribution.
+        """
 
         hidden_state = ScannedRNN.initialize_carry(
             (cfg.system.sample_batch_size, obs.agents_view.shape[2]), cfg.system.hidden_size
         )
         obs = switch_leading_axis(obs)  # B, T -> T, B
         done = switch_leading_axis(done)  # B, T -> T, B
-        obs_done = (obs, done)  # RNN inputs TODO ask RNNObservation
+        obs_done = (obs, done)
 
-        _, greedy_dist, next_q_vals_online = q_net.apply(params, hidden_state, obs_done, 0)
-        return (
-            greedy_dist,
-            next_q_vals_online,
-        )  # switch back for com[atibility with everything else out of the rb
+        return hidden_state, obs_done
 
     # Standardise the update function inputs for a cond
     def hard_update(
@@ -387,9 +401,17 @@ def make_update_fns(
         next_done = data_next.done
 
         # Scan over each sample and discard first timestep
-        next_online_greedy_dist, _ = scan_apply(params.online, data.obs, data.done)
+        hidden_state, obs_done = prep_inputs_to_scannedrnn(
+            data.obs, data.done
+        )  # axes switched here to scan over time
 
-        _, next_q_vals_target = scan_apply(params.target, data.obs, data.done)
+        _, next_online_greedy_dist = q_net.apply(
+            params.online, hidden_state, obs_done
+        )  # eps is default 0
+
+        _, next_q_vals_target = q_net.apply(
+            params.target, hidden_state, obs_done, method=RecQNetwork.get_q_values
+        )
         next_q_vals_target = next_q_vals_target[1:, ...]  # TB...
 
         # Double q-value selection
@@ -524,19 +546,19 @@ def make_update_fns(
         donate_argnums=0,
     )
 
-    # Callable[[FrozenDict, HiddenState, RNNObservation], Tuple[HiddenState, Distribution]
-    def eval_apply(
-        params: FrozenVariableDict, hidden_state: Array, obs_done: RNNObservation
-    ) -> Tuple[Array, distrax.Categorical]:  # noqa
-        obs, done = obs_done
-        # obs = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], obs)
-        # done = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], done)
-        next_hidden_state, eps_greedy_dist, q_values = q_net.apply(
-            params, hidden_state, (obs, done), 0
-        )
-        return next_hidden_state, eps_greedy_dist
+    # # Callable[[FrozenDict, HiddenState, RNNObservation], Tuple[HiddenState, Distribution]
+    # def eval_apply(
+    #     params: FrozenVariableDict, hidden_state: Array, obs_done: RNNObservation
+    # ) -> Tuple[Array, distrax.Categorical]:  # noqa
+    #     obs, done = obs_done
+    #     # obs = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], obs)
+    #     # done = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], done)
+    #     next_hidden_state, eps_greedy_dist, q_values = q_net.apply(
+    #         params, hidden_state, (obs, done), 0
+    #     )
+    #     return next_hidden_state, eps_greedy_dist
 
-    return pmaped_updated_step, eval_apply
+    return pmaped_updated_step
 
 
 def run_experiment(cfg: DictConfig) -> float:
@@ -556,7 +578,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     # Initialise system and make learning/evaluation functions
     (env, eval_env), learner_state, q_net, opts, rb, logger, key = init(cfg)
-    update, eval_apply = make_update_fns(cfg, env, q_net, opts, rb)
+    update = make_update_fns(cfg, env, q_net, opts, rb)
 
     cfg.system.num_agents = env.action_spec().shape[0]
     # TODO figure out where others do this
@@ -564,7 +586,7 @@ def run_experiment(cfg: DictConfig) -> float:
     key, eval_key = jax.random.split(key)
     evaluator, absolute_metric_evaluator = make_eval_fns(
         eval_env=eval_env,
-        network_apply_fn=eval_apply,
+        network_apply_fn=q_net.apply,
         config=cfg,
         hidden_carry_size=cfg.network.q_network.pre_torso.layer_sizes[-1],
         use_recurrent_net=True,
