@@ -6,4 +6,4 @@ system_name: rec_iql
 # --- Neptune options ---
 kwargs:
   neptune_project: Instadeep/Mava
-  neptune_tag: [ff-idqn, lbf]
+  neptune_tag: [louisebeyers, rec-iql-pr-evidence]

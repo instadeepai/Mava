@@ -114,8 +114,8 @@ def init(
     env, eval_env = environments.make(cfg)
 
     # actions, agents, keysplits
-    num_actions = int(env.action_spec().num_values[0])
-    num_agents = env.action_spec().shape[0]
+    action_dim = env.action_dim
+    num_agents = env.action_spec.num_agents
     key, q_key = jax.random.split(key, 2)
 
     # Make dummy inputs to init recurrent Q network -> need format TBAx
@@ -134,7 +134,7 @@ def init(
     )  # (B, A, x)
 
     # Make recurrent Q network
-    q_net = RecQNetwork(num_actions, cfg.network.q_network.post_torso.layer_sizes[-1])
+    q_net = RecQNetwork(action_dim, cfg.network.q_network.post_torso.layer_sizes[-1])
     q_params = q_net.init(q_key, init_hidden_state, init_x, 0)
     q_target_params = q_net.init(
         q_key, init_hidden_state, init_x, 0
@@ -250,7 +250,7 @@ def make_update_fns(
         done = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], done)
 
         # Get q values
-        next_hidden_state, q_values, eps_greedy_dist = q_net.apply(
+        next_hidden_state, eps_greedy_dist, q_values = q_net.apply(
             params, hidden_state, (obs, done), eps
         )
 
@@ -313,7 +313,7 @@ def make_update_fns(
         q_online_params: FrozenVariableDict, obs: Array, done: Array, action: Array, target: Array
     ) -> Tuple[Array, Metrics]:
         """The portion of the calculation to grad, namely online apply and mse with target."""
-        q_online, greedy_dist = scan_apply(
+        greedy_dist, q_online = scan_apply(
             q_online_params, obs, done
         )  # get online q values of all actions
         q_online = switch_leading_axis(q_online)  # TB... -> BT...
@@ -349,10 +349,10 @@ def make_update_fns(
         done = switch_leading_axis(done)  # B, T -> T, B
         obs_done = (obs, done)  # RNN inputs TODO ask RNNObservation
 
-        _, next_q_vals_online, greedy_dist = q_net.apply(params, hidden_state, obs_done, 0)
+        _, greedy_dist, next_q_vals_online = q_net.apply(params, hidden_state, obs_done, 0)
         return (
-            next_q_vals_online,
             greedy_dist,
+            next_q_vals_online,
         )  # switch back for com[atibility with everything else out of the rb
 
     # Standardise the update function inputs for a cond
@@ -387,9 +387,9 @@ def make_update_fns(
         next_done = data_next.done
 
         # Scan over each sample and discard first timestep
-        next_q_vals_online, next_online_greedy_dist = scan_apply(params.online, data.obs, data.done)
+        next_online_greedy_dist, _ = scan_apply(params.online, data.obs, data.done)
 
-        next_q_vals_target, _ = scan_apply(params.target, data.obs, data.done)
+        _, next_q_vals_target = scan_apply(params.target, data.obs, data.done)
         next_q_vals_target = next_q_vals_target[1:, ...]  # TB...
 
         # Double q-value selection
@@ -531,7 +531,7 @@ def make_update_fns(
         obs, done = obs_done
         # obs = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], obs)
         # done = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], done)
-        next_hidden_state, q_values, eps_greedy_dist = q_net.apply(
+        next_hidden_state, eps_greedy_dist, q_values = q_net.apply(
             params, hidden_state, (obs, done), 0
         )
         return next_hidden_state, eps_greedy_dist
