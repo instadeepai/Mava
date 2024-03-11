@@ -376,7 +376,7 @@ def make_update_fns(
         return params, opt_states, loss_info
 
     # Act/learn loops:
-    def update_epoch(
+    def train(
         carry: Tuple[BufferState, SacParams, OptStates, int, chex.PRNGKey], _: Any
     ) -> Tuple[Tuple[BufferState, SacParams, OptStates, int, chex.PRNGKey], Metrics]:
         """Update the Q function and optionally policy/alpha with TD3 delayed update."""
@@ -435,7 +435,7 @@ def make_update_fns(
         )
         return learner_state, metrics
 
-    scanned_update = lambda state: lax.scan(update_epoch, state, None, length=cfg.system.epochs)
+    scanned_train = lambda state: lax.scan(train, state, None, length=cfg.system.epochs)
     scanned_act = lambda state: lax.scan(act, state, None, length=cfg.system.rollout_length)
 
     # Act loop -> sample -> update loop
@@ -450,7 +450,7 @@ def make_update_fns(
 
         # Sample and learn
         learn_state = (buffer_state, params, opt_states, t, learn_key)
-        (buffer_state, params, opt_states, _, _), losses = scanned_update(learn_state)
+        (buffer_state, params, opt_states, _, _), losses = scanned_train(learn_state)
 
         t += cfg.arch.num_envs * cfg.system.rollout_length
         return (
