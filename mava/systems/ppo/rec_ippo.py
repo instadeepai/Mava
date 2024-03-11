@@ -218,18 +218,16 @@ def get_learner_fn(
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
 
-                params, opt_states = train_state
-                (
-                    traj_batch,
-                    advantages,
-                    targets,
-                ) = batch_info
+                # UNPACK TRAIN STATE AND BATCH INFO
+                params, opt_states, key = train_state
+                traj_batch, advantages, targets = batch_info
 
                 def _actor_loss_fn(
                     actor_params: FrozenDict,
                     actor_opt_state: OptState,
                     traj_batch: RNNPPOTransition,
                     gae: chex.Array,
+                    key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate the actor loss."""
                     # RERUN NETWORK
@@ -253,7 +251,8 @@ def get_learner_fn(
                     )
                     loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
                     loss_actor = loss_actor.mean()
-                    entropy = actor_policy.entropy().mean()
+                    # The seed will be used in the TanhTransformedDistribution:
+                    entropy = actor_policy.entropy(seed=key).mean()
 
                     total_loss = loss_actor - config.system.ent_coef * entropy
                     return total_loss, (loss_actor, entropy)
@@ -283,9 +282,14 @@ def get_learner_fn(
                     return total_loss, (value_loss)
 
                 # CALCULATE ACTOR LOSS
+                key, entropy_key = jax.random.split(key)
                 actor_grad_fn = jax.value_and_grad(_actor_loss_fn, has_aux=True)
                 actor_loss_info, actor_grads = actor_grad_fn(
-                    params.actor_params, opt_states.actor_opt_state, traj_batch, advantages
+                    params.actor_params,
+                    opt_states.actor_opt_state,
+                    traj_batch,
+                    advantages,
+                    entropy_key,
                 )
 
                 # CALCULATE CRITIC LOSS
@@ -341,18 +345,10 @@ def get_learner_fn(
                     "entropy": entropy,
                 }
 
-                return (new_params, new_opt_state), loss_info
+                return (new_params, new_opt_state, entropy_key), loss_info
 
-            (
-                params,
-                opt_states,
-                init_hstates,
-                traj_batch,
-                advantages,
-                targets,
-                key,
-            ) = update_state
-            key, shuffle_key = jax.random.split(key)
+            params, opt_states, init_hstates, traj_batch, advantages, targets, key = update_state
+            key, shuffle_key, entropy_key = jax.random.split(key, 3)
 
             # SHUFFLE MINIBATCHES
             batch = (traj_batch, advantages, targets)
@@ -382,8 +378,8 @@ def get_learner_fn(
             minibatches = jax.tree_util.tree_map(lambda x: jnp.swapaxes(x, 1, 0), reshaped_batch)
 
             # UPDATE MINIBATCHES
-            (params, opt_states), loss_info = jax.lax.scan(
-                _update_minibatch, (params, opt_states), minibatches
+            (params, opt_states, entropy_key), loss_info = jax.lax.scan(
+                _update_minibatch, (params, opt_states, entropy_key), minibatches
             )
 
             update_state = (
@@ -465,11 +461,9 @@ def learner_setup(
     # Get available TPU cores.
     n_devices = len(jax.devices())
 
-    # Get number of actions and agents.
-    num_actions = int(env.action_spec().num_values[0])
-    num_agents = env.action_spec().shape[0]
+    # Get number of agents.
+    num_agents = env.num_agents
     config.system.num_agents = num_agents
-    config.system.action_dim = num_actions
 
     # PRNG keys.
     key, actor_net_key, critic_net_key = keys
@@ -477,14 +471,23 @@ def learner_setup(
     # Define network and optimisers.
     actor_pre_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
     actor_post_torso = hydra.utils.instantiate(config.network.actor_network.post_torso)
-    actor_action_head = hydra.utils.instantiate(config.network.action_head, action_dim=num_actions)
+    actor_action_head = hydra.utils.instantiate(
+        config.network.action_head, action_dim=env.action_dim
+    )
     critic_pre_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
     critic_post_torso = hydra.utils.instantiate(config.network.critic_network.post_torso)
 
     actor_network = Actor(
-        pre_torso=actor_pre_torso, post_torso=actor_post_torso, action_head=actor_action_head
+        pre_torso=actor_pre_torso,
+        post_torso=actor_post_torso,
+        action_head=actor_action_head,
+        hidden_state_dim=config.network.hidden_state_dim,
     )
-    critic_network = Critic(pre_torso=critic_pre_torso, post_torso=critic_post_torso)
+    critic_network = Critic(
+        pre_torso=critic_pre_torso,
+        post_torso=critic_post_torso,
+        hidden_state_dim=config.network.hidden_state_dim,
+    )
 
     actor_lr = make_learning_rate(config.system.actor_lr, config)
     critic_lr = make_learning_rate(config.system.critic_lr, config)
@@ -509,12 +512,11 @@ def learner_setup(
     init_x = (init_obs, init_done)
 
     # Initialise hidden states.
-    hidden_size = config.network.actor_network.pre_torso.layer_sizes[-1]
     init_policy_hstate = ScannedRNN.initialize_carry(
-        (config.arch.num_envs, num_agents), hidden_size
+        (config.arch.num_envs, num_agents), config.network.hidden_state_dim
     )
     init_critic_hstate = ScannedRNN.initialize_carry(
-        (config.arch.num_envs, num_agents), hidden_size
+        (config.arch.num_envs, num_agents), config.network.hidden_state_dim
     )
 
     # initialise params and optimiser state.
@@ -565,7 +567,7 @@ def learner_setup(
 
     # Define params to be replicated across devices and batches.
     dones = jnp.zeros(
-        (config.arch.num_envs, config.system.num_agents),
+        (config.arch.num_envs, num_agents),
         dtype=bool,
     )
     key, step_keys = jax.random.split(key)
@@ -675,7 +677,6 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
         elapsed_time = time.time() - start_time
         t = int(steps_per_rollout * (eval_step + 1))
         episode_metrics, ep_completed = get_final_step_metrics(learner_output.episode_metrics)
-        episode_return = jnp.mean(episode_metrics["episode_return"])
         episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
 
         # Separately log timesteps, actoring metrics and training metrics.
@@ -700,7 +701,8 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
         elapsed_time = time.time() - start_time
         episode_return = jnp.mean(evaluator_output.episode_metrics["episode_return"])
 
-        evaluator_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
+        evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
         logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.EVAL)
 
         if save_checkpoint:
@@ -734,8 +736,9 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
 
         elapsed_time = time.time() - start_time
 
+        steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
         t = int(steps_per_rollout * (eval_step + 1))
-        evaluator_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
         logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.ABSOLUTE)
 
     # Stop the logger.

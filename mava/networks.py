@@ -16,13 +16,14 @@ import functools
 from typing import Callable, Dict, Sequence, Tuple, Union
 
 import chex
-import distrax
 import jax
 import jax.numpy as jnp
 import numpy as np
+import tensorflow_probability.substrates.jax.distributions as tfd
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
 
+from mava.distributions import IdentityTransformation, TanhTransformedDistribution
 from mava.types import (
     Observation,
     ObservationGlobalState,
@@ -75,7 +76,8 @@ class CNNTorso(nn.Module):
                 x = nn.LayerNorm(use_scale=False)(x)
             x = self.activation_fn(x)
 
-        return x.reshape((x.shape[0], -1))
+        # Reshape should keep the batch and agent dimensions unchanged.
+        return x.reshape((x.shape[0], x.shape[1], -1))
 
 
 class DiscreteActionHead(nn.Module):
@@ -84,7 +86,9 @@ class DiscreteActionHead(nn.Module):
     action_dim: int
 
     @nn.compact
-    def __call__(self, obs_embedding: chex.Array, observation: Observation) -> distrax.Categorical:
+    def __call__(
+        self, obs_embedding: chex.Array, observation: Observation
+    ) -> tfd.TransformedDistribution:
         """Action selection for distrete action space environments.
 
         Args:
@@ -93,7 +97,7 @@ class DiscreteActionHead(nn.Module):
                 `step_count`.
 
         Returns:
-            A distrax.Categorical distribution over the action space for sampling actions from.
+            A transformed tfd.categorical distribution on the action space for action sampling.
 
         NOTE: We pass both the observation embedding and the observation object to the action head
         since the observation object contains the action mask and other potentially useful
@@ -108,7 +112,43 @@ class DiscreteActionHead(nn.Module):
             jnp.finfo(jnp.float32).min,
         )
 
-        return distrax.Categorical(logits=masked_logits)
+        #  We transform this distribution with the `Identity()` transformation to
+        # keep the API identical to the ContinuousActionHead.
+        return IdentityTransformation(distribution=tfd.Categorical(logits=masked_logits))
+
+
+class ContinuousActionHead(nn.Module):
+    """ContinuousActionHead using a transformed Normal distribution.
+
+    Note: This network only handles the case where actions lie in the interval [-1, 1].
+    """
+
+    action_dim: int
+    min_scale: float = 1e-3
+
+    def setup(self) -> None:
+        self.mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))
+        self.log_std = self.param("log_std", nn.initializers.zeros, (self.action_dim,))
+
+    @nn.compact
+    def __call__(self, obs_embedding: chex.Array, observation: Observation) -> tfd.Independent:
+        """Action selection for continuous action space environments.
+
+        Args:
+            obs_embedding (chex.Array): Observation embedding.
+            observation (Observation): Observation object.
+
+        Returns:
+            tfd.Independent: Independent transformed distribution.
+        """
+        loc = self.mean(obs_embedding)
+        scale = jax.nn.softplus(self.log_std) + self.min_scale
+        distribution = tfd.Normal(loc=loc, scale=scale)
+
+        return tfd.Independent(
+            TanhTransformedDistribution(distribution),
+            reinterpreted_batch_ndims=1,
+        )
 
 
 class FeedForwardActor(nn.Module):
@@ -118,7 +158,7 @@ class FeedForwardActor(nn.Module):
     action_head: nn.Module
 
     @nn.compact
-    def __call__(self, observation: Observation) -> distrax.DistributionLike:
+    def __call__(self, observation: Observation) -> tfd.Distribution:
         """Forward pass."""
 
         obs_embedding = self.torso(observation.agents_view)
@@ -151,6 +191,8 @@ class FeedForwardCritic(nn.Module):
 
 
 class ScannedRNN(nn.Module):
+    hidden_state_dim: int = 128
+
     @functools.partial(
         nn.scan,
         variable_broadcast="params",
@@ -165,7 +207,7 @@ class ScannedRNN(nn.Module):
         ins, resets = x
         rnn_state = jnp.where(
             resets[:, :, jnp.newaxis],
-            self.initialize_carry((ins.shape[0], ins.shape[1]), ins.shape[2]),
+            self.initialize_carry((ins.shape[0], ins.shape[1]), self.hidden_state_dim),
             rnn_state,
         )
         new_rnn_state, y = nn.GRUCell(features=ins.shape[-1])(rnn_state, ins)
@@ -185,19 +227,22 @@ class RecurrentActor(nn.Module):
     pre_torso: nn.Module
     post_torso: nn.Module
     action_head: nn.Module
+    hidden_state_dim: int = 128
 
     @nn.compact
     def __call__(
         self,
         policy_hidden_state: chex.Array,
         observation_done: RNNObservation,
-    ) -> Tuple[chex.Array, distrax.Categorical]:
+    ) -> Tuple[chex.Array, tfd.Distribution]:
         """Forward pass."""
         observation, done = observation_done
 
         policy_embedding = self.pre_torso(observation.agents_view)
         policy_rnn_input = (policy_embedding, done)
-        policy_hidden_state, policy_embedding = ScannedRNN()(policy_hidden_state, policy_rnn_input)
+        policy_hidden_state, policy_embedding = ScannedRNN(self.hidden_state_dim)(
+            policy_hidden_state, policy_rnn_input
+        )
         policy_embedding = self.post_torso(policy_embedding)
         pi = self.action_head(policy_embedding, observation)
 
@@ -210,6 +255,7 @@ class RecurrentCritic(nn.Module):
     pre_torso: nn.Module
     post_torso: nn.Module
     centralised_critic: bool = False
+    hidden_state_dim: int = 128
 
     @nn.compact
     def __call__(
@@ -231,7 +277,9 @@ class RecurrentCritic(nn.Module):
 
         critic_embedding = self.pre_torso(observation)
         critic_rnn_input = (critic_embedding, done)
-        critic_hidden_state, critic_embedding = ScannedRNN()(critic_hidden_state, critic_rnn_input)
+        critic_hidden_state, critic_embedding = ScannedRNN(self.hidden_state_dim)(
+            critic_hidden_state, critic_rnn_input
+        )
         critic_output = self.post_torso(critic_embedding)
         critic_output = nn.Dense(1, kernel_init=orthogonal(1.0))(critic_output)
 

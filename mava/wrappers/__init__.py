@@ -23,4 +23,4 @@ from mava.wrappers.jumanji import (
     RwareWrapper,
 )
 from mava.wrappers.matrax import MatraxWrapper
-from mava.wrappers.observation import AgentIDWrapper, GlobalStateWrapper
+from mava.wrappers.observation import AgentIDWrapper
