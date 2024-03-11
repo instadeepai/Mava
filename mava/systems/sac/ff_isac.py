@@ -158,8 +158,8 @@ def init(
     opts = (actor_opt, q_opt, alpha_opt)
 
     # Reset env.
-    n_keys = cfg.system.n_envs * cfg.arch.n_devices * cfg.system.update_batch_size
-    key_shape = (cfg.arch.n_devices, cfg.system.update_batch_size, cfg.system.n_envs, -1)
+    n_keys = cfg.arch.num_envs * cfg.arch.n_devices * cfg.system.update_batch_size
+    key_shape = (cfg.arch.n_devices, cfg.system.update_batch_size, cfg.arch.num_envs, -1)
     key, reset_key = jax.random.split(key)
     reset_keys = jax.random.split(reset_key, n_keys)
     reset_keys = jnp.reshape(reset_keys, key_shape)
@@ -170,7 +170,7 @@ def init(
 
     env_state, first_timestep = jax.pmap(  # devices
         jax.vmap(  # update_batch_size
-            jax.vmap(env.reset),  # n_envs
+            jax.vmap(env.reset),  # num_envs
             axis_name="batch",
         ),
         axis_name="device",
@@ -200,7 +200,7 @@ def make_update_fns(
     actor, q = nns
     actor_opt, q_opt, alpha_opt = opts
 
-    full_action_shape = (cfg.system.n_envs, *env.action_spec().shape)
+    full_action_shape = (cfg.arch.num_envs, *env.action_spec().shape)
 
     def step(
         action: Array, obs: Observation, env_state: State, buffer_state: BufferState
@@ -390,7 +390,7 @@ def make_update_fns(
         action = jax.random.uniform(explore_key, full_action_shape)
         next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
 
-        t += cfg.system.n_envs
+        t += cfg.arch.num_envs
         learner_state = carry._replace(
             obs=next_obs, env_state=env_state, buffer_state=buffer_state, t=t, key=key
         )
@@ -413,15 +413,15 @@ def make_update_fns(
         learn_state = (buffer_state, params, opt_states, t, learn_key)
         (buffer_state, params, opt_states, _, _), losses = scanned_update(learn_state)
 
-        t += cfg.system.n_envs * cfg.system.rollout_length
+        t += cfg.arch.num_envs * cfg.system.rollout_length
         return (
             LearnerState(next_obs, env_state, buffer_state, params, opt_states, t, key),
             (metrics, losses),
         )
 
     # pmap and scan over explore and update_step
-    # Make sure to not do n_envs explore steps (could fill up the buffer too much).
-    explore_steps = cfg.system.explore_steps // cfg.system.n_envs
+    # Make sure to not do num_envs explore steps (could fill up the buffer too much).
+    explore_steps = cfg.system.explore_steps // cfg.arch.num_envs
     pmaped_explore = jax.pmap(
         jax.vmap(
             lambda state: lax.scan(explore, state, None, length=explore_steps),
@@ -451,7 +451,7 @@ def run_experiment(cfg: DictConfig) -> float:
     # Multiplier for a single env/learn step in an anakin system
     anakin_steps = cfg.arch.n_devices * cfg.system.update_batch_size
     # Number of env steps in one anakin style update.
-    anakin_act_steps = anakin_steps * cfg.system.n_envs * cfg.system.rollout_length
+    anakin_act_steps = anakin_steps * cfg.arch.num_envs * cfg.system.rollout_length
     # Number of steps to do in the scanned update method (how many anakin steps).
     cfg.system.scan_steps = int(steps_per_rollout / anakin_act_steps)
 
