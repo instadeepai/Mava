@@ -303,7 +303,7 @@ def make_eval_fns(
 
     Returns:
         Tuple[EvalFn, EvalFn]: A tuple of two evaluation functions:
-                            one for use during training and one for overall metrics.
+        one for use during training and one for overall metrics.
 
     Raises:
         AssertionError: If `use_recurrent_net` is True but `scanned_rnn` is not provided.
