@@ -245,7 +245,7 @@ def get_rnn_evaluator_fn(
         # Initialise hidden state.
         init_hstate = scanned_rnn.initialize_carry(
             (eval_batch, config.system.num_agents),
-            hidden_carry_size,
+            config.network.hidden_state_dim,
         )
 
         # Initialise dones.
