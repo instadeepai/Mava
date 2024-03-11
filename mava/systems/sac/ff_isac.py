@@ -41,8 +41,8 @@ from mava.systems.sac.types import (
     Networks,
     Optimisers,
     OptStates,
-    Qs,
-    QsAndTarget,
+    QVals,
+    QValsAndTarget,
     SacParams,
     Transition,
 )
@@ -462,7 +462,7 @@ def make_update_fns(
         axis_name="device",
         donate_argnums=0,
     )
-    pmaped_updated_step = jax.pmap(
+    pmaped_update_step = jax.pmap(
         jax.vmap(
             lambda state: lax.scan(update_step, state, None, length=cfg.system.scan_steps),
             axis_name="batch",
@@ -471,7 +471,7 @@ def make_update_fns(
         donate_argnums=0,
     )
 
-    return pmaped_explore, pmaped_updated_step
+    return pmaped_explore, pmaped_update_step
 
 
 def run_experiment(cfg: DictConfig) -> float:
