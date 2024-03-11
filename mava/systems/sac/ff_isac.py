@@ -66,6 +66,22 @@ def init(
     MavaLogger,
     chex.PRNGKey,
 ]:
+    """Initialize system by creating the envs, networks etc.
+
+    Args:
+        cfg: System configuration.
+
+    Returns:
+        Tuple containing:
+            Tuple[Environment, Environment]: The environment and evaluation environment.
+            Networks: Tuple of actor and critic networks.
+            Optimisers: Tuple of actor, critic and alpha optimisers.
+            TrajectoryBuffer: The replay buffer.
+            LearnerState: The initial learner state.
+            Array: The target entropy.
+            MavaLogger: The logger.
+            PRNGKey: The random key.
+    """
     logger = MavaLogger(cfg)
 
     key = jax.random.PRNGKey(cfg.system.seed)
@@ -197,6 +213,21 @@ def make_update_fns(
     Callable[[LearnerState], Tuple[LearnerState, Metrics]],
     Callable[[LearnerState], Tuple[LearnerState, Tuple[Metrics, Metrics]]],
 ]:
+    """Create the update functions for the learner.
+
+    Args:
+        cfg: System configuration.
+        env: The environment.
+        nns: Tuple of actor and critic networks.
+        opts: Tuple of actor, critic and alpha optimisers.
+        rb: The replay buffer.
+        target_entropy: The target entropy.
+
+    Returns:
+        Tuple of (explore_fn, update_fn).
+        Explore function is used for initial exploration with random actions.
+        Update function is the main learning function, it both acts and learns.
+    """
     actor, q = nns
     actor_opt, q_opt, alpha_opt = opts
 
