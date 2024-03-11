@@ -30,19 +30,19 @@ Optimisers: TypeAlias = Tuple[
 ]
 
 
-class Qs(NamedTuple):
+class QVals(NamedTuple):
     q1: FrozenVariableDict
     q2: FrozenVariableDict
 
 
-class QsAndTarget(NamedTuple):
-    online: Qs
-    targets: Qs
+class QValsAndTarget(NamedTuple):
+    online: QVals
+    targets: QVals
 
 
 class SacParams(NamedTuple):
     actor: FrozenVariableDict
-    q: QsAndTarget
+    q: QValsAndTarget
     log_alpha: Array
 
 

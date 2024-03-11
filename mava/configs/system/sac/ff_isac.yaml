@@ -14,7 +14,8 @@ update_batch_size: 1 # number of vectorised gradient updates per device.
 
 rollout_length: 2 # number of environment steps per vectorised environment.
 epochs: 32 # number of learn epochs per training data batch.
-policy_frequency: 4  # the frequency of training policy - every n q learning steps the policy is trained once
+policy_update_frequency: 4  # the frequency of training policy -
+# every `policy_frequency` q network learning steps the policy network is trained `policy_frequency` times
 
 # sizes
 buffer_size: 500000  # size of the replay buffer. Note: total size is this * num_devices
@@ -23,7 +24,7 @@ batch_size: 32
 # learning rates
 policy_lr: 3e-4  # the learning rate of the policy network optimizer
 q_lr: 1e-3  # the learning rate of the Q network network optimizer
-alpha_lr: 13e-4  # the learning rate of the alpha optimizer
+alpha_lr: 3e-4  # the learning rate of the alpha optimizer
 
 # SAC specific
 tau: 0.005  # smoothing coefficient for target networks
