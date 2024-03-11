@@ -384,6 +384,8 @@ def make_update_fns(
     def explore(carry: LearnerState, _: Any) -> Tuple[LearnerState, Metrics]:
         """Take random actions to fill up buffer at the start of training."""
         obs, env_state, buffer_state, _, _, t, key = carry
+        assert isinstance(obs, Observation)  # mypy thinks it's Observation | ObservationGlobalState
+
         key, explore_key = jax.random.split(key)
         action = jax.random.uniform(explore_key, full_action_shape)
         next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
