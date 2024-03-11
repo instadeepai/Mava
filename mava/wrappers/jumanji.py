@@ -39,7 +39,7 @@ from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
 
 from mava.types import Observation, ObservationGlobalState, State
-import jax
+
 
 class MultiAgentWrapper(Wrapper, ABC):
     def __init__(self, env: Environment, add_global_state: bool):
@@ -285,7 +285,6 @@ class MultiCVRPWrapper(MultiAgentWrapper):
         self.has_global_state = add_global_state
         self._env = env
 
-
     def modify_timestep(self, timestep: TimeStep, state: State) -> TimeStep[Observation]:
         observation, global_observation = self._flatten_observation(timestep.observation)
         obs_data = {
@@ -301,8 +300,7 @@ class MultiCVRPWrapper(MultiAgentWrapper):
 
         reward = jnp.repeat(timestep.reward, (self.num_agents))
         discount = jnp.repeat(timestep.discount, (self.num_agents))
-        timestep = timestep.replace(observation=observation, reward=reward, discount=discount)
-        return timestep
+        return timestep.replace(observation=observation, reward=reward, discount=discount)
 
     def _flatten_observation(
         self, observation: MultiCvrpObservation
@@ -367,9 +365,9 @@ class MultiCVRPWrapper(MultiAgentWrapper):
             "agents_view",
         )
         obs_data = {
-                "agents_view":agents_view,
-                "action_mask":action_mask,
-                "step_count":step_count,
+            "agents_view": agents_view,
+            "action_mask": action_mask,
+            "step_count": step_count,
         }
 
         if self.has_global_state:
@@ -382,7 +380,6 @@ class MultiCVRPWrapper(MultiAgentWrapper):
             return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
 
         return specs.Spec(Observation, "ObservationSpec", **obs_data)
-        
 
     def reward_spec(self) -> specs.Array:
         return specs.Array(shape=(self.num_agents,), dtype=float, name="reward")
