@@ -148,7 +148,6 @@ def get_rnn_evaluator_fn(
     env: Environment,
     apply_fn: RecActorApply,
     config: DictConfig,
-    hidden_carry_size: int,
     scanned_rnn: nn.Module,
     log_win_rate: bool = False,
     eval_multiplier: int = 1,
@@ -245,7 +244,7 @@ def get_rnn_evaluator_fn(
         # Initialise hidden state.
         init_hstate = scanned_rnn.initialize_carry(
             (eval_batch, config.system.num_agents),
-            hidden_carry_size,
+            config.network.hidden_state_dim,
         )
 
         # Initialise dones.
@@ -290,18 +289,15 @@ def make_eval_fns(
     network_apply_fn: Union[ActorApply, RecActorApply],
     config: DictConfig,
     use_recurrent_net: bool = False,
-    hidden_carry_size: Optional[int] = None,
     scanned_rnn: Optional[nn.Module] = None,
 ) -> Tuple[EvalFn, EvalFn]:
-    """ "Initialize evaluator functions for reinforcement learning.
+    """Initialize evaluator functions for reinforcement learning.
 
     Args:
         eval_env (Environment): The environment used for evaluation.
         network_apply_fn (Union[ActorApply,RecActorApply]): Creates a policy to sample.
         config (DictConfig): The configuration settings for the evaluation.
         use_recurrent_net (bool, optional): Whether to use a rnn. Defaults to False.
-        hidden_carry_size (Optional[int], optional): Size of the hidden carry to
-            initialise for the RNN. Required if `use_recurrent_net` is True. Defaults to None.
         scanned_rnn (Optional[nn.Module], optional): The rnn module.
             Required if `use_recurrent_net` is True. Defaults to None.
 
@@ -317,12 +313,10 @@ def make_eval_fns(
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
         assert scanned_rnn is not None
-        assert hidden_carry_size is not None
         evaluator = get_rnn_evaluator_fn(
             eval_env,
             network_apply_fn,  # type: ignore
             config,
-            hidden_carry_size,
             scanned_rnn,
             log_win_rate,
         )
@@ -330,7 +324,6 @@ def make_eval_fns(
             eval_env,
             network_apply_fn,  # type: ignore
             config,
-            hidden_carry_size,
             scanned_rnn,
             log_win_rate,
             10,
