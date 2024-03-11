@@ -21,8 +21,13 @@ from omegaconf import DictConfig
 def check_total_timesteps(config: DictConfig) -> DictConfig:
     """Check if total_timesteps is set, if not, set it based on the other parameters"""
     n_devices = len(jax.devices())
+
+    # make sure that the total_timesteps and num_updates are ints
+    config.system.total_timesteps = int(config.system.total_timesteps)
+    config.system.num_updates = int(config.system.num_updates)
+
     if config.system.total_timesteps is None:
-        config.system.total_timesteps = (
+        config.system.total_timesteps = int(
             n_devices
             * config.system.num_updates
             * config.system.rollout_length
@@ -30,7 +35,7 @@ def check_total_timesteps(config: DictConfig) -> DictConfig:
             * config.arch.num_envs
         )
     else:
-        config.system.num_updates = (
+        config.system.num_updates = int(
             config.system.total_timesteps
             // config.system.rollout_length
             // config.system.update_batch_size
