@@ -110,16 +110,16 @@ def init(
     actor_action_head = hydra.utils.instantiate(
         cfg.network.action_head, action_dim=action_dim, independent_std=False
     )
-    actor = Actor(actor_torso, actor_action_head)
-    actor_params = actor.init(actor_key, obs_single_batched)
+    actor_network = Actor(actor_torso, actor_action_head)
+    actor_params = actor_network.init(actor_key, obs_single_batched)
 
     # Making Q networks
     critic_torso = hydra.utils.instantiate(cfg.network.critic_network.pre_torso)
-    q = QNetwork(critic_torso)
-    q1_params = q.init(q1_key, obs_single_batched, act_single_batched)
-    q2_params = q.init(q2_key, obs_single_batched, act_single_batched)
-    q1_target_params = q.init(q1_target_key, obs_single_batched, act_single_batched)
-    q2_target_params = q.init(q2_target_key, obs_single_batched, act_single_batched)
+    q_network = QNetwork(critic_torso)
+    q1_params = q_network.init(q1_key, obs_single_batched, act_single_batched)
+    q2_params = q_network.init(q2_key, obs_single_batched, act_single_batched)
+    q1_target_params = q_network.init(q1_target_key, obs_single_batched, act_single_batched)
+    q2_target_params = q_network.init(q2_target_key, obs_single_batched, act_single_batched)
 
     # Automatic entropy tuning
     target_entropy = -cfg.system.target_entropy_scale * action_dim
@@ -171,7 +171,7 @@ def init(
     )
     buffer_state = replicate(rb.init(init_transition))
 
-    networks = (actor, q)
+    networks = (actor_network, q_network)
     optims = (actor_opt, q_opt, alpha_opt)
 
     # Reset env.
@@ -284,11 +284,11 @@ def make_update_fns(
         action = pi.sample(seed=key)
         log_prob = pi.log_prob(action)
 
-        qf1_pi = q_net.apply(q_params.q1, obs, action)
-        qf2_pi = q_net.apply(q_params.q2, obs, action)
-        min_qf_pi = jnp.minimum(qf1_pi, qf2_pi)
+        qval_1 = q_net.apply(q_params.q1, obs, action)
+        qval_2 = q_net.apply(q_params.q2, obs, action)
+        min_q_val = jnp.minimum(qval_1, qval_2)
 
-        return ((alpha * log_prob) - min_qf_pi).mean()
+        return ((alpha * log_prob) - min_q_val).mean()
 
     def alpha_loss_fn(log_alpha: Array, log_pi: Array, target_entropy: Array) -> Array:
         return jnp.mean(-jnp.exp(log_alpha) * (log_pi + target_entropy))
