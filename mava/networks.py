@@ -178,7 +178,8 @@ class FeedForwardActor(nn.Module):
 
 
 class FeedForwardValueNet(nn.Module):
-    """Feedforward Value Network. Returns the value of an observation."""
+    """Feedforward Value Network. Returns a value estimate of the given observation."""
+`` 
 
     torso: nn.Module
     centralised_critic: bool = False
