@@ -18,9 +18,7 @@ from pprint import pprint
 from typing import Any, Callable, Dict, Tuple  # noqa
 
 import chex
-import distrax  # noqa
 import flashbax as fbx
-import flax.linen as nn
 import hydra
 import jax
 import jax.lax as lax
@@ -35,9 +33,8 @@ from jax import Array
 from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
 
-from mava.distributions import MaskedEpsGreedyDistribution
 from mava.evaluator import make_eval_fns  # noqa
-from mava.networks import MLPTorso, ScannedRNN
+from mava.networks import RecQNetwork, ScannedRNN
 from mava.systems.q_learning.types import (  # BufferState,
     ActionSelectionState,
     DDQNParams,
@@ -47,88 +44,54 @@ from mava.systems.q_learning.types import (  # BufferState,
     TrainState,
     Transition,
 )
-from mava.types import Observation, RNNObservation
+from mava.types import Observation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer  # noqa
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers import episode_metrics
 
 
-class RecQNetwork(nn.Module):
-    num_actions: int
-    hidden_size: int
-
-    def setup(self) -> None:
-        self.pre_torso: MLPTorso = MLPTorso((self.hidden_size,))
-        self.post_torso: MLPTorso = MLPTorso((self.hidden_size,))
-
-    @nn.compact
-    def get_q_values(
-        self,
-        hidden_state: chex.Array,
-        observations_resets: RNNObservation,
-    ) -> Array:
-        # unpack consumed parameters
-        obs, resets = observations_resets
-
-        embedding = self.pre_torso(obs.agents_view)
-
-        # pack consumed parameters
-        rnn_input = (embedding, resets)
-        hidden_state, embedding = ScannedRNN()(hidden_state, rnn_input)
-
-        embedding = self.post_torso(embedding)
-
-        q_values = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01))(embedding)
-
-        return hidden_state, q_values
-
-    def __call__(
-        self,
-        hidden_state: chex.Array,
-        observations_resets: RNNObservation,
-        eps: float = 0,
-    ) -> Array:
-
-        obs, _ = observations_resets
-
-        hidden_state, q_values = self.get_q_values(hidden_state, observations_resets)
-
-        eps_greedy_dist = MaskedEpsGreedyDistribution(q_values, eps, obs.action_mask)
-
-        return hidden_state, eps_greedy_dist
-
-
 def init(
     cfg: DictConfig,
 ) -> Tuple[
     Tuple[Environment, Environment],
-    LearnerState,
     RecQNetwork,
     optax.GradientTransformation,
     TrajectoryBuffer,
+    LearnerState,
     MavaLogger,
     PRNGKey,
 ]:
+    """Initialize system by creating the envs, networks etc.
 
+    Args:
+        cfg: System configuration.
+
+    Returns:
+        Tuple containing:
+            Tuple[Environment, Environment]: The environment and evaluation environment.
+            RecQNetwork: Recurrent Q network
+            optax.GradientTransformation: Optimiser for RecQNetwork.
+            TrajectoryBuffer: The replay buffer.
+            LearnerState: The initial learner state.
+            MavaLogger: The logger.
+            PRNGKey: The random key.
+    """
     logger = MavaLogger(cfg)
 
-    # init key, get devices available
     key = jax.random.PRNGKey(cfg.system.seed)
     devices = jax.devices()
-    n_devices = len(devices)
 
     def replicate(x: Any) -> Any:
         """First replicate the update batch dim then put on devices."""
         x = jax.tree_map(lambda y: jnp.broadcast_to(y, (cfg.system.update_batch_size, *y.shape)), x)
         return jax.device_put_replicated(x, devices)
 
-    # make envs
     env, eval_env = environments.make(cfg)
 
-    # actions, agents, keysplits
     action_dim = env.action_dim
     num_agents = env.num_agents
+
     key, q_key = jax.random.split(key, 2)
 
     # Make dummy inputs to init recurrent Q network -> need format TBAx
@@ -143,45 +106,42 @@ def init(
     init_done = jnp.zeros((1, cfg.arch.num_envs, 1), dtype=bool)  # (1,B,1)
     init_x = (init_obs_batched, init_done)  # pack the RNN dummy inputs
     init_hidden_state = ScannedRNN.initialize_carry(
-        (cfg.arch.num_envs, num_agents), cfg.network.q_network.post_torso.layer_sizes[-1]
+        (cfg.arch.num_envs, num_agents), cfg.network.hidden_state_dim
     )  # (B, A, x)
 
-    # Make recurrent Q network
-    q_net = RecQNetwork(action_dim, cfg.network.q_network.post_torso.layer_sizes[-1])
-    q_params = q_net.init(q_key, init_hidden_state, init_x, 0)
-    q_target_params = q_net.init(
-        q_key, init_hidden_state, init_x, 0
-    )  # ensure parameters are separate
+    # Making recurrent Q network
+    q_net = RecQNetwork(action_dim, cfg.network.hidden_state_dim)
+    q_params = q_net.init(q_key, init_hidden_state, init_x)  # epsilon defaults to 0
+    q_target_params = q_net.init(q_key, init_hidden_state, init_x)  # ensure parameters are separate
 
-    # Pack params
+    # Pack Q network params
     params = DDQNParams(q_params, q_target_params)
 
-    # OPTIMISER
+    # Making optimiser and state
     opt = optax.chain(
         # optax.clip_by_global_norm(10), # used in JAXMARL
-        optax.adam(learning_rate=cfg.system.q_lr),  # eps=1e-5 in JAXMARL paper
+        optax.adam(learning_rate=cfg.system.q_lr),  # eps=1e-5 in JAXMARL
     )
     opt_state = opt.init(params.online)
 
-    # Distribute params and opt states across all devices
+    # Distribute params, opt states and hidden states across all devices
     params = replicate(params)
     opt_state = replicate(opt_state)
     init_hidden_state = replicate(init_hidden_state)
 
-    # Create dummy inputs to initialise trajectory buffer
+    # Create dummy transition
     init_acts = env.action_spec().generate_value()  # A,
-    init_obs = env.observation_spec().generate_value()  # A, x
     init_transition = Transition(
-        obs=Observation(*init_obs),
+        obs=Observation(*init_obs),  # A, x
         action=init_acts,
-        reward=jnp.zeros((1,), dtype=float),
-        done=jnp.zeros((1,), dtype=bool),
+        reward=jnp.zeros((1,), dtype=float),  # no support for individual rewards
+        done=jnp.zeros((1,), dtype=bool),  # one flag for all agents
     )
 
     # Initialise trajectory buffer
     rb = fbx.make_trajectory_buffer(
         sample_sequence_length=cfg.system.recurrent_chunk_size
-        + 1,  # n transitions gives n-1 full data points # TODO: rename
+        + 1,  # n transitions gives n-1 full data points
         period=1,  # sample any unique trajectory
         add_batch_size=cfg.arch.num_envs,
         sample_batch_size=cfg.system.sample_batch_size,
@@ -191,11 +151,9 @@ def init(
     buffer_state = rb.init(init_transition)
     buffer_state = replicate(buffer_state)
 
-    # Produce inputs to first learner state
-
     # Keys to reset env
-    n_keys = cfg.arch.num_envs * n_devices * cfg.system.update_batch_size
-    key_shape = (n_devices, cfg.system.update_batch_size, cfg.arch.num_envs, -1)
+    n_keys = cfg.arch.num_envs * cfg.arch.n_devices * cfg.system.update_batch_size
+    key_shape = (cfg.arch.n_devices, cfg.system.update_batch_size, cfg.arch.num_envs, -1)
     key, reset_key = jax.random.split(key)
     reset_keys = jax.random.split(reset_key, n_keys)
     reset_keys = jnp.reshape(reset_keys, key_shape)
@@ -208,15 +166,16 @@ def init(
         ),
         axis_name="device",
     )(reset_keys)
-
     first_obs = first_timestep.observation
     first_done = first_timestep.last()[..., jnp.newaxis]  # ..., 1
-    t0 = jnp.zeros((n_devices, cfg.system.update_batch_size), dtype=int)
-    t0_train = jnp.zeros((n_devices, cfg.system.update_batch_size), dtype=int)
+
+    # Initialise env steps and training steps
+    t0 = jnp.zeros((cfg.arch.n_devices, cfg.system.update_batch_size), dtype=int)
+    t0_train = jnp.zeros((cfg.arch.n_devices, cfg.system.update_batch_size), dtype=int)
 
     # Keys passed to learner
-    first_keys = jax.random.split(key, (n_devices * cfg.system.update_batch_size))
-    first_keys = first_keys.reshape((n_devices, cfg.system.update_batch_size, -1))
+    first_keys = jax.random.split(key, (cfg.arch.n_devices * cfg.system.update_batch_size))
+    first_keys = first_keys.reshape((cfg.arch.n_devices, cfg.system.update_batch_size, -1))
 
     # Initial learner state.
     learner_state = LearnerState(
@@ -232,7 +191,7 @@ def init(
         first_keys,
     )
 
-    return (env, eval_env), learner_state, q_net, opt, rb, logger, key
+    return (env, eval_env), q_net, opt, rb, learner_state, logger, key
 
 
 def make_update_fns(
@@ -361,7 +320,7 @@ def make_update_fns(
         """
 
         hidden_state = ScannedRNN.initialize_carry(
-            (cfg.system.sample_batch_size, obs.agents_view.shape[2]), cfg.system.hidden_size
+            (cfg.system.sample_batch_size, obs.agents_view.shape[2]), cfg.network.hidden_state_dim
         )
         obs = switch_leading_axis(obs)  # B, T -> T, B
         done = switch_leading_axis(done)  # B, T -> T, B
@@ -577,8 +536,8 @@ def run_experiment(cfg: DictConfig) -> float:
     pprint(OmegaConf.to_container(cfg, resolve=True))
 
     # Initialise system and make learning/evaluation functions
-    (env, eval_env), learner_state, q_net, opts, rb, logger, key = init(cfg)
-    update = make_update_fns(cfg, env, q_net, opts, rb)
+    (env, eval_env), q_net, opt, rb, learner_state, logger, key = init(cfg)
+    update = make_update_fns(cfg, env, q_net, opt, rb)
 
     cfg.system.num_agents = env.action_spec().shape[0]
     # TODO figure out where others do this

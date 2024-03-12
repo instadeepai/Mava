@@ -31,11 +31,11 @@ critic_network:
 q_network:
   pre_torso:
     module: mava.networks.MLPTorso
-    layer_sizes: [256]
+    layer_sizes: [128]
     use_layer_norm: False
     activation: relu
   post_torso:
     module: mava.networks.MLPTorso
-    layer_sizes: [256]
+    layer_sizes: [128]
     use_layer_norm: False
     activation: relu

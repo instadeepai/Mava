@@ -29,4 +29,4 @@ eps_min: 0.05
 eps_decay: 1e5
 
 recurrent_chunk_size: 20 # TODO if unspecified, use rollout length
-hidden_size: 256 # Embedding layers width as well as RNN hidden dimension
+#hidden_size: 256 # Embedding layers width as well as RNN hidden dimension

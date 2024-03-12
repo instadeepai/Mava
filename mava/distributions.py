@@ -97,8 +97,8 @@ class MaskedEpsGreedyDistribution(tfd.Categorical):
     Computes an epsilon-greedy distribution for each action choice. There are two
     components in the distribution:
 
-    A uniform component, where every action that is NOT masked out gets an even weighting.
-    A greedy component, where the action with the highest corresponding q-value that is
+    1. A uniform component, where every action that is NOT masked out gets an even weighting.
+    2. A greedy component, where the action with the highest corresponding q-value that is
     NOT masked out gets a probability of one.
 
     Combining these two distributions per action choice in a ratio of eps:1-eps gives
@@ -107,6 +107,7 @@ class MaskedEpsGreedyDistribution(tfd.Categorical):
     """
 
     def __init__(self, q_values: chex.Array, epsilon: float, mask: chex.Array):
+        self.q_values = q_values
 
         # UNIFORM PART (eps %)
         # generate uniform probabilities across all allowable actions at most granular level
@@ -128,7 +129,7 @@ class MaskedEpsGreedyDistribution(tfd.Categorical):
         greedy_actions = jnp.argmax(masked_q_vals, axis=-1)
         # get one-hot so that shapes are equal again and ready to be made into a prob
         greedy_actions = jax.nn.one_hot(greedy_actions, q_values.shape[-1])
-        # two probability masks need to fit one another, and why not check consistency
+        # consistency check
         chex.assert_equal_shape([greedy_actions, masked_q_vals, q_values])
 
         mixed_eps_greedy_probs = (
@@ -136,6 +137,9 @@ class MaskedEpsGreedyDistribution(tfd.Categorical):
         )
 
         super().__init__(probs=mixed_eps_greedy_probs)
+
+    def get_q_values(self) -> chex.Array:
+        return self.q_values
 
     @classmethod
     def _parameter_properties(cls, dtype: Optional[Any], num_classes: Any = None) -> Any:
