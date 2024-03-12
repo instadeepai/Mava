@@ -6,7 +6,7 @@ add_agent_id: False
 
 # --- RL hyperparameters ---
 # step related
-total_timesteps: 2e7 # Set the total environment steps.
+total_timesteps: ~ # Set the total environment steps.
 # If unspecified, it's derived from num_updates; otherwise, num_updates adjusts based on this value.
 num_updates: 625000 # Number of updates
 explore_steps: 5000  # number of steps to take with random actions at the start of training
