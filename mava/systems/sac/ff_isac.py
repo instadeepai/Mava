@@ -14,7 +14,6 @@
 
 import copy
 import time
-from rich.pretty import pprint
 from typing import Any, Callable, Dict, Tuple
 
 import chex
@@ -30,6 +29,7 @@ from flax.core.scope import FrozenVariableDict
 from jax import Array
 from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
+from rich.pretty import pprint
 
 from mava.evaluator import make_eval_fns
 from mava.networks import FeedForwardActor as Actor
@@ -336,8 +336,8 @@ def make_update_fns(
     ) -> Tuple[SacParams, OptStates, Metrics]:
         """Update the actor and alpha parameters. Compensated for the delay in policy updates."""
         # compensate for the delay by doing `policy_frequency` updates instead of 1.
-        assert cfg.system.policy_update_frequency > 0, "Need to have a policy frequency > 0."
-        for _ in range(cfg.system.policy_update_frequency):
+        assert cfg.system.policy_update_delay > 0, "Need to have a policy update delay > 0."
+        for _ in range(cfg.system.policy_update_delay):
             actor_key, alpha_key = jax.random.split(key)
 
             # Update actor.
@@ -389,7 +389,7 @@ def make_update_fns(
         # learn
         params, opt_states, q_loss_info = update_q(params, opt_states, data, q_key)
         params, opt_states, act_loss_info = lax.cond(
-            t % cfg.system.policy_update_frequency == 0,  # TD 3 Delayed update support
+            t % cfg.system.policy_update_delay == 0,  # TD 3 Delayed update support
             update_actor_and_alpha,
             # just return same params and opt_states and 0 for losses
             lambda params, opt_states, *_: (
