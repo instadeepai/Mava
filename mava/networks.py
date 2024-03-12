@@ -155,40 +155,54 @@ class ContinuousActionHead(nn.Module):
         )
 
 
-class DiscreteActionEpsGreedyMaskedHead(nn.Module):
-    """Discrete Action Head With Epsilon Greedy Selection And Action Masking"""
+class RecQNetwork(nn.Module):
+    """
+    Recurrent Q network for training and for selecting actions
+    in a shared-weight Q learning system.
+    """
 
-    action_dim: int
+    num_actions: int
+    hidden_size: int
+
+    def setup(self) -> None:
+        self.pre_torso: MLPTorso = MLPTorso((self.hidden_size,))
+        self.post_torso: MLPTorso = MLPTorso((self.hidden_size,))
 
     @nn.compact
+    def get_q_values(
+        self,
+        hidden_state: chex.Array,
+        observations_resets: RNNObservation,
+    ) -> Tuple[chex.Array, chex.Array]:
+        """Obtain q values."""
+        obs, resets = observations_resets
+
+        embedding = self.pre_torso(obs.agents_view)
+
+        rnn_input = (embedding, resets)
+        hidden_state, embedding = ScannedRNN()(hidden_state, rnn_input)
+
+        embedding = self.post_torso(embedding)
+
+        q_values = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01))(embedding)
+
+        return hidden_state, q_values
+
     def __call__(
-        self, obs_embedding: chex.Array, observation: Observation, epsilon: float
-    ) -> Tuple[chex.Array, tfd.Categorical]:
-        """Action selection for distrete action space environments.
+        self,
+        hidden_state: chex.Array,
+        observations_resets: RNNObservation,
+        eps: float = 0.0,
+    ) -> Tuple[chex.Array, tfd.Distribution]:
+        """Obtain q values and use them to make an epsilon-greedy distribution over actions."""
 
-        Args:
-            obs_embedding: Observation embedding from network torso.
-            observation: Observation object containing `agents_view`, `action_mask` and
-                `step_count`.
+        obs, _ = observations_resets
 
-        Returns:
-            q_values: used for double Q-learning selection.
-            eps_greedy_dist: an eps-greedy initialised tfd.Categorical for sampling actions.
+        hidden_state, q_values = self.get_q_values(hidden_state, observations_resets)
 
-        NOTE: We pass both the observation embedding and the observation object to the action head
-        since the observation object contains the action mask and other potentially useful
-        information.
-        """
+        eps_greedy_dist = MaskedEpsGreedyDistribution(q_values, eps, obs.action_mask)
 
-        q_values = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(obs_embedding)
-
-        # action mask needs to fit onto the array of action q-vals
-        chex.assert_equal_shape([q_values, observation.action_mask])
-
-        eps_greedy_dist = MaskedEpsGreedyDistribution(q_values, epsilon, observation.action_mask)
-
-        # q values must be returned for q learning, else we can't double-q-learning-select
-        return eps_greedy_dist, q_values
+        return hidden_state, eps_greedy_dist
 
 
 class FeedForwardActor(nn.Module):

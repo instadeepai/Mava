@@ -107,6 +107,7 @@ class MaskedEpsGreedyDistribution(tfd.Categorical):
     """
 
     def __init__(self, q_values: chex.Array, epsilon: float, mask: chex.Array):
+        self.q_values = q_values
 
         # UNIFORM PART (eps %)
         # generate uniform probabilities across all allowable actions at most granular level
@@ -136,6 +137,9 @@ class MaskedEpsGreedyDistribution(tfd.Categorical):
         )
 
         super().__init__(probs=mixed_eps_greedy_probs)
+
+    def get_q_values(self) -> chex.Array:
+        return self.q_values
 
     @classmethod
     def _parameter_properties(cls, dtype: Optional[Any], num_classes: Any = None) -> Any:
