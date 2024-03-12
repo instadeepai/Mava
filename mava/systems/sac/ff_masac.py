@@ -290,8 +290,8 @@ def make_update_fns(
         new_actions = pi.sample(seed=key)
         log_prob = pi.log_prob(new_actions)
 
-        # Updated joint actions are done so that each agents central critic sees what all
-        # other agents did in the past, but it sees how its agents policy is currently acting.
+        # Updated joint actions are done so that each agent's central critic sees what all
+        # other agents did in the past, but it sees how its agent's policy is currently acting.
         # This is done by placing new_action[i] in joint_actions[i].
         joint_actions = get_updated_joint_actions(actions, new_actions)
 
