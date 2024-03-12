@@ -387,7 +387,6 @@ def make_update_fns(
         data = rb.sample(buffer_state, buff_key).experience
 
         # learn
-        # todo: do this in a loop and get rid of the cond
         params, opt_states, q_loss_info = update_q(params, opt_states, data, q_key)
         params, opt_states, act_loss_info = lax.cond(
             t % cfg.system.policy_update_frequency == 0,  # TD 3 Delayed update support
