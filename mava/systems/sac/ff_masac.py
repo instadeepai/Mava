@@ -520,7 +520,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     actor, _ = networks
     key, eval_key = jax.random.split(key)
-    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor, cfg)
+    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor.apply, cfg)
 
     if cfg.logger.checkpointing.save_model:
         checkpointer = Checkpointer(

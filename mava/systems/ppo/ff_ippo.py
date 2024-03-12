@@ -458,7 +458,7 @@ def run_experiment(_config: DictConfig) -> float:
     # Setup evaluator.
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
-    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network, config)
+    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network.apply, config)
 
     # Calculate total timesteps.
     config = check_total_timesteps(config)
