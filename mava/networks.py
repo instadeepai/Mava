@@ -148,11 +148,8 @@ class ContinuousActionHead(nn.Module):
         """
         loc = self.mean(obs_embedding)
 
-        if self.independent_std:
-            scale = jax.nn.softplus(self.log_std) + self.min_scale
-        else:
-            scale = self.log_std(obs_embedding)
-            scale = jax.nn.softplus(scale) + self.min_scale
+        scale = self.log_std if self.independent_std else self.log_std(obs_embedding)
+        scale = jax.nn.softplus(scale) + self.min_scale
 
         distribution = tfd.Normal(loc=loc, scale=scale)
 
