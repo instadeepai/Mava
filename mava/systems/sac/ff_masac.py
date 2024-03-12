@@ -48,19 +48,12 @@ from mava.systems.sac.types import (
 )
 from mava.types import ObservationGlobalState
 from mava.utils import make_env as environments
+from mava.utils.centralised_training import get_joint_action, get_updated_joint_actions
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.wrappers import episode_metrics
-
-
-def get_joint_action(actions: Array) -> Array:
-    batch_size, num_agents, _ = actions.shape
-    repeated_action = jnp.tile(actions[:, jnp.newaxis, ...], (1, num_agents, 1, 1))
-    joint_action = jnp.reshape(repeated_action, (batch_size, num_agents, -1))
-
-    return joint_action
 
 
 def init(
@@ -243,7 +236,6 @@ def make_update_fns(
     actor_opt, q_opt, alpha_opt = optims
 
     full_action_shape = (cfg.arch.num_envs, *env.action_spec().shape)
-    num_agents = env.num_agents
 
     def step(
         action: Array, obs: ObservationGlobalState, env_state: State, buffer_state: BufferState
@@ -295,21 +287,16 @@ def make_update_fns(
         key: chex.PRNGKey,
     ) -> Array:
         pi = actor_net.apply(actor_params, obs)
-        new_action = pi.sample(seed=key)
-        log_prob = pi.log_prob(new_action)
+        new_actions = pi.sample(seed=key)
+        log_prob = pi.log_prob(new_actions)
 
-        # Repeat the actions from the replay buffer such that you have (B, Ag, Ag, Ac).
-        # This gives you n_agent joint actions with the action dim kept separate.
-        # Then replace along the diagonal with the new action from the policy.
-        # This replacement means that joint_action_i will have the new action for agent_i.
-        actions_repeated = jnp.tile(actions[:, jnp.newaxis, ...], (1, num_agents, 1, 1))
-        inds = jnp.diag_indices_from(actions_repeated[0, ..., 0])
-        spliced_actions = actions_repeated.at[:, inds[0], inds[1], :].set(new_action)
-        joint_actions = spliced_actions.reshape((*spliced_actions.shape[:2], -1))
+        # Updated joint actions are done so that each agents central critic sees what all
+        # other agents did in the past, but it sees how its agents policy is currently acting.
+        # This is done by placing new_action[i] in joint_actions[i].
+        joint_actions = get_updated_joint_actions(actions, new_actions)
 
         qval_1 = q_net.apply(q_params.q1, obs, joint_actions)
         qval_2 = q_net.apply(q_params.q2, obs, joint_actions)
-
         min_q_val = jnp.minimum(qval_1, qval_2)
 
         return ((alpha * log_prob) - min_q_val).mean()
