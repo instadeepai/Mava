@@ -54,8 +54,8 @@ def get_updated_joint_actions(rb_actions: Array, policy_actions: Array) -> Array
     Finally join the last two dims to get (B, A, A * Act).
 
     Example:
-    Given an action dim of 1, batch size of 1 and 3 agents an action may look like this:
-    [0, 1, 2].
+    Given an action dim of 1, batch size of 1 and 3 agents.
+    All agents action may look like this: [0, 1, 2].
     It is then repeated num agent times:
     [
       [0, 1, 2],
