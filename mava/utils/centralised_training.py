@@ -15,6 +15,11 @@
 import jax.numpy as jnp
 from chex import Array
 
+# Shape legend:
+# B: batch size
+# A: num agents
+# Act: action dim/num actions
+
 
 def get_joint_action(actions: Array) -> Array:
     """
@@ -48,6 +53,25 @@ def get_updated_joint_actions(rb_actions: Array, policy_actions: Array) -> Array
     This replacement means that joint_action[i] will have the new action for agent[i].
     Finally join the last two dims to get (B, A, A * Act).
 
+    Example:
+    Given an action dim of 1, batch size of 1 and 3 agents an action may look like this:
+    [0, 1, 2].
+    It is then repeated num agent times:
+    [
+      [0, 1, 2],
+      [0, 1, 2],
+      [0, 1, 2]
+    ]
+    Now new/updated actions from the policies may look like this: [3, 4, 5].
+    We want to replace action[i] in joint_action[i] so we replace along the diagonal:
+    [
+      [3, 1, 2],
+      [0, 4, 2],
+      [0, 1, 5]
+    ]
+    Seeing as our action dim is 1 there is no need to do the final reshape step,
+    but given an action dim > 1 you would need to join the last two dims.
+
     Args:
         rb_actions (B, A, Act): the actions from the replay buffer.
         policy_actions (B, A, Act): the new actions from the policy.
@@ -64,6 +88,6 @@ def get_updated_joint_actions(rb_actions: Array, policy_actions: Array) -> Array
     inds = jnp.diag_indices(num_agents)
     # Replace along the diagonal with the new action from the policy.
     # This replacement means that joint_action[i] will have the new action for agent[i].
-    spliced_actions = actions_repeated.at[:, inds[0], inds[1], :].set(policy_actions)
+    updated_joint_actions = actions_repeated.at[:, inds[0], inds[1], :].set(policy_actions)
     # Reshape to (B, A, A * Act) so that we create the joint action dim from the extra agent dim.
-    return spliced_actions.reshape(batch_size, num_agents, num_agents * act_size)
+    return updated_joint_actions.reshape(batch_size, num_agents, num_agents * act_size)
