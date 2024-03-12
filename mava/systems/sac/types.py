@@ -57,7 +57,7 @@ class Transition(NamedTuple):
     action: Array
     reward: Array
     done: Array
-    next_obs: Array
+    next_obs: Union[Observation, ObservationGlobalState]
 
 
 BufferState: TypeAlias = TrajectoryBufferState[Transition]
