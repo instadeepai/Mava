@@ -275,7 +275,7 @@ def make_update_fns(
 
     def actor_loss_fn(
         actor_params: FrozenVariableDict,
-        obs: Array,
+        obs: Observation,
         alpha: Array,
         q_params: QVals,
         key: chex.PRNGKey,
