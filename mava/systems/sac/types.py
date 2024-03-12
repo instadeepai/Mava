@@ -30,19 +30,19 @@ Optimisers: TypeAlias = Tuple[
 ]
 
 
-class Qs(NamedTuple):
+class QVals(NamedTuple):
     q1: FrozenVariableDict
     q2: FrozenVariableDict
 
 
-class QsAndTarget(NamedTuple):
-    online: Qs
-    targets: Qs
+class QValsAndTarget(NamedTuple):
+    online: QVals
+    targets: QVals
 
 
 class SacParams(NamedTuple):
     actor: FrozenVariableDict
-    q: QsAndTarget
+    q: QValsAndTarget
     log_alpha: Array
 
 
@@ -64,10 +64,10 @@ BufferState: TypeAlias = TrajectoryBufferState[Transition]
 
 
 class LearnerState(NamedTuple):
-    obs: Array
+    obs: Union[Observation, ObservationGlobalState]
     env_state: State
     buffer_state: BufferState
     params: SacParams
     opt_states: OptStates
-    t: Array
+    t: Array  # the timestep counter
     key: PRNGKey

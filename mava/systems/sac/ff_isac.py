@@ -14,7 +14,6 @@
 
 import copy
 import time
-from pprint import pprint
 from typing import Any, Callable, Dict, Tuple
 
 import chex
@@ -30,6 +29,7 @@ from flax.core.scope import FrozenVariableDict
 from jax import Array
 from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
+from rich.pretty import pprint
 
 from mava.evaluator import make_eval_fns
 from mava.networks import FeedForwardActor as Actor
@@ -41,8 +41,8 @@ from mava.systems.sac.types import (
     Networks,
     Optimisers,
     OptStates,
-    Qs,
-    QsAndTarget,
+    QVals,
+    QValsAndTarget,
     SacParams,
     Transition,
 )
@@ -51,6 +51,7 @@ from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
+from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.wrappers import episode_metrics
 
 
@@ -66,6 +67,22 @@ def init(
     MavaLogger,
     chex.PRNGKey,
 ]:
+    """Initialize system by creating the envs, networks etc.
+
+    Args:
+        cfg: System configuration.
+
+    Returns:
+        Tuple containing:
+            Tuple[Environment, Environment]: The environment and evaluation environment.
+            Networks: Tuple of actor and critic networks.
+            Optimisers: Tuple of actor, critic and alpha optimisers.
+            TrajectoryBuffer: The replay buffer.
+            LearnerState: The initial learner state.
+            Array: The target entropy.
+            MavaLogger: The logger.
+            PRNGKey: The random key.
+    """
     logger = MavaLogger(cfg)
 
     key = jax.random.PRNGKey(cfg.system.seed)
@@ -78,8 +95,8 @@ def init(
 
     env, eval_env = environments.make(cfg)
 
-    n_agents = env.action_spec().shape[0]
-    action_dim = env.action_spec().shape[1]
+    n_agents = env.num_agents
+    action_dim = env.action_dim
 
     key, actor_key, q1_key, q2_key, q1_target_key, q2_target_key = jax.random.split(key, 6)
 
@@ -91,18 +108,18 @@ def init(
     # Making actor network
     actor_torso = hydra.utils.instantiate(cfg.network.actor_network.pre_torso)
     actor_action_head = hydra.utils.instantiate(
-        cfg.network.action_head, action_dim=env.action_dim, independent_std=False
+        cfg.network.action_head, action_dim=action_dim, independent_std=False
     )
-    actor = Actor(actor_torso, actor_action_head)
-    actor_params = actor.init(actor_key, obs_single_batched)
+    actor_network = Actor(actor_torso, actor_action_head)
+    actor_params = actor_network.init(actor_key, obs_single_batched)
 
     # Making Q networks
     critic_torso = hydra.utils.instantiate(cfg.network.critic_network.pre_torso)
-    q = QNetwork(critic_torso)
-    q1_params = q.init(q1_key, obs_single_batched, act_single_batched)
-    q2_params = q.init(q2_key, obs_single_batched, act_single_batched)
-    q1_target_params = q.init(q1_target_key, obs_single_batched, act_single_batched)
-    q2_target_params = q.init(q2_target_key, obs_single_batched, act_single_batched)
+    q_network = QNetwork(critic_torso)
+    q1_params = q_network.init(q1_key, obs_single_batched, act_single_batched)
+    q2_params = q_network.init(q2_key, obs_single_batched, act_single_batched)
+    q1_target_params = q_network.init(q1_target_key, obs_single_batched, act_single_batched)
+    q2_target_params = q_network.init(q2_target_key, obs_single_batched, act_single_batched)
 
     # Automatic entropy tuning
     target_entropy = -cfg.system.target_entropy_scale * action_dim
@@ -116,9 +133,9 @@ def init(
         log_alpha = jnp.broadcast_to(log_alpha, target_entropy.shape)
 
     # Pack params
-    online_q_params = Qs(q1_params, q2_params)
-    target_q_params = Qs(q1_target_params, q2_target_params)
-    params = SacParams(actor_params, QsAndTarget(online_q_params, target_q_params), log_alpha)
+    online_q_params = QVals(q1_params, q2_params)
+    target_q_params = QVals(q1_target_params, q2_target_params)
+    params = SacParams(actor_params, QValsAndTarget(online_q_params, target_q_params), log_alpha)
 
     # Make opt states.
     actor_opt = optax.adam(cfg.system.policy_lr)
@@ -154,12 +171,12 @@ def init(
     )
     buffer_state = replicate(rb.init(init_transition))
 
-    nns = (actor, q)
-    opts = (actor_opt, q_opt, alpha_opt)
+    networks = (actor_network, q_network)
+    optims = (actor_opt, q_opt, alpha_opt)
 
     # Reset env.
-    n_keys = cfg.system.n_envs * cfg.arch.n_devices * cfg.system.update_batch_size
-    key_shape = (cfg.arch.n_devices, cfg.system.update_batch_size, cfg.system.n_envs, -1)
+    n_keys = cfg.arch.num_envs * cfg.arch.n_devices * cfg.system.update_batch_size
+    key_shape = (cfg.arch.n_devices, cfg.system.update_batch_size, cfg.arch.num_envs, -1)
     key, reset_key = jax.random.split(key)
     reset_keys = jax.random.split(reset_key, n_keys)
     reset_keys = jnp.reshape(reset_keys, key_shape)
@@ -170,7 +187,7 @@ def init(
 
     env_state, first_timestep = jax.pmap(  # devices
         jax.vmap(  # update_batch_size
-            jax.vmap(env.reset),  # n_envs
+            jax.vmap(env.reset),  # num_envs
             axis_name="batch",
         ),
         axis_name="device",
@@ -183,24 +200,39 @@ def init(
     learner_state = LearnerState(
         first_obs, env_state, buffer_state, params, opt_states, t, first_keys
     )
-    return (env, eval_env), nns, opts, rb, learner_state, target_entropy, logger, key
+    return (env, eval_env), networks, optims, rb, learner_state, target_entropy, logger, key
 
 
 def make_update_fns(
     cfg: DictConfig,
     env: Environment,
-    nns: Networks,
-    opts: Optimisers,
+    networks: Networks,
+    optims: Optimisers,
     rb: TrajectoryBuffer,
     target_entropy: chex.Array,
 ) -> Tuple[
     Callable[[LearnerState], Tuple[LearnerState, Metrics]],
     Callable[[LearnerState], Tuple[LearnerState, Tuple[Metrics, Metrics]]],
 ]:
-    actor, q = nns
-    actor_opt, q_opt, alpha_opt = opts
+    """Create the update functions for the learner.
 
-    full_action_shape = (cfg.system.n_envs, *env.action_spec().shape)
+    Args:
+        cfg: System configuration.
+        env: The environment.
+        networks: Tuple of actor and critic networks.
+        optims: Tuple of actor, critic and alpha optimisers.
+        rb: The replay buffer.
+        target_entropy: The target entropy.
+
+    Returns:
+        Tuple of (explore_fn, update_fn).
+        Explore function is used for initial exploration with random actions.
+        Update function is the main learning function, it both acts and learns.
+    """
+    actor_net, q_net = networks
+    actor_opt, q_opt, alpha_opt = optims
+
+    full_action_shape = (cfg.arch.num_envs, *env.action_spec().shape)
 
     def step(
         action: Array, obs: Observation, env_state: State, buffer_state: BufferState
@@ -220,10 +252,12 @@ def make_update_fns(
         return next_obs, env_state, buffer_state, infos["episode_metrics"]
 
     # losses:
-    def q_loss_fn(q_params: Qs, obs: Array, action: Array, target: Array) -> Tuple[Array, Metrics]:
+    def q_loss_fn(
+        q_params: QVals, obs: Array, action: Array, target: Array
+    ) -> Tuple[Array, Metrics]:
         q1_params, q2_params = q_params
-        q1_a_values = q.apply(q1_params, obs, action)
-        q2_a_values = q.apply(q2_params, obs, action)
+        q1_a_values = q_net.apply(q1_params, obs, action)
+        q2_a_values = q_net.apply(q2_params, obs, action)
 
         q1_loss = jnp.mean(jnp.square(q1_a_values - target))
         q2_loss = jnp.mean(jnp.square(q2_a_values - target))
@@ -240,17 +274,21 @@ def make_update_fns(
         return loss, loss_info
 
     def actor_loss_fn(
-        actor_params: FrozenVariableDict, obs: Array, alpha: Array, q_params: Qs, key: chex.PRNGKey
+        actor_params: FrozenVariableDict,
+        obs: Array,
+        alpha: Array,
+        q_params: QVals,
+        key: chex.PRNGKey,
     ) -> Array:
-        pi = actor.apply(actor_params, obs)
+        pi = actor_net.apply(actor_params, obs)
         action = pi.sample(seed=key)
         log_prob = pi.log_prob(action)
 
-        qf1_pi = q.apply(q_params.q1, obs, action)
-        qf2_pi = q.apply(q_params.q2, obs, action)
-        min_qf_pi = jnp.minimum(qf1_pi, qf2_pi)
+        qval_1 = q_net.apply(q_params.q1, obs, action)
+        qval_2 = q_net.apply(q_params.q2, obs, action)
+        min_q_val = jnp.minimum(qval_1, qval_2)
 
-        return ((alpha * log_prob) - min_qf_pi).mean()
+        return ((alpha * log_prob) - min_q_val).mean()
 
     def alpha_loss_fn(log_alpha: Array, log_pi: Array, target_entropy: Array) -> Array:
         return jnp.mean(-jnp.exp(log_alpha) * (log_pi + target_entropy))
@@ -261,12 +299,12 @@ def make_update_fns(
     ) -> Tuple[SacParams, OptStates, Metrics]:
         """Update the Q parameters."""
         # Calculate Q target values.
-        pi = actor.apply(params.actor, data.next_obs)
+        pi = actor_net.apply(params.actor, data.next_obs)
         next_action = pi.sample(seed=key)
         next_log_prob = pi.log_prob(next_action)
 
-        next_q1_val = q.apply(params.q.targets.q1, data.next_obs, next_action)
-        next_q2_val = q.apply(params.q.targets.q2, data.next_obs, next_action)
+        next_q1_val = q_net.apply(params.q.targets.q1, data.next_obs, next_action)
+        next_q2_val = q_net.apply(params.q.targets.q2, data.next_obs, next_action)
         next_q_val = jnp.minimum(next_q1_val, next_q2_val)
         next_q_val = next_q_val - jnp.exp(params.log_alpha) * next_log_prob
 
@@ -287,7 +325,7 @@ def make_update_fns(
         )
 
         # Repack params and opt_states.
-        q_and_target = QsAndTarget(new_online_q_params, new_target_q_params)
+        q_and_target = QValsAndTarget(new_online_q_params, new_target_q_params)
         params = params._replace(q=q_and_target)
         opt_states = opt_states._replace(q=new_q_opt_state)
 
@@ -298,8 +336,8 @@ def make_update_fns(
     ) -> Tuple[SacParams, OptStates, Metrics]:
         """Update the actor and alpha parameters. Compensated for the delay in policy updates."""
         # compensate for the delay by doing `policy_frequency` updates instead of 1.
-        assert cfg.system.policy_frequency > 0, "Need to have a policy frequency > 0."
-        for _ in range(cfg.system.policy_frequency):
+        assert cfg.system.policy_update_delay > 0, "Need to have a policy update delay > 0."
+        for _ in range(cfg.system.policy_update_delay):
             actor_key, alpha_key = jax.random.split(key)
 
             # Update actor.
@@ -320,7 +358,7 @@ def make_update_fns(
             alpha_loss = 0.0  # loss is 0 if autotune is off
             if cfg.system.autotune:
                 # Get log prob for alpha loss
-                pi = actor.apply(params.actor, data.obs)
+                pi = actor_net.apply(params.actor, data.obs)
                 action = pi.sample(seed=key)
                 log_prob = pi.log_prob(action)
 
@@ -338,7 +376,7 @@ def make_update_fns(
         return params, opt_states, loss_info
 
     # Act/learn loops:
-    def update_epoch(
+    def train(
         carry: Tuple[BufferState, SacParams, OptStates, int, chex.PRNGKey], _: Any
     ) -> Tuple[Tuple[BufferState, SacParams, OptStates, int, chex.PRNGKey], Metrics]:
         """Update the Q function and optionally policy/alpha with TD3 delayed update."""
@@ -351,7 +389,7 @@ def make_update_fns(
         # learn
         params, opt_states, q_loss_info = update_q(params, opt_states, data, q_key)
         params, opt_states, act_loss_info = lax.cond(
-            t % cfg.system.policy_frequency == 0,  # TD 3 Delayed update support
+            t % cfg.system.policy_update_delay == 0,  # TD 3 Delayed update support
             update_actor_and_alpha,
             # just return same params and opt_states and 0 for losses
             lambda params, opt_states, *_: (
@@ -375,7 +413,7 @@ def make_update_fns(
         """Acting loop: select action, step env, add to buffer."""
         actor_params, obs, env_state, buffer_state, key = carry
 
-        pi = actor.apply(actor_params, obs)
+        pi = actor_net.apply(actor_params, obs)
         action = pi.sample(seed=key)
 
         next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
@@ -384,22 +422,24 @@ def make_update_fns(
     def explore(carry: LearnerState, _: Any) -> Tuple[LearnerState, Metrics]:
         """Take random actions to fill up buffer at the start of training."""
         obs, env_state, buffer_state, _, _, t, key = carry
+        assert isinstance(obs, Observation)  # mypy thinks it's Observation | ObservationGlobalState
+
         key, explore_key = jax.random.split(key)
         action = jax.random.uniform(explore_key, full_action_shape)
         next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
 
-        t += cfg.system.n_envs
+        t += cfg.arch.num_envs
         learner_state = carry._replace(
             obs=next_obs, env_state=env_state, buffer_state=buffer_state, t=t, key=key
         )
         return learner_state, metrics
 
-    scanned_update = lambda state: lax.scan(update_epoch, state, None, length=cfg.system.epochs)
+    scanned_train = lambda state: lax.scan(train, state, None, length=cfg.system.epochs)
     scanned_act = lambda state: lax.scan(act, state, None, length=cfg.system.rollout_length)
 
     # Act loop -> sample -> update loop
     def update_step(carry: LearnerState, _: Any) -> Tuple[LearnerState, Tuple[Metrics, Metrics]]:
-        """Act, sample, learn."""
+        """Act, sample, learn. The body of the main SAC loop."""
 
         obs, env_state, buffer_state, params, opt_states, t, key = carry
         key, act_key, learn_key = jax.random.split(key, 3)
@@ -409,17 +449,17 @@ def make_update_fns(
 
         # Sample and learn
         learn_state = (buffer_state, params, opt_states, t, learn_key)
-        (buffer_state, params, opt_states, _, _), losses = scanned_update(learn_state)
+        (buffer_state, params, opt_states, _, _), losses = scanned_train(learn_state)
 
-        t += cfg.system.n_envs * cfg.system.rollout_length
+        t += cfg.arch.num_envs * cfg.system.rollout_length
         return (
             LearnerState(next_obs, env_state, buffer_state, params, opt_states, t, key),
             (metrics, losses),
         )
 
     # pmap and scan over explore and update_step
-    # Make sure to not do n_envs explore steps (could fill up the buffer too much).
-    explore_steps = cfg.system.explore_steps // cfg.system.n_envs
+    # Make sure to not do num_envs explore steps (could fill up the buffer too much).
+    explore_steps = cfg.system.explore_steps // cfg.arch.num_envs
     pmaped_explore = jax.pmap(
         jax.vmap(
             lambda state: lax.scan(explore, state, None, length=explore_steps),
@@ -428,7 +468,7 @@ def make_update_fns(
         axis_name="device",
         donate_argnums=0,
     )
-    pmaped_updated_step = jax.pmap(
+    pmaped_update_step = jax.pmap(
         jax.vmap(
             lambda state: lax.scan(update_step, state, None, length=cfg.system.scan_steps),
             axis_name="batch",
@@ -437,29 +477,30 @@ def make_update_fns(
         donate_argnums=0,
     )
 
-    return pmaped_explore, pmaped_updated_step
+    return pmaped_explore, pmaped_update_step
 
 
 def run_experiment(cfg: DictConfig) -> float:
     # Add runtime variables to config
     cfg.arch.n_devices = len(jax.devices())
+    cfg = check_total_timesteps(cfg)
 
     # Number of env steps before evaluating/logging.
     steps_per_rollout = int(cfg.system.total_timesteps // cfg.arch.num_evaluation)
     # Multiplier for a single env/learn step in an anakin system
     anakin_steps = cfg.arch.n_devices * cfg.system.update_batch_size
     # Number of env steps in one anakin style update.
-    anakin_act_steps = anakin_steps * cfg.system.n_envs * cfg.system.rollout_length
+    anakin_act_steps = anakin_steps * cfg.arch.num_envs * cfg.system.rollout_length
     # Number of steps to do in the scanned update method (how many anakin steps).
     cfg.system.scan_steps = int(steps_per_rollout / anakin_act_steps)
 
     pprint(OmegaConf.to_container(cfg, resolve=True))
 
     # Initialize system and make learning functions.
-    (env, eval_env), nns, opts, rb, learner_state, target_entropy, logger, key = init(cfg)
-    explore, update = make_update_fns(cfg, env, nns, opts, rb, target_entropy)
+    (env, eval_env), networks, optims, rb, learner_state, target_entropy, logger, key = init(cfg)
+    explore, update = make_update_fns(cfg, env, networks, optims, rb, target_entropy)
 
-    actor, _ = nns
+    actor, _ = networks
     key, eval_key = jax.random.split(key)
     evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor, cfg)
 
@@ -481,9 +522,10 @@ def run_experiment(cfg: DictConfig) -> float:
     sps = t / (time.time() - start_time)
     logger.log({"step": t, "steps_per_second": sps}, t, 0, LogEvent.MISC)
 
-    final_metrics, ep_completed = episode_metrics.get_final_step_metrics(metrics)
-    if ep_completed:
-        logger.log(final_metrics, cfg.system.explore_steps, 0, LogEvent.ACT)
+    # Don't mind if episode isn't completed here, nice to have the graphs start near 0.
+    # So we ignore the second return value.
+    final_metrics, _ = episode_metrics.get_final_step_metrics(metrics)
+    logger.log(final_metrics, cfg.system.explore_steps, 0, LogEvent.ACT)
 
     # Main loop:
     # We want start to align with the final step of the first pmaped_learn,

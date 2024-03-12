@@ -63,12 +63,18 @@ def get_ff_evaluator_fn(
 
             # Select action.
             key, policy_key = jax.random.split(key)
-            pi = apply_fn(params, last_timestep.observation)
+            # Add a batch dimension to the observation.
+            pi = apply_fn(
+                params, jax.tree_map(lambda x: x[jnp.newaxis, ...], last_timestep.observation)
+            )
 
             if config.arch.evaluation_greedy:
                 action = pi.mode()
             else:
                 action = pi.sample(seed=policy_key)
+
+            # Remove batch dim for stepping the environment.
+            action = jnp.squeeze(action, axis=0)
 
             # Step environment.
             env_state, timestep = env.step(env_state, action)
@@ -236,7 +242,7 @@ def get_rnn_evaluator_fn(
         # Initialise hidden state.
         init_hstate = scanned_rnn.initialize_carry(
             (eval_batch, config.system.num_agents),
-            config.network.actor_network.pre_torso.layer_sizes[-1],
+            config.network.hidden_state_dim,
         )
 
         # Initialise dones.
