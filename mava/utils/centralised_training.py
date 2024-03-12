@@ -44,14 +44,14 @@ def get_updated_joint_actions(rb_actions: Array, policy_actions: Array) -> Array
     Get the updated joint actions by replacing the actions from the replay buffer with the new
     actions from the policy. Only update joint action i with the new action for agent i.
 
-    The effect of this is that each agents central critic sees what all other agents did in the
-    past, but it sees how its agents policy is currently acting.
+    The effect of this is that each agent's central critic sees what all other agents did in the
+    past, but it sees how its agent's policy is currently acting.
 
     Method explanation:
-    The `rb_actions` (B, A, Act) will be repeated such that you have two agent dims: (B, A, A, Ac).
+    The `rb_actions` (B, A, Act) will be repeated such that you have two agent dims: (B, A, A, Act).
     Then the diagonal of the repeated actions will be replaced with the new actions from the policy.
     This replacement means that joint_action[i] will have the new action for agent[i].
-    Finally join the last two dims to get (B, A, A * Act).
+    Finally join the last two dimensions to get (B, A, A * Act).
 
     Example:
     Given an action dim of 1, batch size of 1 and 3 agents.
@@ -82,7 +82,7 @@ def get_updated_joint_actions(rb_actions: Array, policy_actions: Array) -> Array
     batch_size, num_agents, act_size = rb_actions.shape
 
     # Repeat the actions from the replay buffer such that you have (B, A, A, Act).
-    # This gives you num agents joint actions with the action dim kept separate.
+    # This gives num agents joint actions with the action dim kept separate.
     actions_repeated = jnp.tile(rb_actions[:, jnp.newaxis, ...], (1, num_agents, 1, 1))
     # Find the indices of the diagonal of an (A, A) matrix.
     inds = jnp.diag_indices(num_agents)
