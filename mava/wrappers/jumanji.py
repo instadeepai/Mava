@@ -296,7 +296,7 @@ class CleanerWrapper(MultiAgentWrapper):
             dirty_channel = jnp.tile(grid == DIRTY, (num_agents, 1, 1))
             wall_channel = jnp.tile(grid == WALL, (num_agents, 1, 1))
 
-            # Get each agent's position
+            # Get each agent's position.
             # (2, N)
             xs, ys = agents_locations[:, 0], agents_locations[:, 1]
 
