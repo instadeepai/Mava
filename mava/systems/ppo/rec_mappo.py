@@ -31,7 +31,7 @@ from rich.pretty import pprint
 
 from mava.evaluator import make_eval_fns
 from mava.networks import RecurrentActor as Actor
-from mava.networks import RecurrentCritic as Critic
+from mava.networks import RecurrentValueNet as Critic
 from mava.networks import ScannedRNN
 from mava.systems.ppo.types import (
     HiddenStates,
@@ -469,10 +469,16 @@ def learner_setup(
     critic_post_torso = hydra.utils.instantiate(config.network.critic_network.post_torso)
 
     actor_network = Actor(
-        pre_torso=actor_pre_torso, post_torso=actor_post_torso, action_head=actor_action_head
+        pre_torso=actor_pre_torso,
+        post_torso=actor_post_torso,
+        action_head=actor_action_head,
+        hidden_state_dim=config.network.hidden_state_dim,
     )
     critic_network = Critic(
-        pre_torso=critic_pre_torso, post_torso=critic_post_torso, centralised_critic=True
+        pre_torso=critic_pre_torso,
+        post_torso=critic_post_torso,
+        hidden_state_dim=config.network.hidden_state_dim,
+        centralised_critic=True,
     )
 
     actor_lr = make_learning_rate(config.system.actor_lr, config)
@@ -498,12 +504,11 @@ def learner_setup(
     init_obs_done = (init_obs, init_done)
 
     # Initialise hidden state.
-    hidden_size = config.network.actor_network.pre_torso.layer_sizes[-1]
     init_policy_hstate = ScannedRNN.initialize_carry(
-        (config.arch.num_envs, num_agents), hidden_size
+        (config.arch.num_envs, num_agents), config.network.hidden_state_dim
     )
     init_critic_hstate = ScannedRNN.initialize_carry(
-        (config.arch.num_envs, num_agents), hidden_size
+        (config.arch.num_envs, num_agents), config.network.hidden_state_dim
     )
 
     # initialise params and optimiser state.

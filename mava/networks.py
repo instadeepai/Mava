@@ -129,10 +129,15 @@ class ContinuousActionHead(nn.Module):
 
     action_dim: int
     min_scale: float = 1e-3
+    independent_std: bool = True  # whether or not the log_std is independent of the observation.
 
     def setup(self) -> None:
         self.mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))
-        self.log_std = self.param("log_std", nn.initializers.zeros, (self.action_dim,))
+
+        if self.independent_std:
+            self.log_std = self.param("log_std", nn.initializers.zeros, (self.action_dim,))
+        else:
+            self.log_std = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))
 
     @nn.compact
     def __call__(self, obs_embedding: chex.Array, observation: Observation) -> tfd.Independent:
@@ -146,7 +151,10 @@ class ContinuousActionHead(nn.Module):
             tfd.Independent: Independent transformed distribution.
         """
         loc = self.mean(obs_embedding)
-        scale = jax.nn.softplus(self.log_std) + self.min_scale
+
+        scale = self.log_std if self.independent_std else self.log_std(obs_embedding)
+        scale = jax.nn.softplus(scale) + self.min_scale
+
         distribution = tfd.Normal(loc=loc, scale=scale)
 
         return tfd.Independent(
@@ -220,8 +228,8 @@ class FeedForwardActor(nn.Module):
         return self.action_head(obs_embedding, observation)
 
 
-class FeedForwardCritic(nn.Module):
-    """Feedforward Critic Network."""
+class FeedForwardValueNet(nn.Module):
+    """Feedforward Value Network. Returns the value of an observation."""
 
     torso: nn.Module
     centralised_critic: bool = False
@@ -244,7 +252,37 @@ class FeedForwardCritic(nn.Module):
         return jnp.squeeze(critic_output, axis=-1)
 
 
+class FeedForwardQNet(nn.Module):
+    """Feedforward Q Network. Returns the value of an observation-action pair."""
+
+    torso: nn.Module
+    centralised_critic: bool = False
+
+    def setup(self) -> None:
+        self.critic = nn.Dense(1, kernel_init=orthogonal(1.0))
+
+    def __call__(
+        self, observation: Union[Observation, ObservationGlobalState], action: chex.Array
+    ) -> chex.Array:
+        if self.centralised_critic:
+            if not isinstance(observation, ObservationGlobalState):
+                raise ValueError("Global state must be provided to the centralised critic.")
+            # Get global state in the case of a centralised critic.
+            observation = observation.global_state
+        else:
+            # Get single agent view in the case of a decentralised critic.
+            observation = observation.agents_view
+
+        x = jnp.concatenate([observation, action], axis=-1)
+        x = self.torso(x)
+        y = self.critic(x)
+
+        return jnp.squeeze(y, axis=-1)
+
+
 class ScannedRNN(nn.Module):
+    hidden_state_dim: int = 128
+
     @functools.partial(
         nn.scan,
         variable_broadcast="params",
@@ -259,7 +297,7 @@ class ScannedRNN(nn.Module):
         ins, resets = x
         rnn_state = jnp.where(
             resets[:, :, jnp.newaxis],
-            self.initialize_carry((ins.shape[0], ins.shape[1]), ins.shape[2]),
+            self.initialize_carry((ins.shape[0], ins.shape[1]), self.hidden_state_dim),
             rnn_state,
         )
         new_rnn_state, y = nn.GRUCell(features=ins.shape[-1])(rnn_state, ins)
@@ -279,6 +317,7 @@ class RecurrentActor(nn.Module):
     pre_torso: nn.Module
     post_torso: nn.Module
     action_head: nn.Module
+    hidden_state_dim: int = 128
 
     @nn.compact
     def __call__(
@@ -291,24 +330,27 @@ class RecurrentActor(nn.Module):
 
         policy_embedding = self.pre_torso(observation.agents_view)
         policy_rnn_input = (policy_embedding, done)
-        policy_hidden_state, policy_embedding = ScannedRNN()(policy_hidden_state, policy_rnn_input)
+        policy_hidden_state, policy_embedding = ScannedRNN(self.hidden_state_dim)(
+            policy_hidden_state, policy_rnn_input
+        )
         policy_embedding = self.post_torso(policy_embedding)
         pi = self.action_head(policy_embedding, observation)
 
         return policy_hidden_state, pi
 
 
-class RecurrentCritic(nn.Module):
+class RecurrentValueNet(nn.Module):
     """Recurrent Critic Network."""
 
     pre_torso: nn.Module
     post_torso: nn.Module
     centralised_critic: bool = False
+    hidden_state_dim: int = 128
 
     @nn.compact
     def __call__(
         self,
-        critic_hidden_state: Tuple[chex.Array, chex.Array],
+        value_net_hidden_state: Tuple[chex.Array, chex.Array],
         observation_done: Union[RNNObservation, RNNGlobalObservation],
     ) -> Tuple[chex.Array, chex.Array]:
         """Forward pass."""
@@ -323,13 +365,15 @@ class RecurrentCritic(nn.Module):
             # Get single agent view in the case of a decentralised critic.
             observation = observation.agents_view
 
-        critic_embedding = self.pre_torso(observation)
-        critic_rnn_input = (critic_embedding, done)
-        critic_hidden_state, critic_embedding = ScannedRNN()(critic_hidden_state, critic_rnn_input)
-        critic_output = self.post_torso(critic_embedding)
-        critic_output = nn.Dense(1, kernel_init=orthogonal(1.0))(critic_output)
+        value_embedding = self.pre_torso(observation)
+        value_rnn_input = (value_embedding, done)
+        value_net_hidden_state, value_embedding = ScannedRNN(self.hidden_state_dim)(
+            value_net_hidden_state, value_rnn_input
+        )
+        value = self.post_torso(value_embedding)
+        value = nn.Dense(1, kernel_init=orthogonal(1.0))(value)
 
-        return critic_hidden_state, jnp.squeeze(critic_output, axis=-1)
+        return value_net_hidden_state, jnp.squeeze(value, axis=-1)
 
 
 def _parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex.Array]:

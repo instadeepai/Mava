@@ -113,9 +113,7 @@ def get_ff_evaluator_fn(
         eval_batch = (config.arch.num_eval_episodes // n_devices) * eval_multiplier
 
         key, *env_keys = jax.random.split(key, eval_batch + 1)
-        env_states, timesteps = jax.vmap(env.reset)(
-            jnp.stack(env_keys),
-        )
+        env_states, timesteps = jax.vmap(env.reset)(jnp.stack(env_keys))
         # Split keys for each core.
         key, *step_keys = jax.random.split(key, eval_batch + 1)
         # Add dimension to pmap over.
@@ -244,7 +242,7 @@ def get_rnn_evaluator_fn(
         # Initialise hidden state.
         init_hstate = scanned_rnn.initialize_carry(
             (eval_batch, config.system.num_agents),
-            config.network.actor_network.pre_torso.layer_sizes[-1],
+            config.network.hidden_state_dim,
         )
 
         # Initialise dones.
