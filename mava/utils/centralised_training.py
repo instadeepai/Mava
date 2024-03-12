@@ -47,7 +47,7 @@ def get_updated_joint_actions(rb_actions: Array, policy_actions: Array) -> Array
     The effect of this is that each agents central critic sees what all other agents did in the
     past, but it sees how its agents policy is currently acting.
 
-    Method explaination:
+    Method explanation:
     The `rb_actions` (B, A, Act) will be repeated such that you have two agent dims: (B, A, A, Ac).
     Then the diagonal of the repeated actions will be replaced with the new actions from the policy.
     This replacement means that joint_action[i] will have the new action for agent[i].
