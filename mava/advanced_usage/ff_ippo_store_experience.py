@@ -32,7 +32,7 @@ from rich.pretty import pprint
 
 from mava.evaluator import make_eval_fns
 from mava.networks import FeedForwardActor as Actor
-from mava.networks import FeedForwardCritic as Critic
+from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
 from mava.types import ActorApply, CriticApply, ExperimentOutput, MavaState
 from mava.utils.checkpointing import Checkpointer
@@ -622,7 +622,8 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
         elapsed_time = time.time() - start_time
         episode_return = jnp.mean(evaluator_output.episode_metrics["episode_return"])
 
-        evaluator_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
+        evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
         logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.EVAL)
 
         if save_checkpoint:
@@ -655,9 +656,9 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
         jax.block_until_ready(evaluator_output)
 
         elapsed_time = time.time() - start_time
-
+        steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
         t = int(steps_per_rollout * (eval_step + 1))
-        evaluator_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
         logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.ABSOLUTE)
 
     # Stop logger

@@ -31,7 +31,7 @@ from rich.pretty import pprint
 
 from mava.evaluator import make_eval_fns
 from mava.networks import RecurrentActor as Actor
-from mava.networks import RecurrentCritic as Critic
+from mava.networks import RecurrentValueNet as Critic
 from mava.networks import ScannedRNN
 from mava.systems.ppo.types import (
     HiddenStates,
@@ -478,9 +478,16 @@ def learner_setup(
     critic_post_torso = hydra.utils.instantiate(config.network.critic_network.post_torso)
 
     actor_network = Actor(
-        pre_torso=actor_pre_torso, post_torso=actor_post_torso, action_head=actor_action_head
+        pre_torso=actor_pre_torso,
+        post_torso=actor_post_torso,
+        action_head=actor_action_head,
+        hidden_state_dim=config.network.hidden_state_dim,
     )
-    critic_network = Critic(pre_torso=critic_pre_torso, post_torso=critic_post_torso)
+    critic_network = Critic(
+        pre_torso=critic_pre_torso,
+        post_torso=critic_post_torso,
+        hidden_state_dim=config.network.hidden_state_dim,
+    )
 
     actor_lr = make_learning_rate(config.system.actor_lr, config)
     critic_lr = make_learning_rate(config.system.critic_lr, config)
@@ -505,12 +512,11 @@ def learner_setup(
     init_x = (init_obs, init_done)
 
     # Initialise hidden states.
-    hidden_size = config.network.actor_network.pre_torso.layer_sizes[-1]
     init_policy_hstate = ScannedRNN.initialize_carry(
-        (config.arch.num_envs, num_agents), hidden_size
+        (config.arch.num_envs, num_agents), config.network.hidden_state_dim
     )
     init_critic_hstate = ScannedRNN.initialize_carry(
-        (config.arch.num_envs, num_agents), hidden_size
+        (config.arch.num_envs, num_agents), config.network.hidden_state_dim
     )
 
     # initialise params and optimiser state.
@@ -621,7 +627,7 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
     eval_keys = jax.random.split(key_e, n_devices)
     evaluator, absolute_metric_evaluator = make_eval_fns(
         eval_env=eval_env,
-        network=actor_network,
+        network_apply_fn=actor_network.apply,
         config=config,
         use_recurrent_net=True,
         scanned_rnn=ScannedRNN,
@@ -695,7 +701,8 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
         elapsed_time = time.time() - start_time
         episode_return = jnp.mean(evaluator_output.episode_metrics["episode_return"])
 
-        evaluator_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
+        evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
         logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.EVAL)
 
         if save_checkpoint:
@@ -729,8 +736,9 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
 
         elapsed_time = time.time() - start_time
 
+        steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
         t = int(steps_per_rollout * (eval_step + 1))
-        evaluator_output.episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
         logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.ABSOLUTE)
 
     # Stop the logger.
