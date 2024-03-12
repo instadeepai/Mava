@@ -113,9 +113,7 @@ def get_ff_evaluator_fn(
         eval_batch = (config.arch.num_eval_episodes // n_devices) * eval_multiplier
 
         key, *env_keys = jax.random.split(key, eval_batch + 1)
-        env_states, timesteps = jax.vmap(env.reset)(
-            jnp.stack(env_keys),
-        )
+        env_states, timesteps = jax.vmap(env.reset)(jnp.stack(env_keys))
         # Split keys for each core.
         key, *step_keys = jax.random.split(key, eval_batch + 1)
         # Add dimension to pmap over.
@@ -245,7 +243,7 @@ def get_rnn_evaluator_fn(
         # Initialise hidden state.
         init_hstate = scanned_rnn.initialize_carry(
             (eval_batch, config.system.num_agents),
-            hidden_carry_size,
+            config.network.hidden_state_dim,
         )
 
         # Initialise dones.
@@ -293,21 +291,19 @@ def make_eval_fns(
     hidden_carry_size: Optional[int] = None,
     scanned_rnn: Optional[nn.Module] = None,
 ) -> Tuple[EvalFn, EvalFn]:
-    """ "Initialize evaluator functions for reinforcement learning.
+    """Initialize evaluator functions for reinforcement learning.
 
     Args:
         eval_env (Environment): The environment used for evaluation.
         network_apply_fn (Union[ActorApply,RecActorApply]): Creates a policy to sample.
         config (DictConfig): The configuration settings for the evaluation.
         use_recurrent_net (bool, optional): Whether to use a rnn. Defaults to False.
-        hidden_carry_size (Optional[int], optional): Size of the hidden carry to
-            initialise for the RNN. Required if `use_recurrent_net` is True. Defaults to None.
         scanned_rnn (Optional[nn.Module], optional): The rnn module.
             Required if `use_recurrent_net` is True. Defaults to None.
 
     Returns:
         Tuple[EvalFn, EvalFn]: A tuple of two evaluation functions:
-                            one for use during training and one for overall metrics.
+        one for use during training and one for absolute metrics.
 
     Raises:
         AssertionError: If `use_recurrent_net` is True but `scanned_rnn` is not provided.
