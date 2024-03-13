@@ -261,7 +261,7 @@ def make_update_fns(
         new_key, explore_key = jax.random.split(key, 2)
 
         action = eps_greedy_dist.sample(seed=explore_key)
-        action = jnp.squeeze(action)
+        action = action[0, ...]  # (1, B, A) -> (B, A)
 
         next_action_selection_state = ActionSelectionState(
             params, next_hidden_state, t + cfg.arch.num_envs, new_key
