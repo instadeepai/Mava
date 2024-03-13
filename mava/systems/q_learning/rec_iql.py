@@ -105,7 +105,7 @@ def init(
     )  # (B, A, ...)
     init_obs_batched = jax.tree_util.tree_map(
         lambda x: x[jnp.newaxis, ...], init_obs_batched
-    )  # add time dim (1,B,A,x)
+    )  # add time dim (1, B, A, ...)
     init_done = jnp.zeros((1, cfg.arch.num_envs, 1), dtype=bool)  # (1,B,1)
     init_x = (init_obs_batched, init_done)  # pack the RNN dummy inputs
     init_hidden_state = ScannedRNN.initialize_carry(
