@@ -558,7 +558,7 @@ def run_experiment(cfg: DictConfig) -> float:
         network_apply_fn=q_net.apply,
         config=cfg,
         use_recurrent_net=True,
-        scanned_rnn=ScannedRNN(),
+        scanned_rnn=ScannedRNN(cfg.network.hidden_state_dim),
     )
 
     if cfg.logger.checkpointing.save_model:

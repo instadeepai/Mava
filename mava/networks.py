@@ -184,7 +184,7 @@ class RecQNetwork(nn.Module):
         embedding = self.pre_torso(obs.agents_view)
 
         rnn_input = (embedding, resets)
-        hidden_state, embedding = ScannedRNN()(hidden_state, rnn_input)
+        hidden_state, embedding = ScannedRNN(self.hidden_state_dim)(hidden_state, rnn_input)
 
         embedding = self.post_torso(embedding)
 
