@@ -136,7 +136,7 @@ def init(
     init_hidden_state = replicate(init_hidden_state)
 
     # Create dummy transition
-    init_acts = env.action_spec().generate_value()  # A,
+    init_acts = env.action_spec().generate_value()  # (A,)
     init_transition = Transition(
         obs=Observation(*init_obs),  # A, x
         action=init_acts,
