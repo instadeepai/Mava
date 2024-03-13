@@ -272,7 +272,7 @@ def make_update_fns(
     def interaction_step(
         interaction_state: InteractionState, _: Any
     ) -> Tuple[InteractionState, Dict]:
-        """Selects action, steps global env, stores timesteps in rb and repacks the parameters."""
+        """Selects action, steps env, stores timesteps in rb and repacks the parameters."""
         # light unpacking
         action_selection_state, env_state, buffer_state, obs, done = interaction_state
 
