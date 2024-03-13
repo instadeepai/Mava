@@ -285,7 +285,7 @@ def make_update_fns(
         next_buffer_state = rb.add(buffer_state, transition)
 
         # Next obs and done for learner state
-        next_obs = next_timestep.observation  # NB step!!
+        next_obs = next_timestep.observation
         next_done = next_timestep.last()[
             ..., jnp.newaxis
         ]  # make compatible with network input and transition storage in next step
