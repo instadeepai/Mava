@@ -107,6 +107,7 @@ class MaskedEpsGreedyDistribution(tfd.Categorical):
     """
 
     def __init__(self, q_values: chex.Array, epsilon: float, mask: chex.Array):
+        # keep q values available if we need to use them to learn with later
         self.q_values = q_values
 
         # UNIFORM PART (eps %)
