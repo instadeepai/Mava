@@ -139,9 +139,6 @@ class MaskedEpsGreedyDistribution(tfd.Categorical):
 
         super().__init__(probs=mixed_eps_greedy_probs)
 
-    def get_q_values(self) -> chex.Array:
-        return self.q_values
-
     @classmethod
     def _parameter_properties(cls, dtype: Optional[Any], num_classes: Any = None) -> Any:
         td_properties = super()._parameter_properties(dtype, num_classes=num_classes)
