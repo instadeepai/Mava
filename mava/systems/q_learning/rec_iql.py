@@ -102,7 +102,7 @@ def init(
     init_obs_batched = jax.tree_util.tree_map(
         lambda x: jnp.repeat(x[jnp.newaxis, ...], cfg.arch.num_envs, axis=0),
         init_obs,
-    )  # B, A , x
+    )  # (B, A, ...)
     init_obs_batched = jax.tree_util.tree_map(
         lambda x: x[jnp.newaxis, ...], init_obs_batched
     )  # add time dim (1,B,A,x)
