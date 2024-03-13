@@ -331,7 +331,7 @@ def make_update_fns(
         _, q_online = q_net.apply(
             q_online_params, hidden_state, obs_done, method="get_q_values"
         )  # get online q values of all actions
-        q_online = switch_leading_axes(q_online)  # TB... -> BT...
+        q_online = switch_leading_axes(q_online)  # (T, B, ...) -> (B, T, ...)
         q_online = jnp.squeeze(
             jnp.take_along_axis(q_online, action[..., jnp.newaxis], axis=-1), axis=-1
         )  # get the q values of the taken actions and remove extra dim
