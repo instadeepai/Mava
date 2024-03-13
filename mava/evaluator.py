@@ -146,7 +146,6 @@ def get_rnn_evaluator_fn(
     env: Environment,
     apply_fn: RecActorApply,
     config: DictConfig,
-    hidden_carry_size: int,
     scanned_rnn: nn.Module,
     log_win_rate: bool = False,
     eval_multiplier: int = 1,
@@ -288,7 +287,6 @@ def make_eval_fns(
     network_apply_fn: Union[ActorApply, RecActorApply],
     config: DictConfig,
     use_recurrent_net: bool = False,
-    hidden_carry_size: Optional[int] = None,
     scanned_rnn: Optional[nn.Module] = None,
 ) -> Tuple[EvalFn, EvalFn]:
     """Initialize evaluator functions for reinforcement learning.
@@ -313,12 +311,10 @@ def make_eval_fns(
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
         assert scanned_rnn is not None
-        assert hidden_carry_size is not None
         evaluator = get_rnn_evaluator_fn(
             eval_env,
             network_apply_fn,  # type: ignore
             config,
-            hidden_carry_size,
             scanned_rnn,
             log_win_rate,
         )
@@ -326,7 +322,6 @@ def make_eval_fns(
             eval_env,
             network_apply_fn,  # type: ignore
             config,
-            hidden_carry_size,
             scanned_rnn,
             log_win_rate,
             10,
