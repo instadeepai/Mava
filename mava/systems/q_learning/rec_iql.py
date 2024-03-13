@@ -388,7 +388,7 @@ def make_update_fns(
         )
 
         # Skip first timestep, since we are working with "next" information
-        next_action = next_online_greedy_dist.mode()[1:, ...]  # TB...
+        next_action = next_online_greedy_dist.mode()[1:, ...]  # (T, B, ...)
         next_q_vals_target = next_q_vals_target[1:, ...]  # TB...
 
         # Double q-value selection
