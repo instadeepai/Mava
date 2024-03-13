@@ -312,7 +312,7 @@ def make_update_fns(
         hidden_state = ScannedRNN.initialize_carry(
             (cfg.system.sample_batch_size, obs.agents_view.shape[2]), cfg.network.hidden_state_dim
         )
-        obs = switch_leading_axes(obs)  # B, T -> T, B
+        obs = switch_leading_axes(obs)  # (B, T) -> (T, B)
         done = switch_leading_axes(done)  # B, T -> T, B
         obs_done = (obs, done)
 
