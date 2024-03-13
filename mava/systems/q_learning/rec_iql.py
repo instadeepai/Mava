@@ -153,8 +153,8 @@ def init(
 
     # Initialise trajectory buffer
     rb = fbx.make_trajectory_buffer(
-        sample_sequence_length=cfg.system.recurrent_chunk_size
-        + 1,  # n transitions gives n-1 full data points
+        # n transitions gives n-1 full data points
+        sample_sequence_length=cfg.system.recurrent_chunk_size + 1,
         period=1,  # sample any unique trajectory
         add_batch_size=cfg.arch.num_envs,
         sample_batch_size=cfg.system.sample_batch_size,
