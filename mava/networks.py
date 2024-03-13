@@ -166,12 +166,10 @@ class ContinuousActionHead(nn.Module):
 class RecQNetwork(nn.Module):
     """Recurrent Q-Network."""
 
+    pre_torso: nn.Module
+    post_torso: nn.Module
     num_actions: int
-    hidden_size: int
-
-    def setup(self) -> None:
-        self.pre_torso: MLPTorso = MLPTorso((self.hidden_size,))
-        self.post_torso: MLPTorso = MLPTorso((self.hidden_size,))
+    hidden_state_dim: int = 128
 
     @nn.compact
     def get_q_values(

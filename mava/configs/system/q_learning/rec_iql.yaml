@@ -7,7 +7,7 @@ seed: 1
 add_agent_id: True
 
 # --- RL hyperparameters ---
-buffer_min_size: 132  # Number of steps to take with random actions at the start of training.
+buffer_min_size: 32
 update_batch_size: 1 # Number of vectorised gradient updates per device.
 
 rollout_length: 2 # Number of environment steps per vectorised environment.

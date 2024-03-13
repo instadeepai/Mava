@@ -113,7 +113,14 @@ def init(
     )  # (B, A, ...)
 
     # Making recurrent Q network
-    q_net = RecQNetwork(action_dim, cfg.network.hidden_state_dim)
+    pre_torso = hydra.utils.instantiate(cfg.network.q_network.pre_torso)
+    post_torso = hydra.utils.instantiate(cfg.network.q_network.post_torso)
+    q_net = RecQNetwork(
+        pre_torso,
+        post_torso,
+        action_dim,
+        cfg.network.hidden_state_dim,
+    )
     q_params = q_net.init(q_key, init_hidden_state, init_x)  # epsilon defaults to 0
     q_target_params = q_net.init(q_key, init_hidden_state, init_x)  # ensure parameters are separate
 
