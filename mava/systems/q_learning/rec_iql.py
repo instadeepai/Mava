@@ -147,7 +147,7 @@ def init(
     init_transition = Transition(
         obs=Observation(*init_obs),  # (A, ...)
         action=init_acts,
-        reward=jnp.zeros((1,), dtype=float),  # no support for individual rewards
+        reward=jnp.zeros((num_agents,), dtype=float),  # no support for individual rewards
         done=jnp.zeros((1,), dtype=bool),  # one flag for all agents
     )
 
@@ -281,9 +281,15 @@ def make_update_fns(
         next_env_state, next_timestep = jax.vmap(env.step)(env_state, action)
 
         # Get reward
-        reward = jnp.mean(
-            next_timestep.reward, axis=-1, keepdims=True
-        )  # NOTE: we combine agent rewards
+        reward = next_timestep.reward
+        meaned_reward = jax.tree_util.tree_map(
+            lambda x: jnp.repeat(x[:, jnp.newaxis, ...], cfg.system.num_agents, axis=1),
+            jnp.mean(next_timestep.reward, axis=-1),
+        )
+
+        reward = jax.lax.select(
+            (jnp.zeros_like(reward) + cfg.system.mean_reward).astype(int), meaned_reward, reward
+        )
 
         transition = Transition(obs, action, reward, done)
         transition = jax.tree_util.tree_map(
