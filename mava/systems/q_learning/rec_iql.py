@@ -227,7 +227,8 @@ def make_update_fns(
         The update function.
     """
 
-    # INTERACT LEVEL 2
+    # Interaction functions
+
     def select_eps_greedy_action(
         action_selection_state: ActionSelectionState, obs: Observation, done: Array
     ) -> Tuple[ActionSelectionState, Array]:
@@ -264,7 +265,6 @@ def make_update_fns(
 
         return next_action_selection_state, action
 
-    # INTERACT LEVEL 1
     def interaction_step(
         interaction_state: InteractionState, _: Any
     ) -> Tuple[InteractionState, Dict]:
@@ -315,7 +315,8 @@ def make_update_fns(
         arr: Dict[str, chex.Array] = jax.tree_map(lambda x: jax.numpy.swapaxes(x, 0, 1), arr)
         return arr
 
-    # TRAIN LEVEL 3 and 4
+    # Training functions
+
     def prep_inputs_to_scannedrnn(obs: Observation, done: chex.Array) -> chex.Array:
         """
         Prepares the inputs to the RNN network for either
@@ -331,7 +332,6 @@ def make_update_fns(
 
         return hidden_state, obs_done
 
-    # TRAIN LEVEL 3
     def q_loss_fn(
         q_online_params: FrozenVariableDict, obs: Array, done: Array, action: Array, target: Array
     ) -> Tuple[Array, Metrics]:
@@ -378,7 +378,6 @@ def make_update_fns(
         )
         return next_target_params
 
-    # TRAIN LEVEL 2
     def update_q(
         params: DDQNParams, opt_states: optax.OptState, data: Transition, t_train: int
     ) -> Tuple[DDQNParams, optax.OptState, Metrics]:
@@ -447,7 +446,6 @@ def make_update_fns(
 
         return next_params, next_opt_state, q_loss_info
 
-    # TRAIN LEVEL 1
     def train(train_state: TrainState, _: Any) -> Tuple[TrainState, Metrics]:
         """Sample, train and repack."""
 
@@ -468,7 +466,7 @@ def make_update_fns(
 
         return next_train_state, q_loss_info
 
-    # INTERACT-TRAIN LOOP
+    # Interact-train loop
 
     scanned_interact = lambda state: lax.scan(
         interaction_step, state, None, length=cfg.system.rollout_length
