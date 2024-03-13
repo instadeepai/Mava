@@ -124,7 +124,7 @@ def init(
     if cfg.system.clip_optimiser:
         opt = optax.chain(
             optax.clip_by_global_norm(cfg.system.global_norm),
-            optax.adam(learning_rate=cfg.system.q_lr),
+            optax.adam(learning_rate=cfg.system.q_lr, eps=1e-5),
         )
     else:
         opt = optax.adam(learning_rate=cfg.system.q_lr)
