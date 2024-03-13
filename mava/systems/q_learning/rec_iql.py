@@ -34,7 +34,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from mava.evaluator import make_eval_fns
 from mava.networks import RecQNetwork, ScannedRNN
-from mava.systems.q_learning.types import (  # BufferState,
+from mava.systems.q_learning.types import (
     ActionSelectionState,
     DDQNParams,
     InteractionState,
@@ -45,7 +45,8 @@ from mava.systems.q_learning.types import (  # BufferState,
 )
 from mava.types import Observation
 from mava.utils import make_env as environments
-from mava.utils.checkpointing import Checkpointer  # noqa
+from mava.utils.checkpointing import Checkpointer
+from mava.utils.jax import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers import episode_metrics
 
@@ -537,8 +538,7 @@ def run_experiment(cfg: DictConfig) -> float:
     (env, eval_env), q_net, opt, rb, learner_state, logger, key = init(cfg)
     update = make_update_fns(cfg, env, q_net, opt, rb)
 
-    cfg.system.num_agents = env.action_spec().shape[0]
-    # TODO figure out where others do this
+    cfg.system.num_agents = env.num_agents
 
     key, eval_key = jax.random.split(key)
     evaluator, absolute_metric_evaluator = make_eval_fns(
@@ -549,20 +549,20 @@ def run_experiment(cfg: DictConfig) -> float:
         scanned_rnn=ScannedRNN(),
     )
 
-    max_episode_return = -jnp.inf
-
-    start_time = time.time()  # noqa
-
-    # TODO code duplication
-    def get_epsilon(t: int) -> float:
-        """Calculate epsilon for exploration rate using config variables."""
-        eps = jax.numpy.maximum(
-            cfg.system.eps_min, 1 - (t / cfg.system.eps_decay) * (1 - cfg.system.eps_min)
+    if cfg.logger.checkpointing.save_model:
+        checkpointer = Checkpointer(
+            metadata=cfg,  # Save all config as metadata in the checkpoint
+            model_name=cfg.logger.system_name,
+            **cfg.logger.checkpointing.save_args,  # Checkpoint args
         )
-        return float(eps)
+
+    max_episode_return = -jnp.inf
+    start_time = time.time()
 
     # Main loop:
-    for eval_idx, t in enumerate(range(0, int(cfg.system.total_timesteps), steps_per_rollout)):
+    for eval_idx, t in enumerate(
+        range(steps_per_rollout, int(cfg.system.total_timesteps), steps_per_rollout)
+    ):
         # Learn loop:
         learner_state, (metrics, losses) = update(learner_state)
         jax.block_until_ready(learner_state)
@@ -572,20 +572,24 @@ def run_experiment(cfg: DictConfig) -> float:
         # But we also want to make sure we're counting env steps correctly so
         # learn steps is not included in the loop counter.
         learn_steps = anakin_steps * cfg.system.epochs
+        eps = jax.numpy.maximum(
+            cfg.system.eps_min, 1 - (t / cfg.system.eps_decay) * (1 - cfg.system.eps_min)
+        )
         sps = (t + learn_steps) / (time.time() - start_time)
+
         final_metrics, ep_completed = episode_metrics.get_final_step_metrics(metrics)
         loss_metrics = losses
         logger.log({"step": t, "steps_per_second": sps}, t, eval_idx, LogEvent.MISC)
         if ep_completed:
             logger.log(final_metrics, t, eval_idx, LogEvent.ACT)
         logger.log(loss_metrics, t, eval_idx, LogEvent.TRAIN)
-        logger.log({"epsilon": get_epsilon(t)}, t, eval_idx, LogEvent.MISC)
+        logger.log({"epsilon": eps}, t, eval_idx, LogEvent.MISC)
 
         # Evaluate:
         key, eval_key = jax.random.split(key)
         eval_keys = jax.random.split(eval_key, cfg.arch.n_devices)
         # essentially squeeze/unreplicate batch dim
-        eval_params = jax.tree_util.tree_map(lambda x: x[0, ...], learner_state.params.online)
+        eval_params = unreplicate_batch_dim(learner_state.params.online)
         eval_output = evaluator(eval_params, eval_keys)
         jax.block_until_ready(eval_output)
 
@@ -595,19 +599,18 @@ def run_experiment(cfg: DictConfig) -> float:
 
         # Save best actor params.
         if cfg.arch.absolute_metric and max_episode_return <= episode_return:
-            best_params = copy.deepcopy(learner_state.params.online)
+            best_params = copy.deepcopy(eval_params)
             max_episode_return = episode_return
 
-        # # Checkpoint:
-        # if cfg.logger.checkpointing.save_model:
-        #     # Save checkpoint of learner state
-        #     unreplicated_learner_state =
-        # unreplicate_learner_state(unreplicate_batch_dim(learner_state))  # type: ignore
-        #     checkpointer.save(
-        #         timestep=t_frm_learnstate,
-        #         unreplicated_learner_state=unreplicated_learner_state,
-        #         episode_return=episode_return,
-        #     )
+        # Checkpoint:
+        if cfg.logger.checkpointing.save_model:
+            # Save checkpoint of learner state
+            unreplicated_learner_state = unreplicate_n_dims(learner_state)  # type: ignore
+            checkpointer.save(
+                timestep=t,
+                unreplicated_learner_state=unreplicated_learner_state,
+                episode_return=episode_return,
+            )
 
     # Measure absolute metric.
     if cfg.arch.absolute_metric:
