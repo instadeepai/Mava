@@ -29,7 +29,7 @@ Metrics = Dict[str, Array]
 class Transition(NamedTuple):
     """Transition for recurrent Q-learning."""
 
-    obs: Array
+    obs: Observation
     action: Array
     reward: Array
     done: Array
