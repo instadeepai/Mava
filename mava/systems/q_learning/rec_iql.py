@@ -396,7 +396,7 @@ def make_update_fns(
             jnp.take_along_axis(next_q_vals_target, next_action[..., jnp.newaxis], axis=-1), axis=-1
         )
 
-        next_q_val = switch_leading_axes(next_q_val)  # TB... -> BT...
+        next_q_val = switch_leading_axes(next_q_val)  # (T, B, ...) -> (B, T, ...)
 
         # TD Target
         target_q_val = (
