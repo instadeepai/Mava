@@ -110,7 +110,7 @@ def init(
     init_x = (init_obs_batched, init_done)  # pack the RNN dummy inputs
     init_hidden_state = ScannedRNN.initialize_carry(
         (cfg.arch.num_envs, num_agents), cfg.network.hidden_state_dim
-    )  # (B, A, x)
+    )  # (B, A, ...)
 
     # Making recurrent Q network
     q_net = RecQNetwork(action_dim, cfg.network.hidden_state_dim)
