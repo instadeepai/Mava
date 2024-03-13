@@ -1,5 +1,5 @@
 # --- Defaults REC-IDQN ---
-total_timesteps: 20_000_000
+total_timesteps: 5_000_000
 num_updates: 1000 # total_timesteps takes preference
 seed: 1
 
@@ -19,8 +19,10 @@ sample_batch_size: 32 #as in jaxmarl paper
 
 # learning rates
 q_lr: 3e-4  # the learning rate of the Q network network optimizer
+clip_optimiser: False
+global_norm: 10 # value used to clip optimiser
 # other
-hard_update: True
+hard_update: False
 update_period: 200
 tau: 0.01  # smoothing coefficient for target networks
 gamma: 0.99  # discount factor
