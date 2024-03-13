@@ -291,7 +291,7 @@ class CleanerWrapper(MultiAgentWrapper):
             # grid: (R, C)
             # agents_locations: (A, 2)
 
-            # Get dirty / wall tiles from first agent's obs and tile.
+            # Get dirty / wall tiles from first agent's obs and tile in agents dimension.
             # (A, R, C)
             dirty_channel = jnp.tile(grid == DIRTY, (num_agents, 1, 1))
             wall_channel = jnp.tile(grid == WALL, (num_agents, 1, 1))
