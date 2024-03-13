@@ -138,7 +138,7 @@ def init(
     # Create dummy transition
     init_acts = env.action_spec().generate_value()  # (A,)
     init_transition = Transition(
-        obs=Observation(*init_obs),  # A, x
+        obs=Observation(*init_obs),  # (A, ...)
         action=init_acts,
         reward=jnp.zeros((1,), dtype=float),  # no support for individual rewards
         done=jnp.zeros((1,), dtype=bool),  # one flag for all agents
