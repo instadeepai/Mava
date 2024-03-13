@@ -173,7 +173,7 @@ def init(
         axis_name="device",
     )(reset_keys)
     first_obs = first_timestep.observation
-    first_done = first_timestep.last()[..., jnp.newaxis]  # ..., 1
+    first_done = first_timestep.last()[..., jnp.newaxis] 
 
     # Initialise env steps and training steps
     t0 = jnp.zeros((cfg.arch.n_devices, cfg.system.update_batch_size), dtype=int)
