@@ -93,10 +93,10 @@ def init(
     num_agents = env.num_agents
 
     key, q_key = jax.random.split(key, 2)
-# Shape legend: 
-# T: Time 
-# B: Batch
-# A: Agent
+    # Shape legend:
+    # T: Time
+    # B: Batch
+    # A: Agent
     # Make dummy inputs to init recurrent Q network -> need shape (T, B, A, ...)
     init_obs = env.observation_spec().generate_value()  # (A, ...)
     init_obs_batched = jax.tree_util.tree_map(
@@ -173,7 +173,7 @@ def init(
         axis_name="device",
     )(reset_keys)
     first_obs = first_timestep.observation
-    first_done = first_timestep.last()[..., jnp.newaxis] 
+    first_done = first_timestep.last()[..., jnp.newaxis]
 
     # Initialise env steps and training steps
     t0 = jnp.zeros((cfg.arch.n_devices, cfg.system.update_batch_size), dtype=int)

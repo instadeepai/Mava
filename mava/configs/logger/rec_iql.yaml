@@ -2,4 +2,3 @@ defaults:
     - base_logger
 
 system_name: rec_iql
-
