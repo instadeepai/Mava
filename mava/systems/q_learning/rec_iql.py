@@ -159,7 +159,7 @@ def init(
         add_batch_size=cfg.arch.num_envs,
         sample_batch_size=cfg.system.sample_batch_size,
         max_length_time_axis=cfg.system.buffer_size,
-        min_length_time_axis=cfg.system.buffer_min_size,
+        min_length_time_axis=cfg.system.min_buffer_size,
     )
     buffer_state = rb.init(init_transition)
     buffer_state = replicate(buffer_state)
