@@ -46,7 +46,11 @@ from mava.systems.q_learning.types import (
 from mava.types import Observation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import unreplicate_batch_dim, unreplicate_n_dims
+from mava.utils.jax import (
+    switch_leading_axes,
+    unreplicate_batch_dim,
+    unreplicate_n_dims,
+)
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers import episode_metrics
 
@@ -309,11 +313,6 @@ def make_update_fns(
         )
 
         return new_interact_state, next_timestep.extras["episode_metrics"]
-
-    def switch_leading_axes(arr: chex.Array) -> chex.Array:
-        """Switches the first two axes, generally used for BT -> TB."""
-        arr: Dict[str, chex.Array] = jax.tree_map(lambda x: jax.numpy.swapaxes(x, 0, 1), arr)
-        return arr
 
     # Training functions
 
