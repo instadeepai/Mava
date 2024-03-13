@@ -98,7 +98,7 @@ def init(
 # B: Batch
 # A: Agent
     # Make dummy inputs to init recurrent Q network -> need shape (T, B, A, ...)
-    init_obs = env.observation_spec().generate_value()  # A,x
+    init_obs = env.observation_spec().generate_value()  # (A, ...)
     init_obs_batched = jax.tree_util.tree_map(
         lambda x: jnp.repeat(x[jnp.newaxis, ...], cfg.arch.num_envs, axis=0),
         init_obs,
