@@ -163,52 +163,6 @@ class ContinuousActionHead(nn.Module):
         )
 
 
-class RecQNetwork(nn.Module):
-    """Recurrent Q-Network."""
-
-    pre_torso: nn.Module
-    post_torso: nn.Module
-    num_actions: int
-    hidden_state_dim: int = 128
-
-    @nn.compact
-    def get_q_values(
-        self,
-        hidden_state: chex.Array,
-        observations_resets: RNNObservation,
-    ) -> chex.Array:
-        """Forward pass to obtain q values."""
-
-        obs, resets = observations_resets
-
-        embedding = self.pre_torso(obs.agents_view)
-
-        rnn_input = (embedding, resets)
-        hidden_state, embedding = ScannedRNN(self.hidden_state_dim)(hidden_state, rnn_input)
-
-        embedding = self.post_torso(embedding)
-
-        q_values = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01))(embedding)
-
-        return hidden_state, q_values
-
-    def __call__(
-        self,
-        hidden_state: chex.Array,
-        observations_resets: RNNObservation,
-        eps: float = 0,  # when epsilon is not specified, we assume a greedy approach
-    ) -> chex.Array:
-        """Forward pass with additional construction of epsilon-greedy distribution."""
-
-        obs, _ = observations_resets
-
-        hidden_state, q_values = self.get_q_values(hidden_state, observations_resets)
-
-        eps_greedy_dist = MaskedEpsGreedyDistribution(q_values, eps, obs.action_mask)
-
-        return hidden_state, eps_greedy_dist
-
-
 class FeedForwardActor(nn.Module):
     """Feed Forward Actor Network."""
 
@@ -379,3 +333,49 @@ def _parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex
         "tanh": nn.tanh,
     }
     return activation_fns[activation_fn_name]
+
+
+class RecQNetwork(nn.Module):
+    """Recurrent Q-Network."""
+
+    pre_torso: nn.Module
+    post_torso: nn.Module
+    num_actions: int
+    hidden_state_dim: int = 128
+
+    @nn.compact
+    def get_q_values(
+        self,
+        hidden_state: chex.Array,
+        observations_resets: RNNObservation,
+    ) -> chex.Array:
+        """Forward pass to obtain q values."""
+
+        obs, resets = observations_resets
+
+        embedding = self.pre_torso(obs.agents_view)
+
+        rnn_input = (embedding, resets)
+        hidden_state, embedding = ScannedRNN(self.hidden_state_dim)(hidden_state, rnn_input)
+
+        embedding = self.post_torso(embedding)
+
+        q_values = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01))(embedding)
+
+        return hidden_state, q_values
+
+    def __call__(
+        self,
+        hidden_state: chex.Array,
+        observations_resets: RNNObservation,
+        eps: float = 0,  # when epsilon is not specified, we assume a greedy approach
+    ) -> chex.Array:
+        """Forward pass with additional construction of epsilon-greedy distribution."""
+
+        obs, _ = observations_resets
+
+        hidden_state, q_values = self.get_q_values(hidden_state, observations_resets)
+
+        eps_greedy_dist = MaskedEpsGreedyDistribution(q_values, eps, obs.action_mask)
+
+        return hidden_state, eps_greedy_dist
