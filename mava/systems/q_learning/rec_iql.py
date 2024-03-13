@@ -452,7 +452,6 @@ def make_update_fns(
 
         return next_train_state, q_loss_info
 
-    # ___________________________________________________________________________________________________
     # INTERACT-TRAIN LOOP
 
     scanned_interact = lambda state: lax.scan(
