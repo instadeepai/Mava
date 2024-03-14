@@ -325,9 +325,10 @@ def make_update_fns(
             q_online_params, hidden_state, obs_done, method="get_q_values"
         )
         q_online = switch_leading_axes(q_online)  # (T, B, ...) -> (B, T, ...)
+        # get the q values of the taken actions and remove extra dim
         q_online = jnp.squeeze(
             jnp.take_along_axis(q_online, action[..., jnp.newaxis], axis=-1), axis=-1
-        )  # get the q values of the taken actions and remove extra dim
+        )
         q_loss = jnp.mean((q_online - target) ** 2)  # mse
 
         # pack metrics for logging
