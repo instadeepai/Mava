@@ -21,8 +21,7 @@ sample_sequence_length: 20 # 21 transitions are sampled, giving 20 complete data
 
 # learning rates
 q_lr: 3e-4  # the learning rate of the Q network network optimizer
-clip_optimiser: False
-global_norm: 10 # value used to clip optimiser
+max_grad_norm: 10 # value used to clip optimiser - set big for no clipping
 
 # other
 hard_update: False

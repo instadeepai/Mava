@@ -132,13 +132,10 @@ def init(
     params = DDQNParams(q_params, q_target_params)
 
     # Making optimiser and state
-    if cfg.system.clip_optimiser:
-        opt = optax.chain(
-            optax.clip_by_global_norm(cfg.system.global_norm),
-            optax.adam(learning_rate=cfg.system.q_lr, eps=1e-5),
-        )
-    else:
-        opt = optax.adam(learning_rate=cfg.system.q_lr)
+    opt = optax.chain(
+        optax.clip_by_global_norm(cfg.system.global_norm),
+        optax.adam(learning_rate=cfg.system.q_lr, eps=1e-5),
+    )
     opt_state = opt.init(params.online)
 
     # Distribute params, opt states and hidden states across all devices
