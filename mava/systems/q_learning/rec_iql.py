@@ -286,7 +286,7 @@ def make_update_fns(
         # Next obs and done for learner state
         next_obs = next_timestep.observation
         # make compatible with network input and transition storage in next step
-        next_done = next_timestep.last()[..., jnp.newaxis]  
+        next_done = next_timestep.last()[..., jnp.newaxis]
 
         # Repack
         new_act_state = ActionState(
@@ -321,9 +321,7 @@ def make_update_fns(
         hidden_state, obs_done = prep_inputs_to_scannedrnn(obs, done)
 
         # get online q values of all actions
-        _, q_online = q_net.apply(
-            q_online_params, hidden_state, obs_done, method="get_q_values"
-        )
+        _, q_online = q_net.apply(q_online_params, hidden_state, obs_done, method="get_q_values")
         q_online = switch_leading_axes(q_online)  # (T, B, ...) -> (B, T, ...)
         # get the q values of the taken actions and remove extra dim
         q_online = jnp.squeeze(
@@ -395,8 +393,7 @@ def make_update_fns(
 
         # TD Target
         target_q_val = (
-            first_reward
-            + (1.0 - next_done.astype(float)) * cfg.system.gamma * next_q_val
+            first_reward + (1.0 - next_done.astype(float)) * cfg.system.gamma * next_q_val
         )
 
         # Update Q function.
