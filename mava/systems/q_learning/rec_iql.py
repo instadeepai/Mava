@@ -315,7 +315,6 @@ def make_update_fns(
     def q_loss_fn(
         q_online_params: FrozenVariableDict, obs: Array, done: Array, action: Array, target: Array
     ) -> Tuple[Array, Metrics]:
-        """The portion of the calculation to grad, namely online apply and mse with target."""
 
         # axes switched here to scan over time
         hidden_state, obs_done = prep_inputs_to_scannedrnn(obs, done)
