@@ -279,9 +279,8 @@ def make_update_fns(
         reward = next_timestep.reward
 
         transition = Transition(obs, action, reward, done)
-        transition = jax.tree_util.tree_map(
-            lambda x: x[:, jnp.newaxis, ...], transition
-        )  # Add dummy time dim
+        # Add dummy time dim
+        transition = jax.tree_util.tree_map(lambda x: x[:, jnp.newaxis, ...], transition)  
         next_buffer_state = rb.add(buffer_state, transition)
 
         # Next obs and done for learner state
