@@ -285,9 +285,8 @@ def make_update_fns(
 
         # Next obs and done for learner state
         next_obs = next_timestep.observation
-        next_done = next_timestep.last()[
-            ..., jnp.newaxis
-        ]  # make compatible with network input and transition storage in next step
+        # make compatible with network input and transition storage in next step
+        next_done = next_timestep.last()[..., jnp.newaxis]  
 
         # Repack
         new_act_state = ActionState(
