@@ -320,9 +320,10 @@ def make_update_fns(
         # axes switched here to scan over time
         hidden_state, obs_done = prep_inputs_to_scannedrnn(obs, done)
 
+        # get online q values of all actions
         _, q_online = q_net.apply(
             q_online_params, hidden_state, obs_done, method="get_q_values"
-        )  # get online q values of all actions
+        )
         q_online = switch_leading_axes(q_online)  # (T, B, ...) -> (B, T, ...)
         q_online = jnp.squeeze(
             jnp.take_along_axis(q_online, action[..., jnp.newaxis], axis=-1), axis=-1
