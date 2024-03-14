@@ -326,14 +326,13 @@ def make_update_fns(
         q_online = jnp.squeeze(
             jnp.take_along_axis(q_online, action[..., jnp.newaxis], axis=-1), axis=-1
         )
-        q_loss = jnp.mean(jnp.square(q_online - target))  # mse
+        q_error = jnp.square(q_online - target)
+        q_loss = jnp.mean(q_error)  # mse
 
         # pack metrics for logging
         loss_info = {
             "q_loss": q_loss,
             "mean_q": jnp.mean(q_online),
-            "max_q_error": jnp.max(jnp.abs(q_online - target) ** 2),
-            "min_q_error": jnp.min(jnp.abs(q_online - target) ** 2),
             "mean_target": jnp.mean(target),
         }
 
