@@ -17,6 +17,7 @@ epochs: 2 # Number of learn epochs per training data batch.
 # sizes
 buffer_size: 5_000  # size of the replay buffer. Note: total size is this * num_devices
 sample_batch_size: 32  # size of training data batch sampled from the buffer
+sample_sequence_length: 20 # 21 transitions are sampled, giving 20 complete data points
 
 # learning rates
 q_lr: 3e-4  # the learning rate of the Q network network optimizer
@@ -31,5 +32,3 @@ gamma: 0.99  # discount factor
 
 eps_min: 0.05
 eps_decay: 1e5
-
-recurrent_chunk_size: 20 # TODO if unspecified, use rollout length
