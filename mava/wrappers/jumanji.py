@@ -98,8 +98,9 @@ class MultiAgentWrapper(Wrapper, ABC):
             "step_count",
         )
 
+        obs_spec = self._env.observation_spec()
+
         if self.add_global_state:
-            obs_spec = self._env.observation_spec()
             num_obs_features = obs_spec.agents_view.shape[-1]
             global_state = specs.Array(
                 (self._env.num_agents, self._env.num_agents * num_obs_features),
@@ -115,7 +116,13 @@ class MultiAgentWrapper(Wrapper, ABC):
                 step_count=step_count,
             )
 
-        return self._env.observation_spec().replace(step_count=step_count)
+        return specs.Spec(
+            Observation,
+            "ObservationSpec",
+            agents_view=obs_spec.agents_view,
+            action_mask=obs_spec.action_mask,
+            step_count=step_count,
+        )
 
     @cached_property
     def action_dim(self) -> chex.Array:
