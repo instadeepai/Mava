@@ -338,23 +338,6 @@ def make_update_fns(
 
         return q_loss, loss_info
 
-    # Standardise the update function inputs for a cond
-    def hard_update(
-        next_online_params: FrozenVariableDict, target_params: FrozenVariableDict, t_train: int
-    ) -> FrozenVariableDict:
-        next_target_params = optax.periodic_update(
-            next_online_params, target_params, t_train, cfg.system.update_period
-        )
-        return next_target_params
-
-    def soft_update(
-        next_online_params: FrozenVariableDict, target_params: FrozenVariableDict, t_train: int
-    ) -> FrozenVariableDict:
-        next_target_params = optax.incremental_update(
-            next_online_params, target_params, cfg.system.tau
-        )
-        return next_target_params
-
     def update_q(
         params: DDQNParams, opt_states: optax.OptState, data: Transition, t_train: int
     ) -> Tuple[DDQNParams, optax.OptState, Metrics]:
@@ -406,15 +389,14 @@ def make_update_fns(
         q_updates, next_opt_state = opt.update(q_grads, opt_states)
         next_online_params = optax.apply_updates(params.online, q_updates)
 
-        target_update_params = (next_online_params, params.target, t_train)
-
-        # Depending on choice of target network strategy, update target weights.
-        next_target_params = jax.lax.cond(
-            cfg.system.hard_update,
-            hard_update,
-            soft_update,
-            *target_update_params,
-        )
+        if cfg.system.hard_update:
+            next_target_params = optax.periodic_update(
+                next_online_params, params.target, t_train, cfg.system.update_period
+            )
+        else:
+            next_target_params = optax.incremental_update(
+                next_online_params, params.target, cfg.system.tau
+            )
 
         # Repack params and opt_states.
         next_params = DDQNParams(next_online_params, next_target_params)
