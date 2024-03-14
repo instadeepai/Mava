@@ -396,7 +396,7 @@ def make_update_fns(
         # TD Target
         target_q_val = (
             first_reward
-            + (1.0 - jnp.array(next_done, dtype="float32")) * cfg.system.gamma * next_q_val
+            + (1.0 - next_done.astype(float)) * cfg.system.gamma * next_q_val
         )
 
         # Update Q function.
