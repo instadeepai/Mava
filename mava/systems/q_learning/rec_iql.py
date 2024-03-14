@@ -74,7 +74,7 @@ def init(
     Returns:
         Tuple containing:
             Tuple[Environment, Environment]: The environment and evaluation environment.
-            RecQNetwork: Recurrent Q network
+            RecQNetwork: Recurrent Q network.
             optax.GradientTransformation: Optimiser for RecQNetwork.
             TrajectoryBuffer: The replay buffer.
             LearnerState: The initial learner state.
