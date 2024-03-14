@@ -388,9 +388,10 @@ def make_update_fns(
         # Scan over each sample and discard first timestep
         hidden_state, obs_done = prep_inputs_to_scannedrnn(data.obs, data.done)
 
+        # eps defaults to 0
         _, next_online_greedy_dist = q_net.apply(
             params.online, hidden_state, obs_done
-        )  # eps defaults to 0
+        ) 
 
         _, next_q_vals_target = q_net.apply(
             params.target, hidden_state, obs_done, method="get_q_values"
