@@ -103,13 +103,7 @@ def init(
     # A: Agent
     # Make dummy inputs to init recurrent Q network -> need shape (T, B, A, ...)
     init_obs = env.observation_spec().generate_value()  # (A, ...)
-    init_obs_batched = jax.tree_util.tree_map(
-        lambda x: jnp.repeat(x[jnp.newaxis, ...], cfg.arch.num_envs, axis=0),
-        init_obs,
-    )  # (B, A, ...)
-    init_obs_batched = jax.tree_util.tree_map(
-        lambda x: x[jnp.newaxis, ...], init_obs_batched
-    )  # add time dim (1, B, A, ...)
+    init_obs_batched = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, jnp.newaxis, ...], init_obs)  # (B, T, A, ...)
     init_done = jnp.zeros((1, cfg.arch.num_envs, 1), dtype=bool)  # (1, B, 1)
     init_x = (init_obs_batched, init_done)  # pack the RNN dummy inputs
     init_hidden_state = ScannedRNN.initialize_carry(
