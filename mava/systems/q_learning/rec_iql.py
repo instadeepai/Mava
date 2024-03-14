@@ -36,8 +36,8 @@ from mava.evaluator import make_eval_fns
 from mava.networks import RecQNetwork, ScannedRNN
 from mava.systems.q_learning.types import (
     ActionSelectionState,
+    ActionState,
     DDQNParams,
-    InteractionState,
     LearnerState,
     Metrics,
     TrainState,
@@ -266,12 +266,10 @@ def make_update_fns(
 
         return next_action_selection_state, action
 
-    def interaction_step(
-        interaction_state: InteractionState, _: Any
-    ) -> Tuple[InteractionState, Dict]:
+    def action_step(action_state: ActionState, _: Any) -> Tuple[ActionState, Dict]:
         """Selects action, steps env, stores timesteps in rb and repacks the parameters."""
         # light unpacking
-        action_selection_state, env_state, buffer_state, obs, done = interaction_state
+        action_selection_state, env_state, buffer_state, obs, done = action_state
 
         # select the actions to take
         next_action_selection_state, action = select_eps_greedy_action(
@@ -305,11 +303,11 @@ def make_update_fns(
         ]  # make compatible with network input and transition storage in next step
 
         # Repack
-        new_interact_state = InteractionState(
+        new_act_state = ActionState(
             next_action_selection_state, next_env_state, next_buffer_state, next_obs, next_done
         )
 
-        return new_interact_state, next_timestep.extras["episode_metrics"]
+        return new_act_state, next_timestep.extras["episode_metrics"]
 
     # Training functions
 
@@ -464,9 +462,7 @@ def make_update_fns(
 
     # Interact-train loop
 
-    scanned_interact = lambda state: lax.scan(
-        interaction_step, state, None, length=cfg.system.rollout_length
-    )
+    scanned_act = lambda state: lax.scan(action_step, state, None, length=cfg.system.rollout_length)
     scanned_train = lambda state: lax.scan(train, state, None, length=cfg.system.epochs)
 
     def update_step(
@@ -487,32 +483,30 @@ def make_update_fns(
             params,
             key,
         ) = learner_state
-        new_key, interact_key, train_key = jax.random.split(key, 3)
+        new_key, act_key, train_key = jax.random.split(key, 3)
 
         # Select actions, step env and store transitions
         action_selection_state = ActionSelectionState(
-            params.online, hidden_state, time_steps, interact_key
+            params.online, hidden_state, time_steps, act_key
         )
-        interaction_state = InteractionState(
-            action_selection_state, env_state, buffer_state, obs, done
-        )
-        final_interaction_state, metrics = scanned_interact(interaction_state)
+        action_state = ActionState(action_selection_state, env_state, buffer_state, obs, done)
+        final_action_state, metrics = scanned_act(action_state)
 
         # Sample and learn
         train_state = TrainState(
-            final_interaction_state.buffer_state, params, opt_state, train_steps, train_key
+            final_action_state.buffer_state, params, opt_state, train_steps, train_key
         )
         final_train_state, losses = scanned_train(train_state)
 
         next_learner_state = LearnerState(
-            final_interaction_state.obs,
-            final_interaction_state.done,
-            final_interaction_state.action_selection_state.hidden_state,
-            final_interaction_state.env_state,
-            final_interaction_state.action_selection_state.time_steps,
+            final_action_state.obs,
+            final_action_state.done,
+            final_action_state.action_selection_state.hidden_state,
+            final_action_state.env_state,
+            final_action_state.action_selection_state.time_steps,
             final_train_state.train_steps,
             final_train_state.opt_state,
-            final_interaction_state.buffer_state,
+            final_action_state.buffer_state,
             final_train_state.params,
             new_key,
         )

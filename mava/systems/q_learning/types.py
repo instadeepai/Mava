@@ -74,7 +74,7 @@ class ActionSelectionState(NamedTuple):
     key: PRNGKey
 
 
-class InteractionState(NamedTuple):
+class ActionState(NamedTuple):
     """The carry in the interaction loop."""
 
     action_selection_state: ActionSelectionState
