@@ -103,7 +103,9 @@ def init(
     # A: Agent
     # Make dummy inputs to init recurrent Q network -> need shape (T, B, A, ...)
     init_obs = env.observation_spec().generate_value()  # (A, ...)
-    init_obs_batched = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, jnp.newaxis, ...], init_obs)  # (B, T, A, ...)
+    init_obs_batched = jax.tree_util.tree_map(
+        lambda x: x[jnp.newaxis, jnp.newaxis, ...], init_obs
+    )  # (B, T, A, ...)
     init_done = jnp.zeros((1, cfg.arch.num_envs, 1), dtype=bool)  # (1, B, 1)
     init_x = (init_obs_batched, init_done)  # pack the RNN dummy inputs
     init_hidden_state = ScannedRNN.initialize_carry(
@@ -275,14 +277,6 @@ def make_update_fns(
 
         # Get reward
         reward = next_timestep.reward
-        meaned_reward = jax.tree_util.tree_map(
-            lambda x: jnp.repeat(x[:, jnp.newaxis, ...], cfg.system.num_agents, axis=1),
-            jnp.mean(next_timestep.reward, axis=-1),
-        )
-
-        reward = jax.lax.select(
-            (jnp.zeros_like(reward) + cfg.system.mean_reward).astype(int), meaned_reward, reward
-        )
 
         transition = Transition(obs, action, reward, done)
         transition = jax.tree_util.tree_map(
@@ -383,9 +377,7 @@ def make_update_fns(
         hidden_state, obs_done = prep_inputs_to_scannedrnn(data.obs, data.done)
 
         # eps defaults to 0
-        _, next_online_greedy_dist = q_net.apply(
-            params.online, hidden_state, obs_done
-        ) 
+        _, next_online_greedy_dist = q_net.apply(params.online, hidden_state, obs_done)
 
         _, next_q_vals_target = q_net.apply(
             params.target, hidden_state, obs_done, method="get_q_values"

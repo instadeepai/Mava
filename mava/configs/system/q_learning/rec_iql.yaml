@@ -5,7 +5,6 @@ seed: 1
 
 # --- Agent observations ---
 add_agent_id: True
-mean_reward: False
 
 # --- RL hyperparameters ---
 min_buffer_size: 32
