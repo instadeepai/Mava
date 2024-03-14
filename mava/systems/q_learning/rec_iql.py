@@ -317,9 +317,8 @@ def make_update_fns(
     ) -> Tuple[Array, Metrics]:
         """The portion of the calculation to grad, namely online apply and mse with target."""
 
-        hidden_state, obs_done = prep_inputs_to_scannedrnn(
-            obs, done
-        )  # axes switched here to scan over time
+        # axes switched here to scan over time
+        hidden_state, obs_done = prep_inputs_to_scannedrnn(obs, done)
 
         _, q_online = q_net.apply(
             q_online_params, hidden_state, obs_done, method="get_q_values"
