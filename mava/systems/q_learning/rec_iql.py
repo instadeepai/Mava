@@ -594,11 +594,10 @@ def run_experiment(cfg: DictConfig) -> float:
 
         final_metrics, ep_completed = episode_metrics.get_final_step_metrics(metrics)
         loss_metrics = losses
-        logger.log({"step": t, "steps_per_second": sps}, t, eval_idx, LogEvent.MISC)
+        logger.log({"step": t, "steps_per_second": sps, "epsilon": eps}, t, eval_idx, LogEvent.MISC)
         if ep_completed:
             logger.log(final_metrics, t, eval_idx, LogEvent.ACT)
         logger.log(loss_metrics, t, eval_idx, LogEvent.TRAIN)
-        logger.log({"epsilon": eps}, t, eval_idx, LogEvent.MISC)
 
         # Evaluate:
         key, eval_key = jax.random.split(key)
