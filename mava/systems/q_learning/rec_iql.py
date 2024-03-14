@@ -98,8 +98,8 @@ def init(
 
     key, q_key = jax.random.split(key, 2)
     # Shape legend:
-    # T: Time
-    # B: Batch
+    # T: Time (dummy dimension size = 1)
+    # B: Batch (dummy dimension size = 1)
     # A: Agent
     # Make dummy inputs to init recurrent Q network -> need shape (T, B, A, ...)
     init_obs = env.observation_spec().generate_value()  # (A, ...)
