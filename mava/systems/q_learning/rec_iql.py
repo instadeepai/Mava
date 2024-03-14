@@ -133,7 +133,7 @@ def init(
 
     # Making optimiser and state
     opt = optax.chain(
-        optax.clip_by_global_norm(cfg.system.global_norm),
+        optax.clip_by_global_norm(cfg.system.max_grad_norm),
         optax.adam(learning_rate=cfg.system.q_lr, eps=1e-5),
     )
     opt_state = opt.init(params.online)
@@ -584,10 +584,10 @@ def run_experiment(cfg: DictConfig) -> float:
         # But we also want to make sure we're counting env steps correctly so
         # learn steps is not included in the loop counter.
         learn_steps = anakin_steps * cfg.system.epochs
-        sps = (t + learn_steps) / (time.time() - start_time)
         eps = jax.numpy.maximum(
             cfg.system.eps_min, 1 - (t / cfg.system.eps_decay) * (1 - cfg.system.eps_min)
         )
+        sps = (t + learn_steps) / (time.time() - start_time)
 
         final_metrics, ep_completed = episode_metrics.get_final_step_metrics(metrics)
         loss_metrics = losses
