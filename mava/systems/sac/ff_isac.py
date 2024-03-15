@@ -49,7 +49,7 @@ from mava.systems.sac.types import (
 from mava.types import Observation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import unreplicate_batch_dim, unreplicate_n_dims
+from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.wrappers import episode_metrics
@@ -502,7 +502,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     actor, _ = networks
     key, eval_key = jax.random.split(key)
-    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor, cfg)
+    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor.apply, cfg)
 
     if cfg.logger.checkpointing.save_model:
         checkpointer = Checkpointer(
