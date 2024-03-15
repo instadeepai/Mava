@@ -36,7 +36,7 @@ from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransitio
 from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax_tools import (
+from mava.utils.jax_utils import (
     merge_leading_dims,
     unreplicate_batch_dim,
     unreplicate_n_dims,
