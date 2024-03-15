@@ -368,9 +368,11 @@ class RecQNetwork(nn.Module):
         self,
         hidden_state: chex.Array,
         observations_resets: RNNObservation,
-        eps: float = 0,  # when epsilon is not specified, we assume a greedy approach
+        eps: float = 0,
     ) -> chex.Array:
-        """Forward pass with additional construction of epsilon-greedy distribution."""
+        """Forward pass with additional construction of epsilon-greedy distribution.
+        When epsilon is not specified, we assume a greedy approach
+        """
 
         obs, _ = observations_resets
 

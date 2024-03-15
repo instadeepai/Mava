@@ -15,7 +15,7 @@
 import copy
 import time
 from pprint import pprint
-from typing import Any, Callable, Dict, Tuple  # noqa
+from typing import Any, Callable, Dict, Tuple
 
 import chex
 import flashbax as fbx
