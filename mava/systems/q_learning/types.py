@@ -32,7 +32,9 @@ class Transition(NamedTuple):
     obs: Observation
     action: Array
     reward: Array
-    done: Array
+    terminal: Array
+    term_or_trunc: Array
+    next_obs: Observation
 
 
 BufferState: TypeAlias = TrajectoryBufferState[Transition]
@@ -50,7 +52,8 @@ class LearnerState(NamedTuple):
 
     # Interaction vars
     obs: Array
-    done: Array
+    terminal: Array
+    term_or_trunc: Array
     hidden_state: Array
     env_state: State
     time_steps: Array
@@ -81,7 +84,8 @@ class ActionState(NamedTuple):
     env_state: State
     buffer_state: BufferState
     obs: Observation
-    done: Array
+    terminal: Array
+    term_or_trunc: Array
 
 
 class TrainState(NamedTuple):

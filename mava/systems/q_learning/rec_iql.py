@@ -107,8 +107,8 @@ def init(
     init_obs_batched = jax.tree_util.tree_map(
         lambda x: x[jnp.newaxis, jnp.newaxis, ...], init_obs
     )  # (B, T, A, ...)
-    init_done = jnp.zeros((1, 1, 1), dtype=bool)  # (T, B, 1)
-    init_x = (init_obs_batched, init_done)  # pack the RNN dummy inputs
+    init_term_or_trunc = jnp.zeros((1, 1, 1), dtype=bool)  # (T, B, 1)
+    init_x = (init_obs_batched, init_term_or_trunc)  # pack the RNN dummy inputs
     init_hidden_state = ScannedRNN.initialize_carry(
         (cfg.arch.num_envs, num_agents), cfg.network.hidden_state_dim
     )  # (B, A, ...)
@@ -146,7 +146,9 @@ def init(
         obs=init_obs,  # (A, ...)
         action=init_acts,
         reward=jnp.zeros((num_agents,), dtype=float),
-        done=jnp.zeros((1,), dtype=bool),  # one flag for all agents
+        terminal=jnp.zeros((1,), dtype=bool),  # one flag for all agents
+        term_or_trunc=jnp.zeros((1,), dtype=bool),
+        next_obs=init_obs,
     )
 
     # Initialise trajectory buffer
@@ -178,7 +180,8 @@ def init(
         axis_name="device",
     )(reset_keys)
     first_obs = first_timestep.observation
-    first_done = first_timestep.last()[..., jnp.newaxis]
+    first_term_or_trunc = first_timestep.last()[..., jnp.newaxis]
+    first_term = (1 - first_timestep.discount[..., 0, jnp.newaxis]).astype(bool)
 
     # Initialise env steps and training steps
     t0 = jnp.zeros((cfg.arch.n_devices, cfg.system.update_batch_size), dtype=int)
@@ -191,7 +194,8 @@ def init(
     # Initial learner state.
     learner_state = LearnerState(
         first_obs,
-        first_done,
+        first_term,
+        first_term_or_trunc,
         init_hidden_state,
         env_state,
         t0,
@@ -228,7 +232,7 @@ def make_update_fns(
     # Interaction functions
 
     def select_eps_greedy_action(
-        action_selection_state: ActionSelectionState, obs: Observation, done: Array
+        action_selection_state: ActionSelectionState, obs: Observation, term_or_trunc: Array
     ) -> Tuple[ActionSelectionState, Array]:
         """Select action to take in epsilon-greedy way. Batch and agent dims are included.
 
@@ -236,7 +240,7 @@ def make_update_fns(
             action_selection_state: Tuple of online parameters, previous hidden state,
                 environment timestep (used to calculate epsilon) and a random key.
             obs: The observation from the previous timestep.
-            done: The flag timestep.last() from the previous timestep.
+            term_or_trunc: The flag timestep.last() from the previous timestep.
 
         Returns:
             A tuple of the updated action selection state and the chosen action.
@@ -248,9 +252,11 @@ def make_update_fns(
         )
 
         obs = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], obs)
-        done = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], done)
+        term_or_trunc = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], term_or_trunc)
 
-        next_hidden_state, eps_greedy_dist = q_net.apply(params, hidden_state, (obs, done), eps)
+        next_hidden_state, eps_greedy_dist = q_net.apply(
+            params, hidden_state, (obs, term_or_trunc), eps
+        )
 
         new_key, explore_key = jax.random.split(key, 2)
 
@@ -266,11 +272,11 @@ def make_update_fns(
     def action_step(action_state: ActionState, _: Any) -> Tuple[ActionState, Dict]:
         """Selects action, steps env, stores timesteps in rb and repacks the parameters."""
         # light unpacking
-        action_selection_state, env_state, buffer_state, obs, done = action_state
+        action_selection_state, env_state, buffer_state, obs, terminal, term_or_trunc = action_state
 
         # select the actions to take
         next_action_selection_state, action = select_eps_greedy_action(
-            action_selection_state, obs, done
+            action_selection_state, obs, term_or_trunc
         )
 
         # step env with selected actions
@@ -279,26 +285,34 @@ def make_update_fns(
         # Get reward
         reward = next_timestep.reward
 
-        transition = Transition(obs, action, reward, done)
+        transition = Transition(
+            obs, action, reward, terminal, term_or_trunc, next_timestep.extras["real_next_obs"]
+        )  # NOTE pick up here
         # Add dummy time dim
         transition = jax.tree_util.tree_map(lambda x: x[:, jnp.newaxis, ...], transition)
         next_buffer_state = rb.add(buffer_state, transition)
 
-        # Next obs and done for learner state
+        # Next obs and term_or_trunc for learner state
         next_obs = next_timestep.observation
         # make compatible with network input and transition storage in next step
-        next_done = next_timestep.last()[..., jnp.newaxis]
+        next_terminal = (1 - next_timestep.discount[..., 0, jnp.newaxis]).astype(bool)
+        next_term_or_trunc = next_timestep.last()[..., jnp.newaxis]
 
         # Repack
         new_act_state = ActionState(
-            next_action_selection_state, next_env_state, next_buffer_state, next_obs, next_done
+            next_action_selection_state,
+            next_env_state,
+            next_buffer_state,
+            next_obs,
+            next_terminal,
+            next_term_or_trunc,
         )
 
         return new_act_state, next_timestep.extras["episode_metrics"]
 
     # Training functions
 
-    def prep_inputs_to_scannedrnn(obs: Observation, done: chex.Array) -> chex.Array:
+    def prep_inputs_to_scannedrnn(obs: Observation, term_or_trunc: chex.Array) -> chex.Array:
         """
         Prepares the inputs to the RNN network for either
         getting q values or the eps-greedy distribution.
@@ -309,20 +323,26 @@ def make_update_fns(
         )
         # the rb outputs (B, T, ... ) the RNN takes in (T, B, ...)
         obs = switch_leading_axes(obs)  # (B, T) -> (T, B)
-        done = switch_leading_axes(done)  # (B, T) -> (T, B)
-        obs_done = (obs, done)
+        term_or_trunc = switch_leading_axes(term_or_trunc)  # (B, T) -> (T, B)
+        obs_term_or_trunc = (obs, term_or_trunc)
 
-        return hidden_state, obs_done
+        return hidden_state, obs_term_or_trunc
 
     def q_loss_fn(
-        q_online_params: FrozenVariableDict, obs: Array, done: Array, action: Array, target: Array
+        q_online_params: FrozenVariableDict,
+        obs: Array,
+        term_or_trunc: Array,
+        action: Array,
+        target: Array,
     ) -> Tuple[Array, Metrics]:
 
         # axes switched here to scan over time
-        hidden_state, obs_done = prep_inputs_to_scannedrnn(obs, done)
+        hidden_state, obs_term_or_trunc = prep_inputs_to_scannedrnn(obs, term_or_trunc)
 
         # get online q values of all actions
-        _, q_online = q_net.apply(q_online_params, hidden_state, obs_done, method="get_q_values")
+        _, q_online = q_net.apply(
+            q_online_params, hidden_state, obs_term_or_trunc, method="get_q_values"
+        )
         q_online = switch_leading_axes(q_online)  # (T, B, ...) -> (B, T, ...)
         # get the q values of the taken actions and remove extra dim
         q_online = jnp.squeeze(
@@ -350,22 +370,32 @@ def make_update_fns(
         # Get the data associated with next_obs
         data_next = jax.tree_map(lambda x: x[:, 1:, ...], data)
 
-        first_reward = data_first.reward
-        next_done = data_next.done
+        obs = data_first.obs
+        term_or_trunc = data_first.term_or_trunc
+        reward = data_first.reward
+        action = data_first.action
+
+        # TODO: explain this
+        next_obs = data_first.next_obs
+        next_term_or_trunc = data_next.term_or_trunc
+        next_terminal = data_next.terminal
 
         # Scan over each sample and discard first timestep
-        hidden_state, obs_done = prep_inputs_to_scannedrnn(data.obs, data.done)
+        hidden_state, next_obs_term_or_trunc = prep_inputs_to_scannedrnn(
+            next_obs, next_term_or_trunc
+        )
 
         # eps defaults to 0
-        _, next_online_greedy_dist = q_net.apply(params.online, hidden_state, obs_done)
+        _, next_online_greedy_dist = q_net.apply(
+            params.online, hidden_state, next_obs_term_or_trunc
+        )
 
         _, next_q_vals_target = q_net.apply(
-            params.target, hidden_state, obs_done, method="get_q_values"
+            params.target, hidden_state, next_obs_term_or_trunc, method="get_q_values"
         )
 
         # Skip first timestep, since we are working with "next" information
-        next_action = next_online_greedy_dist.mode()[1:, ...]  # (T, B, ...)
-        next_q_vals_target = next_q_vals_target[1:, ...]  # (T, B, ...)
+        next_action = next_online_greedy_dist.mode()  # (T, B, ...)
 
         # Double q-value selection
         next_q_val = jnp.squeeze(
@@ -375,15 +405,11 @@ def make_update_fns(
         next_q_val = switch_leading_axes(next_q_val)  # (T, B, ...) -> (B, T, ...)
 
         # TD Target
-        target_q_val = (
-            first_reward + (1.0 - next_done.astype(float)) * cfg.system.gamma * next_q_val
-        )
+        target_q_val = reward + (1.0 - next_terminal) * cfg.system.gamma * next_q_val
 
         # Update Q function.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
-        q_grads, q_loss_info = q_grad_fn(
-            params.online, data_first.obs, data_first.done, data_first.action, target_q_val
-        )
+        q_grads, q_loss_info = q_grad_fn(params.online, obs, term_or_trunc, action, target_q_val)
 
         # Mean over the device and batch dimension.
         q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="device")
@@ -438,7 +464,8 @@ def make_update_fns(
         # unpack and get random keys
         (
             obs,
-            done,
+            terminal,
+            term_or_trunc,
             hidden_state,
             env_state,
             time_steps,
@@ -454,7 +481,9 @@ def make_update_fns(
         action_selection_state = ActionSelectionState(
             params.online, hidden_state, time_steps, act_key
         )
-        action_state = ActionState(action_selection_state, env_state, buffer_state, obs, done)
+        action_state = ActionState(
+            action_selection_state, env_state, buffer_state, obs, terminal, term_or_trunc
+        )
         final_action_state, metrics = scanned_act(action_state)
 
         # Sample and learn
@@ -465,7 +494,8 @@ def make_update_fns(
 
         next_learner_state = LearnerState(
             final_action_state.obs,
-            final_action_state.done,
+            final_action_state.terminal,
+            final_action_state.term_or_trunc,
             final_action_state.action_selection_state.hidden_state,
             final_action_state.env_state,
             final_action_state.action_selection_state.time_steps,

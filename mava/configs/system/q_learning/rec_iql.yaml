@@ -1,5 +1,5 @@
 # --- Defaults REC-IDQN ---
-total_timesteps: ~ # Set the total environment steps.
+total_timesteps: 5000000 # Set the total environment steps.
 # If unspecified, it's derived from num_updates; otherwise, num_updates adjusts based on this value.
 num_updates: 1000 # Number of updates.
 seed: 1
@@ -12,7 +12,7 @@ min_buffer_size: 32
 update_batch_size: 1 # Number of vectorised gradient updates per device.
 
 rollout_length: 2 # Number of environment steps per vectorised environment.
-epochs: 32 # Number of learn epochs per training data batch.
+epochs: 2 # Number of learn epochs per training data batch.
 
 # sizes
 buffer_size: 5000 # size of the replay buffer. Note: total size is this * num_devices
