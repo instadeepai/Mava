@@ -36,7 +36,11 @@ from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
 from mava.types import ActorApply, CriticApply, ExperimentOutput, MavaState
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import merge_leading_dims, unreplicate_batch_dim, unreplicate_n_dims
+from mava.utils.jax_tools import (
+    merge_leading_dims,
+    unreplicate_batch_dim,
+    unreplicate_n_dims,
+)
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.make_env import make
 from mava.wrappers.episode_metrics import get_final_step_metrics
