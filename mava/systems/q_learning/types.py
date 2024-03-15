@@ -21,7 +21,7 @@ from jax import Array
 from jumanji.env import State
 from typing_extensions import TypeAlias
 
-from mava.types import Observation  # , RNNObservation
+from mava.types import Observation
 
 Metrics = Dict[str, Array]
 
