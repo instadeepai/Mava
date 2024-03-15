@@ -375,9 +375,7 @@ class RecQNetwork(nn.Module):
         """
 
         obs, _ = observations_resets
-
         hidden_state, q_values = self.get_q_values(hidden_state, observations_resets)
-
         eps_greedy_dist = MaskedEpsGreedyDistribution(q_values, eps, obs.action_mask)
 
         return hidden_state, eps_greedy_dist
