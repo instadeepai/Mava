@@ -292,25 +292,27 @@ class CleanerWrapper(MultiAgentWrapper):
             # agents_locations: (A, 2)
 
             # Get dirty / wall tiles from first agent's obs and tile in agents dimension.
-            # (A, R, C)
-            dirty_channel = jnp.tile(grid == DIRTY, (num_agents, 1, 1))
-            wall_channel = jnp.tile(grid == WALL, (num_agents, 1, 1))
+
+            dirty_channel = jnp.tile(grid == DIRTY, (num_agents, 1, 1))  # (A, R, C)
+            wall_channel = jnp.tile(grid == WALL, (num_agents, 1, 1))  # (A, R, C)
 
             # Get each agent's position.
-            # (2, A)
-            xs, ys = agents_locations[:, 0], agents_locations[:, 1]
+            xs, ys = agents_locations[:, 0], agents_locations[:, 1]  # (A), (A)
 
             # Mask each agent's position so an agent can idenfity itself.
             # Sum the masked grids together for global agent information.
-            # (A, R, C)
-            pos_per_agent = jnp.repeat(jnp.zeros_like(grid)[jnp.newaxis, :, :], num_agents, axis=0)
-            pos_per_agent = pos_per_agent.at[jnp.arange(num_agents), xs, ys].set(1)
-            agents_channel = jnp.tile(jnp.sum(pos_per_agent, axis=0), (num_agents, 1, 1))
+            pos_per_agent = jnp.repeat(
+                jnp.zeros_like(grid)[jnp.newaxis, :, :], num_agents, axis=0
+            )  # (A, R, C)
+            pos_per_agent = pos_per_agent.at[jnp.arange(num_agents), xs, ys].set(1)  # (A, R, C)
+            agents_channel = jnp.tile(
+                jnp.sum(pos_per_agent, axis=0), (num_agents, 1, 1)
+            )  # (A, R, C)
 
             # Stack the channels along the last dimension.
-            # (A, R, C, 4)
             agents_view = jnp.stack(
-                [dirty_channel, wall_channel, agents_channel, pos_per_agent], axis=-1
+                [dirty_channel, wall_channel, agents_channel, pos_per_agent],
+                axis=-1,  # (A, R, C, 4)
             )
             return agents_view
 
@@ -332,7 +334,7 @@ class CleanerWrapper(MultiAgentWrapper):
     def get_global_state(self, obs: Observation) -> chex.Array:
         """Constructs the global state from the global information
         in the agent observations (dirty tiles, wall tiles and agent positions)."""
-        return obs.agents_view[..., :3]
+        return obs.agents_view[..., :3]  # (A, R, C, 3)
 
     def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         """Specification of the observation of the environment."""
