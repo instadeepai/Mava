@@ -3,5 +3,5 @@ defaults:
   - logger: rec_iql
   - arch: anakin
   - system: q_learning/rec_iql
-  - env: smax
   - network: rnn
+  - env: smax
