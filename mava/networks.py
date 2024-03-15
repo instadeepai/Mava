@@ -371,7 +371,7 @@ class RecQNetwork(nn.Module):
         eps: float = 0,
     ) -> chex.Array:
         """Forward pass with additional construction of epsilon-greedy distribution.
-        When epsilon is not specified, we assume a greedy approach
+        When epsilon is not specified, we assume a greedy approach.
         """
 
         obs, _ = observations_resets
