@@ -99,24 +99,6 @@ class MultiAgentWrapper(Wrapper, ABC):
         )
 
         obs_spec = self._env.observation_spec()
-
-        if self.add_global_state:
-            num_obs_features = obs_spec.agents_view.shape[-1]
-            global_state = specs.Array(
-                (self._env.num_agents, self._env.num_agents * num_obs_features),
-                obs_spec.agents_view.dtype,
-                "global_state",
-            )
-            return specs.Spec(
-                ObservationGlobalState,
-                "ObservationSpec",
-                agents_view=obs_spec.agents_view,
-                action_mask=obs_spec.action_mask,
-                global_state=global_state,
-                step_count=step_count,
-            )
-
-      obs_spec = self._env.observation_spec()
         obs_data = {
             "agents_view": obs_spec.agents_view,
             "action_mask": obs_spec.action_mask,
