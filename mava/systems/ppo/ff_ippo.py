@@ -23,12 +23,15 @@ import jax
 import jax.numpy as jnp
 import optax
 from colorama import Fore, Style
+from ConfigSpace import Configuration
 from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
+from smac import HyperparameterOptimizationFacade, Scenario
 
+from mava.configs.tune_spaces.rware.tiny_4ag.ff_ippo import tuner_config_space
 from mava.evaluator import make_eval_fns
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
@@ -578,17 +581,36 @@ def run_experiment(_config: DictConfig) -> float:
     return eval_performance
 
 
-@hydra.main(config_path="../../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
-def hydra_entry_point(cfg: DictConfig) -> float:
-    """Experiment entry point."""
-    # Allow dynamic attributes.
-    OmegaConf.set_struct(cfg, False)
+def tuner_main(config: Configuration, seed: int) -> float:
 
-    # Run experiment.
-    eval_performance = run_experiment(cfg)
-    print(f"{Fore.CYAN}{Style.BRIGHT}IPPO experiment completed{Style.RESET_ALL}")
-    return eval_performance
+    @hydra.main(config_path="../../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
+    def hydra_entry_point(cfg: DictConfig) -> float:
+        """Experiment entry point."""
+        # Allow dynamic attributes.
+        OmegaConf.set_struct(cfg, False)
+
+        cfg.system.ppo_epochs = config["ppo_epochs"]
+        cfg.system.num_minibatches = config["num_minibatches"]
+        cfg.system.ent_coef = config["ent_coef"]
+        cfg.system.clip_eps = config["clip_eps"]
+        cfg.system.max_grad_norm = config["max_grad_norm"]
+        cfg.system.critic_lr = config["critic_lr"]
+        cfg.system.actor_lr = config["actor_lr"]
+        cfg.system.seed = seed
+
+        # Run experiment.
+        eval_performance = run_experiment(cfg)
+        print(f"{Fore.CYAN}{Style.BRIGHT}IPPO experiment completed{Style.RESET_ALL}")
+        print(f"RESULT IN: {eval_performance}")
+        return eval_performance
+
+    result: float = hydra_entry_point()
+    print(f"RESULT OUT: {result}")
+    return result
 
 
 if __name__ == "__main__":
-    hydra_entry_point()
+    scenario = Scenario(tuner_config_space, deterministic=True, n_trials=5)
+    facade = HyperparameterOptimizationFacade(scenario, tuner_main)
+    incumbent = facade.optimize()
+    print(incumbent)

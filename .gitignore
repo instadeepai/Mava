@@ -174,3 +174,6 @@ results/
 outputs/
 multirun/
 .neptune
+
+# Sweep outputs
+smac3_output/
