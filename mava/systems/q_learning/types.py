@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Callable, Dict, NamedTuple, Tuple  # noqa
+from typing import Dict, NamedTuple
 
 import optax
 from chex import PRNGKey
@@ -42,7 +42,7 @@ class Transition(NamedTuple):
 BufferState: TypeAlias = TrajectoryBufferState[Transition]
 
 
-class DDQNParams(NamedTuple):
+class QNetParams(NamedTuple):
     """Double Q-learning network parameters."""
 
     online: FrozenVariableDict
@@ -66,7 +66,7 @@ class LearnerState(NamedTuple):
 
     # Shared vars
     buffer_state: TrajectoryBufferState
-    params: DDQNParams
+    params: QNetParams
     key: PRNGKey
 
 
@@ -94,7 +94,7 @@ class TrainState(NamedTuple):
     """The carry in the training loop."""
 
     buffer_state: BufferState
-    params: DDQNParams
+    params: QNetParams
     opt_state: optax.OptState
     train_steps: Array
     key: PRNGKey

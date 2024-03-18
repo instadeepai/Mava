@@ -37,9 +37,9 @@ from mava.networks import RecQNetwork, ScannedRNN
 from mava.systems.q_learning.types import (
     ActionSelectionState,
     ActionState,
-    DDQNParams,
     LearnerState,
     Metrics,
+    QNetParams,
     TrainState,
     Transition,
 )
@@ -105,9 +105,7 @@ def init(
     # Make dummy inputs to init recurrent Q network -> need shape (T, B, A, ...)
     init_obs = env.observation_spec().generate_value()  # (A, ...)
     # (B, T, A, ...)
-    init_obs_batched = jax.tree_util.tree_map(
-        lambda x: x[jnp.newaxis, jnp.newaxis, ...], init_obs
-    )
+    init_obs_batched = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, jnp.newaxis, ...], init_obs)
     init_term_or_trunc = jnp.zeros((1, 1, 1), dtype=bool)  # (T, B, 1)
     init_x = (init_obs_batched, init_term_or_trunc)  # pack the RNN dummy inputs
     # (B, A, ...)
@@ -128,7 +126,7 @@ def init(
     q_target_params = q_net.init(q_key, init_hidden_state, init_x)  # ensure parameters are separate
 
     # Pack Q network params
-    params = DDQNParams(q_params, q_target_params)
+    params = QNetParams(q_params, q_target_params)
 
     # Making optimiser and state
     opt = optax.chain(
@@ -315,9 +313,9 @@ def make_update_fns(
     # ---- Training functions ----
 
     def prep_inputs_to_scannedrnn(obs: Observation, term_or_trunc: chex.Array) -> chex.Array:
-        """Prepares the inputs to the RNN network for either getting q values or the 
+        """Prepares the inputs to the RNN network for either getting q values or the
         eps-greedy distribution.
-        
+
         Mostly swaps leading axes because the replay buffer outputs (B, T, ... )
         and the RNN takes in (T, B, ...).
         """
@@ -365,8 +363,8 @@ def make_update_fns(
         return q_loss, loss_info
 
     def update_q(
-        params: DDQNParams, opt_states: optax.OptState, data: Transition, t_train: int
-    ) -> Tuple[DDQNParams, optax.OptState, Metrics]:
+        params: QNetParams, opt_states: optax.OptState, data: Transition, t_train: int
+    ) -> Tuple[QNetParams, optax.OptState, Metrics]:
         """Update the Q parameters."""
 
         # Get data aligned with current/next timestep
@@ -434,7 +432,7 @@ def make_update_fns(
             )
 
         # Repack params and opt_states.
-        next_params = DDQNParams(next_online_params, next_target_params)
+        next_params = QNetParams(next_online_params, next_target_params)
 
         return next_params, next_opt_state, q_loss_info
 
@@ -619,6 +617,8 @@ def run_experiment(cfg: DictConfig) -> float:
                 episode_return=episode_return,
             )
 
+    eval_performance = float(jnp.mean(eval_output.episode_metrics[cfg.env.eval_metric]))
+
     # Measure absolute metric.
     if cfg.arch.absolute_metric:
         eval_keys = jax.random.split(key, cfg.arch.n_devices)
@@ -630,7 +630,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     logger.stop()
 
-    return float(max_episode_return)
+    return float(eval_performance)
 
 
 @hydra.main(config_path="../../configs", config_name="default_rec_iql.yaml", version_base="1.2")
