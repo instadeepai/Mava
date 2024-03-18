@@ -34,6 +34,8 @@ class Transition(NamedTuple):
     reward: Array
     terminal: Array
     term_or_trunc: Array
+    # Even though we use a trajectory buffer we need to store both obs and next_obs.
+    # This is because of how the `AutoResetWrapper` returns obs at the end of an episode.
     next_obs: Observation
 
 
