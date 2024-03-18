@@ -229,7 +229,7 @@ def make_update_fns(
         The update function.
     """
 
-    # Interaction functions
+    # ---- Acting functions ----
 
     def select_eps_greedy_action(
         action_selection_state: ActionSelectionState, obs: Observation, term_or_trunc: Array
