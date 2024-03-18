@@ -455,7 +455,7 @@ def make_update_fns(
 
         return next_train_state, q_loss_info
 
-    # Interact-train loop
+    # ---- Act-train loop ----
 
     scanned_act = lambda state: lax.scan(action_step, state, None, length=cfg.system.rollout_length)
     scanned_train = lambda state: lax.scan(train, state, None, length=cfg.system.epochs)
