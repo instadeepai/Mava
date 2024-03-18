@@ -325,14 +325,14 @@ class MultiCVRPWrapper(MultiAgentWrapper):
         # Coeffs are composed of (early, late)
         # Vehicles have ((x, y), local_time, capacity)
 
-        # Tuple[(N, 3) : Nodes, (N, 2) : Windows, (N, 2) : Coeffs] 
+        # Tuple[(N, 3) : Nodes, (N, 2) : Windows, (N, 2) : Coeffs]
         customers_info, _ = tree_util.tree_flatten(
             (observation.nodes, observation.windows, observation.coeffs)
         )
         # Tuple[(V, 2) : Coordinates, (V, 1) : Local time, (V, 1) : Capacity]
         vehicles_info, _ = tree_util.tree_flatten(observation.vehicles)
 
-        # (N * 7, ) : N * (7 : Nodes (3) + Windows (2) + Coeffs (2)) 
+        # (N * 7, ) : N * (7 : Nodes (3) + Windows (2) + Coeffs (2))
         customers_info = jnp.column_stack(customers_info).ravel()
         # (V, 4) : V, (4 : Coordinates (2), Local Time (1), Coeffs (1))
         vehicles_info = jnp.column_stack(vehicles_info)
