@@ -1,7 +1,7 @@
 # --- Defaults REC-IDQN ---
-total_timesteps: 5000000 # Set the total environment steps.
+total_timesteps: ~ # Set the total environment steps.
 # If unspecified, it's derived from num_updates; otherwise, num_updates adjusts based on this value.
-num_updates: 1000 # Number of updates.
+num_updates: 156250 # Number of updates.
 seed: 1
 
 # --- Agent observations ---
