@@ -384,7 +384,7 @@ def make_update_fns(
         next_term_or_trunc = data_next.term_or_trunc
         next_terminal = data_next.terminal
 
-        # Scan over each sample and discard first timestep
+        # Scan over each sample
         hidden_state, next_obs_term_or_trunc = prep_inputs_to_scannedrnn(
             next_obs, next_term_or_trunc
         )
