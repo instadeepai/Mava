@@ -375,7 +375,13 @@ def make_update_fns(
         reward = data_first.reward
         action = data_first.action
 
-        # TODO: explain this
+        # Variables:
+        # - data_first.next_obs
+        # - data_next.term_or_trunc
+        # - data_next.terminal
+        # all come from the same time step. They are stored and accessed in this way
+        # because of the difference between next_obs and the obs of the next timestep,
+        # a difference which only happens at the end of an episode.
         next_obs = data_first.next_obs
         next_term_or_trunc = data_next.term_or_trunc
         next_terminal = data_next.terminal
