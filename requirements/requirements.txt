@@ -1,4 +1,5 @@
 colorama
+distrax @ git+https://github.com/google-deepmind/distrax  # distrax release doesn't support jax > 0.4.13
 flashbax~=0.1.0
 flax
 gigastep @ git+https://github.com/mlech26l/gigastep
