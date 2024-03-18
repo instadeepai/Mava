@@ -365,9 +365,8 @@ def make_update_fns(
     ) -> Tuple[DDQNParams, optax.OptState, Metrics]:
         """Update the Q parameters."""
 
-        # Get the data associated with obs
+        # Get data aligned with current/next timestep
         data_first = jax.tree_map(lambda x: x[:, :-1, ...], data)
-        # Get the data associated with next_obs
         data_next = jax.tree_map(lambda x: x[:, 1:, ...], data)
 
         obs = data_first.obs
