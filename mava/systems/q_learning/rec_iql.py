@@ -14,7 +14,7 @@
 
 import copy
 import time
-from pprint import pprint
+from rich.pretty import pprint
 from typing import Any, Callable, Dict, Tuple
 
 import chex
