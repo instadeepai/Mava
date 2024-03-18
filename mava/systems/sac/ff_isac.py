@@ -164,9 +164,9 @@ def init(
     )
 
     rb = fbx.make_item_buffer(
-        max_length=cfg.system.buffer_size,
-        min_length=cfg.system.explore_steps,
-        sample_batch_size=cfg.system.batch_size,
+        max_length=int(cfg.system.buffer_size),
+        min_length=int(cfg.system.explore_steps),
+        sample_batch_size=int(cfg.system.batch_size),
         add_batches=True,
     )
     buffer_state = replicate(rb.init(init_transition))
