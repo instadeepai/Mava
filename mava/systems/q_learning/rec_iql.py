@@ -310,7 +310,7 @@ def make_update_fns(
 
         return new_act_state, next_timestep.extras["episode_metrics"]
 
-    # Training functions
+    # ---- Training functions ----
 
     def prep_inputs_to_scannedrnn(obs: Observation, term_or_trunc: chex.Array) -> chex.Array:
         """
