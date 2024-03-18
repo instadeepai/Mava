@@ -575,6 +575,9 @@ def run_experiment(cfg: DictConfig) -> float:
                 episode_return=episode_return,
             )
 
+    # Record the performance for the final evaluation run.
+    eval_performance = float(jnp.mean(eval_output.episode_metrics[cfg.env.eval_metric]))
+
     # Measure absolute metric.
     if cfg.arch.absolute_metric:
         eval_keys = jax.random.split(key, cfg.arch.n_devices)
@@ -586,7 +589,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     logger.stop()
 
-    return float(max_episode_return)
+    return eval_performance
 
 
 @hydra.main(config_path="../../configs", config_name="default_ff_isac.yaml", version_base="1.2")
