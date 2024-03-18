@@ -273,7 +273,7 @@ def make_update_fns(
 
     def action_step(action_state: ActionState, _: Any) -> Tuple[ActionState, Dict]:
         """Selects action, steps env, stores timesteps in rb and repacks the parameters."""
-        # light unpacking
+        # Unpack
         action_selection_state, env_state, buffer_state, obs, terminal, term_or_trunc = action_state
 
         # select the actions to take
