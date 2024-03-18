@@ -46,7 +46,7 @@ from mava.systems.q_learning.types import (
 from mava.types import Observation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import (
+from mava.utils.jax_utils import (
     switch_leading_axes,
     unreplicate_batch_dim,
     unreplicate_n_dims,
@@ -287,7 +287,7 @@ def make_update_fns(
 
         transition = Transition(
             obs, action, reward, terminal, term_or_trunc, next_timestep.extras["real_next_obs"]
-        )  # NOTE pick up here
+        )
         # Add dummy time dim
         transition = jax.tree_util.tree_map(lambda x: x[:, jnp.newaxis, ...], transition)
         next_buffer_state = rb.add(buffer_state, transition)
