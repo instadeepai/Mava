@@ -184,7 +184,7 @@ def init(
     first_term = (1 - first_timestep.discount[..., 0, jnp.newaxis]).astype(bool)
 
     # Initialise env steps and training steps
-    t0 = jnp.zeros((cfg.arch.n_devices, cfg.system.update_batch_size), dtype=int)
+    t0_act = jnp.zeros((cfg.arch.n_devices, cfg.system.update_batch_size), dtype=int)
     t0_train = jnp.zeros((cfg.arch.n_devices, cfg.system.update_batch_size), dtype=int)
 
     # Keys passed to learner
@@ -198,7 +198,7 @@ def init(
         first_term_or_trunc,
         init_hidden_state,
         env_state,
-        t0,
+        t0_act,
         t0_train,
         opt_state,
         buffer_state,
