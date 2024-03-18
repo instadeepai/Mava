@@ -14,7 +14,6 @@
 
 import copy
 import time
-from rich.pretty import pprint
 from typing import Any, Callable, Dict, Tuple
 
 import chex
@@ -31,6 +30,7 @@ from flax.core.scope import FrozenVariableDict
 from jax import Array
 from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
+from rich.pretty import pprint
 
 from mava.evaluator import make_eval_fns
 from mava.networks import RecQNetwork, ScannedRNN
@@ -375,7 +375,7 @@ def make_update_fns(
         reward = data_first.reward
         action = data_first.action
 
-        # The three following variables all come from the same time step. 
+        # The three following variables all come from the same time step.
         # They are stored and accessed in this way because of the `AutoResetWrapper`.
         # At the end of an episode `data_first.next_obs` and `data_next.obs` will be
         # different, which is why we need to store both. Thus `data_first.next_obs`
