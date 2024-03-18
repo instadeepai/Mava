@@ -320,7 +320,7 @@ class MultiCVRPWrapper(MultiAgentWrapper):
         global_observation = None
         # N: number of nodes, same as _num_customers + 1
         # V: number of vehicles, same as num_agents
-        # nodes are composed of (x, y, demands)
+        # Nodes are composed of (x, y, demands)
         # Windows are composed of (start_time, end_time)
         # Coeffs are composed of (early, late)
         # Vehicles have ((x, y), local_time, capacity)
@@ -332,7 +332,7 @@ class MultiCVRPWrapper(MultiAgentWrapper):
         # Tuple[(V, 2), (V, 1), (V, 1)]
         vehicles_info, _ = tree_util.tree_flatten(observation.vehicles)
 
-        # (N * 7, )
+        # (N * 7, ) 
         customers_info = jnp.column_stack(customers_info).ravel()
         # (V, 4)
         vehicles_info = jnp.column_stack(vehicles_info)
