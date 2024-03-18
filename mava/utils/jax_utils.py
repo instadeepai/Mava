@@ -64,3 +64,9 @@ def unreplicate_batch_dim(x: Any) -> Any:
     We simply take element 0 as the params are identical across this dimension.
     """
     return jax.tree_map(lambda x: x[:, 0, ...], x)  # type: ignore
+
+
+def switch_leading_axes(arr: chex.Array) -> chex.Array:
+    """Switches the first two axes, generally used for BT -> TB."""
+    arr = jax.tree_map(lambda x: jax.numpy.swapaxes(x, 0, 1), arr)
+    return arr
