@@ -51,7 +51,7 @@ class LearnerState(NamedTuple):
     """State of the learner in an interaction-training loop."""
 
     # Interaction vars
-    obs: Array
+    obs: Observation
     terminal: Array
     term_or_trunc: Array
     hidden_state: Array
