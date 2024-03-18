@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union
 
 import chex
 import flax.linen as nn
@@ -42,7 +42,7 @@ def get_ff_evaluator_fn(
     """Get the evaluator function for feedforward networks.
 
     Args:
-        env (Environment): An evironment isntance for evaluation.
+        env (Environment): An evironment instance for evaluation.
         apply_fn (callable): Network forward pass method.
         config (dict): Experiment configuration.
         eval_multiplier (int): A scalar that will increase the number of evaluation
@@ -113,9 +113,7 @@ def get_ff_evaluator_fn(
         eval_batch = (config.arch.num_eval_episodes // n_devices) * eval_multiplier
 
         key, *env_keys = jax.random.split(key, eval_batch + 1)
-        env_states, timesteps = jax.vmap(env.reset)(
-            jnp.stack(env_keys),
-        )
+        env_states, timesteps = jax.vmap(env.reset)(jnp.stack(env_keys))
         # Split keys for each core.
         key, *step_keys = jax.random.split(key, eval_batch + 1)
         # Add dimension to pmap over.
@@ -286,12 +284,28 @@ def get_rnn_evaluator_fn(
 
 def make_eval_fns(
     eval_env: Environment,
-    network: Any,
+    network_apply_fn: Union[ActorApply, RecActorApply],
     config: DictConfig,
     use_recurrent_net: bool = False,
     scanned_rnn: Optional[nn.Module] = None,
 ) -> Tuple[EvalFn, EvalFn]:
-    """Initialise evaluator_fn."""
+    """Initialize evaluator functions for reinforcement learning.
+
+    Args:
+        eval_env (Environment): The environment used for evaluation.
+        network_apply_fn (Union[ActorApply,RecActorApply]): Creates a policy to sample.
+        config (DictConfig): The configuration settings for the evaluation.
+        use_recurrent_net (bool, optional): Whether to use a rnn. Defaults to False.
+        scanned_rnn (Optional[nn.Module], optional): The rnn module.
+            Required if `use_recurrent_net` is True. Defaults to None.
+
+    Returns:
+        Tuple[EvalFn, EvalFn]: A tuple of two evaluation functions:
+        one for use during training and one for absolute metrics.
+
+    Raises:
+        AssertionError: If `use_recurrent_net` is True but `scanned_rnn` is not provided.
+    """
     # Check if win rate is required for evaluation.
     log_win_rate = config.env.eval_metric == "win_rate"
     # Vmap it over number of agents and create evaluator_fn.
@@ -299,23 +313,25 @@ def make_eval_fns(
         assert scanned_rnn is not None
         evaluator = get_rnn_evaluator_fn(
             eval_env,
-            network.apply,
+            network_apply_fn,  # type: ignore
             config,
             scanned_rnn,
             log_win_rate,
         )
         absolute_metric_evaluator = get_rnn_evaluator_fn(
             eval_env,
-            network.apply,
+            network_apply_fn,  # type: ignore
             config,
             scanned_rnn,
             log_win_rate,
             10,
         )
     else:
-        evaluator = get_ff_evaluator_fn(eval_env, network.apply, config, log_win_rate)
+        evaluator = get_ff_evaluator_fn(
+            eval_env, network_apply_fn, config, log_win_rate  # type: ignore
+        )
         absolute_metric_evaluator = get_ff_evaluator_fn(
-            eval_env, network.apply, config, log_win_rate, 10
+            eval_env, network_apply_fn, config, log_win_rate, 10  # type: ignore
         )
 
     evaluator = jax.pmap(evaluator, axis_name="device")
