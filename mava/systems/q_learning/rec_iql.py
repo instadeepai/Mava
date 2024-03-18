@@ -593,7 +593,6 @@ def run_experiment(cfg: DictConfig) -> float:
         # Evaluate:
         key, eval_key = jax.random.split(key)
         eval_keys = jax.random.split(eval_key, cfg.arch.n_devices)
-        # essentially squeeze/unreplicate batch dim
         eval_params = unreplicate_batch_dim(learner_state.params.online)
         eval_output = evaluator(eval_params, eval_keys)
         jax.block_until_ready(eval_output)
