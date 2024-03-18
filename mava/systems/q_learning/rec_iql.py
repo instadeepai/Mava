@@ -398,7 +398,7 @@ def make_update_fns(
             params.target, hidden_state, next_obs_term_or_trunc, method="get_q_values"
         )
 
-        # Skip first timestep, since we are working with "next" information
+        # Get the greedy action
         next_action = next_online_greedy_dist.mode()  # (T, B, ...)
 
         # Double q-value selection
