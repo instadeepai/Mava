@@ -315,9 +315,11 @@ def make_update_fns(
     # ---- Training functions ----
 
     def prep_inputs_to_scannedrnn(obs: Observation, term_or_trunc: chex.Array) -> chex.Array:
-        """
-        Prepares the inputs to the RNN network for either
-        getting q values or the eps-greedy distribution.
+        """Prepares the inputs to the RNN network for either getting q values or the 
+        eps-greedy distribution.
+        
+        Mostly swaps leading axes because the replay buffer outputs (B, T, ... )
+        and the RNN takes in (T, B, ...).
         """
 
         hidden_state = ScannedRNN.initialize_carry(
