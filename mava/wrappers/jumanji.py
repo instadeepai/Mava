@@ -281,7 +281,8 @@ class CleanerWrapper(MultiAgentWrapper):
 
         def create_agents_view(grid: chex.Array, agents_locations: chex.Array) -> chex.Array:
             """Create separate channels for dirty cells, wall cells and agent positions.
-            Also add a channel that marks an agent's own position."""
+            Also add a channel that marks an agent's own position.
+            """
 
             num_agents = self.num_agents
 
@@ -301,13 +302,11 @@ class CleanerWrapper(MultiAgentWrapper):
 
             # Mask each agent's position so an agent can idenfity itself.
             # Sum the masked grids together for global agent information.
-            pos_per_agent = jnp.repeat(
-                jnp.zeros_like(grid)[jnp.newaxis, :, :], num_agents, axis=0
-            )  # (A, R, C)
+            # (A, R, C)
+            pos_per_agent = jnp.repeat(jnp.zeros_like(grid)[jnp.newaxis, :, :], num_agents, axis=0)
             pos_per_agent = pos_per_agent.at[jnp.arange(num_agents), xs, ys].set(1)  # (A, R, C)
-            agents_channel = jnp.tile(
-                jnp.sum(pos_per_agent, axis=0), (num_agents, 1, 1)
-            )  # (A, R, C)
+            # (A, R, C)
+            agents_channel = jnp.tile(jnp.sum(pos_per_agent, axis=0), (num_agents, 1, 1))
 
             # Stack the channels along the last dimension.
             agents_view = jnp.stack(
@@ -333,7 +332,8 @@ class CleanerWrapper(MultiAgentWrapper):
 
     def get_global_state(self, obs: Observation) -> chex.Array:
         """Constructs the global state from the global information
-        in the agent observations (dirty tiles, wall tiles and agent positions)."""
+        in the agent observations (dirty tiles, wall tiles and agent positions).
+        """
         return obs.agents_view[..., :3]  # (A, R, C, 3)
 
     def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
