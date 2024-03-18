@@ -110,9 +110,10 @@ def init(
     )
     init_term_or_trunc = jnp.zeros((1, 1, 1), dtype=bool)  # (T, B, 1)
     init_x = (init_obs_batched, init_term_or_trunc)  # pack the RNN dummy inputs
+    # (B, A, ...)
     init_hidden_state = ScannedRNN.initialize_carry(
         (cfg.arch.num_envs, num_agents), cfg.network.hidden_state_dim
-    )  # (B, A, ...)
+    )
 
     # Making recurrent Q network
     pre_torso = hydra.utils.instantiate(cfg.network.q_network.pre_torso)
