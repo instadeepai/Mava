@@ -80,7 +80,6 @@ class CNNTorso(nn.Module):
                 x = nn.LayerNorm(use_scale=False)(x)
             x = self.activation_fn(x)
 
-        # Reshape should keep the batch and agent dimensions unchanged.
         # Collapse (merge) the last three dimensions (width, height, channels)
         # Leave the batch, agent and time (if recurrent) dims unchanged.
         return jax.lax.collapse(x, -3)
