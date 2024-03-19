@@ -325,9 +325,10 @@ class CleanerWrapper(MultiAgentWrapper):
 
         reward = jnp.repeat(timestep.reward, self.num_agents)
         discount = jnp.repeat(timestep.discount, self.num_agents)
+        extras = {"won_episode": timestep.extras["num_dirty_tiles"] == 0}
 
         return timestep.replace(
-            observation=Observation(**obs_data), reward=reward, discount=discount
+            observation=Observation(**obs_data), reward=reward, discount=discount, extras=extras
         )
 
     def get_global_state(self, obs: Observation) -> chex.Array:
