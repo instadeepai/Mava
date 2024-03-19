@@ -325,6 +325,8 @@ class CleanerWrapper(MultiAgentWrapper):
 
         reward = jnp.repeat(timestep.reward, self.num_agents)
         discount = jnp.repeat(timestep.discount, self.num_agents)
+
+        # The episode is won if every tile is cleaned.
         extras = {"won_episode": timestep.extras["num_dirty_tiles"] == 0}
 
         return timestep.replace(
