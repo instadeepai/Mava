@@ -31,12 +31,16 @@ from rich.pretty import pprint
 
 from mava.evaluator import make_eval_fns
 from mava.networks import FeedForwardActor as Actor
-from mava.networks import FeedForwardCritic as Critic
+from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
 from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax import merge_leading_dims, unreplicate_batch_dim, unreplicate_n_dims
+from mava.utils.jax_utils import (
+    merge_leading_dims,
+    unreplicate_batch_dim,
+    unreplicate_n_dims,
+)
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import make_learning_rate
@@ -458,7 +462,7 @@ def run_experiment(_config: DictConfig) -> float:
     # Setup evaluator.
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
-    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network, config)
+    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network.apply, config)
 
     # Calculate total timesteps.
     config = check_total_timesteps(config)
