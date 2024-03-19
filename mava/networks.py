@@ -77,7 +77,7 @@ class CNNTorso(nn.Module):
             x = self.activation_fn(x)
 
         # Reshape should keep the batch and agent dimensions unchanged.
-        return x.reshape((x.shape[0], x.shape[1], -1))
+        return jax.lax.collapse(x, -3)
 
 
 class DiscreteActionHead(nn.Module):
