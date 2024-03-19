@@ -5,3 +5,6 @@ task_name: con-10x10x5a
 task_config:
   grid_size: 10
   num_agents: 5
+
+env_kwargs:
+  {}

@@ -9,3 +9,6 @@ task_config:
   num_food: 2
   max_agent_level: 2
   force_coop: True
+
+env_kwargs:
+  {}

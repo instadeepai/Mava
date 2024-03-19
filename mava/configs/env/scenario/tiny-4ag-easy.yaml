@@ -9,3 +9,6 @@ task_config:
   num_agents: 4
   sensor_range: 1
   request_queue_size: 8
+
+env_kwargs:
+  {}
