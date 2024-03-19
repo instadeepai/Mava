@@ -15,9 +15,9 @@
 from typing import Any, Callable, Dict, Generic, Tuple, TypeVar
 
 import chex
-from distrax import Distribution
 from flax.core.frozen_dict import FrozenDict
 from jumanji.types import TimeStep
+from tensorflow_probability.substrates.jax.distributions import Distribution
 from typing_extensions import NamedTuple, TypeAlias
 
 Action: TypeAlias = chex.Array
