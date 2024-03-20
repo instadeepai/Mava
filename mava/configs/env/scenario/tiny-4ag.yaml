@@ -11,4 +11,4 @@ task_config:
   request_queue_size: 4
 
 env_kwargs:
-  {}
+  {}  # there are no scenario specific env_kwargs for this env

@@ -11,4 +11,4 @@ task_config:
   force_coop: False
 
 env_kwargs:
-  {}
+  {}  # there are no scenario specific env_kwargs for this env
