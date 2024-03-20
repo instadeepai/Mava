@@ -21,7 +21,7 @@ import jax.numpy as jnp
 import numpy as np
 import tensorflow_probability.substrates.jax.distributions as tfd
 from flax import linen as nn
-from flax.linen.initializers import orthogonal
+from flax.linen.initializers import lecun_normal, orthogonal
 
 from mava.distributions import (
     IdentityTransformation,
@@ -41,18 +41,20 @@ class MLPTorso(nn.Module):
 
     layer_sizes: Sequence[int]
     activation: str = "relu"
+    kernel_init: str = "orthogonal"  # orthogonal or lecun_normal
     use_layer_norm: bool = False
     activate_final: bool = True
 
     def setup(self) -> None:
         self.activation_fn = _parse_activation_fn(self.activation)
+        self.kernel_init_fn = _parse_kernel_init_fn(self.kernel_init)
 
     @nn.compact
     def __call__(self, observation: chex.Array) -> chex.Array:
         """Forward pass."""
         x = observation
         for i, layer_size in enumerate(self.layer_sizes):
-            x = nn.Dense(layer_size, kernel_init=orthogonal(np.sqrt(2)))(x)
+            x = nn.Dense(layer_size, kernel_init=self.kernel_init_fn)(x)
             if self.use_layer_norm:
                 x = nn.LayerNorm(use_scale=False)(x)
 
@@ -339,6 +341,15 @@ def _parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex
         "tanh": nn.tanh,
     }
     return activation_fns[activation_fn_name]
+
+
+def _parse_kernel_init_fn(kernel_init_fn_name: str) -> Callable[[chex.Array], chex.Array]:
+    """Get kernel init function."""
+    init_fns: Dict[str, Callable[[chex.Array], chex.Array]] = {
+        "orthogonal": orthogonal(np.sqrt(2)),
+        "lecun_normal": lecun_normal(),
+    }
+    return init_fns[kernel_init_fn_name]
 
 
 class RecQNetwork(nn.Module):
