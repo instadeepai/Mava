@@ -101,9 +101,7 @@ def make_jumanji_env(
     wrapper = _jumanji_registry[env_name]["wrapper"]
 
     # Create envs.
-    print(config.env.kwargs, config.env.scenario.env_kwargs)
     env_config = {**config.env.kwargs, **config.env.scenario.env_kwargs}
-    print(env_config)
     train_env = jumanji.make(env_name, generator=generator, **env_config)
     eval_env = jumanji.make(env_name, generator=generator, **env_config)
     train_env = wrapper(train_env, add_global_state=add_global_state)
