@@ -42,6 +42,7 @@ class MLPTorso(nn.Module):
     layer_sizes: Sequence[int]
     activation: str = "relu"
     use_layer_norm: bool = False
+    activate_final: bool = True
 
     def setup(self) -> None:
         self.activation_fn = _parse_activation_fn(self.activation)
@@ -50,11 +51,16 @@ class MLPTorso(nn.Module):
     def __call__(self, observation: chex.Array) -> chex.Array:
         """Forward pass."""
         x = observation
-        for layer_size in self.layer_sizes:
+        for i, layer_size in enumerate(self.layer_sizes):
             x = nn.Dense(layer_size, kernel_init=orthogonal(np.sqrt(2)))(x)
             if self.use_layer_norm:
                 x = nn.LayerNorm(use_scale=False)(x)
-            x = self.activation_fn(x)
+
+            if i != len(self.layer_sizes) - 1:
+                x = self.activation_fn(x)
+            elif i == len(self.layer_sizes) - 1 and self.activate_final:
+                x = self.activation_fn(x)
+
         return x
 
 
@@ -379,3 +385,76 @@ class RecQNetwork(nn.Module):
         eps_greedy_dist = MaskedEpsGreedyDistribution(q_values, eps, obs.action_mask)
 
         return hidden_state, eps_greedy_dist
+
+
+class QMixNetwork(nn.Module):
+    """Mixer network for the QMix algorithm."""
+
+    num_actions: int
+    num_agents: int
+    hyper_hidden_dim: int = 64
+    embed_dim: int = 32
+    norm_env_states: bool = True
+
+    def setup(self) -> None:
+        self.hyper_w1: MLPTorso = MLPTorso(
+            (self.hyper_hidden_dim, self.embed_dim * self.num_agents),
+            activate_final=False,  # kernel_init="lecun_normal"
+        )
+
+        self.hyper_b1: MLPTorso = MLPTorso(
+            (self.embed_dim,),  # kernel_init="lecun_normal"
+        )
+
+        self.hyper_w2: MLPTorso = MLPTorso(
+            (self.hyper_hidden_dim, self.embed_dim),
+            activate_final=False,  # kernel_init="lecun_normal"
+        )
+
+        self.hyper_b2: MLPTorso = MLPTorso(
+            (self.embed_dim, 1),
+            activate_final=False,  # kernel_init="lecun_normal"
+        )
+
+        self.layer_norm: nn.Module = nn.LayerNorm()
+
+    @nn.compact
+    def __call__(
+        self,
+        agent_qs: chex.Array,
+        env_global_state: chex.Array,
+    ) -> chex.Array:
+
+        b, t = agent_qs.shape[:2]  # batch size
+
+        # # # Reshaping
+        agent_qs = jnp.reshape(agent_qs, (b, t, 1, self.num_agents))
+
+        if self.norm_env_states:
+            states = self.layer_norm(env_global_state)
+        else:
+            states = env_global_state
+
+        # First layer
+        w1 = jnp.abs(self.hyper_w1(states))
+        b1 = self.hyper_b1(states)
+        w1 = jnp.reshape(w1, (b, t, self.num_agents, self.embed_dim))
+        b1 = jnp.reshape(b1, (b, t, 1, self.embed_dim))
+
+        # Matrix multiplication
+        hidden = nn.elu(jnp.matmul(agent_qs, w1) + b1)
+
+        # Second layer
+        w2 = jnp.abs(self.hyper_w2(states))
+        b2 = self.hyper_b2(states)
+
+        w2 = jnp.reshape(w2, (b, t, self.embed_dim, 1))
+        b2 = jnp.reshape(b2, (b, t, 1, 1))
+
+        # Compute final output
+        y = jnp.matmul(hidden, w2) + b2
+
+        # Reshape
+        q_tot = jnp.reshape(y, (b, t, 1))
+
+        return q_tot

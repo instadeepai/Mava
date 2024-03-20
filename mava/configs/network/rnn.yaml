@@ -39,3 +39,9 @@ q_network:
     layer_sizes: [128]
     use_layer_norm: False
     activation: relu
+
+q_mixer:
+  _target_: mava.networks.QMixNetwork
+  hyper_hidden_dim: 128
+  embed_dim: 32
+  norm_env_states: True

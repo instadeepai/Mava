@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, NamedTuple
+from typing import Dict, NamedTuple, Union
 
 import optax
 from chex import PRNGKey
@@ -21,7 +21,7 @@ from jax import Array
 from jumanji.env import State
 from typing_extensions import TypeAlias
 
-from mava.types import Observation
+from mava.types import Observation, ObservationGlobalState
 
 Metrics = Dict[str, Array]
 
@@ -29,14 +29,14 @@ Metrics = Dict[str, Array]
 class Transition(NamedTuple):
     """Transition for recurrent Q-learning."""
 
-    obs: Observation
+    obs: Union[Observation, ObservationGlobalState]
     action: Array
     reward: Array
     terminal: Array
     term_or_trunc: Array
     # Even though we use a trajectory buffer we need to store both obs and next_obs.
     # This is because of how the `AutoResetWrapper` returns obs at the end of an episode.
-    next_obs: Observation
+    next_obs: Union[Observation, ObservationGlobalState]
 
 
 BufferState: TypeAlias = TrajectoryBufferState[Transition]
@@ -49,11 +49,20 @@ class QNetParams(NamedTuple):
     target: FrozenVariableDict
 
 
+class QMixParams(NamedTuple):
+    """Online and target parameters for a recurrent Q Net's body and mixer component."""
+
+    online: FrozenVariableDict
+    target: FrozenVariableDict
+    mixer_online: FrozenVariableDict
+    mixer_target: FrozenVariableDict
+
+
 class LearnerState(NamedTuple):
     """State of the learner in an interaction-training loop."""
 
     # Interaction vars
-    obs: Observation
+    obs: Union[Observation, ObservationGlobalState]
     terminal: Array
     term_or_trunc: Array
     hidden_state: Array
@@ -66,7 +75,7 @@ class LearnerState(NamedTuple):
 
     # Shared vars
     buffer_state: TrajectoryBufferState
-    params: QNetParams
+    params: Union[QNetParams, QMixParams]
     key: PRNGKey
 
 
@@ -85,7 +94,7 @@ class ActionState(NamedTuple):
     action_selection_state: ActionSelectionState
     env_state: State
     buffer_state: BufferState
-    obs: Observation
+    obs: Union[Observation, ObservationGlobalState]
     terminal: Array
     term_or_trunc: Array
 
@@ -94,7 +103,7 @@ class TrainState(NamedTuple):
     """The carry in the training loop."""
 
     buffer_state: BufferState
-    params: QNetParams
+    params: Union[QNetParams, QMixParams]
     opt_state: optax.OptState
     train_steps: Array
     key: PRNGKey
