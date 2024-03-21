@@ -283,7 +283,7 @@ class CleanerWrapper(MultiAgentWrapper):
         super().__init__(env, add_global_state)
         self._env: Cleaner
 
-    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
+    def modify_timestep(self, timestep: TimeStep, state: State) -> TimeStep[Observation]:
         """Modify the timestep for the Cleaner environment."""
 
         def create_agents_view(grid: chex.Array, agents_locations: chex.Array) -> chex.Array:
