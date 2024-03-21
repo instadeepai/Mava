@@ -1,0 +1,8 @@
+# The config of the 5x5x5a scenario
+name: Cleaner-v0
+task_name: clean-5x5x5a
+
+task_config:
+  num_rows: 5
+  num_cols: 5
+  num_agents: 5
