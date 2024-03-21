@@ -281,16 +281,17 @@ class MultiCVRPWrapper(MultiAgentWrapper):
         env.num_agents = env._num_vehicles
         env.time_limit = env._num_customers + 1  # added for consistency
         env.action_dim = env._num_customers + 1  # n_costumers + 1 starter node
-        super().__init__(env, False)
         self.has_global_state = add_global_state
+        self.num_customers = env._num_customers
         self._env = env
+        super().__init__(env, False)
 
     def modify_timestep(self, timestep: TimeStep, state: State) -> TimeStep[Observation]:
         observation, global_observation = self._flatten_observation(timestep.observation)
         obs_data = {
             "agents_view": observation,
             "action_mask": timestep.observation.action_mask,
-            "step_count": jnp.repeat(state.step_count, (self.num_agents)),
+            "step_count": jnp.repeat(state.step_count, self.num_agents),
         }
         if self.has_global_state:
             obs_data["global_state"] = global_observation
@@ -298,8 +299,8 @@ class MultiCVRPWrapper(MultiAgentWrapper):
         else:
             observation = Observation(**obs_data)
 
-        reward = jnp.repeat(timestep.reward, (self.num_agents))
-        discount = jnp.repeat(timestep.discount, (self.num_agents))
+        reward = jnp.repeat(timestep.reward, self.num_agents)
+        discount = jnp.repeat(timestep.discount, self.num_agents)
         return timestep.replace(observation=observation, reward=reward, discount=discount)
 
     def _flatten_observation(
@@ -351,14 +352,14 @@ class MultiCVRPWrapper(MultiAgentWrapper):
 
     def observation_spec(self) -> specs.Spec[Observation]:
         step_count = specs.BoundedArray(
-            (self.num_agents,), jnp.int32, 0, self._env._num_customers + 1, "step_count"
+            (self.num_agents,), jnp.int32, 0, self.num_customers + 1, "step_count"
         )
         action_mask = specs.BoundedArray(
-            (self.num_agents, self._env._num_customers + 1), bool, False, True, "action_mask"
+            (self.num_agents, self.num_customers + 1), bool, False, True, "action_mask"
         )
 
         agents_view = specs.BoundedArray(
-            (self.num_agents, (self._env._num_customers + 1) * 7 + 4),
+            (self.num_agents, (self.num_customers + 1) * 7 + 4),
             jnp.float32,
             -jnp.inf,
             jnp.inf,
@@ -372,7 +373,7 @@ class MultiCVRPWrapper(MultiAgentWrapper):
 
         if self.has_global_state:
             global_state = specs.Array(
-                (self.num_agents, (self._env._num_customers + 1) * 7 + 4 * self.num_agents),
+                (self.num_agents, (self.num_customers + 1) * 7 + 4 * self.num_agents),
                 jnp.float32,
                 "global_state",
             )
@@ -381,15 +382,7 @@ class MultiCVRPWrapper(MultiAgentWrapper):
 
         return specs.Spec(Observation, "ObservationSpec", **obs_data)
 
-    def reward_spec(self) -> specs.Array:
-        return specs.Array(shape=(self.num_agents,), dtype=float, name="reward")
-
-    def discount_spec(self) -> specs.BoundedArray:
-        return specs.BoundedArray(
-            shape=(self.num_agents,), dtype=float, minimum=0.0, maximum=1.0, name="discount"
-        )
-
     def action_spec(self) -> specs.Spec:
         return specs.MultiDiscreteArray(
-            num_values=jnp.full(self.num_agents, self._env._num_customers + 1)
+            num_values=jnp.full(self.num_agents, self.num_customers + 1)
         )
