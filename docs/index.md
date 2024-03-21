@@ -1,14 +1,14 @@
-<div align="center">
-    <a href="docs/images/logos/mava_full_logo.png">
-        <img src="docs/images/logos/mava_full_logo.png" alt="Mava logo" style="width: 50%;"/>
+<div style="text-align: center;">
+    <a href="images/logos/mava_full_logo.png">
+        <img src="images/logos/mava_full_logo.png" alt="Mava logo" style="width: 50%;"/>
     </a>
 </div>
 
-<h2 align="center">
+<h2 style="text-align: center;">
     <p>Distributed Multi-Agent Reinforcement Learning in JAX</p>
 </h2>
 
-<div align="center">
+<div style="text-align: center;">
 <a href="https://www.python.org/doc/versions/">
       <img src="https://img.shields.io/badge/python-3.9-blue" alt="Python Versions">
 </a>
@@ -34,7 +34,7 @@ Mava is a project originating in the Research Team at [InstaDeep](https://www.in
 
 **If you are looking for documentation, benchmarks, contribution guidelines and more, you can find them [here](https://id-mava.readthedocs.io/)!**
 
-To join us in these efforts, please feel free to reach out, raise issues or read our [contribution guidelines](#contributing-) (or just star 🌟 to stay up to date with the latest developments)!
+To join us in these efforts, please feel free to reach out, raise issues or read our [contribution guidelines](#contributing) (or just star 🌟 to stay up to date with the latest developments)!
 
 ## Overview 🦜
 
@@ -61,7 +61,7 @@ pip install -e .
 ```
 
 We have tested `Mava` on Python 3.9. Note that because the installation of JAX differs depending on your hardware accelerator,
-we advise users to explicitly install the correct JAX version (see the [official installation guide](https://github.com/google/jax#installation)). For more in-depth installation guides including Docker builds and virtual environments, please see our [detailed installation guide](docs/install.md).
+we advise users to explicitly install the correct JAX version (see the [official installation guide](https://github.com/google/jax#installation)). For more in-depth installation guides including Docker builds and virtual environments, please see our [detailed installation guide](install.md).
 
 ## Quickstart ⚡
 
@@ -87,11 +87,11 @@ Additionally, we also have a [Quickstart notebook][quickstart] that can be used 
 
 ## Advanced Usage 👽
 
-Mava can be used in a wide array of advanced systems. As an example, we demonstrate recording experience data from one of our PPO systems into a [Flashbax](https://github.com/instadeepai/flashbax) `Vault`. This vault can then easily be integrated into offline MARL systems, such as those found in [OG-MARL](https://github.com/instadeepai/og-marl). See the [Advanced README](./mava/advanced_usage/) for more information.
+Mava can be used in a wide array of advanced systems. As an example, we demonstrate recording experience data from one of our PPO systems into a [Flashbax](https://github.com/instadeepai/flashbax) `Vault`. This vault can then easily be integrated into offline MARL systems, such as those found in [OG-MARL](https://github.com/instadeepai/og-marl). See the [Advanced README](other/advanced_usage.md) for more information.
 
 ## Contributing 🤝
 
-Please read our [contributing docs](docs/contributing) for details on how to submit pull requests, our Contributor License Agreement and community guidelines.
+Please read our [contributing docs](contributing.md) for details on how to submit pull requests, our Contributor License Agreement and community guidelines.
 
 ## Roadmap 🛤️
 

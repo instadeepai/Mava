@@ -1,0 +1,94 @@
+
+# yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
+site_name: Mava
+site_author: InstaDeep Research
+site_url: https://instadeepai.github.io/Mava
+site_dir: public
+
+nav:
+  - Overview: 'index.md'
+  - Installation: 'install.md'
+#  - User Guide: 'user_guide.md'
+#  - Performance Evaluation: 'performance_evaluation.md'
+  - Our Benchmarks: 'benchmarks.md'
+  - Contributing: 'contributing.md'
+#  - FAQs: 'faq.md'
+  - Other:
+      - Advanced Usage: 'other/advanced_usage.md'
+      - RWARE Comparison: 'other/jumanji_rware_comparison.md'
+
+theme:
+  name: material
+  logo: images/logos/instadeep_logo.png
+  favicon: images/logos/instadeep_logo.png
+  language: en
+  features:
+    - navigation.tracking # the URL is automatically updated with the active anchor
+    - navigation.sections # top-level sections are rendered as groups in the sidebar
+    - navigation.tabs.sticky # navigation tabs will lock below the header and always remain visible when scrolling
+    - navigation.indexes # documents can be directly attached to sections
+    - search.highlight # highlight search result
+    - search.share # share button
+    - search.suggest # smart suggestion
+    - toc.integrate
+    - toc.follow
+    - content.code.annotate
+    - content.code.copy
+    - navigation.tabs
+    - navigation.top
+  palette:
+    - scheme: default
+      primary: white
+      accent: deep purple
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - scheme: slate
+      primary: black
+      accent: deep purple
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:pymdownx.emoji.to_svg
+      emoji_index: !!python/name:pymdownx.emoji.gemoji
+  - pymdownx.snippets:
+      base_path: ./
+#  - pymdownx.pathconverter:
+#      absolute: True
+#      base_path: ./Mava/
+  - toc:
+      permalink: "#"
+      toc_depth: 3
+  - pymdownx.highlight:
+      linenums: false
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.superfences
+  - def_list
+  - admonition
+  - pymdownx.details
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+# Git repo
+repo_name: instadeepai/Mava
+repo_url: https://github.com/instadeepai/Mava
+edit_uri: edit/develop/docs/
+
+# Copyright
+copyright: InstaDeep © 2024 Copyright, all rights reserved.
+
+watch:
+  - "."
+  - "docs"
