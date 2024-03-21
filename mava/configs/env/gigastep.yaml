@@ -19,4 +19,4 @@ log_win_rate: True
 kwargs:
   max_episode_length: 500
   discrete_actions: True
-  obs_type : vector # Options: [vector, rgb, rgb_vector]
+  obs_type: vector # Options: [vector, rgb, rgb_vector]

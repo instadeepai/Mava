@@ -18,4 +18,4 @@ implicit_agent_id: True
 log_win_rate: True
 
 kwargs:
-  time_limit: 100
+  {}  # time limit set in scenario
