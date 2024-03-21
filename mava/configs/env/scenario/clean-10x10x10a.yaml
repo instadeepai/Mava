@@ -6,3 +6,6 @@ task_config:
   num_rows: 10
   num_cols: 10
   num_agents: 10
+
+env_kwargs:
+  time_limit: 100

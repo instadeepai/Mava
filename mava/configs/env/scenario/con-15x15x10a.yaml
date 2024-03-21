@@ -5,3 +5,6 @@ task_name: con-15x15x10a
 task_config:
   grid_size: 15
   num_agents: 10
+
+env_kwargs:
+  {}  # there are no scenario specific env_kwargs for this env

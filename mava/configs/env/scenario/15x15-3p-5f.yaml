@@ -9,3 +9,6 @@ task_config:
   num_food: 5
   max_agent_level: 2
   force_coop: False
+
+env_kwargs:
+  {}  # there are no scenario specific env_kwargs for this env
