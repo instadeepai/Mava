@@ -44,8 +44,8 @@ To join us in these efforts, please feel free to reach out, raise issues or read
 
 Mava currently offers the following building blocks for MARL research:
 
-- 🥑 **Implementations of MARL algorithms**: Implementations of multi-agent PPO systems that follow both the Centralised Training with Decentralised Execution (CTDE) and Decentralised Training with Decentralised Execution (DTDE) MARL paradigms.
-- 🍬 **Environment Wrappers**: Example wrappers for mapping Jumanji environments to an environment that is compatible with Mava. At the moment, we support [Robotic Warehouse][jumanji_rware] and [Level-Based Foraging][jumanji_lbf] with plans to support more environments soon. We have also recently added support for the SMAX environment from [JaxMARL][jaxmarl].
+- 🥑 **Implementations of MARL algorithms**: Implementations of multi-agent PPO systems that follow both the Centralised Training with Decentralised Execution (CTDE) and Decentralised Training with Decentralised Execution (DTDE) MARL paradigms with support for continuous and discrete action space environments.
+- 🍬 **Environment Wrappers**: Example wrappers for mapping Jumanji environments to an environment that is compatible with Mava. At the moment, we support [Robotic Warehouse][jumanji_rware] and [Level-Based Foraging][jumanji_lbf] with plans to support more environments soon. We have also recently added support for the SMAX and MaBrax environments from [JaxMARL][jaxmarl].
 - 🎓 **Educational Material**: [Quickstart notebook][quickstart] to demonstrate how Mava can be used and to highlight the added value of JAX-based MARL.
 - 🧪 **Statistically robust evaluation**: Mava natively supports logging to json files which adhere to the standard suggested by [Gorsane et al. (2022)][toward_standard_eval]. This enables easy downstream experiment plotting and aggregation using the tools found in the [MARL-eval][marl_eval] library.
 
@@ -142,7 +142,7 @@ Furthermore, we illustrate the speed of Mava by showing the steps per second as 
 
 ## Code Philosophy 🧘
 
-The current code in Mava is adapted from [PureJaxRL][purejaxrl] which provides high-quality single-file implementations with research-friendly features. In turn, PureJaxRL is inspired by the code philosophy from [CleanRL][cleanrl]. Along this vein of easy-to-use and understandable RL codebases, Mava is not designed to be a modular library and is not meant to be imported. Our repository focuses on simplicity and clarity in its implementations while utilising the advantages offered by JAX such as `pmap` and `vmap`, making it an excellent resource for researchers and practitioners to build upon.
+The current code in Mava is adapted from [PureJaxRL][purejaxrl] which provides high-quality single-file implementations with research-friendly features. In turn, PureJaxRL is inspired by the code philosophy from [CleanRL][cleanrl]. Along this vein of easy-to-use and understandable RL codebases, Mava is not designed to be a modular library and is not meant to be imported. Our repository focuses on simplicity and clarity in its implementations while utilising the advantages offered by JAX such as `pmap` and `vmap`, making it an excellent resource for researchers and practitioners to build upon. A notable difference between Mava and other single-file libraries is that Mava makes use of abstraction where relevant. In particular, this is done for network and environment creation.
 
 ## Installation 🎬
 
@@ -164,19 +164,25 @@ we advise users to explicitly install the correct JAX version (see the [official
 To get started with training your first Mava system, simply run one of the system files. e.g.,
 
 ```bash
-python mava/systems/ff_ippo.py
+python mava/systems/ppo/ff_ippo.py
 ```
 
 Mava makes use of Hydra for config management. In order to see our default system configs please see the `mava/configs/` directory. A benefit of Hydra is that configs can either be set in config yaml files or overwritten from the terminal on the fly. For an example of running a system on the LBF environment, the above code can simply be adapted as follows:
 
 ```bash
-python mava/systems/ff_ippo.py env=lbf
+python mava/systems/ppo/ff_ippo.py env=lbf
 ```
 
 Different scenarios can also be run by making the following config updates from the terminal:
 
 ```bash
-python mava/systems/ff_ippo.py env=rware env/scenario=tiny-4ag
+python mava/systems/ppo/ff_ippo.py env=rware env/scenario=tiny-4ag
+```
+
+To toggle between continuous and discrete systems, simply select the continuous action space network head. To run the same system on an `MaBrax` environment make the follow config updates from the terminal:
+
+```bash
+python mava/systems/ppo/ff_ippo.py env=mabrax network.action_head._target_="mava.networks.ContinuousActionHead"
 ```
 
 Additionally, we also have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-agent system.
@@ -194,10 +200,8 @@ Please read our [contributing docs](docs/CONTRIBUTING.md) for details on how to 
 We plan to iteratively expand Mava in the following increments:
 
 - 🌴 Support for more environments.
-- 🔁 More robust recurrent systems.
 - 🌳 Support for non JAX-based environments.
 - 🦾 Support for off-policy algorithms.
-- 🎛 Continuous action space environments and algorithms.
 
 Please do follow along as we develop this next phase!
 
