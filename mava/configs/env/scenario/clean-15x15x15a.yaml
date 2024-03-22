@@ -1,0 +1,11 @@
+# The config of the 15x15x15a scenario
+name: Cleaner-v0
+task_name: clean-15x15x15a
+
+task_config:
+  num_rows: 15
+  num_cols: 15
+  num_agents: 15
+
+env_kwargs:
+  time_limit: 225

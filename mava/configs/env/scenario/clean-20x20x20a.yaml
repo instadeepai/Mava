@@ -1,0 +1,11 @@
+# The config of the 20x20x40a scenario
+name: Cleaner-v0
+task_name: clean-20x20x40a
+
+task_config:
+  num_rows: 20
+  num_cols: 20
+  num_agents: 20
+
+env_kwargs:
+  time_limit: 400

@@ -20,6 +20,9 @@ import matrax
 from gigastep import ScenarioBuilder
 from jaxmarl.environments.smax import map_name_to_scenario
 from jumanji.env import Environment
+from jumanji.environments.routing.cleaner.generator import (
+    RandomGenerator as CleanerRandomGenerator,
+)
 from jumanji.environments.routing.connector.generator import (
     RandomWalkGenerator as ConnectorRandomGenerator,
 )
@@ -34,6 +37,7 @@ from omegaconf import DictConfig
 from mava.wrappers import (
     AgentIDWrapper,
     AutoResetWrapper,
+    CleanerWrapper,
     ConnectorWrapper,
     GigastepWrapper,
     LbfWrapper,
@@ -49,6 +53,7 @@ _jumanji_registry = {
     "RobotWarehouse-v0": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper},
     "LevelBasedForaging-v0": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
     "MaConnector-v2": {"generator": ConnectorRandomGenerator, "wrapper": ConnectorWrapper},
+    "Cleaner-v0": {"generator": CleanerRandomGenerator, "wrapper": CleanerWrapper},
 }
 
 # Define a different registry for Matrax since it has no generator.
@@ -96,8 +101,9 @@ def make_jumanji_env(
     wrapper = _jumanji_registry[env_name]["wrapper"]
 
     # Create envs.
-    train_env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
-    eval_env = jumanji.make(env_name, generator=generator, **config.env.kwargs)
+    env_config = {**config.env.kwargs, **config.env.scenario.env_kwargs}
+    train_env = jumanji.make(env_name, generator=generator, **env_config)
+    eval_env = jumanji.make(env_name, generator=generator, **env_config)
     train_env = wrapper(train_env, add_global_state=add_global_state)
     eval_env = wrapper(eval_env, add_global_state=add_global_state)
 

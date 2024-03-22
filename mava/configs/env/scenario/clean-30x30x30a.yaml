@@ -1,0 +1,11 @@
+# The config of the 30x30x30a scenario
+name: Cleaner-v0
+task_name: clean-30x30x30a
+
+task_config:
+  num_rows: 30
+  num_cols: 30
+  num_agents: 30
+
+env_kwargs:
+  time_limit: 600
