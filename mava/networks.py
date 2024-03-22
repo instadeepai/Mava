@@ -410,6 +410,7 @@ class QMixNetwork(nn.Module):
     def setup(self) -> None:
         self.hyper_w1: MLPTorso = MLPTorso(
             (self.hyper_hidden_dim, self.embed_dim * self.num_agents),
+            use_layer_norm=True,
             activate_final=False,  # kernel_init="lecun_normal"
         )
 
@@ -419,6 +420,7 @@ class QMixNetwork(nn.Module):
 
         self.hyper_w2: MLPTorso = MLPTorso(
             (self.hyper_hidden_dim, self.embed_dim),
+            use_layer_norm=True,
             activate_final=False,  # kernel_init="lecun_normal"
         )
 

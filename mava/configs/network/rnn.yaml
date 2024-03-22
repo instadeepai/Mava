@@ -42,6 +42,6 @@ q_network:
 
 q_mixer:
   _target_: mava.networks.QMixNetwork
-  hyper_hidden_dim: 128
+  hyper_hidden_dim: 64
   embed_dim: 32
   norm_env_states: True
