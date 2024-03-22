@@ -390,8 +390,8 @@ class MultiCVRPWrapper(MultiAgentWrapper):
         env.action_dim = env._num_customers + 1  # n_costumers + 1 starter node
         self.has_global_state = add_global_state
         self.num_customers = env._num_customers
-        self._env = env
         super().__init__(env, False)
+        self._env : MultiCVRP
 
     def modify_timestep(self, timestep: TimeStep, state: State) -> TimeStep[Observation]:
         observation, global_observation = self._flatten_observation(timestep.observation)
@@ -489,7 +489,3 @@ class MultiCVRPWrapper(MultiAgentWrapper):
 
         return specs.Spec(Observation, "ObservationSpec", **obs_data)
 
-    def action_spec(self) -> specs.Spec:
-        return specs.MultiDiscreteArray(
-            num_values=jnp.full(self.num_agents, self.num_customers + 1)
-        )
