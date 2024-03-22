@@ -20,6 +20,7 @@ from mava.wrappers.jumanji import (
     CleanerWrapper,
     ConnectorWrapper,
     LbfWrapper,
+    MultiCVRPWrapper,
     RwareWrapper,
 )
 from mava.wrappers.matrax import MatraxWrapper

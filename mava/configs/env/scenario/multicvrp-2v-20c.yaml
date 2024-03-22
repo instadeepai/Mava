@@ -1,0 +1,6 @@
+name: MultiCVRP-v0
+task_name: multicvrp-2v-20c
+
+task_config:
+  num_customers : 20
+  num_vehicles : 2
