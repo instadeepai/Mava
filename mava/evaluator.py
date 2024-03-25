@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import chex
 import flax.linen as nn
@@ -104,40 +104,67 @@ def get_ff_evaluator_fn(
 
         return eval_metrics
 
-    def evaluator_fn(trained_params: FrozenDict, key: chex.PRNGKey) -> ExperimentOutput[EvalState]:
-        """Evaluator function."""
+    def parallel_evaluator(
+        carry: Tuple[FrozenDict, chex.PRNGKey], _: Any
+    ) -> Tuple[Tuple[FrozenDict, chex.PRNGKey], ExperimentOutput[EvalState]]:
+        """Evaluates the agent on multiple environments in parallel."""
+        trained_params, key = carry
 
-        # Initialise environment states and timesteps.
         n_devices = len(jax.devices())
+        episodes_per_device = config.arch.num_eval_episodes * eval_multiplier // n_devices
+        parallel_eval_batch_size = min(config.arch.num_envs, episodes_per_device)
 
-        eval_batch = (config.arch.num_eval_episodes // n_devices) * eval_multiplier
-
-        key, *env_keys = jax.random.split(key, eval_batch + 1)
+        # Initialize eval state for the parallel environments.
+        key, *env_keys = jax.random.split(key, parallel_eval_batch_size + 1)
         env_states, timesteps = jax.vmap(env.reset)(jnp.stack(env_keys))
-        # Split keys for each core.
-        key, *step_keys = jax.random.split(key, eval_batch + 1)
-        # Add dimension to pmap over.
-        step_keys = jnp.stack(step_keys).reshape(eval_batch, -1)
+
+        # Split keys for parallel execution in vmap.
+        key, *step_keys = jax.random.split(key, parallel_eval_batch_size + 1)
+        step_keys = jnp.stack(step_keys).reshape(parallel_eval_batch_size, -1)
 
         eval_state = EvalState(
             key=step_keys,
             env_state=env_states,
             timestep=timesteps,
-            step_count=jnp.zeros((eval_batch, 1)),
+            step_count=jnp.zeros((parallel_eval_batch_size, 1)),
             episode_return=jnp.zeros_like(timesteps.reward),
         )
-
+        # Evaluate over a batch of environments in parallel using vmap.
         eval_metrics = jax.vmap(
             eval_one_episode,
             in_axes=(None, 0),
             axis_name="eval_batch",
         )(trained_params, eval_state)
 
-        return ExperimentOutput(
+        return (trained_params, key), ExperimentOutput(
             learner_state=eval_state,
             episode_metrics=eval_metrics,
             train_metrics={},
         )
+
+    def evaluator_fn(trained_params: FrozenDict, key: chex.PRNGKey) -> ExperimentOutput[EvalState]:
+        """Evaluator function"""
+        n_devices = len(jax.devices())
+
+        # Calculate episodes to evaluate per device.
+        episodes_per_device = config.arch.num_eval_episodes * eval_multiplier // n_devices
+        # Determine parallel evaluation batch size.
+        # Limited by architecture's max environments or episodes per device.
+        parallel_eval_batch_size = min(config.arch.num_envs, episodes_per_device)
+        # Compute the number of sequential evaluation batches required per device
+        # to cover all episodes.
+        sequential_eval_batches = episodes_per_device // parallel_eval_batch_size
+
+        # Sequentially scan through the batched environments.
+        _, experiment_output = jax.lax.scan(
+            parallel_evaluator, (trained_params, key), None, length=sequential_eval_batches
+        )
+
+        # Reshape output to match the original batch size, if necessary.
+        experiment_output: ExperimentOutput = jax.tree_util.tree_map(
+            lambda x: jnp.reshape(x, (x.shape[0] * x.shape[1], *x.shape[2:])), experiment_output
+        )
+        return experiment_output
 
     return evaluator_fn
 
@@ -222,33 +249,34 @@ def get_rnn_evaluator_fn(
 
         return eval_metrics
 
-    def evaluator_fn(
-        trained_params: FrozenDict, key: chex.PRNGKey
-    ) -> ExperimentOutput[RNNEvalState]:
-        """Evaluator function."""
+    def parallel_evaluator(
+        carry: Tuple[FrozenDict, chex.PRNGKey], _: Any
+    ) -> Tuple[Tuple[FrozenDict, chex.PRNGKey], ExperimentOutput[RNNEvalState]]:
+        """Evaluates the agent on multiple environments in parallel."""
+        trained_params, key = carry
 
-        # Initialise environment states and timesteps.
         n_devices = len(jax.devices())
+        episodes_per_device = config.arch.num_eval_episodes * eval_multiplier // n_devices
+        parallel_eval_batch_size = min(config.arch.num_envs, episodes_per_device)
 
-        eval_batch = config.arch.num_eval_episodes // n_devices * eval_multiplier
-
-        key, *env_keys = jax.random.split(key, eval_batch + 1)
+        # Initialize eval state for the parallel environments.
+        key, *env_keys = jax.random.split(key, parallel_eval_batch_size + 1)
         env_states, timesteps = jax.vmap(env.reset)(jnp.stack(env_keys))
-        # Split keys for each core.
-        key, *step_keys = jax.random.split(key, eval_batch + 1)
-        # Add dimension to pmap over.
-        step_keys = jnp.stack(step_keys).reshape(eval_batch, -1)
+
+        # Split keys for parallel execution in vmap.
+        key, *step_keys = jax.random.split(key, parallel_eval_batch_size + 1)
+        step_keys = jnp.stack(step_keys).reshape(parallel_eval_batch_size, -1)
 
         # Initialise hidden state.
         init_hstate = scanned_rnn.initialize_carry(
-            (eval_batch, config.system.num_agents),
+            (parallel_eval_batch_size, config.system.num_agents),
             config.network.hidden_state_dim,
         )
 
         # Initialise dones.
         dones = jnp.zeros(
             (
-                eval_batch,
+                parallel_eval_batch_size,
                 config.system.num_agents,
             ),
             dtype=bool,
@@ -263,7 +291,7 @@ def get_rnn_evaluator_fn(
             timestep=timesteps,
             dones=dones,
             hstate=init_hstate,
-            step_count=jnp.zeros((eval_batch, 1)),
+            step_count=jnp.zeros((parallel_eval_batch_size, 1)),
             episode_return=jnp.zeros_like(timesteps.reward),
         )
 
@@ -273,11 +301,37 @@ def get_rnn_evaluator_fn(
             axis_name="eval_batch",
         )(trained_params, eval_state)
 
-        return ExperimentOutput(
+        return (trained_params, key), ExperimentOutput(
             learner_state=eval_state,
             episode_metrics=eval_metrics,
             train_metrics={},
         )
+
+    def evaluator_fn(
+        trained_params: FrozenDict, key: chex.PRNGKey
+    ) -> ExperimentOutput[RNNEvalState]:
+        """Evaluator function"""
+        n_devices = len(jax.devices())
+
+        # Calculate episodes to evaluate per device.
+        episodes_per_device = config.arch.num_eval_episodes * eval_multiplier // n_devices
+        # Determine parallel evaluation batch size.
+        # Limited by architecture's max environments or episodes per device.
+        parallel_eval_batch_size = min(config.arch.num_envs, episodes_per_device)
+        # Compute the number of sequential evaluation batches required per device
+        # to cover all episodes.
+        sequential_eval_batches = episodes_per_device // parallel_eval_batch_size
+
+        # Sequentially scan through the batched environments.
+        _, experiment_output = jax.lax.scan(
+            parallel_evaluator, (trained_params, key), None, length=sequential_eval_batches
+        )
+
+        # Reshape output to match the original batch size, if necessary.
+        experiment_output: ExperimentOutput = jax.tree_util.tree_map(
+            lambda x: jnp.reshape(x, (x.shape[0] * x.shape[1], *x.shape[2:])), experiment_output
+        )
+        return experiment_output
 
     return evaluator_fn
 
