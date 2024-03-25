@@ -1,0 +1,4 @@
+defaults:
+    - base_logger
+
+system_name: qmix

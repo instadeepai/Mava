@@ -350,7 +350,7 @@ def make_update_fns(
         q_online = jnp.squeeze(
             jnp.take_along_axis(q_online, action[..., jnp.newaxis], axis=-1), axis=-1
         )
-        q_online = jnp.sum(q_online,axis=-1)
+        q_online = jnp.sum(q_online, axis=-1)
 
         q_error = jnp.square(q_online - target)
         q_loss = jnp.mean(q_error)  # mse
@@ -408,12 +408,14 @@ def make_update_fns(
         next_q_val = jnp.squeeze(
             jnp.take_along_axis(next_q_vals_target, next_action[..., jnp.newaxis], axis=-1), axis=-1
         )
-        next_q_val = jnp.sum(next_q_val,axis=-1)
+        next_q_val = jnp.sum(next_q_val, axis=-1)
 
         next_q_val = switch_leading_axes(next_q_val)  # (T, B, ...) -> (B, T, ...)
 
         # TD Target
-        target_q_val = reward[:,:,0] + (1.0 - next_terminal[:,:,0]) * cfg.system.gamma * next_q_val
+        target_q_val = (
+            reward[:, :, 0] + (1.0 - next_terminal[:, :, 0]) * cfg.system.gamma * next_q_val
+        )
 
         # Update Q function.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
@@ -636,7 +638,7 @@ def run_experiment(cfg: DictConfig) -> float:
     return float(eval_performance)
 
 
-@hydra.main(config_path="../../configs", config_name="default_rec_iql.yaml", version_base="1.2")
+@hydra.main(config_path="../../configs", config_name="default_vdn.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
@@ -645,7 +647,7 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     # Run experiment.
     final_return = run_experiment(cfg)
 
-    print(f"{Fore.CYAN}{Style.BRIGHT}IDQN experiment completed{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}VDN experiment completed{Style.RESET_ALL}")
 
     return float(final_return)
 
