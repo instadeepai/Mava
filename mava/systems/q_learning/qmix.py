@@ -692,7 +692,7 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     # Run experiment.
     final_return = run_experiment(cfg)
 
-    print(f"{Fore.CYAN}{Style.BRIGHT}IDQN experiment completed{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}QMix experiment completed{Style.RESET_ALL}")
 
     return float(final_return)
 

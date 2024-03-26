@@ -416,7 +416,7 @@ class QMixNetwork(nn.Module):
 
         self.hyper_b1: MLPTorso = MLPTorso(
             (
-                self.hyper_hidden_dim,
+                #self.hyper_hidden_dim,
                 self.embed_dim,
             ),  # NOTE: Louise added hidden dim
             activate_final=False,  # kernel_init="lecun_normal"
@@ -429,8 +429,8 @@ class QMixNetwork(nn.Module):
         )
 
         self.hyper_b2: MLPTorso = MLPTorso(
-            (self.hyper_hidden_dim, self.embed_dim, 1),
-            activate_final=True,  # kernel_init="lecun_normal"
+            (self.embed_dim, 1),
+            activate_final=False,  # kernel_init="lecun_normal"
         )
 
         self.layer_norm: nn.Module = nn.LayerNorm()
