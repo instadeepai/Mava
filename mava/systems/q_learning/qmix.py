@@ -128,13 +128,13 @@ def init(
 
     # Making QMixer
     dummy_agent_qs = jnp.zeros(
-        (cfg.arch.num_envs, cfg.system.sample_sequence_length - 1, num_agents), float
+        (cfg.arch.num_envs, cfg.system.sample_sequence_length, num_agents), float
     )
     global_env_state_shape = (
         env.observation_spec().generate_value().global_state[0, ...].shape
     )  # NOTE the global state is replicated for all agents
     dummy_global_env_state = jnp.zeros(
-        (cfg.arch.num_envs, cfg.system.sample_sequence_length - 1, *global_env_state_shape), float
+        (cfg.arch.num_envs, cfg.system.sample_sequence_length, *global_env_state_shape), float
     )
 
     q_mixer = hydra.utils.instantiate(
@@ -148,7 +148,7 @@ def init(
 
     # Making optimiser and state
     opt = optax.chain(
-        optax.clip_by_global_norm(cfg.system.max_grad_norm),
+        # optax.clip_by_global_norm(cfg.system.max_grad_norm),
         optax.adam(learning_rate=cfg.system.q_lr, eps=1e-5),
     )
     opt_state = opt.init((params.online, params.mixer_online))
@@ -376,19 +376,20 @@ def make_update_fns(
             jnp.take_along_axis(q_online, action[..., jnp.newaxis], axis=-1), axis=-1
         )
 
-        q_online = mixer.apply(
+        q_online_mixed = mixer.apply(
             online_mixer_params, q_online, obs.global_state[:, :, 0, ...]
         )  # B,T,A,... -> B,T,1,...
 
-        chex.assert_equal_shape([q_online, target])
+        chex.assert_equal_shape([q_online_mixed, target])
 
-        q_error = jnp.square(q_online - target)
+        q_error = jnp.square(q_online_mixed - target)
         q_loss = jnp.mean(q_error)  # mse
 
         # pack metrics for logging
         loss_info = {
             "q_loss": q_loss,
             "mean_q": jnp.mean(q_online),
+            "mean_q_mixed": jnp.mean(q_online_mixed),
             "mean_target": jnp.mean(target),
         }
 
