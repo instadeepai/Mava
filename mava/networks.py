@@ -414,7 +414,7 @@ class QMixNetwork(nn.Module):
         )
 
         self.hyper_b1: MLPTorso = MLPTorso(
-            (self.embed_dim), 
+            (self.embed_dim,), 
         )
 
         self.hyper_w2: MLPTorso = MLPTorso(
