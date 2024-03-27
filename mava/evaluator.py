@@ -38,6 +38,7 @@ def get_ff_evaluator_fn(
     config: DictConfig,
     log_win_rate: bool = False,
     eval_multiplier: int = 1,
+    is_happo: bool = False,
 ) -> EvalFn:
     """Get the evaluator function for feedforward networks.
 
@@ -64,17 +65,31 @@ def get_ff_evaluator_fn(
             # Select action.
             key, policy_key = jax.random.split(key)
             # Add a batch dimension to the observation.
-            pi = apply_fn(
-                params, jax.tree_map(lambda x: x[jnp.newaxis, ...], last_timestep.observation)
-            )
-
-            if config.arch.evaluation_greedy:
-                action = pi.mode()
+            if is_happo:
+                action = jnp.zeros((config.system.num_agents), dtype=jnp.int32)
+                for agent in range(config.system.num_agents):
+                    single_agent_obs = jax.tree_util.tree_map(
+                        lambda x: x[jnp.newaxis, agent], last_timestep.observation
+                    )
+                    agent_params = jax.tree_util.tree_map(lambda x: x[agent], params)
+                    pi = apply_fn(agent_params, single_agent_obs)
+                    if config.arch.evaluation_greedy:
+                        action_per_agent = pi.mode()
+                    else:
+                        action_per_agent = pi.sample(seed=policy_key)
+                    action = action.at[agent].set(action_per_agent.squeeze(0))
             else:
-                action = pi.sample(seed=policy_key)
+                pi = apply_fn(
+                    params, jax.tree_map(lambda x: x[jnp.newaxis, ...], last_timestep.observation)
+                )
 
-            # Remove batch dim for stepping the environment.
-            action = jnp.squeeze(action, axis=0)
+                if config.arch.evaluation_greedy:
+                    action = pi.mode()
+                else:
+                    action = pi.sample(seed=policy_key)
+
+                # Remove batch dim for stepping the environment.
+                action = jnp.squeeze(action, axis=0)
 
             # Step environment.
             env_state, timestep = env.step(env_state, action)
@@ -288,6 +303,7 @@ def make_eval_fns(
     config: DictConfig,
     use_recurrent_net: bool = False,
     scanned_rnn: Optional[nn.Module] = None,
+    is_happo: bool = False,
 ) -> Tuple[EvalFn, EvalFn]:
     """Initialize evaluator functions for reinforcement learning.
 
@@ -328,10 +344,10 @@ def make_eval_fns(
         )
     else:
         evaluator = get_ff_evaluator_fn(
-            eval_env, network_apply_fn, config, log_win_rate  # type: ignore
+            eval_env, network_apply_fn, config, log_win_rate, 1, is_happo  # type: ignore
         )
         absolute_metric_evaluator = get_ff_evaluator_fn(
-            eval_env, network_apply_fn, config, log_win_rate, 10  # type: ignore
+            eval_env, network_apply_fn, config, log_win_rate, 10, is_happo  # type: ignore
         )
 
     evaluator = jax.pmap(evaluator, axis_name="device")

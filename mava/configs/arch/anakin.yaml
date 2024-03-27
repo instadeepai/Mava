@@ -1,13 +1,13 @@
 # --- Anakin config ---
 
 # --- Training ---
-num_envs: 16  # Number of vectorised environments per device.
+num_envs: 64  # Number of vectorised environments per device.
 
 # --- Evaluation ---
 evaluation_greedy: False # Evaluate the policy greedily. If True the policy will select
   # an action which corresponds to the greatest logit. If false, the policy will sample
   # from the logits.
 num_eval_episodes: 32 # Number of episodes to evaluate per evaluation.
-num_evaluation: 200 # Number of evenly spaced evaluations to perform during training.
+num_evaluation: 122 # Number of evenly spaced evaluations to perform during training.
 absolute_metric: True # Whether the absolute metric should be computed. For more details
   # on the absolute metric please see: https://arxiv.org/abs/2209.10485
