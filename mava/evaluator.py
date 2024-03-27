@@ -148,9 +148,9 @@ def get_ff_evaluator_fn(
 
         # Calculate episodes to evaluate per device.
         episodes_per_device = config.arch.num_eval_episodes * eval_multiplier // n_devices
-        # Determine parallel evaluation batch size.
+        # Determine how many eval episodes to vmap over.
         # Limited by architecture's max environments or episodes per device.
-        parallel_eval_batch_size = min(config.arch.num_envs, episodes_per_device)
+        num_vmapped_episodes = min(config.arch.num_envs, episodes_per_device)
         # Compute the number of sequential evaluation batches required per device
         # to cover all episodes.
         sequential_eval_batches = episodes_per_device // parallel_eval_batch_size
