@@ -446,7 +446,7 @@ def make_update_fns(
             params.mixer_target, next_q_val, next_obs.global_state[:, :, 0, ...]
         )  # B,T,A,... -> B,T,1,...
 
-        reward = jnp.mean(reward, axis=-1, keepdims=True)
+        reward = jnp.sum(reward, axis=-1, keepdims=True)
 
         # TD Target
         target_q_val = reward + (1.0 - next_terminal) * cfg.system.gamma * next_q_val
