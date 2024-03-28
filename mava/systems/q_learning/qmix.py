@@ -149,7 +149,7 @@ def init(
     # Making optimiser and state
     opt = optax.chain(
         # optax.clip_by_global_norm(cfg.system.max_grad_norm),
-        optax.adam(learning_rate=cfg.system.q_lr, eps=1e-5),
+        optax.adamw(learning_rate=cfg.system.q_lr, eps=1e-5, weight_decay=1e-6),
     )
     opt_state = opt.init((params.online, params.mixer_online))
 
@@ -460,7 +460,7 @@ def make_update_fns(
         # Mean over the device and batch dimension.
         q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="device")
         q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="batch")
-        q_updates, next_opt_state = opt.update(q_grads, opt_states)
+        q_updates, next_opt_state = opt.update(q_grads, opt_states,(params.online, params.mixer_online))
         (next_online_params, next_mixer_params) = optax.apply_updates(
             (params.online, params.mixer_online), q_updates
         )
