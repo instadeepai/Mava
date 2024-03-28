@@ -213,9 +213,6 @@ def get_learner_fn(
                     return critic_total_loss, (value_loss)
 
                 # CALCULATE ACTOR LOSS
-                loss_info = {"total_actor_loss": 0.0, "total_entropy": 0.0}
-                actor_loss_arr = jnp.zeros(config.system.num_agents)
-                entropy_arr = jnp.zeros(config.system.num_agents)
                 advantages_single_agent = advantages[:, 0]
                 actor_grad_fn = jax.value_and_grad(_actor_loss_fn, has_aux=True)
                 agents_params = params.actor_params
@@ -263,13 +260,6 @@ def get_learner_fn(
                     ratio = jnp.exp(log_prob - agent_traj.log_prob)
                     advantages_single_agent *= ratio
 
-                    # Log the loss info
-                    actor_loss_arr.at[agent].set(actor_loss_info_per_agent[1][0])
-                    entropy_arr.at[agent].set(actor_loss_info_per_agent[1][1])
-                    # TODO: check if we need sum or mean
-                    loss_info["total_actor_loss"] += actor_loss_info_per_agent[1][0]
-                    loss_info["total_entropy"] += actor_loss_info_per_agent[1][1]
-
                 # CALCULATE CRITIC LOSS
                 critic_grad_fn = jax.value_and_grad(_critic_loss_fn, has_aux=True)
                 critic_loss_info, critic_grads = critic_grad_fn(
@@ -280,6 +270,7 @@ def get_learner_fn(
                 # This calculation is inspired by the Anakin architecture demo notebook.
                 # available at https://tinyurl.com/26tdzs5x
                 # This pmean could be a regular mean as the batch axis is on the same device.
+
                 critic_grads, critic_loss_info = jax.lax.pmean(
                     (critic_grads, critic_loss_info), axis_name="batch"
                 )
@@ -298,21 +289,17 @@ def get_learner_fn(
                 new_opt_state = OptStates(agent_opt_states, critic_new_opt_state)
 
                 # PACK LOSS INFO
-                loss_info.update(
-                    {
-                        "total_loss": loss_info["total_actor_loss"] + critic_loss_info[0],
-                        "value_loss": critic_loss_info[1],
-                        **{
-                            f"actor_loss_agent_{agent}": actor_loss_arr[agent]
-                            for agent in range(config.system.num_agents)
-                        },
-                        **{
-                            f"entropy_agent_{agent}": entropy_arr[agent]
-                            for agent in range(config.system.num_agents)
-                        },
-                    }
-                )
-                return (new_params, new_opt_state, key), loss_info
+                """total_loss = actor_loss_info[0] + critic_loss_info[0]
+                value_loss = critic_loss_info[1]
+                actor_loss = actor_loss_info[1][0]
+                entropy = actor_loss_info[1][1]
+                loss_info = {
+                    "total_loss": total_loss,
+                    "value_loss": value_loss,
+                    "actor_loss": actor_loss,
+                    "entropy": entropy,
+                }"""
+                return (new_params, new_opt_state, key), {"total_loss": critic_loss_info[1]}
 
             params, opt_states, traj_batch, advantages, targets, key = update_state
             key, shuffle_key, entropy_key = jax.random.split(key, 3)
