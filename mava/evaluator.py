@@ -112,21 +112,21 @@ def get_ff_evaluator_fn(
 
         n_devices = len(jax.devices())
         episodes_per_device = config.arch.num_eval_episodes * eval_multiplier // n_devices
-        parallel_eval_batch_size = min(config.arch.num_envs, episodes_per_device)
+        num_vmapped_episodes = min(config.arch.num_envs, episodes_per_device)
 
         # Initialize eval state for the parallel environments.
-        key, *env_keys = jax.random.split(key, parallel_eval_batch_size + 1)
+        key, *env_keys = jax.random.split(key, num_vmapped_episodes + 1)
         env_states, timesteps = jax.vmap(env.reset)(jnp.stack(env_keys))
 
         # Split keys for parallel execution in vmap.
-        key, *step_keys = jax.random.split(key, parallel_eval_batch_size + 1)
-        step_keys = jnp.stack(step_keys).reshape(parallel_eval_batch_size, -1)
+        key, *step_keys = jax.random.split(key, num_vmapped_episodes + 1)
+        step_keys = jnp.stack(step_keys).reshape(num_vmapped_episodes, -1)
 
         eval_state = EvalState(
             key=step_keys,
             env_state=env_states,
             timestep=timesteps,
-            step_count=jnp.zeros((parallel_eval_batch_size, 1)),
+            step_count=jnp.zeros((num_vmapped_episodes, 1)),
             episode_return=jnp.zeros_like(timesteps.reward),
         )
         # Evaluate over a batch of environments in parallel using vmap.
@@ -153,7 +153,7 @@ def get_ff_evaluator_fn(
         num_vmapped_episodes = min(config.arch.num_envs, episodes_per_device)
         # Compute the number of sequential evaluation batches required per device
         # to cover all episodes.
-        sequential_eval_batches = episodes_per_device // parallel_eval_batch_size
+        sequential_eval_batches = episodes_per_device // num_vmapped_episodes
 
         # Sequentially scan through the batched environments.
         _, experiment_output = jax.lax.scan(
@@ -257,26 +257,26 @@ def get_rnn_evaluator_fn(
 
         n_devices = len(jax.devices())
         episodes_per_device = config.arch.num_eval_episodes * eval_multiplier // n_devices
-        parallel_eval_batch_size = min(config.arch.num_envs, episodes_per_device)
+        num_vmapped_episodes = min(config.arch.num_envs, episodes_per_device)
 
         # Initialize eval state for the parallel environments.
-        key, *env_keys = jax.random.split(key, parallel_eval_batch_size + 1)
+        key, *env_keys = jax.random.split(key, num_vmapped_episodes + 1)
         env_states, timesteps = jax.vmap(env.reset)(jnp.stack(env_keys))
 
         # Split keys for parallel execution in vmap.
-        key, *step_keys = jax.random.split(key, parallel_eval_batch_size + 1)
-        step_keys = jnp.stack(step_keys).reshape(parallel_eval_batch_size, -1)
+        key, *step_keys = jax.random.split(key, num_vmapped_episodes + 1)
+        step_keys = jnp.stack(step_keys).reshape(num_vmapped_episodes, -1)
 
         # Initialise hidden state.
         init_hstate = scanned_rnn.initialize_carry(
-            (parallel_eval_batch_size, config.system.num_agents),
+            (num_vmapped_episodes, config.system.num_agents),
             config.network.hidden_state_dim,
         )
 
         # Initialise dones.
         dones = jnp.zeros(
             (
-                parallel_eval_batch_size,
+                num_vmapped_episodes,
                 config.system.num_agents,
             ),
             dtype=bool,
@@ -291,7 +291,7 @@ def get_rnn_evaluator_fn(
             timestep=timesteps,
             dones=dones,
             hstate=init_hstate,
-            step_count=jnp.zeros((parallel_eval_batch_size, 1)),
+            step_count=jnp.zeros((num_vmapped_episodes, 1)),
             episode_return=jnp.zeros_like(timesteps.reward),
         )
 
@@ -317,10 +317,10 @@ def get_rnn_evaluator_fn(
         episodes_per_device = config.arch.num_eval_episodes * eval_multiplier // n_devices
         # Determine parallel evaluation batch size.
         # Limited by architecture's max environments or episodes per device.
-        parallel_eval_batch_size = min(config.arch.num_envs, episodes_per_device)
+        num_vmapped_episodes = min(config.arch.num_envs, episodes_per_device)
         # Compute the number of sequential evaluation batches required per device
         # to cover all episodes.
-        sequential_eval_batches = episodes_per_device // parallel_eval_batch_size
+        sequential_eval_batches = episodes_per_device // num_vmapped_episodes
 
         # Sequentially scan through the batched environments.
         _, experiment_output = jax.lax.scan(
