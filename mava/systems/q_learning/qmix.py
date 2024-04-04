@@ -149,7 +149,7 @@ def init(
     # Making optimiser and state
     opt = optax.chain(
         # optax.clip_by_global_norm(cfg.system.max_grad_norm),
-        optax.adamw(learning_rate=cfg.system.q_lr, eps=1e-5, weight_decay=1e-6),
+        optax.adam(learning_rate=cfg.system.q_lr),
     )
     opt_state = opt.init((params.online, params.mixer_online))
 
