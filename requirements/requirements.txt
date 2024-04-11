@@ -8,6 +8,8 @@ id-marl-eval @ git+https://github.com/instadeepai/marl-eval
 jax
 jaxlib
 jaxmarl
+mujoco==0.0.2
+mujoco-mjx==0.0.2
 jumanji @ git+https://github.com/sash-a/jumanji
 matrax @ git+https://github.com/instadeepai/matrax
 neptune
