@@ -17,6 +17,7 @@ from typing import Callable, Dict, Sequence, Tuple, Union
 
 import chex
 import jax
+from jax import custom_jvp
 import jax.numpy as jnp
 import numpy as np
 import tensorflow_probability.substrates.jax.distributions as tfd
@@ -375,9 +376,9 @@ class RecQNetwork(nn.Module):
         rnn_input = (embedding, resets)
         hidden_state, embedding = ScannedRNN(self.hidden_state_dim)(hidden_state, rnn_input)
 
-        embedding = self.post_torso(embedding)
+        # embedding = self.post_torso(embedding)
 
-        q_values = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01))(embedding)
+        q_values = nn.Dense(self.num_actions, kernel_init=lecun_normal())(embedding)
 
         return hidden_state, q_values
 
@@ -397,6 +398,22 @@ class RecQNetwork(nn.Module):
 
         return hidden_state, eps_greedy_dist
 
+## NOTE: Alternative absolute value calculation that has grad 0 at 0, jnp.abs has grad 1 at 0, tf.abs has grad 0 at 0
+@custom_jvp
+def cabs(x):
+  return jnp.abs(x)
+
+@cabs.defjvp
+def cabs_jvp(primals, tangents):
+  x, = primals
+  x_dot, = tangents
+  ans = jnp.abs(x)
+  ans_dot = jax.lax.select(
+      x==0.0,
+      jnp.zeros_like(x),
+      jnp.sign(x)
+  ) * x_dot
+  return ans, ans_dot
 
 class QMixNetwork(nn.Module):
     """Mixer network for the QMix algorithm."""
@@ -405,26 +422,31 @@ class QMixNetwork(nn.Module):
     num_agents: int
     hyper_hidden_dim: int = 64
     embed_dim: int = 32
-    norm_env_states: bool = True
+    norm_env_states: bool = False
 
     def setup(self) -> None:
         self.hyper_w1: MLPTorso = MLPTorso(
             (self.hyper_hidden_dim, self.embed_dim * self.num_agents),
             activate_final=False, 
+            kernel_init="lecun_normal"
         )
 
         self.hyper_b1: MLPTorso = MLPTorso(
-            (self.embed_dim,), 
+            (self.embed_dim,),
+            activate_final=False, 
+            kernel_init="lecun_normal"
         )
 
         self.hyper_w2: MLPTorso = MLPTorso(
             (self.hyper_hidden_dim, self.embed_dim), 
             activate_final=False,
+            kernel_init="lecun_normal"
         )
 
         self.hyper_b2: MLPTorso = MLPTorso(
             (self.embed_dim, 1),
             activate_final=False,
+            kernel_init="lecun_normal"
         )
 
         self.layer_norm: nn.Module = nn.LayerNorm()
@@ -447,7 +469,7 @@ class QMixNetwork(nn.Module):
             states = env_global_state
 
         # First layer
-        w1 = jnp.abs(self.hyper_w1(states))
+        w1 = cabs(self.hyper_w1(states))
         b1 = self.hyper_b1(states)
         w1 = jnp.reshape(w1, (b, t, self.num_agents, self.embed_dim))
         b1 = jnp.reshape(b1, (b, t, 1, self.embed_dim))
@@ -456,7 +478,7 @@ class QMixNetwork(nn.Module):
         hidden = nn.elu(jnp.matmul(agent_qs, w1) + b1)
 
         # Second layer
-        w2 = jnp.abs(self.hyper_w2(states))
+        w2 = cabs(self.hyper_w2(states))
         b2 = self.hyper_b2(states)
 
         w2 = jnp.reshape(w2, (b, t, self.embed_dim, 1))
