@@ -897,7 +897,7 @@ def run_experiment(cfg: DictConfig) -> float:
         # Multiply by learn steps here because anakin steps per second is learn + act steps
         # But we want to make sure we're counting env steps correctly so it's not included
         # in the loop counter.
-        t_frm_learnstate = learner_state.time_steps[0][0]
+        t_frm_learnstate = int(learner_state.time_steps[0][0].item())
         sps = t_frm_learnstate * cfg.system.epochs / (time.time() - start_time)
         final_metrics, _ = episode_metrics.get_final_step_metrics(metrics)
         loss_metrics = losses
@@ -952,7 +952,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     #     logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.ABSOLUTE)
 
-    # logger.stop()
+    logger.stop()
 
     return float(episode_return)
 

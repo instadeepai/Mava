@@ -200,7 +200,7 @@ def get_rnn_evaluator_fn(
             #     action = pi.sample(seed=policy_key)
 
             # Step environment.
-            env_state, timestep = env.step(env_state, action[-1])#.squeeze(0))
+            env_state, timestep = env.step(env_state, action[-1])  # .squeeze(0))
 
             # Log episode metrics.
             episode_return += timestep.reward

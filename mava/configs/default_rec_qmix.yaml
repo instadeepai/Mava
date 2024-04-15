@@ -1,0 +1,7 @@
+defaults:
+  - _self_
+  - logger: rec_qmix
+  - arch: anakin
+  - system: q_learning/rec_qmix
+  - network: rnn
+  - env: smax
