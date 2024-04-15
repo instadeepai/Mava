@@ -25,8 +25,6 @@ import hydra
 import jax
 import jax.lax as lax
 import jax.numpy as jnp
-import jax.numpy as jnp
-from jax import custom_jvp
 import optax
 from chex import PRNGKey
 from colorama import Fore, Style
@@ -34,17 +32,17 @@ from flashbax.buffers.flat_buffer import TrajectoryBuffer
 from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.scope import FrozenVariableDict
 from flax.linen.initializers import orthogonal
-from jax import Array
+from jax import Array, custom_jvp
 from jax.typing import ArrayLike
 from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
 from typing_extensions import TypeAlias
-from mava.evaluator import make_eval_fns
-from mava.utils.jax_utils import unreplicate_batch_dim
 
+from mava.evaluator import make_eval_fns
 from mava.types import Observation, ObservationGlobalState, RNNObservation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
+from mava.utils.jax_utils import unreplicate_batch_dim
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers import episode_metrics
 
@@ -126,7 +124,8 @@ class TrainState(NamedTuple):  # 'carry' in training loop
 #   ) * x_dot
 #   return ans, ans_dot
 
-from flax.linen.initializers import orthogonal, lecun_normal
+from flax.linen.initializers import lecun_normal, orthogonal
+
 
 def _parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex.Array]:
     """Get the activation function."""
@@ -136,6 +135,7 @@ def _parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex
     }
     return activation_fns[activation_fn_name]
 
+
 def _parse_kernel_init_fn(kernel_init_fn_name: str) -> Callable[[chex.Array], chex.Array]:
     """Get kernel init function."""
     init_fns: Dict[str, Callable[[chex.Array], chex.Array]] = {
@@ -144,12 +144,13 @@ def _parse_kernel_init_fn(kernel_init_fn_name: str) -> Callable[[chex.Array], ch
     }
     return init_fns[kernel_init_fn_name]
 
+
 class MLPTorso(nn.Module):
     """MLP torso."""
 
     layer_sizes: Sequence[int]
     activation: str = "relu"
-    kernel_init: str = "orthogonal" # orthogonal or lecun_normal
+    kernel_init: str = "orthogonal"  # orthogonal or lecun_normal
     use_layer_norm: bool = False
     activate_final: bool = True
 
@@ -165,12 +166,12 @@ class MLPTorso(nn.Module):
             x = nn.Dense(layer_size, kernel_init=self.kernel_init_fn)(x)
             if self.use_layer_norm:
                 x = nn.LayerNorm(use_scale=False)(x)
-                
-            if i != len(self.layer_sizes) - 1: 
+
+            if i != len(self.layer_sizes) - 1:
                 x = self.activation_fn(x)
             elif i == len(self.layer_sizes) - 1 and self.activate_final:
                 x = self.activation_fn(x)
-            
+
         return x
 
 
@@ -212,22 +213,24 @@ class QMixNetwork(nn.Module):
     embed_dim: int = 32
     norm_env_states: bool = True
 
-
     def setup(self) -> None:
         self.hyper_w1: MLPTorso = MLPTorso(
-            (self.hyper_hidden_dim, self.embed_dim*self.num_agents), activate_final=False, #kernel_init="lecun_normal"
-        ) 
+            (self.hyper_hidden_dim, self.embed_dim * self.num_agents),
+            activate_final=False,  # kernel_init="lecun_normal"
+        )
 
         self.hyper_b1: MLPTorso = MLPTorso(
-            (self.embed_dim,), #kernel_init="lecun_normal"
+            (self.embed_dim,),  # kernel_init="lecun_normal"
         )
 
         self.hyper_w2: MLPTorso = MLPTorso(
-            (self.hyper_hidden_dim, self.embed_dim), activate_final=False, #kernel_init="lecun_normal"
+            (self.hyper_hidden_dim, self.embed_dim),
+            activate_final=False,  # kernel_init="lecun_normal"
         )
 
         self.hyper_b2: MLPTorso = MLPTorso(
-            (self.embed_dim, 1), activate_final=False, #kernel_init="lecun_normal"
+            (self.embed_dim, 1),
+            activate_final=False,  # kernel_init="lecun_normal"
         )
 
         self.layer_norm: nn.Module = nn.LayerNorm()
@@ -238,7 +241,7 @@ class QMixNetwork(nn.Module):
         agent_qs: Array,
         env_global_state: Array,
     ) -> Array:
-        
+
         B, T = agent_qs.shape[:2]  # batch size
 
         # # # Reshaping
@@ -312,8 +315,7 @@ class RecQNetwork(nn.Module):
 def init(
     cfg: DictConfig,
 ) -> Tuple[
-    Tuple[Environment, Environment],        # jax.debug.print("{x}", x=q_loss_info["q_loss"])
-
+    Tuple[Environment, Environment],  # jax.debug.print("{x}", x=q_loss_info["q_loss"])
     LearnerState,
     RecQNetwork,
     optax.GradientTransformation,
@@ -368,9 +370,20 @@ def init(
     q_target_params = q_net.init(q_key, init_hidden_state, init_x)
 
     # Make QMixer
-    dummy_agent_qs = jnp.zeros((cfg.system.sample_batch_size, cfg.system.sample_sequence_length - 1, num_agents), "float32")
-    global_env_state_shape = env.observation_spec().generate_value().global_state[0,:].shape # NOTE env wrapper currently duplicates env state for each agent
-    dummy_global_env_state = jnp.zeros((cfg.system.sample_batch_size, cfg.system.sample_sequence_length - 1, *global_env_state_shape), "float32")
+    dummy_agent_qs = jnp.zeros(
+        (cfg.system.sample_batch_size, cfg.system.sample_sequence_length - 1, num_agents), "float32"
+    )
+    global_env_state_shape = (
+        env.observation_spec().generate_value().global_state[0, :].shape
+    )  # NOTE env wrapper currently duplicates env state for each agent
+    dummy_global_env_state = jnp.zeros(
+        (
+            cfg.system.sample_batch_size,
+            cfg.system.sample_sequence_length - 1,
+            *global_env_state_shape,
+        ),
+        "float32",
+    )
     q_mixer = QMixNetwork(num_actions, num_agents, 64, 32)
     mixer_online_params = q_mixer.init(q_key, dummy_agent_qs, dummy_global_env_state)
     mixer_target_params = q_mixer.init(q_key, dummy_agent_qs, dummy_global_env_state)
@@ -614,7 +627,9 @@ def make_update_fns(
             jnp.take_along_axis(q_online, action[..., jnp.newaxis], axis=-1), axis=-1
         )
 
-        q_online = mixer.apply(online_mixer_params, q_online, obs.global_state[:,:,0,...]) # B,T,A,... -> B,T,1,... # NOTE states are replicated over agents thats why we only take first one
+        q_online = mixer.apply(
+            online_mixer_params, q_online, obs.global_state[:, :, 0, ...]
+        )  # B,T,A,... -> B,T,1,... # NOTE states are replicated over agents thats why we only take first one
 
         q_loss = jnp.mean((q_online - target) ** 2)
 
@@ -676,7 +691,9 @@ def make_update_fns(
         next_q_val = jnp.squeeze(
             jnp.take_along_axis(next_q_vals_target, next_action[..., jnp.newaxis], axis=-1), axis=-1
         )
-        next_q_val = mixer.apply(params.mixer_target, next_q_val, data_next.obs.global_state[:,:,0,...]) # B,T,A,... -> B,T,1,...
+        next_q_val = mixer.apply(
+            params.mixer_target, next_q_val, data_next.obs.global_state[:, :, 0, ...]
+        )  # B,T,A,... -> B,T,1,...
 
         # TD Target
         target_q_val = (
@@ -687,7 +704,11 @@ def make_update_fns(
         # Update Q function.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
         q_grads, q_loss_info = q_grad_fn(
-            (params.online, params.mixer_online), data_first.obs, data_first.done, data_first.action, target_q_val
+            (params.online, params.mixer_online),
+            data_first.obs,
+            data_first.done,
+            data_first.action,
+            target_q_val,
         )
         q_loss_info["mean_first_reward"] = jnp.mean(first_reward)
         q_loss_info["mean_next_qval"] = jnp.mean(next_q_val)
@@ -697,7 +718,9 @@ def make_update_fns(
         q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="device")
         q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="batch")
         q_updates, next_opt_state = opt.update(q_grads, opt_states)
-        (next_online_params, next_mixer_params) = optax.apply_updates((params.online, params.mixer_online), q_updates)
+        (next_online_params, next_mixer_params) = optax.apply_updates(
+            (params.online, params.mixer_online), q_updates
+        )
 
         # # Target network polyak update.
         # next_target_params = jax.lax.select(
@@ -713,7 +736,9 @@ def make_update_fns(
         # chex.assert_trees_all_equal(params.mixer_online, next_mixer_params)
         # jax.debug.print("{x}", x=q_loss_info["q_loss"])
         # Repack params and opt_states.
-        next_params = QMIXParams(next_online_params, next_target_params, next_mixer_params, next_mixer_target_params)
+        next_params = QMIXParams(
+            next_online_params, next_target_params, next_mixer_params, next_mixer_target_params
+        )
 
         return next_params, next_opt_state, q_loss_info
 
@@ -899,7 +924,6 @@ def run_experiment(cfg: DictConfig) -> float:
         episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
         logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
 
-
         # # Log:
         # episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
         # logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
@@ -930,7 +954,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     # logger.stop()
 
-    return float(max_episode_return)
+    return float(episode_return)
 
 
 @hydra.main(config_path="../../configs", config_name="default_rec_iql.yaml", version_base="1.2")
