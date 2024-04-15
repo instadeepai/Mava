@@ -180,15 +180,27 @@ def get_rnn_evaluator_fn(
             )
 
             # Run the network.
-            hstate, pi = apply_fn(params, hstate, ac_in)
+            hstate, q_values = apply_fn(params, hstate, ac_in)
 
-            if config.arch.evaluation_greedy:
-                action = pi.mode()
-            else:
-                action = pi.sample(seed=policy_key)
+            # Remove the dummy time dimension
+            q_values = q_values[0]
+
+            # Make unavailable actions quite negative
+            q_vals_masked = jnp.where(
+                last_timestep.observation.action_mask, q_values, jnp.zeros(q_values.shape) - 9999999
+            )  # TODO: action masking in nw
+
+            # Greedy argmax over action-value dim
+            action = jnp.argmax(q_vals_masked, axis=-1)
+            # action = action[0]  # TODO check what dim this is... remove redundant first dim
+
+            # if config.arch.evaluation_greedy:
+            #     action = pi.mode()
+            # else:
+            #     action = pi.sample(seed=policy_key)
 
             # Step environment.
-            env_state, timestep = env.step(env_state, action[-1].squeeze(0))
+            env_state, timestep = env.step(env_state, action[-1])#.squeeze(0))
 
             # Log episode metrics.
             episode_return += timestep.reward
