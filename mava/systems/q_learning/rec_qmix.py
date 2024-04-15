@@ -813,6 +813,7 @@ def make_update_fns(
 
 def run_experiment(cfg: DictConfig) -> float:
     n_devices = len(jax.devices())
+    cfg.arch.n_devices = n_devices
 
     pmaped_steps = 1024  # todo: config option
     steps_per_rollout = n_devices * cfg.arch.num_envs * cfg.system.rollout_length * pmaped_steps
