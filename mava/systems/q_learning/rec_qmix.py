@@ -40,7 +40,6 @@ from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
 from typing_extensions import TypeAlias
 
-from mava.networks import MLPTorso, ScannedRNN
 from mava.types import Observation, ObservationGlobalState, RNNObservation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
@@ -124,6 +123,85 @@ class TrainState(NamedTuple):  # 'carry' in training loop
 #       jnp.sign(x)
 #   ) * x_dot
 #   return ans, ans_dot
+
+from flax.linen.initializers import orthogonal, lecun_normal
+
+def _parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex.Array]:
+    """Get the activation function."""
+    activation_fns: Dict[str, Callable[[chex.Array], chex.Array]] = {
+        "relu": nn.relu,
+        "tanh": nn.tanh,
+    }
+    return activation_fns[activation_fn_name]
+
+def _parse_kernel_init_fn(kernel_init_fn_name: str) -> Callable[[chex.Array], chex.Array]:
+    """Get kernel init function."""
+    init_fns: Dict[str, Callable[[chex.Array], chex.Array]] = {
+        "orthogonal": orthogonal(jnp.sqrt(2)),
+        "lecun_normal": lecun_normal(),
+    }
+    return init_fns[kernel_init_fn_name]
+
+class MLPTorso(nn.Module):
+    """MLP torso."""
+
+    layer_sizes: Sequence[int]
+    activation: str = "relu"
+    kernel_init: str = "orthogonal" # orthogonal or lecun_normal
+    use_layer_norm: bool = False
+    activate_final: bool = True
+
+    def setup(self) -> None:
+        self.activation_fn = _parse_activation_fn(self.activation)
+        self.kernel_init_fn = _parse_kernel_init_fn(self.kernel_init)
+
+    @nn.compact
+    def __call__(self, observation: chex.Array) -> chex.Array:
+        """Forward pass."""
+        x = observation
+        for i, layer_size in enumerate(self.layer_sizes):
+            x = nn.Dense(layer_size, kernel_init=self.kernel_init_fn)(x)
+            if self.use_layer_norm:
+                x = nn.LayerNorm(use_scale=False)(x)
+                
+            if i != len(self.layer_sizes) - 1: 
+                x = self.activation_fn(x)
+            elif i == len(self.layer_sizes) - 1 and self.activate_final:
+                x = self.activation_fn(x)
+            
+        return x
+
+
+class ScannedRNN(nn.Module):
+    @functools.partial(
+        nn.scan,
+        variable_broadcast="params",
+        in_axes=0,
+        out_axes=0,
+        split_rngs={"params": False},
+    )
+    @nn.compact
+    def __call__(self, carry: chex.Array, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
+        """Applies the module."""
+        rnn_state = carry
+        ins, resets = x
+        rnn_state = jnp.where(
+            resets[:, :, jnp.newaxis],  # NOTE (Louise) changes about to hit in mava
+            self.initialize_carry((ins.shape[0], ins.shape[1]), ins.shape[2]),
+            rnn_state,
+        )
+        new_rnn_state, y = nn.GRUCell(features=ins.shape[-1])(rnn_state, ins)
+        return new_rnn_state, y
+
+    @staticmethod
+    def initialize_carry(batch_size: Sequence[int], hidden_size: int) -> chex.Array:
+        """Initializes the carry state."""
+        # Use a dummy key since the default state init fn is just zeros.
+        cell = nn.GRUCell(features=hidden_size)
+        return cell.initialize_carry(
+            jax.random.PRNGKey(0), (*batch_size, hidden_size)
+        )  # NOTE (Louise) this change has not yet been merged into develop, but is necessary to remove agent vmapping
+
 
 class QMixNetwork(nn.Module):
     num_actions: int
@@ -242,7 +320,7 @@ def init(
     chex.PRNGKey,
 ]:
 
-    hidden_size = 128  # TODO: dynamically get?
+    hidden_size = 256  # TODO: dynamically get?
     logger = MavaLogger(cfg)
 
     # init key, get devices available
@@ -384,7 +462,7 @@ def make_update_fns(
     rb: TrajectoryBuffer,
 ) -> Any:  # TODO typing
 
-    hidden_size = 128  # TODO dynamically get this
+    hidden_size = 256  # TODO dynamically get this
 
     def select_random_action_batch(
         selection_key: chex.PRNGKey, obs: ObservationGlobalState
