@@ -39,6 +39,8 @@ from jax.typing import ArrayLike
 from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
 from typing_extensions import TypeAlias
+from mava.evaluator import make_eval_fns
+from mava.utils.jax_utils import unreplicate_batch_dim
 
 from mava.types import Observation, ObservationGlobalState, RNNObservation
 from mava.utils import make_env as environments
@@ -820,6 +822,15 @@ def run_experiment(cfg: DictConfig) -> float:
     update, greedy = make_update_fns(cfg, env, q_net, mixer, opts, rb)
 
     key, eval_key = jax.random.split(key)
+
+    evaluator, absolute_metric_evaluator = make_eval_fns(
+        eval_env=eval_env,
+        network_apply_fn=q_net.apply,
+        config=cfg,
+        use_recurrent_net=True,
+        scanned_rnn=ScannedRNN(cfg.network.hidden_state_dim),
+    )
+
     # todo: don't need to return trained_params or eval keys
     # evaluator, absolute_metric_evaluator, (trained_params, eval_keys) = evaluator_setup(
     #     eval_env=eval_env,
@@ -875,12 +886,17 @@ def run_experiment(cfg: DictConfig) -> float:
             {"epsilon": get_epsilon(t_frm_learnstate)}, t_frm_learnstate, eval_idx, LogEvent.MISC
         )
 
-        # # Evaluate:
-        # key, eval_key = jax.random.split(key)
-        # eval_keys = jax.random.split(eval_key, n_devices)
-        # # todo: bug likely here -> don't have batch vmap yet so shouldn't unreplicate_batch_dim
-        # eval_output = evaluator(unreplicate_batch_dim(learner_state.params.online), eval_keys)
-        # jax.block_until_ready(eval_output)
+        # Evaluate:
+        key, eval_key = jax.random.split(key)
+        eval_keys = jax.random.split(eval_key, cfg.arch.n_devices)
+        eval_params = unreplicate_batch_dim(learner_state.params.online)
+        eval_output = evaluator(eval_params, eval_keys)
+        jax.block_until_ready(eval_output)
+
+        # Log:
+        episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
+        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
+
 
         # # Log:
         # episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
