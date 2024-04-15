@@ -341,6 +341,7 @@ def init(
     # actions, agents, keysplits
     num_actions = int(env.action_spec().num_values[0])
     num_agents = env.action_spec().shape[0]
+    cfg.system.num_agents = num_agents
     key, q_key = jax.random.split(key, 2)
 
     # ALL INITS TO MAKE NETWORK -> need TBAx
