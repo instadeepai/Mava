@@ -384,7 +384,7 @@ def init(
         ),
         "float32",
     )
-    q_mixer = QMixNetwork(num_actions, num_agents, 64, 32)
+    q_mixer = QMixNetwork(num_actions, num_agents, 64, cfg.system.qmix_embed_dim)
     mixer_online_params = q_mixer.init(q_key, dummy_agent_qs, dummy_global_env_state)
     mixer_target_params = q_mixer.init(q_key, dummy_agent_qs, dummy_global_env_state)
 

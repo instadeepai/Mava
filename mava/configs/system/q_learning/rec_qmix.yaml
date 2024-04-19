@@ -31,3 +31,5 @@ gamma: 0.99  # discount factor
 
 eps_min: 0.05
 eps_decay: 1e5
+
+qmix_embed_dim: 32
