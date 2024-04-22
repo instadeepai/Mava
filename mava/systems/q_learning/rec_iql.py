@@ -568,7 +568,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     # Main loop:
     for eval_idx, t in enumerate(
-        range(0, int(cfg.system.total_timesteps), steps_per_rollout)
+        range(steps_per_rollout, int(cfg.system.total_timesteps + 1), steps_per_rollout)
     ):
         # Learn loop:
         learner_state, (metrics, losses) = update(learner_state)
