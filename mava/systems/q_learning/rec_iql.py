@@ -564,13 +564,13 @@ def run_experiment(cfg: DictConfig) -> float:
         )
 
     max_episode_return = -jnp.inf
-    start_time = time.time()
 
     # Main loop:
     for eval_idx, t in enumerate(
         range(steps_per_rollout, int(cfg.system.total_timesteps + 1), steps_per_rollout)
     ):
         # Learn loop:
+        start_time = time.time()
         learner_state, (metrics, losses) = update(learner_state)
         jax.block_until_ready(learner_state)
 
@@ -579,14 +579,12 @@ def run_experiment(cfg: DictConfig) -> float:
         # But we also want to make sure we're counting env steps correctly so
         # learn steps is not included in the loop counter.
         elapsed_time = time.time() - start_time
-        learn_steps = anakin_steps * cfg.system.epochs
-        sps = (t + learn_steps) / elapsed_time
         eps = jax.numpy.maximum(
             cfg.system.eps_min, 1 - (t / cfg.system.eps_decay) * (1 - cfg.system.eps_min)
         )
 
         final_metrics, ep_completed = episode_metrics.get_final_step_metrics(metrics)
-        final_metrics["steps_per_second"] = sps
+        final_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
         loss_metrics = losses
         logger.log({"step": t, "epsilon": eps}, t, eval_idx, LogEvent.MISC)
         if ep_completed:
