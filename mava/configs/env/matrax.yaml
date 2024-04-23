@@ -17,7 +17,7 @@ env_name: Matrax  # Used for logging purposes.
 #       4.1. id = {0, 1, 2, ..., 56}
 #       4.2. state = {stateful, stateless}
 scenario:
-  task_name: Climbing-stateless-v0
+  task_name: NoConflict-20-stateless-v0
   name: Matrax
 
 # Defines the metric that will be used to evaluate the performance of the agent.

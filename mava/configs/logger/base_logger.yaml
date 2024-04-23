@@ -3,17 +3,17 @@
 base_exp_path: results # Base path for logging.
 use_console: True # Whether to log to stdout.
 use_tb: False # Whether to use tensorboard logging.
-use_json: False # Whether to log marl-eval style to json files.
-use_neptune: False  # Whether to log to neptune.ai.
+use_json: True # Whether to log marl-eval style to json files.
+use_neptune: True  # Whether to log to neptune.ai.
 
 # --- Other logger kwargs ---
 kwargs:
   neptune_project: Instadeep/Mava
-  neptune_tag: [rware]
+  neptune_tag: [matrax-measure-set-benchmark-iql-new]
   detailed_neptune_logging: False  # having mean/std/min/max can clutter neptune so we make it optional
   json_path: ~ # If set, json files will be logged to a set path so that multiple experiments can
     # write to the same json file for easy downstream aggregation and plotting with marl-eval.
-  upload_json_data: False # Whether JSON file data should be uploaded to Neptune for downstream
+  upload_json_data: True # Whether JSON file data should be uploaded to Neptune for downstream
     # aggregation and plotting of data from multiple experiments. Note that when uploading JSON files,
     # `json_path` must be unset to ensure that uploaded json files don't continue getting larger
     # over time. Setting both will break.

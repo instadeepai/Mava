@@ -1,31 +1,32 @@
 # --- Defaults REC-IDQN ---
+
 total_timesteps: ~ # Set the total environment steps.
 # If unspecified, it's derived from num_updates; otherwise, num_updates adjusts based on this value.
-num_updates: 156250 # Number of updates.
-seed: 1
+num_updates: 490 # Number of updates.
+seed: 42
 
 # --- Agent observations ---
 add_agent_id: True
 
 # --- RL hyperparameters ---
 min_buffer_size: 32
-update_batch_size: 1 # Number of vectorised gradient updates per device.
+update_batch_size: 2 # Number of vectorised gradient updates per device.
 
-rollout_length: 2 # Number of environment steps per vectorised environment.
+rollout_length: 128 # Number of environment steps per vectorised environment.
 epochs: 2 # Number of learn epochs per training data batch.
 
 # sizes
-buffer_size: 5000 # size of the replay buffer. Note: total size is this * num_devices
+buffer_size: 1000 # size of the replay buffer. Note: total size is this * num_devices
 sample_batch_size: 32  # size of training data batch sampled from the buffer
 sample_sequence_length: 20 # 21 transitions are sampled, giving 20 complete data points
 
 # learning rates
-q_lr: 3e-4  # the learning rate of the Q network network optimizer
+q_lr: 0.003  # the learning rate of the Q network network optimizer
 max_grad_norm: 10 # value used to clip optimiser - set big for no clipping
 
 # other
 hard_update: False
-update_period: 200
+update_period: 100
 tau: 0.01  # smoothing coefficient for target networks
 gamma: 0.99  # discount factor
 
