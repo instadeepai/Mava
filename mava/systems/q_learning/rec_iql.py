@@ -582,10 +582,10 @@ def run_experiment(cfg: DictConfig) -> float:
         eps = jax.numpy.maximum(
             cfg.system.eps_min, 1 - (t / cfg.system.eps_decay) * (1 - cfg.system.eps_min)
         )
-
         final_metrics, ep_completed = episode_metrics.get_final_step_metrics(metrics)
         final_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
         loss_metrics = losses
+
         logger.log({"timestep": t, "epsilon": eps}, t, eval_idx, LogEvent.MISC)
         if ep_completed:
             logger.log(final_metrics, t, eval_idx, LogEvent.ACT)
