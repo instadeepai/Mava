@@ -307,7 +307,7 @@ def make_eval_fns(
         AssertionError: If `use_recurrent_net` is True but `scanned_rnn` is not provided.
     """
     # Check if win rate is required for evaluation.
-    log_win_rate = config.env.eval_metric == "win_rate"
+    log_win_rate = config.env.log_win_rate
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
         assert scanned_rnn is not None
