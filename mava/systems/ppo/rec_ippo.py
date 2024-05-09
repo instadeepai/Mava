@@ -92,7 +92,7 @@ def get_learner_fn(
                 env_state,
                 last_timestep,
                 last_done,
-                hstates,
+                last_hstates,
             ) = learner_state
 
             key, policy_key = jax.random.split(key)
@@ -108,10 +108,10 @@ def get_learner_fn(
 
             # Run the network.
             policy_hidden_state, actor_policy = actor_apply_fn(
-                params.actor_params, hstates.policy_hidden_state, ac_in
+                params.actor_params, last_hstates.policy_hidden_state, ac_in
             )
             critic_hidden_state, value = critic_apply_fn(
-                params.critic_params, hstates.critic_hidden_state, ac_in
+                params.critic_params, last_hstates.critic_hidden_state, ac_in
             )
 
             # Sample action from the policy and squeeze out the batch dimension.
@@ -141,16 +141,13 @@ def get_learner_fn(
                 timestep.reward,
                 log_prob,
                 last_timestep.observation,
-                hstates,
+                last_hstates,
                 info,
             )
             learner_state = RNNLearnerState(
                 params, opt_states, key, env_state, timestep, done, hstates
             )
             return learner_state, transition
-
-        # INITIALISE RNN STATE
-        initial_hstates = learner_state.hstates
 
         # STEP ENVIRONMENT FOR ROLLOUT LENGTH
         learner_state, traj_batch = jax.lax.scan(
@@ -341,7 +338,7 @@ def get_learner_fn(
 
                 return (new_params, new_opt_state, entropy_key), loss_info
 
-            params, opt_states, init_hstates, traj_batch, advantages, targets, key = update_state
+            params, opt_states, traj_batch, advantages, targets, key = update_state
             key, shuffle_key, entropy_key = jax.random.split(key, 3)
 
             # SHUFFLE MINIBATCHES
@@ -379,7 +376,6 @@ def get_learner_fn(
             update_state = (
                 params,
                 opt_states,
-                init_hstates,
                 traj_batch,
                 advantages,
                 targets,
@@ -387,11 +383,9 @@ def get_learner_fn(
             )
             return update_state, loss_info
 
-        init_hstates = jax.tree_util.tree_map(lambda x: x[None, :], initial_hstates)
         update_state = (
             params,
             opt_states,
-            init_hstates,
             traj_batch,
             advantages,
             targets,
@@ -403,7 +397,7 @@ def get_learner_fn(
             _update_epoch, update_state, None, config.system.ppo_epochs
         )
 
-        params, opt_states, _, traj_batch, advantages, targets, key = update_state
+        params, opt_states, traj_batch, advantages, targets, key = update_state
         learner_state = RNNLearnerState(
             params,
             opt_states,
