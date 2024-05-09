@@ -129,7 +129,7 @@ def get_learner_fn(
 
             hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
             transition = RNNPPOTransition(
-                done,
+                last_done,
                 action,
                 value,
                 timestep.reward,
@@ -173,36 +173,30 @@ def get_learner_fn(
 
         # Squeeze out the batch dimension and mask out the value of terminal states.
         last_val = last_val.squeeze(0)
-        last_val = jnp.where(last_done, jnp.zeros_like(last_val), last_val)
 
         def _calculate_gae(
-            traj_batch: RNNPPOTransition, last_val: chex.Array
+            traj_batch: RNNPPOTransition, last_val: chex.Array, last_done: chex.Array
         ) -> Tuple[chex.Array, chex.Array]:
-            """Calculate the GAE."""
-
-            def _get_advantages(gae_and_next_value: Tuple, transition: RNNPPOTransition) -> Tuple:
-                """Calculate the GAE for a single transition."""
-                gae, next_value = gae_and_next_value
-                done, value, reward = (
-                    transition.done,
-                    transition.value,
-                    transition.reward,
-                )
+            def _get_advantages(
+                carry: Tuple[chex.Array, chex.Array, chex.Array], transition: RNNPPOTransition
+            ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
+                gae, next_value, next_done = carry
+                done, value, reward = transition.done, transition.value, transition.reward
                 gamma = config.system.gamma
-                delta = reward + gamma * next_value * (1 - done) - value
-                gae = delta + gamma * config.system.gae_lambda * (1 - done) * gae
-                return (gae, value), gae
+                delta = reward + gamma * next_value * (1 - next_done) - value
+                gae = delta + gamma * config.system.gae_lambda * (1 - next_done) * gae
+                return (gae, value, done), gae
 
             _, advantages = jax.lax.scan(
                 _get_advantages,
-                (jnp.zeros_like(last_val), last_val),
+                (jnp.zeros_like(last_val), last_val, last_done),
                 traj_batch,
                 reverse=True,
                 unroll=16,
             )
             return advantages, advantages + traj_batch.value
 
-        advantages, targets = _calculate_gae(traj_batch, last_val)
+        advantages, targets = _calculate_gae(traj_batch, last_val, last_done)
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""
