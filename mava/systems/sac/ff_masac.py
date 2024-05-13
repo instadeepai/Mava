@@ -538,19 +538,23 @@ def run_experiment(cfg: DictConfig) -> float:
     # Log explore metrics.
     t = int(jnp.sum(learner_state.t))
     sps = t / (time.time() - start_time)
-    logger.log({"step": t, "steps_per_second": sps}, t, 0, LogEvent.MISC)
+    logger.log({"step": t}, t, 0, LogEvent.MISC)
 
     # Don't mind if episode isn't completed here, nice to have the graphs start near 0.
     # So we ignore the second return value.
     final_metrics, _ = episode_metrics.get_final_step_metrics(metrics)
+    final_metrics["steps_per_second"] = sps
     logger.log(final_metrics, cfg.system.explore_steps, 0, LogEvent.ACT)
 
     # Main loop:
     # We want start to align with the final step of the first pmaped_learn,
     # where we've done explore_steps and 1 full learn step.
     start = cfg.system.explore_steps + steps_per_rollout
-    for eval_idx, t in enumerate(range(start, int(cfg.system.total_timesteps), steps_per_rollout)):
+    for eval_idx, t in enumerate(
+        range(start, int(cfg.system.total_timesteps + 1), steps_per_rollout)
+    ):
         # Learn loop:
+        start_time = time.time()
         learner_state, (metrics, losses) = update(learner_state)
         jax.block_until_ready(learner_state)
 
@@ -558,15 +562,18 @@ def run_experiment(cfg: DictConfig) -> float:
         # Add learn steps here because anakin steps per second is learn + act steps
         # But we also want to make sure we're counting env steps correctly so
         # learn steps is not included in the loop counter.
-        learn_steps = anakin_steps * cfg.system.epochs
-        sps = (t + learn_steps) / (time.time() - start_time)
+        elapsed_time = time.time() - start_time
         final_metrics, ep_completed = episode_metrics.get_final_step_metrics(metrics)
+        final_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
         loss_metrics = losses | {"log_alpha": learner_state.params.log_alpha}
 
-        logger.log({"step": t, "steps_per_second": sps}, t, eval_idx, LogEvent.MISC)
+        logger.log({"timestep": t}, t, eval_idx, LogEvent.MISC)
         if ep_completed:
             logger.log(final_metrics, t, eval_idx, LogEvent.ACT)
         logger.log(loss_metrics, t, eval_idx, LogEvent.TRAIN)
+
+        # Prepare for evaluation.
+        start_time = time.time()
 
         # Evaluate:
         key, eval_key = jax.random.split(key)
@@ -575,7 +582,10 @@ def run_experiment(cfg: DictConfig) -> float:
         jax.block_until_ready(eval_output)
 
         # Log:
+        elapsed_time = time.time() - start_time
         episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
+        steps_per_eval = int(jnp.sum(eval_output.episode_metrics["episode_length"]))
+        eval_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
         logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
 
         # Save best actor params.
@@ -598,11 +608,17 @@ def run_experiment(cfg: DictConfig) -> float:
 
     # Measure absolute metric.
     if cfg.arch.absolute_metric:
+        start_time = time.time()
+
         eval_keys = jax.random.split(key, cfg.arch.n_devices)
 
         eval_output = absolute_metric_evaluator(best_params, eval_keys)
         jax.block_until_ready(eval_output)
 
+        elapsed_time = time.time() - start_time
+
+        steps_per_eval = int(jnp.sum(eval_output.episode_metrics["episode_length"]))
+        eval_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
         logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.ABSOLUTE)
 
     logger.stop()
