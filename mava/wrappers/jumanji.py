@@ -208,8 +208,8 @@ class ConnectorWrapper(MultiAgentWrapper):
 
         # TARGET = 3 = The number of different types of items on the grid.
         def create_agents_view(grid: chex.Array) -> chex.Array:
-            positions = jnp.where(grid % TARGET == POSITION, jnp.ceil(grid / TARGET), 0)
-            targets = jnp.where((grid % TARGET == 0) & (grid != EMPTY), jnp.ceil(grid / TARGET), 0)
+            positions = jnp.where(grid % TARGET == POSITION, jnp.ceil(grid / TARGET), 0) / self.num_agents
+            targets = jnp.where((grid % TARGET == 0) & (grid != EMPTY), jnp.ceil(grid / TARGET), 0) / self.num_agents
             paths = jnp.where(grid % TARGET == PATH, 1, 0)
             position_per_agent = jnp.where(grid == POSITION, 1, 0)
             target_per_agent = jnp.where(grid == TARGET, 1, 0)
@@ -224,8 +224,7 @@ class ConnectorWrapper(MultiAgentWrapper):
             """Aggregate individual rewards and discounts across agents."""
             team_reward = jnp.sum(timestep.reward)
             reward = jnp.repeat(team_reward, self.num_agents)
-            discount = jnp.repeat(jnp.max(timestep.discount), self.num_agents)
-            return timestep.replace(reward=reward, discount=discount)
+            return timestep.replace(reward=reward)
 
         timestep = aggregate_rewards(timestep)
 
@@ -258,7 +257,7 @@ class ConnectorWrapper(MultiAgentWrapper):
         )
         agents_view = specs.BoundedArray(
             shape=(self._env.num_agents, self._env.grid_size, self._env.grid_size, 5),
-            dtype=int,
+            dtype=float,
             name="agents_view",
             minimum=0,
             maximum=self.num_agents,
@@ -272,7 +271,7 @@ class ConnectorWrapper(MultiAgentWrapper):
         if self.add_global_state:
             global_state = specs.BoundedArray(
                 shape=(self._env.num_agents, self._env.grid_size, self._env.grid_size, 3),
-                dtype=int,
+                dtype=float,
                 name="global_state",
                 minimum=0,
                 maximum=self.num_agents,
