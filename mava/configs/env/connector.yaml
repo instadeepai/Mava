@@ -1,7 +1,7 @@
 # ---Environment Configs---
 defaults:
   - _self_
-  - scenario: con-10x10x5a # [con-5x5x3a, con-7x7x5a, con-10x10x5a, con-15x15x10a]
+  - scenario: con-5x5x3a # [con-5x5x3a, con-7x7x5a, con-10x10x10a, con-15x15x23a]
 # Further environment config details in "con-10x10x5a" file.
 
 env_name: MaConnector # Used for logging purposes.
