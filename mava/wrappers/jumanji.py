@@ -208,8 +208,13 @@ class ConnectorWrapper(MultiAgentWrapper):
 
         # TARGET = 3 = The number of different types of items on the grid.
         def create_agents_view(grid: chex.Array) -> chex.Array:
-            positions = jnp.where(grid % TARGET == POSITION, jnp.ceil(grid / TARGET), 0) / self.num_agents
-            targets = jnp.where((grid % TARGET == 0) & (grid != EMPTY), jnp.ceil(grid / TARGET), 0) / self.num_agents
+            positions = (
+                jnp.where(grid % TARGET == POSITION, jnp.ceil(grid / TARGET), 0) / self.num_agents
+            )
+            targets = (
+                jnp.where((grid % TARGET == 0) & (grid != EMPTY), jnp.ceil(grid / TARGET), 0)
+                / self.num_agents
+            )
             paths = jnp.where(grid % TARGET == PATH, 1, 0)
             position_per_agent = jnp.where(grid == POSITION, 1, 0)
             target_per_agent = jnp.where(grid == TARGET, 1, 0)
@@ -259,8 +264,8 @@ class ConnectorWrapper(MultiAgentWrapper):
             shape=(self._env.num_agents, self._env.grid_size, self._env.grid_size, 5),
             dtype=float,
             name="agents_view",
-            minimum=0,
-            maximum=self.num_agents,
+            minimum=0.0,
+            maximum=1.0,
         )
         obs_data = {
             "agents_view": agents_view,
@@ -273,8 +278,8 @@ class ConnectorWrapper(MultiAgentWrapper):
                 shape=(self._env.num_agents, self._env.grid_size, self._env.grid_size, 3),
                 dtype=float,
                 name="global_state",
-                minimum=0,
-                maximum=self.num_agents,
+                minimum=0.0,
+                maximum=1.0,
             )
             obs_data["global_state"] = global_state
             return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
