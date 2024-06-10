@@ -10,8 +10,8 @@ jaxlib
 jaxmarl
 jumanji @ git+https://github.com/sash-a/jumanji
 matrax @ git+https://github.com/instadeepai/matrax
-mujoco==3.1.3
-mujoco-mjx==3.1.3
+mujoco==3.1.6
+mujoco-mjx==3.1.6
 neptune
 numpy
 omegaconf
