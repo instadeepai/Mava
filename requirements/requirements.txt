@@ -17,8 +17,8 @@ numpy
 omegaconf
 optax
 protobuf~=3.20
+rware @ git+https://github.com/RuanJohn/robotic-warehouse.git
 scipy==1.12.0
 tensorboard_logger
 tensorflow_probability
 type_enforced # needed because gigastep is missing this dependency
-rware @ git+https://github.com/RuanJohn/robotic-warehouse.git
