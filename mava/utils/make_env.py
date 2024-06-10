@@ -14,9 +14,11 @@
 
 from typing import Tuple
 
+import gym.vector
 import jaxmarl
 import jumanji
 import matrax
+import gym
 from gigastep import ScenarioBuilder
 from jaxmarl.environments.smax import map_name_to_scenario
 from jumanji.env import Environment
@@ -46,6 +48,7 @@ from mava.wrappers import (
     RecordEpisodeMetrics,
     RwareWrapper,
     SmaxWrapper,
+    GymWrapper,
 )
 
 # Registry mapping environment names to their generator and wrapper classes.
@@ -198,6 +201,29 @@ def make_gigastep_env(
     train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
     return train_env, eval_env
 
+def make_gym_env(env_name: str, config: DictConfig, add_global_state: bool = False):
+    """
+     Create a Gym environment.
+
+    Args:
+        env_name (str): The name of the environment to create.
+        config (Dict): The configuration of the environment.
+        add_global_state (bool): Whether to add the global state to the observation. Default False.
+
+    Returns:
+        A tuple of the environments.
+    """
+    def create_gym_env(config: DictConfig, add_global_state: bool = False, eval_env : bool = False): #todo: add the RecordEpisodeMetrics for gym.
+        env = gym.make(config.env.scenario)
+        wrapped_env = GymWrapper(env, config.env.use_individual_rewards, add_global_state, eval_env)
+        if not config.env.implicit_agent_id:
+            pass #todo : add agent id wrapper for gym .
+        return wrapped_env
+        
+    num_env = config.arch.num_envs
+    train_env = gym.vector.async_vector_env([create_gym_env(config, add_global_state) for _ in range(num_env)])
+    eval_env = gym.vector.async_vector_env([create_gym_env(config, add_global_state, eval_env=True) for _ in range(num_env)])
+    return train_env, eval_env
 
 def make(config: DictConfig, add_global_state: bool = False) -> Tuple[Environment, Environment]:
     """
@@ -220,5 +246,7 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[Environmen
         return make_matrax_env(env_name, config, add_global_state)
     elif env_name in _gigastep_registry:
         return make_gigastep_env(env_name, config, add_global_state)
+    elif env_name.startswith("gym"):
+        return make_gym_env(env_name, config, add_global_state)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")
