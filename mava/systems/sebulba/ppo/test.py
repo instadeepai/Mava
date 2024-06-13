@@ -21,7 +21,7 @@ from rich.pretty import pprint
 from mava.evaluator import make_eval_fns
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
-from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition #todo: change this
+from mava.systems.anakin.ppo.types import LearnerState, OptStates, Params, PPOTransition #todo: change this
 from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn, Observation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
