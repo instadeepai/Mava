@@ -16,6 +16,7 @@ from typing import Tuple
 
 import gym
 import gym.vector
+import gym.wrappers
 import jaxmarl
 import jumanji
 import matrax
@@ -221,6 +222,9 @@ def make_gym_env(
         config: DictConfig, add_global_state: bool = False, eval_env: bool = False
     ) -> Environment:  # todo: add the RecordEpisodeMetrics for gym.
         env = gym.make(config.env.scenario)
+        env = gym.wrappers.EnvCompatibility(
+            env
+        )  # todo: check if this will break if env is developed for v26
         wrapped_env = GymWrapper(env, config.env.use_individual_rewards, add_global_state, eval_env)
         if not config.env.implicit_agent_id:
             pass  # todo : add agent id wrapper for gym .
