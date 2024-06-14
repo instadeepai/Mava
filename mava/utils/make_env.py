@@ -203,10 +203,8 @@ def make_gigastep_env(
 
 
 def make_gym_env(
-    env_name: str, config: DictConfig, add_global_state: bool = False , eval_env : bool = False
-) -> Tuple[
-    Environment, Environment
-]:  # todo : create the appropriate annotation for the sync vector
+    env_name: str, config: DictConfig, add_global_state: bool = False, eval_env: bool = False
+) -> Environment:  # todo : create the appropriate annotation for the sync vector
     """
      Create a Gym environment.
 
@@ -230,9 +228,12 @@ def make_gym_env(
 
     num_env = config.arch.num_envs
     envs = gym.vector.async_vector_env(
-        [lambda: create_gym_env(config, add_global_state, eval_env=eval_env) for _ in range(num_env)]
+        [
+            lambda: create_gym_env(config, add_global_state, eval_env=eval_env)
+            for _ in range(num_env)
+        ]
     )
-    
+
     return envs
 
 
