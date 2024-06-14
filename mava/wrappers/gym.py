@@ -71,7 +71,7 @@ class GymWrapper(gym.Wrapper):
     def step(self, actions: NDArray) -> Tuple:
 
         self.step_count += 1
-        if self._reset_next_step and not self.eval_env:  # only auto-reset in training envs.
+        if self._reset_next_step and not self.eval_env:  # only auto-reset in training envs. todo: turn this into a sepreat wrapper 
             return self.reset()
 
         agents_view, reward, terminated, truncated, extra = self.env.step(actions)
@@ -102,3 +102,4 @@ class GymWrapper(gym.Wrapper):
         if "action_mask" in extra:
             return np.array(extra["action_mask"])
         return np.ones((self.num_agents, self.num_actions), dtype=np.float32)
+

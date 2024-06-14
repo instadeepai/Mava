@@ -203,7 +203,7 @@ def make_gigastep_env(
 
 
 def make_gym_env(
-    env_name: str, config: DictConfig, add_global_state: bool = False
+    env_name: str, config: DictConfig, add_global_state: bool = False , eval_env : bool = False
 ) -> Tuple[
     Environment, Environment
 ]:  # todo : create the appropriate annotation for the sync vector
@@ -229,13 +229,11 @@ def make_gym_env(
         return wrapped_env
 
     num_env = config.arch.num_envs
-    train_env = gym.vector.async_vector_env(
-        [lambda: create_gym_env(config, add_global_state) for _ in range(num_env)]
+    envs = gym.vector.async_vector_env(
+        [lambda: create_gym_env(config, add_global_state, eval_env=eval_env) for _ in range(num_env)]
     )
-    eval_env = gym.vector.async_vector_env(
-        [create_gym_env(config, add_global_state, eval_env=True) for _ in range(num_env)]
-    )
-    return train_env, eval_env
+    
+    return envs
 
 
 def make(config: DictConfig, add_global_state: bool = False) -> Tuple[Environment, Environment]:
@@ -259,7 +257,5 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[Environmen
         return make_matrax_env(env_name, config, add_global_state)
     elif env_name in _gigastep_registry:
         return make_gigastep_env(env_name, config, add_global_state)
-    elif env_name.startswith("gym"):
-        return make_gym_env(env_name, config, add_global_state)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")
