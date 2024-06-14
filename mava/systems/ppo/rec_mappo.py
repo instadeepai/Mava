@@ -116,11 +116,7 @@ def get_learner_fn(
             action = actor_policy.sample(seed=policy_key)
             log_prob = actor_policy.log_prob(action)
 
-            action, log_prob, value = (
-                action.squeeze(0),
-                log_prob.squeeze(0),
-                value.squeeze(0),
-            )
+            action, log_prob, value = action.squeeze(0), log_prob.squeeze(0), value.squeeze(0)
 
             # Step the environment.
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
@@ -180,15 +176,10 @@ def get_learner_fn(
             traj_batch: RNNPPOTransition, last_val: chex.Array, last_done: chex.Array
         ) -> Tuple[chex.Array, chex.Array]:
             def _get_advantages(
-                carry: Tuple[chex.Array, chex.Array, chex.Array],
-                transition: RNNPPOTransition,
+                carry: Tuple[chex.Array, chex.Array, chex.Array], transition: RNNPPOTransition
             ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
                 gae, next_value, next_done = carry
-                done, value, reward = (
-                    transition.done,
-                    transition.value,
-                    transition.reward,
-                )
+                done, value, reward = transition.done, transition.value, transition.reward
                 gamma = config.system.gamma
                 delta = reward + gamma * next_value * (1 - next_done) - value
                 gae = delta + gamma * config.system.gae_lambda * (1 - next_done) * gae
@@ -225,9 +216,7 @@ def get_learner_fn(
                     # RERUN NETWORK
                     obs_and_done = (traj_batch.obs, traj_batch.done)
                     _, actor_policy = actor_apply_fn(
-                        actor_params,
-                        traj_batch.hstates.policy_hidden_state[0],
-                        obs_and_done,
+                        actor_params, traj_batch.hstates.policy_hidden_state[0], obs_and_done
                     )
                     log_prob = actor_policy.log_prob(traj_batch.action)
 
@@ -260,9 +249,7 @@ def get_learner_fn(
                     # RERUN NETWORK
                     obs_and_done = (traj_batch.obs, traj_batch.done)
                     _, value = critic_apply_fn(
-                        critic_params,
-                        traj_batch.hstates.critic_hidden_state[0],
-                        obs_and_done,
+                        critic_params, traj_batch.hstates.critic_hidden_state[0], obs_and_done
                     )
 
                     # CALCULATE VALUE LOSS
@@ -290,10 +277,7 @@ def get_learner_fn(
                 # CALCULATE CRITIC LOSS
                 critic_grad_fn = jax.value_and_grad(_critic_loss_fn, has_aux=True)
                 critic_loss_info, critic_grads = critic_grad_fn(
-                    params.critic_params,
-                    opt_states.critic_opt_state,
-                    traj_batch,
-                    targets,
+                    params.critic_params, opt_states.critic_opt_state, traj_batch, targets
                 )
 
                 # Compute the parallel mean (pmean) over the batch.
@@ -743,11 +727,7 @@ def run_experiment(_config: DictConfig) -> float:
     return eval_performance
 
 
-@hydra.main(
-    config_path="../../configs",
-    config_name="default_rec_mappo.yaml",
-    version_base="1.2",
-)
+@hydra.main(config_path="../../configs", config_name="default_rec_mappo.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.

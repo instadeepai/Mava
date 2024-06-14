@@ -286,11 +286,7 @@ class JaxMarlWrapper(Wrapper, ABC):
 
     def discount_spec(self) -> specs.BoundedArray:
         return specs.BoundedArray(
-            shape=(self.num_agents,),
-            dtype=float,
-            minimum=0.0,
-            maximum=1.0,
-            name="discount",
+            shape=(self.num_agents,), dtype=float, minimum=0.0, maximum=1.0, name="discount"
         )
 
     @abstractmethod

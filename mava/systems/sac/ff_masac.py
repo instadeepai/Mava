@@ -182,12 +182,7 @@ def init(
 
     # Reset env.
     n_keys = cfg.arch.num_envs * cfg.arch.n_devices * cfg.system.update_batch_size
-    key_shape = (
-        cfg.arch.n_devices,
-        cfg.system.update_batch_size,
-        cfg.arch.num_envs,
-        -1,
-    )
+    key_shape = (cfg.arch.n_devices, cfg.system.update_batch_size, cfg.arch.num_envs, -1)
     key, reset_key = jax.random.split(key)
     reset_keys = jax.random.split(reset_key, n_keys)
     reset_keys = jnp.reshape(reset_keys, key_shape)
@@ -211,16 +206,7 @@ def init(
     learner_state = LearnerState(
         first_obs, env_state, buffer_state, params, opt_states, t, first_keys
     )
-    return (
-        (env, eval_env),
-        networks,
-        optims,
-        rb,
-        learner_state,
-        target_entropy,
-        logger,
-        key,
-    )
+    return (env, eval_env), networks, optims, rb, learner_state, target_entropy, logger, key
 
 
 def make_update_fns(
@@ -258,10 +244,7 @@ def make_update_fns(
     full_action_shape = (cfg.arch.num_envs, *env.action_spec().shape)
 
     def step(
-        action: Array,
-        obs: ObservationGlobalState,
-        env_state: State,
-        buffer_state: BufferState,
+        action: Array, obs: ObservationGlobalState, env_state: State, buffer_state: BufferState
     ) -> Tuple[Array, State, BufferState, Dict]:
         """Given an action, step the environment and add to the buffer."""
         env_state, timestep = jax.vmap(env.step)(env_state, action)
@@ -448,8 +431,7 @@ def make_update_fns(
         return (buffer_state, params, opt_states, t, key), losses
 
     def act(
-        carry: Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey],
-        _: Any,
+        carry: Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey], _: Any
     ) -> Tuple[Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey], Dict]:
         """Acting loop: select action, step env, add to buffer."""
         actor_params, obs, env_state, buffer_state, key = carry
@@ -538,16 +520,7 @@ def run_experiment(cfg: DictConfig) -> float:
     pprint(OmegaConf.to_container(cfg, resolve=True))
 
     # Initialize system and make learning functions.
-    (
-        (env, eval_env),
-        networks,
-        optims,
-        rb,
-        learner_state,
-        target_entropy,
-        logger,
-        key,
-    ) = init(cfg)
+    (env, eval_env), networks, optims, rb, learner_state, target_entropy, logger, key = init(cfg)
     explore, update = make_update_fns(cfg, env, networks, optims, rb, target_entropy)
 
     actor, _ = networks

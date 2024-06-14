@@ -93,9 +93,7 @@ class RecordEpisodeMetrics(Wrapper):
         return state, timestep
 
 
-def get_final_step_metrics(
-    metrics: Dict[str, chex.Array],
-) -> Tuple[Dict[str, chex.Array], bool]:
+def get_final_step_metrics(metrics: Dict[str, chex.Array]) -> Tuple[Dict[str, chex.Array], bool]:
     """Get the metrics for the final step of an episode and check if there was a final step
     within the provided metrics.
 

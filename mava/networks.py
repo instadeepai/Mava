@@ -216,9 +216,7 @@ class FeedForwardQNet(nn.Module):
         self.critic = nn.Dense(1, kernel_init=orthogonal(1.0))
 
     def __call__(
-        self,
-        observation: Union[Observation, ObservationGlobalState],
-        action: chex.Array,
+        self, observation: Union[Observation, ObservationGlobalState], action: chex.Array
     ) -> chex.Array:
         if self.centralised_critic:
             if not isinstance(observation, ObservationGlobalState):

@@ -107,13 +107,7 @@ def get_learner_fn(
             info = timestep.extras["episode_metrics"]
 
             transition = PPOTransition(
-                done,
-                action,
-                value,
-                timestep.reward,
-                log_prob,
-                last_timestep.observation,
-                info,
+                done, action, value, timestep.reward, log_prob, last_timestep.observation, info
             )
 
             learner_state = LearnerState(params, opt_states, key, env_state, timestep)
@@ -220,19 +214,13 @@ def get_learner_fn(
                 # CALCULATE ACTOR LOSS
                 actor_grad_fn = jax.value_and_grad(_actor_loss_fn, has_aux=True)
                 actor_loss_info, actor_grads = actor_grad_fn(
-                    params.actor_params,
-                    opt_states.actor_opt_state,
-                    traj_batch,
-                    advantages,
+                    params.actor_params, opt_states.actor_opt_state, traj_batch, advantages
                 )
 
                 # CALCULATE CRITIC LOSS
                 critic_grad_fn = jax.value_and_grad(_critic_loss_fn, has_aux=True)
                 critic_loss_info, critic_grads = critic_grad_fn(
-                    params.critic_params,
-                    opt_states.critic_opt_state,
-                    traj_batch,
-                    targets,
+                    params.critic_params, opt_states.critic_opt_state, traj_batch, targets
                 )
 
                 # Compute the parallel mean (pmean) over the batch.
@@ -413,10 +401,7 @@ def learner_setup(
             input_params=Params(actor_params, critic_params)
         )
         # Update the params
-        actor_params, critic_params = (
-            restored_params.actor_params,
-            restored_params.critic_params,
-        )
+        actor_params, critic_params = restored_params.actor_params, restored_params.critic_params
 
     # Pack apply and update functions.
     apply_fns = (actor_network.apply, critic_network.apply)

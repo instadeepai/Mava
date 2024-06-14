@@ -67,8 +67,7 @@ def get_ff_evaluator_fn(
             key, policy_key = jax.random.split(key)
             # Add a batch dimension to the observation.
             pi = apply_fn(
-                params,
-                jax.tree_map(lambda x: x[jnp.newaxis, ...], last_timestep.observation),
+                params, jax.tree_map(lambda x: x[jnp.newaxis, ...], last_timestep.observation)
             )
 
             if config.arch.evaluation_greedy:

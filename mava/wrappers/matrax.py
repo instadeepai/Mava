@@ -61,9 +61,7 @@ class MatraxWrapper(Wrapper):
         state, timestep = self._env.step(state, action)
         return state, self.modify_timestep(timestep)
 
-    def observation_spec(
-        self,
-    ) -> specs.Spec[Union[Observation][ObservationGlobalState]]:
+    def observation_spec(self) -> specs.Spec[Union[Observation][ObservationGlobalState]]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
             (self._num_agents,),

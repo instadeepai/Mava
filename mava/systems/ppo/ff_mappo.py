@@ -99,13 +99,7 @@ def get_learner_fn(
             info = timestep.extras["episode_metrics"]
 
             transition = PPOTransition(
-                done,
-                action,
-                value,
-                timestep.reward,
-                log_prob,
-                last_timestep.observation,
-                info,
+                done, action, value, timestep.reward, log_prob, last_timestep.observation, info
             )
             learner_state = LearnerState(params, opt_states, key, env_state, timestep)
             return learner_state, transition
@@ -224,10 +218,7 @@ def get_learner_fn(
                 # CALCULATE CRITIC LOSS
                 critic_grad_fn = jax.value_and_grad(_critic_loss_fn, has_aux=True)
                 critic_loss_info, critic_grads = critic_grad_fn(
-                    params.critic_params,
-                    opt_states.critic_opt_state,
-                    traj_batch,
-                    targets,
+                    params.critic_params, opt_states.critic_opt_state, traj_batch, targets
                 )
 
                 # Compute the parallel mean (pmean) over the batch.

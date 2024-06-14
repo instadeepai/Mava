@@ -52,10 +52,7 @@ from mava.wrappers import (
 _jumanji_registry = {
     "RobotWarehouse-v0": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper},
     "LevelBasedForaging-v0": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
-    "MaConnector-v2": {
-        "generator": ConnectorRandomGenerator,
-        "wrapper": ConnectorWrapper,
-    },
+    "MaConnector-v2": {"generator": ConnectorRandomGenerator, "wrapper": ConnectorWrapper},
     "Cleaner-v0": {"generator": CleanerRandomGenerator, "wrapper": CleanerWrapper},
 }
 

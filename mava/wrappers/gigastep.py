@@ -199,10 +199,7 @@ class GigastepWrapper(Wrapper):
         )
         if self.has_global_state:
             global_state = specs.BoundedArray(
-                (
-                    self.num_agents,
-                    self._env.observation_space.shape[0] * self._env.n_agents,
-                ),
+                (self.num_agents, self._env.observation_space.shape[0] * self._env.n_agents),
                 jnp.int32,
                 0,
                 255,
@@ -233,11 +230,7 @@ class GigastepWrapper(Wrapper):
 
     def discount_spec(self) -> specs.BoundedArray:
         return specs.BoundedArray(
-            shape=(self.num_agents,),
-            dtype=float,
-            minimum=0.0,
-            maximum=1.0,
-            name="discount",
+            shape=(self.num_agents,), dtype=float, minimum=0.0, maximum=1.0, name="discount"
         )
 
     def _split_obs_and_state(
