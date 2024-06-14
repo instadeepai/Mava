@@ -29,11 +29,11 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava.evaluator import make_eval_fns
+from mava.evaluator import get_eval_fn, make_eval_fns
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
-from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn
+from mava.types import Action, ActorApply, CriticApply, ExperimentOutput, LearnerFn
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import (
@@ -100,7 +100,13 @@ def get_learner_fn(
             info = timestep.extras["episode_metrics"]
 
             transition = PPOTransition(
-                done, action, value, timestep.reward, log_prob, last_timestep.observation, info
+                done,
+                action,
+                value,
+                timestep.reward,
+                log_prob,
+                last_timestep.observation,
+                info,
             )
             learner_state = LearnerState(params, opt_states, key, env_state, timestep)
             return learner_state, transition
@@ -220,7 +226,10 @@ def get_learner_fn(
                 # CALCULATE CRITIC LOSS
                 critic_grad_fn = jax.value_and_grad(_critic_loss_fn, has_aux=True)
                 critic_loss_info, critic_grads = critic_grad_fn(
-                    params.critic_params, opt_states.critic_opt_state, traj_batch, targets
+                    params.critic_params,
+                    opt_states.critic_opt_state,
+                    traj_batch,
+                    targets,
                 )
 
                 # Compute the parallel mean (pmean) over the batch.
@@ -463,6 +472,16 @@ def run_experiment(_config: DictConfig) -> float:
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
     evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network.apply, config)
+
+    def eval_act_fn(params, timestep, key) -> Tuple[Action, Dict]:
+        p = unreplicate_n_dims(params)  # for now
+        pi = actor_network.apply(p, timestep.observation)
+        action = pi.mode() if config.arch.evaluation_greedy else pi.sample(seed=key)
+        return action, {}
+
+    evaluator2 = get_eval_fn(eval_env, eval_act_fn, config, config.arch.num_eval_episodes)
+    eval_metrics = evaluator2(learner_state.params.actor_params, key, {})
+    print(eval_metrics)
 
     # Calculate total timesteps.
     config = check_total_timesteps(config)

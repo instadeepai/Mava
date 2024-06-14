@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import chex
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
+from chex import Array, PRNGKey
 from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
+from jumanji.types import TimeStep
 from omegaconf import DictConfig
 
 from mava.types import (
@@ -27,9 +29,59 @@ from mava.types import (
     EvalFn,
     EvalState,
     ExperimentOutput,
+    HiddenState,
+    Observation,
+    ObservationGlobalState,
     RecActorApply,
     RNNEvalState,
 )
+
+# Dict[str, Any] is the actor state
+ActFn = Callable[
+    [
+        FrozenDict,
+        TimeStep[Union[Observation, ObservationGlobalState]],
+        PRNGKey,
+        ...,
+    ],
+    Tuple[Array, Dict[str, Any]],
+]
+
+
+# todo: pmap
+def get_eval_fn(env: Environment, act_fn: ActFn, config: DictConfig, eval_episodes: int) -> EvalFn:
+    def eval_fn(
+        params: FrozenDict, key: PRNGKey, init_act_state: Dict[str, Any] = {}
+    ) -> ExperimentOutput:
+        def _env_step(eval_state, actor_state):
+            env_state, ts, key, actor_state = eval_state
+
+            key, act_key = jax.random.split(key)
+            # act_keys = jax.random.split(act_key, eval_episodes)
+            action, actor_state = act_fn(params, ts, act_key, **actor_state)
+            env_state, ts = jax.vmap(env.step)(env_state, action)
+
+            return (env_state, ts, key, actor_state), ts
+
+        key, reset_key = jax.random.split(key)
+        # todo: vmap for num envs and loop for enough episodes
+        reset_keys = jax.random.split(reset_key, eval_episodes)
+        env_state, ts = jax.vmap(env.reset)(reset_keys)
+
+        step_state = env_state, ts, key, init_act_state
+        _, timesteps = jax.lax.scan(_env_step, step_state, jnp.arange(env.time_limit))
+
+        # find the first instance of done to get the metrics at that timestep
+        done_idx = jnp.argmax(timesteps.last(), axis=0)
+        # get the reward from the actual timesteps
+        # todo: log winrate!
+        metrics = jax.tree_map(
+            lambda m: m[done_idx, jnp.arange(eval_episodes)], timesteps.extras["episode_metrics"]
+        )
+
+        return metrics
+
+    return eval_fn
 
 
 def get_ff_evaluator_fn(
@@ -65,7 +117,8 @@ def get_ff_evaluator_fn(
             key, policy_key = jax.random.split(key)
             # Add a batch dimension to the observation.
             pi = apply_fn(
-                params, jax.tree_map(lambda x: x[jnp.newaxis, ...], last_timestep.observation)
+                params,
+                jax.tree_map(lambda x: x[jnp.newaxis, ...], last_timestep.observation),
             )
 
             if config.arch.evaluation_greedy:
@@ -328,10 +381,17 @@ def make_eval_fns(
         )
     else:
         evaluator = get_ff_evaluator_fn(
-            eval_env, network_apply_fn, config, log_win_rate  # type: ignore
+            eval_env,
+            network_apply_fn,
+            config,
+            log_win_rate,  # type: ignore
         )
         absolute_metric_evaluator = get_ff_evaluator_fn(
-            eval_env, network_apply_fn, config, log_win_rate, 10  # type: ignore
+            eval_env,
+            network_apply_fn,
+            config,
+            log_win_rate,
+            10,  # type: ignore
         )
 
     evaluator = jax.pmap(evaluator, axis_name="device")

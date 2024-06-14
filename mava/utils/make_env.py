@@ -52,7 +52,10 @@ from mava.wrappers import (
 _jumanji_registry = {
     "RobotWarehouse-v0": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper},
     "LevelBasedForaging-v0": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
-    "MaConnector-v2": {"generator": ConnectorRandomGenerator, "wrapper": ConnectorWrapper},
+    "MaConnector-v2": {
+        "generator": ConnectorRandomGenerator,
+        "wrapper": ConnectorWrapper,
+    },
     "Cleaner-v0": {"generator": CleanerRandomGenerator, "wrapper": CleanerWrapper},
 }
 
@@ -67,7 +70,6 @@ _gigastep_registry = {"Gigastep": GigastepWrapper}
 def add_extra_wrappers(
     train_env: Environment, eval_env: Environment, config: DictConfig
 ) -> Environment:
-
     # Disable the AgentID wrapper if the environment has implicit agent IDs.
     config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
 
@@ -78,6 +80,7 @@ def add_extra_wrappers(
 
     train_env = AutoResetWrapper(train_env)
     train_env = RecordEpisodeMetrics(train_env)
+    eval_env = RecordEpisodeMetrics(eval_env)
     return train_env, eval_env
 
 

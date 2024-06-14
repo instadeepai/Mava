@@ -92,7 +92,7 @@ class ExperimentOutput(NamedTuple, Generic[MavaState]):
 
 
 LearnerFn = Callable[[MavaState], ExperimentOutput[MavaState]]
-EvalFn = Callable[[FrozenDict, chex.PRNGKey], ExperimentOutput[MavaState]]
+EvalFn = Callable[[FrozenDict, chex.PRNGKey, Dict[str, Any]], ExperimentOutput[MavaState]]
 
 ActorApply = Callable[[FrozenDict, Observation], Distribution]
 CriticApply = Callable[[FrozenDict, Observation], Value]
