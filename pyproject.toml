@@ -1,9 +1,3 @@
-[tool.black]
-line-length = 100
-
-[tool.isort]
-profile = "black"
-
 [tool.mypy]
 python_version = 3.9
 namespace_packages = true
@@ -34,35 +28,15 @@ module = [
     "omegaconf.*",
 ]
 
-[tool.flake8]
-select = ["A","B","C","D","E","F","G","I","N","T","W"]  # Specify list of error codes to report.
-exclude = [
-    ".tox",
-    ".git",
-    "__pycache__",
-    "build",
-    "dist",
-    "proto/*",
-    "*.pyc",
-    "*.egg-info",
-    ".cache",
-    ".eggs",
-]
-max-line-length=100
-max-cognitive-complexity=11
-import-order-style = "google"
-application-import-names = "mava"
-doctests = true
-docstring-convention = "google"
-per-file-ignores = "__init__.py:F401"
+[tool.ruff]
+line-length = 100
 
+[tool.ruff.lint]
+select = ["A", "B", "E", "F",  "I", "N", "W", "RUF", "ANN"]
 ignore = [
-    "A002",  # Argument shadowing a Python builtin.
-    "A003",  # Class attribute shadowing a Python builtin.
-    "D107",  # Do not require docstrings for __init__.
-    "E266",  # Do not require block comments to only have a single leading #.
-    "E731",  # Do not assign a lambda expression, use a def.
-    "W503",  # Line break before binary operator (not compatible with black).
-    "B017",  # assertRaises(Exception): or pytest.raises(Exception) should be considered evil.
-    "E203",  # black and flake8 disagree on whitespace before ':'.
+    "E731",  # Allow lambdas to be assigned to variables.
+    "ANN101",  # no need to type self
+    "ANN102",  # no need to type cls
+    "ANN204",  # no need for return type for special methods
+    "ANN401",  # can use Any type
 ]

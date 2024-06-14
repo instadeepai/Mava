@@ -79,14 +79,14 @@ def unbatchify(x: Array, agents: List[str]) -> Dict[str, Array]:
 
 
 def merge_space(
-    spec: Dict[str, Union[jaxmarl_spaces.Box, jaxmarl_spaces.Discrete]]
+    spec: Dict[str, Union[jaxmarl_spaces.Box, jaxmarl_spaces.Discrete]],
 ) -> jaxmarl_spaces.Space:
     """Convert a dictionary of spaces into a single space with a num_agents size first dimension.
 
     JaxMarl uses a dictionary of specs, one per agent. For now we want this to be a single spec.
     """
     n_agents = len(spec)
-    single_spec = copy.deepcopy(list(spec.values())[0])
+    single_spec = copy.deepcopy(next(iter(spec.values())))
 
     err = f"Unsupported space for merging spaces, expected Box or Discrete, got {type(single_spec)}"
     assert _is_discrete(single_spec) or _is_box(single_spec), err
@@ -160,9 +160,7 @@ def jaxmarl_space_to_jumanji_spec(space: jaxmarl_spaces.Space) -> specs.Spec:
 
 
 class JaxMarlWrapper(Wrapper, ABC):
-    """
-    A wrapper for JaxMarl environments to make their API compatible with Jumanji environments.
-    """
+    """A wrapper for JaxMarl environments to make their API compatible with Jumanji environments."""
 
     def __init__(
         self,
@@ -170,13 +168,14 @@ class JaxMarlWrapper(Wrapper, ABC):
         has_global_state: bool,
         timelimit: int,
     ) -> None:
-        """
-        Initialize the JaxMarlWrapper.
+        """Initialize the JaxMarlWrapper.
 
         Args:
+        ----
         - env: The JaxMarl environment to wrap.
         - has_global_state: Whether the environment has global state.
         - timelimit: The time limit for each episode.
+
         """
         # Check that all specs are the same as we only support homogeneous environments, for now ;)
         homogenous_error = (
@@ -193,9 +192,9 @@ class JaxMarlWrapper(Wrapper, ABC):
         self.has_global_state = has_global_state
 
         # Calling these on init to cache the values in a non-jitted context.
-        self.state_size
-        self.action_dim
-        self.num_agents
+        self.state_size  # noqa: B018
+        self.action_dim  # noqa: B018
+        self.num_agents  # noqa: B018
 
     def reset(
         self, key: PRNGKey
@@ -287,7 +286,11 @@ class JaxMarlWrapper(Wrapper, ABC):
 
     def discount_spec(self) -> specs.BoundedArray:
         return specs.BoundedArray(
-            shape=(self.num_agents,), dtype=float, minimum=0.0, maximum=1.0, name="discount"
+            shape=(self.num_agents,),
+            dtype=float,
+            minimum=0.0,
+            maximum=1.0,
+            name="discount",
         )
 
     @abstractmethod
@@ -303,19 +306,19 @@ class JaxMarlWrapper(Wrapper, ABC):
     @cached_property
     @abstractmethod
     def num_agents(self) -> chex.Array:
-        "Get the number of agents"
+        """Get the number of agents"""
         ...
 
     @cached_property
     @abstractmethod
     def action_dim(self) -> chex.Array:
-        "Get the actions dim for each agent."
+        """Get the actions dim for each agent."""
         ...
 
     @cached_property
     @abstractmethod
     def state_size(self) -> chex.Array:
-        "Get the sate size of the global observation"
+        """Get the sate size of the global observation"""
         ...
 
 
@@ -351,17 +354,17 @@ class SmaxWrapper(JaxMarlWrapper):
 
     @cached_property
     def state_size(self) -> chex.Array:
-        "Get the sate size of the global observation"
+        """Get the sate size of the global observation"""
         return self._env.state_size
 
     @cached_property
     def num_agents(self) -> chex.Array:
-        "Get the number of agents"
+        """Get the number of agents"""
         return self._env.num_agents
 
     @cached_property
     def action_dim(self) -> chex.Array:
-        "Get the actions dim for each agent."
+        """Get the actions dim for each agent."""
         single_agent_action_space = self._env.action_space(self.agents[0])
         return single_agent_action_space.n
 
@@ -389,17 +392,17 @@ class MabraxWrapper(JaxMarlWrapper):
 
     @cached_property
     def num_agents(self) -> chex.Array:
-        "Get the number of agents"
+        """Get the number of agents"""
         return self._env.num_agents
 
     @cached_property
     def action_dim(self) -> chex.Array:
-        "Get the actions dim for each agent."
+        """Get the actions dim for each agent."""
         return self._env.action_space(self.agents[0]).shape[0]
 
     @cached_property
     def state_size(self) -> chex.Array:
-        "Get the sate size of the global observation"
+        """Get the sate size of the global observation"""
         brax_env = self._env.env
         return brax_env.observation_size
 

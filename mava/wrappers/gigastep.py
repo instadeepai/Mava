@@ -48,13 +48,13 @@ class GigastepWrapper(Wrapper):
         env: GigastepEnv,
         has_global_state: bool = False,
     ):
-        """
-        Args:
+        """Args:
+        ----
             env: The Gigastep environment to be wrapped.
             time_limit (int): The maximum duration of each episode, in seconds. Defaults to 500.
             has_global_state (bool): Whether the environment has a global state. Defaults to False.
-        """
 
+        """
         super().__init__(env)
         assert (
             env.discrete_actions
@@ -70,18 +70,18 @@ class GigastepWrapper(Wrapper):
         self.has_global_state = has_global_state
 
     def reset(self, key: PRNGKey) -> Tuple[GigastepState, TimeStep]:
-        """
-        Reset the Gigastep environment.
+        """Reset the Gigastep environment.
 
         Args:
+        ----
             key (PRNGKey): The PRNGKey.
 
         Returns:
+        -------
             GigastepState : the state of the environment.
             TimeStep : the first time step.
 
         """
-
         key, reset_key, adversary_key = jax.random.split(key, 3)
         obs, state = self._env.reset(reset_key)
 
@@ -98,14 +98,15 @@ class GigastepWrapper(Wrapper):
         return state, timestep
 
     def step(self, state: GigastepState, action: Array) -> Tuple[GigastepState, TimeStep]:
-        """
-        Takes a step in the Gigastep environment.
+        """Takes a step in the Gigastep environment.
 
         Args:
+        ----
             state (GigastepState): The current state of the environment.
             action (Array): The actions for controllable agents.
 
         Returns:
+        -------
             Tuple[GigastepState, TimeStep]: A tuple containing the next state of the environment
             and the next time step.
 
@@ -166,15 +167,17 @@ class GigastepWrapper(Wrapper):
         return jnp.ones((self.num_agents, self._env.n_actions))  # all actions are valid
 
     def get_global_state(self, obs: Array) -> Array:
-        """
-        Combines observations from all agents and adversaries
+        """Combines observations from all agents and adversaries
         to create a global state for the environment.
 
         Args:
+        ----
             obs (Array): The observations of all agents and adversaries.
 
         Returns:
+        -------
             global_obs (Array): The global observation.
+
         """
         # the global observation needs to be tested once we have better heuristics for adversaries.
         global_obs = jnp.concatenate(obs, axis=0)
@@ -196,7 +199,10 @@ class GigastepWrapper(Wrapper):
         )
         if self.has_global_state:
             global_state = specs.BoundedArray(
-                (self.num_agents, self._env.observation_space.shape[0] * self._env.n_agents),
+                (
+                    self.num_agents,
+                    self._env.observation_space.shape[0] * self._env.n_agents,
+                ),
                 jnp.int32,
                 0,
                 255,
@@ -227,22 +233,28 @@ class GigastepWrapper(Wrapper):
 
     def discount_spec(self) -> specs.BoundedArray:
         return specs.BoundedArray(
-            shape=(self.num_agents,), dtype=float, minimum=0.0, maximum=1.0, name="discount"
+            shape=(self.num_agents,),
+            dtype=float,
+            minimum=0.0,
+            maximum=1.0,
+            name="discount",
         )
 
     def _split_obs_and_state(
         self, obs: Array, state: Tuple[Dict, Dict]
     ) -> Tuple[Array, Tuple[Dict, Dict], Array, Tuple[Dict, Dict]]:
-        """
-        Separates the observations and state for both teams.
+        """Separates the observations and state for both teams.
 
         Args:
+        ----
             obs (Array): The observations of all agents.
             state (Tuple[Dict, Dict]): The state of all agents.
 
         Returns:
+        -------
             Tuple[Array, Tuple[Dict, Dict], Array, Tuple[Dict, Dict]]: Two tuples
             representing observations and states for each team.
+
         """
         # The first n_agents_team1 elements in each array belong to team1
         team1_obs, team2_obs = obs[: self.num_agents], obs[self.num_agents :]
@@ -260,31 +272,35 @@ class GigastepWrapper(Wrapper):
         )
 
     def won_episode(self, state: Tuple[Dict, Dict]) -> Array:
-        """
-        Determines the winning team.
+        """Determines the winning team.
 
         The winning team is the one with more agents alive at the end.
 
         Args:
+        ----
             state (Tuple[Dict, Dict]): The state of all agents.
 
         Returns:
+        -------
             Array: Winning team indicator (1 if team_1 wins, 0 otherwise).
+
         """
         # https://github.com/mlech26l/gigastep/blob/main/gigastep/evaluator.py#L261
         alive = state[0]["alive"]
         return jnp.sum(alive[: self.num_agents]) > jnp.sum(alive[self.num_agents :])
 
     def adversary_policy(self, obs: Array, state: Tuple[Dict, Dict], key: PRNGKey) -> Array:
-        """
-        Generates actions for the adversary based on observations and state.
+        """Generates actions for the adversary based on observations and state.
 
         Args:
+        ----
             obs (Array): The observations of the adversary.
             state (Tuple[Dict, Dict]): The state of the adversary.
             key (PRNGKey): The pseudo-random number generator key.
 
         Returns:
+        -------
             Array: Actions for the adversary.
+
         """
         return jax.random.randint(key, (obs.shape[0],), 0, self.num_actions)

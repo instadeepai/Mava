@@ -57,7 +57,6 @@ def get_learner_fn(
     config: DictConfig,
 ) -> LearnerFn[RNNLearnerState]:
     """Get the learner function."""
-
     actor_apply_fn, critic_apply_fn = apply_fns
     actor_update_fn, critic_update_fn = update_fns
 
@@ -70,6 +69,7 @@ def get_learner_fn(
         losses.
 
         Args:
+        ----
             learner_state (NamedTuple):
                 - params (Params): The current model parameters.
                 - opt_states (OptStates): The current optimizer states.
@@ -79,6 +79,7 @@ def get_learner_fn(
                 - last_done (bool): Whether the last timestep was a terminal state.
                 - hstates (HiddenStates): The hidden state of the policy and critic RNN.
             _ (Any): The current metrics info.
+
         """
 
         def _env_step(
@@ -115,7 +116,11 @@ def get_learner_fn(
             action = actor_policy.sample(seed=policy_key)
             log_prob = actor_policy.log_prob(action)
 
-            action, log_prob, value = (action.squeeze(0), log_prob.squeeze(0), value.squeeze(0))
+            action, log_prob, value = (
+                action.squeeze(0),
+                log_prob.squeeze(0),
+                value.squeeze(0),
+            )
 
             # Step the environment.
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
@@ -175,10 +180,15 @@ def get_learner_fn(
             traj_batch: RNNPPOTransition, last_val: chex.Array, last_done: chex.Array
         ) -> Tuple[chex.Array, chex.Array]:
             def _get_advantages(
-                carry: Tuple[chex.Array, chex.Array, chex.Array], transition: RNNPPOTransition
+                carry: Tuple[chex.Array, chex.Array, chex.Array],
+                transition: RNNPPOTransition,
             ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
                 gae, next_value, next_done = carry
-                done, value, reward = transition.done, transition.value, transition.reward
+                done, value, reward = (
+                    transition.done,
+                    transition.value,
+                    transition.reward,
+                )
                 gamma = config.system.gamma
                 delta = reward + gamma * next_value * (1 - next_done) - value
                 gae = delta + gamma * config.system.gae_lambda * (1 - next_done) * gae
@@ -200,7 +210,6 @@ def get_learner_fn(
 
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
-
                 # UNPACK TRAIN STATE AND BATCH INFO
                 params, opt_states, key = train_state
                 traj_batch, advantages, targets = batch_info
@@ -216,7 +225,9 @@ def get_learner_fn(
                     # RERUN NETWORK
                     obs_and_done = (traj_batch.obs, traj_batch.done)
                     _, actor_policy = actor_apply_fn(
-                        actor_params, traj_batch.hstates.policy_hidden_state[0], obs_and_done
+                        actor_params,
+                        traj_batch.hstates.policy_hidden_state[0],
+                        obs_and_done,
                     )
                     log_prob = actor_policy.log_prob(traj_batch.action)
 
@@ -249,7 +260,9 @@ def get_learner_fn(
                     # RERUN NETWORK
                     obs_and_done = (traj_batch.obs, traj_batch.done)
                     _, value = critic_apply_fn(
-                        critic_params, traj_batch.hstates.critic_hidden_state[0], obs_and_done
+                        critic_params,
+                        traj_batch.hstates.critic_hidden_state[0],
+                        obs_and_done,
                     )
 
                     # CALCULATE VALUE LOSS
@@ -277,7 +290,10 @@ def get_learner_fn(
                 # CALCULATE CRITIC LOSS
                 critic_grad_fn = jax.value_and_grad(_critic_loss_fn, has_aux=True)
                 critic_loss_info, critic_grads = critic_grad_fn(
-                    params.critic_params, opt_states.critic_opt_state, traj_batch, targets
+                    params.critic_params,
+                    opt_states.critic_opt_state,
+                    traj_batch,
+                    targets,
                 )
 
                 # Compute the parallel mean (pmean) over the batch.
@@ -409,6 +425,7 @@ def get_learner_fn(
         updates. The `_update_step` function is vectorized over a batch of inputs.
 
         Args:
+        ----
             learner_state (NamedTuple):
                 - params (Params): The initial model parameters.
                 - opt_states (OptStates): The initial optimizer states.
@@ -417,8 +434,8 @@ def get_learner_fn(
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
                 - dones (bool): Whether the initial timestep was a terminal state.
                 - hstates (HiddenStates): The hidden state of the policy and critic RNN.
-        """
 
+        """
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
 
         learner_state, (episode_info, loss_info) = jax.lax.scan(
@@ -555,7 +572,7 @@ def learner_setup(
     replicate_learner = (params, opt_states, hstates, step_keys, dones)
 
     # Duplicate learner for update_batch_size.
-    broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size,) + x.shape)
+    broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size, *x.shape))
     replicate_learner = jax.tree_map(broadcast, replicate_learner)
 
     # Duplicate learner across devices.
@@ -575,7 +592,7 @@ def learner_setup(
     return learn, actor_network, init_learner_state
 
 
-def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
+def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
     config = copy.deepcopy(_config)
 
@@ -726,7 +743,11 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
     return eval_performance
 
 
-@hydra.main(config_path="../../configs", config_name="default_rec_mappo.yaml", version_base="1.2")
+@hydra.main(
+    config_path="../../configs",
+    config_name="default_rec_mappo.yaml",
+    version_base="1.2",
+)
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.

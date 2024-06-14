@@ -90,7 +90,9 @@ class MultiAgentWrapper(Wrapper, ABC):
 
         return state, timestep
 
-    def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
+    def observation_spec(
+        self,
+    ) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
             (self.num_agents,),
@@ -121,7 +123,7 @@ class MultiAgentWrapper(Wrapper, ABC):
 
     @cached_property
     def action_dim(self) -> chex.Array:
-        "Get the actions dim for each agent."
+        """Get the actions dim for each agent."""
         return int(self._env.action_spec().num_values[0])
 
 
@@ -145,13 +147,14 @@ class RwareWrapper(MultiAgentWrapper):
 
 
 class LbfWrapper(MultiAgentWrapper):
-    """
-     Multi-agent wrapper for the Level-Based Foraging environment.
+    """Multi-agent wrapper for the Level-Based Foraging environment.
 
     Args:
+    ----
         env (Environment): The base environment.
         use_individual_rewards (bool): If true each agent gets a separate reward,
         sum reward otherwise.
+
     """
 
     def __init__(
@@ -178,7 +181,6 @@ class LbfWrapper(MultiAgentWrapper):
         """Modify the timestep for Level-Based Foraging environment and update
         the reward based on the specified reward handling strategy.
         """
-
         # Create a new observation with adjusted step count
         modified_observation = Observation(
             agents_view=timestep.observation.agents_view,
@@ -230,10 +232,11 @@ class ConnectorWrapper(MultiAgentWrapper):
         """Constructs the global state from the global information
         in the agent observations (positions, targets and paths.)
         """
-
         return obs.agents_view[..., :3]
 
-    def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
+    def observation_spec(
+        self,
+    ) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
             (self.num_agents,),
@@ -257,7 +260,12 @@ class ConnectorWrapper(MultiAgentWrapper):
 
         if self.add_global_state:
             global_state = specs.BoundedArray(
-                shape=(self._env.num_agents, self._env.grid_size, self._env.grid_size, 3),
+                shape=(
+                    self._env.num_agents,
+                    self._env.grid_size,
+                    self._env.grid_size,
+                    3,
+                ),
                 dtype=bool,
                 name="global_state",
                 minimum=False,
@@ -283,7 +291,6 @@ class CleanerWrapper(MultiAgentWrapper):
             """Create separate channels for dirty cells, wall cells and agent positions.
             Also add a channel that marks an agent's own position.
             """
-
             num_agents = self.num_agents
 
             # A: Number of agents
@@ -330,7 +337,10 @@ class CleanerWrapper(MultiAgentWrapper):
         extras = {"won_episode": timestep.extras["num_dirty_tiles"] == 0}
 
         return timestep.replace(
-            observation=Observation(**obs_data), reward=reward, discount=discount, extras=extras
+            observation=Observation(**obs_data),
+            reward=reward,
+            discount=discount,
+            extras=extras,
         )
 
     def get_global_state(self, obs: Observation) -> chex.Array:
@@ -339,7 +349,9 @@ class CleanerWrapper(MultiAgentWrapper):
         """
         return obs.agents_view[..., :3]  # (A, R, C, 3)
 
-    def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
+    def observation_spec(
+        self,
+    ) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
             (self.num_agents,),

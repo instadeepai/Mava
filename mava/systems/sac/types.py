@@ -26,7 +26,9 @@ from mava.types import Observation, ObservationGlobalState, State
 Metrics: TypeAlias = Dict[str, Array]
 Networks: TypeAlias = Tuple[nn.Module, nn.Module]
 Optimisers: TypeAlias = Tuple[
-    optax.GradientTransformation, optax.GradientTransformation, optax.GradientTransformation
+    optax.GradientTransformation,
+    optax.GradientTransformation,
+    optax.GradientTransformation,
 ]
 
 
