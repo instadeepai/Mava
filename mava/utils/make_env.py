@@ -227,7 +227,7 @@ def make_gym_env(
         return wrapped_env
 
     num_env = config.arch.num_envs
-    envs = gym.vector.async_vector_env(
+    envs = gym.vector.AsyncVectorEnv(
         [
             lambda: create_gym_env(config, add_global_state, eval_env=eval_env)
             for _ in range(num_env)
