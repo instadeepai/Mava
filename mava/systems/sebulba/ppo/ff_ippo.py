@@ -27,7 +27,6 @@ import queue
 from collections import deque
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
-from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
@@ -61,7 +60,7 @@ def rollout(
     learner_devices: List):
     
     #create envs
-    env = environments.make(config)
+    env = environments.make_gym_env(config.env.scenario.name, config)
     
     #setup
     len_executor_device_ids = len(config.arch.executor_device_ids)
@@ -461,7 +460,7 @@ def learner_setup(
     n_devices = len(learner_devices)
     
     #create temporory envoirnments.
-    env  = environments.make(config)
+    env  = environments.make_gym_env(config.env.scenario.name, config)
     # Get number of agents and actions.
     action_space = env.single_action_space
     config.system.num_agents = len(action_space)
