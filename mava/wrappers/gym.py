@@ -18,6 +18,8 @@ import gym
 import numpy as np
 from numpy.typing import NDArray
 
+from mava.types import Observation
+
 
 class GymWrapper(gym.Wrapper):
     """Wrapper for gym environments"""
@@ -48,9 +50,10 @@ class GymWrapper(gym.Wrapper):
         self.num_actions = self._env.action_space[
             0
         ].n  # todo: all the agents must have the same num_actions, add assertion?
+        self.step_count = 0  # todo : make sure this implementaion is correct
 
     def reset(self) -> Tuple:
-        obs, extra = self._env.reset(
+        agents_view, extra = self._env.reset(
             seed=np.random.randint(1), option={}
         )  # todo: assure reproducibility
         reward = np.zeros(self._env.n_agents)
@@ -59,14 +62,19 @@ class GymWrapper(gym.Wrapper):
         )
         actions_mask = self._get_actions_mask(extra)
 
-        return np.array(obs), actions_mask, reward, terminated, truncated, extra
+        obs = Observation(
+            agents_view=np.array(agents_view), action_mask=actions_mask, step_count=self.step_count
+        )
+
+        return obs, reward, terminated, truncated, extra
 
     def step(self, actions: NDArray) -> Tuple:
 
+        self.step_count += 1
         if self._reset_next_step and not self.eval_env:  # only auto-reset in training envs.
             return self.reset()
 
-        obs, reward, terminated, truncated, extra = self.env.step(actions)
+        agents_view, reward, terminated, truncated, extra = self.env.step(actions)
 
         terminated, truncated = np.array(terminated), np.array(truncated)
 
@@ -84,7 +92,11 @@ class GymWrapper(gym.Wrapper):
         else:
             reward = np.array([np.array(reward).mean()] * self.num_agents)
 
-        return np.array(obs), actions_mask, reward, terminated, truncated, extra
+        obs = Observation(
+            agents_view=np.array(agents_view), action_mask=actions_mask, step_count=self.step_count
+        )
+
+        return obs, reward, terminated, truncated, extra
 
     def _get_actions_mask(self, extra: Dict) -> NDArray:
         if "action_mask" in extra:

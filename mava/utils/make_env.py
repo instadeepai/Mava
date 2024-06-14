@@ -204,7 +204,9 @@ def make_gigastep_env(
 
 def make_gym_env(
     env_name: str, config: DictConfig, add_global_state: bool = False
-) -> Tuple[Environment, Environment]: #todo : create the appropriate annotation for the sync vector 
+) -> Tuple[
+    Environment, Environment
+]:  # todo : create the appropriate annotation for the sync vector
     """
      Create a Gym environment.
 
