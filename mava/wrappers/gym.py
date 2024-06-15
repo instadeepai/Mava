@@ -53,9 +53,9 @@ class GymWrapper(gym.Wrapper):
         self.step_count = 0  # todo : make sure this implementaion is correct
 
     def reset(self) -> Tuple:
-        agents_view, extra = self._env.reset(
+        (agents_view, extra), _ = self._env.reset(
             seed=np.random.randint(1)
-        )  # todo: assure reproducibility
+        )  # todo: assure reproducibility, this only works for rware
         reward = np.zeros(self.num_agents)
         terminated, truncated = np.zeros(self.num_agents, dtype=bool), np.zeros(
             self.num_agents, dtype=bool

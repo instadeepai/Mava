@@ -226,7 +226,7 @@ def make_gym_env(
         env = gym.make(config.env.scenario)
         env = gym.wrappers.compatibility.EnvCompatibility(
             env
-        )  # todo: check if this will break if env is developed for v26
+        )  
         wrapped_env = GymWrapper(env, config.env.use_individual_rewards, add_global_state, eval_env)
         if not config.env.implicit_agent_id:
             pass  # todo : add agent id wrapper for gym .
