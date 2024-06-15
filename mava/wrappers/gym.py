@@ -26,7 +26,7 @@ class GymWrapper(gym.Wrapper):
 
     def __init__(
         self,
-        env: gym.env,
+        env: gym.Env,
         use_individual_rewards: bool = False,
         add_global_state: bool = False,
         eval_env: bool = False,
@@ -46,7 +46,7 @@ class GymWrapper(gym.Wrapper):
         self.use_individual_rewards = use_individual_rewards
         self.add_global_state = add_global_state  # todo : add the global observations
         self.eval_env = eval_env
-        self.num_agents = self._env.n_agents
+        self.num_agents = len(self._env.action_space)
         self.num_actions = self._env.action_space[
             0
         ].n  # todo: all the agents must have the same num_actions, add assertion?
@@ -54,11 +54,11 @@ class GymWrapper(gym.Wrapper):
 
     def reset(self) -> Tuple:
         agents_view, extra = self._env.reset(
-            seed=np.random.randint(1), option={}
+            seed=np.random.randint(1)
         )  # todo: assure reproducibility
-        reward = np.zeros(self._env.n_agents)
-        terminated, truncated = np.zeros(self._env.n_agents, dtype=bool), np.zeros(
-            self._env.n_agents, dtype=bool
+        reward = np.zeros(self.num_agents)
+        terminated, truncated = np.zeros(self.num_agents, dtype=bool), np.zeros(
+            self.num_agents, dtype=bool
         )
         actions_mask = self._get_actions_mask(extra)
 

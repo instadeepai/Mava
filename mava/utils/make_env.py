@@ -17,6 +17,8 @@ from typing import Tuple
 import gym
 import gym.vector
 import gym.wrappers
+import gym.wrappers
+import gym.wrappers.compatibility
 import jaxmarl
 import jumanji
 import matrax
@@ -204,7 +206,7 @@ def make_gigastep_env(
 
 
 def make_gym_env(
-    env_name: str, config: DictConfig, add_global_state: bool = False, eval_env: bool = False
+    config: DictConfig, add_global_state: bool = False, eval_env: bool = False
 ) -> Environment:  # todo : create the appropriate annotation for the sync vector
     """
      Create a Gym environment.
@@ -222,7 +224,7 @@ def make_gym_env(
         config: DictConfig, add_global_state: bool = False, eval_env: bool = False
     ) -> Environment:  # todo: add the RecordEpisodeMetrics for gym.
         env = gym.make(config.env.scenario)
-        env = gym.wrappers.EnvCompatibility(
+        env = gym.wrappers.compatibility.EnvCompatibility(
             env
         )  # todo: check if this will break if env is developed for v26
         wrapped_env = GymWrapper(env, config.env.use_individual_rewards, add_global_state, eval_env)
