@@ -60,7 +60,7 @@ def rollout(
     learner_devices: List):
     
     #create envs
-    env = environments.make_gym_env(config.env.scenario.name, config)
+    env = environments.make_gym_env(config)
     
     #setup
     len_executor_device_ids = len(config.arch.executor_device_ids)
@@ -460,19 +460,19 @@ def learner_setup(
     n_devices = len(learner_devices)
     
     #create temporory envoirnments.
-    env  = environments.make_gym_env(config.env.scenario.name, config)
+    env  = environments.make_gym_env(config)
     # Get number of agents and actions.
     action_space = env.single_action_space
     config.system.num_agents = len(action_space)
     config.system.num_actions = action_space[0].n 
 
     # PRNG keys.
-    key, actor_net_key, critic_net_key = keys
+    actor_net_key, critic_net_key = keys
 
     # Define network and optimiser.
     actor_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
     actor_action_head = hydra.utils.instantiate(
-        config.network.action_head, action_dim=env.action_dim
+        config.network.action_head, action_dim=config.system.num_actions
     )
     critic_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
 
@@ -494,7 +494,7 @@ def learner_setup(
     # Initialise observation: Select only obs for a single agent.
     init_obs = np.array([env.single_observation_space.sample()[0]])
     init_action_mask = np.ones((1, config.system.num_actions))
-    init_x = Observation(init_obs, init_action_mask)
+    init_x = Observation(init_obs, init_action_mask, None)
 
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(actor_net_key, init_x)
@@ -512,7 +512,7 @@ def learner_setup(
     update_fns = (actor_optim.update, critic_optim.update)
 
     # Get batched iterated update and replicate it to pmap it over cores.
-    learn = get_learner_fn(env, apply_fns, update_fns, config)
+    learn = get_learner_fn(apply_fns, update_fns, config)
     learn = jax.pmap(learn, axis_name="device", devices = learner_devices)
 
     # Load model from checkpoint if specified.
@@ -539,7 +539,7 @@ def learner_setup(
 
     # Initialise learner state.
     params, opt_states = replicate_learner
-    init_learner_state = LearnerState(params, opt_states)
+    init_learner_state = LearnerState(params, opt_states, None, None, None)
     env.close()
 
     return learn, apply_fns, init_learner_state
@@ -574,7 +574,7 @@ def run_experiment(_config: DictConfig) -> float:
     
     # Setup learner.
     learn, apply_fns , learner_state = learner_setup(
-        learner_keys, config, learner_devices
+        (actor_net_key, critic_net_key), config, learner_devices
     )
 
     # Setup evaluator.
@@ -591,7 +591,7 @@ def run_experiment(_config: DictConfig) -> float:
     # Calculate number of updates per evaluation.
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
     steps_per_rollout = (
-        config.arch.executor_device_ids
+        len(config.arch.executor_device_ids)
         * config.arch.n_threads_per_executor
         * config.system.num_updates_per_eval
         * config.system.rollout_length
