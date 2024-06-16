@@ -45,7 +45,8 @@ from mava.wrappers import (
     CleanerWrapper,
     ConnectorWrapper,
     GigastepWrapper,
-    GymWrapper,
+    GymRwareWrapper,
+    AsyncGymWrapper,
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
@@ -68,6 +69,8 @@ _matrax_registry = {"Matrax": MatraxWrapper}
 _jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 
 _gigastep_registry = {"Gigastep": GigastepWrapper}
+
+_gym_registry = {"rware" : GymRwareWrapper}
 
 
 def add_extra_wrappers(
@@ -219,27 +222,27 @@ def make_gym_env(
     Returns:
         A tuple of the environments.
     """
+    base_env_name = config.env.scenario.split(":")[0]
+    wrapper = _gym_registry[base_env_name]
 
     def create_gym_env(
         config: DictConfig, add_global_state: bool = False, eval_env: bool = False
     ) -> Environment:  # todo: add the RecordEpisodeMetrics for gym.
         env = gym.make(config.env.scenario)
-        env = gym.wrappers.compatibility.EnvCompatibility(
-            env
-        )  
-        wrapped_env = GymWrapper(env, config.env.use_individual_rewards, add_global_state, eval_env)
+        _gym_registry
+        wrapped_env = wrapper(env, config.env.use_individual_rewards, add_global_state, eval_env)
         if not config.env.implicit_agent_id:
             pass  # todo : add agent id wrapper for gym .
         return wrapped_env
 
-    num_env = config.arch.num_envs
-    envs = gym.vector.AsyncVectorEnv(
+    num_env = config.arch.num_envs 
+    envs = gym.vector.AsyncVectorEnv( #todo : give them more descriptive names 
         [
             lambda: create_gym_env(config, add_global_state, eval_env=eval_env)
             for _ in range(num_env)
         ]
     )
-
+    envs = AsyncGymWrapper(envs)
     return envs
 
 
