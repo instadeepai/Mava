@@ -62,26 +62,19 @@ class GymRwareWrapper(gym.Wrapper):
 
     def step(self, actions: NDArray) -> Tuple:
 
-        if (
-            self._reset_next_step and not self.eval_env
-        ):  # only auto-reset in training envs. todo: turn this into a sepreat wrapper
-            agents_view, info = self.reset()
-            reward = np.zeros(self.num_agents)
-            terminated, truncated = np.zeros(self.num_agents, dtype=bool), np.zeros(
-                self.num_agents, dtype=bool
-            )
-            return agents_view, reward, terminated, truncated, info
-
         agents_view, reward, terminated, truncated, info = self.env.step(actions)
-
-        terminated, truncated = np.array(terminated), np.array(truncated)
 
         done = np.logical_or(terminated, truncated).all()
 
         if (
             done and not self.eval_env
         ):  # only auto-reset in training envs, same functionality as the AutoResetWrapper.
-            return self.reset()
+            agents_view, info = self.reset()
+            reward = np.zeros(self.num_agents)
+            terminated, truncated = np.zeros(self.num_agents, dtype=bool), np.zeros(
+                self.num_agents, dtype=bool
+            )
+            return agents_view, reward, terminated, truncated, info
 
         info["action_mask"] = self._get_actions_mask(info)
 
@@ -99,22 +92,29 @@ class GymRwareWrapper(gym.Wrapper):
         return np.ones((self.num_agents, self.num_actions), dtype=np.float32)
     
 
-class AsyncGymWrapper:
+class AsyncGymWrapper(gym.Wrapper):
     """Wrapper for async gym environments"""
 
     def __init__(self, env: gym.vector.AsyncVectorEnv):
+        super().__init__(env)
         self._env = env
         self.step_count = 0 #todo : make sure this is implemented correctly 
+        
+        action_space = env.single_action_space
+        self.num_agents = len(action_space)
+        self.num_actions = action_space[0].n 
+        self.num_envs = env.num_envs
         
     def reset(self) -> Tuple[Observation, Dict]:
         agents_view , info = self._env.reset()
         obs = self._create_obs(agents_view, info)
-        return obs, info
+        dones = np.zeros((self.num_envs, 1))
+        return obs, dones, info
 
-    def step(self) -> Tuple[Observation, NDArray, NDArray, NDArray, Dict]:
+    def step(self, actions : NDArray) -> Tuple[Observation, NDArray, NDArray, NDArray, Dict]:
         
         self.step_count += 1
-        agents_view, reward, terminated, truncated, info = self._env.step()
+        agents_view, reward, terminated, truncated, info = self._env.step(actions)
         obs = self._create_obs(agents_view, info)
         
         return obs, reward, terminated, truncated, info
