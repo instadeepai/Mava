@@ -229,7 +229,6 @@ def make_gym_env(
         config: DictConfig, add_global_state: bool = False, eval_env: bool = False
     ) -> Environment:  # todo: add the RecordEpisodeMetrics for gym.
         env = gym.make(config.env.scenario)
-        _gym_registry
         wrapped_env = wrapper(env, config.env.use_individual_rewards, add_global_state, eval_env)
         if not config.env.implicit_agent_id:
             pass  # todo : add agent id wrapper for gym .
