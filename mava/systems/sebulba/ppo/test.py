@@ -31,20 +31,33 @@ from mava.utils.jax_utils import (
     unreplicate_n_dims,
 )
 from mava.utils.logger import LogEvent, MavaLogger
-from mava.utils.total_timestep_checker import check_total_timesteps
+from mava.utils.total_timestep_checker import anakin_check_total_timesteps
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
-
-
+from flax import linen as nn
+import gym
+from mava.wrappers import GymRwareWrapper
 @hydra.main(config_path="../../../configs", config_name="default_ff_ippo_seb.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
 
+
+    base = gym.make(cfg.env.scenario)
+    base = GymRwareWrapper(base, cfg.env.use_individual_rewards, False, True)
+    base.reset()
+    ree = base.step([0,0])
+    print(ree)
     env = environments.make_gym_env(cfg)
     a = env.reset()
     print(a)
+    b = env.step([[0,0], [0,0], [0,0], [0,0]])
+    #print(b)
+    #r = 1+1
+    # Create a sample input
+    #env = gym.make(cfg.env.scenario)
+    #env.reset()
+    #a = env.step(jnp.ones((4)))
 
-if __name__ == "__main__":
-    hydra_entry_point()
+hydra_entry_point()

@@ -45,7 +45,7 @@ from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
-from mava.utils.total_timestep_checker import check_total_timesteps
+from mava.utils.total_timestep_checker import anakin_check_total_timesteps
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
@@ -622,7 +622,7 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
     )
 
     # Calculate total timesteps.
-    config = check_total_timesteps(config)
+    config = anakin_check_total_timesteps(config)
     assert (
         config.system.num_updates > config.arch.num_evaluation
     ), "Number of updates per evaluation must be less than total number of updates."

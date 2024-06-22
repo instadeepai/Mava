@@ -20,6 +20,7 @@ import chex
 import flax
 import hydra
 import jax
+import jax.debug
 import jax.numpy as jnp
 import numpy as np
 import optax
@@ -34,8 +35,8 @@ from rich.pretty import pprint
 from mava.evaluator import make_eval_fns
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
-from mava.systems.anakin.ppo.types import LearnerState, OptStates, Params, PPOTransition #todo: change this
-from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn, Observation
+from mava.systems.sebulba.ppo.types import LearnerState, OptStates, Params, PPOTransition, Observation #todo: change this Observation to use the origial one 
+from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import (
@@ -44,26 +45,28 @@ from mava.utils.jax_utils import (
     unreplicate_n_dims,
 )
 from mava.utils.logger import LogEvent, MavaLogger
-from mava.utils.total_timestep_checker import check_total_timesteps
+from mava.utils.total_timestep_checker import sebulba_check_total_timesteps
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
 
 def rollout(    
-    rng: chex.PRNGKey,
+    key: chex.PRNGKey,
     config: DictConfig,
     rollout_queue: queue.Queue,
     params_queue: queue.Queue,
     device_thread_id: int,
     apply_fns: Tuple,
     logger: MavaLogger,
-    learner_devices: List):
+    learner_devices: List,
+    actor_device_id : int):
     
     #create envs
     env = environments.make_gym_env(config)
     
     #setup
     len_executor_device_ids = len(config.arch.executor_device_ids)
+    current_actor_device = jax.devices()[actor_device_id]
     t_env = 0
     start_time = time.time()
 
@@ -78,9 +81,10 @@ def rollout(
     ) -> Tuple:
         """Get action and value."""
         key, subkey = jax.random.split(key)
-
-        policy = actor_apply_fn(params.actor_params, observation)
-        action, log_prob = policy.sample_and_log_prob(seed=subkey)
+        
+        actor_policy = actor_apply_fn(params.actor_params, observation)
+        action = actor_policy.sample(seed=subkey)
+        log_prob = actor_policy.log_prob(action)
 
         value = critic_apply_fn(params.critic_params, observation).squeeze()
         return action, log_prob, value, key
@@ -89,7 +93,7 @@ def rollout(
     def prepare_data(storage: List[PPOTransition]) -> PPOTransition:
         """Prepare data to share with learner."""
         return jax.tree_map(  # type: ignore
-            lambda *xs: jnp.split(jnp.stack(xs), len(learner_devices), axis=1), *storage
+            lambda *xs: jnp.stack(xs), *storage
         )
 
 
@@ -98,7 +102,10 @@ def rollout(
     rollout_time: deque = deque(maxlen=10)
     rollout_queue_put_time: deque = deque(maxlen=10)
     
-    next_obs, next_rewards, next_dones , extra = env.reset()
+    next_obs , info = env.reset()
+    next_dones = jnp.zeros((config.arch.num_envs, config.system.num_agents), dtype=jax.numpy.bool_)
+    
+    move_to_device = lambda x : jax.device_put(x, device = current_actor_device)
 
     # Loop till the learner has finished training
     for update in range(1, config.system.num_updates + 2):
@@ -113,15 +120,16 @@ def rollout(
         params = params_queue.get()
         params_queue_get_time.append(time.time() - params_queue_get_time_start)
         
-        # Rollout
+        # Rollout   
         rollout_time_start = time.time()
         storage: List = []
         # Loop over the rollout length
         for _ in range(0, config.system.rollout_length):
             # Cached for transition
-            cached_next_obs = next_obs
-            cached_next_dones = next_dones
-
+            cached_next_obs = move_to_device(jnp.stack(next_obs, axis = 1))
+            cached_next_dones = move_to_device(next_dones)
+            cashed_action_mask = move_to_device(jnp.stack([*info["actions_mask"]], axis = 0) ) #unpack the numpy object, find a more pythonic way?
+            
             # Increment current timestep
             t_env += (
                 config.arch.n_threads_per_executor * len_executor_device_ids * config.arch.num_envs
@@ -129,24 +137,20 @@ def rollout(
             
             # Get action and value
             inference_time_start = time.time()
-            
+            #
             (
                 action,
                 log_prob,
                 value,
-                rng,
-            ) = get_action_and_value(params, cached_next_obs, rng)
+                key,
+            ) = get_action_and_value(params, Observation(cached_next_obs, cashed_action_mask), key)
             inference_time += time.time() - inference_time_start
             
             # Step the environment
             env_send_time_start = time.time()
-            cpu_action = np.array(action)
-            next_obs, next_reward, next_dones, extra = env.step(cpu_action)
-            
-            next_dones = jax.tree_util.tree_map(
-                lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
-                (next_dones),
-            )
+            cpu_action = jax.device_get(action)
+            next_obs, next_reward, terminated, truncated, info = env.step(cpu_action.swapaxes(0,1)) #num_env, num_agents --> num_agents, num_env 
+            next_dones = np.logical_or(terminated, truncated)         
             
             # Append data to storage
             env_send_time += time.time() - env_send_time_start
@@ -158,38 +162,32 @@ def rollout(
                     value=value,
                     reward=next_reward,
                     log_prob=log_prob,
-                    obs=cached_next_obs,
-                    info=extra,
-                )
+                    obs=Observation(cached_next_obs, cashed_action_mask),
+                    info={"win_rate" : info.get("win_rate")}, 
+                    )#todo: use a threadsafe alt https://github.com/instadeepai/CityLearn/blob/27e69f8ebdf1789c55ffab5c326bfaa50733a5e7/power_systems/sax_sebulba.py#L39
             )
             storage_time += time.time() - storage_time_start
 
         rollout_time.append(time.time() - rollout_time_start) 
         
         # Prepare data to share with learner 
-        # todo: investigate the thread --> single learning  
+        # todo: investigate te thread --> single learning  
         partitioned_storage = prepare_data(storage)
-        sharded_storage = PPOTransition(
-            *list(  # noqa: C417
-                map(
-                    lambda x: jax.device_put_sharded(x, devices=learner_devices),  # type: ignore
-                    partitioned_storage,
-                )
-            )
-        )
+        #sorage has shape rollout_len, num_agents, num_envs, .... while the other vectors have num_agents, num_envs, ... -> their split axis is diffrent
+        shard_split_payload= lambda x, axis : jax.device_put_sharded(jnp.split(x, len(learner_devices), axis=axis), devices=learner_devices)
+
+        sharded_storage = jax.tree_map(lambda x : shard_split_payload(x, 1) , partitioned_storage)
         
-        sharded_next_obs = jax.device_put_sharded(
-            np.split(next_obs, len(learner_devices)), devices=learner_devices
-        )
-        sharded_next_done = jax.device_put_sharded(
-            np.split(next_dones, len(learner_devices)), devices=learner_devices
-        )
+        sharded_next_obs = shard_split_payload(jnp.stack(next_obs, axis = 1), 0) 
+        sharded_next_action_mask = shard_split_payload(jnp.stack([*info["actions_mask"]], axis = 0), 0)  
+        sharded_next_done = shard_split_payload(next_dones, 0)
 
         payload = (
             t_env,
             sharded_storage,
             sharded_next_obs,
             sharded_next_done,
+            sharded_next_action_mask,
             np.mean(params_queue_get_time),
         )
 
@@ -210,7 +208,7 @@ def get_learner_fn(
     actor_apply_fn, critic_apply_fn = apply_fns
     actor_update_fn, critic_update_fn = update_fns
 
-    def _update_step(learner_state: LearnerState, _: Any, traj_batch : PPOTransition, last_obs: chex.Array, last_done: chex.Array) -> Tuple[LearnerState, Tuple]:
+    def _update_step(learner_state: LearnerState, _: Any, traj_batch : PPOTransition, last_obs: chex.Array, last_action_mask : chex.Array, last_dones : chex.Array) -> Tuple[LearnerState, Tuple]:
         """A single update of the network.
 
         This function steps the environment and records the trajectory batch for
@@ -252,8 +250,8 @@ def get_learner_fn(
         
         # CALCULATE ADVANTAGE
         params, opt_states, key, _, _ = learner_state
-        last_val = critic_apply_fn(params.critic_params, last_obs)
-        advantages, targets = _calculate_gae(traj_batch, last_val, last_done)
+        last_val = critic_apply_fn(params.critic_params, Observation(last_obs, last_action_mask))
+        advantages, targets = _calculate_gae(traj_batch, last_val, last_dones)
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""
@@ -338,18 +336,11 @@ def get_learner_fn(
                 # Compute the parallel mean (pmean) over the batch.
                 # This calculation is inspired by the Anakin architecture demo notebook.
                 # available at https://tinyurl.com/26tdzs5x
-                # This pmean could be a regular mean as the batch axis is on the same device.
-                actor_grads, actor_loss_info = jax.lax.pmean(
-                    (actor_grads, actor_loss_info), axis_name="batch"
-                )
                 # pmean over devices.
                 actor_grads, actor_loss_info = jax.lax.pmean(
                     (actor_grads, actor_loss_info), axis_name="device"
                 )
 
-                critic_grads, critic_loss_info = jax.lax.pmean(
-                    (critic_grads, critic_loss_info), axis_name="batch"
-                )
                 # pmean over devices.
                 critic_grads, critic_loss_info = jax.lax.pmean(
                     (critic_grads, critic_loss_info), axis_name="device"
@@ -370,7 +361,6 @@ def get_learner_fn(
                 # PACK NEW PARAMS AND OPTIMISER STATE
                 new_params = Params(actor_new_params, critic_new_params)
                 new_opt_state = OptStates(actor_new_opt_state, critic_new_opt_state)
-
                 # PACK LOSS INFO
                 total_loss = actor_loss_info[0] + critic_loss_info[0]
                 value_loss = critic_loss_info[1]
@@ -386,9 +376,8 @@ def get_learner_fn(
 
             params, opt_states, traj_batch, advantages, targets, key = update_state
             key, shuffle_key, entropy_key = jax.random.split(key, 3)
-
             # SHUFFLE MINIBATCHES
-            batch_size = config.system.rollout_length * config.arch.num_envs
+            batch_size = config.system.rollout_length * config.arch.num_envs * len(config.arch.executor_device_ids) * config.arch.n_threads_per_executor
             permutation = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
             batch = jax.tree_util.tree_map(lambda x: merge_leading_dims(x, 2), batch)
@@ -399,7 +388,6 @@ def get_learner_fn(
                 lambda x: jnp.reshape(x, [config.system.num_minibatches, -1] + list(x.shape[1:])),
                 shuffled_batch,
             )
-
             # UPDATE MINIBATCHES
             (params, opt_states, entropy_key), loss_info = jax.lax.scan(
                 _update_minibatch, (params, opt_states, entropy_key), minibatches
@@ -409,18 +397,17 @@ def get_learner_fn(
             return update_state, loss_info
 
         update_state = (params, opt_states, traj_batch, advantages, targets, key)
-
         # UPDATE EPOCHS
         update_state, loss_info = jax.lax.scan(
             _update_epoch, update_state, None, config.system.ppo_epochs
         )
 
         params, opt_states, traj_batch, advantages, targets, key = update_state
-        learner_state = LearnerState(params, opt_states, key)
-        metric = traj_batch.info
+        learner_state = LearnerState(params, opt_states, key, None, None)
+        metric = traj_batch.info #todo: metrci calcualtions
         return learner_state, (metric, loss_info)
 
-    def learner_fn(learner_state: LearnerState, traj_batch : PPOTransition, last_obs: chex.Array, last_done: chex.Array) -> ExperimentOutput[LearnerState]:
+    def learner_fn(learner_state: LearnerState, traj_batch : PPOTransition, last_obs: chex.Array, last_action_mask : chex.Array, last_dones : chex.Array) -> ExperimentOutput[LearnerState]:
         """Learner function.
 
         This function represents the learner, it updates the network parameters
@@ -435,14 +422,13 @@ def get_learner_fn(
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
         """
-
-        batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
+        # Broadcast static parameters for scan
+        partial_update_step =  lambda learner_state,  xs :  _update_step(learner_state,  xs, traj_batch , last_obs, last_action_mask, last_dones) 
         
-        partial_batched_update_step = lambda learner_state,  xs :  batched_update_step(learner_state,  xs, traj_batch , last_obs, last_done)
-
         learner_state, (episode_info, loss_info) = jax.lax.scan(
-            partial_batched_update_step, learner_state, None, config.system.num_updates_per_eval
+            partial_update_step, learner_state, None, config.system.num_updates_per_eval
         )
+
         return ExperimentOutput(
             learner_state=learner_state,
             episode_metrics=episode_info,
@@ -467,7 +453,7 @@ def learner_setup(
     config.system.num_actions = action_space[0].n 
 
     # PRNG keys.
-    actor_net_key, critic_net_key = keys
+    key, actor_net_key, critic_net_key = keys
 
     # Define network and optimiser.
     actor_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
@@ -492,9 +478,9 @@ def learner_setup(
     )
 
     # Initialise observation: Select only obs for a single agent.
-    init_obs = np.array([env.single_observation_space.sample()[0]])
-    init_action_mask = np.ones((1, config.system.num_actions))
-    init_x = Observation(init_obs, init_action_mask, None)
+    init_obs = jnp.array([env.single_observation_space.sample()])
+    init_action_mask = jnp.ones((config.system.num_agents, config.system.num_actions))
+    init_x = Observation(init_obs, init_action_mask)
 
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(actor_net_key, init_x)
@@ -527,19 +513,16 @@ def learner_setup(
         params = restored_params
 
     # Define params to be replicated across devices and batches.
+    key, step_keys = jax.random.split(key)
     opt_states = OptStates(actor_opt_state, critic_opt_state)
-    replicate_learner = (params, opt_states)
-
-    # Duplicate learner for update_batch_size.
-    broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size,) + x.shape)
-    replicate_learner = jax.tree_map(broadcast, replicate_learner)
+    replicate_learner = (params, opt_states, step_keys)
 
     # Duplicate learner across Learner devices.
     replicate_learner = flax.jax_utils.replicate(replicate_learner, devices=learner_devices)
 
     # Initialise learner state.
-    params, opt_states = replicate_learner
-    init_learner_state = LearnerState(params, opt_states, None, None, None)
+    params, opt_states, step_keys = replicate_learner
+    init_learner_state = LearnerState(params, opt_states, step_keys, None, None)
     env.close()
 
     return learn, apply_fns, init_learner_state
@@ -562,7 +545,7 @@ def run_experiment(_config: DictConfig) -> float:
     # Sanity check of config
     assert (
         config.arch.num_envs % len(config.arch.learner_device_ids) == 0
-    ), "The number of environments need to be divisible by the number of learners "  
+    ), "The number of environments must to be divisible by the number of learners "  
     
     assert (
         int(config.arch.num_envs / len(config.arch.learner_device_ids))
@@ -574,7 +557,7 @@ def run_experiment(_config: DictConfig) -> float:
     
     # Setup learner.
     learn, apply_fns , learner_state = learner_setup(
-        (actor_net_key, critic_net_key), config, learner_devices
+        (key ,actor_net_key, critic_net_key), config, learner_devices
     )
 
     # Setup evaluator.
@@ -583,7 +566,7 @@ def run_experiment(_config: DictConfig) -> float:
     #evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network.apply, config)
 
     # Calculate total timesteps.
-    config = check_total_timesteps(config) #todo: update this for sebulba
+    config = sebulba_check_total_timesteps(config) #todo: update this for sebulba
     assert (
         config.system.num_updates > config.arch.num_evaluation
     ), "Number of updates per evaluation must be less than total number of updates."
@@ -595,7 +578,6 @@ def run_experiment(_config: DictConfig) -> float:
         * config.arch.n_threads_per_executor
         * config.system.num_updates_per_eval
         * config.system.rollout_length
-        * config.system.update_batch_size
         * config.arch.num_envs
     )
 
@@ -639,6 +621,7 @@ def run_experiment(_config: DictConfig) -> float:
                     apply_fns,
                     logger,
                     learner_devices,
+                    d_id,
                 ),
             ).start()
             
@@ -648,7 +631,7 @@ def run_experiment(_config: DictConfig) -> float:
     trainer_update_number = 0
     max_episode_return = jnp.float32(0.0)
     best_params = None
-    while True:
+    for eval_step in range(config.arch.num_evaluation): #todo : place holder
         trainer_update_number += 1
         rollout_queue_get_time_start = time.time()
         sharded_storages = []
@@ -666,25 +649,36 @@ def run_experiment(_config: DictConfig) -> float:
                     sharded_storage,
                     sharded_next_obs,
                     sharded_next_done,
+                    sharded_next_action_mask,
                     avg_params_queue_get_time,
                 ) = rollout_queues[d_idx * config.arch.n_threads_per_executor + thread_id].get()
                 sharded_storages.append(sharded_storage)
                 sharded_next_obss.append(sharded_next_obs)
                 sharded_next_dones.append(sharded_next_done)
-
+                sharded_next_action_masks.append(sharded_next_action_mask)
         rollout_queue_get_time.append(time.time() - rollout_queue_get_time_start)
         training_time_start = time.time()
         
-        learner_output = learn(learner_state, sharded_storages, sharded_next_obss, sharded_next_dones)
+        #Concatinate the returned trajectories on the n_env axis 
+        sharded_storages = jax.tree_map(lambda *x : jnp.concatenate(x, axis = 2), *sharded_storages) 
+        sharded_next_obss = jnp.concatenate(sharded_next_obss, axis = 1)
+        sharded_next_dones = jnp.concatenate(sharded_next_dones, axis = 1)
+        sharded_next_action_masks = jnp.concatenate(sharded_next_action_masks, axis = 1)
+
+        learner_output = learn(learner_state, sharded_storages, sharded_next_obss, sharded_next_action_masks, sharded_next_dones)
         
         # Send updated params to executors
-        unreplicated_params = flax.jax_utils.unreplicate(learner_state.params)
+        unreplicated_params = flax.jax_utils.unreplicate(learner_output.learner_state.params)
         for d_idx, d_id in enumerate(config.arch.executor_device_ids):
             device_params = jax.device_put(unreplicated_params, devices[d_id])
             for thread_id in range(config.arch.n_threads_per_executor):
                 params_queues[d_idx * config.arch.n_threads_per_executor + thread_id].put(
                     device_params
                 )
+        
+        t = int(steps_per_rollout * (eval_step + 1))
+        logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
+
 
     return None#eval_performance
 

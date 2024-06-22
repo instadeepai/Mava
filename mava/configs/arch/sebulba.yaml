@@ -1,6 +1,6 @@
 # --- Sebulba config ---
 arch_name: "sebulba"
-num_envs: 2  # number of envs per thread
+num_envs: 4  # number of envs per thread
 
 # --- Evaluation ---
 evaluation_greedy: False # Evaluate the policy greedily. If True the policy will select
@@ -12,7 +12,7 @@ absolute_metric: True # Whether the absolute metric should be computed. For more
   # on the absolute metric please see: https://arxiv.org/abs/2209.10485
 
 # --- Sebulba devices config ---
-n_threads_per_executor: 1  # num of different threads/env batches per actor
+n_threads_per_executor: 2  # num of different threads/env batches per actor
 executor_device_ids: [0] # ids of actor devices
 learner_device_ids: [0] # ids of learner devices
 

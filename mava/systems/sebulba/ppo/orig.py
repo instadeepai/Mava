@@ -43,7 +43,6 @@ from mava.types import (
     ActorApply,
     CriticApply,
     LearnerState,
-    Observation,
     OptStates,
     Params,
 )
@@ -189,8 +188,8 @@ def rollout(  # noqa: CCR001
             )
             storage_time += time.time() - storage_time_start
 
-            # Update episode info
-            episode_returns[env_id] += np.mean(next_reward)
+            # Update episode info ---------------------------------------------------------------------------------------------------------- this is kinda cringe? 
+            episode_returns[env_id] += np.mean(next_reward, axis = 1)
             returned_episode_returns[env_id] = np.where(
                 next_done,
                 episode_returns[env_id],

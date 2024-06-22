@@ -52,7 +52,7 @@ from mava.utils.centralised_training import get_joint_action, get_updated_joint_
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
-from mava.utils.total_timestep_checker import check_total_timesteps
+from mava.utils.total_timestep_checker import anakin_check_total_timesteps
 from mava.wrappers import episode_metrics
 
 
@@ -501,7 +501,7 @@ def make_update_fns(
 def run_experiment(cfg: DictConfig) -> float:
     # Add runtime variables to config
     cfg.arch.n_devices = len(jax.devices())
-    cfg = check_total_timesteps(cfg)
+    cfg = anakin_check_total_timesteps(cfg)
 
     # Number of env steps before evaluating/logging.
     steps_per_rollout = int(cfg.system.total_timesteps // cfg.arch.num_evaluation)
