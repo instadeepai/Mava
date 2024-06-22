@@ -46,7 +46,6 @@ from mava.wrappers import (
     ConnectorWrapper,
     GigastepWrapper,
     GymRwareWrapper,
-    AsyncGymWrapper,
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
@@ -241,7 +240,7 @@ def make_gym_env(
             for _ in range(num_env)
         ]
     )
-    envs = AsyncGymWrapper(envs)
+    
     return envs
 
 
