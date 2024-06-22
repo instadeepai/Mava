@@ -75,7 +75,8 @@ class PPOTransition(NamedTuple):
     reward: chex.Array
     log_prob: chex.Array
     obs: chex.Array
-    info : Dict
+    info: Dict
+
 
 class RNNPPOTransition(NamedTuple):
     """Transition tuple for PPO."""

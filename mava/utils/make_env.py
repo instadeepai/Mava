@@ -17,7 +17,6 @@ from typing import Tuple
 import gym
 import gym.vector
 import gym.wrappers
-import gym.wrappers
 import gym.wrappers.compatibility
 import jaxmarl
 import jumanji
@@ -45,6 +44,7 @@ from mava.wrappers import (
     CleanerWrapper,
     ConnectorWrapper,
     GigastepWrapper,
+    GymRecordEpisodeMetrics,
     GymRwareWrapper,
     LbfWrapper,
     MabraxWrapper,
@@ -69,7 +69,7 @@ _jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 
 _gigastep_registry = {"Gigastep": GigastepWrapper}
 
-_gym_registry = {"rware" : GymRwareWrapper}
+_gym_registry = {"rware": GymRwareWrapper}
 
 
 def add_extra_wrappers(
@@ -231,16 +231,17 @@ def make_gym_env(
         wrapped_env = wrapper(env, config.env.use_individual_rewards, add_global_state, eval_env)
         if not config.env.implicit_agent_id:
             pass  # todo : add agent id wrapper for gym .
+        env = GymRecordEpisodeMetrics(env)
         return wrapped_env
 
-    num_env = config.arch.num_envs 
-    envs = gym.vector.AsyncVectorEnv( #todo : give them more descriptive names 
+    num_env = config.arch.num_envs
+    envs = gym.vector.AsyncVectorEnv(  # todo : give them more descriptive names
         [
             lambda: create_gym_env(config, add_global_state, eval_env=eval_env)
             for _ in range(num_env)
         ]
     )
-    
+
     return envs
 
 
