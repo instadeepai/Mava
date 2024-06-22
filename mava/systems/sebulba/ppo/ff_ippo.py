@@ -667,6 +667,12 @@ def run_experiment(_config: DictConfig) -> float:
 
         learner_output = learn(learner_state, sharded_storages, sharded_next_obss, sharded_next_action_masks, sharded_next_dones)
         
+        # Log the results of the training.
+        elapsed_time = time.time() - rollout_queue_get_time_start
+        t = int(steps_per_rollout * (eval_step + 1))
+        episode_metrics, ep_completed = get_final_step_metrics(learner_output.episode_metrics)
+        episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        
         # Send updated params to executors
         unreplicated_params = flax.jax_utils.unreplicate(learner_output.learner_state.params)
         for d_idx, d_id in enumerate(config.arch.executor_device_ids):
@@ -675,8 +681,11 @@ def run_experiment(_config: DictConfig) -> float:
                 params_queues[d_idx * config.arch.n_threads_per_executor + thread_id].put(
                     device_params
                 )
-        
-        t = int(steps_per_rollout * (eval_step + 1))
+                
+        # Separately log timesteps, actoring metrics and training metrics.
+        logger.log({"timestep": t}, t, eval_step, LogEvent.MISC)
+        if ep_completed:  # only log episode metrics if an episode was completed in the rollout.
+            logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
         logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
 
 
@@ -697,3 +706,6 @@ def hydra_entry_point(cfg: DictConfig) -> float:
 
 if __name__ == "__main__":
     hydra_entry_point()
+
+#learner_output.episode_metrics.keys()
+#dict_keys(['episode_length', 'episode_return'])

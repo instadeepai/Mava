@@ -33,7 +33,7 @@ from mava.evaluator import make_eval_fns
 from mava.networks import RecurrentActor as Actor
 from mava.networks import RecurrentValueNet as Critic
 from mava.networks import ScannedRNN
-from mava.systems.ppo.types import (
+from mava.systems.anakin.ppo.types import (
     HiddenStates,
     OptStates,
     Params,
