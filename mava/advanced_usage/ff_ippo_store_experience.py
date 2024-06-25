@@ -30,7 +30,7 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava.evaluator import make_eval_fns
+from mava.evaluator import make_anakin_eval_fns
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
@@ -469,7 +469,7 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
 
     # Setup evaluator.
     eval_keys = jax.random.split(key_e, n_devices)
-    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network, config)
+    evaluator, absolute_metric_evaluator = make_anakin_eval_fns(eval_env, actor_network, config)
 
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
     steps_per_rollout = (

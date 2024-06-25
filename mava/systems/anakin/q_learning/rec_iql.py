@@ -32,7 +32,7 @@ from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
-from mava.evaluator import make_eval_fns
+from mava.evaluator import make_anakin_eval_fns
 from mava.networks import RecQNetwork, ScannedRNN
 from mava.systems.q_learning.types import (
     ActionSelectionState,
@@ -548,7 +548,7 @@ def run_experiment(cfg: DictConfig) -> float:
     cfg.system.num_agents = env.num_agents
 
     key, eval_key = jax.random.split(key)
-    evaluator, absolute_metric_evaluator = make_eval_fns(
+    evaluator, absolute_metric_evaluator = make_anakin_eval_fns(
         eval_env=eval_env,
         network_apply_fn=q_net.apply,
         config=cfg,

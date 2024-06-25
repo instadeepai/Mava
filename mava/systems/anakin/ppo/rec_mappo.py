@@ -29,7 +29,7 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava.evaluator import make_eval_fns
+from mava.evaluator import make_anakin_eval_fns
 from mava.networks import RecurrentActor as Actor
 from mava.networks import RecurrentValueNet as Critic
 from mava.networks import ScannedRNN
@@ -605,7 +605,7 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
     # Setup evaluator.
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
-    evaluator, absolute_metric_evaluator = make_eval_fns(
+    evaluator, absolute_metric_evaluator = make_anakin_eval_fns(
         eval_env=eval_env,
         network_apply_fn=actor_network.apply,
         config=config,

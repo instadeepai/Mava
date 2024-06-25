@@ -46,6 +46,7 @@ from mava.wrappers import (
     GigastepWrapper,
     GymRecordEpisodeMetrics,
     GymRwareWrapper,
+    _multiagent_worker_shared_memory,
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
@@ -208,7 +209,7 @@ def make_gigastep_env(
 
 
 def make_gym_env(
-    config: DictConfig, add_global_state: bool = False, eval_env: bool = False
+    config: DictConfig,  num_env : int, add_global_state: bool = False, eval_env: bool = False
 ) -> Environment:  # todo : create the appropriate annotation for the sync vector
     """
      Create a Gym environment.
@@ -230,8 +231,8 @@ def make_gym_env(
         env = gym.make(config.env.scenario)
         wrapped_env = wrapper(env, config.env.use_individual_rewards, add_global_state, eval_env)
         if not config.env.implicit_agent_id:
-            pass  # todo : add agent id wrapper for gym .
-        env = GymRecordEpisodeMetrics(env)
+            wrapped_env = AgentIDWrapper(wrapped_env)  # todo : add agent id wrapper for gym .
+        wrapped_env = GymRecordEpisodeMetrics(wrapped_env)
         return wrapped_env
 
     num_env = config.arch.num_envs
@@ -239,7 +240,8 @@ def make_gym_env(
         [
             lambda: create_gym_env(config, add_global_state, eval_env=eval_env)
             for _ in range(num_env)
-        ]
+        ],
+        worker=_multiagent_worker_shared_memory
     )
 
     return envs

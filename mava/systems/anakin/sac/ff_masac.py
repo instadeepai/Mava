@@ -31,7 +31,7 @@ from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
-from mava.evaluator import make_eval_fns
+from mava.evaluator import make_anakin_eval_fns
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardQNet as QNetwork
 from mava.systems.sac.types import (
@@ -520,7 +520,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     actor, _ = networks
     key, eval_key = jax.random.split(key)
-    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor.apply, cfg)
+    evaluator, absolute_metric_evaluator = make_anakin_eval_fns(eval_env, actor.apply, cfg)
 
     if cfg.logger.checkpointing.save_model:
         checkpointer = Checkpointer(

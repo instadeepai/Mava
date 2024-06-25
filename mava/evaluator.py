@@ -31,8 +31,10 @@ from mava.types import (
     RNNEvalState,
 )
 
+from mava.systems.sebulba.ppo.types import Observation 
+import numpy as np
 
-def get_ff_evaluator_fn(
+def get_anakin_ff_evaluator_fn(
     env: Environment,
     apply_fn: ActorApply,
     config: DictConfig,
@@ -282,7 +284,7 @@ def get_rnn_evaluator_fn(
     return evaluator_fn
 
 
-def make_eval_fns(
+def make_anakin_eval_fns(
     eval_env: Environment,
     network_apply_fn: Union[ActorApply, RecActorApply],
     config: DictConfig,
@@ -327,14 +329,133 @@ def make_eval_fns(
             10,
         )
     else:
-        evaluator = get_ff_evaluator_fn(
+        evaluator = get_anakin_ff_evaluator_fn(
             eval_env, network_apply_fn, config, log_win_rate  # type: ignore
         )
-        absolute_metric_evaluator = get_ff_evaluator_fn(
+        absolute_metric_evaluator = get_anakin_ff_evaluator_fn(
             eval_env, network_apply_fn, config, log_win_rate, 10  # type: ignore
         )
 
     evaluator = jax.pmap(evaluator, axis_name="device")
     absolute_metric_evaluator = jax.pmap(absolute_metric_evaluator, axis_name="device")
+
+    return evaluator, absolute_metric_evaluator
+
+
+def get_sebulba_ff_evaluator_fn(
+    env: Environment,
+    apply_fn: ActorApply,
+    config: DictConfig,
+    log_win_rate: bool = False,
+) -> EvalFn:
+    """Get the evaluator function for feedforward networks.
+
+    Args:
+        env (Environment): An evironment instance for evaluation.
+        apply_fn (callable): Network forward pass method.
+        config (dict): Experiment configuration.
+    """
+    @jax.jit
+    def get_action( #todo explicetly put these on the learner? they should already be there
+        params: FrozenDict,
+        observation: Observation,
+        key: chex.PRNGKey,
+    ) -> Tuple:
+        """Get action."""
+        
+        pi = apply_fn(params, observation)
+        
+        if config.arch.evaluation_greedy:
+            action = pi.mode()
+        else:
+            action = pi.sample(seed=key)
+
+        return action
+    def eval_episodes(params: FrozenDict, key : chex.PRNGKey) -> Dict:
+ 
+        dones = np.zeros(env.num_envs) # todo: jnp or np?
+        
+        obs, info = env.reset()
+        eval_metrics = jax.tree_map(lambda *x : jnp.asarray(x), *info["metrics"])
+        
+        while not dones.all():
+            
+            key, policy_key = jax.random.split(key)
+            
+            obs = jax.device_put(jnp.stack(obs, axis = 1))
+            action_mask = jax.device_put(jnp.stack([*info["actions_mask"]], axis = 0))
+            
+            actions = get_action(params, Observation(obs, action_mask), policy_key)
+            cpu_action = jax.device_get(actions)
+
+            obs, reward, terminated, truncated, info = env.step(cpu_action.swapaxes(0,1))
+                       
+            next_metrics = jax.tree_map(lambda *x : jnp.asarray(x), *info["metrics"])
+            
+            next_dones = next_metrics["is_terminal_step"]
+            
+            update_metric = lambda old_metric, new_metric :  np.where(np.logical_and(next_dones, dones == False), new_metric, old_metric)
+            eval_metrics = jax.tree_map(update_metric, eval_metrics, next_metrics)
+            
+            dones = np.logical_or(dones, next_dones) 
+        eval_metrics.pop("is_terminal_step")
+
+        return eval_metrics
+    
+    return eval_episodes
+
+
+def make_sebulba_eval_fns(
+    eval_env_fn: callable,
+    network_apply_fn: Union[ActorApply, RecActorApply],
+    config: DictConfig,
+    use_recurrent_net: bool = False,
+    scanned_rnn: Optional[nn.Module] = None,
+) -> Tuple[EvalFn, EvalFn]:
+    """Initialize evaluator functions for reinforcement learning.
+
+    Args:
+        eval_env_fn (Environment): The function to Create the eval envs.
+        network_apply_fn (Union[ActorApply,RecActorApply]): Creates a policy to sample.
+        config (DictConfig): The configuration settings for the evaluation.
+        use_recurrent_net (bool, optional): Whether to use a rnn. Defaults to False.
+        scanned_rnn (Optional[nn.Module], optional): The rnn module.
+            Required if `use_recurrent_net` is True. Defaults to None.
+
+    Returns:
+        Tuple[EvalFn, EvalFn]: A tuple of two evaluation functions:
+        one for use during training and one for absolute metrics.
+
+    Raises:
+        AssertionError: If `use_recurrent_net` is True but `scanned_rnn` is not provided.
+    """
+    eval_env, absolute_eval_env = eval_env_fn(config, config.arch.num_eval_episodes), eval_env_fn(config, config.arch.num_eval_episodes * 10)
+    
+    # Check if win rate is required for evaluation.
+    log_win_rate = config.env.log_win_rate
+    # Vmap it over number of agents and create evaluator_fn.
+    if use_recurrent_net:
+        assert scanned_rnn is not None
+        evaluator = get_rnn_evaluator_fn(
+            eval_env,
+            network_apply_fn,  # type: ignore
+            config,
+            scanned_rnn,
+            log_win_rate,
+        )
+        absolute_metric_evaluator = get_rnn_evaluator_fn(
+            absolute_eval_env,
+            network_apply_fn,  # type: ignore
+            config,
+            scanned_rnn,
+            log_win_rate,
+        )
+    else:
+        evaluator = get_sebulba_ff_evaluator_fn(
+            eval_env, network_apply_fn, config, log_win_rate  # type: ignore
+        )
+        absolute_metric_evaluator = get_sebulba_ff_evaluator_fn(
+            absolute_eval_env, network_apply_fn, config, log_win_rate  # type: ignore
+        )
 
     return evaluator, absolute_metric_evaluator

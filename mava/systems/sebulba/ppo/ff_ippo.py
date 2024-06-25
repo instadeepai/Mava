@@ -32,7 +32,7 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava.evaluator import make_eval_fns
+from mava.evaluator import make_sebulba_eval_fns as make_eval_fns #todo: make a standered eval function 
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.sebulba.ppo.types import LearnerState, OptStates, Params, PPOTransition, Observation #todo: change this Observation to use the origial one 
@@ -62,7 +62,7 @@ def rollout(
     actor_device_id : int):
     
     #create envs
-    env = environments.make_gym_env(config)
+    env = environments.make_gym_env(config, config.arch.num_envs)
     
     #setup
     len_executor_device_ids = len(config.arch.executor_device_ids)
@@ -93,7 +93,7 @@ def rollout(
     def prepare_data(storage: List[PPOTransition]) -> PPOTransition:
         """Prepare data to share with learner."""
         return jax.tree_map(  # type: ignore
-            lambda *xs: jnp.stack(xs), *storage
+            lambda *xs : jnp.stack(xs), *storage
         )
 
 
@@ -102,73 +102,75 @@ def rollout(
     rollout_time: deque = deque(maxlen=10)
     rollout_queue_put_time: deque = deque(maxlen=10)
     
-    next_obs , info = env.reset()
+    next_obs , info = env.reset() #todo : the first info is discarded , is that a problem?
     next_dones = jnp.zeros((config.arch.num_envs, config.system.num_agents), dtype=jax.numpy.bool_)
     
     move_to_device = lambda x : jax.device_put(x, device = current_actor_device)
 
     # Loop till the learner has finished training
-    for update in range(1, config.system.num_updates + 2):
-        # Setup
-        env_recv_time: float = 0
-        inference_time: float = 0
-        storage_time: float = 0
-        env_send_time: float = 0
-        
-        # Get the latest parameters from the learner
-        params_queue_get_time_start = time.time()
-        params = params_queue.get()
-        params_queue_get_time.append(time.time() - params_queue_get_time_start)
-        
-        # Rollout   
-        rollout_time_start = time.time()
-        storage: List = []
-        # Loop over the rollout length
-        for _ in range(0, config.system.rollout_length):
-            # Cached for transition
-            cached_next_obs = move_to_device(jnp.stack(next_obs, axis = 1))
-            cached_next_dones = move_to_device(next_dones)
-            cashed_action_mask = move_to_device(jnp.stack([*info["actions_mask"]], axis = 0) ) #unpack the numpy object, find a more pythonic way?
+    for eval_step in range(config.arch.num_evaluation):
+        for update in range(1, config.system.num_updates_per_eval + 2):
+            # Setup
+            env_recv_time: float = 0
+            inference_time: float = 0
+            storage_time: float = 0
+            env_send_time: float = 0
             
-            # Increment current timestep
-            t_env += (
-                config.arch.n_threads_per_executor * len_executor_device_ids * config.arch.num_envs
-            )
+            # Get the latest parameters from the learner
+            params_queue_get_time_start = time.time()
+            params = params_queue.get()
+            params_queue_get_time.append(time.time() - params_queue_get_time_start)
             
-            # Get action and value
-            inference_time_start = time.time()
-            #
-            (
-                action,
-                log_prob,
-                value,
-                key,
-            ) = get_action_and_value(params, Observation(cached_next_obs, cashed_action_mask), key)
-            inference_time += time.time() - inference_time_start
-            
-            # Step the environment
-            env_send_time_start = time.time()
-            cpu_action = jax.device_get(action)
-            next_obs, next_reward, terminated, truncated, info = env.step(cpu_action.swapaxes(0,1)) #num_env, num_agents --> num_agents, num_env 
-            next_dones = np.logical_or(terminated, truncated)         
-            
-            # Append data to storage
-            env_send_time += time.time() - env_send_time_start
-            storage_time_start = time.time()
-            storage.append(
-                PPOTransition(
-                    done=cached_next_dones,
-                    action=action,
-                    value=value,
-                    reward=next_reward,
-                    log_prob=log_prob,
-                    obs=Observation(cached_next_obs, cashed_action_mask),
-                    info={"win_rate" : info.get("win_rate")}, 
-                    )#todo: use a threadsafe alt https://github.com/instadeepai/CityLearn/blob/27e69f8ebdf1789c55ffab5c326bfaa50733a5e7/power_systems/sax_sebulba.py#L39
-            )
-            storage_time += time.time() - storage_time_start
+            # Rollout   
+            rollout_time_start = time.time()
+            storage: List = []
+            # Loop over the rollout length
+            for _ in range(0, config.system.rollout_length):
+                # Cached for transition
+                cached_next_obs = move_to_device(jnp.stack(next_obs, axis = 1))
+                cached_next_dones = move_to_device(next_dones)
+                cashed_action_mask = move_to_device(jnp.stack([*info["actions_mask"]], axis = 0) ) #unpack the numpy object, find a more pythonic way?
+                
+                # Increment current timestep
+                t_env += (
+                    config.arch.n_threads_per_executor * len_executor_device_ids * config.arch.num_envs
+                )
+                
+                # Get action and value
+                inference_time_start = time.time()
+                #
+                (
+                    action,
+                    log_prob,
+                    value,
+                    key,
+                ) = get_action_and_value(params, Observation(cached_next_obs, cashed_action_mask), key)
+                inference_time += time.time() - inference_time_start
+                
+                # Step the environment
+                env_send_time_start = time.time()
+                cpu_action = jax.device_get(action)
+                next_obs, next_reward, terminated, truncated, info = env.step(cpu_action.swapaxes(0,1)) #num_env, num_agents --> num_agents, num_env 
+                next_dones = np.logical_or(terminated, truncated)         
+                
+                metrics = jax.tree_map(lambda *x : jnp.asarray(x), *info["metrics"]) # Stack the metrics (N_envs , N_metrics) -- > (N_metrics, N_envs)
+                # Append data to storage
+                env_send_time += time.time() - env_send_time_start
+                storage_time_start = time.time()
+                storage.append(
+                    PPOTransition(
+                        done=cached_next_dones,
+                        action=action,
+                        value=value,
+                        reward=next_reward,
+                        log_prob=log_prob,
+                        obs=Observation(cached_next_obs, cashed_action_mask),
+                        info=metrics, 
+                        )#todo: use a threadsafe alt https://github.com/instadeepai/CityLearn/blob/27e69f8ebdf1789c55ffab5c326bfaa50733a5e7/power_systems/sax_sebulba.py#L39
+                )
+                storage_time += time.time() - storage_time_start
 
-        rollout_time.append(time.time() - rollout_time_start) 
+            rollout_time.append(time.time() - rollout_time_start) 
         
         # Prepare data to share with learner 
         # todo: investigate te thread --> single learning  
@@ -446,7 +448,7 @@ def learner_setup(
     n_devices = len(learner_devices)
     
     #create temporory envoirnments.
-    env  = environments.make_gym_env(config)
+    env  = environments.make_gym_env(config, config.arch.num_envs)
     # Get number of agents and actions.
     action_space = env.single_action_space
     config.system.num_agents = len(action_space)
@@ -562,8 +564,7 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Setup evaluator.
     # One key per device for evaluation.
-    #eval_keys = jax.random.split(key_e, n_devices) # todo: well add the evaluations :)
-    #evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network.apply, config)
+    evaluator, absolute_metric_evaluator = make_eval_fns(environments.make_gym_env, apply_fns[0], config) #todo: make this more generic
 
     # Calculate total timesteps.
     config = sebulba_check_total_timesteps(config) #todo: update this for sebulba
@@ -576,9 +577,9 @@ def run_experiment(_config: DictConfig) -> float:
     steps_per_rollout = (
         len(config.arch.executor_device_ids)
         * config.arch.n_threads_per_executor
-        * config.system.num_updates_per_eval
         * config.system.rollout_length
         * config.arch.num_envs
+        * config.system.num_updates_per_eval
     )
 
     # Logger setup
@@ -633,7 +634,7 @@ def run_experiment(_config: DictConfig) -> float:
     best_params = None
     for eval_step in range(config.arch.num_evaluation): #todo : place holder
         trainer_update_number += 1
-        rollout_queue_get_time_start = time.time()
+        start_time = time.time()
         sharded_storages = []
         sharded_next_obss = []
         sharded_next_dones = []
@@ -656,22 +657,16 @@ def run_experiment(_config: DictConfig) -> float:
                 sharded_next_obss.append(sharded_next_obs)
                 sharded_next_dones.append(sharded_next_done)
                 sharded_next_action_masks.append(sharded_next_action_mask)
-        rollout_queue_get_time.append(time.time() - rollout_queue_get_time_start)
+        rollout_queue_get_time.append(time.time() - start_time)
         training_time_start = time.time()
         
         #Concatinate the returned trajectories on the n_env axis 
-        sharded_storages = jax.tree_map(lambda *x : jnp.concatenate(x, axis = 2), *sharded_storages) 
+        sharded_storages = jax.tree_map(lambda *x : jnp.concatenate(x, axis = 2), *sharded_storages)  #todo: check if this breaks the explicet array device placment 
         sharded_next_obss = jnp.concatenate(sharded_next_obss, axis = 1)
         sharded_next_dones = jnp.concatenate(sharded_next_dones, axis = 1)
         sharded_next_action_masks = jnp.concatenate(sharded_next_action_masks, axis = 1)
 
         learner_output = learn(learner_state, sharded_storages, sharded_next_obss, sharded_next_action_masks, sharded_next_dones)
-        
-        # Log the results of the training.
-        elapsed_time = time.time() - rollout_queue_get_time_start
-        t = int(steps_per_rollout * (eval_step + 1))
-        episode_metrics, ep_completed = get_final_step_metrics(learner_output.episode_metrics)
-        episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
         
         # Send updated params to executors
         unreplicated_params = flax.jax_utils.unreplicate(learner_output.learner_state.params)
@@ -682,13 +677,36 @@ def run_experiment(_config: DictConfig) -> float:
                     device_params
                 )
                 
+        # Log the results of the training.
+        elapsed_time = time.time() - start_time
+        t = int(steps_per_rollout * (eval_step + 1))
+        episode_metrics, ep_completed = get_final_step_metrics(learner_output.episode_metrics) # todo: these shapes are not as expected  
+        episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+                
         # Separately log timesteps, actoring metrics and training metrics.
         logger.log({"timestep": t}, t, eval_step, LogEvent.MISC)
         if ep_completed:  # only log episode metrics if an episode was completed in the rollout.
             logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
         logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
 
+        # Evaluation on the learner 
+        key_e, eval_key = jax.random.split(key_e, 2)
+        episode_metrics = evaluator(unreplicate_n_dims(learner_output.learner_state.params.actor_params, 1 ), eval_key)
+        
+        # Log the results of the evaluation.
+        elapsed_time = time.time() - start_time
+        episode_return = jnp.mean(episode_metrics["episode_return"])
 
+        steps_per_eval = int(jnp.sum(episode_metrics["episode_length"]))
+        episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
+        logger.log(episode_metrics, t, eval_step, LogEvent.EVAL)
+        
+        #todo: add saving
+        
+        if config.arch.absolute_metric and max_episode_return <= episode_return:
+            best_params = copy.deepcopy(learner_output.learner_state.params)
+            max_episode_return = episode_return
+    #todo: abs metric
     return None#eval_performance
 
 

@@ -29,7 +29,7 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava.evaluator import make_eval_fns
+from mava.evaluator import make_anakin_eval_fns
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.anakin.ppo.types import LearnerState, OptStates, Params, PPOTransition
@@ -462,7 +462,7 @@ def run_experiment(_config: DictConfig) -> float:
     # Setup evaluator.
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
-    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network.apply, config)
+    evaluator, absolute_metric_evaluator = make_anakin_eval_fns(eval_env, actor_network.apply, config)
 
     # Calculate total timesteps.
     config = anakin_check_total_timesteps(config)
