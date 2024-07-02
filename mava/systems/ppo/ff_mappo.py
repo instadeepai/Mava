@@ -464,8 +464,8 @@ def run_experiment(_config: DictConfig) -> float:
     # Calculate total timesteps.
     config = check_total_timesteps(config)
     assert (
-        config.system.num_updates > config.arch.num_evaluation
-    ), "Number of updates per evaluation must be less than total number of updates."
+        config.system.num_updates % config.arch.num_evaluation == 0
+    ), "Number of updates must be divisible by the number of evaluations."
 
     # Calculate number of updates per evaluation.
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
