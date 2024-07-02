@@ -68,7 +68,7 @@ def rollout(
     len_executor_device_ids = len(config.arch.executor_device_ids)
     current_actor_device = jax.devices()[actor_device_id]
     t_env = 0
-    start_time = time.time()
+    
 
     actor_apply_fn, critic_apply_fn = apply_fns
     
@@ -98,9 +98,9 @@ def rollout(
 
 
     # Define queues to track time
-    params_queue_get_time: deque = deque(maxlen=10)
-    rollout_time: deque = deque(maxlen=10)
-    rollout_queue_put_time: deque = deque(maxlen=10)
+    params_queue_get_time: deque = deque(maxlen=1)
+    rollout_time: deque = deque(maxlen=1)
+    rollout_queue_put_time: deque = deque(maxlen=1)
     
     next_obs , info = env.reset() #todo : the first info is discarded , is that a problem?
     next_dones = jnp.zeros((config.arch.num_envs, config.system.num_agents), dtype=jax.numpy.bool_)
@@ -108,70 +108,77 @@ def rollout(
     move_to_device = lambda x : jax.device_put(x, device = current_actor_device)
 
     # Loop till the learner has finished training
-    for eval_step in range(config.arch.num_evaluation):
-        for update in range(1, config.system.num_updates_per_eval + 2):
-            # Setup
-            env_recv_time: float = 0
-            inference_time: float = 0
-            storage_time: float = 0
-            env_send_time: float = 0
+    for update in range(config.system.num_updates):
+        print(update)
+        # Setup todo: double check tracking times
+        inference_time: float = 0
+        storage_time: float = 0
+        env_send_time: float = 0
+        setup = 0
             
-            # Get the latest parameters from the learner
-            params_queue_get_time_start = time.time()
-            params = params_queue.get()
-            params_queue_get_time.append(time.time() - params_queue_get_time_start)
-            
-            # Rollout   
-            rollout_time_start = time.time()
-            storage: List = []
-            # Loop over the rollout length
-            for _ in range(0, config.system.rollout_length):
-                # Cached for transition
-                cached_next_obs = move_to_device(jnp.stack(next_obs, axis = 1))
-                cached_next_dones = move_to_device(next_dones)
-                cashed_action_mask = move_to_device(jnp.stack([*info["actions_mask"]], axis = 0) ) #unpack the numpy object, find a more pythonic way?
-                
-                # Increment current timestep
-                t_env += (
-                    config.arch.n_threads_per_executor * len_executor_device_ids * config.arch.num_envs
-                )
-                
-                # Get action and value
-                inference_time_start = time.time()
-                #
-                (
-                    action,
-                    log_prob,
-                    value,
-                    key,
-                ) = get_action_and_value(params, Observation(cached_next_obs, cashed_action_mask), key)
-                inference_time += time.time() - inference_time_start
-                
-                # Step the environment
-                env_send_time_start = time.time()
-                cpu_action = jax.device_get(action)
-                next_obs, next_reward, terminated, truncated, info = env.step(cpu_action.swapaxes(0,1)) #num_env, num_agents --> num_agents, num_env 
-                next_dones = np.logical_or(terminated, truncated)         
-                
-                metrics = jax.tree_map(lambda *x : jnp.asarray(x), *info["metrics"]) # Stack the metrics (N_envs , N_metrics) -- > (N_metrics, N_envs)
-                # Append data to storage
-                env_send_time += time.time() - env_send_time_start
-                storage_time_start = time.time()
-                storage.append(
-                    PPOTransition(
-                        done=cached_next_dones,
-                        action=action,
-                        value=value,
-                        reward=next_reward,
-                        log_prob=log_prob,
-                        obs=Observation(cached_next_obs, cashed_action_mask),
-                        info=metrics, 
-                        )#todo: use a threadsafe alt https://github.com/instadeepai/CityLearn/blob/27e69f8ebdf1789c55ffab5c326bfaa50733a5e7/power_systems/sax_sebulba.py#L39
-                )
-                storage_time += time.time() - storage_time_start
-
-            rollout_time.append(time.time() - rollout_time_start) 
+        # Get the latest parameters from the learner
+        params_queue_get_time_start = time.time()
+        params = params_queue.get()
+        params_queue_get_time.append(time.time() - params_queue_get_time_start)
         
+        # Rollout   
+        rollout_time_start = time.time()
+        storage: List = []
+
+        # Loop over the rollout length
+        for _ in range(0, config.system.rollout_length):
+            
+            # Cached for transition
+            cached_next_obs = move_to_device(jnp.stack(next_obs, axis = 1))
+            cached_next_dones = move_to_device(next_dones)
+            setup_start = time.time()
+            cashed_action_mask = move_to_device(np.stack(info["actions_mask"]) ) 
+            setup += time.time() - setup_start
+            # Increment current timestep
+            t_env += (
+                config.arch.n_threads_per_executor * len_executor_device_ids * config.arch.num_envs
+            )
+            
+            # Get action and value
+            inference_time_start = time.time()
+            #
+            (
+                action,
+                log_prob,
+                value,
+                key,
+            ) = get_action_and_value(params, Observation(cached_next_obs, cashed_action_mask), key)
+            inference_time += time.time() - inference_time_start
+            
+            # Step the environment
+            env_send_time_start = time.time()
+            cpu_action = jax.device_get(action)
+
+            next_obs, next_reward, terminated, truncated, info = env.step(cpu_action.swapaxes(0,1)) #num_env, num_agents --> num_agents, num_env 
+            env_send_time += time.time() - env_send_time_start
+            
+            
+            storage_time_start = time.time()
+            # Prepare the data
+            next_dones = np.logical_or(terminated, truncated)         
+            metrics = jax.tree_map(lambda *x : jnp.asarray(x), *info["metrics"]) # Stack the metrics (N_envs , N_metrics) -- > (N_metrics, N_envs)
+            
+            # Append data to storage
+            storage.append(
+                PPOTransition(
+                    done=cached_next_dones,
+                    action=action,
+                    value=value,
+                    reward=next_reward,
+                    log_prob=log_prob,
+                    obs=Observation(cached_next_obs, cashed_action_mask),
+                    info=metrics, 
+                    )#todo: use a threadsafe alt https://github.com/instadeepai/CityLearn/blob/27e69f8ebdf1789c55ffab5c326bfaa50733a5e7/power_systems/sax_sebulba.py#L39
+            )
+            storage_time += time.time() - storage_time_start
+        rollout_time.append(time.time() - rollout_time_start) 
+    
+        parse_timer = time.time()
         # Prepare data to share with learner 
         # todo: investigate te thread --> single learning  
         partitioned_storage = prepare_data(storage)
@@ -184,15 +191,27 @@ def rollout(
         sharded_next_action_mask = shard_split_payload(jnp.stack([*info["actions_mask"]], axis = 0), 0)  
         sharded_next_done = shard_split_payload(next_dones, 0)
 
+
+        speed_info = {
+            "rollout_time": np.mean(rollout_time),
+            "params_queue_get_time": np.mean(params_queue_get_time),
+            "action_inference": inference_time,
+            "storage_time": storage_time,
+            "env_step_time": env_send_time,
+            "rollout_queue_put_time": np.mean(rollout_queue_put_time) if rollout_queue_put_time else 0,
+            "parse_time" : time.time() - parse_timer,
+            "setup_time" : setup,
+            }
+        #print(speed_info)
+        
         payload = (
             t_env,
             sharded_storage,
             sharded_next_obs,
             sharded_next_done,
-            sharded_next_action_mask,
-            np.mean(params_queue_get_time),
+            sharded_next_action_mask
         )
-
+        
         # Put data in the rollout queue to share it with the learner
         rollout_queue_put_time_start = time.time()
         rollout_queue.put(payload)
@@ -210,7 +229,7 @@ def get_learner_fn(
     actor_apply_fn, critic_apply_fn = apply_fns
     actor_update_fn, critic_update_fn = update_fns
 
-    def _update_step(learner_state: LearnerState, _: Any, traj_batch : PPOTransition, last_obs: chex.Array, last_action_mask : chex.Array, last_dones : chex.Array) -> Tuple[LearnerState, Tuple]:
+    def _update_step(learner_state: LearnerState, traj_batch : PPOTransition, last_obs: chex.Array, last_action_mask : chex.Array, last_dones : chex.Array) -> Tuple[LearnerState, Tuple]:
         """A single update of the network.
 
         This function steps the environment and records the trajectory batch for
@@ -340,7 +359,7 @@ def get_learner_fn(
                 # available at https://tinyurl.com/26tdzs5x
                 # pmean over devices.
                 actor_grads, actor_loss_info = jax.lax.pmean(
-                    (actor_grads, actor_loss_info), axis_name="device"
+                    (actor_grads, actor_loss_info), axis_name="device" #todo: pmean over learner devices not all
                 )
 
                 # pmean over devices.
@@ -406,7 +425,7 @@ def get_learner_fn(
 
         params, opt_states, traj_batch, advantages, targets, key = update_state
         learner_state = LearnerState(params, opt_states, key, None, None)
-        metric = traj_batch.info #todo: metrci calcualtions
+        metric = traj_batch.info
         return learner_state, (metric, loss_info)
 
     def learner_fn(learner_state: LearnerState, traj_batch : PPOTransition, last_obs: chex.Array, last_action_mask : chex.Array, last_dones : chex.Array) -> ExperimentOutput[LearnerState]:
@@ -424,12 +443,9 @@ def get_learner_fn(
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
         """
-        # Broadcast static parameters for scan
-        partial_update_step =  lambda learner_state,  xs :  _update_step(learner_state,  xs, traj_batch , last_obs, last_action_mask, last_dones) 
+
         
-        learner_state, (episode_info, loss_info) = jax.lax.scan(
-            partial_update_step, learner_state, None, config.system.num_updates_per_eval
-        )
+        learner_state, (episode_info, loss_info) =  _update_step(learner_state,  traj_batch , last_obs, last_action_mask, last_dones) 
 
         return ExperimentOutput(
             learner_state=learner_state,
@@ -534,15 +550,13 @@ def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
     config = copy.deepcopy(_config)
 
-    devices = jax.devices() # todo: use local devices insted? 
+    devices = jax.devices() 
     learner_devices = [devices[d_id] for d_id in config.arch.learner_device_ids]
 
     # PRNG keys.
     key, key_e, actor_net_key, critic_net_key = jax.random.split(
         jax.random.PRNGKey(config.system.seed), num=4
     )
-
-    learner_keys = jax.device_put_replicated(key, learner_devices)
     
     # Sanity check of config
     assert (
@@ -624,77 +638,94 @@ def run_experiment(_config: DictConfig) -> float:
                     learner_devices,
                     d_id,
                 ),
-            ).start()
+            ).start() #todo : this is techinically only multu threaded not multi processepr? 
             
     # Run experiment for the total number of updates.
-    rollout_queue_get_time: deque = deque(maxlen=10)
-    data_transfer_time: deque = deque(maxlen=10)
-    trainer_update_number = 0
     max_episode_return = jnp.float32(0.0)
     best_params = None
-    for eval_step in range(config.arch.num_evaluation): #todo : place holder
-        trainer_update_number += 1
-        start_time = time.time()
-        sharded_storages = []
-        sharded_next_obss = []
-        sharded_next_dones = []
-        sharded_next_action_masks = []
-
-        # Loop through each executor device
-        for d_idx, _ in enumerate(config.arch.executor_device_ids):
-            # Loop through each executor thread
-            for thread_id in range(config.arch.n_threads_per_executor):
-                # Get data from rollout queue
-                (
-                    t_env,
-                    sharded_storage,
-                    sharded_next_obs,
-                    sharded_next_done,
-                    sharded_next_action_mask,
-                    avg_params_queue_get_time,
-                ) = rollout_queues[d_idx * config.arch.n_threads_per_executor + thread_id].get()
-                sharded_storages.append(sharded_storage)
-                sharded_next_obss.append(sharded_next_obs)
-                sharded_next_dones.append(sharded_next_done)
-                sharded_next_action_masks.append(sharded_next_action_mask)
-        rollout_queue_get_time.append(time.time() - start_time)
-        training_time_start = time.time()
+    for eval_step in range(config.arch.num_evaluation): 
+        training_start_time = time.time()
+        learner_speeds = []
+        rollout_times = []
         
-        #Concatinate the returned trajectories on the n_env axis 
-        sharded_storages = jax.tree_map(lambda *x : jnp.concatenate(x, axis = 2), *sharded_storages)  #todo: check if this breaks the explicet array device placment 
-        sharded_next_obss = jnp.concatenate(sharded_next_obss, axis = 1)
-        sharded_next_dones = jnp.concatenate(sharded_next_dones, axis = 1)
-        sharded_next_action_masks = jnp.concatenate(sharded_next_action_masks, axis = 1)
-
-        learner_output = learn(learner_state, sharded_storages, sharded_next_obss, sharded_next_action_masks, sharded_next_dones)
+        episode_metrics = []
+        train_metrics = []
         
-        # Send updated params to executors
-        unreplicated_params = flax.jax_utils.unreplicate(learner_output.learner_state.params)
-        for d_idx, d_id in enumerate(config.arch.executor_device_ids):
-            device_params = jax.device_put(unreplicated_params, devices[d_id])
-            for thread_id in range(config.arch.n_threads_per_executor):
-                params_queues[d_idx * config.arch.n_threads_per_executor + thread_id].put(
-                    device_params
-                )
-                
+        for update in range(config.system.num_updates_per_eval):
+            sharded_storages = []
+            sharded_next_obss = []
+            sharded_next_dones = []
+            sharded_next_action_masks = []
+            
+            rollout_start_time = time.time()
+            # Loop through each executor device
+            for d_idx, _ in enumerate(config.arch.executor_device_ids):
+                # Loop through each executor thread
+                for thread_id in range(config.arch.n_threads_per_executor):
+                    # Get data from rollout queue
+                    (
+                        t_env,
+                        sharded_storage,
+                        sharded_next_obs,
+                        sharded_next_done,
+                        sharded_next_action_mask
+                    ) = rollout_queues[d_idx * config.arch.n_threads_per_executor + thread_id].get()
+                    sharded_storages.append(sharded_storage)
+                    sharded_next_obss.append(sharded_next_obs)
+                    sharded_next_dones.append(sharded_next_done)
+                    sharded_next_action_masks.append(sharded_next_action_mask)
+
+            rollout_times.append(time.time() - rollout_start_time)
+    
+            
+            # Concatinate the returned trajectories on the n_env axis 
+            sharded_storages = jax.tree_map(lambda *x : jnp.concatenate(x, axis = 2), *sharded_storages)  #todo: check if this breaks the explicet array device placment 
+            sharded_next_obss = jnp.concatenate(sharded_next_obss, axis = 1)
+            sharded_next_dones = jnp.concatenate(sharded_next_dones, axis = 1)
+            sharded_next_action_masks = jnp.concatenate(sharded_next_action_masks, axis = 1)
+
+
+            learner_start_time = time.time()
+            learner_output = learn(learner_state, sharded_storages, sharded_next_obss, sharded_next_action_masks, sharded_next_dones)
+            learner_speeds.append(time.time() - learner_start_time)
+            
+            # Stack the metrics
+            episode_metrics.append(learner_output.episode_metrics)
+            train_metrics.append(learner_output.train_metrics)
+            
+            # Send updated params to executors
+            unreplicated_params = flax.jax_utils.unreplicate(learner_output.learner_state.params)
+            for d_idx, d_id in enumerate(config.arch.executor_device_ids):
+                device_params = jax.device_put(unreplicated_params, devices[d_id])
+                for thread_id in range(config.arch.n_threads_per_executor):
+                    params_queues[d_idx * config.arch.n_threads_per_executor + thread_id].put(
+                        device_params
+                    )
+
+
+
         # Log the results of the training.
-        elapsed_time = time.time() - start_time
+        elapsed_time = time.time() - training_start_time
         t = int(steps_per_rollout * (eval_step + 1))
-        episode_metrics, ep_completed = get_final_step_metrics(learner_output.episode_metrics) # todo: these shapes are not as expected  
-        episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        episode_metrics = jax.tree_map(lambda *x : np.asarray(x), *episode_metrics)
+        episode_metrics, ep_completed = get_final_step_metrics(episode_metrics) 
+        episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time  
                 
         # Separately log timesteps, actoring metrics and training metrics.
-        logger.log({"timestep": t}, t, eval_step, LogEvent.MISC)
+        speed_info = {"total_time" : elapsed_time, "rollout_time" : np.sum(rollout_times), "learner_time" : np.sum(learner_speeds), "timestep" : t}
+        logger.log(speed_info , t, eval_step, LogEvent.MISC)
         if ep_completed:  # only log episode metrics if an episode was completed in the rollout.
-            logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
-        logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
+            logger.log(episode_metrics, t, eval_step, LogEvent.ACT) 
+        train_metrics = jax.tree_map(lambda *x : np.asarray(x), *train_metrics)
+        logger.log(train_metrics, t, eval_step, LogEvent.TRAIN)
 
         # Evaluation on the learner 
+        evaluation_start_timer = time.time()
         key_e, eval_key = jax.random.split(key_e, 2)
         episode_metrics = evaluator(unreplicate_n_dims(learner_output.learner_state.params.actor_params, 1 ), eval_key)
         
         # Log the results of the evaluation.
-        elapsed_time = time.time() - start_time
+        elapsed_time = time.time() - evaluation_start_timer
         episode_return = jnp.mean(episode_metrics["episode_return"])
 
         steps_per_eval = int(jnp.sum(episode_metrics["episode_length"]))
@@ -706,8 +737,32 @@ def run_experiment(_config: DictConfig) -> float:
         if config.arch.absolute_metric and max_episode_return <= episode_return:
             best_params = copy.deepcopy(learner_output.learner_state.params)
             max_episode_return = episode_return
-    #todo: abs metric
-    return None#eval_performance
+            
+        # Update runner state to continue training.
+        learner_state = learner_output.learner_state
+    
+        # Record the performance for the final evaluation run.
+    eval_performance = float(jnp.mean(episode_metrics[config.env.eval_metric]))
+
+    # Measure absolute metric.
+    if config.arch.absolute_metric:
+        start_time = time.time()
+
+        key_e, eval_key = jax.random.split(key_e, 2)
+        episode_metrics = absolute_metric_evaluator(unreplicate_n_dims(best_params.actor_params, 1), eval_key)
+
+        elapsed_time = time.time() - start_time
+        steps_per_eval = int(jnp.sum(episode_metrics["episode_length"]))
+        
+        t = int(steps_per_rollout * (eval_step + 1))
+        episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
+        logger.log(episode_metrics, t, eval_step, LogEvent.ABSOLUTE)
+
+    # Stop the logger.
+    logger.stop()
+
+    return eval_performance
+
 
 
 @hydra.main(config_path="../../../configs", config_name="default_ff_ippo_seb.yaml", version_base="1.2")

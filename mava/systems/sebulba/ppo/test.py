@@ -39,7 +39,8 @@ from mava.wrappers.episode_metrics import get_final_step_metrics
 from flax import linen as nn
 import gym
 import rware 
-from mava.wrappers import GymRwareWrapper, GymRecordEpisodeMetrics,  _multiagent_worker_shared_memory
+import lbforaging
+from mava.wrappers import GymRwareWrapper, GymRecordEpisodeMetrics,  _multiagent_worker_shared_memory, GymAgentIDWrapper, GymLBFWrapper
 @hydra.main(config_path="../../../configs", config_name="default_ff_ippo_seb.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
@@ -49,7 +50,8 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     OmegaConf.set_struct(cfg, False)
     def f():
         base = gym.make(cfg.env.scenario)
-        base = GymRwareWrapper(base, cfg.env.use_individual_rewards, False, True)
+        base = GymLBFWrapper(base, cfg.env.use_individual_rewards,  True)
+        base = GymAgentIDWrapper(base)
         return GymRecordEpisodeMetrics(base)
     
     base =  gym.vector.AsyncVectorEnv(  # todo : give them more descriptive names
@@ -62,13 +64,14 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     base.reset()
     n = 0
     done = False
+    r = [0] * 3
     while not done:
         n+= 1
-        agents_view, reward, terminated, truncated, info = base.step([[0,0,0], [0,0,0]])
+        agents_view, reward, terminated, truncated, info = base.step([r, r])
+        print(terminated, truncated)
         done = np.logical_or(terminated, truncated).all()
-        metrics = jax.tree_map(lambda *x : jnp.asarray(x), *info["metrics"])
-        print(n, done, terminated, np.logical_or(terminated, truncated).shape, metrics)
-        done = True
+        print(n, done)
+        #metrics = jax.tree_map(lambda *x : jnp.asarray(x), *info["metrics"])
     base.close()
     print(done)
     
