@@ -25,7 +25,7 @@ from jumanji.types import TimeStep
 from omegaconf import DictConfig
 from typing_extensions import TypeAlias
 
-from mava.types import Action, EvalFn, Observation, ObservationGlobalState
+from mava.types import Action, EvalFn, Metrics, Observation, ObservationGlobalState
 
 # Optional extras that are passed out of the actor and then into the actor in the next step
 ActorState: TypeAlias = Dict[str, Any]
@@ -39,6 +39,12 @@ class EvalActFn(Protocol):
         key: PRNGKey,
         **actor_state,
     ) -> Tuple[Array, ActorState]: ...
+
+
+class EvalFn(Protocol):
+    def __call__(
+        self, params: FrozenDict, key: PRNGKey, actor_state: ActorState = {}
+    ) -> Metrics: ...
 
 
 def get_eval_fn(
@@ -84,7 +90,6 @@ def get_eval_fn(
         # So in evaluation we have config.arch.num_envs parallel envs and loop
         # enough times so that we do at least `eval_episodes` number of episodes
         _, metrics = jax.lax.scan(_episode, key, xs=None, length=episode_loops)
-        # todo: can we calculate sps here?
         return jax.tree_map(lambda x: x.reshape(-1), metrics)  # flatten metrics
 
     return jax.pmap(eval_fn, axis_name="device")
