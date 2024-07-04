@@ -29,11 +29,11 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava.evaluator import get_eval_fn, make_eval_fns
+from mava.evaluator import get_eval_fn, make_ff_eval_act_fn
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
-from mava.types import Action, ActorApply, CriticApply, ExperimentOutput, LearnerFn
+from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import (
@@ -471,16 +471,8 @@ def run_experiment(_config: DictConfig) -> float:
     # Setup evaluator.
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
-
-    def eval_act_fn(params, timestep, key) -> Tuple[Action, Dict]:
-        # p = unreplicate_n_dims(params)  # for now
-        pi = actor_network.apply(params, timestep.observation)
-        action = pi.mode() if config.arch.evaluation_greedy else pi.sample(seed=key)
-        return action, {}
-
-    evaluator2 = get_eval_fn(eval_env, eval_act_fn, config, config.arch.num_eval_episodes)
-    # eval_metrics = evaluator2(learner_state.params.actor_params, key, {})
-    # print(eval_metrics)
+    eval_act_fn = make_ff_eval_act_fn(actor_network, config)
+    evaluator = get_eval_fn(eval_env, eval_act_fn, config, config.arch.num_eval_episodes)
 
     # Calculate total timesteps.
     config = check_total_timesteps(config)
@@ -544,7 +536,7 @@ def run_experiment(_config: DictConfig) -> float:
         eval_keys = eval_keys.reshape(n_devices, -1)
 
         # Evaluate.
-        eval_metrics = evaluator2(trained_params, eval_keys, {})
+        eval_metrics = evaluator(trained_params, eval_keys)
         jax.block_until_ready(eval_metrics)
 
         # Log the results of the evaluation.
@@ -571,7 +563,7 @@ def run_experiment(_config: DictConfig) -> float:
         learner_state = learner_output.learner_state
 
     # Record the performance for the final evaluation run.
-    eval_performance = float(jnp.mean(eval_metrics.episode_metrics[config.env.eval_metric]))
+    eval_performance = float(jnp.mean(eval_metrics[config.env.eval_metric]))
 
     # Measure absolute metric.
     if config.arch.absolute_metric:
