@@ -79,7 +79,7 @@ def unbatchify(x: Array, agents: List[str]) -> Dict[str, Array]:
 
 
 def merge_space(
-    spec: Dict[str, Union[jaxmarl_spaces.Box, jaxmarl_spaces.Discrete]]
+    spec: Dict[str, Union[jaxmarl_spaces.Box, jaxmarl_spaces.Discrete]],
 ) -> jaxmarl_spaces.Space:
     """Convert a dictionary of spaces into a single space with a num_agents size first dimension.
 
@@ -187,10 +187,10 @@ class JaxMarlWrapper(Wrapper, ABC):
 
         super().__init__(env)
         self._env: MultiAgentEnv
-        self._timelimit = timelimit
         self.agents = self._env.agents
-        self.num_agents = self._env.num_agents
         self.has_global_state = has_global_state
+        self.time_limit = timelimit
+        self.num_agents = self._env.num_agents
 
         # Calling these on init to cache the values in a non-jitted context.
         self.state_size
@@ -252,7 +252,7 @@ class JaxMarlWrapper(Wrapper, ABC):
             (self.num_agents, self.action_dim), bool, False, True, "action_mask"
         )
         step_count = specs.BoundedArray(
-            (self.num_agents,), jnp.int32, 0, self._timelimit, "step_count"
+            (self.num_agents,), jnp.int32, 0, self.time_limit, "step_count"
         )
 
         if self.has_global_state:
@@ -287,7 +287,11 @@ class JaxMarlWrapper(Wrapper, ABC):
 
     def discount_spec(self) -> specs.BoundedArray:
         return specs.BoundedArray(
-            shape=(self.num_agents,), dtype=float, minimum=0.0, maximum=1.0, name="discount"
+            shape=(self.num_agents,),
+            dtype=float,
+            minimum=0.0,
+            maximum=1.0,
+            name="discount",
         )
 
     @abstractmethod
@@ -326,9 +330,8 @@ class SmaxWrapper(JaxMarlWrapper):
         self,
         env: MultiAgentEnv,
         has_global_state: bool = False,
-        timelimit: int = 500,
     ):
-        super().__init__(env, has_global_state, timelimit)
+        super().__init__(env, has_global_state, env.max_steps)
         self._env: SMAX
 
     def reset(
@@ -382,9 +385,8 @@ class MabraxWrapper(JaxMarlWrapper):
         self,
         env: MABraxEnv,
         has_global_state: bool = False,
-        timelimit: int = 1000,
     ):
-        super().__init__(env, has_global_state, timelimit)
+        super().__init__(env, has_global_state, env.episode_length)
         self._env: MABraxEnv
 
     @cached_property

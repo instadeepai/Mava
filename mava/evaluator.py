@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+import math
+from typing import Any, Callable, Dict, Optional, Protocol, Tuple, Union
 
 import chex
 import flax.linen as nn
@@ -23,6 +24,7 @@ from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
 from jumanji.types import TimeStep
 from omegaconf import DictConfig
+from typing_extensions import TypeAlias
 
 from mava.types import (
     ActorApply,
@@ -36,52 +38,66 @@ from mava.types import (
     RNNEvalState,
 )
 
-# Dict[str, Any] is the actor state
-ActFn = Callable[
-    [
-        FrozenDict,
-        TimeStep[Union[Observation, ObservationGlobalState]],
-        PRNGKey,
-        ...,
-    ],
-    Tuple[Array, Dict[str, Any]],
-]
+# Optional extras that are passed out of the actor and then into the actor in the next step
+ActorState: TypeAlias = Dict[str, Any]
 
 
-# todo: pmap
-def get_eval_fn(env: Environment, act_fn: ActFn, config: DictConfig, eval_episodes: int) -> EvalFn:
+class EvalActFn(Protocol):
+    def __call__(
+        self,
+        params: FrozenDict,
+        timestep: TimeStep[Union[Observation, ObservationGlobalState]],
+        key: PRNGKey,
+        **actor_state,
+    ) -> Tuple[Array, ActorState]: ...
+
+
+def get_eval_fn(
+    env: Environment, act_fn: EvalActFn, config: DictConfig, eval_episodes: int
+) -> EvalFn:
     def eval_fn(
-        params: FrozenDict, key: PRNGKey, init_act_state: Dict[str, Any] = {}
-    ) -> ExperimentOutput:
+        params: FrozenDict, key: PRNGKey, init_act_state: ActorState = {}
+    ) -> Dict[str, Array]:
         def _env_step(eval_state, actor_state):
+            """Performs a single environment step"""
             env_state, ts, key, actor_state = eval_state
 
             key, act_key = jax.random.split(key)
-            # act_keys = jax.random.split(act_key, eval_episodes)
             action, actor_state = act_fn(params, ts, act_key, **actor_state)
             env_state, ts = jax.vmap(env.step)(env_state, action)
 
             return (env_state, ts, key, actor_state), ts
 
-        key, reset_key = jax.random.split(key)
-        # todo: vmap for num envs and loop for enough episodes
-        reset_keys = jax.random.split(reset_key, eval_episodes)
-        env_state, ts = jax.vmap(env.reset)(reset_keys)
+        def _episode(key: PRNGKey, _) -> Tuple[PRNGKey, Dict[str, Array]]:
+            """Simulates `config.arch.num_envs` episodes."""
+            key, reset_key = jax.random.split(key)
+            reset_keys = jax.random.split(reset_key, config.arch.num_envs)
+            env_state, ts = jax.vmap(env.reset)(reset_keys)
 
-        step_state = env_state, ts, key, init_act_state
-        _, timesteps = jax.lax.scan(_env_step, step_state, jnp.arange(env.time_limit))
+            step_state = env_state, ts, key, init_act_state
+            _, timesteps = jax.lax.scan(_env_step, step_state, jnp.arange(env.time_limit))
 
-        # find the first instance of done to get the metrics at that timestep
-        done_idx = jnp.argmax(timesteps.last(), axis=0)
-        # get the reward from the actual timesteps
-        # todo: log winrate!
-        metrics = jax.tree_map(
-            lambda m: m[done_idx, jnp.arange(eval_episodes)], timesteps.extras["episode_metrics"]
-        )
+            metrics = timesteps.extras["episode_metrics"]
+            if config.env.log_win_rate:
+                metrics["won_episode"] = timesteps.extras["won_episode"]
 
-        return metrics
+            # find the first instance of done to get the metrics at that timestep
+            # we don't care about subsequent steps because we only the results from the first episode
+            done_idx = jnp.argmax(timesteps.last(), axis=0)
+            metrics = jax.tree_map(lambda m: m[done_idx, jnp.arange(config.arch.num_envs)], metrics)
+            del metrics["is_terminal_step"]  # uneeded for logging
 
-    return eval_fn
+            return key, metrics
+
+        # todo: do we want to divide this by n devices?
+        episode_loops = math.ceil(eval_episodes / config.arch.num_envs)
+        # This loop is important because we don't want too many parallel envs.
+        # So in evaluation we have config.arch.num_envs parallel envs and loop
+        # enough times so that we do at least `eval_episodes` number of episodes
+        _, metrics = jax.lax.scan(_episode, key, xs=None, length=episode_loops)
+        return jax.tree_map(lambda x: x.reshape(-1), metrics)  # flatten metrics
+
+    return jax.pmap(eval_fn)
 
 
 def get_ff_evaluator_fn(

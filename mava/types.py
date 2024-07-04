@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, Generic, Tuple, TypeVar
+from typing import Any, Callable, Dict, Generic, Optional, Tuple, TypeVar
 
 import chex
 from flax.core.frozen_dict import FrozenDict
@@ -26,6 +26,7 @@ Done: TypeAlias = chex.Array
 HiddenState: TypeAlias = chex.Array
 # Can't know the exact type of State.
 State: TypeAlias = Any
+Metrics: TypeAlias = Dict[str, chex.Array]
 
 
 class Observation(NamedTuple):
@@ -87,12 +88,13 @@ class ExperimentOutput(NamedTuple, Generic[MavaState]):
     """Experiment output."""
 
     learner_state: MavaState
-    episode_metrics: Dict[str, chex.Array]
-    train_metrics: Dict[str, chex.Array]
+    episode_metrics: Metrics
+    train_metrics: Metrics
 
 
 LearnerFn = Callable[[MavaState], ExperimentOutput[MavaState]]
-EvalFn = Callable[[FrozenDict, chex.PRNGKey, Dict[str, Any]], ExperimentOutput[MavaState]]
+# todo: define eval types here to use in the eval fn?
+EvalFn = Callable[[FrozenDict, chex.PRNGKey, Optional[Dict[str, Any]]], Metrics]
 
 ActorApply = Callable[[FrozenDict, Observation], Distribution]
 CriticApply = Callable[[FrozenDict, Observation], Value]

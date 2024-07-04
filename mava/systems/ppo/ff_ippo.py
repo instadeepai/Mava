@@ -471,17 +471,16 @@ def run_experiment(_config: DictConfig) -> float:
     # Setup evaluator.
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
-    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network.apply, config)
 
     def eval_act_fn(params, timestep, key) -> Tuple[Action, Dict]:
-        p = unreplicate_n_dims(params)  # for now
-        pi = actor_network.apply(p, timestep.observation)
+        # p = unreplicate_n_dims(params)  # for now
+        pi = actor_network.apply(params, timestep.observation)
         action = pi.mode() if config.arch.evaluation_greedy else pi.sample(seed=key)
         return action, {}
 
     evaluator2 = get_eval_fn(eval_env, eval_act_fn, config, config.arch.num_eval_episodes)
-    eval_metrics = evaluator2(learner_state.params.actor_params, key, {})
-    print(eval_metrics)
+    # eval_metrics = evaluator2(learner_state.params.actor_params, key, {})
+    # print(eval_metrics)
 
     # Calculate total timesteps.
     config = check_total_timesteps(config)
@@ -545,16 +544,16 @@ def run_experiment(_config: DictConfig) -> float:
         eval_keys = eval_keys.reshape(n_devices, -1)
 
         # Evaluate.
-        evaluator_output = evaluator(trained_params, eval_keys)
-        jax.block_until_ready(evaluator_output)
+        eval_metrics = evaluator2(trained_params, eval_keys, {})
+        jax.block_until_ready(eval_metrics)
 
         # Log the results of the evaluation.
         elapsed_time = time.time() - start_time
-        episode_return = jnp.mean(evaluator_output.episode_metrics["episode_return"])
+        episode_return = jnp.mean(eval_metrics["episode_return"])
 
-        steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
-        evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
-        logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.EVAL)
+        steps_per_eval = int(jnp.sum(eval_metrics["episode_length"]))
+        eval_metrics["steps_per_second"] = steps_per_eval / elapsed_time
+        logger.log(eval_metrics, t, eval_step, LogEvent.EVAL)
 
         if save_checkpoint:
             # Save checkpoint of learner state
@@ -572,24 +571,27 @@ def run_experiment(_config: DictConfig) -> float:
         learner_state = learner_output.learner_state
 
     # Record the performance for the final evaluation run.
-    eval_performance = float(jnp.mean(evaluator_output.episode_metrics[config.env.eval_metric]))
+    eval_performance = float(jnp.mean(eval_metrics.episode_metrics[config.env.eval_metric]))
 
     # Measure absolute metric.
     if config.arch.absolute_metric:
         start_time = time.time()
 
+        eval_episodes = config.arch.num_absolute_metric_eval_episodes
+        abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, config, eval_episodes)
+
         key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
 
-        evaluator_output = absolute_metric_evaluator(best_params, eval_keys)
-        jax.block_until_ready(evaluator_output)
+        eval_metrics = abs_metric_evaluator(best_params, eval_keys)
+        jax.block_until_ready(eval_metrics)
 
         elapsed_time = time.time() - start_time
-        steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
+        steps_per_eval = int(jnp.sum(eval_metrics["episode_length"]))
         t = int(steps_per_rollout * (eval_step + 1))
-        evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
-        logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.ABSOLUTE)
+        eval_metrics["steps_per_second"] = steps_per_eval / elapsed_time
+        logger.log(eval_metrics, t, eval_step, LogEvent.ABSOLUTE)
 
     # Stop the logger.
     logger.stop()
