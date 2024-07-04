@@ -398,7 +398,7 @@ def get_learner_fn(
             params, opt_states, traj_batch, advantages, targets, key = update_state
             key, shuffle_key, entropy_key = jax.random.split(key, 3)
             # SHUFFLE MINIBATCHES
-            batch_size = config.system.rollout_length * config.arch.num_envs * len(config.arch.executor_device_ids) * config.arch.n_threads_per_executor
+            batch_size = config.system.rollout_length * (config.arch.num_envs // len(config.arch.learner_device_ids)) * len(config.arch.executor_device_ids) * config.arch.n_threads_per_executor
             permutation = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
             batch = jax.tree_util.tree_map(lambda x: merge_leading_dims(x, 2), batch)
