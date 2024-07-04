@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import math
-from typing import Any, Dict, Optional, Protocol, Tuple, Union
+from typing import Any, Dict, Protocol, Tuple, Union
 
 import flax.linen as nn
 import jax

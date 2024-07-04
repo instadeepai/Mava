@@ -94,6 +94,7 @@ class ExperimentOutput(NamedTuple, Generic[MavaState]):
 
 LearnerFn = Callable[[MavaState], ExperimentOutput[MavaState]]
 # todo: define eval types here to use in the eval fn?
+# todo: make 3rd arg optional with protocol
 EvalFn = Callable[[FrozenDict, chex.PRNGKey, Optional[Dict[str, Any]]], Metrics]
 
 ActorApply = Callable[[FrozenDict, Observation], Distribution]

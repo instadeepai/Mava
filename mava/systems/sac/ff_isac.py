@@ -31,7 +31,7 @@ from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
-from mava.evaluator import make_eval_fns
+from mava.evaluator import get_eval_fn, make_ff_eval_act_fn
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardQNet as QNetwork
 from mava.systems.sac.types import (
@@ -502,7 +502,8 @@ def run_experiment(cfg: DictConfig) -> float:
 
     actor, _ = networks
     key, eval_key = jax.random.split(key)
-    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor.apply, cfg)
+    eval_act_fn = make_ff_eval_act_fn(actor, cfg)
+    evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, cfg.arch.num_eval_episodes)
 
     if cfg.logger.checkpointing.save_model:
         checkpointer = Checkpointer(
@@ -559,15 +560,15 @@ def run_experiment(cfg: DictConfig) -> float:
         # Evaluate:
         key, eval_key = jax.random.split(key)
         eval_keys = jax.random.split(eval_key, cfg.arch.n_devices)
-        eval_output = evaluator(unreplicate_batch_dim(learner_state.params.actor), eval_keys)
-        jax.block_until_ready(eval_output)
+        eval_metrics = evaluator(unreplicate_batch_dim(learner_state.params.actor), eval_keys)
+        jax.block_until_ready(eval_metrics)
 
         # Log:
         elapsed_time = time.time() - start_time
-        episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
-        steps_per_eval = int(jnp.sum(eval_output.episode_metrics["episode_length"]))
-        eval_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
-        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
+        episode_return = jnp.mean(eval_metrics["episode_return"])
+        steps_per_eval = int(jnp.sum(eval_metrics["episode_length"]))
+        eval_metrics["steps_per_second"] = steps_per_eval / elapsed_time
+        logger.log(eval_metrics, t, eval_idx, LogEvent.EVAL)
 
         # Save best actor params.
         if cfg.arch.absolute_metric and max_episode_return <= episode_return:
@@ -585,7 +586,7 @@ def run_experiment(cfg: DictConfig) -> float:
             )
 
     # Record the performance for the final evaluation run.
-    eval_performance = float(jnp.mean(eval_output.episode_metrics[cfg.env.eval_metric]))
+    eval_performance = float(jnp.mean(eval_metrics[cfg.env.eval_metric]))
 
     # Measure absolute metric.
     if cfg.arch.absolute_metric:
@@ -593,14 +594,16 @@ def run_experiment(cfg: DictConfig) -> float:
 
         eval_keys = jax.random.split(key, cfg.arch.n_devices)
 
-        eval_output = absolute_metric_evaluator(best_params, eval_keys)
-        jax.block_until_ready(eval_output)
+        eval_episodes = cfg.arch.num_absolute_metric_eval_episodes
+        abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, eval_episodes)
+        eval_metrics = abs_metric_evaluator(best_params, eval_keys)
+        jax.block_until_ready(eval_metrics)
 
         elapsed_time = time.time() - start_time
 
-        steps_per_eval = int(jnp.sum(eval_output.episode_metrics["episode_length"]))
-        eval_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
-        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.ABSOLUTE)
+        steps_per_eval = int(jnp.sum(eval_metrics["episode_length"]))
+        eval_metrics["steps_per_second"] = steps_per_eval / elapsed_time
+        logger.log(eval_metrics, t, eval_idx, LogEvent.ABSOLUTE)
 
     logger.stop()
 

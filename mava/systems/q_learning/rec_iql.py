@@ -32,7 +32,7 @@ from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
-from mava.evaluator import make_eval_fns
+from mava.evaluator import get_eval_fn
 from mava.networks import RecQNetwork, ScannedRNN
 from mava.systems.q_learning.types import (
     ActionSelectionState,
@@ -337,7 +337,6 @@ def make_update_fns(
         action: Array,
         target: Array,
     ) -> Tuple[Array, Metrics]:
-
         # axes switched here to scan over time
         hidden_state, obs_term_or_trunc = prep_inputs_to_scannedrnn(obs, term_or_trunc)
 
@@ -548,13 +547,17 @@ def run_experiment(cfg: DictConfig) -> float:
     cfg.system.num_agents = env.num_agents
 
     key, eval_key = jax.random.split(key)
-    evaluator, absolute_metric_evaluator = make_eval_fns(
-        eval_env=eval_env,
-        network_apply_fn=q_net.apply,
-        config=cfg,
-        use_recurrent_net=True,
-        scanned_rnn=ScannedRNN(cfg.network.hidden_state_dim),
-    )
+
+    def eval_act_fn(params, timestep, key, hidden_state):
+        term_or_trunc = timestep.last()
+        net_input = (timestep.observation, term_or_trunc[..., jnp.newaxis])
+        net_input = jax.tree_map(lambda x: x[jnp.newaxis], net_input)  # add batch dim to obs
+
+        next_hidden_state, eps_greedy_dist = q_net.apply(params, hidden_state, net_input, 0.0)
+        action = eps_greedy_dist.sample(seed=key).squeeze(0)
+        return action, {"hidden_state": next_hidden_state}
+
+    evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, cfg.arch.num_eval_episodes)
 
     if cfg.logger.checkpointing.save_model:
         checkpointer = Checkpointer(
@@ -598,15 +601,19 @@ def run_experiment(cfg: DictConfig) -> float:
         key, eval_key = jax.random.split(key)
         eval_keys = jax.random.split(eval_key, cfg.arch.n_devices)
         eval_params = unreplicate_batch_dim(learner_state.params.online)
-        eval_output = evaluator(eval_params, eval_keys)
-        jax.block_until_ready(eval_output)
+        eval_hs = ScannedRNN.initialize_carry(
+            (len(jax.devices()), cfg.arch.num_envs, cfg.system.num_agents),
+            cfg.network.hidden_state_dim,
+        )
+        eval_metrics = evaluator(eval_params, eval_keys, {"hidden_state": eval_hs})
+        jax.block_until_ready(eval_metrics)
 
         # Log:
         elapsed_time = time.time() - start_time
-        episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
-        steps_per_eval = int(jnp.sum(eval_output.episode_metrics["episode_length"]))
-        eval_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
-        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
+        episode_return = jnp.mean(eval_metrics["episode_return"])
+        steps_per_eval = int(jnp.sum(eval_metrics["episode_length"]))
+        eval_metrics["steps_per_second"] = steps_per_eval / elapsed_time
+        logger.log(eval_metrics, t, eval_idx, LogEvent.EVAL)
 
         # Save best actor params.
         if cfg.arch.absolute_metric and max_episode_return <= episode_return:
@@ -623,7 +630,7 @@ def run_experiment(cfg: DictConfig) -> float:
                 episode_return=episode_return,
             )
 
-    eval_performance = float(jnp.mean(eval_output.episode_metrics[cfg.env.eval_metric]))
+    eval_performance = float(jnp.mean(eval_metrics[cfg.env.eval_metric]))
 
     # Measure absolute metric.
     if cfg.arch.absolute_metric:
@@ -631,14 +638,20 @@ def run_experiment(cfg: DictConfig) -> float:
 
         eval_keys = jax.random.split(key, cfg.arch.n_devices)
 
-        eval_output = absolute_metric_evaluator(best_params, eval_keys)
-        jax.block_until_ready(eval_output)
+        eval_episodes = cfg.arch.num_absolute_metric_eval_episodes
+        abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, eval_episodes)
+        eval_hs = ScannedRNN.initialize_carry(
+            (len(jax.devices()), cfg.arch.num_envs, cfg.system.num_agents),
+            cfg.network.hidden_state_dim,
+        )
+        eval_metrics = abs_metric_evaluator(best_params, eval_keys, {"hidden_state": eval_hs})
+        jax.block_until_ready(eval_metrics)
 
         elapsed_time = time.time() - start_time
 
-        steps_per_eval = int(jnp.sum(eval_output.episode_metrics["episode_length"]))
-        eval_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
-        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.ABSOLUTE)
+        steps_per_eval = int(jnp.sum(eval_metrics["episode_length"]))
+        eval_metrics["steps_per_second"] = steps_per_eval / elapsed_time
+        logger.log(eval_metrics, t, eval_idx, LogEvent.ABSOLUTE)
 
     logger.stop()
 
