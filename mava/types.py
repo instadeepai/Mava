@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, Generic, Optional, Tuple, TypeVar
+from typing import Any, Callable, Dict, Generic, Tuple, TypeVar
 
 import chex
 from flax.core.frozen_dict import FrozenDict
-from jumanji.types import TimeStep
 from tensorflow_probability.substrates.jax.distributions import Distribution
 from typing_extensions import NamedTuple, TypeAlias
 
