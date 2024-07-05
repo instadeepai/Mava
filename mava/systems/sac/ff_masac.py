@@ -579,7 +579,7 @@ def run_experiment(cfg: DictConfig) -> float:
         # Evaluate:
         key, eval_key = jax.random.split(key)
         eval_keys = jax.random.split(eval_key, cfg.arch.n_devices)
-        eval_metrics = evaluator(unreplicate_batch_dim(learner_state.params.actor), eval_keys)
+        eval_metrics = evaluator(unreplicate_batch_dim(learner_state.params.actor), eval_keys, {})
         jax.block_until_ready(eval_metrics)
 
         # Log:
@@ -615,7 +615,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
         eval_episodes = cfg.arch.num_absolute_metric_eval_episodes
         abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, eval_episodes)
-        eval_metrics = abs_metric_evaluator(best_params, eval_keys)
+        eval_metrics = abs_metric_evaluator(best_params, eval_keys, {})
         jax.block_until_ready(eval_metrics)
 
         elapsed_time = time.time() - start_time

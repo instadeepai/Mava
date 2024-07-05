@@ -30,7 +30,7 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava.evaluator import make_eval_fns
+from mava.evaluator import get_eval_fn, make_ff_eval_act_fn
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
@@ -469,7 +469,8 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
 
     # Setup evaluator.
     eval_keys = jax.random.split(key_e, n_devices)
-    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network, config)
+    eval_act_fn = make_ff_eval_act_fn(actor_network, config)
+    evaluator = get_eval_fn(eval_env, eval_act_fn, config, config.arch.num_eval_episodes)
 
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
     steps_per_rollout = (
@@ -619,16 +620,16 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
         eval_keys = eval_keys.reshape(n_devices, -1)
 
         # Evaluate.
-        evaluator_output = evaluator(trained_params, eval_keys)
-        jax.block_until_ready(evaluator_output)
+        eval_metrics = evaluator(trained_params, eval_keys, {})
+        jax.block_until_ready(eval_metrics)
 
         # Log the results of the evaluation.
         elapsed_time = time.time() - start_time
-        episode_return = jnp.mean(evaluator_output.episode_metrics["episode_return"])
+        episode_return = jnp.mean(eval_metrics["episode_return"])
 
-        steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
-        evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
-        logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.EVAL)
+        steps_per_eval = int(jnp.sum(eval_metrics["episode_length"]))
+        eval_metrics["steps_per_second"] = steps_per_eval / elapsed_time
+        logger.log(eval_metrics, t, eval_step, LogEvent.EVAL)
 
         if save_checkpoint:
             # Save checkpoint of learner state
@@ -652,18 +653,21 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     if config.arch.absolute_metric:
         start_time = time.time()
 
+        eval_episodes = config.arch.num_absolute_metric_eval_episodes
+        abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, config, eval_episodes)
+
         key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
 
-        evaluator_output = absolute_metric_evaluator(best_params, eval_keys)
-        jax.block_until_ready(evaluator_output)
+        eval_metrics = abs_metric_evaluator(best_params, eval_keys, {})
+        jax.block_until_ready(eval_metrics)
 
         elapsed_time = time.time() - start_time
-        steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
+        steps_per_eval = int(jnp.sum(eval_metrics["episode_length"]))
         t = int(steps_per_rollout * (eval_step + 1))
-        evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
-        logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.ABSOLUTE)
+        eval_metrics["steps_per_second"] = steps_per_eval / elapsed_time
+        logger.log(eval_metrics, t, eval_step, LogEvent.ABSOLUTE)
 
     # Stop logger
     logger.stop()

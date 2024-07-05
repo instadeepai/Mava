@@ -536,7 +536,7 @@ def run_experiment(_config: DictConfig) -> float:
         eval_keys = eval_keys.reshape(n_devices, -1)
 
         # Evaluate.
-        eval_metrics = evaluator(trained_params, eval_keys)
+        eval_metrics = evaluator(trained_params, eval_keys, {})
         jax.block_until_ready(eval_metrics)
 
         # Log the results of the evaluation.
@@ -576,7 +576,7 @@ def run_experiment(_config: DictConfig) -> float:
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
 
-        eval_metrics = abs_metric_evaluator(best_params, eval_keys)
+        eval_metrics = abs_metric_evaluator(best_params, eval_keys, {})
         jax.block_until_ready(eval_metrics)
 
         elapsed_time = time.time() - start_time

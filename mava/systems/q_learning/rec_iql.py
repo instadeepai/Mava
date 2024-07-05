@@ -27,12 +27,14 @@ from chex import PRNGKey
 from colorama import Fore, Style
 from flashbax.buffers.flat_buffer import TrajectoryBuffer
 from flax.core.scope import FrozenVariableDict
+from flax.linen import FrozenDict
 from jax import Array
 from jumanji.env import Environment
+from jumanji.types import TimeStep
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
-from mava.evaluator import get_eval_fn
+from mava.evaluator import ActorState, get_eval_fn
 from mava.networks import RecQNetwork, ScannedRNN
 from mava.systems.q_learning.types import (
     ActionSelectionState,
@@ -548,7 +550,11 @@ def run_experiment(cfg: DictConfig) -> float:
 
     key, eval_key = jax.random.split(key)
 
-    def eval_act_fn(params, timestep, key, hidden_state):
+    def eval_act_fn(
+        params: FrozenDict, timestep: TimeStep, key: chex.PRNGKey, **actor_state: ActorState
+    ) -> Tuple[chex.Array, ActorState]:
+        hidden_state = actor_state["hidden_state"]
+
         term_or_trunc = timestep.last()
         net_input = (timestep.observation, term_or_trunc[..., jnp.newaxis])
         net_input = jax.tree_map(lambda x: x[jnp.newaxis], net_input)  # add batch dim to obs
