@@ -450,7 +450,6 @@ def learner_setup(
     return learn, actor_network, init_learner_state
 
 
-# TODO: fix cognitive complexity
 def run_experiment(_config: DictConfig) -> None:
     """Runs experiment."""
     # Logger setup
