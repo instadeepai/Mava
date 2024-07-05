@@ -89,14 +89,6 @@ def rollout(
         value = critic_apply_fn(params.critic_params, observation).squeeze()
         return action, log_prob, value, key
 
-    @jax.jit
-    def prepare_data(storage: List[PPOTransition]) -> PPOTransition:
-        """Prepare data to share with learner."""
-        return jax.tree_map(  # type: ignore
-            lambda *xs : jnp.stack(xs), *storage
-        )
-
-
     # Define queues to track time
     params_queue_get_time: deque = deque(maxlen=1)
     rollout_time: deque = deque(maxlen=1)
@@ -109,12 +101,9 @@ def rollout(
 
     # Loop till the learner has finished training
     for update in range(config.system.num_updates):
-        print(update)
-        # Setup todo: double check tracking times
         inference_time: float = 0
         storage_time: float = 0
         env_send_time: float = 0
-        setup = 0
             
         # Get the latest parameters from the learner
         params_queue_get_time_start = time.time()
@@ -131,9 +120,8 @@ def rollout(
             # Cached for transition
             cached_next_obs = move_to_device(jnp.stack(next_obs, axis = 1))
             cached_next_dones = move_to_device(next_dones)
-            setup_start = time.time()
             cashed_action_mask = move_to_device(np.stack(info["actions_mask"]) ) 
-            setup += time.time() - setup_start
+            
             # Increment current timestep
             t_env += (
                 config.arch.n_threads_per_executor * len_executor_device_ids * config.arch.num_envs
@@ -141,15 +129,14 @@ def rollout(
             
             # Get action and value
             inference_time_start = time.time()
-            #
             (
                 action,
                 log_prob,
                 value,
                 key,
             ) = get_action_and_value(params, Observation(cached_next_obs, cashed_action_mask), key)
-            inference_time += time.time() - inference_time_start
             
+            inference_time += time.time() - inference_time_start
             # Step the environment
             env_send_time_start = time.time()
             cpu_action = jax.device_get(action)
@@ -161,7 +148,7 @@ def rollout(
             storage_time_start = time.time()
             # Prepare the data
             next_dones = np.logical_or(terminated, truncated)         
-            metrics = jax.tree_map(lambda *x : jnp.asarray(x), *info["metrics"]) # Stack the metrics (N_envs , N_metrics) -- > (N_metrics, N_envs)
+            metrics = jax.tree_map(lambda *x : jnp.asarray(x), *info["metrics"]) # Stack the metrics 
             
             # Append data to storage
             storage.append(
@@ -173,22 +160,23 @@ def rollout(
                     log_prob=log_prob,
                     obs=Observation(cached_next_obs, cashed_action_mask),
                     info=metrics, 
-                    )#todo: use a threadsafe alt https://github.com/instadeepai/CityLearn/blob/27e69f8ebdf1789c55ffab5c326bfaa50733a5e7/power_systems/sax_sebulba.py#L39
+                    )
             )
             storage_time += time.time() - storage_time_start
         rollout_time.append(time.time() - rollout_time_start) 
     
         parse_timer = time.time()
+        
         # Prepare data to share with learner 
-        # todo: investigate te thread --> single learning  
-        partitioned_storage = prepare_data(storage)
+        stacked_storage = jax.tree_map( lambda *xs : jnp.stack(xs), *storage)
+        
         #sorage has shape rollout_len, num_agents, num_envs, .... while the other vectors have num_agents, num_envs, ... -> their split axis is diffrent
         shard_split_payload= lambda x, axis : jax.device_put_sharded(jnp.split(x, len(learner_devices), axis=axis), devices=learner_devices)
 
-        sharded_storage = jax.tree_map(lambda x : shard_split_payload(x, 1) , partitioned_storage)
+        sharded_storage = jax.tree_map(lambda x : shard_split_payload(x, 1) , stacked_storage)
         
         sharded_next_obs = shard_split_payload(jnp.stack(next_obs, axis = 1), 0) 
-        sharded_next_action_mask = shard_split_payload(jnp.stack([*info["actions_mask"]], axis = 0), 0)  
+        sharded_next_action_mask = shard_split_payload(np.stack(info["actions_mask"]), 0)  
         sharded_next_done = shard_split_payload(next_dones, 0)
 
 
@@ -200,7 +188,6 @@ def rollout(
             "env_step_time": env_send_time,
             "rollout_queue_put_time": np.mean(rollout_queue_put_time) if rollout_queue_put_time else 0,
             "parse_time" : time.time() - parse_timer,
-            "setup_time" : setup,
             }
         #print(speed_info)
         
@@ -581,13 +568,14 @@ def run_experiment(_config: DictConfig) -> float:
     evaluator, absolute_metric_evaluator = make_eval_fns(environments.make_gym_env, apply_fns[0], config) #todo: make this more generic
 
     # Calculate total timesteps.
-    config = sebulba_check_total_timesteps(config) #todo: update this for sebulba
+    config = sebulba_check_total_timesteps(config) 
     assert (
         config.system.num_updates > config.arch.num_evaluation
     ), "Number of updates per evaluation must be less than total number of updates."
 
     # Calculate number of updates per evaluation.
-    config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
+    config.system.num_updates_per_eval, remaining_updates = divmod(config.system.num_updates , config.arch.num_evaluation)
+    config.arch.num_evaluation += (remaining_updates != 0) # Add an evaluation if the num_updates is not a multiple of num_evaluation
     steps_per_rollout = (
         len(config.arch.executor_device_ids)
         * config.arch.n_threads_per_executor
@@ -638,8 +626,9 @@ def run_experiment(_config: DictConfig) -> float:
                     learner_devices,
                     d_id,
                 ),
-            ).start() #todo : this is techinically only multu threaded not multi processepr? 
-            
+            ).start() #todo : Use a process insted of a thread? threads are limited by pything's GIL and they only run on a single core , processes have a bogger overhead (max num_env for optimal performance?)
+    
+    
     # Run experiment for the total number of updates.
     max_episode_return = jnp.float32(0.0)
     best_params = None
@@ -651,7 +640,9 @@ def run_experiment(_config: DictConfig) -> float:
         episode_metrics = []
         train_metrics = []
         
-        for update in range(config.system.num_updates_per_eval):
+        # Make sure that the 
+        num_updates_in_eval = config.system.num_updates_per_eva if eval_step != config.arch.num_evaluation - 1 else remaining_updates
+        for update in range(num_updates_in_eval):
             sharded_storages = []
             sharded_next_obss = []
             sharded_next_dones = []
@@ -679,7 +670,7 @@ def run_experiment(_config: DictConfig) -> float:
     
             
             # Concatinate the returned trajectories on the n_env axis 
-            sharded_storages = jax.tree_map(lambda *x : jnp.concatenate(x, axis = 2), *sharded_storages)  #todo: check if this breaks the explicet array device placment 
+            sharded_storages = jax.tree_map(lambda *x : jnp.concatenate(x, axis = 2), *sharded_storages)  
             sharded_next_obss = jnp.concatenate(sharded_next_obss, axis = 1)
             sharded_next_dones = jnp.concatenate(sharded_next_dones, axis = 1)
             sharded_next_action_masks = jnp.concatenate(sharded_next_action_masks, axis = 1)
