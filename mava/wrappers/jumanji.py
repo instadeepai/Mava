@@ -208,6 +208,7 @@ class ConnectorWrapper(MultiAgentWrapper):
 
         # TARGET = 3 = The number of different types of items on the grid.
         def create_agents_view(grid: chex.Array) -> chex.Array:
+            # Mark position and target of each agent with that agent's normalized index.
             positions = (
                 jnp.where(grid % TARGET == POSITION, jnp.ceil(grid / TARGET), 0) / self.num_agents
             )
