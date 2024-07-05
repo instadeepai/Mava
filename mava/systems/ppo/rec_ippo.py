@@ -92,7 +92,7 @@ def get_learner_fn(
                 env_state,
                 last_timestep,
                 last_done,
-                hstates,
+                last_hstates,
             ) = learner_state
 
             key, policy_key = jax.random.split(key)
@@ -108,10 +108,10 @@ def get_learner_fn(
 
             # Run the network.
             policy_hidden_state, actor_policy = actor_apply_fn(
-                params.actor_params, hstates.policy_hidden_state, ac_in
+                params.actor_params, last_hstates.policy_hidden_state, ac_in
             )
             critic_hidden_state, value = critic_apply_fn(
-                params.critic_params, hstates.critic_hidden_state, ac_in
+                params.critic_params, last_hstates.critic_hidden_state, ac_in
             )
 
             # Sample action from the policy and squeeze out the batch dimension.
@@ -135,22 +135,19 @@ def get_learner_fn(
 
             hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
             transition = RNNPPOTransition(
-                done,
+                last_done,
                 action,
                 value,
                 timestep.reward,
                 log_prob,
                 last_timestep.observation,
-                hstates,
+                last_hstates,
                 info,
             )
             learner_state = RNNLearnerState(
                 params, opt_states, key, env_state, timestep, done, hstates
             )
             return learner_state, transition
-
-        # INITIALISE RNN STATE
-        initial_hstates = learner_state.hstates
 
         # STEP ENVIRONMENT FOR ROLLOUT LENGTH
         learner_state, traj_batch = jax.lax.scan(
@@ -181,36 +178,30 @@ def get_learner_fn(
         _, last_val = critic_apply_fn(params.critic_params, hstates.critic_hidden_state, ac_in)
         # Squeeze out the batch dimension and mask out the value of terminal states.
         last_val = last_val.squeeze(0)
-        last_val = jnp.where(last_done, jnp.zeros_like(last_val), last_val)
 
         def _calculate_gae(
-            traj_batch: RNNPPOTransition, last_val: chex.Array
+            traj_batch: RNNPPOTransition, last_val: chex.Array, last_done: chex.Array
         ) -> Tuple[chex.Array, chex.Array]:
-            """Calculate the GAE."""
-
-            def _get_advantages(gae_and_next_value: Tuple, transition: RNNPPOTransition) -> Tuple:
-                """Calculate the GAE for a single transition."""
-                gae, next_value = gae_and_next_value
-                done, value, reward = (
-                    transition.done,
-                    transition.value,
-                    transition.reward,
-                )
+            def _get_advantages(
+                carry: Tuple[chex.Array, chex.Array, chex.Array], transition: RNNPPOTransition
+            ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
+                gae, next_value, next_done = carry
+                done, value, reward = transition.done, transition.value, transition.reward
                 gamma = config.system.gamma
-                delta = reward + gamma * next_value * (1 - done) - value
-                gae = delta + gamma * config.system.gae_lambda * (1 - done) * gae
-                return (gae, value), gae
+                delta = reward + gamma * next_value * (1 - next_done) - value
+                gae = delta + gamma * config.system.gae_lambda * (1 - next_done) * gae
+                return (gae, value, done), gae
 
             _, advantages = jax.lax.scan(
                 _get_advantages,
-                (jnp.zeros_like(last_val), last_val),
+                (jnp.zeros_like(last_val), last_val, last_done),
                 traj_batch,
                 reverse=True,
                 unroll=16,
             )
             return advantages, advantages + traj_batch.value
 
-        advantages, targets = _calculate_gae(traj_batch, last_val)
+        advantages, targets = _calculate_gae(traj_batch, last_val, last_done)
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""
@@ -347,7 +338,7 @@ def get_learner_fn(
 
                 return (new_params, new_opt_state, entropy_key), loss_info
 
-            params, opt_states, init_hstates, traj_batch, advantages, targets, key = update_state
+            params, opt_states, traj_batch, advantages, targets, key = update_state
             key, shuffle_key, entropy_key = jax.random.split(key, 3)
 
             # SHUFFLE MINIBATCHES
@@ -385,7 +376,6 @@ def get_learner_fn(
             update_state = (
                 params,
                 opt_states,
-                init_hstates,
                 traj_batch,
                 advantages,
                 targets,
@@ -393,11 +383,9 @@ def get_learner_fn(
             )
             return update_state, loss_info
 
-        init_hstates = jax.tree_util.tree_map(lambda x: x[None, :], initial_hstates)
         update_state = (
             params,
             opt_states,
-            init_hstates,
             traj_batch,
             advantages,
             targets,
@@ -409,7 +397,7 @@ def get_learner_fn(
             _update_epoch, update_state, None, config.system.ppo_epochs
         )
 
-        params, opt_states, _, traj_batch, advantages, targets, key = update_state
+        params, opt_states, traj_batch, advantages, targets, key = update_state
         learner_state = RNNLearnerState(
             params,
             opt_states,
