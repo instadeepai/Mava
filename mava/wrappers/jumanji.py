@@ -386,7 +386,7 @@ class MultiCVRPWrapper(MultiAgentWrapper):
 
     def __init__(self, env: MultiCVRP, add_global_state: bool = False):
         env.num_agents = env._num_vehicles
-        env.time_limit = env._num_customers + 1  # added for consistency
+        env.time_limit = None  # added for consistency
         env.action_dim = env._num_customers + 1  # n_costumers + 1 starter node
         self.has_global_state = add_global_state
         self.num_customers = env._num_customers

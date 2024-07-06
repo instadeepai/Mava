@@ -11,4 +11,6 @@ implicit_agent_id: False
 
 eval_metric: episode_return
 
+log_win_rate: False
+
 kwargs: {}
