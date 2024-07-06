@@ -45,7 +45,7 @@ from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
-from mava.utils.total_timestep_checker import check_total_timesteps
+from mava.utils.total_timestep_checker import check_total_ppo_timesteps
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
@@ -614,10 +614,10 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
     )
 
     # Calculate total timesteps.
-    config = check_total_timesteps(config)
+    config = check_total_ppo_timesteps(config)
     assert (
-        config.system.num_updates % config.arch.num_evaluation == 0
-    ), "Number of updates must be divisible by the number of evaluations."
+        config.system.num_updates >= config.arch.num_evaluation
+    ), "The number of evaluations must be less than or equal to the total number of updates."
 
     # Calculate number of updates per evaluation.
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
