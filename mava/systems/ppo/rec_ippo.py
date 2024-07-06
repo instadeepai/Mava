@@ -610,7 +610,7 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
     eval_act_fn = make_rec_eval_act_fn(actor_network, config)
-    evaluator = get_eval_fn(eval_env, eval_act_fn, config, config.arch.num_eval_episodes)
+    evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=False)
 
     # Calculate total timesteps.
     config = check_total_timesteps(config)
@@ -709,8 +709,7 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
     if config.arch.absolute_metric:
         start_time = time.time()
 
-        eval_episodes = config.arch.num_absolute_metric_eval_episodes
-        abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, config, eval_episodes)
+        abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=True)
 
         key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
         eval_keys = jnp.stack(eval_keys)

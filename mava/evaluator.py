@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import math
+import warnings
 from typing import Any, Dict, Protocol, Tuple, Union
 
 import flax.linen as nn
@@ -58,7 +59,7 @@ class EvalFn(Protocol):
 
 
 def get_eval_fn(
-    env: Environment, act_fn: EvalActFn, config: DictConfig, eval_episodes: int
+    env: Environment, act_fn: EvalActFn, config: DictConfig, absolute_metric: bool
 ) -> EvalFn:
     """Creates a function that can be used to evaluate agents on a given environment.
 
@@ -66,11 +67,35 @@ def get_eval_fn(
         env: an environment that conforms to the mava environment spec.
         act_fn: a function that takes in params, timestep, key and optionally a state
                 and returns actions and optionally a state (see `EvalActFn`).
-        config: the systems config.
-        eval_episodes: how many episodes to evaluate the agents. At least this many episodes
-                will be done, however more may be done if `config.arch.num_envs` does
-                not evenly divide `eval_episodes`
+        config: the system config.
+        absolute_metric: whether or not this evaluator calculates the absolute_metric.
+                This determines how many evaluation episodes it does.
     """
+    # Calculating how many eval loops and parallel environments to have
+    n_devices = jax.device_count()
+    eval_episodes = (
+        config.arch.num_abs_metric_eval_episodes
+        if absolute_metric
+        else config.arch.num_eval_episodes
+    )
+    if eval_episodes < config.arch.num_envs * n_devices:
+        warnings.warn(
+            f"Number of evaluation episodes ({eval_episodes}) is less than"
+            f"`num_envs` * `num_devices` ({config.arch.num_envs} * {n_devices}). "
+            f"Automatically reducing number of envs.",
+            stacklevel=2,
+        )
+        num_envs = math.ceil(eval_episodes / n_devices)
+    else:
+        num_envs = config.arch.num_envs
+
+    if eval_episodes % (num_envs * n_devices) != 0:
+        warnings.warn(
+            f"Number of evaluation episodes ({eval_episodes}) is not divisible by "
+            f"`num_envs` * `num_devices` ({num_envs} * {n_devices})",
+            stacklevel=2,
+        )
+    episode_loops = math.ceil(eval_episodes / (num_envs * n_devices))
 
     def eval_fn(params: FrozenDict, key: PRNGKey, init_act_state: ActorState) -> Dict[str, Array]:
         def _env_step(eval_state: _EvalEnvStepState, _: Any) -> Tuple[_EvalEnvStepState, TimeStep]:
@@ -84,9 +109,9 @@ def get_eval_fn(
             return (env_state, ts, key, actor_state), ts
 
         def _episode(key: PRNGKey, _: Any) -> Tuple[PRNGKey, Metrics]:
-            """Simulates `config.arch.num_envs` episodes."""
+            """Simulates `num_envs` episodes."""
             key, reset_key = jax.random.split(key)
-            reset_keys = jax.random.split(reset_key, config.arch.num_envs)
+            reset_keys = jax.random.split(reset_key, num_envs)
             env_state, ts = jax.vmap(env.reset)(reset_keys)
 
             step_state = env_state, ts, key, init_act_state
@@ -99,16 +124,14 @@ def get_eval_fn(
             # find the first instance of done to get the metrics at that timestep we don't
             # care about subsequent steps because we only the results from the first episode
             done_idx = jnp.argmax(timesteps.last(), axis=0)
-            metrics = jax.tree_map(lambda m: m[done_idx, jnp.arange(config.arch.num_envs)], metrics)
+            metrics = jax.tree_map(lambda m: m[done_idx, jnp.arange(num_envs)], metrics)
             del metrics["is_terminal_step"]  # uneeded for logging
 
             return key, metrics
 
-        # todo: do we want to divide this by n devices?
-        episode_loops = math.ceil(eval_episodes / config.arch.num_envs)
         # This loop is important because we don't want too many parallel envs.
-        # So in evaluation we have config.arch.num_envs parallel envs and loop
-        # enough times so that we do at least `eval_episodes` number of episodes
+        # So in evaluation we have num_envs parallel envs and loop enough times
+        # so that we do at least `eval_episodes` number of episodes
         _, metrics = jax.lax.scan(_episode, key, xs=None, length=episode_loops)
         metrics: Metrics = jax.tree_map(lambda x: x.reshape(-1), metrics)  # flatten metrics
         return metrics

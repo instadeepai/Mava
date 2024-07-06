@@ -563,7 +563,7 @@ def run_experiment(cfg: DictConfig) -> float:
         action = eps_greedy_dist.sample(seed=key).squeeze(0)
         return action, {"hidden_state": next_hidden_state}
 
-    evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, cfg.arch.num_eval_episodes)
+    evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, absolute_metric=False)
 
     if cfg.logger.checkpointing.save_model:
         checkpointer = Checkpointer(
@@ -644,8 +644,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
         eval_keys = jax.random.split(key, cfg.arch.n_devices)
 
-        eval_episodes = cfg.arch.num_absolute_metric_eval_episodes
-        abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, eval_episodes)
+        abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, absolute_metric=True)
         eval_hs = ScannedRNN.initialize_carry(
             (len(jax.devices()), cfg.arch.num_envs, cfg.system.num_agents),
             cfg.network.hidden_state_dim,
