@@ -46,7 +46,7 @@ from mava.systems.sac.types import (
     SacParams,
     Transition,
 )
-from mava.types import Observation
+from mava.types import MarlEnv, Observation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
@@ -205,7 +205,7 @@ def init(
 
 def make_update_fns(
     cfg: DictConfig,
-    env: Environment,
+    env: MarlEnv,
     networks: Networks,
     optims: Optimisers,
     rb: TrajectoryBuffer,

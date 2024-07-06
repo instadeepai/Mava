@@ -27,7 +27,7 @@ from colorama import Fore, Style
 from flashbax.buffers.flat_buffer import TrajectoryBuffer
 from flax.core.scope import FrozenVariableDict
 from jax import Array
-from jumanji.env import Environment, State
+from jumanji.env import State
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
@@ -46,7 +46,7 @@ from mava.systems.sac.types import (
     SacParams,
     Transition,
 )
-from mava.types import ObservationGlobalState
+from mava.types import MarlEnv, ObservationGlobalState
 from mava.utils import make_env as environments
 from mava.utils.centralised_training import get_joint_action, get_updated_joint_actions
 from mava.utils.checkpointing import Checkpointer
@@ -59,7 +59,7 @@ from mava.wrappers import episode_metrics
 def init(
     cfg: DictConfig,
 ) -> Tuple[
-    Tuple[Environment, Environment],
+    Tuple[MarlEnv, MarlEnv],
     Networks,
     Optimisers,
     TrajectoryBuffer,
@@ -208,7 +208,7 @@ def init(
 
 def make_update_fns(
     cfg: DictConfig,
-    env: Environment,
+    env: MarlEnv,
     networks: Networks,
     optims: Optimisers,
     rb: TrajectoryBuffer,

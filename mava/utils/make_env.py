@@ -19,7 +19,6 @@ import jumanji
 import matrax
 from gigastep import ScenarioBuilder
 from jaxmarl.environments.smax import map_name_to_scenario
-from jumanji.env import Environment
 from jumanji.environments.routing.cleaner.generator import (
     RandomGenerator as CleanerRandomGenerator,
 )
@@ -34,6 +33,7 @@ from jumanji.environments.routing.robot_warehouse.generator import (
 )
 from omegaconf import DictConfig
 
+from mava.types import MarlEnv
 from mava.wrappers import (
     AgentIDWrapper,
     AutoResetWrapper,
@@ -65,25 +65,24 @@ _gigastep_registry = {"Gigastep": GigastepWrapper}
 
 
 def add_extra_wrappers(
-    train_env: Environment, eval_env: Environment, config: DictConfig
-) -> Environment:
-
+    train_env: MarlEnv, eval_env: MarlEnv, config: DictConfig
+) -> Tuple[MarlEnv, MarlEnv]:
     # Disable the AgentID wrapper if the environment has implicit agent IDs.
     config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
 
-    # Add agent id to observation.
     if config.system.add_agent_id:
-        train_env = AgentIDWrapper(train_env)
-        eval_env = AgentIDWrapper(eval_env)
+        train_env = AgentIDWrapper(train_env)  # type: ignore
+        eval_env = AgentIDWrapper(eval_env)  # type: ignore
 
-    train_env = AutoResetWrapper(train_env)
-    train_env = RecordEpisodeMetrics(train_env)
+    train_env = AutoResetWrapper(train_env)  # type: ignore
+    train_env = RecordEpisodeMetrics(train_env)  # type: ignore
+
     return train_env, eval_env
 
 
 def make_jumanji_env(
     env_name: str, config: DictConfig, add_global_state: bool = False
-) -> Tuple[Environment, Environment]:
+) -> Tuple[MarlEnv, MarlEnv]:
     """
     Create a Jumanji environments for training and evaluation.
 
@@ -113,7 +112,7 @@ def make_jumanji_env(
 
 def make_jaxmarl_env(
     env_name: str, config: DictConfig, add_global_state: bool = False
-) -> Tuple[Environment, Environment]:
+) -> Tuple[MarlEnv, MarlEnv]:
     """
      Create a JAXMARL environment.
 
@@ -140,14 +139,14 @@ def make_jaxmarl_env(
         add_global_state,
     )
 
-    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)  # type: ignore
 
     return train_env, eval_env
 
 
 def make_matrax_env(
     env_name: str, config: DictConfig, add_global_state: bool = False
-) -> Tuple[Environment, Environment]:
+) -> Tuple[MarlEnv, MarlEnv]:
     """
     Creates Matrax environments for training and evaluation.
 
@@ -175,7 +174,7 @@ def make_matrax_env(
 
 def make_gigastep_env(
     env_name: str, config: DictConfig, add_global_state: bool = False
-) -> Tuple[Environment, Environment]:
+) -> Tuple[MarlEnv, MarlEnv]:
     """
      Create a Gigastep environment.
 
@@ -199,7 +198,7 @@ def make_gigastep_env(
     return train_env, eval_env
 
 
-def make(config: DictConfig, add_global_state: bool = False) -> Tuple[Environment, Environment]:
+def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
     """
     Create environments for training and evaluation..
 
