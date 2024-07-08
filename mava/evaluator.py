@@ -329,13 +329,13 @@ def make_eval_fns(
     else:
         evaluator = get_ff_evaluator_fn(
             eval_env,
-            network_apply_fn,
+            network_apply_fn,  # type: ignore
             config,
             log_win_rate,  # type: ignore
         )
         absolute_metric_evaluator = get_ff_evaluator_fn(
             eval_env,
-            network_apply_fn,
+            network_apply_fn,  # type: ignore
             config,
             log_win_rate,
             10,  # type: ignore

@@ -33,6 +33,7 @@ class MarlEnv(Environment, Protocol):
     """The API used by mava for environments.
 
     A mava environment simply uses the Jumanji env API with a few added attributes.
+    For examples of how to add custom environments to Mava see `mava/wrappers/jumanji.py`.
     Jumanji API docs: https://instadeepai.github.io/jumanji/#basic-usage
     """
 
