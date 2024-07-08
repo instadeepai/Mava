@@ -31,7 +31,8 @@ from mava.types import (
     RNNEvalState,
 )
 
-from mava.systems.sebulba.ppo.types import Observation 
+from mava.types import Observation
+ 
 import numpy as np
 
 def get_anakin_ff_evaluator_fn(
@@ -383,7 +384,7 @@ def get_sebulba_ff_evaluator_fn(
             key, policy_key = jax.random.split(key)
             
             obs = jax.device_put(jnp.stack(obs, axis = 1))
-            action_mask = jax.device_put(jnp.stack([*info["actions_mask"]], axis = 0))
+            action_mask = jax.device_put(np.stack(info["actions_mask"]) )
             
             actions = get_action(params, Observation(obs, action_mask), policy_key)
             cpu_action = jax.device_get(actions)
@@ -409,6 +410,7 @@ def make_sebulba_eval_fns(
     eval_env_fn: callable,
     network_apply_fn: Union[ActorApply, RecActorApply],
     config: DictConfig,
+    add_global_state : bool = False,
     use_recurrent_net: bool = False,
     scanned_rnn: Optional[nn.Module] = None,
 ) -> Tuple[EvalFn, EvalFn]:
@@ -429,7 +431,7 @@ def make_sebulba_eval_fns(
     Raises:
         AssertionError: If `use_recurrent_net` is True but `scanned_rnn` is not provided.
     """
-    eval_env, absolute_eval_env = eval_env_fn(config, config.arch.num_eval_episodes), eval_env_fn(config, config.arch.num_eval_episodes * 10)
+    eval_env, absolute_eval_env = eval_env_fn(config, config.arch.num_eval_episodes, add_global_state = add_global_state), eval_env_fn(config, config.arch.num_eval_episodes * 10, add_global_state = add_global_state)
     
     # Check if win rate is required for evaluation.
     log_win_rate = config.env.log_win_rate

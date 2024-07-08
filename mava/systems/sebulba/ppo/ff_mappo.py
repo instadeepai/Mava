@@ -35,8 +35,8 @@ from rich.pretty import pprint
 from mava.evaluator import make_sebulba_eval_fns as make_eval_fns 
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
-from mava.systems.anakin.ppo.types import LearnerState, OptStates, Params, PPOTransition 
-from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn, Observation
+from mava.systems.anakin.ppo.types import LearnerState, OptStates, Params, PPOTransition #todo: change this Observation to use the standard obs   
+from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn, ObservationGlobalState
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import (
@@ -60,7 +60,7 @@ def rollout(
     actor_device_id : int):
         
     #setup
-    env = environments.make_gym_env(config, config.arch.num_envs)
+    env = environments.make_gym_env(config, config.arch.num_envs, add_global_state=True)
     current_actor_device = jax.devices()[actor_device_id]
     actor_apply_fn, critic_apply_fn = apply_fns
     
@@ -68,7 +68,7 @@ def rollout(
     @jax.jit
     def get_action_and_value(
         params: FrozenDict,
-        observation: Observation,
+        observation: ObservationGlobalState,
         key: chex.PRNGKey,
     ) -> Tuple:
         """Get action and value."""
@@ -113,15 +113,18 @@ def rollout(
             cached_next_obs = move_to_device(jnp.stack(next_obs, axis = 1)) # (num_envs, num_agents, ...)
             cached_next_dones = move_to_device(next_dones) # (num_envs, num_agents)
             cashed_action_mask = move_to_device(np.stack(info["actions_mask"])) # (num_envs, num_agents, num_actions)
+            cached_next_global_obs = move_to_device(np.stack(info["global_obs"]))
+            
             
             # Get action and value
+            full_observation = ObservationGlobalState(cached_next_obs, cashed_action_mask, cached_next_global_obs)
             inference_time_start = time.time()
             (
                 action,
                 log_prob,
                 value,
                 key,
-            ) = get_action_and_value(params, Observation(cached_next_obs, cashed_action_mask), key)
+            ) = get_action_and_value(params, full_observation , key)
             
             
             # Step the environment
@@ -144,7 +147,7 @@ def rollout(
                     value=value,
                     reward=next_reward,
                     log_prob=log_prob,
-                    obs=Observation(cached_next_obs, cashed_action_mask),
+                    obs=full_observation,
                     info=metrics, 
                     )
             )
@@ -165,12 +168,13 @@ def rollout(
         
         # (num_learner_devices, num_envs, num_agents, ...)
         sharded_next_obs = shard_split_payload(jnp.stack(next_obs, axis = 1), 0)   
-        sharded_next_action_mask = shard_split_payload(np.stack(info["actions_mask"]), 0)  
+        sharded_next_action_mask = shard_split_payload(np.stack(info["actions_mask"]), 0) 
+        sharded_next_global_obs =  shard_split_payload(np.stack(info["global_obs"]), 0)
         sharded_next_done = shard_split_payload(next_dones, 0)
-        
-        # Pack the obs and action mask
-        payload_obs = Observation(sharded_next_obs, sharded_next_action_mask)
 
+        # Pack the obs and action mask
+        payload_obs = ObservationGlobalState(sharded_next_obs, sharded_next_action_mask, sharded_next_global_obs)
+        
         # For debugging
         speed_info = {
             "rollout_time": np.mean(rollout_time),
@@ -439,7 +443,7 @@ def learner_setup(
     """Initialise learner_fn, network, optimiser, environment and states."""
     
     #create temporory envoirnments.
-    env  = environments.make_gym_env(config, config.arch.num_envs)
+    env  = environments.make_gym_env(config, 1, add_global_state=True)
     # Get number of agents and actions.
     action_space = env.single_action_space
     config.system.num_agents = len(action_space)
@@ -456,7 +460,7 @@ def learner_setup(
     critic_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
 
     actor_network = Actor(torso=actor_torso, action_head=actor_action_head)
-    critic_network = Critic(torso=critic_torso)
+    critic_network = Critic(torso=critic_torso, centralised_critic= True)
 
     actor_lr = make_learning_rate(config.system.actor_lr, config)
     critic_lr = make_learning_rate(config.system.critic_lr, config)
@@ -471,9 +475,11 @@ def learner_setup(
     )
 
     # Initialise observation: Select only obs for a single agent.
-    init_obs = jnp.array([env.single_observation_space.sample()])
-    init_action_mask = jnp.ones((config.system.num_agents, config.system.num_actions))
-    init_x = Observation(init_obs, init_action_mask)
+    obs, info = env.reset()
+    init_obs = jnp.stack(obs, axis = 1) # (num_envs, num_agents, ...)
+    init_mask = np.stack(info["actions_mask"]) # (num_envs, num_agents, num_actions)
+    init_global_obs = np.stack(info["global_obs"])
+    init_x = ObservationGlobalState(init_obs, init_mask, init_global_obs)
 
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(actor_net_key, init_x)
@@ -553,7 +559,7 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Setup evaluator.
     # One key per device for evaluation.
-    evaluator, absolute_metric_evaluator = make_eval_fns(environments.make_gym_env, apply_fns[0], config) #todo: make this more generic
+    evaluator, absolute_metric_evaluator = make_eval_fns(environments.make_gym_env, apply_fns[0], config, add_global_state=True) #todo: make this more generic
 
     # Calculate total timesteps.
     config = sebulba_check_total_timesteps(config) 
@@ -647,7 +653,7 @@ def run_experiment(_config: DictConfig) -> float:
                     sharded_storages.append(sharded_storage)
                     sharded_next_obss.append(sharded_next_obs)
                     sharded_next_dones.append(sharded_next_done)
-                    
+
             rollout_times.append(time.time() - rollout_start_time)
     
             

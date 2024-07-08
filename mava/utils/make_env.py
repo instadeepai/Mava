@@ -46,10 +46,9 @@ from mava.wrappers import (
     ConnectorWrapper,
     GigastepWrapper,
     GymRecordEpisodeMetrics,
-    GymRwareWrapper,
+    GymGenericWrapper,
     GymAgentIDWrapper,
     _multiagent_worker_shared_memory,
-    GymLBFWrapper,
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
@@ -73,7 +72,7 @@ _jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 
 _gigastep_registry = {"Gigastep": GigastepWrapper}
 
-_gym_registry = {"RobotWarehouse": GymRwareWrapper, "LevelBasedForaging" : GymLBFWrapper}
+_gym_registry = {"RobotWarehouse": GymGenericWrapper, "LevelBasedForaging" : GymGenericWrapper}
 
 
 def add_extra_wrappers(
@@ -238,7 +237,6 @@ def make_gym_env(
         wrapped_env = GymRecordEpisodeMetrics(wrapped_env)
         return wrapped_env
 
-    num_env = config.arch.num_envs
     envs = gym.vector.AsyncVectorEnv(  # todo : give them more descriptive names
         [
             lambda: create_gym_env(config, add_global_state)

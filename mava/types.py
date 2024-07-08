@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, Generic, Tuple, TypeVar
+from typing import Any, Callable, Dict, Generic, Tuple, TypeVar, Optional
 
 import chex
 from flax.core.frozen_dict import FrozenDict
@@ -37,7 +37,7 @@ class Observation(NamedTuple):
 
     agents_view: chex.Array  # (num_agents, num_obs_features)
     action_mask: chex.Array  # (num_agents, num_actions)
-    step_count: chex.Array  # (num_agents, )
+    step_count: Optional[chex.Array] = None  # (num_agents, )
 
 
 class ObservationGlobalState(NamedTuple):
@@ -49,7 +49,7 @@ class ObservationGlobalState(NamedTuple):
     agents_view: chex.Array  # (num_agents, num_obs_features)
     action_mask: chex.Array  # (num_agents, num_actions)
     global_state: chex.Array  # (num_agents, num_agents * num_obs_features)
-    step_count: chex.Array  # (num_agents, )
+    step_count: Optional[chex.Array] = None  # (num_agents, )
 
 
 RNNObservation: TypeAlias = Tuple[Observation, Done]
