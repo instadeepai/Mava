@@ -7,4 +7,4 @@ task_config:
   num_agents: 3
 
 env_kwargs:
-  {}  # there are no scenario specific env_kwargs for this env
+  time_limit: 25
