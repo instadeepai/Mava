@@ -14,7 +14,7 @@
 
 import math
 import warnings
-from typing import Any, Dict, Protocol, Tuple, Union
+from typing import Any, Callable, Dict, Protocol, Tuple, Union
 
 import flax.linen as nn
 import jax
@@ -32,12 +32,14 @@ from mava.types import Action, Metrics, Observation, ObservationGlobalState, Sta
 ActorState: TypeAlias = Dict[str, Any]
 # Type of the carry for the _env_step function in the evaluator
 _EvalEnvStepState: TypeAlias = Tuple[State, TimeStep, PRNGKey, ActorState]
+# The function signature for the mava evaluation function (returned by `get_eval_fn`).
+EvalFn: TypeAlias = Callable[[FrozenDict, PRNGKey, ActorState], Metrics]
 
 
 class EvalActFn(Protocol):
     """The API for the acting function that is passed to the `EvalFn`.
 
-    Your get_action fucntion must conform to this API in order to be used with Mava's evaluator.
+    A get_action function must conform to this API in order to be used with Mava's evaluator.
     See `make_ff_eval_act_fn` and `make_rec_eval_act_fn` as examples.
     """
 
@@ -46,16 +48,8 @@ class EvalActFn(Protocol):
         params: FrozenDict,
         timestep: TimeStep[Union[Observation, ObservationGlobalState]],
         key: PRNGKey,
-        **actor_state: Array,
+        **actor_state: ActorState,
     ) -> Tuple[Array, ActorState]: ...
-
-
-class EvalFn(Protocol):
-    """The function signature for the evaluation function returned by `get_eval_fn`."""
-
-    def __call__(  # noqa: E704
-        self, params: FrozenDict, key: PRNGKey, actor_state: ActorState
-    ) -> Metrics: ...
 
 
 def get_eval_fn(
@@ -80,7 +74,7 @@ def get_eval_fn(
     )
     if eval_episodes < config.arch.num_envs * n_devices:
         warnings.warn(
-            f"Number of evaluation episodes ({eval_episodes}) is less than"
+            f"Number of evaluation episodes ({eval_episodes}) is less than "
             f"`num_envs` * `num_devices` ({config.arch.num_envs} * {n_devices}). "
             f"Automatically reducing number of envs.",
             stacklevel=2,
@@ -92,12 +86,13 @@ def get_eval_fn(
     if eval_episodes % (num_envs * n_devices) != 0:
         warnings.warn(
             f"Number of evaluation episodes ({eval_episodes}) is not divisible by "
-            f"`num_envs` * `num_devices` ({num_envs} * {n_devices})",
+            f"`num_envs` * `num_devices` ({num_envs} * {n_devices}) - will perform"
+            " slightly more evaluations.",
             stacklevel=2,
         )
     episode_loops = math.ceil(eval_episodes / (num_envs * n_devices))
 
-    def eval_fn(params: FrozenDict, key: PRNGKey, init_act_state: ActorState) -> Dict[str, Array]:
+    def eval_fn(params: FrozenDict, key: PRNGKey, init_act_state: ActorState) -> Metrics:
         def _env_step(eval_state: _EvalEnvStepState, _: Any) -> Tuple[_EvalEnvStepState, TimeStep]:
             """Performs a single environment step"""
             env_state, ts, key, actor_state = eval_state
