@@ -88,6 +88,7 @@ class RNNPPOTransition(NamedTuple):
     log_prob: chex.Array
     obs: chex.Array
     hstates: HiddenStates
+    info: Dict
 
 
 class Observation(NamedTuple):
