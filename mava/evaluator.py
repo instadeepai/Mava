@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import math
+import time
 import warnings
 from typing import Any, Callable, Dict, Protocol, Tuple, Union
 
@@ -65,34 +66,41 @@ def get_eval_fn(
         absolute_metric: whether or not this evaluator calculates the absolute_metric.
                 This determines how many evaluation episodes it does.
     """
-    # Calculating how many eval loops and parallel environments to have
     n_devices = jax.device_count()
     eval_episodes = (
-        config.arch.num_abs_metric_eval_episodes
+        config.arch.num_absolute_metric_eval_episodes
         if absolute_metric
         else config.arch.num_eval_episodes
     )
-    if eval_episodes < config.arch.num_envs * n_devices:
+    n_parallel_envs = config.arch.num_envs * n_devices
+    episode_loops = math.ceil(eval_episodes / n_parallel_envs)
+
+    # Warnings if num eval episodes is too low or not divisible by num parallel envs.
+    if eval_episodes < n_parallel_envs:
         warnings.warn(
             f"Number of evaluation episodes ({eval_episodes}) is less than "
             f"`num_envs` * `num_devices` ({config.arch.num_envs} * {n_devices}). "
-            f"Automatically reducing number of envs.",
+            f"Thus {n_parallel_envs} evaluation episodes will be executed.",
             stacklevel=2,
         )
-        num_envs = math.ceil(eval_episodes / n_devices)
-    else:
-        num_envs = config.arch.num_envs
 
-    if eval_episodes % (num_envs * n_devices) != 0:
+    if eval_episodes % n_parallel_envs != 0:
         warnings.warn(
-            f"Number of evaluation episodes ({eval_episodes}) is not divisible by "
-            f"`num_envs` * `num_devices` ({num_envs} * {n_devices}) - will perform"
-            " slightly more evaluations.",
+            f"Number of evaluation episodes ({eval_episodes}) is not divisible by `num_envs` * "
+            f"`num_devices` ({config.arch.num_envs} * {n_devices}). Some extra evaluations will be "
+            f"executed. New number of evaluation episodes = {episode_loops * n_parallel_envs}",
             stacklevel=2,
         )
-    episode_loops = math.ceil(eval_episodes / (num_envs * n_devices))
 
     def eval_fn(params: FrozenDict, key: PRNGKey, init_act_state: ActorState) -> Metrics:
+        """Evaluates the given params on an environment and returns relevent metrics.
+
+        Metrics are collected by the `RecordEpisodeMetrics` wrapper: episode return and length,
+        also win rate for environments that support it.
+
+        Returns: Dict[str, Array] - dictionary of metric name to metric values for each episode.
+        """
+
         def _env_step(eval_state: _EvalEnvStepState, _: Any) -> Tuple[_EvalEnvStepState, TimeStep]:
             """Performs a single environment step"""
             env_state, ts, key, actor_state = eval_state
@@ -106,7 +114,7 @@ def get_eval_fn(
         def _episode(key: PRNGKey, _: Any) -> Tuple[PRNGKey, Metrics]:
             """Simulates `num_envs` episodes."""
             key, reset_key = jax.random.split(key)
-            reset_keys = jax.random.split(reset_key, num_envs)
+            reset_keys = jax.random.split(reset_key, config.arch.num_envs)
             env_state, ts = jax.vmap(env.reset)(reset_keys)
 
             step_state = env_state, ts, key, init_act_state
@@ -119,19 +127,31 @@ def get_eval_fn(
             # find the first instance of done to get the metrics at that timestep we don't
             # care about subsequent steps because we only the results from the first episode
             done_idx = jnp.argmax(timesteps.last(), axis=0)
-            metrics = jax.tree_map(lambda m: m[done_idx, jnp.arange(num_envs)], metrics)
+            metrics = jax.tree_map(lambda m: m[done_idx, jnp.arange(config.arch.num_envs)], metrics)
             del metrics["is_terminal_step"]  # uneeded for logging
 
             return key, metrics
 
         # This loop is important because we don't want too many parallel envs.
         # So in evaluation we have num_envs parallel envs and loop enough times
-        # so that we do at least `eval_episodes` number of episodes
+        # so that we do at least `eval_episodes` number of episodes.
         _, metrics = jax.lax.scan(_episode, key, xs=None, length=episode_loops)
         metrics: Metrics = jax.tree_map(lambda x: x.reshape(-1), metrics)  # flatten metrics
         return metrics
 
-    return jax.pmap(eval_fn, axis_name="device")  # type: ignore
+    def timed_eval_fn(params: FrozenDict, key: PRNGKey, init_act_state: ActorState) -> Metrics:
+        """Wrapper around eval function to time it and add in steps per second metric."""
+        start_time = time.time()
+
+        metrics = jax.pmap(eval_fn)(params, key, init_act_state)
+        metrics: Metrics = jax.block_until_ready(metrics)
+
+        end_time = time.time()
+        total_timesteps = jnp.sum(metrics["episode_length"])
+        metrics["steps_per_second"] = total_timesteps / (end_time - start_time)
+        return metrics
+
+    return timed_eval_fn
 
 
 def make_ff_eval_act_fn(actor_network: nn.Module, config: DictConfig) -> EvalActFn:

@@ -561,14 +561,8 @@ def run_experiment(cfg: DictConfig) -> float:
         key, eval_key = jax.random.split(key)
         eval_keys = jax.random.split(eval_key, cfg.arch.n_devices)
         eval_metrics = evaluator(unreplicate_batch_dim(learner_state.params.actor), eval_keys, {})
-        jax.block_until_ready(eval_metrics)
-
-        # Log:
-        elapsed_time = time.time() - start_time
-        episode_return = jnp.mean(eval_metrics["episode_return"])
-        steps_per_eval = int(jnp.sum(eval_metrics["episode_length"]))
-        eval_metrics["steps_per_second"] = steps_per_eval / elapsed_time
         logger.log(eval_metrics, t, eval_idx, LogEvent.EVAL)
+        episode_return = jnp.mean(eval_metrics["episode_return"])
 
         # Save best actor params.
         if cfg.arch.absolute_metric and max_episode_return <= episode_return:
@@ -590,18 +584,11 @@ def run_experiment(cfg: DictConfig) -> float:
 
     # Measure absolute metric.
     if cfg.arch.absolute_metric:
-        start_time = time.time()
-
         eval_keys = jax.random.split(key, cfg.arch.n_devices)
 
         abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, absolute_metric=True)
         eval_metrics = abs_metric_evaluator(best_params, eval_keys, {})
-        jax.block_until_ready(eval_metrics)
 
-        elapsed_time = time.time() - start_time
-
-        steps_per_eval = int(jnp.sum(eval_metrics["episode_length"]))
-        eval_metrics["steps_per_second"] = steps_per_eval / elapsed_time
         logger.log(eval_metrics, t, eval_idx, LogEvent.ABSOLUTE)
 
     logger.stop()

@@ -515,24 +515,14 @@ def run_experiment(_config: DictConfig) -> float:
         logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
 
         # Prepare for evaluation.
-        start_time = time.time()
-
         trained_params = unreplicate_batch_dim(learner_state.params.actor_params)
         key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
-
         # Evaluate.
         eval_metrics = evaluator(trained_params, eval_keys, {})
-        jax.block_until_ready(eval_metrics)
-
-        # Log the results of the evaluation.
-        elapsed_time = time.time() - start_time
-        episode_return = jnp.mean(eval_metrics["episode_return"])
-
-        steps_per_eval = int(jnp.sum(eval_metrics["episode_length"]))
-        eval_metrics["steps_per_second"] = steps_per_eval / elapsed_time
         logger.log(eval_metrics, t, eval_step, LogEvent.EVAL)
+        episode_return = jnp.mean(eval_metrics["episode_return"])
 
         if save_checkpoint:
             # Save checkpoint of learner state
@@ -554,21 +544,12 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Measure absolute metric.
     if config.arch.absolute_metric:
-        start_time = time.time()
-
         abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=True)
-
-        key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
-        eval_keys = jnp.stack(eval_keys)
-        eval_keys = eval_keys.reshape(n_devices, -1)
+        eval_keys = jax.random.split(key, n_devices)
 
         eval_metrics = abs_metric_evaluator(best_params, eval_keys, {})
-        jax.block_until_ready(eval_metrics)
 
-        elapsed_time = time.time() - start_time
-        steps_per_eval = int(jnp.sum(eval_metrics["episode_length"]))
         t = int(steps_per_rollout * (eval_step + 1))
-        eval_metrics["steps_per_second"] = steps_per_eval / elapsed_time
         logger.log(eval_metrics, t, eval_step, LogEvent.ABSOLUTE)
 
     # Stop the logger.
