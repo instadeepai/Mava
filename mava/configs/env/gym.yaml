@@ -15,6 +15,7 @@ implicit_agent_id: False
 # environments have a winrate metric.
 log_win_rate: False
 
+# Weather or not to average the returned rewards over all of the agents.
 use_individual_rewards: True
 
 kwargs:
