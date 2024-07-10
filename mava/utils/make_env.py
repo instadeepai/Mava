@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple
+from typing import Dict, Tuple, Type
 
 import jaxmarl
 import jumanji
@@ -47,6 +47,7 @@ from mava.wrappers import (
     RwareWrapper,
     SmaxWrapper,
 )
+from mava.wrappers.jaxmarl import JaxMarlWrapper
 
 # Registry mapping environment names to their generator and wrapper classes.
 _jumanji_registry = {
@@ -59,7 +60,7 @@ _jumanji_registry = {
 # Define a different registry for Matrax since it has no generator.
 _matrax_registry = {"Matrax": MatraxWrapper}
 
-_jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
+_jaxmarl_wrappers: Dict[str, Type[JaxMarlWrapper]] = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 
 _gigastep_registry = {"Gigastep": GigastepWrapper}
 
@@ -71,11 +72,11 @@ def add_extra_wrappers(
     config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
 
     if config.system.add_agent_id:
-        train_env = AgentIDWrapper(train_env)  # type: ignore
-        eval_env = AgentIDWrapper(eval_env)  # type: ignore
+        train_env = AgentIDWrapper(train_env)
+        eval_env = AgentIDWrapper(eval_env)
 
-    train_env = AutoResetWrapper(train_env)  # type: ignore
-    train_env = RecordEpisodeMetrics(train_env)  # type: ignore
+    train_env = AutoResetWrapper(train_env)
+    train_env = RecordEpisodeMetrics(train_env)
 
     return train_env, eval_env
 
@@ -139,7 +140,7 @@ def make_jaxmarl_env(
         add_global_state,
     )
 
-    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)  # type: ignore
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
 
     return train_env, eval_env
 

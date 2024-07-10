@@ -168,7 +168,7 @@ class JaxMarlWrapper(Wrapper, ABC):
         self,
         env: MultiAgentEnv,
         has_global_state: bool,
-        timelimit: int,
+        timelimit: int = 1000,
     ) -> None:
         """
         Initialize the JaxMarlWrapper.

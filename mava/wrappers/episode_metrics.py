@@ -20,7 +20,7 @@ import jax.numpy as jnp
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
 
-from mava.types import State
+from mava.types import MarlEnv, State
 
 if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
     from dataclasses import dataclass
@@ -44,6 +44,16 @@ class RecordEpisodeMetricsState:
 
 class RecordEpisodeMetrics(Wrapper):
     """Record the episode returns and lengths."""
+
+    # This init isn't really needed as jumanji.Wrapper will forward the attributes,
+    # but mypy doesn't realize this.
+    def __init__(self, env: MarlEnv):
+        super().__init__(env)
+        self._env: MarlEnv
+
+        self.num_agents = self._env.num_agents
+        self.time_limit = self._env.time_limit
+        self.action_dim = self._env.action_dim
 
     def reset(self, key: chex.PRNGKey) -> Tuple[RecordEpisodeMetricsState, TimeStep]:
         """Reset the environment."""
