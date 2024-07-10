@@ -75,7 +75,7 @@ class RecordEpisodeMetrics(Wrapper):
         # Previous episode return/length until done and then the next episode return.
         episode_return_info = state.episode_return * not_done + new_episode_return * done
         episode_length_info = state.episode_length * not_done + new_episode_length * done
-        
+
         timestep.extras["episode_metrics"] = {
             "episode_return": episode_return_info,
             "episode_length": episode_length_info,

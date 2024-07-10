@@ -68,7 +68,7 @@ def sebulba_check_total_timesteps(config: DictConfig) -> DictConfig:
             // config.system.rollout_length
             // config.arch.num_envs
             // config.arch.n_threads_per_executor
-            //  len(config.arch.executor_device_ids)
+            // len(config.arch.executor_device_ids)
         )
         print(
             f"{Fore.RED}{Style.BRIGHT} Changing the number of updates "

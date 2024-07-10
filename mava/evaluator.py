@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import chex
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
+import numpy as np
 from flax.core.frozen_dict import FrozenDict
 from jumanji.env import Environment
 from omegaconf import DictConfig
@@ -27,13 +28,13 @@ from mava.types import (
     EvalFn,
     EvalState,
     ExperimentOutput,
+    Observation,
     RecActorApply,
     RNNEvalState,
+    RNNObservation,
+    SebulbaEvalFn,
 )
 
-from mava.types import Observation
- 
-import numpy as np
 
 def get_anakin_ff_evaluator_fn(
     env: Environment,
@@ -348,7 +349,7 @@ def get_sebulba_ff_evaluator_fn(
     apply_fn: ActorApply,
     config: DictConfig,
     log_win_rate: bool = False,
-) -> EvalFn:
+) -> SebulbaEvalFn:
     """Get the evaluator function for feedforward networks.
 
     Args:
@@ -356,55 +357,61 @@ def get_sebulba_ff_evaluator_fn(
         apply_fn (callable): Network forward pass method.
         config (dict): Experiment configuration.
     """
+
     @jax.jit
-    def get_action( #todo explicetly put these on the learner? they should already be there
+    def get_action(  # todo explicetly put these on the learner? they should already be there
         params: FrozenDict,
         observation: Observation,
         key: chex.PRNGKey,
-    ) -> Tuple:
+    ) -> chex.Array:
         """Get action."""
-        
+
         pi = apply_fn(params, observation)
-        
+
         if config.arch.evaluation_greedy:
             action = pi.mode()
         else:
             action = pi.sample(seed=key)
 
         return action
-    def eval_episodes(params: FrozenDict, key : chex.PRNGKey) -> Dict:
- 
-        
-        
+
+    def eval_episodes(params: FrozenDict, key: chex.PRNGKey) -> Any:
+
         obs, info = env.reset()
-        dones = np.zeros(env.num_envs) # todo: jnp or np?
-        eval_metrics = jax.tree_map(lambda *x : jnp.asarray(x), *info["metrics"])
-        
+        dones = np.full(env.num_envs, False)
+        eval_metrics = jax.tree_map(lambda *x: jnp.asarray(x), *info["metrics"])
+
         while not dones.all():
-            
+
             key, policy_key = jax.random.split(key)
-            
-            obs = jax.device_put(jnp.stack(obs, axis = 1))
-            action_mask = jax.device_put(np.stack(info["actions_mask"]) )
-            
+
+            obs = jax.device_put(jnp.stack(obs, axis=1))
+            action_mask = jax.device_put(np.stack(info["actions_mask"]))
+
             actions = get_action(params, Observation(obs, action_mask), policy_key)
             cpu_action = jax.device_get(actions)
 
-            obs, reward, terminated, truncated, info = env.step(cpu_action.swapaxes(0,1))
-                       
-            next_metrics = jax.tree_map(lambda *x : jnp.asarray(x), *info["metrics"])
-            
+            obs, reward, terminated, truncated, info = env.step(cpu_action.swapaxes(0, 1))
+
+            next_metrics = jax.tree_map(lambda *x: jnp.asarray(x), *info["metrics"])
+
             next_dones = next_metrics["is_terminal_step"]
-            
-            update_metric = lambda old_metric, new_metric :  np.where(np.logical_and(next_dones, dones == False), new_metric, old_metric)
-            eval_metrics = jax.tree_map(update_metric, eval_metrics, next_metrics)
-            
-            dones = np.logical_or(dones, next_dones) 
+
+            update_flags = np.logical_and(next_dones, np.invert(dones))
+
+            update_metrics = lambda new_metric, old_metric, update_flags=update_flags: np.where(
+                (update_flags), new_metric, old_metric
+            )
+
+            eval_metrics = jax.tree_map(update_metrics, next_metrics, eval_metrics)
+
+            dones = np.logical_or(dones, next_dones)
         eval_metrics.pop("is_terminal_step")
 
         return eval_metrics
-    
+
     return eval_episodes
+
 
 def get_sebulba_rnn_evaluator_fn(
     env: Environment,
@@ -412,7 +419,7 @@ def get_sebulba_rnn_evaluator_fn(
     config: DictConfig,
     scanned_rnn: nn.Module,
     log_win_rate: bool = False,
-) -> EvalFn:
+) -> SebulbaEvalFn:
     """Get the evaluator function for feedforward networks.
 
     Args:
@@ -420,76 +427,82 @@ def get_sebulba_rnn_evaluator_fn(
         apply_fn (callable): Network forward pass method.
         config (dict): Experiment configuration.
     """
+
     @jax.jit
-    def get_action( #todo explicetly put these on the learner? they should already be there
+    def get_action(  # todo explicetly put these on the learner? they should already be there
         params: FrozenDict,
-        observation: Observation,
-        hstate : chex.Array,
+        observation: RNNObservation,
+        hstate: chex.Array,
         key: chex.PRNGKey,
-    ) -> Tuple:
+    ) -> Tuple[chex.Array, chex.Array]:
         """Get action."""
-        
+
         hstate, pi = apply_fn(params, hstate, observation)
-        
+
         if config.arch.evaluation_greedy:
             action = pi.mode()
         else:
             action = pi.sample(seed=key)
 
         return action, hstate
-    def eval_episodes(params: FrozenDict, key : chex.PRNGKey) -> Dict:
- 
-     
-        
-        obs, info = env.reset()
-        eval_metrics = jax.tree_map(lambda *x : jnp.asarray(x), *info["metrics"])
-        
-        hstate = scanned_rnn.initialize_carry(
-        (env.num_envs, config.system.num_agents), config.network.hidden_state_dim
-        )
-        
-        dones = jnp.zeros((env.num_envs, config.system.num_agents), dtype=jax.numpy.bool_)
-        
-        while not dones.all():
-            
-            key, policy_key = jax.random.split(key)
-            
-            obs = jax.device_put(jnp.stack(obs, axis = 1))
-            action_mask = jax.device_put(np.stack(info["actions_mask"]) )
-            
-            obs, action_mask, dones = jax.tree_map(lambda x : x[jnp.newaxis, :], (obs, action_mask, dones))
 
-            
-            actions, hstate = get_action(params, (Observation(obs, action_mask), dones), hstate, policy_key)
+    def eval_episodes(params: FrozenDict, key: chex.PRNGKey) -> Any:
+
+        obs, info = env.reset()
+        eval_metrics = jax.tree_map(lambda *x: jnp.asarray(x), *info["metrics"])
+
+        hstate = scanned_rnn.initialize_carry(
+            (env.num_envs, config.system.num_agents), config.network.hidden_state_dim
+        )
+
+        dones = jnp.full((env.num_envs, config.system.num_agents), False)
+
+        while not dones.all():
+
+            key, policy_key = jax.random.split(key)
+
+            obs = jax.device_put(jnp.stack(obs, axis=1))
+            action_mask = jax.device_put(np.stack(info["actions_mask"]))
+
+            obs, action_mask, dones = jax.tree_map(
+                lambda x: x[jnp.newaxis, :], (obs, action_mask, dones)
+            )
+
+            actions, hstate = get_action(
+                params, (Observation(obs, action_mask), dones), hstate, policy_key
+            )
             cpu_action = jax.device_get(actions)
 
-            obs, reward, terminated, truncated, info = env.step(cpu_action[0].swapaxes(0,1))
-                       
-            next_metrics = jax.tree_map(lambda *x : jnp.asarray(x), *info["metrics"])
-            
+            obs, reward, terminated, truncated, info = env.step(cpu_action[0].swapaxes(0, 1))
+
+            next_metrics = jax.tree_map(lambda *x: jnp.asarray(x), *info["metrics"])
+
             next_dones = np.logical_or(terminated, truncated)
-            
-            per_env_done = np.all(np.logical_and(next_dones, dones[0] == False),axis = 1)
-            
-            update_metric = lambda old_metric, new_metric :  np.where(per_env_done, new_metric, old_metric)
-            eval_metrics = jax.tree_map(update_metric, eval_metrics, next_metrics)
-            
-            dones = np.logical_or(dones, next_dones) 
+
+            update_flags = np.all(np.logical_and(next_dones, np.invert(dones[0])), axis=1)
+
+            update_metrics = lambda new_metric, old_metric, update_flags=update_flags: np.where(
+                (update_flags), new_metric, old_metric
+            )
+
+            eval_metrics = jax.tree_map(update_metrics, next_metrics, eval_metrics)
+
+            dones = np.logical_or(dones, next_dones)
         eval_metrics.pop("is_terminal_step")
 
         return eval_metrics
-    
+
     return eval_episodes
 
 
 def make_sebulba_eval_fns(
-    eval_env_fn: callable,
+    eval_env_fn: Callable,
     network_apply_fn: Union[ActorApply, RecActorApply],
     config: DictConfig,
-    add_global_state : bool = False,
+    add_global_state: bool = False,
     use_recurrent_net: bool = False,
     scanned_rnn: Optional[nn.Module] = None,
-) -> Tuple[EvalFn, EvalFn]:
+) -> Tuple[SebulbaEvalFn, SebulbaEvalFn]:
     """Initialize evaluator functions for reinforcement learning.
 
     Args:
@@ -501,14 +514,16 @@ def make_sebulba_eval_fns(
             Required if `use_recurrent_net` is True. Defaults to None.
 
     Returns:
-        Tuple[EvalFn, EvalFn]: A tuple of two evaluation functions:
+        Tuple[SebulbaEvalFn, SebulbaEvalFn]: A tuple of two evaluation functions:
         one for use during training and one for absolute metrics.
 
     Raises:
         AssertionError: If `use_recurrent_net` is True but `scanned_rnn` is not provided.
     """
-    eval_env, absolute_eval_env = eval_env_fn(config, config.arch.num_eval_episodes, add_global_state = add_global_state), eval_env_fn(config, config.arch.num_eval_episodes * 10, add_global_state = add_global_state)
-    
+    eval_env, absolute_eval_env = eval_env_fn(
+        config, config.arch.num_eval_episodes, add_global_state=add_global_state
+    ), eval_env_fn(config, config.arch.num_eval_episodes * 10, add_global_state=add_global_state)
+
     # Check if win rate is required for evaluation.
     log_win_rate = config.env.log_win_rate
     # Vmap it over number of agents and create evaluator_fn.

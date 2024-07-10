@@ -462,7 +462,9 @@ def run_experiment(_config: DictConfig) -> float:
     # Setup evaluator.
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
-    evaluator, absolute_metric_evaluator = make_anakin_eval_fns(eval_env, actor_network.apply, config)
+    evaluator, absolute_metric_evaluator = make_anakin_eval_fns(
+        eval_env, actor_network.apply, config
+    )
 
     # Calculate total timesteps.
     config = anakin_check_total_timesteps(config)

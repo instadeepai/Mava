@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, Generic, Tuple, TypeVar, Optional
+from typing import Any, Callable, Dict, Generic, Optional, Tuple, TypeVar
 
 import chex
 from flax.core.frozen_dict import FrozenDict
@@ -81,6 +81,7 @@ class RNNEvalState(NamedTuple):
 # `MavaState` is the main type passed around in our systems. It is often used as a scan carry.
 # Types like: `EvalState` | `LearnerState` (mava/systems/<system_name>/types.py) are `MavaState`s.
 MavaState = TypeVar("MavaState")
+MavaTransition = TypeVar("MavaTransition")
 
 
 class ExperimentOutput(NamedTuple, Generic[MavaState]):
@@ -92,7 +93,11 @@ class ExperimentOutput(NamedTuple, Generic[MavaState]):
 
 
 LearnerFn = Callable[[MavaState], ExperimentOutput[MavaState]]
+SebulbaLearnerFn = Callable[
+    [MavaState, MavaTransition, chex.Array, chex.Array], ExperimentOutput[MavaState]
+]
 EvalFn = Callable[[FrozenDict, chex.PRNGKey], ExperimentOutput[MavaState]]
+SebulbaEvalFn = Callable[[FrozenDict, chex.PRNGKey], Dict]
 
 ActorApply = Callable[[FrozenDict, Observation], Distribution]
 CriticApply = Callable[[FrozenDict, Observation], Value]
