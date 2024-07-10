@@ -46,7 +46,7 @@ from mava.wrappers import (
     ConnectorWrapper,
     GigastepWrapper,
     GymRecordEpisodeMetrics,
-    GymGenericWrapper,
+    GymRwareWrapper,
     GymAgentIDWrapper,
     _multiagent_worker_shared_memory,
     LbfWrapper,
@@ -72,7 +72,7 @@ _jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 
 _gigastep_registry = {"Gigastep": GigastepWrapper}
 
-_gym_registry = {"RobotWarehouse": GymGenericWrapper, "LevelBasedForaging" : GymGenericWrapper}
+_gym_registry = {"RobotWarehouse": GymRwareWrapper}
 
 
 def add_extra_wrappers(
