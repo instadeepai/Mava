@@ -1,0 +1,7 @@
+defaults:
+  - logger: rec_ippo
+  - arch: sebulba
+  - system: ppo/rec_ippo
+  - network: rnn
+  - env: gym
+  - _self_

@@ -145,7 +145,7 @@ def get_anakin_ff_evaluator_fn(
     return evaluator_fn
 
 
-def get_rnn_evaluator_fn(
+def get_anakin_rnn_evaluator_fn(
     env: Environment,
     apply_fn: RecActorApply,
     config: DictConfig,
@@ -314,14 +314,14 @@ def make_anakin_eval_fns(
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
         assert scanned_rnn is not None
-        evaluator = get_rnn_evaluator_fn(
+        evaluator = get_anakin_rnn_evaluator_fn(
             eval_env,
             network_apply_fn,  # type: ignore
             config,
             scanned_rnn,
             log_win_rate,
         )
-        absolute_metric_evaluator = get_rnn_evaluator_fn(
+        absolute_metric_evaluator = get_anakin_rnn_evaluator_fn(
             eval_env,
             network_apply_fn,  # type: ignore
             config,
@@ -374,9 +374,10 @@ def get_sebulba_ff_evaluator_fn(
         return action
     def eval_episodes(params: FrozenDict, key : chex.PRNGKey) -> Dict:
  
-        dones = np.zeros(env.num_envs) # todo: jnp or np?
+        
         
         obs, info = env.reset()
+        dones = np.zeros(env.num_envs) # todo: jnp or np?
         eval_metrics = jax.tree_map(lambda *x : jnp.asarray(x), *info["metrics"])
         
         while not dones.all():
@@ -396,6 +397,81 @@ def get_sebulba_ff_evaluator_fn(
             next_dones = next_metrics["is_terminal_step"]
             
             update_metric = lambda old_metric, new_metric :  np.where(np.logical_and(next_dones, dones == False), new_metric, old_metric)
+            eval_metrics = jax.tree_map(update_metric, eval_metrics, next_metrics)
+            
+            dones = np.logical_or(dones, next_dones) 
+        eval_metrics.pop("is_terminal_step")
+
+        return eval_metrics
+    
+    return eval_episodes
+
+def get_sebulba_rnn_evaluator_fn(
+    env: Environment,
+    apply_fn: RecActorApply,
+    config: DictConfig,
+    scanned_rnn: nn.Module,
+    log_win_rate: bool = False,
+) -> EvalFn:
+    """Get the evaluator function for feedforward networks.
+
+    Args:
+        env (Environment): An evironment instance for evaluation.
+        apply_fn (callable): Network forward pass method.
+        config (dict): Experiment configuration.
+    """
+    @jax.jit
+    def get_action( #todo explicetly put these on the learner? they should already be there
+        params: FrozenDict,
+        observation: Observation,
+        hstate : chex.Array,
+        key: chex.PRNGKey,
+    ) -> Tuple:
+        """Get action."""
+        
+        hstate, pi = apply_fn(params, hstate, observation)
+        
+        if config.arch.evaluation_greedy:
+            action = pi.mode()
+        else:
+            action = pi.sample(seed=key)
+
+        return action, hstate
+    def eval_episodes(params: FrozenDict, key : chex.PRNGKey) -> Dict:
+ 
+     
+        
+        obs, info = env.reset()
+        eval_metrics = jax.tree_map(lambda *x : jnp.asarray(x), *info["metrics"])
+        
+        hstate = scanned_rnn.initialize_carry(
+        (env.num_envs, config.system.num_agents), config.network.hidden_state_dim
+        )
+        
+        dones = jnp.zeros((env.num_envs, config.system.num_agents), dtype=jax.numpy.bool_)
+        
+        while not dones.all():
+            
+            key, policy_key = jax.random.split(key)
+            
+            obs = jax.device_put(jnp.stack(obs, axis = 1))
+            action_mask = jax.device_put(np.stack(info["actions_mask"]) )
+            
+            obs, action_mask, dones = jax.tree_map(lambda x : x[jnp.newaxis, :], (obs, action_mask, dones))
+
+            
+            actions, hstate = get_action(params, (Observation(obs, action_mask), dones), hstate, policy_key)
+            cpu_action = jax.device_get(actions)
+
+            obs, reward, terminated, truncated, info = env.step(cpu_action[0].swapaxes(0,1))
+                       
+            next_metrics = jax.tree_map(lambda *x : jnp.asarray(x), *info["metrics"])
+            
+            next_dones = np.logical_or(terminated, truncated)
+            
+            per_env_done = np.all(np.logical_and(next_dones, dones[0] == False),axis = 1)
+            
+            update_metric = lambda old_metric, new_metric :  np.where(per_env_done, new_metric, old_metric)
             eval_metrics = jax.tree_map(update_metric, eval_metrics, next_metrics)
             
             dones = np.logical_or(dones, next_dones) 
@@ -438,14 +514,14 @@ def make_sebulba_eval_fns(
     # Vmap it over number of agents and create evaluator_fn.
     if use_recurrent_net:
         assert scanned_rnn is not None
-        evaluator = get_rnn_evaluator_fn(
+        evaluator = get_sebulba_rnn_evaluator_fn(
             eval_env,
             network_apply_fn,  # type: ignore
             config,
             scanned_rnn,
             log_win_rate,
         )
-        absolute_metric_evaluator = get_rnn_evaluator_fn(
+        absolute_metric_evaluator = get_sebulba_rnn_evaluator_fn(
             absolute_eval_env,
             network_apply_fn,  # type: ignore
             config,

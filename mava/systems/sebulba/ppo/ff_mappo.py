@@ -210,7 +210,7 @@ def get_learner_fn(
     actor_apply_fn, critic_apply_fn = apply_fns
     actor_update_fn, critic_update_fn = update_fns
 
-    def _update_step(learner_state: LearnerState, traj_batch : PPOTransition, last_obs: chex.Array, last_dones : chex.Array) -> Tuple[LearnerState, Tuple]:
+    def _update_step(learner_state: LearnerState, traj_batch : PPOTransition, last_obs: ObservationGlobalState, last_dones : chex.Array) -> Tuple[LearnerState, Tuple]:
         """A single update of the network.
 
         This function steps the environment and records the trajectory batch for
@@ -749,7 +749,7 @@ def run_experiment(_config: DictConfig) -> float:
 
 
 
-@hydra.main(config_path="../../../configs", config_name="default_ff_ippo_seb.yaml", version_base="1.2")
+@hydra.main(config_path="../../../configs", config_name="default_ff_mappo_seb.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
