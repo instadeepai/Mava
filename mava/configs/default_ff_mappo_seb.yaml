@@ -1,7 +1,0 @@
-defaults:
-  - logger: ff_mappo
-  - arch: sebulba
-  - system: ppo/ff_mappo
-  - network: mlp
-  - env: gym
-  - _self_

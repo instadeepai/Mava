@@ -12,23 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
 import warnings
-from typing import Dict, Tuple, Optional
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import gym
 import numpy as np
-from numpy.typing import NDArray
-
 from gym import spaces
 from gym.vector.utils import write_to_shared_memory
-import sys
+from numpy.typing import NDArray
 
 # Filter out the warnings
 warnings.filterwarnings("ignore", module="gym.utils.passive_env_checker")
 
 
-class GymGenericWrapper(gym.Wrapper): 
-    """Wrapper for rware gym environments"""
+class GymRwareWrapper(gym.Wrapper):
+    """Wrapper for rware gym environments."""
 
     def __init__(
         self,
@@ -37,7 +36,6 @@ class GymGenericWrapper(gym.Wrapper):
         add_global_state: bool = False,
     ):
         """Initialize the gym wrapper
-
         Args:
             env (gym.env): gym env instance.
             use_individual_rewards (bool, optional): Use individual or group rewards.
@@ -45,30 +43,26 @@ class GymGenericWrapper(gym.Wrapper):
             add_global_state (bool, optional) : Create global observations. Defaults to False.
         """
         super().__init__(env)
-        self._env = env 
+        self._env = env
         self.use_individual_rewards = use_individual_rewards
-        self.add_global_state = add_global_state 
+        self.add_global_state = add_global_state
         self.num_agents = len(self._env.action_space)
-        self.num_actions = self._env.action_space[
-            0
-        ].n  
-        
-    def reset(
-        self, seed: Optional[int] = None, options: Optional[dict] = None
-    ) -> Tuple:
-        
+        self.num_actions = self._env.action_space[0].n
+
+    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> Tuple:
+
         if seed is not None:
             self.env.seed(seed)
-            
-        agents_view, info = self._env.reset() 
+
+        agents_view, info = self._env.reset()
 
         info = {"actions_mask": self.get_actions_mask(info)}
         if self.add_global_state:
             info["global_obs"] = self.get_global_obs(agents_view)
-            
+
         return np.array(agents_view), info
 
-    def step(self, actions: NDArray) -> Tuple: 
+    def step(self, actions: NDArray) -> Tuple:
 
         agents_view, reward, terminated, truncated, info = self._env.step(actions)
 
@@ -80,7 +74,7 @@ class GymGenericWrapper(gym.Wrapper):
             reward = np.array(reward)
         else:
             reward = np.array([np.array(reward).mean()] * self.num_agents)
-            
+
         return agents_view, reward, terminated, truncated, info
 
     def get_actions_mask(self, info: Dict) -> NDArray:
@@ -88,13 +82,9 @@ class GymGenericWrapper(gym.Wrapper):
             return np.array(info["action_mask"])
         return np.ones((self.num_agents, self.num_actions), dtype=np.float32)
 
-    def get_global_obs(self, obs: NDArray):
+    def get_global_obs(self, obs: NDArray) -> NDArray:
         global_obs = np.concatenate(obs, axis=0)
         return np.tile(global_obs, (self.num_agents, 1))
-    
-
-        
-
 
 
 class GymRecordEpisodeMetrics(gym.Wrapper):
@@ -117,14 +107,14 @@ class GymRecordEpisodeMetrics(gym.Wrapper):
             "episode_length": self.running_count_episode_length,
             "is_terminal_step": True,
         }
-                
+
         # Reset the metrics
         self.running_count_episode_return = 0.0
         self.running_count_episode_length = 0
-        
+
         if "won_episode" in info:
             metrics["won_episode"] = info["won_episode"]
-            
+
         info["metrics"] = metrics
 
         return agents_view, info
@@ -140,17 +130,18 @@ class GymRecordEpisodeMetrics(gym.Wrapper):
         metrics = {
             "episode_return": self.running_count_episode_return,
             "episode_length": self.running_count_episode_length,
-            "is_terminal_step": False, # We handle the True case in the reset function since this gets overwritten 
+            "is_terminal_step": False,
         }
         if "won_episode" in info:
             metrics["won_episode"] = info["won_episode"]
-            
+
         info["metrics"] = metrics
-        
+
         return agents_view, reward, terminated, truncated, info
-    
+
+
 class GymAgentIDWrapper(gym.Wrapper):
-    """Add onehot agent IDs to observation."""
+    """Add one hot agent IDs to observation."""
 
     def __init__(self, env: gym.Env):
         super().__init__(env)
@@ -164,7 +155,9 @@ class GymAgentIDWrapper(gym.Wrapper):
             observation_space.shape,
         )
         _new_obs_shape = (_obs_shape[0] + self.env.num_agents,)
-        _observation_boxs = [spaces.Box(low=_obs_low, high=_obs_high, shape=_new_obs_shape, dtype=_obs_dtype)] * self.env.num_agents
+        _observation_boxs = [
+            spaces.Box(low=_obs_low, high=_obs_high, shape=_new_obs_shape, dtype=_obs_dtype)
+        ] * self.env.num_agents
         self.observation_space = spaces.Tuple(_observation_boxs)
 
     def reset(self) -> Tuple[np.ndarray, Dict]:
@@ -178,9 +171,18 @@ class GymAgentIDWrapper(gym.Wrapper):
         obs, reward, terminated, truncated, info = self.env.step(action)
         obs = np.concatenate([self.agent_ids, obs], axis=1)
         return obs, reward, terminated, truncated, info
-    
 
-def _multiagent_worker_shared_memory(index, env_fn, pipe, parent_pipe, shared_memory, error_queue):
+
+# Copied form https://github.com/openai/gym/blob/master/gym/vector/async_vector_env.py
+# Modified to work with multiple agents
+def _multiagent_worker_shared_memory(  # noqa: CCR001
+    index: int,
+    env_fn: Callable[[], Any],
+    pipe: Any,
+    parent_pipe: Any,
+    shared_memory: Any,
+    error_queue: Any,
+) -> None:
     assert shared_memory is not None
     env = env_fn()
     observation_space = env.observation_space
@@ -190,9 +192,7 @@ def _multiagent_worker_shared_memory(index, env_fn, pipe, parent_pipe, shared_me
             command, data = pipe.recv()
             if command == "reset":
                 observation, info = env.reset(**data)
-                write_to_shared_memory(
-                    observation_space, index, observation, shared_memory
-                )
+                write_to_shared_memory(observation_space, index, observation, shared_memory)
                 pipe.send(((None, info), True))
 
             elif command == "step":
@@ -203,14 +203,13 @@ def _multiagent_worker_shared_memory(index, env_fn, pipe, parent_pipe, shared_me
                     truncated,
                     info,
                 ) = env.step(data)
+                # Handel the dones across all of envs and agents
                 if np.logical_or(terminated, truncated).all():
                     old_observation, old_info = observation, info
                     observation, info = env.reset()
                     info["final_observation"] = old_observation
                     info["final_info"] = old_info
-                write_to_shared_memory(
-                    observation_space, index, observation, shared_memory
-                )
+                write_to_shared_memory(observation_space, index, observation, shared_memory)
                 pipe.send(((None, reward, terminated, truncated, info), True))
             elif command == "seed":
                 env.seed(data)
@@ -235,9 +234,7 @@ def _multiagent_worker_shared_memory(index, env_fn, pipe, parent_pipe, shared_me
                 setattr(env, name, value)
                 pipe.send((None, True))
             elif command == "_check_spaces":
-                pipe.send(
-                    ((data[0] == observation_space, data[1] == env.action_space), True)
-                )
+                pipe.send(((data[0] == observation_space, data[1] == env.action_space), True))
             else:
                 raise RuntimeError(
                     f"Received unknown command `{command}`. Must "
