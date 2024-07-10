@@ -22,7 +22,6 @@ import jaxmarl
 import jumanji
 import matrax
 from gigastep import ScenarioBuilder
-import lbforaging
 from jaxmarl.environments.smax import map_name_to_scenario
 from jumanji.env import Environment
 from jumanji.environments.routing.cleaner.generator import (
@@ -45,16 +44,16 @@ from mava.wrappers import (
     CleanerWrapper,
     ConnectorWrapper,
     GigastepWrapper,
+    GymAgentIDWrapper,
     GymRecordEpisodeMetrics,
     GymRwareWrapper,
-    GymAgentIDWrapper,
-    _multiagent_worker_shared_memory,
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
     RecordEpisodeMetrics,
     RwareWrapper,
     SmaxWrapper,
+    _multiagent_worker_shared_memory,
 )
 
 # Registry mapping environment names to their generator and wrapper classes.
@@ -211,7 +210,9 @@ def make_gigastep_env(
 
 
 def make_gym_env(
-    config: DictConfig,  num_env : int, add_global_state: bool = False, 
+    config: DictConfig,
+    num_env: int,
+    add_global_state: bool = False,
 ) -> Environment:  # todo : create the appropriate annotation for the sync vector
     """
      Create a Gym environment.
@@ -238,11 +239,8 @@ def make_gym_env(
         return wrapped_env
 
     envs = gym.vector.AsyncVectorEnv(  # todo : give them more descriptive names
-        [
-            lambda: create_gym_env(config, add_global_state)
-            for _ in range(num_env)
-        ],
-        worker=_multiagent_worker_shared_memory
+        [lambda: create_gym_env(config, add_global_state) for _ in range(num_env)],
+        worker=_multiagent_worker_shared_memory,
     )
 
     return envs
