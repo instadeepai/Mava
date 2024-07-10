@@ -79,7 +79,7 @@ def unbatchify(x: Array, agents: List[str]) -> Dict[str, Array]:
 
 
 def merge_space(
-    spec: Dict[str, Union[jaxmarl_spaces.Box, jaxmarl_spaces.Discrete]]
+    spec: Dict[str, Union[jaxmarl_spaces.Box, jaxmarl_spaces.Discrete]],
 ) -> jaxmarl_spaces.Space:
     """Convert a dictionary of spaces into a single space with a num_agents size first dimension.
 
@@ -204,7 +204,10 @@ class JaxMarlWrapper(Wrapper, ABC):
         obs, env_state = self._env.reset(reset_key)
 
         obs = self._create_observation(obs, env_state)
-        return JaxMarlState(env_state, key, 0), restart(obs, shape=(self.num_agents,))
+        state = JaxMarlState(env_state, key, jnp.array(0, dtype=int))
+        timestep = restart(obs, shape=(self.num_agents,))
+
+        return state, timestep
 
     def step(
         self, state: JaxMarlState, action: Array
@@ -222,11 +225,12 @@ class JaxMarlWrapper(Wrapper, ABC):
         ts = TimeStep(
             step_type=step_type,
             reward=batchify(reward, self.agents),
-            discount=1.0 - batchify(done, self.agents),
+            discount=(1.0 - batchify(done, self.agents)).astype(float),
             observation=obs,
         )
+        state = JaxMarlState(env_state, key, state.step + jnp.array(1, dtype=int))
 
-        return JaxMarlState(env_state, key, state.step + 1), ts
+        return state, ts
 
     def _create_observation(
         self,
