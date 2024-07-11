@@ -57,11 +57,9 @@ _jumanji_registry = {
     "Cleaner-v0": {"generator": CleanerRandomGenerator, "wrapper": CleanerWrapper},
 }
 
-# Define a different registry for Matrax since it has no generator.
+# Define a different registry for other suites since they have no generator.
 _matrax_registry = {"Matrax": MatraxWrapper}
-
 _jaxmarl_wrappers: Dict[str, Type[JaxMarlWrapper]] = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
-
 _gigastep_registry = {"Gigastep": GigastepWrapper}
 
 

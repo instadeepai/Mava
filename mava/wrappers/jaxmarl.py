@@ -79,7 +79,7 @@ def unbatchify(x: Array, agents: List[str]) -> Dict[str, Array]:
 
 
 def merge_space(
-    spec: Dict[str, Union[jaxmarl_spaces.Box, jaxmarl_spaces.Discrete]]
+    spec: Dict[str, Union[jaxmarl_spaces.Box, jaxmarl_spaces.Discrete]],
 ) -> jaxmarl_spaces.Space:
     """Convert a dictionary of spaces into a single space with a num_agents size first dimension.
 
@@ -168,15 +168,15 @@ class JaxMarlWrapper(Wrapper, ABC):
         self,
         env: MultiAgentEnv,
         has_global_state: bool,
-        timelimit: int = 1000,
+        time_limit: int = -1,
     ) -> None:
         """
         Initialize the JaxMarlWrapper.
 
         Args:
-        - env: The JaxMarl environment to wrap.
-        - has_global_state: Whether the environment has global state.
-        - timelimit: The time limit for each episode.
+            - env: The JaxMarl environment to wrap.
+            - has_global_state: Whether the environment has global state.
+            - time_limit: The time limit for each episode.
         """
         # Check that all specs are the same as we only support homogeneous environments, for now ;)
         homogenous_error = (
@@ -184,18 +184,18 @@ class JaxMarlWrapper(Wrapper, ABC):
             f"but you tried to use {env} which is not homogeneous."
         )
         assert is_homogenous(env), homogenous_error
+        assert time_limit > 0, f"Time limit must be greater than 0, got {time_limit}"
 
         super().__init__(env)
-        self._env: MultiAgentEnv
-        self._timelimit = timelimit
+
+        self.has_global_state = has_global_state
+        self.time_limit = time_limit
         self.agents = self._env.agents
         self.num_agents = self._env.num_agents
-        self.has_global_state = has_global_state
 
         # Calling these on init to cache the values in a non-jitted context.
         self.state_size
         self.action_dim
-        self.num_agents
 
     def reset(
         self, key: PRNGKey
@@ -252,7 +252,7 @@ class JaxMarlWrapper(Wrapper, ABC):
             (self.num_agents, self.action_dim), bool, False, True, "action_mask"
         )
         step_count = specs.BoundedArray(
-            (self.num_agents,), jnp.int32, 0, self._timelimit, "step_count"
+            (self.num_agents,), jnp.int32, 0, self.time_limit, "step_count"
         )
 
         if self.has_global_state:
@@ -302,12 +302,6 @@ class JaxMarlWrapper(Wrapper, ABC):
 
     @cached_property
     @abstractmethod
-    def num_agents(self) -> chex.Array:
-        "Get the number of agents"
-        ...
-
-    @cached_property
-    @abstractmethod
     def action_dim(self) -> chex.Array:
         "Get the actions dim for each agent."
         ...
@@ -326,9 +320,9 @@ class SmaxWrapper(JaxMarlWrapper):
         self,
         env: MultiAgentEnv,
         has_global_state: bool = False,
-        timelimit: int = 500,
+        time_limit: int = 500,
     ):
-        super().__init__(env, has_global_state, timelimit)
+        super().__init__(env, has_global_state, time_limit)
         self._env: SMAX
 
     def reset(
@@ -355,11 +349,6 @@ class SmaxWrapper(JaxMarlWrapper):
         return self._env.state_size
 
     @cached_property
-    def num_agents(self) -> chex.Array:
-        "Get the number of agents"
-        return self._env.num_agents
-
-    @cached_property
     def action_dim(self) -> chex.Array:
         "Get the actions dim for each agent."
         single_agent_action_space = self._env.action_space(self.agents[0])
@@ -382,15 +371,10 @@ class MabraxWrapper(JaxMarlWrapper):
         self,
         env: MABraxEnv,
         has_global_state: bool = False,
-        timelimit: int = 1000,
+        time_limit: int = 1000,
     ):
-        super().__init__(env, has_global_state, timelimit)
+        super().__init__(env, has_global_state, time_limit)
         self._env: MABraxEnv
-
-    @cached_property
-    def num_agents(self) -> chex.Array:
-        "Get the number of agents"
-        return self._env.num_agents
 
     @cached_property
     def action_dim(self) -> chex.Array:
