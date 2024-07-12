@@ -57,9 +57,9 @@ _jumanji_registry = {
     "Cleaner-v0": {"generator": CleanerRandomGenerator, "wrapper": CleanerWrapper},
 }
 
-# Define a different registry for other suites since they have no generator.
+# Registry mapping environment names directly to the corresponding wrapper classes.
 _matrax_registry = {"Matrax": MatraxWrapper}
-_jaxmarl_wrappers: Dict[str, Type[JaxMarlWrapper]] = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
+_jaxmarl_registry: Dict[str, Type[JaxMarlWrapper]] = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 _gigastep_registry = {"Gigastep": GigastepWrapper}
 
 
@@ -129,11 +129,11 @@ def make_jaxmarl_env(
         kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
 
     # Create jaxmarl envs.
-    train_env = _jaxmarl_wrappers[config.env.env_name](
+    train_env = _jaxmarl_registry[config.env.env_name](
         jaxmarl.make(env_name, **kwargs),
         add_global_state,
     )
-    eval_env = _jaxmarl_wrappers[config.env.env_name](
+    eval_env = _jaxmarl_registry[config.env.env_name](
         jaxmarl.make(env_name, **kwargs),
         add_global_state,
     )
