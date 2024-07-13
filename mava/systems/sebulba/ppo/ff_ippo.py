@@ -666,11 +666,11 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
         episode_metrics = []
         train_metrics = []
 
-        # Make sure that the
+        # Full or partial last eval step.
         num_updates_in_eval = (
-            config.system.num_updates_per_eval
-            if eval_step != config.arch.num_evaluation - 1
-            else remaining_updates
+            remaining_updates
+            if eval_step == config.arch.num_evaluation - 1 and remaining_updates
+            else config.system.num_updates_per_eval
         )
         for _update in range(num_updates_in_eval):
             sharded_storages = []
