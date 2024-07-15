@@ -71,9 +71,11 @@ def init(
     """Initialize system by creating the envs, networks etc.
 
     Args:
+    ----
         cfg: System configuration.
 
     Returns:
+    -------
         Tuple containing:
             Tuple[Environment, Environment]: The environment and evaluation environment.
             Networks: Tuple of actor and critic networks.
@@ -83,6 +85,7 @@ def init(
             Array: The target entropy.
             MavaLogger: The logger.
             PRNGKey: The random key.
+
     """
     logger = MavaLogger(cfg)
 
@@ -220,6 +223,7 @@ def make_update_fns(
     """Create the update functions for the learner.
 
     Args:
+    ----
         cfg: System configuration.
         env: The environment.
         networks: Tuple of actor and critic networks.
@@ -228,9 +232,11 @@ def make_update_fns(
         target_entropy: The target entropy.
 
     Returns:
+    -------
         Tuple of (explore_fn, update_fn).
         Explore function is used for initial exploration with random actions.
         Update function is the main learning function, it both acts and learns.
+
     """
     actor_net, q_net = networks
     actor_opt, q_opt, alpha_opt = optims
@@ -458,7 +464,6 @@ def make_update_fns(
     # Act loop -> sample -> update loop
     def update_step(carry: LearnerState, _: Any) -> Tuple[LearnerState, Tuple[Metrics, Metrics]]:
         """Act, sample, learn. The body of the main SAC loop."""
-
         obs, env_state, buffer_state, params, opt_states, t, key = carry
         key, act_key, learn_key = jax.random.split(key, 3)
         # Act
