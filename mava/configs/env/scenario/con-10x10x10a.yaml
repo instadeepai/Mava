@@ -1,0 +1,10 @@
+# The config of the 10x10x10a scenario
+name: MaConnector-v2
+task_name: con-10x10x10a
+
+task_config:
+  grid_size: 10
+  num_agents: 10
+
+env_kwargs:
+  time_limit: 100
