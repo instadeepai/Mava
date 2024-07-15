@@ -42,6 +42,7 @@ def get_ff_evaluator_fn(
     """Get the evaluator function for feedforward networks.
 
     Args:
+    ----
         env (Environment): An evironment instance for evaluation.
         apply_fn (callable): Network forward pass method.
         config (dict): Experiment configuration.
@@ -51,6 +52,7 @@ def get_ff_evaluator_fn(
             of training by rolling out the policy which obtained the greatest evaluation
             performance during training for 10 times more episodes than were used at a
             single evaluation step.
+
     """
 
     def eval_one_episode(params: FrozenDict, init_eval_state: EvalState) -> Dict:
@@ -106,7 +108,6 @@ def get_ff_evaluator_fn(
 
     def evaluator_fn(trained_params: FrozenDict, key: chex.PRNGKey) -> ExperimentOutput[EvalState]:
         """Evaluator function."""
-
         # Initialise environment states and timesteps.
         n_devices = len(jax.devices())
 
@@ -226,7 +227,6 @@ def get_rnn_evaluator_fn(
         trained_params: FrozenDict, key: chex.PRNGKey
     ) -> ExperimentOutput[RNNEvalState]:
         """Evaluator function."""
-
         # Initialise environment states and timesteps.
         n_devices = len(jax.devices())
 
@@ -292,6 +292,7 @@ def make_eval_fns(
     """Initialize evaluator functions for reinforcement learning.
 
     Args:
+    ----
         eval_env (Environment): The environment used for evaluation.
         network_apply_fn (Union[ActorApply,RecActorApply]): Creates a policy to sample.
         config (DictConfig): The configuration settings for the evaluation.
@@ -300,11 +301,14 @@ def make_eval_fns(
             Required if `use_recurrent_net` is True. Defaults to None.
 
     Returns:
+    -------
         Tuple[EvalFn, EvalFn]: A tuple of two evaluation functions:
         one for use during training and one for absolute metrics.
 
     Raises:
+    ------
         AssertionError: If `use_recurrent_net` is True but `scanned_rnn` is not provided.
+
     """
     # Check if win rate is required for evaluation.
     log_win_rate = config.env.log_win_rate
@@ -328,10 +332,17 @@ def make_eval_fns(
         )
     else:
         evaluator = get_ff_evaluator_fn(
-            eval_env, network_apply_fn, config, log_win_rate  # type: ignore
+            eval_env,
+            network_apply_fn,  # type: ignore
+            config,
+            log_win_rate,  # type: ignore
         )
         absolute_metric_evaluator = get_ff_evaluator_fn(
-            eval_env, network_apply_fn, config, log_win_rate, 10  # type: ignore
+            eval_env,
+            network_apply_fn,  # type: ignore
+            config,
+            log_win_rate,
+            10,  # type: ignore
         )
 
     evaluator = jax.pmap(evaluator, axis_name="device")
