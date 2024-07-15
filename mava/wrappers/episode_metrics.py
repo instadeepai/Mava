@@ -59,11 +59,18 @@ class RecordEpisodeMetrics(Wrapper):
         """Reset the environment."""
         key, reset_key = jax.random.split(key)
         state, timestep = self._env.reset(reset_key)
-        state = RecordEpisodeMetricsState(state, key, 0.0, 0, 0.0, 0)
+        state = RecordEpisodeMetricsState(
+            state,
+            key,
+            jnp.array(0.0, dtype=float),
+            jnp.array(0, dtype=int),
+            jnp.array(0.0, dtype=float),
+            jnp.array(0, dtype=int),
+        )
         timestep.extras["episode_metrics"] = {
-            "episode_return": 0.0,
-            "episode_length": 0,
-            "is_terminal_step": False,
+            "episode_return": jnp.array(0.0, dtype=float),
+            "episode_length": jnp.array(0, dtype=int),
+            "is_terminal_step": jnp.array(False, dtype=bool),
         }
         return state, timestep
 
