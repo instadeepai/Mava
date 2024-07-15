@@ -251,7 +251,6 @@ class ConnectorWrapper(MultiAgentWrapper):
         """
         return jnp.tile(obs.agents_view[..., :3][0], (obs.agents_view.shape[0], 1, 1, 1))
 
-
     def observation_spec(
         self,
     ) -> specs.Spec[Union[Observation, ObservationGlobalState]]:

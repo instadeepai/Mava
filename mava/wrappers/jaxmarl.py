@@ -86,6 +86,7 @@ def merge_space(
     JaxMarl uses a dictionary of specs, one per agent. For now we want this to be a single spec.
     """
     n_agents = len(spec)
+    # Get the first agent's spec from the dictionary.
     single_spec = copy.deepcopy(next(iter(spec.values())))
 
     err = f"Unsupported space for merging spaces, expected Box or Discrete, got {type(single_spec)}"
