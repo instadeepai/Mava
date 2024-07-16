@@ -86,7 +86,8 @@ def merge_space(
     JaxMarl uses a dictionary of specs, one per agent. For now we want this to be a single spec.
     """
     n_agents = len(spec)
-    single_spec = copy.deepcopy(list(spec.values())[0])
+    # Get the first agent's spec from the dictionary.
+    single_spec = copy.deepcopy(next(iter(spec.values())))
 
     err = f"Unsupported space for merging spaces, expected Box or Discrete, got {type(single_spec)}"
     assert _is_discrete(single_spec) or _is_box(single_spec), err
@@ -160,9 +161,7 @@ def jaxmarl_space_to_jumanji_spec(space: jaxmarl_spaces.Space) -> specs.Spec:
 
 
 class JaxMarlWrapper(Wrapper, ABC):
-    """
-    A wrapper for JaxMarl environments to make their API compatible with Jumanji environments.
-    """
+    """A wrapper for JaxMarl environments to make their API compatible with Jumanji environments."""
 
     def __init__(
         self,
@@ -170,13 +169,13 @@ class JaxMarlWrapper(Wrapper, ABC):
         has_global_state: bool,
         time_limit: int = -1,
     ) -> None:
-        """
-        Initialize the JaxMarlWrapper.
+        """Initialize the JaxMarlWrapper.
 
         Args:
-            - env: The JaxMarl environment to wrap.
-            - has_global_state: Whether the environment has global state.
-            - time_limit: The time limit for each episode.
+        ----
+        - env: The JaxMarl environment to wrap.
+        - has_global_state: Whether the environment has global state.
+        - time_limit: The time limit for each episode.
         """
         # Check that all specs are the same as we only support homogeneous environments, for now ;)
         homogenous_error = (
@@ -194,8 +193,8 @@ class JaxMarlWrapper(Wrapper, ABC):
         self.num_agents = self._env.num_agents
 
         # Calling these on init to cache the values in a non-jitted context.
-        self.state_size
-        self.action_dim
+        self.state_size  # noqa: B018
+        self.action_dim  # noqa: B018
 
     def reset(
         self, key: PRNGKey
@@ -307,13 +306,13 @@ class JaxMarlWrapper(Wrapper, ABC):
     @cached_property
     @abstractmethod
     def action_dim(self) -> chex.Array:
-        "Get the actions dim for each agent."
+        """Get the actions dim for each agent."""
         ...
 
     @cached_property
     @abstractmethod
     def state_size(self) -> chex.Array:
-        "Get the sate size of the global observation"
+        """Get the sate size of the global observation"""
         ...
 
 
@@ -349,12 +348,12 @@ class SmaxWrapper(JaxMarlWrapper):
 
     @cached_property
     def state_size(self) -> chex.Array:
-        "Get the sate size of the global observation"
+        """Get the sate size of the global observation"""
         return self._env.state_size
 
     @cached_property
     def action_dim(self) -> chex.Array:
-        "Get the actions dim for each agent."
+        """Get the actions dim for each agent."""
         single_agent_action_space = self._env.action_space(self.agents[0])
         return single_agent_action_space.n
 
@@ -382,12 +381,12 @@ class MabraxWrapper(JaxMarlWrapper):
 
     @cached_property
     def action_dim(self) -> chex.Array:
-        "Get the actions dim for each agent."
+        """Get the actions dim for each agent."""
         return self._env.action_space(self.agents[0]).shape[0]
 
     @cached_property
     def state_size(self) -> chex.Array:
-        "Get the sate size of the global observation"
+        """Get the sate size of the global observation"""
         brax_env = self._env.env
         return brax_env.observation_size
 

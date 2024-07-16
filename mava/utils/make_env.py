@@ -86,12 +86,15 @@ def make_jumanji_env(
     Create a Jumanji environments for training and evaluation.
 
     Args:
+    ----
         env_name (str): The name of the environment to create.
         config (Dict): The configuration of the environment.
         add_global_state (bool): Whether to add the global state to the observation.
 
     Returns:
+    -------
         A tuple of the environments.
+
     """
     # Config generator and select the wrapper.
     generator = _jumanji_registry[env_name]["generator"]
@@ -116,14 +119,16 @@ def make_jaxmarl_env(
      Create a JAXMARL environment.
 
     Args:
+    ----
         env_name (str): The name of the environment to create.
         config (Dict): The configuration of the environment.
         add_global_state (bool): Whether to add the global state to the observation.
 
     Returns:
+    -------
         A JAXMARL environment.
-    """
 
+    """
     kwargs = dict(config.env.kwargs)
     if "smax" in env_name.lower():
         kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
@@ -150,12 +155,15 @@ def make_matrax_env(
     Creates Matrax environments for training and evaluation.
 
     Args:
+    ----
         env_name: The name of the environment to create.
         config: The configuration of the environment.
         add_global_state: Whether to add the global state to the observation.
 
     Returns:
+    -------
         A tuple containing a train and evaluation Matrax environment.
+
     """
     # Select the Matrax wrapper.
     wrapper = _matrax_registry[env_name]
@@ -178,12 +186,15 @@ def make_gigastep_env(
      Create a Gigastep environment.
 
     Args:
+    ----
         env_name (str): The name of the environment to create.
         config (Dict): The configuration of the environment.
         add_global_state (bool): Whether to add the global state to the observation. Default False.
 
     Returns:
+    -------
         A tuple of the environments.
+
     """
     wrapper = _gigastep_registry[env_name]
 
@@ -199,14 +210,17 @@ def make_gigastep_env(
 
 def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
     """
-    Create environments for training and evaluation..
+    Create environments for training and evaluation.
 
     Args:
+    ----
         config (Dict): The configuration of the environment.
         add_global_state (bool): Whether to add the global state to the observation.
 
     Returns:
+    -------
         A tuple of the environments.
+
     """
     env_name = config.env.scenario.name
 

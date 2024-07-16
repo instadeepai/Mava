@@ -121,7 +121,7 @@ class JumanjiMarlWrapper(Wrapper, ABC):
 
     @cached_property
     def action_dim(self) -> chex.Array:
-        "Get the actions dim for each agent."
+        """Get the actions dim for each agent."""
         return int(self._env.action_spec().num_values[0])
 
 
@@ -145,13 +145,14 @@ class RwareWrapper(JumanjiMarlWrapper):
 
 
 class LbfWrapper(JumanjiMarlWrapper):
-    """
-     Multi-agent wrapper for the Level-Based Foraging environment.
+    """Multi-agent wrapper for the Level-Based Foraging environment.
 
     Args:
+    ----
         env (Environment): The base environment.
         use_individual_rewards (bool): If true each agent gets a separate reward,
         sum reward otherwise.
+
     """
 
     def __init__(
@@ -178,7 +179,6 @@ class LbfWrapper(JumanjiMarlWrapper):
         """Modify the timestep for Level-Based Foraging environment and update
         the reward based on the specified reward handling strategy.
         """
-
         # Create a new observation with adjusted step count
         modified_observation = Observation(
             agents_view=timestep.observation.agents_view,
@@ -249,10 +249,11 @@ class ConnectorWrapper(JumanjiMarlWrapper):
         """Constructs the global state from the global information
         in the agent observations (positions, targets and paths.)
         """
-
         return jnp.tile(obs.agents_view[..., :3][0], (obs.agents_view.shape[0], 1, 1, 1))
 
-    def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
+    def observation_spec(
+        self,
+    ) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
             (self.num_agents,),
@@ -302,7 +303,6 @@ class CleanerWrapper(JumanjiMarlWrapper):
             """Create separate channels for dirty cells, wall cells and agent positions.
             Also add a channel that marks an agent's own position.
             """
-
             num_agents = self.num_agents
 
             # A: Number of agents

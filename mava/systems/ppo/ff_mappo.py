@@ -34,11 +34,7 @@ from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransitio
 from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn, MarlEnv
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax_utils import (
-    merge_leading_dims,
-    unreplicate_batch_dim,
-    unreplicate_n_dims,
-)
+from mava.utils.jax_utils import merge_leading_dims, unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import make_learning_rate
@@ -52,7 +48,6 @@ def get_learner_fn(
     config: DictConfig,
 ) -> LearnerFn[LearnerState]:
     """Get the learner function."""
-
     # Unpack apply and update functions.
     actor_apply_fn, critic_apply_fn = apply_fns
     actor_update_fn, critic_update_fn = update_fns
@@ -66,6 +61,7 @@ def get_learner_fn(
         losses.
 
         Args:
+        ----
             learner_state (NamedTuple):
                 - params (Params): The current model parameters.
                 - opt_states (OptStates): The current optimizer states.
@@ -73,6 +69,7 @@ def get_learner_fn(
                 - env_state (State): The environment state.
                 - last_timestep (TimeStep): The last timestep in the current trajectory.
             _ (Any): The current metrics info.
+
         """
 
         def _env_step(learner_state: LearnerState, _: Any) -> Tuple[LearnerState, PPOTransition]:
@@ -145,7 +142,6 @@ def get_learner_fn(
 
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
-
                 # UNPACK TRAIN STATE AND BATCH INFO
                 params, opt_states, key = train_state
                 traj_batch, advantages, targets = batch_info
@@ -280,7 +276,7 @@ def get_learner_fn(
                 lambda x: jnp.take(x, permutation, axis=0), batch
             )
             minibatches = jax.tree_util.tree_map(
-                lambda x: jnp.reshape(x, [config.system.num_minibatches, -1] + list(x.shape[1:])),
+                lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 shuffled_batch,
             )
 
@@ -312,14 +308,15 @@ def get_learner_fn(
         updates. The `_update_step` function is vectorized over a batch of inputs.
 
         Args:
+        ----
             learner_state (NamedTuple):
                 - params (Params): The initial model parameters.
                 - opt_states (OptStates): The initial optimizer states.
                 - key (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
-        """
 
+        """
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
 
         learner_state, (episode_info, loss_info) = jax.lax.scan(
@@ -423,7 +420,7 @@ def learner_setup(
     replicate_learner = (params, opt_states, step_keys)
 
     # Duplicate learner for update_batch_size.
-    broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size,) + x.shape)
+    broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size, *x.shape))
     replicate_learner = jax.tree_map(broadcast, replicate_learner)
 
     # Duplicate learner across devices.
