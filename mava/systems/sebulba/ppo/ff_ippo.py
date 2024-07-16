@@ -588,11 +588,11 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
 
     # Generate Numpy RNG for reproducibility
     np_rng = np.random.default_rng(config.system.seed)
-    
+
     # Setup evaluator.
     evaluator, absolute_metric_evaluator = make_eval_fns(
         environments.make_gym_env, apply_fns[0], config, np_rng
-    )  
+    )
 
     # Calculate total timesteps.
     config = sebulba_check_total_timesteps(config)
@@ -634,7 +634,7 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
     unreplicated_params = flax.jax_utils.unreplicate(learner_state.params)
     params_queues: List = []
     rollout_queues: List = []
-    
+
     for _d_idx, d_id in enumerate(  # Loop through each executor device
         config.arch.executor_device_ids
     ):

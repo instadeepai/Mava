@@ -348,7 +348,7 @@ def get_sebulba_ff_evaluator_fn(
     env: Environment,
     apply_fn: ActorApply,
     config: DictConfig,
-    np_rng : np.random.Generator,
+    np_rng: np.random.Generator,
     log_win_rate: bool = False,
 ) -> SebulbaEvalFn:
     """Get the evaluator function for feedforward networks.
@@ -377,9 +377,9 @@ def get_sebulba_ff_evaluator_fn(
         return action
 
     def eval_episodes(params: FrozenDict, key: chex.PRNGKey) -> Any:
-        
+
         seeds = np_rng.integers(np.iinfo(np.int64).max, size=env.num_envs)
-        obs, info = env.reset(seed = seeds)
+        obs, info = env.reset(seed=seeds)
         dones = np.full(env.num_envs, False)
         eval_metrics = jax.tree_map(lambda *x: jnp.asarray(x), *info["metrics"])
 
@@ -419,7 +419,7 @@ def get_sebulba_rnn_evaluator_fn(
     env: Environment,
     apply_fn: RecActorApply,
     config: DictConfig,
-    np_rng : np.random.Generator,
+    np_rng: np.random.Generator,
     scanned_rnn: nn.Module,
     log_win_rate: bool = False,
 ) -> SebulbaEvalFn:
@@ -452,7 +452,7 @@ def get_sebulba_rnn_evaluator_fn(
     def eval_episodes(params: FrozenDict, key: chex.PRNGKey) -> Any:
 
         seeds = np_rng.integers(np.iinfo(np.int64).max, size=env.num_envs)
-        obs, info = env.reset(seed = seeds)
+        obs, info = env.reset(seed=seeds)
         eval_metrics = jax.tree_map(lambda *x: jnp.asarray(x), *info["metrics"])
 
         hstate = scanned_rnn.initialize_carry(
@@ -503,7 +503,7 @@ def make_sebulba_eval_fns(
     eval_env_fn: Callable,
     network_apply_fn: Union[ActorApply, RecActorApply],
     config: DictConfig,
-    np_rng : np.random.Generator,
+    np_rng: np.random.Generator,
     add_global_state: bool = False,
     use_recurrent_net: bool = False,
     scanned_rnn: Optional[nn.Module] = None,
