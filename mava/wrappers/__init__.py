@@ -17,6 +17,7 @@ from mava.wrappers.episode_metrics import RecordEpisodeMetrics
 from mava.wrappers.gigastep import GigastepWrapper
 from mava.wrappers.gym import (
     GymAgentIDWrapper,
+    GymLBFWrapper,
     GymRecordEpisodeMetrics,
     GymRwareWrapper,
     _multiagent_worker_shared_memory,

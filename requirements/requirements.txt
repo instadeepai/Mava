@@ -9,6 +9,7 @@ jax
 jaxlib
 jaxmarl
 jumanji @ git+https://github.com/sash-a/jumanji
+lbforaging @ git+https://github.com/Louay-Ben-nessir/lb-foraging.git
 matrax @ git+https://github.com/instadeepai/matrax
 mujoco==3.1.3
 mujoco-mjx==3.1.3
