@@ -599,7 +599,9 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
     ), "Number of updates per evaluation must be less than total number of updates."
     # Calculate number of updates per evaluation.
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
-    config.arch.num_evaluation, remaining_updates = divmod(config.system.num_updates , config.system.num_updates_per_eval)
+    config.arch.num_evaluation, remaining_updates = divmod(
+        config.system.num_updates, config.system.num_updates_per_eval
+    )
     config.arch.num_evaluation += (
         remaining_updates != 0
     )  # Add an evaluation step if the num_updates is not a multiple of num_evaluation
