@@ -59,6 +59,7 @@ def get_eval_fn(
     """Creates a function that can be used to evaluate agents on a given environment.
 
     Args:
+    ----
         env: an environment that conforms to the mava environment spec.
         act_fn: a function that takes in params, timestep, key and optionally a state
                 and returns actions and optionally a state (see `EvalActFn`).

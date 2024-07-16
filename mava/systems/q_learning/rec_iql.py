@@ -72,9 +72,11 @@ def init(
     """Initialize system by creating the envs, networks etc.
 
     Args:
+    ----
         cfg: System configuration.
 
     Returns:
+    -------
         Tuple containing:
             Tuple[Environment, Environment]: The environment and evaluation environment.
             RecQNetwork: Recurrent Q network.
@@ -83,6 +85,7 @@ def init(
             LearnerState: The initial learner state.
             MavaLogger: The logger.
             PRNGKey: The random key.
+
     """
     logger = MavaLogger(cfg)
 
@@ -221,6 +224,7 @@ def make_update_fns(
     """Create the update function for the Q-learner.
 
     Args:
+    ----
         cfg: System configuration.
         env: Learning environment.
         q_net: Recurrent q network.
@@ -228,9 +232,10 @@ def make_update_fns(
         rb: The replay buffer.
 
     Returns:
+    -------
         The update function.
-    """
 
+    """
     # ---- Acting functions ----
 
     def select_eps_greedy_action(
@@ -238,18 +243,21 @@ def make_update_fns(
     ) -> Tuple[ActionSelectionState, Array]:
         """Select action to take in epsilon-greedy way. Batch and agent dims are included.
 
-            Args:
+        Args:
+        ----
             action_selection_state: Tuple of online parameters, previous hidden state,
                 environment timestep (used to calculate epsilon) and a random key.
             obs: The observation from the previous timestep.
             term_or_trunc: The flag timestep.last() from the previous timestep.
 
         Returns:
+        -------
             A tuple of the updated action selection state and the chosen action.
+
         """
         params, hidden_state, t, key = action_selection_state
 
-        eps = jax.numpy.maximum(
+        eps = jnp.maximum(
             cfg.system.eps_min, 1 - (t / cfg.system.eps_decay) * (1 - cfg.system.eps_min)
         )
 
@@ -321,7 +329,6 @@ def make_update_fns(
         Mostly swaps leading axes because the replay buffer outputs (B, T, ... )
         and the RNN takes in (T, B, ...).
         """
-
         hidden_state = ScannedRNN.initialize_carry(
             (cfg.system.sample_batch_size, obs.agents_view.shape[2]), cfg.network.hidden_state_dim
         )
@@ -367,7 +374,6 @@ def make_update_fns(
         params: QNetParams, opt_states: optax.OptState, data: Transition, t_train: int
     ) -> Tuple[QNetParams, optax.OptState, Metrics]:
         """Update the Q parameters."""
-
         # Get data aligned with current/next timestep
         data_first = jax.tree_map(lambda x: x[:, :-1, ...], data)
         data_next = jax.tree_map(lambda x: x[:, 1:, ...], data)
@@ -439,7 +445,6 @@ def make_update_fns(
 
     def train(train_state: TrainState, _: Any) -> Tuple[TrainState, Metrics]:
         """Sample, train and repack."""
-
         # unpack and get keys
         buffer_state, params, opt_states, t_train, key = train_state
         next_key, buff_key = jax.random.split(key, 2)
@@ -466,7 +471,6 @@ def make_update_fns(
         learner_state: LearnerState, _: Any
     ) -> Tuple[LearnerState, Tuple[Metrics, Metrics]]:
         """Interact, then learn."""
-
         # unpack and get random keys
         (
             obs,
@@ -594,7 +598,7 @@ def run_experiment(cfg: DictConfig) -> float:
         # But we also want to make sure we're counting env steps correctly so
         # learn steps is not included in the loop counter.
         elapsed_time = time.time() - start_time
-        eps = jax.numpy.maximum(
+        eps = jnp.maximum(
             cfg.system.eps_min, 1 - (t / cfg.system.eps_decay) * (1 - cfg.system.eps_min)
         )
         final_metrics, ep_completed = episode_metrics.get_final_step_metrics(metrics)
