@@ -45,6 +45,7 @@ from mava.wrappers import (
     ConnectorWrapper,
     GigastepWrapper,
     GymAgentIDWrapper,
+    GymLBFWrapper,
     GymRecordEpisodeMetrics,
     GymRwareWrapper,
     LbfWrapper,
@@ -71,7 +72,7 @@ _jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 
 _gigastep_registry = {"Gigastep": GigastepWrapper}
 
-_gym_registry = {"RobotWarehouse": GymRwareWrapper}
+_gym_registry = {"RobotWarehouse": GymRwareWrapper, "LevelBasedForaging": GymLBFWrapper}
 
 
 def add_extra_wrappers(
@@ -218,12 +219,12 @@ def make_gym_env(
      Create a Gym environment.
 
     Args:
-        env_name (str): The name of the environment to create.
         config (Dict): The configuration of the environment.
+        num_env (int) : The number of parallel envs to create.
         add_global_state (bool): Whether to add the global state to the observation. Default False.
 
     Returns:
-        A tuple of the environments.
+        Async environments.
     """
     base_env_name = config.env.env_name
     wrapper = _gym_registry[base_env_name]

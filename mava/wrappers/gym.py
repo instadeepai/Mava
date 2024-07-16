@@ -89,6 +89,64 @@ class GymRwareWrapper(gym.Wrapper):
         return np.tile(global_obs, (self.num_agents, 1))
 
 
+class GymLBFWrapper(gym.Wrapper):
+    """Wrapper for rware gym environments"""
+
+    def __init__(
+        self,
+        env: gym.Env,
+        use_individual_rewards: bool = False,
+        add_global_state: bool = False,
+    ):
+        """Initialize the gym wrapper
+        Args:
+            env (gym.env): gym env instance.
+            use_individual_rewards (bool, optional): Use individual or group rewards.
+            Defaults to False.
+            add_global_state (bool, optional) : Create global observations. Defaults to False.
+        """
+        super().__init__(env)
+        self._env = env  # not having _env leaded tp self.env getting replaced --> circular called
+        self.use_individual_rewards = use_individual_rewards
+        self.add_global_state = add_global_state  # todo : add the global observations
+        self.num_agents = len(self._env.action_space)
+        self.num_actions = self._env.action_space[
+            0
+        ].n  # todo: all the agents must have the same num_actions, add assertion?
+
+    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> Tuple:
+
+        if seed is not None:
+            self.env.seed(seed)
+
+        agents_view, info = self._env.reset()
+
+        info = {"actions_mask": self.get_actions_mask(info)}
+
+        return np.array(agents_view), info
+
+    def step(self, actions: NDArray) -> Tuple:  # Vect auto rest
+
+        agents_view, reward, terminated, truncated, info = self._env.step(actions)
+
+        info = {"actions_mask": self.get_actions_mask(info)}
+
+        if self.use_individual_rewards:
+            reward = np.array(reward)
+        else:
+            reward = np.array([np.array(reward).sum()] * self.num_agents)
+
+        truncated = [truncated] * self.num_agents
+        terminated = [terminated] * self.num_agents
+
+        return agents_view, reward, terminated, truncated, info
+
+    def get_actions_mask(self, info: Dict) -> NDArray:
+        if "action_mask" in info:
+            return np.array(info["action_mask"])
+        return np.ones((self.num_agents, self.num_actions), dtype=np.float32)
+
+
 class GymRecordEpisodeMetrics(gym.Wrapper):
     """Record the episode returns and lengths."""
 
