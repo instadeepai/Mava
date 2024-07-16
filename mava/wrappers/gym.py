@@ -49,7 +49,9 @@ class GymRwareWrapper(gym.Wrapper):
         self.num_agents = len(self._env.action_space)
         self.num_actions = self._env.action_space[0].n
 
-    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> Tuple:
+    def reset(
+        self, seed: Optional[int] = None, options: Optional[dict] = None
+    ) -> Tuple[np.ndarray, Dict]:
 
         if seed is not None:
             self.env.seed(seed)
@@ -96,10 +98,12 @@ class GymRecordEpisodeMetrics(gym.Wrapper):
         self.running_count_episode_return = 0.0
         self.running_count_episode_length = 0.0
 
-    def reset(self) -> Tuple:
+    def reset(
+        self, seed: Optional[int] = None, options: Optional[dict] = None
+    ) -> Tuple[np.ndarray, Dict]:
 
         # Reset the env
-        agents_view, info = self._env.reset()
+        agents_view, info = self._env.reset(seed, options)
 
         # Create the metrics dict
         metrics = {
@@ -160,9 +164,11 @@ class GymAgentIDWrapper(gym.Wrapper):
         ] * self.env.num_agents
         self.observation_space = spaces.Tuple(_observation_boxs)
 
-    def reset(self) -> Tuple[np.ndarray, Dict]:
+    def reset(
+        self, seed: Optional[int] = None, options: Optional[dict] = None
+    ) -> Tuple[np.ndarray, Dict]:
         """Reset the environment."""
-        obs, info = self.env.reset()
+        obs, info = self.env.reset(seed, options)
         obs = np.concatenate([self.agent_ids, obs], axis=1)
         return obs, info
 

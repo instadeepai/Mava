@@ -61,6 +61,7 @@ def rollout(
     apply_fns: Tuple,
     learner_devices: List,
     actor_device_id: int,
+    seeds: List[int],
 ) -> None:
 
     # setup
@@ -89,8 +90,7 @@ def rollout(
     params_queue_get_time: deque = deque(maxlen=1)
     rollout_time: deque = deque(maxlen=1)
     rollout_queue_put_time: deque = deque(maxlen=1)
-
-    next_obs, info = env.reset()
+    next_obs, info = env.reset(seed=seeds)
     next_dones = jnp.zeros((config.arch.num_envs, config.system.num_agents), dtype=jax.numpy.bool_)
 
     move_to_device = lambda x: jax.device_put(x, device=current_actor_device)
@@ -586,11 +586,13 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
         (key, actor_net_key, critic_net_key), config, learner_devices
     )
 
+    # Generate Numpy RNG for reproducibility
+    np_rng = np.random.default_rng(config.system.seed)
+    
     # Setup evaluator.
-    # One key per device for evaluation.
     evaluator, absolute_metric_evaluator = make_eval_fns(
-        environments.make_gym_env, apply_fns[0], config
-    )  # todo: make this more generic
+        environments.make_gym_env, apply_fns[0], config, np_rng
+    )  
 
     # Calculate total timesteps.
     config = sebulba_check_total_timesteps(config)
@@ -632,6 +634,7 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
     unreplicated_params = flax.jax_utils.unreplicate(learner_state.params)
     params_queues: List = []
     rollout_queues: List = []
+    
     for _d_idx, d_id in enumerate(  # Loop through each executor device
         config.arch.executor_device_ids
     ):
@@ -639,6 +642,7 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
         device_params = jax.device_put(unreplicated_params, devices[d_id])
         # Loop through each executor thread
         for _thread_id in range(config.arch.n_threads_per_executor):
+            seeds = np_rng.integers(np.iinfo(np.int64).max, size=config.arch.num_envs)
             params_queues.append(queue.Queue(maxsize=1))
             rollout_queues.append(queue.Queue(maxsize=1))
             params_queues[-1].put(device_params)
@@ -652,6 +656,7 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
                     apply_fns,
                     learner_devices,
                     d_id,
+                    seeds,
                 ),
             ).start()
 
