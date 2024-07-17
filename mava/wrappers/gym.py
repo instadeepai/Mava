@@ -75,7 +75,7 @@ class GymRwareWrapper(gym.Wrapper):
         if self.use_individual_rewards:
             reward = np.array(reward)
         else:
-            reward = np.array([np.array(reward).mean()] * self.num_agents)
+            reward = np.array([np.array(reward).sum()] * self.num_agents)
 
         return agents_view, reward, terminated, truncated, info
 
