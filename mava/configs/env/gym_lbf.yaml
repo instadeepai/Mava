@@ -1,0 +1,20 @@
+# ---Environment Configs---
+scenario: gym-2s-8x8-2p-2f-coop copy # [gym-2s-8x8-2p-2f-coop, gym-8x8-2p-2f-coop, gym-2s-10x10-3p-3f, gym-10x10-3p-3f, gym-15x15-3p-5f, gym-15x15-4p-3f, gym-15x15-4p-5f]
+
+env_name: LevelBasedForaging  # Used for logging purposes.
+
+# Defines the metric that will be used to evaluate the performance of the agent.
+# This metric is returned at the end of an experiment and can be used for hyperparameter tuning.
+eval_metric: episode_return
+
+# Whether the add agents IDs to the observations returned by the environment.
+add_agent_id : False
+
+# Whether or not to log the winrate of this environment.
+log_win_rate: False
+
+# Weather or not to sum the returned rewards over all of the agents.
+use_shared_rewards: True
+
+kwargs:
+  {}

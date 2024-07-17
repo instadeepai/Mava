@@ -32,10 +32,10 @@ class GymRwareWrapper(gym.Wrapper):
     def __init__(
         self,
         env: gym.Env,
-        use_shared_rewards: bool = False,
+        use_shared_rewards: bool = True,
         add_global_state: bool = False,
     ):
-        """Initialize the gym wrapper
+        """Initialise the gym wrapper
         Args:
             env (gym.env): gym env instance.
             use_shared_rewards (bool, optional): Use individual or shared rewards.
@@ -95,10 +95,10 @@ class GymLBFWrapper(gym.Wrapper):
     def __init__(
         self,
         env: gym.Env,
-        use_shared_rewards: bool = False,
+        use_shared_rewards: bool = True,
         add_global_state: bool = False,
     ):
-        """Initialize the gym wrapper
+        """Initialise the gym wrapper
         Args:
             env (gym.env): gym env instance.
             use_shared_rewards (bool, optional): Use individual or shared rewards.
@@ -106,13 +106,13 @@ class GymLBFWrapper(gym.Wrapper):
             add_global_state (bool, optional) : Create global observations. Defaults to False.
         """
         super().__init__(env)
-        self._env = env  # not having _env leaded tp self.env getting replaced --> circular called
+        self._env = env  
         self.use_shared_rewards = use_shared_rewards
-        self.add_global_state = add_global_state  # todo : add the global observations
+        self.add_global_state = add_global_state 
         self.num_agents = len(self._env.action_space)
         self.num_actions = self._env.action_space[
             0
-        ].n  # todo: all the agents must have the same num_actions, add assertion?
+        ].n  
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> Tuple:
 
@@ -130,7 +130,9 @@ class GymLBFWrapper(gym.Wrapper):
         agents_view, reward, terminated, truncated, info = self._env.step(actions)
 
         info = {"actions_mask": self.get_actions_mask(info)}
-
+        if self.add_global_state:
+            info["global_obs"] = self.get_global_obs(agents_view)
+        
         if self.use_shared_rewards:
             reward = np.array([np.array(reward).sum()] * self.num_agents)
         else:
@@ -145,7 +147,10 @@ class GymLBFWrapper(gym.Wrapper):
         if "action_mask" in info:
             return np.array(info["action_mask"])
         return np.ones((self.num_agents, self.num_actions), dtype=np.float32)
-
+    
+    def get_global_obs(self, obs: NDArray) -> NDArray:
+        global_obs = np.concatenate(obs, axis=0)
+        return np.tile(global_obs, (self.num_agents, 1))
 
 class GymRecordEpisodeMetrics(gym.Wrapper):
     """Record the episode returns and lengths."""
