@@ -1,0 +1,15 @@
+# The config of the 10x10-3p-3f scenario with the VectorObserver set as default
+name: LevelBasedForaging
+task_name: 10x10-3p-3f
+
+task_config:
+  field_size: [10,10]
+  sight: 10
+  num_agents: 3
+  max_food: 3
+  max_player_level: 2
+  force_coop: False
+  max_episode_steps: 50
+
+env_kwargs:
+  {}  # there are no scenario specific env_kwargs for this env

@@ -32,19 +32,19 @@ class GymRwareWrapper(gym.Wrapper):
     def __init__(
         self,
         env: gym.Env,
-        use_individual_rewards: bool = False,
+        use_shared_rewards: bool = False,
         add_global_state: bool = False,
     ):
         """Initialize the gym wrapper
         Args:
             env (gym.env): gym env instance.
-            use_individual_rewards (bool, optional): Use individual or group rewards.
+            use_shared_rewards (bool, optional): Use individual or shared rewards.
             Defaults to False.
             add_global_state (bool, optional) : Create global observations. Defaults to False.
         """
         super().__init__(env)
         self._env = env
-        self.use_individual_rewards = use_individual_rewards
+        self.use_shared_rewards = use_shared_rewards
         self.add_global_state = add_global_state
         self.num_agents = len(self._env.action_space)
         self.num_actions = self._env.action_space[0].n
@@ -72,10 +72,10 @@ class GymRwareWrapper(gym.Wrapper):
         if self.add_global_state:
             info["global_obs"] = self.get_global_obs(agents_view)
 
-        if self.use_individual_rewards:
-            reward = np.array(reward)
-        else:
+        if self.use_shared_rewards:
             reward = np.array([np.array(reward).sum()] * self.num_agents)
+        else:
+            reward = np.array(reward)
 
         return agents_view, reward, terminated, truncated, info
 
@@ -95,19 +95,19 @@ class GymLBFWrapper(gym.Wrapper):
     def __init__(
         self,
         env: gym.Env,
-        use_individual_rewards: bool = False,
+        use_shared_rewards: bool = False,
         add_global_state: bool = False,
     ):
         """Initialize the gym wrapper
         Args:
             env (gym.env): gym env instance.
-            use_individual_rewards (bool, optional): Use individual or group rewards.
+            use_shared_rewards (bool, optional): Use individual or shared rewards.
             Defaults to False.
             add_global_state (bool, optional) : Create global observations. Defaults to False.
         """
         super().__init__(env)
         self._env = env  # not having _env leaded tp self.env getting replaced --> circular called
-        self.use_individual_rewards = use_individual_rewards
+        self.use_shared_rewards = use_shared_rewards
         self.add_global_state = add_global_state  # todo : add the global observations
         self.num_agents = len(self._env.action_space)
         self.num_actions = self._env.action_space[
@@ -131,10 +131,10 @@ class GymLBFWrapper(gym.Wrapper):
 
         info = {"actions_mask": self.get_actions_mask(info)}
 
-        if self.use_individual_rewards:
-            reward = np.array(reward)
-        else:
+        if self.use_shared_rewards:
             reward = np.array([np.array(reward).sum()] * self.num_agents)
+        else:
+            reward = np.array(reward)
 
         truncated = [truncated] * self.num_agents
         terminated = [terminated] * self.num_agents

@@ -20,7 +20,8 @@ import gym.wrappers
 import gym.wrappers.compatibility
 import jaxmarl
 import jumanji
-import lbforaging  # noqa: F401 used implicitly
+from lbforaging.foraging import environment as GymLBF  
+import rware.warehouse as GymRware
 import matrax
 from gigastep import ScenarioBuilder
 from jaxmarl.environments.smax import map_name_to_scenario
@@ -73,7 +74,7 @@ _jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 
 _gigastep_registry = {"Gigastep": GigastepWrapper}
 
-_gym_registry = {"RobotWarehouse": GymRwareWrapper, "LevelBasedForaging": GymLBFWrapper}
+_gym_registry = {"RobotWarehouse": (GymRware, GymRwareWrapper), "LevelBasedForaging": (GymLBF ,GymLBFWrapper)}
 
 
 def add_extra_wrappers(
@@ -215,7 +216,7 @@ def make_gym_env(
     config: DictConfig,
     num_env: int,
     add_global_state: bool = False,
-) -> Environment:  # todo : create the appropriate annotation for the sync vector
+) -> gym.vector.AsyncVectorEnv:  
     """
      Create a Gym environment.
 
@@ -227,20 +228,20 @@ def make_gym_env(
     Returns:
         Async environments.
     """
-    base_env_name = config.env.env_name
-    wrapper = _gym_registry[base_env_name]
+    base_env_name = config.env.scenario.name
+    env_maker, wrapper = _gym_registry[base_env_name]
 
     def create_gym_env(
         config: DictConfig, add_global_state: bool = False
-    ) -> Environment:  # todo: add the RecordEpisodeMetrics for gym.
-        env = gym.make(config.env.scenario)
-        wrapped_env = wrapper(env, config.env.use_individual_rewards, add_global_state)
-        if not config.env.implicit_agent_id:
-            wrapped_env = GymAgentIDWrapper(wrapped_env)  # todo : add agent id wrapper for gym .
+    ) -> Environment: 
+        env = env_maker(**config.env.scenario.task_config)
+        wrapped_env = wrapper(env, config.env.use_shared_rewards, add_global_state)
+        if config.env.add_agent_id:
+            wrapped_env = GymAgentIDWrapper(wrapped_env)  
         wrapped_env = GymRecordEpisodeMetrics(wrapped_env)
         return wrapped_env
 
-    envs = gym.vector.AsyncVectorEnv(  # todo : give them more descriptive names
+    envs = gym.vector.AsyncVectorEnv(  
         [lambda: create_gym_env(config, add_global_state) for _ in range(num_env)],
         worker=_multiagent_worker_shared_memory,
     )
