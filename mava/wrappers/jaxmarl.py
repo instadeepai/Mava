@@ -167,6 +167,8 @@ class JaxMarlWrapper(Wrapper, ABC):
         self,
         env: MultiAgentEnv,
         has_global_state: bool,
+        # We set this to -1 to make it an optional input for children of this class.
+        # They must set their own defaults or use the wrapped envs value.
         time_limit: int = -1,
     ) -> None:
         """Initialize the JaxMarlWrapper.
@@ -183,6 +185,7 @@ class JaxMarlWrapper(Wrapper, ABC):
             f"but you tried to use {env} which is not homogeneous."
         )
         assert is_homogenous(env), homogenous_error
+        # Making sure the child envs set this correctly.
         assert time_limit > 0, f"Time limit must be greater than 0, got {time_limit}"
 
         super().__init__(env)
@@ -323,9 +326,8 @@ class SmaxWrapper(JaxMarlWrapper):
         self,
         env: MultiAgentEnv,
         has_global_state: bool = False,
-        time_limit: int = 500,
     ):
-        super().__init__(env, has_global_state, time_limit)
+        super().__init__(env, has_global_state, env.max_steps)
         self._env: SMAX
 
     def reset(
@@ -374,9 +376,8 @@ class MabraxWrapper(JaxMarlWrapper):
         self,
         env: MABraxEnv,
         has_global_state: bool = False,
-        time_limit: int = 1000,
     ):
-        super().__init__(env, has_global_state, time_limit)
+        super().__init__(env, has_global_state, env.episode_length)
         self._env: MABraxEnv
 
     @cached_property
