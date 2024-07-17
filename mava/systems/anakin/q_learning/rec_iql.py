@@ -34,7 +34,7 @@ from rich.pretty import pprint
 
 from mava.evaluator import make_eval_fns
 from mava.networks import RecQNetwork, ScannedRNN
-from mava.systems.q_learning.types import (
+from mava.systems.anakin.q_learning.types import (
     ActionSelectionState,
     ActionState,
     LearnerState,
@@ -645,7 +645,7 @@ def run_experiment(cfg: DictConfig) -> float:
     return float(eval_performance)
 
 
-@hydra.main(config_path="../../configs", config_name="default_rec_iql.yaml", version_base="1.2")
+@hydra.main(config_path="../../../configs", config_name="default_rec_iql.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
