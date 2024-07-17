@@ -378,7 +378,7 @@ def get_sebulba_ff_evaluator_fn(
 
     def eval_episodes(params: FrozenDict, key: chex.PRNGKey) -> Any:
 
-        seeds = np_rng.integers(np.iinfo(np.int64).max, size=env.num_envs)
+        seeds = np_rng.integers(np.iinfo(np.int64).max, size=env.num_envs).tolist()
         obs, info = env.reset(seed=seeds)
         dones = np.full(env.num_envs, False)
         eval_metrics = jax.tree_map(lambda *x: jnp.asarray(x), *info["metrics"])
@@ -451,7 +451,7 @@ def get_sebulba_rnn_evaluator_fn(
 
     def eval_episodes(params: FrozenDict, key: chex.PRNGKey) -> Any:
 
-        seeds = np_rng.integers(np.iinfo(np.int64).max, size=env.num_envs)
+        seeds = np_rng.integers(np.iinfo(np.int64).max, size=env.num_envs).tolist()
         obs, info = env.reset(seed=seeds)
         eval_metrics = jax.tree_map(lambda *x: jnp.asarray(x), *info["metrics"])
 

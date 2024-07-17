@@ -642,7 +642,7 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
         device_params = jax.device_put(unreplicated_params, devices[d_id])
         # Loop through each executor thread
         for _thread_id in range(config.arch.n_threads_per_executor):
-            seeds = np_rng.integers(np.iinfo(np.int64).max, size=config.arch.num_envs)
+            seeds = np_rng.integers(np.iinfo(np.int64).max, size=config.arch.num_envs).tolist()
             params_queues.append(queue.Queue(maxsize=1))
             rollout_queues.append(queue.Queue(maxsize=1))
             params_queues[-1].put(device_params)
