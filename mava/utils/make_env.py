@@ -20,6 +20,7 @@ import gym.wrappers
 import gym.wrappers.compatibility
 import jaxmarl
 import jumanji
+import lbforaging  # noqa: F401 used implicitly
 import matrax
 from gigastep import ScenarioBuilder
 from jaxmarl.environments.smax import map_name_to_scenario
