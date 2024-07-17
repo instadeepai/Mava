@@ -1,6 +1,8 @@
 # --- Sebulba config ---
-arch_name: "sebulba"
-num_envs: 32  # number of envs per thread
+arch_name: "Sebulba"
+
+# --- Training ---
+num_envs: 32  # number of environments per thread.
 
 # --- Evaluation ---
 evaluation_greedy: False # Evaluate the policy greedily. If True the policy will select
