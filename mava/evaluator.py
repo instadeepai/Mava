@@ -19,7 +19,6 @@ import flax.linen as nn
 import jax
 import jax.numpy as jnp
 from flax.core.frozen_dict import FrozenDict
-from jumanji.env import Environment
 from omegaconf import DictConfig
 
 from mava.types import (
@@ -27,13 +26,14 @@ from mava.types import (
     EvalFn,
     EvalState,
     ExperimentOutput,
+    MarlEnv,
     RecActorApply,
     RNNEvalState,
 )
 
 
 def get_ff_evaluator_fn(
-    env: Environment,
+    env: MarlEnv,
     apply_fn: ActorApply,
     config: DictConfig,
     log_win_rate: bool = False,
@@ -43,7 +43,7 @@ def get_ff_evaluator_fn(
 
     Args:
     ----
-        env (Environment): An evironment instance for evaluation.
+        env (MarlEnv): An environment instance for evaluation.
         apply_fn (callable): Network forward pass method.
         config (dict): Experiment configuration.
         eval_multiplier (int): A scalar that will increase the number of evaluation
@@ -144,7 +144,7 @@ def get_ff_evaluator_fn(
 
 
 def get_rnn_evaluator_fn(
-    env: Environment,
+    env: MarlEnv,
     apply_fn: RecActorApply,
     config: DictConfig,
     scanned_rnn: nn.Module,
@@ -283,7 +283,7 @@ def get_rnn_evaluator_fn(
 
 
 def make_eval_fns(
-    eval_env: Environment,
+    eval_env: MarlEnv,
     network_apply_fn: Union[ActorApply, RecActorApply],
     config: DictConfig,
     use_recurrent_net: bool = False,
