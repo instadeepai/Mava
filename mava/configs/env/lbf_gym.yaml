@@ -1,5 +1,5 @@
 # ---Environment Configs---
-scenario: gym-2s-8x8-2p-2f-coop copy # [gym-2s-8x8-2p-2f-coop, gym-8x8-2p-2f-coop, gym-2s-10x10-3p-3f, gym-10x10-3p-3f, gym-15x15-3p-5f, gym-15x15-4p-3f, gym-15x15-4p-5f]
+scenario: gym-2s-8x8-2p-2f-coop copy # [gym-lbf-2s-8x8-2p-2f-coop, gym-lbf-8x8-2p-2f-coop, gym-lbf-2s-10x10-3p-3f, gym-lbf-10x10-3p-3f, gym-lbf-15x15-3p-5f, gym-lbf-15x15-4p-3f, gym-lbf-15x15-4p-5f]
 
 env_name: LevelBasedForaging  # Used for logging purposes.
 
@@ -15,6 +15,3 @@ log_win_rate: False
 
 # Weather or not to sum the returned rewards over all of the agents.
 use_shared_rewards: True
-
-kwargs:
-  {}
