@@ -14,10 +14,10 @@
 
 from typing import Tuple
 
-import gym
-import gym.vector
-import gym.wrappers
-import gym.wrappers.compatibility
+import gymnasium
+import gymnasium.vector
+import gymnasium.wrappers
+import gymnasium.wrappers.compatibility
 import jaxmarl
 import jumanji
 import matrax
@@ -219,9 +219,9 @@ def make_gym_env(
     config: DictConfig,
     num_env: int,
     add_global_state: bool = False,
-) -> gym.vector.AsyncVectorEnv:
+) -> gymnasium.vector.AsyncVectorEnv:
     """
-     Create a Gym environment.
+     Create a gymnasium environment.
 
     Args:
         config (Dict): The configuration of the environment.
@@ -242,7 +242,7 @@ def make_gym_env(
         wrapped_env = GymRecordEpisodeMetrics(wrapped_env)
         return wrapped_env
 
-    envs = gym.vector.AsyncVectorEnv(
+    envs = gymnasium.vector.AsyncVectorEnv(
         [lambda: create_gym_env(config, add_global_state) for _ in range(num_env)],
         worker=_multiagent_worker_shared_memory,
     )

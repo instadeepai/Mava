@@ -16,28 +16,28 @@ import sys
 import warnings
 from typing import Any, Callable, Dict, Optional, Tuple
 
-import gym
+import gymnasium
 import numpy as np
-from gym import spaces
-from gym.vector.utils import write_to_shared_memory
+from gymnasium import spaces
+from gymnasium.vector.utils import write_to_shared_memory
 from numpy.typing import NDArray
 
 # Filter out the warnings
-warnings.filterwarnings("ignore", module="gym.utils.passive_env_checker")
+warnings.filterwarnings("ignore", module="gymnasium.utils.passive_env_checker")
 
 
-class GymRwareWrapper(gym.Wrapper):
+class GymRwareWrapper(gymnasium.Wrapper):
     """Wrapper for rware gym environments."""
 
     def __init__(
         self,
-        env: gym.Env,
+        env: gymnasium.Env,
         use_shared_rewards: bool = True,
         add_global_state: bool = False,
     ):
         """Initialise the gym wrapper
         Args:
-            env (gym.env): gym env instance.
+            env (gymnasium.env): gymnasium env instance.
             use_shared_rewards (bool, optional): Use individual or shared rewards.
             Defaults to False.
             add_global_state (bool, optional) : Create global observations. Defaults to False.
@@ -89,18 +89,18 @@ class GymRwareWrapper(gym.Wrapper):
         return np.tile(global_obs, (self.num_agents, 1))
 
 
-class GymLBFWrapper(gym.Wrapper):
+class GymLBFWrapper(gymnasium.Wrapper):
     """Wrapper for rware gym environments"""
 
     def __init__(
         self,
-        env: gym.Env,
+        env: gymnasium.Env,
         use_shared_rewards: bool = True,
         add_global_state: bool = False,
     ):
         """Initialise the gym wrapper
         Args:
-            env (gym.env): gym env instance.
+            env (gymnasium.env): gymnasium env instance.
             use_shared_rewards (bool, optional): Use individual or shared rewards.
             Defaults to False.
             add_global_state (bool, optional) : Create global observations. Defaults to False.
@@ -151,10 +151,10 @@ class GymLBFWrapper(gym.Wrapper):
         return np.tile(global_obs, (self.num_agents, 1))
 
 
-class GymRecordEpisodeMetrics(gym.Wrapper):
+class GymRecordEpisodeMetrics(gymnasium.Wrapper):
     """Record the episode returns and lengths."""
 
-    def __init__(self, env: gym.Env):
+    def __init__(self, env: gymnasium.Env):
         super().__init__(env)
         self._env = env
         self.running_count_episode_return = 0.0
@@ -206,10 +206,10 @@ class GymRecordEpisodeMetrics(gym.Wrapper):
         return agents_view, reward, terminated, truncated, info
 
 
-class GymAgentIDWrapper(gym.Wrapper):
+class GymAgentIDWrapper(gymnasium.Wrapper):
     """Add one hot agent IDs to observation."""
 
-    def __init__(self, env: gym.Env):
+    def __init__(self, env: gymnasium.Env):
         super().__init__(env)
 
         self.agent_ids = np.eye(self.env.num_agents)
