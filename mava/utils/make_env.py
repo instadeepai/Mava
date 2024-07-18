@@ -56,7 +56,7 @@ from mava.wrappers import (
     RecordEpisodeMetrics,
     RwareWrapper,
     SmaxWrapper,
-    _multiagent_worker_shared_memory,
+    async_multiagent_worker,
 )
 
 # Registry mapping environment names to their generator and wrapper classes.
@@ -244,7 +244,7 @@ def make_gym_env(
 
     envs = gymnasium.vector.AsyncVectorEnv(
         [lambda: create_gym_env(config, add_global_state) for _ in range(num_env)],
-        worker=_multiagent_worker_shared_memory,
+        worker=async_multiagent_worker,
     )
 
     return envs

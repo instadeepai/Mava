@@ -22,6 +22,13 @@ from gymnasium import spaces
 from gymnasium.vector.utils import write_to_shared_memory
 from numpy.typing import NDArray
 
+import multiprocessing
+import sys
+import traceback
+from copy import deepcopy
+from multiprocessing import Queue
+from multiprocessing.connection import Connection
+
 # Filter out the warnings
 warnings.filterwarnings("ignore", module="gymnasium.utils.passive_env_checker")
 
@@ -208,76 +215,92 @@ class GymAgentIDWrapper(gymnasium.Wrapper):
         return obs, reward, terminated, truncated, info
 
 
-# Copied form https://github.com/openai/gym/blob/master/gym/vector/async_vector_env.py
+# Copied form https://github.com/Farama-Foundation/Gymnasium/blob/main/gymnasium/vector/async_vector_env.py
 # Modified to work with multiple agents
-def _multiagent_worker_shared_memory(  # noqa: CCR001
+def async_multiagent_worker(
     index: int,
-    env_fn: Callable[[], Any],
-    pipe: Any,
-    parent_pipe: Any,
-    shared_memory: Any,
-    error_queue: Any,
-) -> None:
-    assert shared_memory is not None
+    env_fn: callable,
+    pipe: Connection,
+    parent_pipe: Connection,
+    shared_memory: multiprocessing.Array | dict[str, Any] | tuple[Any, ...],
+    error_queue: Queue,
+):
     env = env_fn()
     observation_space = env.observation_space
+    action_space = env.action_space
+    autoreset = False
+
     parent_pipe.close()
+
     try:
         while True:
             command, data = pipe.recv()
+
             if command == "reset":
                 observation, info = env.reset(**data)
-                write_to_shared_memory(observation_space, index, observation, shared_memory)
-                pipe.send(((None, info), True))
-
+                if shared_memory:
+                    write_to_shared_memory(
+                        observation_space, index, observation, shared_memory
+                    )
+                    observation = None
+                    autoreset = False
+                pipe.send(((observation, info), True))
             elif command == "step":
-                (
-                    observation,
-                    reward,
-                    terminated,
-                    truncated,
-                    info,
-                ) = env.step(data)
-                # Handel the dones across all of envs and agents
-                if np.logical_or(terminated, truncated).all():
-                    old_observation, old_info = observation, info
+                if autoreset:
                     observation, info = env.reset()
-                    info["final_observation"] = old_observation
-                    info["final_info"] = old_info
-                write_to_shared_memory(observation_space, index, observation, shared_memory)
-                pipe.send(((None, reward, terminated, truncated, info), True))
-            elif command == "seed":
-                env.seed(data)
-                pipe.send((None, True))
+                    reward, terminated, truncated = 0, False, False
+                else:
+                    (
+                        observation,
+                        reward,
+                        terminated,
+                        truncated,
+                        info,
+                    ) = env.step(data)
+                autoreset = np.logical_or(terminated, truncated).all()
+
+                if shared_memory:
+                    write_to_shared_memory(
+                        observation_space, index, observation, shared_memory
+                    )
+                    observation = None
+
+                pipe.send(((observation, reward, terminated, truncated, info), True))
             elif command == "close":
                 pipe.send((None, True))
                 break
             elif command == "_call":
                 name, args, kwargs = data
-                if name in ["reset", "step", "seed", "close"]:
+                if name in ["reset", "step", "close", "_setattr", "_check_spaces"]:
                     raise ValueError(
-                        f"Trying to call function `{name}` with "
-                        f"`_call`. Use `{name}` directly instead."
+                        f"Trying to call function `{name}` with `call`, use `{name}` directly instead."
                     )
-                function = getattr(env, name)
-                if callable(function):
-                    pipe.send((function(*args, **kwargs), True))
+
+                attr = env.get_wrapper_attr(name)
+                if callable(attr):
+                    pipe.send((attr(*args, **kwargs), True))
                 else:
-                    pipe.send((function, True))
+                    pipe.send((attr, True))
             elif command == "_setattr":
                 name, value = data
-                setattr(env, name, value)
+                env.set_wrapper_attr(name, value)
                 pipe.send((None, True))
             elif command == "_check_spaces":
-                pipe.send(((data[0] == observation_space, data[1] == env.action_space), True))
+                pipe.send(
+                    (
+                        (data[0] == observation_space, data[1] == action_space),
+                        True,
+                    )
+                )
             else:
                 raise RuntimeError(
-                    f"Received unknown command `{command}`. Must "
-                    "be one of {`reset`, `step`, `seed`, `close`, `_call`, "
-                    "`_setattr`, `_check_spaces`}."
+                    f"Received unknown command `{command}`. Must be one of [`reset`, `step`, `close`, `_call`, `_setattr`, `_check_spaces`]."
                 )
     except (KeyboardInterrupt, Exception):
-        error_queue.put((index,) + sys.exc_info()[:2])
+        error_type, error_message, _ = sys.exc_info()
+        trace = traceback.format_exc()
+
+        error_queue.put((index, error_type, error_message, trace))
         pipe.send((None, False))
     finally:
         env.close()
