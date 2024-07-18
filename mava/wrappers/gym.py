@@ -13,21 +13,17 @@
 # limitations under the License.
 
 import sys
+import traceback
 import warnings
-from typing import Any, Callable, Dict, Optional, Tuple
+from multiprocessing import Queue
+from multiprocessing.connection import Connection
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import gymnasium
 import numpy as np
 from gymnasium import spaces
 from gymnasium.vector.utils import write_to_shared_memory
 from numpy.typing import NDArray
-
-import multiprocessing
-import sys
-import traceback
-from copy import deepcopy
-from multiprocessing import Queue
-from multiprocessing.connection import Connection
 
 # Filter out the warnings
 warnings.filterwarnings("ignore", module="gymnasium.utils.passive_env_checker")
@@ -58,7 +54,7 @@ class GymWrapper(gymnasium.Wrapper):
 
     def reset(
         self, seed: Optional[int] = None, options: Optional[dict] = None
-    ) -> Tuple[np.ndarray, Dict]:
+    ) -> Tuple[NDArray, Dict]:
 
         if seed is not None:
             self.env.seed(seed)
@@ -71,7 +67,7 @@ class GymWrapper(gymnasium.Wrapper):
 
         return np.array(agents_view), info
 
-    def step(self, actions: NDArray) -> Tuple:
+    def step(self, actions: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
 
         agents_view, reward, terminated, truncated, info = self._env.step(actions)
 
@@ -97,7 +93,7 @@ class GymWrapper(gymnasium.Wrapper):
 
 
 class GymLBFWrapper(GymWrapper):
-    """Wrapper for rware gym environments"""
+    """Wrapper for LBF gym environments"""
 
     def __init__(
         self,
@@ -114,15 +110,14 @@ class GymLBFWrapper(GymWrapper):
         """
         super().__init__(env, use_shared_rewards, add_global_state)
 
-    def step(self, actions: NDArray) -> Tuple: 
+    def step(self, actions: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
 
         agents_view, reward, terminated, truncated, info = super().step(actions)
 
         truncated = np.repeat(truncated, self.num_agents)
         terminated = np.repeat(terminated, self.num_agents)
-        
-        return agents_view, reward, terminated, truncated, info
 
+        return agents_view, reward, terminated, truncated, info
 
 
 class GymRecordEpisodeMetrics(gymnasium.Wrapper):
@@ -136,7 +131,7 @@ class GymRecordEpisodeMetrics(gymnasium.Wrapper):
 
     def reset(
         self, seed: Optional[int] = None, options: Optional[dict] = None
-    ) -> Tuple[np.ndarray, Dict]:
+    ) -> Tuple[NDArray, Dict]:
 
         # Reset the env
         agents_view, info = self._env.reset(seed, options)
@@ -202,29 +197,29 @@ class GymAgentIDWrapper(gymnasium.Wrapper):
 
     def reset(
         self, seed: Optional[int] = None, options: Optional[dict] = None
-    ) -> Tuple[np.ndarray, Dict]:
+    ) -> Tuple[NDArray, Dict]:
         """Reset the environment."""
         obs, info = self.env.reset(seed, options)
         obs = np.concatenate([self.agent_ids, obs], axis=1)
         return obs, info
 
-    def step(self, action: list) -> Tuple[np.ndarray, float, bool, bool, Dict]:
+    def step(self, action: list) -> Tuple[NDArray, float, bool, bool, Dict]:
         """Step the environment."""
         obs, reward, terminated, truncated, info = self.env.step(action)
         obs = np.concatenate([self.agent_ids, obs], axis=1)
         return obs, reward, terminated, truncated, info
 
 
-# Copied form https://github.com/Farama-Foundation/Gymnasium/blob/main/gymnasium/vector/async_vector_env.py
+# Copied form Gymnasium/blob/main/gymnasium/vector/async_vector_env.py
 # Modified to work with multiple agents
-def async_multiagent_worker(
+def async_multiagent_worker(  # noqa CCR001
     index: int,
-    env_fn: callable,
+    env_fn: Callable,
     pipe: Connection,
     parent_pipe: Connection,
-    shared_memory: multiprocessing.Array | dict[str, Any] | tuple[Any, ...],
+    shared_memory: Union[NDArray, dict[str, Any], tuple[Any, ...]],
     error_queue: Queue,
-):
+) -> None:
     env = env_fn()
     observation_space = env.observation_space
     action_space = env.action_space
@@ -239,9 +234,7 @@ def async_multiagent_worker(
             if command == "reset":
                 observation, info = env.reset(**data)
                 if shared_memory:
-                    write_to_shared_memory(
-                        observation_space, index, observation, shared_memory
-                    )
+                    write_to_shared_memory(observation_space, index, observation, shared_memory)
                     observation = None
                     autoreset = False
                 pipe.send(((observation, info), True))
@@ -260,9 +253,7 @@ def async_multiagent_worker(
                 autoreset = np.logical_or(terminated, truncated).all()
 
                 if shared_memory:
-                    write_to_shared_memory(
-                        observation_space, index, observation, shared_memory
-                    )
+                    write_to_shared_memory(observation_space, index, observation, shared_memory)
                     observation = None
 
                 pipe.send(((observation, reward, terminated, truncated, info), True))
@@ -273,7 +264,8 @@ def async_multiagent_worker(
                 name, args, kwargs = data
                 if name in ["reset", "step", "close", "_setattr", "_check_spaces"]:
                     raise ValueError(
-                        f"Trying to call function `{name}` with `call`, use `{name}` directly instead."
+                        f"Trying to call function `{name}` with \
+                        `call`, use `{name}` directly instead."
                     )
 
                 attr = env.get_wrapper_attr(name)
@@ -294,7 +286,8 @@ def async_multiagent_worker(
                 )
             else:
                 raise RuntimeError(
-                    f"Received unknown command `{command}`. Must be one of [`reset`, `step`, `close`, `_call`, `_setattr`, `_check_spaces`]."
+                    f"Received unknown command `{command}`. Must be one of \
+                    [`reset`, `step`, `close`, `_call`, `_setattr`, `_check_spaces`]."
                 )
     except (KeyboardInterrupt, Exception):
         error_type, error_message, _ = sys.exc_info()
