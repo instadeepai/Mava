@@ -507,7 +507,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     actor, _ = networks
     key, eval_key = jax.random.split(key)
-    eval_act_fn = make_ff_eval_act_fn(actor, cfg)
+    eval_act_fn = make_ff_eval_act_fn(actor.apply, cfg)
     evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, absolute_metric=False)
 
     if cfg.logger.checkpointing.save_model:

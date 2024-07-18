@@ -555,7 +555,7 @@ def run_experiment(cfg: DictConfig) -> float:
     key, eval_key = jax.random.split(key)
 
     def eval_act_fn(
-        params: FrozenDict, timestep: TimeStep, key: chex.PRNGKey, **actor_state: ActorState
+        params: FrozenDict, timestep: TimeStep, key: chex.PRNGKey, actor_state: ActorState
     ) -> Tuple[chex.Array, ActorState]:
         hidden_state = actor_state["hidden_state"]
 

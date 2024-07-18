@@ -17,7 +17,6 @@ import time
 import warnings
 from typing import Any, Callable, Dict, Protocol, Tuple, Union
 
-import flax.linen as nn
 import jax
 import jax.numpy as jnp
 from chex import Array, PRNGKey
@@ -27,7 +26,15 @@ from jumanji.types import TimeStep
 from omegaconf import DictConfig
 from typing_extensions import TypeAlias
 
-from mava.types import Action, Metrics, Observation, ObservationGlobalState, State
+from mava.types import (
+    Action,
+    ActorApply,
+    Metrics,
+    Observation,
+    ObservationGlobalState,
+    RecActorApply,
+    State,
+)
 
 # Optional extras that are passed out of the actor and then into the actor in the next step
 ActorState: TypeAlias = Dict[str, Any]
@@ -49,7 +56,7 @@ class EvalActFn(Protocol):
         params: FrozenDict,
         timestep: TimeStep[Union[Observation, ObservationGlobalState]],
         key: PRNGKey,
-        **actor_state: ActorState,
+        actor_state: ActorState,
     ) -> Tuple[Array, ActorState]: ...
 
 
@@ -107,7 +114,7 @@ def get_eval_fn(
             env_state, ts, key, actor_state = eval_state
 
             key, act_key = jax.random.split(key)
-            action, actor_state = act_fn(params, ts, act_key, **actor_state)
+            action, actor_state = act_fn(params, ts, act_key, actor_state)
             env_state, ts = jax.vmap(env.step)(env_state, action)
 
             return (env_state, ts, key, actor_state), ts
@@ -155,36 +162,38 @@ def get_eval_fn(
     return timed_eval_fn
 
 
-def make_ff_eval_act_fn(actor_network: nn.Module, config: DictConfig) -> EvalActFn:
+def make_ff_eval_act_fn(actor_apply_fn: ActorApply, config: DictConfig) -> EvalActFn:
     """Makes an act function that conforms to the evaluator API given a standard
     feed forward mava actor network."""
 
     def eval_act_fn(
-        params: FrozenDict, timestep: TimeStep, key: PRNGKey, **_: ActorState
+        params: FrozenDict, timestep: TimeStep, key: PRNGKey, actor_state: ActorState
     ) -> Tuple[Action, Dict]:
-        pi = actor_network.apply(params, timestep.observation)
+        pi = actor_apply_fn(params, timestep.observation)
         action = pi.mode() if config.arch.evaluation_greedy else pi.sample(seed=key)
         return action, {}
 
     return eval_act_fn
 
 
-def make_rec_eval_act_fn(actor_network: nn.Module, config: DictConfig) -> EvalActFn:
+def make_rec_eval_act_fn(actor_apply_fn: RecActorApply, config: DictConfig) -> EvalActFn:
     """Makes an act function that conforms to the evaluator API given a standard
     recurrent mava actor network."""
 
+    _hidden_state = "hidden_state"
+
     def eval_act_fn(
-        params: FrozenDict, timestep: TimeStep, key: PRNGKey, **actor_state: ActorState
+        params: FrozenDict, timestep: TimeStep, key: PRNGKey, actor_state: ActorState
     ) -> Tuple[Action, Dict]:
-        hidden_state = actor_state["hidden_state"]
+        hidden_state = actor_state[_hidden_state]
 
         n_agents = timestep.observation.agents_view.shape[1]
         last_done = timestep.last()[:, jnp.newaxis].repeat(n_agents, axis=-1)
         ac_in = (timestep.observation, last_done)
         ac_in = jax.tree_map(lambda x: x[jnp.newaxis], ac_in)  # add batch dim to obs
 
-        hidden_state, pi = actor_network.apply(params, hidden_state, ac_in)
+        hidden_state, pi = actor_apply_fn(params, hidden_state, ac_in)
         action = pi.mode() if config.arch.evaluation_greedy else pi.sample(seed=key)
-        return action.squeeze(0), {"hidden_state": hidden_state}
+        return action.squeeze(0), {_hidden_state: hidden_state}
 
-    return eval_act_fn  # type: ignore
+    return eval_act_fn
