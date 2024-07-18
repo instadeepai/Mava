@@ -136,7 +136,7 @@ class GymRecordEpisodeMetrics(gymnasium.Wrapper):
 
         return agents_view, info
 
-    def step(self, actions: NDArray) -> Tuple:
+    def step(self, actions: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
         agents_view, reward, terminated, truncated, info = self._env.step(actions)
 
         self.running_count_episode_return += float(np.mean(reward))
