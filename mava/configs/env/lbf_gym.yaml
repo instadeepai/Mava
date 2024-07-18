@@ -1,5 +1,7 @@
 # ---Environment Configs---
-scenario: gym-2s-8x8-2p-2f-coop copy # [gym-lbf-2s-8x8-2p-2f-coop, gym-lbf-8x8-2p-2f-coop, gym-lbf-2s-10x10-3p-3f, gym-lbf-10x10-3p-3f, gym-lbf-15x15-3p-5f, gym-lbf-15x15-4p-3f, gym-lbf-15x15-4p-5f]
+defaults:
+  - _self_
+  - scenario: gym-2s-8x8-2p-2f-coop # [gym-lbf-2s-8x8-2p-2f-coop, gym-lbf-8x8-2p-2f-coop, gym-lbf-2s-10x10-3p-3f, gym-lbf-10x10-3p-3f, gym-lbf-15x15-3p-5f, gym-lbf-15x15-4p-3f, gym-lbf-15x15-4p-5f]
 
 env_name: LevelBasedForaging  # Used for logging purposes.
 

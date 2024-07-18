@@ -9,6 +9,10 @@ task_config:
   n_agents: 4
   sensor_range: 1
   request_queue_size: 8
+  msg_bits : 0
+  max_inactivity_steps : null
+  max_steps : 500
+  reward_type : 0
 
 env_kwargs:
   {}  # there are no scenario specific env_kwargs for this env

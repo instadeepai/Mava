@@ -1,5 +1,7 @@
 # ---Environment Configs---
-scenario: gym-2s-8x8-2p-2f-coop # [gym-rware-tiny-2ag, gym-rware-tiny-4ag, gym-rware-tiny-4ag-easy, gym-rware-small-4ag]
+defaults:
+  - _self_
+  - scenario: gym-rware-tiny-2ag # [gym-rware-tiny-2ag, gym-rware-tiny-4ag, gym-rware-tiny-4ag-easy, gym-rware-small-4ag]
 
 env_name: RobotWarehouse  # Used for logging purposes.
 
