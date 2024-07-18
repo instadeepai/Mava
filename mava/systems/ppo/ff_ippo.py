@@ -24,7 +24,6 @@ import jax.numpy as jnp
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
-from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
@@ -33,7 +32,7 @@ from mava.evaluator import make_eval_fns
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
-from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn
+from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn, MarlEnv
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import (
@@ -48,7 +47,7 @@ from mava.wrappers.episode_metrics import get_final_step_metrics
 
 
 def get_learner_fn(
-    env: Environment,
+    env: MarlEnv,
     apply_fns: Tuple[ActorApply, CriticApply],
     update_fns: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
     config: DictConfig,
@@ -340,7 +339,7 @@ def get_learner_fn(
 
 
 def learner_setup(
-    env: Environment, keys: chex.Array, config: DictConfig
+    env: MarlEnv, keys: chex.Array, config: DictConfig
 ) -> Tuple[LearnerFn[LearnerState], Actor, LearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.

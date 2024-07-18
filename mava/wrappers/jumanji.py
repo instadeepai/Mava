@@ -38,7 +38,7 @@ from jumanji.wrappers import Wrapper
 from mava.types import Observation, ObservationGlobalState, State
 
 
-class MultiAgentWrapper(Wrapper, ABC):
+class JumanjiMarlWrapper(Wrapper, ABC):
     def __init__(self, env: Environment, add_global_state: bool):
         super().__init__(env)
         self.num_agents = self._env.num_agents
@@ -125,7 +125,7 @@ class MultiAgentWrapper(Wrapper, ABC):
         return int(self._env.action_spec().num_values[0])
 
 
-class RwareWrapper(MultiAgentWrapper):
+class RwareWrapper(JumanjiMarlWrapper):
     """Multi-agent wrapper for the Robotic Warehouse environment."""
 
     def __init__(self, env: RobotWarehouse, add_global_state: bool = False):
@@ -144,7 +144,7 @@ class RwareWrapper(MultiAgentWrapper):
         return timestep.replace(observation=observation, reward=reward, discount=discount)
 
 
-class LbfWrapper(MultiAgentWrapper):
+class LbfWrapper(JumanjiMarlWrapper):
     """Multi-agent wrapper for the Level-Based Foraging environment.
 
     Args:
@@ -193,7 +193,7 @@ class LbfWrapper(MultiAgentWrapper):
         return self.aggregate_rewards(timestep, modified_observation)
 
 
-class ConnectorWrapper(MultiAgentWrapper):
+class ConnectorWrapper(JumanjiMarlWrapper):
     """Multi-agent wrapper for the MA Connector environment.
 
     Do not use the AgentID wrapper with this env, it has implicit agent IDs.
@@ -289,7 +289,7 @@ class ConnectorWrapper(MultiAgentWrapper):
         return specs.Spec(Observation, "ObservationSpec", **obs_data)
 
 
-class CleanerWrapper(MultiAgentWrapper):
+class CleanerWrapper(JumanjiMarlWrapper):
     """Multi-agent wrapper for the Cleaner environment."""
 
     def __init__(self, env: Cleaner, add_global_state: bool = False):

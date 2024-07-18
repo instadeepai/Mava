@@ -64,9 +64,9 @@ class GigastepWrapper(Wrapper):
         ), "Only Vector observations are currently supported for Gigastep environments"
 
         self._env: GigastepEnv
-        self._timelimit = self._env.max_episode_length
+        self.time_limit = self._env.max_episode_length
         self.num_agents = self._env.n_agents_team1
-        self.num_actions = self._env.n_actions
+        self.action_dim = self._env.n_actions
         self.has_global_state = has_global_state
 
     def reset(self, key: PRNGKey) -> Tuple[GigastepState, TimeStep]:
@@ -223,7 +223,7 @@ class GigastepWrapper(Wrapper):
         )
 
     def action_spec(self) -> specs.Spec:
-        return specs.MultiDiscreteArray(num_values=jnp.full(self.num_agents, self.num_actions))
+        return specs.MultiDiscreteArray(num_values=jnp.full(self.num_agents, self.action_dim))
 
     def reward_spec(self) -> specs.Array:
         return specs.Array(shape=(self.num_agents,), dtype=float, name="reward")
@@ -296,4 +296,4 @@ class GigastepWrapper(Wrapper):
             Array: Actions for the adversary.
 
         """
-        return jax.random.randint(key, (obs.shape[0],), 0, self.num_actions)
+        return jax.random.randint(key, (obs.shape[0],), 0, self.action_dim)
