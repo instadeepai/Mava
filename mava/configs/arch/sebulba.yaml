@@ -1,5 +1,5 @@
 # --- Sebulba config ---
-arch_name: sebulba
+architecture_name: sebulba
 
 # --- Training ---
 num_envs: 32  # number of environments per thread.
