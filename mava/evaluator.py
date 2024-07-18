@@ -44,7 +44,7 @@ class EvalActFn(Protocol):
     See `make_ff_eval_act_fn` and `make_rec_eval_act_fn` as examples.
     """
 
-    def __call__(  # noqa: E704
+    def __call__(
         self,
         params: FrozenDict,
         timestep: TimeStep[Union[Observation, ObservationGlobalState]],
