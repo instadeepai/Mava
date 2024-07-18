@@ -29,7 +29,10 @@ warnings.filterwarnings("ignore", module="gymnasium.utils.passive_env_checker")
 
 
 class GymWrapper(gymnasium.Wrapper):
-    """Wrapper for gym environments."""
+    """Base wrapper for multi-agent gym environments.
+    This wrapper works out of the box for RobotWarehouse.
+    See `GymLBFWrapper` for how it can be modified to work for other environments.
+    """
 
     def __init__(
         self,
@@ -54,7 +57,6 @@ class GymWrapper(gymnasium.Wrapper):
     def reset(
         self, seed: Optional[int] = None, options: Optional[dict] = None
     ) -> Tuple[NDArray, Dict]:
-
         if seed is not None:
             self.env.seed(seed)
 
@@ -67,7 +69,6 @@ class GymWrapper(gymnasium.Wrapper):
         return np.array(agents_view), info
 
     def step(self, actions: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
-
         agents_view, reward, terminated, truncated, info = self._env.step(actions)
 
         info = {"actions_mask": self.get_actions_mask(info)}
@@ -92,25 +93,9 @@ class GymWrapper(gymnasium.Wrapper):
 
 
 class GymLBFWrapper(GymWrapper):
-    """Wrapper for LBF gym environments"""
-
-    def __init__(
-        self,
-        env: gymnasium.Env,
-        use_shared_rewards: bool = True,
-        add_global_state: bool = False,
-    ):
-        """Initialise the gym wrapper
-        Args:
-            env (gymnasium.env): gymnasium env instance.
-            use_shared_rewards (bool, optional): Use individual or shared rewards.
-            Defaults to False.
-            add_global_state (bool, optional) : Create global observations. Defaults to False.
-        """
-        super().__init__(env, use_shared_rewards, add_global_state)
+    """Wrapper for the gym level based foraging environment."""
 
     def step(self, actions: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
-
         agents_view, reward, terminated, truncated, info = super().step(actions)
 
         truncated = np.repeat(truncated, self.num_agents)
@@ -131,8 +116,6 @@ class GymRecordEpisodeMetrics(gymnasium.Wrapper):
     def reset(
         self, seed: Optional[int] = None, options: Optional[dict] = None
     ) -> Tuple[NDArray, Dict]:
-
-        # Reset the env
         agents_view, info = self._env.reset(seed, options)
 
         # Create the metrics dict
@@ -154,8 +137,6 @@ class GymRecordEpisodeMetrics(gymnasium.Wrapper):
         return agents_view, info
 
     def step(self, actions: NDArray) -> Tuple:
-
-        # Step the env
         agents_view, reward, terminated, truncated, info = self._env.step(actions)
 
         self.running_count_episode_return += float(np.mean(reward))
