@@ -17,6 +17,8 @@ from typing import Any, Callable, Dict, Generic, Protocol, Tuple, TypeVar
 import chex
 import jumanji.specs as specs
 from flax.core.frozen_dict import FrozenDict
+from jumanji import Environment
+from jumanji.types import TimeStep
 from tensorflow_probability.substrates.jax.distributions import Distribution
 from typing_extensions import NamedTuple, TypeAlias
 

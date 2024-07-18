@@ -192,7 +192,7 @@ class JaxMarlWrapper(Wrapper, ABC):
         self._env: MultiAgentEnv
         self.agents = self._env.agents
         self.has_global_state = has_global_state
-        self.time_limit = timelimit
+        self.time_limit = time_limit
         self.num_agents = self._env.num_agents
 
         # Calling these on init to cache the values in a non-jitted context.
