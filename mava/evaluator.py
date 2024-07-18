@@ -60,6 +60,22 @@ class EvalActFn(Protocol):
     ) -> Tuple[Array, ActorState]: ...
 
 
+def get_num_eval_envs(config: DictConfig, absolute_metric: bool) -> int:
+    """Returns the number of vmapped envs/batch size during evaluation."""
+    n_devices = jax.device_count()
+    n_parallel_envs = config.arch.num_envs * n_devices
+
+    if absolute_metric:
+        eval_episodes = config.arch.num_absolute_metric_eval_episodes
+    else:
+        eval_episodes = config.arch.num_eval_episodes
+
+    if eval_episodes <= n_parallel_envs:
+        return math.ceil(eval_episodes / n_devices)
+    else:
+        return config.arch.num_envs  # type: ignore
+
+
 def get_eval_fn(
     env: Environment, act_fn: EvalActFn, config: DictConfig, absolute_metric: bool
 ) -> EvalFn:
@@ -80,22 +96,15 @@ def get_eval_fn(
         if absolute_metric
         else config.arch.num_eval_episodes
     )
-    n_parallel_envs = config.arch.num_envs * n_devices
+    n_vmapped_envs = get_num_eval_envs(config, absolute_metric)
+    n_parallel_envs = n_vmapped_envs * n_devices
     episode_loops = math.ceil(eval_episodes / n_parallel_envs)
 
-    # Warnings if num eval episodes is too low or not divisible by num parallel envs.
-    if eval_episodes < n_parallel_envs:
-        warnings.warn(
-            f"Number of evaluation episodes ({eval_episodes}) is less than "
-            f"`num_envs` * `num_devices` ({config.arch.num_envs} * {n_devices}). "
-            f"Thus {n_parallel_envs} evaluation episodes will be executed.",
-            stacklevel=2,
-        )
-
+    # Warnings if num eval episodes is not divisible by num parallel envs.
     if eval_episodes % n_parallel_envs != 0:
         warnings.warn(
             f"Number of evaluation episodes ({eval_episodes}) is not divisible by `num_envs` * "
-            f"`num_devices` ({config.arch.num_envs} * {n_devices}). Some extra evaluations will be "
+            f"`num_devices` ({n_parallel_envs} * {n_devices}). Some extra evaluations will be "
             f"executed. New number of evaluation episodes = {episode_loops * n_parallel_envs}",
             stacklevel=2,
         )
@@ -122,7 +131,7 @@ def get_eval_fn(
         def _episode(key: PRNGKey, _: Any) -> Tuple[PRNGKey, Metrics]:
             """Simulates `num_envs` episodes."""
             key, reset_key = jax.random.split(key)
-            reset_keys = jax.random.split(reset_key, config.arch.num_envs)
+            reset_keys = jax.random.split(reset_key, n_vmapped_envs)
             env_state, ts = jax.vmap(env.reset)(reset_keys)
 
             step_state = env_state, ts, key, init_act_state
@@ -135,7 +144,7 @@ def get_eval_fn(
             # find the first instance of done to get the metrics at that timestep we don't
             # care about subsequent steps because we only the results from the first episode
             done_idx = jnp.argmax(timesteps.last(), axis=0)
-            metrics = jax.tree_map(lambda m: m[done_idx, jnp.arange(config.arch.num_envs)], metrics)
+            metrics = jax.tree_map(lambda m: m[done_idx, jnp.arange(n_vmapped_envs)], metrics)
             del metrics["is_terminal_step"]  # uneeded for logging
 
             return key, metrics

@@ -34,7 +34,7 @@ from jumanji.types import TimeStep
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
-from mava.evaluator import ActorState, get_eval_fn
+from mava.evaluator import ActorState, get_eval_fn, get_num_eval_envs
 from mava.networks import RecQNetwork, ScannedRNN
 from mava.systems.q_learning.types import (
     ActionSelectionState,
@@ -577,8 +577,9 @@ def run_experiment(cfg: DictConfig) -> float:
         )
 
     # Create an initial hidden state used for resetting memory for evaluation
+    eval_batch_size = get_num_eval_envs(cfg, absolute_metric=False)
     eval_hs = ScannedRNN.initialize_carry(
-        (len(jax.devices()), cfg.arch.num_envs, cfg.system.num_agents),
+        (jax.device_count(), eval_batch_size, cfg.system.num_agents),
         cfg.network.hidden_state_dim,
     )
 
@@ -638,6 +639,11 @@ def run_experiment(cfg: DictConfig) -> float:
     # Measure absolute metric.
     if cfg.arch.absolute_metric:
         eval_keys = jax.random.split(key, cfg.arch.n_devices)
+        eval_batch_size = get_num_eval_envs(cfg, absolute_metric=True)
+        eval_hs = ScannedRNN.initialize_carry(
+            (jax.device_count(), eval_batch_size, cfg.system.num_agents),
+            cfg.network.hidden_state_dim,
+        )
 
         abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, absolute_metric=True)
         eval_metrics = abs_metric_evaluator(best_params, eval_keys, {"hidden_state": eval_hs})

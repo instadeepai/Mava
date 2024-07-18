@@ -29,7 +29,7 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava.evaluator import get_eval_fn, make_rec_eval_act_fn
+from mava.evaluator import get_eval_fn, get_num_eval_envs, make_rec_eval_act_fn
 from mava.networks import RecurrentActor as Actor
 from mava.networks import RecurrentValueNet as Critic
 from mava.networks import ScannedRNN
@@ -645,8 +645,9 @@ def run_experiment(_config: DictConfig) -> float:
         )
 
     # Create an initial hidden state used for resetting memory for evaluation
+    eval_batch_size = get_num_eval_envs(config, absolute_metric=False)
     eval_hs = ScannedRNN.initialize_carry(
-        (n_devices, config.arch.num_envs, config.system.num_agents),
+        (n_devices, eval_batch_size, config.system.num_agents),
         config.network.hidden_state_dim,
     )
 
@@ -701,6 +702,11 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Measure absolute metric.
     if config.arch.absolute_metric:
+        eval_batch_size = get_num_eval_envs(config, absolute_metric=True)
+        eval_hs = ScannedRNN.initialize_carry(
+            (n_devices, eval_batch_size, config.system.num_agents),
+            config.network.hidden_state_dim,
+        )
         abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=True)
         eval_keys = jax.random.split(key, n_devices)
 
