@@ -32,6 +32,7 @@ from mava.types import (
     Metrics,
     Observation,
     ObservationGlobalState,
+    MarlEnv,
     RecActorApply,
     State,
 )
@@ -77,7 +78,7 @@ def get_num_eval_envs(config: DictConfig, absolute_metric: bool) -> int:
 
 
 def get_eval_fn(
-    env: Environment, act_fn: EvalActFn, config: DictConfig, absolute_metric: bool
+    env: MarlEnv, act_fn: EvalActFn, config: DictConfig, absolute_metric: bool
 ) -> EvalFn:
     """Creates a function that can be used to evaluate agents on a given environment.
 

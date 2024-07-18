@@ -167,7 +167,9 @@ class JaxMarlWrapper(Wrapper, ABC):
         self,
         env: MultiAgentEnv,
         has_global_state: bool,
-        timelimit: int,
+        # We set this to -1 to make it an optional input for children of this class.
+        # They must set their own defaults or use the wrapped envs value.
+        time_limit: int = -1,
     ) -> None:
         """Initialize the JaxMarlWrapper.
 
@@ -175,8 +177,7 @@ class JaxMarlWrapper(Wrapper, ABC):
         ----
         - env: The JaxMarl environment to wrap.
         - has_global_state: Whether the environment has global state.
-        - timelimit: The time limit for each episode.
-
+        - time_limit: The time limit for each episode.
         """
         # Check that all specs are the same as we only support homogeneous environments, for now ;)
         homogenous_error = (
@@ -184,6 +185,8 @@ class JaxMarlWrapper(Wrapper, ABC):
             f"but you tried to use {env} which is not homogeneous."
         )
         assert is_homogenous(env), homogenous_error
+        # Making sure the child envs set this correctly.
+        assert time_limit > 0, f"Time limit must be greater than 0, got {time_limit}"
 
         super().__init__(env)
         self._env: MultiAgentEnv
@@ -195,7 +198,6 @@ class JaxMarlWrapper(Wrapper, ABC):
         # Calling these on init to cache the values in a non-jitted context.
         self.state_size  # noqa: B018
         self.action_dim  # noqa: B018
-        self.num_agents  # noqa: B018
 
     def reset(
         self, key: PRNGKey
@@ -310,12 +312,6 @@ class JaxMarlWrapper(Wrapper, ABC):
 
     @cached_property
     @abstractmethod
-    def num_agents(self) -> chex.Array:
-        """Get the number of agents"""
-        ...
-
-    @cached_property
-    @abstractmethod
     def action_dim(self) -> chex.Array:
         """Get the actions dim for each agent."""
         ...
@@ -362,11 +358,6 @@ class SmaxWrapper(JaxMarlWrapper):
         return self._env.state_size
 
     @cached_property
-    def num_agents(self) -> chex.Array:
-        """Get the number of agents"""
-        return self._env.num_agents
-
-    @cached_property
     def action_dim(self) -> chex.Array:
         """Get the actions dim for each agent."""
         single_agent_action_space = self._env.action_space(self.agents[0])
@@ -392,11 +383,6 @@ class MabraxWrapper(JaxMarlWrapper):
     ):
         super().__init__(env, has_global_state, env.episode_length)
         self._env: MABraxEnv
-
-    @cached_property
-    def num_agents(self) -> chex.Array:
-        """Get the number of agents"""
-        return self._env.num_agents
 
     @cached_property
     def action_dim(self) -> chex.Array:
