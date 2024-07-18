@@ -21,7 +21,7 @@ import gymnasium.wrappers.compatibility
 import jaxmarl
 import jumanji
 import matrax
-import rware.warehouse as gym_rware
+from rware.warehouse import Warehouse as gym_rware
 from gigastep import ScenarioBuilder
 from jaxmarl.environments.smax import map_name_to_scenario
 from jumanji.env import Environment
