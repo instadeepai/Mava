@@ -49,7 +49,7 @@ from mava.wrappers import (
     GymAgentIDWrapper,
     GymLBFWrapper,
     GymRecordEpisodeMetrics,
-    GymRwareWrapper,
+    GymWrapper,
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
@@ -75,7 +75,7 @@ _jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 _gigastep_registry = {"Gigastep": GigastepWrapper}
 
 _gym_registry = {
-    "RobotWarehouse": (gym_rware, GymRwareWrapper),
+    "RobotWarehouse": (gym_rware, GymWrapper),
     "LevelBasedForaging": (gym_lbf, GymLBFWrapper),
 }
 

@@ -19,7 +19,7 @@ from mava.wrappers.gym import (
     GymAgentIDWrapper,
     GymLBFWrapper,
     GymRecordEpisodeMetrics,
-    GymRwareWrapper,
+    GymWrapper,
     _multiagent_worker_shared_memory,
 )
 from mava.wrappers.jaxmarl import MabraxWrapper, SmaxWrapper

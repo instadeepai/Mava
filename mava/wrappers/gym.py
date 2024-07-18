@@ -26,8 +26,8 @@ from numpy.typing import NDArray
 warnings.filterwarnings("ignore", module="gymnasium.utils.passive_env_checker")
 
 
-class GymRwareWrapper(gymnasium.Wrapper):
-    """Wrapper for rware gym environments."""
+class GymWrapper(gymnasium.Wrapper):
+    """Wrapper for gym environments."""
 
     def __init__(
         self,
@@ -89,7 +89,7 @@ class GymRwareWrapper(gymnasium.Wrapper):
         return np.tile(global_obs, (self.num_agents, 1))
 
 
-class GymLBFWrapper(gymnasium.Wrapper):
+class GymLBFWrapper(GymWrapper):
     """Wrapper for rware gym environments"""
 
     def __init__(
@@ -105,50 +105,17 @@ class GymLBFWrapper(gymnasium.Wrapper):
             Defaults to False.
             add_global_state (bool, optional) : Create global observations. Defaults to False.
         """
-        super().__init__(env)
-        self._env = env
-        self.use_shared_rewards = use_shared_rewards
-        self.add_global_state = add_global_state
-        self.num_agents = len(self._env.action_space)
-        self.num_actions = self._env.action_space[0].n
+        super().__init__(env, use_shared_rewards, add_global_state)
 
-    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> Tuple:
+    def step(self, actions: NDArray) -> Tuple: 
 
-        if seed is not None:
-            self.env.seed(seed)
+        agents_view, reward, terminated, truncated, info = super().step(actions)
 
-        agents_view, info = self._env.reset()
-
-        info = {"actions_mask": self.get_actions_mask(info)}
-
-        return np.array(agents_view), info
-
-    def step(self, actions: NDArray) -> Tuple:  # Vect auto rest
-
-        agents_view, reward, terminated, truncated, info = self._env.step(actions)
-
-        info = {"actions_mask": self.get_actions_mask(info)}
-        if self.add_global_state:
-            info["global_obs"] = self.get_global_obs(agents_view)
-
-        if self.use_shared_rewards:
-            reward = np.array([np.array(reward).sum()] * self.num_agents)
-        else:
-            reward = np.array(reward)
-
-        truncated = [truncated] * self.num_agents
-        terminated = [terminated] * self.num_agents
-
+        truncated = np.repeat(truncated, self.num_agents)
+        terminated = np.repeat(terminated, self.num_agents)
+        
         return agents_view, reward, terminated, truncated, info
 
-    def get_actions_mask(self, info: Dict) -> NDArray:
-        if "action_mask" in info:
-            return np.array(info["action_mask"])
-        return np.ones((self.num_agents, self.num_actions), dtype=np.float32)
-
-    def get_global_obs(self, obs: NDArray) -> NDArray:
-        global_obs = np.concatenate(obs, axis=0)
-        return np.tile(global_obs, (self.num_agents, 1))
 
 
 class GymRecordEpisodeMetrics(gymnasium.Wrapper):
