@@ -141,7 +141,7 @@ def get_eval_fn(
             if config.env.log_win_rate:
                 metrics["won_episode"] = timesteps.extras["won_episode"]
 
-            # find the first instance of done to get the metrics at that timestep we don't
+            # find the first instance of done to get the metrics at that timestep, we don't
             # care about subsequent steps because we only the results from the first episode
             done_idx = jnp.argmax(timesteps.last(), axis=0)
             metrics = jax.tree_map(lambda m: m[done_idx, jnp.arange(n_vmapped_envs)], metrics)
