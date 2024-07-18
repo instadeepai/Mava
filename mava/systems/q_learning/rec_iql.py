@@ -557,6 +557,9 @@ def run_experiment(cfg: DictConfig) -> float:
     def eval_act_fn(
         params: FrozenDict, timestep: TimeStep, key: chex.PRNGKey, actor_state: ActorState
     ) -> Tuple[chex.Array, ActorState]:
+        """The acting function that get's passed to the evaluator.
+        A custom function is needed for epsilon-greedy acting.
+        """
         hidden_state = actor_state["hidden_state"]
 
         term_or_trunc = timestep.last()
