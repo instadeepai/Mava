@@ -21,7 +21,6 @@ import jax
 import jax.numpy as jnp
 from chex import Array, PRNGKey
 from flax.core.frozen_dict import FrozenDict
-from jumanji.env import Environment
 from jumanji.types import TimeStep
 from omegaconf import DictConfig
 from typing_extensions import TypeAlias
@@ -29,10 +28,10 @@ from typing_extensions import TypeAlias
 from mava.types import (
     Action,
     ActorApply,
+    MarlEnv,
     Metrics,
     Observation,
     ObservationGlobalState,
-    MarlEnv,
     RecActorApply,
     State,
 )
