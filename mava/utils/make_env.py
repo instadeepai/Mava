@@ -21,7 +21,6 @@ import gymnasium.wrappers.compatibility
 import jaxmarl
 import jumanji
 import matrax
-from rware.warehouse import Warehouse as gym_rware
 from gigastep import ScenarioBuilder
 from jaxmarl.environments.smax import map_name_to_scenario
 from jumanji.env import Environment
@@ -39,6 +38,7 @@ from jumanji.environments.routing.robot_warehouse.generator import (
 )
 from lbforaging.foraging import environment as gym_lbf
 from omegaconf import DictConfig
+from rware.warehouse import Warehouse as gym_Warehouse
 
 from mava.wrappers import (
     AgentIDWrapper,
@@ -75,7 +75,7 @@ _jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 _gigastep_registry = {"Gigastep": GigastepWrapper}
 
 _gym_registry = {
-    "RobotWarehouse": (gym_rware, GymWrapper),
+    "RobotWarehouse": (gym_Warehouse, GymWrapper),
     "LevelBasedForaging": (gym_lbf, GymLBFWrapper),
 }
 
