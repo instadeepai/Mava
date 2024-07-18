@@ -17,7 +17,7 @@ from typing import Any, Callable, Dict, Generic, Protocol, Tuple, TypeVar
 import chex
 import jumanji.specs as specs
 from flax.core.frozen_dict import FrozenDict
-from jumanji.env import Environment
+from jumanji import Environment
 from jumanji.types import TimeStep
 from tensorflow_probability.substrates.jax.distributions import Distribution
 from typing_extensions import NamedTuple, TypeAlias
@@ -28,6 +28,7 @@ Done: TypeAlias = chex.Array
 HiddenState: TypeAlias = chex.Array
 # Can't know the exact type of State.
 State: TypeAlias = Any
+Metrics: TypeAlias = Dict[str, chex.Array]
 
 
 class MarlEnv(Protocol):
@@ -137,30 +138,8 @@ RNNObservation: TypeAlias = Tuple[Observation, Done]
 RNNGlobalObservation: TypeAlias = Tuple[ObservationGlobalState, Done]
 
 
-class EvalState(NamedTuple):
-    """State of the evaluator."""
-
-    key: chex.PRNGKey
-    env_state: State
-    timestep: TimeStep
-    step_count: chex.Array
-    episode_return: chex.Array
-
-
-class RNNEvalState(NamedTuple):
-    """State of the evaluator for recurrent architectures."""
-
-    key: chex.PRNGKey
-    env_state: State
-    timestep: TimeStep
-    dones: chex.Array
-    hstate: HiddenState
-    step_count: chex.Array
-    episode_return: chex.Array
-
-
 # `MavaState` is the main type passed around in our systems. It is often used as a scan carry.
-# Types like: `EvalState` | `LearnerState` (mava/systems/<system_name>/types.py) are `MavaState`s.
+# Types like: `LearnerState` (mava/systems/<system_name>/types.py) are `MavaState`s.
 MavaState = TypeVar("MavaState")
 
 
@@ -168,13 +147,11 @@ class ExperimentOutput(NamedTuple, Generic[MavaState]):
     """Experiment output."""
 
     learner_state: MavaState
-    episode_metrics: Dict[str, chex.Array]
-    train_metrics: Dict[str, chex.Array]
+    episode_metrics: Metrics
+    train_metrics: Metrics
 
 
 LearnerFn = Callable[[MavaState], ExperimentOutput[MavaState]]
-EvalFn = Callable[[FrozenDict, chex.PRNGKey], ExperimentOutput[MavaState]]
-
 ActorApply = Callable[[FrozenDict, Observation], Distribution]
 CriticApply = Callable[[FrozenDict, Observation], Value]
 RecActorApply = Callable[

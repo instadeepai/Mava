@@ -28,7 +28,7 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava.evaluator import make_eval_fns
+from mava.evaluator import get_eval_fn, make_ff_eval_act_fn
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
@@ -100,7 +100,13 @@ def get_learner_fn(
             info = timestep.extras["episode_metrics"]
 
             transition = PPOTransition(
-                done, action, value, timestep.reward, log_prob, last_timestep.observation, info
+                done,
+                action,
+                value,
+                timestep.reward,
+                log_prob,
+                last_timestep.observation,
+                info,
             )
             learner_state = LearnerState(params, opt_states, key, env_state, timestep)
             return learner_state, transition
@@ -219,7 +225,10 @@ def get_learner_fn(
                 # CALCULATE CRITIC LOSS
                 critic_grad_fn = jax.value_and_grad(_critic_loss_fn, has_aux=True)
                 critic_loss_info, critic_grads = critic_grad_fn(
-                    params.critic_params, opt_states.critic_opt_state, traj_batch, targets
+                    params.critic_params,
+                    opt_states.critic_opt_state,
+                    traj_batch,
+                    targets,
                 )
 
                 # Compute the parallel mean (pmean) over the batch.
@@ -462,7 +471,8 @@ def run_experiment(_config: DictConfig) -> float:
     # Setup evaluator.
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
-    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network.apply, config)
+    eval_act_fn = make_ff_eval_act_fn(actor_network.apply, config)
+    evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=False)
 
     # Calculate total timesteps.
     config = check_total_timesteps(config)
@@ -518,24 +528,14 @@ def run_experiment(_config: DictConfig) -> float:
         logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
 
         # Prepare for evaluation.
-        start_time = time.time()
-
         trained_params = unreplicate_batch_dim(learner_state.params.actor_params)
         key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
-
         # Evaluate.
-        evaluator_output = evaluator(trained_params, eval_keys)
-        jax.block_until_ready(evaluator_output)
-
-        # Log the results of the evaluation.
-        elapsed_time = time.time() - start_time
-        episode_return = jnp.mean(evaluator_output.episode_metrics["episode_return"])
-
-        steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
-        evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
-        logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.EVAL)
+        eval_metrics = evaluator(trained_params, eval_keys, {})
+        logger.log(eval_metrics, t, eval_step, LogEvent.EVAL)
+        episode_return = jnp.mean(eval_metrics["episode_return"])
 
         if save_checkpoint:
             # Save checkpoint of learner state
@@ -553,24 +553,17 @@ def run_experiment(_config: DictConfig) -> float:
         learner_state = learner_output.learner_state
 
     # Record the performance for the final evaluation run.
-    eval_performance = float(jnp.mean(evaluator_output.episode_metrics[config.env.eval_metric]))
+    eval_performance = float(jnp.mean(eval_metrics[config.env.eval_metric]))
 
     # Measure absolute metric.
     if config.arch.absolute_metric:
-        start_time = time.time()
+        abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=True)
+        eval_keys = jax.random.split(key, n_devices)
 
-        key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
-        eval_keys = jnp.stack(eval_keys)
-        eval_keys = eval_keys.reshape(n_devices, -1)
+        eval_metrics = abs_metric_evaluator(best_params, eval_keys, {})
 
-        evaluator_output = absolute_metric_evaluator(best_params, eval_keys)
-        jax.block_until_ready(evaluator_output)
-
-        elapsed_time = time.time() - start_time
-        steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
         t = int(steps_per_rollout * (eval_step + 1))
-        evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
-        logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.ABSOLUTE)
+        logger.log(eval_metrics, t, eval_step, LogEvent.ABSOLUTE)
 
     # Stop the logger.
     logger.stop()

@@ -12,340 +12,197 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Optional, Tuple, Union
+import math
+import time
+import warnings
+from typing import Any, Callable, Dict, Protocol, Tuple, Union
 
-import chex
-import flax.linen as nn
 import jax
 import jax.numpy as jnp
+from chex import Array, PRNGKey
 from flax.core.frozen_dict import FrozenDict
+from jumanji.types import TimeStep
 from omegaconf import DictConfig
+from typing_extensions import TypeAlias
 
 from mava.types import (
+    Action,
     ActorApply,
-    EvalFn,
-    EvalState,
-    ExperimentOutput,
     MarlEnv,
+    Metrics,
+    Observation,
+    ObservationGlobalState,
     RecActorApply,
-    RNNEvalState,
+    State,
 )
 
+# Optional extras that are passed out of the actor and then into the actor in the next step
+ActorState: TypeAlias = Dict[str, Any]
+# Type of the carry for the _env_step function in the evaluator
+_EvalEnvStepState: TypeAlias = Tuple[State, TimeStep, PRNGKey, ActorState]
+# The function signature for the mava evaluation function (returned by `get_eval_fn`).
+EvalFn: TypeAlias = Callable[[FrozenDict, PRNGKey, ActorState], Metrics]
 
-def get_ff_evaluator_fn(
-    env: MarlEnv,
-    apply_fn: ActorApply,
-    config: DictConfig,
-    log_win_rate: bool = False,
-    eval_multiplier: int = 1,
-) -> EvalFn:
-    """Get the evaluator function for feedforward networks.
 
-    Args:
-    ----
-        env (MarlEnv): An environment instance for evaluation.
-        apply_fn (callable): Network forward pass method.
-        config (dict): Experiment configuration.
-        eval_multiplier (int): A scalar that will increase the number of evaluation
-            episodes by a fixed factor. The reason for the increase is to enable the
-            computation of the `absolute metric` which is a metric computed and the end
-            of training by rolling out the policy which obtained the greatest evaluation
-            performance during training for 10 times more episodes than were used at a
-            single evaluation step.
+class EvalActFn(Protocol):
+    """The API for the acting function that is passed to the `EvalFn`.
 
+    A get_action function must conform to this API in order to be used with Mava's evaluator.
+    See `make_ff_eval_act_fn` and `make_rec_eval_act_fn` as examples.
     """
 
-    def eval_one_episode(params: FrozenDict, init_eval_state: EvalState) -> Dict:
-        """Evaluate one episode. It is vectorized over the number of evaluation episodes."""
-
-        def _env_step(eval_state: EvalState) -> EvalState:
-            """Step the environment."""
-            # PRNG keys.
-            key, env_state, last_timestep, step_count, episode_return = eval_state
-
-            # Select action.
-            key, policy_key = jax.random.split(key)
-            # Add a batch dimension to the observation.
-            pi = apply_fn(
-                params, jax.tree_map(lambda x: x[jnp.newaxis, ...], last_timestep.observation)
-            )
-
-            if config.arch.evaluation_greedy:
-                action = pi.mode()
-            else:
-                action = pi.sample(seed=policy_key)
-
-            # Remove batch dim for stepping the environment.
-            action = jnp.squeeze(action, axis=0)
-
-            # Step environment.
-            env_state, timestep = env.step(env_state, action)
-
-            # Log episode metrics.
-            episode_return += timestep.reward
-            step_count += 1
-            eval_state = EvalState(key, env_state, timestep, step_count, episode_return)
-            return eval_state
-
-        def not_done(carry: Tuple) -> bool:
-            """Check if the episode is done."""
-            timestep = carry[2]
-            is_not_done: bool = ~timestep.last()
-            return is_not_done
-
-        final_state = jax.lax.while_loop(not_done, _env_step, init_eval_state)
-
-        eval_metrics = {
-            "episode_return": final_state.episode_return,
-            "episode_length": final_state.step_count,
-        }
-        # Log won episode if win rate is required.
-
-        if log_win_rate:
-            eval_metrics["won_episode"] = final_state.timestep.extras["won_episode"]
-
-        return eval_metrics
-
-    def evaluator_fn(trained_params: FrozenDict, key: chex.PRNGKey) -> ExperimentOutput[EvalState]:
-        """Evaluator function."""
-        # Initialise environment states and timesteps.
-        n_devices = len(jax.devices())
-
-        eval_batch = (config.arch.num_eval_episodes // n_devices) * eval_multiplier
-
-        key, *env_keys = jax.random.split(key, eval_batch + 1)
-        env_states, timesteps = jax.vmap(env.reset)(jnp.stack(env_keys))
-        # Split keys for each core.
-        key, *step_keys = jax.random.split(key, eval_batch + 1)
-        # Add dimension to pmap over.
-        step_keys = jnp.stack(step_keys).reshape(eval_batch, -1)
-
-        eval_state = EvalState(
-            key=step_keys,
-            env_state=env_states,
-            timestep=timesteps,
-            step_count=jnp.zeros((eval_batch, 1)),
-            episode_return=jnp.zeros_like(timesteps.reward),
-        )
-
-        eval_metrics = jax.vmap(
-            eval_one_episode,
-            in_axes=(None, 0),
-            axis_name="eval_batch",
-        )(trained_params, eval_state)
-
-        return ExperimentOutput(
-            learner_state=eval_state,
-            episode_metrics=eval_metrics,
-            train_metrics={},
-        )
-
-    return evaluator_fn
+    def __call__(
+        self,
+        params: FrozenDict,
+        timestep: TimeStep[Union[Observation, ObservationGlobalState]],
+        key: PRNGKey,
+        actor_state: ActorState,
+    ) -> Tuple[Array, ActorState]: ...
 
 
-def get_rnn_evaluator_fn(
-    env: MarlEnv,
-    apply_fn: RecActorApply,
-    config: DictConfig,
-    scanned_rnn: nn.Module,
-    log_win_rate: bool = False,
-    eval_multiplier: int = 1,
-) -> EvalFn:
-    """Get the evaluator function for recurrent networks."""
+def get_num_eval_envs(config: DictConfig, absolute_metric: bool) -> int:
+    """Returns the number of vmapped envs/batch size during evaluation."""
+    n_devices = jax.device_count()
+    n_parallel_envs = config.arch.num_envs * n_devices
 
-    def eval_one_episode(params: FrozenDict, init_eval_state: RNNEvalState) -> Dict:
-        """Evaluate one episode. It is vectorized over the number of evaluation episodes."""
-
-        def _env_step(eval_state: RNNEvalState) -> RNNEvalState:
-            """Step the environment."""
-            (
-                key,
-                env_state,
-                last_timestep,
-                last_done,
-                hstate,
-                step_count,
-                episode_return,
-            ) = eval_state
-
-            # PRNG keys.
-            key, policy_key = jax.random.split(key)
-
-            # Add a batch dimension and env dimension to the observation.
-            batched_observation = jax.tree_util.tree_map(
-                lambda x: x[jnp.newaxis, jnp.newaxis, :], last_timestep.observation
-            )
-            ac_in = (
-                batched_observation,
-                last_done[jnp.newaxis, jnp.newaxis, :],
-            )
-
-            # Run the network.
-            hstate, pi = apply_fn(params, hstate, ac_in)
-
-            if config.arch.evaluation_greedy:
-                action = pi.mode()
-            else:
-                action = pi.sample(seed=policy_key)
-
-            # Step environment.
-            env_state, timestep = env.step(env_state, action[-1].squeeze(0))
-
-            # Log episode metrics.
-            episode_return += timestep.reward
-            step_count += 1
-            eval_state = RNNEvalState(
-                key,
-                env_state,
-                timestep,
-                jnp.repeat(timestep.last(), config.system.num_agents),
-                hstate,
-                step_count,
-                episode_return,
-            )
-            return eval_state
-
-        def not_done(carry: Tuple) -> bool:
-            """Check if the episode is done."""
-            timestep = carry[2]
-            is_not_done: bool = ~timestep.last()
-            return is_not_done
-
-        final_state = jax.lax.while_loop(not_done, _env_step, init_eval_state)
-
-        eval_metrics = {
-            "episode_return": final_state.episode_return,
-            "episode_length": final_state.step_count,
-        }
-        # Log won episode if win rate is required.
-        if log_win_rate:
-            eval_metrics["won_episode"] = final_state.timestep.extras["won_episode"]
-
-        return eval_metrics
-
-    def evaluator_fn(
-        trained_params: FrozenDict, key: chex.PRNGKey
-    ) -> ExperimentOutput[RNNEvalState]:
-        """Evaluator function."""
-        # Initialise environment states and timesteps.
-        n_devices = len(jax.devices())
-
-        eval_batch = config.arch.num_eval_episodes // n_devices * eval_multiplier
-
-        key, *env_keys = jax.random.split(key, eval_batch + 1)
-        env_states, timesteps = jax.vmap(env.reset)(jnp.stack(env_keys))
-        # Split keys for each core.
-        key, *step_keys = jax.random.split(key, eval_batch + 1)
-        # Add dimension to pmap over.
-        step_keys = jnp.stack(step_keys).reshape(eval_batch, -1)
-
-        # Initialise hidden state.
-        init_hstate = scanned_rnn.initialize_carry(
-            (eval_batch, config.system.num_agents),
-            config.network.hidden_state_dim,
-        )
-
-        # Initialise dones.
-        dones = jnp.zeros(
-            (
-                eval_batch,
-                config.system.num_agents,
-            ),
-            dtype=bool,
-        )
-
-        # Adding an extra batch dim for the vmapped eval functions.
-        init_hstate = init_hstate[:, jnp.newaxis, ...]
-
-        eval_state = RNNEvalState(
-            key=step_keys,
-            env_state=env_states,
-            timestep=timesteps,
-            dones=dones,
-            hstate=init_hstate,
-            step_count=jnp.zeros((eval_batch, 1)),
-            episode_return=jnp.zeros_like(timesteps.reward),
-        )
-
-        eval_metrics = jax.vmap(
-            eval_one_episode,
-            in_axes=(None, 0),
-            axis_name="eval_batch",
-        )(trained_params, eval_state)
-
-        return ExperimentOutput(
-            learner_state=eval_state,
-            episode_metrics=eval_metrics,
-            train_metrics={},
-        )
-
-    return evaluator_fn
-
-
-def make_eval_fns(
-    eval_env: MarlEnv,
-    network_apply_fn: Union[ActorApply, RecActorApply],
-    config: DictConfig,
-    use_recurrent_net: bool = False,
-    scanned_rnn: Optional[nn.Module] = None,
-) -> Tuple[EvalFn, EvalFn]:
-    """Initialize evaluator functions for reinforcement learning.
-
-    Args:
-    ----
-        eval_env (Environment): The environment used for evaluation.
-        network_apply_fn (Union[ActorApply,RecActorApply]): Creates a policy to sample.
-        config (DictConfig): The configuration settings for the evaluation.
-        use_recurrent_net (bool, optional): Whether to use a rnn. Defaults to False.
-        scanned_rnn (Optional[nn.Module], optional): The rnn module.
-            Required if `use_recurrent_net` is True. Defaults to None.
-
-    Returns:
-    -------
-        Tuple[EvalFn, EvalFn]: A tuple of two evaluation functions:
-        one for use during training and one for absolute metrics.
-
-    Raises:
-    ------
-        AssertionError: If `use_recurrent_net` is True but `scanned_rnn` is not provided.
-
-    """
-    # Check if win rate is required for evaluation.
-    log_win_rate = config.env.log_win_rate
-    # Vmap it over number of agents and create evaluator_fn.
-    if use_recurrent_net:
-        assert scanned_rnn is not None
-        evaluator = get_rnn_evaluator_fn(
-            eval_env,
-            network_apply_fn,  # type: ignore
-            config,
-            scanned_rnn,
-            log_win_rate,
-        )
-        absolute_metric_evaluator = get_rnn_evaluator_fn(
-            eval_env,
-            network_apply_fn,  # type: ignore
-            config,
-            scanned_rnn,
-            log_win_rate,
-            10,
-        )
+    if absolute_metric:
+        eval_episodes = config.arch.num_absolute_metric_eval_episodes
     else:
-        evaluator = get_ff_evaluator_fn(
-            eval_env,
-            network_apply_fn,  # type: ignore
-            config,
-            log_win_rate,  # type: ignore
-        )
-        absolute_metric_evaluator = get_ff_evaluator_fn(
-            eval_env,
-            network_apply_fn,  # type: ignore
-            config,
-            log_win_rate,
-            10,  # type: ignore
+        eval_episodes = config.arch.num_eval_episodes
+
+    if eval_episodes <= n_parallel_envs:
+        return math.ceil(eval_episodes / n_devices)  # type: ignore
+    else:
+        return config.arch.num_envs  # type: ignore
+
+
+def get_eval_fn(
+    env: MarlEnv, act_fn: EvalActFn, config: DictConfig, absolute_metric: bool
+) -> EvalFn:
+    """Creates a function that can be used to evaluate agents on a given environment.
+
+    Args:
+    ----
+        env: an environment that conforms to the mava environment spec.
+        act_fn: a function that takes in params, timestep, key and optionally a state
+                and returns actions and optionally a state (see `EvalActFn`).
+        config: the system config.
+        absolute_metric: whether or not this evaluator calculates the absolute_metric.
+                This determines how many evaluation episodes it does.
+    """
+    n_devices = jax.device_count()
+    eval_episodes = (
+        config.arch.num_absolute_metric_eval_episodes
+        if absolute_metric
+        else config.arch.num_eval_episodes
+    )
+    n_vmapped_envs = get_num_eval_envs(config, absolute_metric)
+    n_parallel_envs = n_vmapped_envs * n_devices
+    episode_loops = math.ceil(eval_episodes / n_parallel_envs)
+
+    # Warnings if num eval episodes is not divisible by num parallel envs.
+    if eval_episodes % n_parallel_envs != 0:
+        warnings.warn(
+            f"Number of evaluation episodes ({eval_episodes}) is not divisible by `num_envs` * "
+            f"`num_devices` ({n_parallel_envs} * {n_devices}). Some extra evaluations will be "
+            f"executed. New number of evaluation episodes = {episode_loops * n_parallel_envs}",
+            stacklevel=2,
         )
 
-    evaluator = jax.pmap(evaluator, axis_name="device")
-    absolute_metric_evaluator = jax.pmap(absolute_metric_evaluator, axis_name="device")
+    def eval_fn(params: FrozenDict, key: PRNGKey, init_act_state: ActorState) -> Metrics:
+        """Evaluates the given params on an environment and returns relevent metrics.
 
-    return evaluator, absolute_metric_evaluator
+        Metrics are collected by the `RecordEpisodeMetrics` wrapper: episode return and length,
+        also win rate for environments that support it.
+
+        Returns: Dict[str, Array] - dictionary of metric name to metric values for each episode.
+        """
+
+        def _env_step(eval_state: _EvalEnvStepState, _: Any) -> Tuple[_EvalEnvStepState, TimeStep]:
+            """Performs a single environment step"""
+            env_state, ts, key, actor_state = eval_state
+
+            key, act_key = jax.random.split(key)
+            action, actor_state = act_fn(params, ts, act_key, actor_state)
+            env_state, ts = jax.vmap(env.step)(env_state, action)
+
+            return (env_state, ts, key, actor_state), ts
+
+        def _episode(key: PRNGKey, _: Any) -> Tuple[PRNGKey, Metrics]:
+            """Simulates `num_envs` episodes."""
+            key, reset_key = jax.random.split(key)
+            reset_keys = jax.random.split(reset_key, n_vmapped_envs)
+            env_state, ts = jax.vmap(env.reset)(reset_keys)
+
+            step_state = env_state, ts, key, init_act_state
+            _, timesteps = jax.lax.scan(_env_step, step_state, jnp.arange(env.time_limit))
+
+            metrics = timesteps.extras["episode_metrics"]
+            if config.env.log_win_rate:
+                metrics["won_episode"] = timesteps.extras["won_episode"]
+
+            # find the first instance of done to get the metrics at that timestep, we don't
+            # care about subsequent steps because we only the results from the first episode
+            done_idx = jnp.argmax(timesteps.last(), axis=0)
+            metrics = jax.tree_map(lambda m: m[done_idx, jnp.arange(n_vmapped_envs)], metrics)
+            del metrics["is_terminal_step"]  # uneeded for logging
+
+            return key, metrics
+
+        # This loop is important because we don't want too many parallel envs.
+        # So in evaluation we have num_envs parallel envs and loop enough times
+        # so that we do at least `eval_episodes` number of episodes.
+        _, metrics = jax.lax.scan(_episode, key, xs=None, length=episode_loops)
+        metrics: Metrics = jax.tree_map(lambda x: x.reshape(-1), metrics)  # flatten metrics
+        return metrics
+
+    def timed_eval_fn(params: FrozenDict, key: PRNGKey, init_act_state: ActorState) -> Metrics:
+        """Wrapper around eval function to time it and add in steps per second metric."""
+        start_time = time.time()
+
+        metrics = jax.pmap(eval_fn)(params, key, init_act_state)
+        metrics: Metrics = jax.block_until_ready(metrics)
+
+        end_time = time.time()
+        total_timesteps = jnp.sum(metrics["episode_length"])
+        metrics["steps_per_second"] = total_timesteps / (end_time - start_time)
+        return metrics
+
+    return timed_eval_fn
+
+
+def make_ff_eval_act_fn(actor_apply_fn: ActorApply, config: DictConfig) -> EvalActFn:
+    """Makes an act function that conforms to the evaluator API given a standard
+    feed forward mava actor network."""
+
+    def eval_act_fn(
+        params: FrozenDict, timestep: TimeStep, key: PRNGKey, actor_state: ActorState
+    ) -> Tuple[Action, Dict]:
+        pi = actor_apply_fn(params, timestep.observation)
+        action = pi.mode() if config.arch.evaluation_greedy else pi.sample(seed=key)
+        return action, {}
+
+    return eval_act_fn
+
+
+def make_rec_eval_act_fn(actor_apply_fn: RecActorApply, config: DictConfig) -> EvalActFn:
+    """Makes an act function that conforms to the evaluator API given a standard
+    recurrent mava actor network."""
+
+    _hidden_state = "hidden_state"
+
+    def eval_act_fn(
+        params: FrozenDict, timestep: TimeStep, key: PRNGKey, actor_state: ActorState
+    ) -> Tuple[Action, Dict]:
+        hidden_state = actor_state[_hidden_state]
+
+        n_agents = timestep.observation.agents_view.shape[1]
+        last_done = timestep.last()[:, jnp.newaxis].repeat(n_agents, axis=-1)
+        ac_in = (timestep.observation, last_done)
+        ac_in = jax.tree_map(lambda x: x[jnp.newaxis], ac_in)  # add batch dim to obs
+
+        hidden_state, pi = actor_apply_fn(params, hidden_state, ac_in)
+        action = pi.mode() if config.arch.evaluation_greedy else pi.sample(seed=key)
+        return action.squeeze(0), {_hidden_state: hidden_state}
+
+    return eval_act_fn
