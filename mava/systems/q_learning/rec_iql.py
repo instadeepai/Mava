@@ -27,12 +27,14 @@ from chex import PRNGKey
 from colorama import Fore, Style
 from flashbax.buffers.flat_buffer import TrajectoryBuffer
 from flax.core.scope import FrozenVariableDict
+from flax.linen import FrozenDict
 from jax import Array
 from jumanji.env import Environment
+from jumanji.types import TimeStep
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
-from mava.evaluator import make_eval_fns
+from mava.evaluator import ActorState, get_eval_fn, get_num_eval_envs
 from mava.networks import RecQNetwork, ScannedRNN
 from mava.systems.q_learning.types import (
     ActionSelectionState,
@@ -551,13 +553,24 @@ def run_experiment(cfg: DictConfig) -> float:
     cfg.system.num_agents = env.num_agents
 
     key, eval_key = jax.random.split(key)
-    evaluator, absolute_metric_evaluator = make_eval_fns(
-        eval_env=eval_env,
-        network_apply_fn=q_net.apply,
-        config=cfg,
-        use_recurrent_net=True,
-        scanned_rnn=ScannedRNN(cfg.network.hidden_state_dim),
-    )
+
+    def eval_act_fn(
+        params: FrozenDict, timestep: TimeStep, key: chex.PRNGKey, actor_state: ActorState
+    ) -> Tuple[chex.Array, ActorState]:
+        """The acting function that get's passed to the evaluator.
+        A custom function is needed for epsilon-greedy acting.
+        """
+        hidden_state = actor_state["hidden_state"]
+
+        term_or_trunc = timestep.last()
+        net_input = (timestep.observation, term_or_trunc[..., jnp.newaxis])
+        net_input = jax.tree_map(lambda x: x[jnp.newaxis], net_input)  # add batch dim to obs
+
+        next_hidden_state, eps_greedy_dist = q_net.apply(params, hidden_state, net_input, 0.0)
+        action = eps_greedy_dist.sample(seed=key).squeeze(0)
+        return action, {"hidden_state": next_hidden_state}
+
+    evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, absolute_metric=False)
 
     if cfg.logger.checkpointing.save_model:
         checkpointer = Checkpointer(
@@ -565,6 +578,13 @@ def run_experiment(cfg: DictConfig) -> float:
             model_name=cfg.logger.system_name,
             **cfg.logger.checkpointing.save_args,  # Checkpoint args
         )
+
+    # Create an initial hidden state used for resetting memory for evaluation
+    eval_batch_size = get_num_eval_envs(cfg, absolute_metric=False)
+    eval_hs = ScannedRNN.initialize_carry(
+        (jax.device_count(), eval_batch_size, cfg.system.num_agents),
+        cfg.network.hidden_state_dim,
+    )
 
     max_episode_return = -jnp.inf
 
@@ -594,22 +614,13 @@ def run_experiment(cfg: DictConfig) -> float:
             logger.log(final_metrics, t, eval_idx, LogEvent.ACT)
         logger.log(loss_metrics, t, eval_idx, LogEvent.TRAIN)
 
-        # Prepare for evaluation.
-        start_time = time.time()
-
         # Evaluate:
         key, eval_key = jax.random.split(key)
         eval_keys = jax.random.split(eval_key, cfg.arch.n_devices)
         eval_params = unreplicate_batch_dim(learner_state.params.online)
-        eval_output = evaluator(eval_params, eval_keys)
-        jax.block_until_ready(eval_output)
-
-        # Log:
-        elapsed_time = time.time() - start_time
-        episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
-        steps_per_eval = int(jnp.sum(eval_output.episode_metrics["episode_length"]))
-        eval_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
-        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
+        eval_metrics = evaluator(eval_params, eval_keys, {"hidden_state": eval_hs})
+        logger.log(eval_metrics, t, eval_idx, LogEvent.EVAL)
+        episode_return = jnp.mean(eval_metrics["episode_return"])
 
         # Save best actor params.
         if cfg.arch.absolute_metric and max_episode_return <= episode_return:
@@ -626,22 +637,21 @@ def run_experiment(cfg: DictConfig) -> float:
                 episode_return=episode_return,
             )
 
-    eval_performance = float(jnp.mean(eval_output.episode_metrics[cfg.env.eval_metric]))
+    eval_performance = float(jnp.mean(eval_metrics[cfg.env.eval_metric]))
 
     # Measure absolute metric.
     if cfg.arch.absolute_metric:
-        start_time = time.time()
-
         eval_keys = jax.random.split(key, cfg.arch.n_devices)
+        eval_batch_size = get_num_eval_envs(cfg, absolute_metric=True)
+        eval_hs = ScannedRNN.initialize_carry(
+            (jax.device_count(), eval_batch_size, cfg.system.num_agents),
+            cfg.network.hidden_state_dim,
+        )
 
-        eval_output = absolute_metric_evaluator(best_params, eval_keys)
-        jax.block_until_ready(eval_output)
+        abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, absolute_metric=True)
+        eval_metrics = abs_metric_evaluator(best_params, eval_keys, {"hidden_state": eval_hs})
 
-        elapsed_time = time.time() - start_time
-
-        steps_per_eval = int(jnp.sum(eval_output.episode_metrics["episode_length"]))
-        eval_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
-        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.ABSOLUTE)
+        logger.log(eval_metrics, t, eval_idx, LogEvent.ABSOLUTE)
 
     logger.stop()
 

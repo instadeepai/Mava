@@ -189,10 +189,10 @@ class JaxMarlWrapper(Wrapper, ABC):
         assert time_limit > 0, f"Time limit must be greater than 0, got {time_limit}"
 
         super().__init__(env)
-
+        self._env: MultiAgentEnv
+        self.agents = self._env.agents
         self.has_global_state = has_global_state
         self.time_limit = time_limit
-        self.agents = self._env.agents
         self.num_agents = self._env.num_agents
 
         # Calling these on init to cache the values in a non-jitted context.
@@ -293,7 +293,11 @@ class JaxMarlWrapper(Wrapper, ABC):
 
     def discount_spec(self) -> specs.BoundedArray:
         return specs.BoundedArray(
-            shape=(self.num_agents,), dtype=float, minimum=0.0, maximum=1.0, name="discount"
+            shape=(self.num_agents,),
+            dtype=float,
+            minimum=0.0,
+            maximum=1.0,
+            name="discount",
         )
 
     @abstractmethod

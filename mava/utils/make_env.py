@@ -53,7 +53,10 @@ from mava.wrappers.jaxmarl import JaxMarlWrapper
 _jumanji_registry = {
     "RobotWarehouse-v0": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper},
     "LevelBasedForaging-v0": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
-    "MaConnector-v2": {"generator": ConnectorRandomGenerator, "wrapper": ConnectorWrapper},
+    "MaConnector-v2": {
+        "generator": ConnectorRandomGenerator,
+        "wrapper": ConnectorWrapper,
+    },
     "Cleaner-v0": {"generator": CleanerRandomGenerator, "wrapper": CleanerWrapper},
 }
 
@@ -75,6 +78,7 @@ def add_extra_wrappers(
 
     train_env = AutoResetWrapper(train_env)
     train_env = RecordEpisodeMetrics(train_env)
+    eval_env = RecordEpisodeMetrics(eval_env)
 
     return train_env, eval_env
 
