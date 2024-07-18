@@ -71,7 +71,7 @@ def get_num_eval_envs(config: DictConfig, absolute_metric: bool) -> int:
         eval_episodes = config.arch.num_eval_episodes
 
     if eval_episodes <= n_parallel_envs:
-        return math.ceil(eval_episodes / n_devices)
+        return math.ceil(eval_episodes / n_devices)  # type: ignore
     else:
         return config.arch.num_envs  # type: ignore
 
