@@ -24,7 +24,7 @@ from flax.core.frozen_dict import FrozenDict
 from jax.tree_util import tree_map
 from omegaconf import DictConfig, OmegaConf
 
-from mava.systems.anakin.ppo.types import HiddenStates, Params
+from mava.systems.ppo.types import HiddenStates, Params
 from mava.types import MavaState
 
 # Keep track of the version of the checkpointer

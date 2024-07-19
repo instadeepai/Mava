@@ -34,7 +34,7 @@ from rich.pretty import pprint
 
 from mava.evaluator import make_eval_fns
 from mava.networks import RecQNetwork, ScannedRNN
-from mava.systems.anakin.q_learning.types import (
+from mava.systems.q_learning.types import (
     ActionSelectionState,
     ActionState,
     LearnerState,
