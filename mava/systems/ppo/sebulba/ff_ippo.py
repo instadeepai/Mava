@@ -148,7 +148,7 @@ def rollout(
             # Prepare the data
             storage_time_start = time.time()
             next_dones = np.logical_or(terminated, truncated)
-            metrics = jax.tree_map(lambda *x: jnp.asarray(x), *info["metrics"])  # Stack the metrics
+            metrics = jax.tree_util.tree_map(lambda *x: jnp.asarray(x), *info["metrics"])  # Stack the metrics
 
             # Append data to storage
             storage.append(
@@ -170,11 +170,11 @@ def rollout(
         # Prepare data to share with learner
         # [PPOTransition() * rollout_len] --> PPOTransition[done=(rollout_len, num_envs, num_agents)
         # , action=(rollout_len, num_envs, num_agents, num_actions), ...]
-        stacked_storage = jax.tree_map(lambda *xs: jnp.stack(xs), *storage)
+        stacked_storage = jax.tree_util.tree_map(lambda *xs: jnp.stack(xs), *storage)
 
         # Split the arrays over the different learner_devices on the num_envs axis
 
-        sharded_storage = jax.tree_map(
+        sharded_storage = jax.tree_util.tree_map(
             lambda x: shard_split_payload(x, 1), stacked_storage
         )  # (num_learner_devices, rollout_len, num_envs, num_agents, ...)
 
@@ -700,10 +700,10 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
             rollout_times.append(time.time() - rollout_start_time)
 
             # Concatinate the returned trajectories on the n_env axis
-            sharded_storages = jax.tree_map(
+            sharded_storages = jax.tree_util.tree_map(
                 lambda *x: jnp.concatenate(x, axis=2), *sharded_storages
             )
-            sharded_next_obss = jax.tree_map(
+            sharded_next_obss = jax.tree_util.tree_map(
                 lambda *x: jnp.concatenate(x, axis=1), *sharded_next_obss
             )
             sharded_next_dones = jnp.concatenate(sharded_next_dones, axis=1)
@@ -730,7 +730,7 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
         # Log the results of the training.
         elapsed_time = time.time() - training_start_time
         t = int(steps_per_rollout * (eval_step + 1))
-        episode_metrics = jax.tree_map(lambda *x: np.asarray(x), *episode_metrics)
+        episode_metrics = jax.tree_util.tree_map(lambda *x: np.asarray(x), *episode_metrics)
         episode_metrics, ep_completed = get_final_step_metrics(episode_metrics)
         episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
 
@@ -744,7 +744,7 @@ def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
         logger.log(speed_info, t, eval_step, LogEvent.MISC)
         if ep_completed:  # only log episode metrics if an episode was completed in the rollout.
             logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
-        train_metrics = jax.tree_map(lambda *x: np.asarray(x), *train_metrics)
+        train_metrics = jax.tree_util.tree_map(lambda *x: np.asarray(x), *train_metrics)
         logger.log(train_metrics, t, eval_step, LogEvent.TRAIN)
 
         # Evaluation on the learner
