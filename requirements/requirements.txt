@@ -1,3 +1,4 @@
+brax==0.10.3
 colorama
 distrax
 flashbax~=0.1.0
