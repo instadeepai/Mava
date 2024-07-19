@@ -36,7 +36,7 @@ from jumanji.environments.routing.lbf.generator import (
 from jumanji.environments.routing.robot_warehouse.generator import (
     RandomGenerator as RwareRandomGenerator,
 )
-from lbforaging.foraging import environment as gym_lbf
+from lbforaging.foraging import ForagingEnv as gym_ForagingEnv
 from omegaconf import DictConfig
 from rware.warehouse import Warehouse as gym_Warehouse
 
@@ -76,7 +76,7 @@ _gigastep_registry = {"Gigastep": GigastepWrapper}
 
 _gym_registry = {
     "RobotWarehouse": (gym_Warehouse, GymWrapper),
-    "LevelBasedForaging": (gym_lbf, GymLBFWrapper),
+    "LevelBasedForaging": (gym_ForagingEnv, GymLBFWrapper),
 }
 
 
