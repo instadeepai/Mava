@@ -148,7 +148,9 @@ def rollout(
             # Prepare the data
             storage_time_start = time.time()
             next_dones = np.logical_or(terminated, truncated)
-            metrics = jax.tree_util.tree_map(lambda *x: jnp.asarray(x), *info["metrics"])  # Stack the metrics
+            metrics = jax.tree_util.tree_map(
+                lambda *x: jnp.asarray(x), *info["metrics"]
+            )  # Stack the metrics
 
             # Append data to storage
             storage.append(

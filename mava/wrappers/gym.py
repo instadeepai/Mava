@@ -203,7 +203,6 @@ def async_multiagent_worker(  # noqa CCR001
     env = env_fn()
     observation_space = env.observation_space
     action_space = env.action_space
-    autoreset = False
 
     parent_pipe.close()
 
@@ -216,7 +215,6 @@ def async_multiagent_worker(  # noqa CCR001
                 if shared_memory:
                     write_to_shared_memory(observation_space, index, observation, shared_memory)
                     observation = None
-                    autoreset = False
                 pipe.send(((observation, info), True))
             elif command == "step":
                 # Modified the step function to align with 'AutoResetWrapper'.
