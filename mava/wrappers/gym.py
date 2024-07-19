@@ -203,8 +203,6 @@ def async_multiagent_worker(  # noqa CCR001
     env = env_fn()
     observation_space = env.observation_space
     action_space = env.action_space
-    autoreset = False
-
     parent_pipe.close()
 
     try:
@@ -216,22 +214,19 @@ def async_multiagent_worker(  # noqa CCR001
                 if shared_memory:
                     write_to_shared_memory(observation_space, index, observation, shared_memory)
                     observation = None
-                    autoreset = False
                 pipe.send(((observation, info), True))
             elif command == "step":
-                if autoreset:
+                # Modified the step function to align with 'AutoResetWrapper'.
+                # The environment resets immediately upon termination or truncation.
+                (
+                    observation,
+                    reward,
+                    terminated,
+                    truncated,
+                    info,
+                ) = env.step(data)
+                if np.logical_or(terminated, truncated).all():
                     observation, info = env.reset()
-                    reward, terminated, truncated = 0, False, False
-                else:
-                    (
-                        observation,
-                        reward,
-                        terminated,
-                        truncated,
-                        info,
-                    ) = env.step(data)
-                # The autoreset was modified to work with boolean arrays.
-                autoreset = np.logical_or(terminated, truncated).all()
 
                 if shared_memory:
                     write_to_shared_memory(observation_space, index, observation, shared_memory)
