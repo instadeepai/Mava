@@ -1,0 +1,15 @@
+# The config of the 2s-8x8-2p-2f-coop scenario with the VectorObserver set as default.
+name: LevelBasedForaging
+task_name: 2s-8x8-2p-2f-coop
+
+task_config:
+  field_size: [8, 8] # size of the grid to generate.
+  sight: 2 # field of view of an agent.
+  num_agents: 2 # number of agents on the grid.
+  max_food: 2 # number of food in the environment.
+  max_player_level: 2 # maximum level of the agents (inclusive).
+  force_coop: True # force cooperation between agents.
+  max_episode_steps: 50 # max number of steps per episode.
+
+env_kwargs:
+  {}  # there are no scenario specific env_kwargs for this env

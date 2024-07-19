@@ -150,9 +150,8 @@ class NeptuneLogger(BaseLogger):
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
         tags = list(cfg.logger.kwargs.neptune_tag)
         project = cfg.logger.kwargs.neptune_project
-        mode = "sync" if cfg.arch.arch_name == "Sebulba" else "async"
 
-        self.logger = neptune.init_run(project=project, tags=tags, mode=mode)
+        self.logger = neptune.init_run(project=project, tags=tags)
 
         self.logger["config"] = stringify_unsupported(cfg)
         self.detailed_logging = cfg.logger.kwargs.detailed_neptune_logging
@@ -338,7 +337,7 @@ def get_logger_path(config: DictConfig, logger_type: str) -> str:
 def describe(x: ArrayLike) -> Union[Dict[str, ArrayLike], ArrayLike]:
     """Generate summary statistics for an array of metrics (mean, std, min, max)."""
 
-    if not (isinstance(x, jax.Array) or isinstance(x, np.ndarray)) or x.size <= 1:
+    if not isinstance(x, jax.Array) or x.size <= 1:
         return x
 
     # np instead of jnp because we don't jit here

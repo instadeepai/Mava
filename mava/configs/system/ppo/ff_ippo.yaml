@@ -9,12 +9,12 @@ seed: 42
 add_agent_id: True
 
 # --- RL hyperparameters ---
-actor_lr: 0.0005 # Learning rate for actor network
-critic_lr: 0.0005 # Learning rate for critic network
+actor_lr: 2.5e-4 # Learning rate for actor network
+critic_lr: 2.5e-4 # Learning rate for critic network
 update_batch_size: 2 # Number of vectorised gradient updates per device.
 rollout_length: 128 # Number of environment steps per vectorised environment.
 ppo_epochs: 4 # Number of ppo epochs per training data batch.
-num_minibatches: 1 # Number of minibatches per ppo epoch.
+num_minibatches: 2 # Number of minibatches per ppo epoch.
 gamma: 0.99 # Discounting factor.
 gae_lambda: 0.95 # Lambda value for GAE computation.
 clip_eps: 0.2 # Clipping value for PPO updates and value function.
