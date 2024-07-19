@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import copy
 import time
 from typing import Any, Dict, Tuple
@@ -32,7 +31,7 @@ from rich.pretty import pprint
 from mava.evaluator import make_anakin_eval_fns
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
-from mava.systems.anakin.ppo.types import LearnerState, OptStates, Params, PPOTransition
+from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
 from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
@@ -55,7 +54,7 @@ def get_learner_fn(
 ) -> LearnerFn[LearnerState]:
     """Get the learner function."""
 
-    # Get apply and update functions for actor and critic networks.
+    # Unpack apply and update functions.
     actor_apply_fn, critic_apply_fn = apply_fns
     actor_update_fn, critic_update_fn = update_fns
 
@@ -85,7 +84,6 @@ def get_learner_fn(
             key, policy_key = jax.random.split(key)
             actor_policy = actor_apply_fn(params.actor_params, last_timestep.observation)
             value = critic_apply_fn(params.critic_params, last_timestep.observation)
-
             action = actor_policy.sample(seed=policy_key)
             log_prob = actor_policy.log_prob(action)
 
@@ -255,7 +253,6 @@ def get_learner_fn(
                 )
                 critic_new_params = optax.apply_updates(params.critic_params, critic_updates)
 
-                # PACK NEW PARAMS AND OPTIMISER STATE
                 new_params = Params(actor_new_params, critic_new_params)
                 new_opt_state = OptStates(actor_new_opt_state, critic_new_opt_state)
 
@@ -318,7 +315,7 @@ def get_learner_fn(
         Args:
             learner_state (NamedTuple):
                 - params (Params): The initial model parameters.
-                - opt_states (OptStates): The initial optimizer state.
+                - opt_states (OptStates): The initial optimizer states.
                 - key (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
@@ -359,7 +356,7 @@ def learner_setup(
     critic_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
 
     actor_network = Actor(torso=actor_torso, action_head=actor_action_head)
-    critic_network = Critic(torso=critic_torso)
+    critic_network = Critic(torso=critic_torso, centralised_critic=True)
 
     actor_lr = make_learning_rate(config.system.actor_lr, config)
     critic_lr = make_learning_rate(config.system.critic_lr, config)
@@ -447,7 +444,7 @@ def run_experiment(_config: DictConfig) -> float:
     n_devices = len(jax.devices())
 
     # Create the enviroments for train and eval.
-    env, eval_env = environments.make(config)
+    env, eval_env = environments.make(config=config, add_global_state=True)
 
     # PRNG keys.
     key, key_e, actor_net_key, critic_net_key = jax.random.split(
@@ -503,7 +500,6 @@ def run_experiment(_config: DictConfig) -> float:
     for eval_step in range(config.arch.num_evaluation):
         # Train.
         start_time = time.time()
-
         learner_output = learn(learner_state)
         jax.block_until_ready(learner_output)
 
@@ -569,6 +565,7 @@ def run_experiment(_config: DictConfig) -> float:
         jax.block_until_ready(evaluator_output)
 
         elapsed_time = time.time() - start_time
+
         steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
         t = int(steps_per_rollout * (eval_step + 1))
         evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
@@ -580,7 +577,7 @@ def run_experiment(_config: DictConfig) -> float:
     return eval_performance
 
 
-@hydra.main(config_path="../../../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
+@hydra.main(config_path="../../configs", config_name="default_ff_mappo.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
@@ -588,7 +585,7 @@ def hydra_entry_point(cfg: DictConfig) -> float:
 
     # Run experiment.
     eval_performance = run_experiment(cfg)
-    print(f"{Fore.CYAN}{Style.BRIGHT}IPPO experiment completed{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}MAPPO experiment completed{Style.RESET_ALL}")
     return eval_performance
 
 

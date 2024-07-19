@@ -3,5 +3,5 @@ defaults:
   - arch: sebulba
   - system: ppo/ff_ippo
   - network: mlp
-  - env: gym
+  - env: rware_gym
   - _self_

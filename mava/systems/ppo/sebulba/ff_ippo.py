@@ -36,7 +36,7 @@ from rich.pretty import pprint
 from mava.evaluator import make_sebulba_eval_fns as make_eval_fns
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
-from mava.systems.anakin.ppo.types import LearnerState, OptStates, Params, PPOTransition
+from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
 from mava.types import (
     ActorApply,
     CriticApply,
@@ -479,7 +479,7 @@ def learner_setup(
     # Get number of agents and actions.
     action_space = env.single_action_space
     config.system.num_agents = len(action_space)
-    config.system.num_actions = action_space[0].n
+    config.system.num_actions = int(action_space[0].n)
 
     # PRNG keys.
     key, actor_net_key, critic_net_key = keys
