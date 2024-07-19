@@ -22,17 +22,18 @@ from chex import Array
 
 
 def get_joint_action(actions: Array) -> Array:
-    """
-    Get the joint action from the individual actions of the agents.
+    """Get the joint action from the individual actions of the agents.
 
     Joint actions are simply the concatenation of all agents actions.
     Shapes are transformed from (B, A, Act) -> (B, A, A * Act).
     Note: this returns the same joint action tiled for each agent.
 
     Args:
+    ----
         actions (B, A, Act): the individual actions of the agents.
 
     Returns: (B, A, A * Act): the joint action repeated for each agent.
+
     """
     batch_size, num_agents, act_size = actions.shape
     repeated_action = jnp.tile(actions[:, jnp.newaxis, ...], (1, num_agents, 1, 1))
@@ -40,8 +41,7 @@ def get_joint_action(actions: Array) -> Array:
 
 
 def get_updated_joint_actions(rb_actions: Array, policy_actions: Array) -> Array:
-    """
-    Get the updated joint actions by replacing the actions from the replay buffer with the new
+    """Get the updated joint actions by replacing the actions from the replay buffer with the new
     actions from the policy. Only update joint action i with the new action for agent i.
 
     The effect of this is that each agent's central critic sees what all other agents did in the
@@ -54,6 +54,7 @@ def get_updated_joint_actions(rb_actions: Array, policy_actions: Array) -> Array
     Finally join the last two dimensions to get (B, A, A * Act).
 
     Example:
+    -------
     Given an action dim of 1, batch size of 1 and 3 agents.
     All agents action may look like this: [0, 1, 2].
     It is then repeated num agent times:
@@ -73,12 +74,13 @@ def get_updated_joint_actions(rb_actions: Array, policy_actions: Array) -> Array
     but given an action dim > 1 you would need to join the last two dims.
 
     Args:
+    ----
         rb_actions (B, A, Act): the actions from the replay buffer.
         policy_actions (B, A, Act): the new actions from the policy.
 
     Returns: (B, A, A * Act): the updated joint actions.
-    """
 
+    """
     batch_size, num_agents, act_size = rb_actions.shape
 
     # Repeat the actions from the replay buffer such that you have (B, A, A, Act).

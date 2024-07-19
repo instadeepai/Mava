@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple
+from typing import Dict, Tuple, Type
 
 import jaxmarl
 import jumanji
 import matrax
 from gigastep import ScenarioBuilder
 from jaxmarl.environments.smax import map_name_to_scenario
-from jumanji.env import Environment
 from jumanji.environments.routing.cleaner.generator import (
     RandomGenerator as CleanerRandomGenerator,
 )
@@ -34,6 +33,7 @@ from jumanji.environments.routing.robot_warehouse.generator import (
 )
 from omegaconf import DictConfig
 
+from mava.types import MarlEnv
 from mava.wrappers import (
     AgentIDWrapper,
     AutoResetWrapper,
@@ -47,53 +47,58 @@ from mava.wrappers import (
     RwareWrapper,
     SmaxWrapper,
 )
+from mava.wrappers.jaxmarl import JaxMarlWrapper
 
 # Registry mapping environment names to their generator and wrapper classes.
 _jumanji_registry = {
     "RobotWarehouse-v0": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper},
     "LevelBasedForaging-v0": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
-    "MaConnector-v2": {"generator": ConnectorRandomGenerator, "wrapper": ConnectorWrapper},
+    "MaConnector-v2": {
+        "generator": ConnectorRandomGenerator,
+        "wrapper": ConnectorWrapper,
+    },
     "Cleaner-v0": {"generator": CleanerRandomGenerator, "wrapper": CleanerWrapper},
 }
 
-# Define a different registry for Matrax since it has no generator.
+# Registry mapping environment names directly to the corresponding wrapper classes.
 _matrax_registry = {"Matrax": MatraxWrapper}
-
-_jaxmarl_wrappers = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
-
+_jaxmarl_registry: Dict[str, Type[JaxMarlWrapper]] = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 _gigastep_registry = {"Gigastep": GigastepWrapper}
 
 
 def add_extra_wrappers(
-    train_env: Environment, eval_env: Environment, config: DictConfig
-) -> Environment:
-
+    train_env: MarlEnv, eval_env: MarlEnv, config: DictConfig
+) -> Tuple[MarlEnv, MarlEnv]:
     # Disable the AgentID wrapper if the environment has implicit agent IDs.
     config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
 
-    # Add agent id to observation.
     if config.system.add_agent_id:
         train_env = AgentIDWrapper(train_env)
         eval_env = AgentIDWrapper(eval_env)
 
     train_env = AutoResetWrapper(train_env)
     train_env = RecordEpisodeMetrics(train_env)
+    eval_env = RecordEpisodeMetrics(eval_env)
+
     return train_env, eval_env
 
 
 def make_jumanji_env(
     env_name: str, config: DictConfig, add_global_state: bool = False
-) -> Tuple[Environment, Environment]:
+) -> Tuple[MarlEnv, MarlEnv]:
     """
     Create a Jumanji environments for training and evaluation.
 
     Args:
+    ----
         env_name (str): The name of the environment to create.
         config (Dict): The configuration of the environment.
         add_global_state (bool): Whether to add the global state to the observation.
 
     Returns:
+    -------
         A tuple of the environments.
+
     """
     # Config generator and select the wrapper.
     generator = _jumanji_registry[env_name]["generator"]
@@ -113,29 +118,31 @@ def make_jumanji_env(
 
 def make_jaxmarl_env(
     env_name: str, config: DictConfig, add_global_state: bool = False
-) -> Tuple[Environment, Environment]:
+) -> Tuple[MarlEnv, MarlEnv]:
     """
      Create a JAXMARL environment.
 
     Args:
+    ----
         env_name (str): The name of the environment to create.
         config (Dict): The configuration of the environment.
         add_global_state (bool): Whether to add the global state to the observation.
 
     Returns:
+    -------
         A JAXMARL environment.
-    """
 
+    """
     kwargs = dict(config.env.kwargs)
     if "smax" in env_name.lower():
         kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
 
     # Create jaxmarl envs.
-    train_env = _jaxmarl_wrappers[config.env.env_name](
+    train_env = _jaxmarl_registry[config.env.env_name](
         jaxmarl.make(env_name, **kwargs),
         add_global_state,
     )
-    eval_env = _jaxmarl_wrappers[config.env.env_name](
+    eval_env = _jaxmarl_registry[config.env.env_name](
         jaxmarl.make(env_name, **kwargs),
         add_global_state,
     )
@@ -147,17 +154,20 @@ def make_jaxmarl_env(
 
 def make_matrax_env(
     env_name: str, config: DictConfig, add_global_state: bool = False
-) -> Tuple[Environment, Environment]:
+) -> Tuple[MarlEnv, MarlEnv]:
     """
     Creates Matrax environments for training and evaluation.
 
     Args:
+    ----
         env_name: The name of the environment to create.
         config: The configuration of the environment.
         add_global_state: Whether to add the global state to the observation.
 
     Returns:
+    -------
         A tuple containing a train and evaluation Matrax environment.
+
     """
     # Select the Matrax wrapper.
     wrapper = _matrax_registry[env_name]
@@ -175,17 +185,20 @@ def make_matrax_env(
 
 def make_gigastep_env(
     env_name: str, config: DictConfig, add_global_state: bool = False
-) -> Tuple[Environment, Environment]:
+) -> Tuple[MarlEnv, MarlEnv]:
     """
      Create a Gigastep environment.
 
     Args:
+    ----
         env_name (str): The name of the environment to create.
         config (Dict): The configuration of the environment.
         add_global_state (bool): Whether to add the global state to the observation. Default False.
 
     Returns:
+    -------
         A tuple of the environments.
+
     """
     wrapper = _gigastep_registry[env_name]
 
@@ -199,16 +212,19 @@ def make_gigastep_env(
     return train_env, eval_env
 
 
-def make(config: DictConfig, add_global_state: bool = False) -> Tuple[Environment, Environment]:
+def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
     """
-    Create environments for training and evaluation..
+    Create environments for training and evaluation.
 
     Args:
+    ----
         config (Dict): The configuration of the environment.
         add_global_state (bool): Whether to add the global state to the observation.
 
     Returns:
+    -------
         A tuple of the environments.
+
     """
     env_name = config.env.scenario.name
 

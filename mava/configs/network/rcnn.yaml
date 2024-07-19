@@ -1,10 +1,17 @@
-# ---CNN Networks---
+# ---Recurrent CNN Networks---
+hidden_state_dim: 128 # The size of the RNN hiddenstate for each agent.
+
 actor_network:
   pre_torso:
     _target_: mava.networks.CNNTorso
     channel_sizes: [32, 32]
     kernel_sizes: [3, 3]
     strides: [1, 1]
+    use_layer_norm: False
+    activation: relu
+  post_torso:
+    _target_: mava.networks.MLPTorso
+    layer_sizes: [128]
     use_layer_norm: False
     activation: relu
 
@@ -17,5 +24,10 @@ critic_network:
     channel_sizes: [32, 32]
     kernel_sizes: [3, 3]
     strides: [1, 1]
+    use_layer_norm: False
+    activation: relu
+  post_torso:
+    _target_: mava.networks.MLPTorso
+    layer_sizes: [128]
     use_layer_norm: False
     activation: relu
