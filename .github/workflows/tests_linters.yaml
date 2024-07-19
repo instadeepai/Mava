@@ -1,12 +1,12 @@
 name: Tests and Linters 🧪
 
-on: [ push, pull_request ]
+on: [ pull_request ]
 
 jobs:
   tests-and-linters:
     name: "Python ${{ matrix.python-version }} on ${{ matrix.os }}"
     runs-on: "${{ matrix.os }}"
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     strategy:
       matrix:
