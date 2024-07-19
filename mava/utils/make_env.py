@@ -231,8 +231,7 @@ def make_gym_env(
     Returns:
         Async environments.
     """
-    base_env_name = config.env.scenario.name
-    env_maker, wrapper = _gym_registry[base_env_name]
+    env_maker, wrapper = _gym_registry[config.env.scenario.name]
 
     def create_gym_env(config: DictConfig, add_global_state: bool = False) -> Environment:
         env = env_maker(**config.env.scenario.task_config)

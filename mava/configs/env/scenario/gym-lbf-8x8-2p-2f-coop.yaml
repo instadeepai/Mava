@@ -9,7 +9,7 @@ task_config:
   max_num_food: 2
   max_player_level: 2
   force_coop: True
-  max_episode_steps: 50
+  max_episode_steps: 100
   min_player_level : 1
   min_food_level : null
   max_food_level : null
