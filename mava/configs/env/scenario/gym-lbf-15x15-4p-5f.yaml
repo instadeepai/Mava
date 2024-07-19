@@ -5,11 +5,14 @@ task_name: 15x15-4p-5f
 task_config:
   field_size: [15, 15]
   sight: 15
-  num_agents: 4
-  max_food: 5
+  players: 4
+  max_num_food: 5
   max_player_level: 2
   force_coop: False
   max_episode_steps: 50
+  min_player_level : 1 
+  min_food_level : null
+  max_food_level : null
 
 env_kwargs:
   {}  # there are no scenario specific env_kwargs for this env
