@@ -10,7 +10,7 @@ jax
 jaxlib
 jaxmarl
 jumanji @ git+https://github.com/sash-a/jumanji
-lbforaging @ git+https://github.com/LukasSchaefer/lb-foraging.git@gymnasium_integration
+lbforaging @ git+https://github.com/LukasSchaefer/lb-foraging.git@gymnasium_integration # fixes: https://github.com/semitable/lb-foraging/issues/20
 matrax @ git+https://github.com/instadeepai/matrax
 mujoco==3.1.3
 mujoco-mjx==3.1.3
@@ -19,7 +19,7 @@ numpy
 omegaconf
 optax
 protobuf~=3.20
-rware @ git+https://github.com/RuanJohn/robotic-warehouse.git
+rware @ git+https://github.com/RuanJohn/robotic-warehouse.git # compatibility with latest gymnasium
 scipy==1.12.0
 tensorboard_logger
 tensorflow_probability

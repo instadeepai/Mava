@@ -230,6 +230,7 @@ def async_multiagent_worker(  # noqa CCR001
                         truncated,
                         info,
                     ) = env.step(data)
+                # The autoreset was modified to work with boolean arrays.
                 autoreset = np.logical_or(terminated, truncated).all()
 
                 if shared_memory:
