@@ -10,7 +10,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.12"]
+        python-version: ["3.12", "3.11"]
         os: [ubuntu-latest]
 
     steps:
