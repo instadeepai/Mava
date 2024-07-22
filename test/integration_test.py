@@ -99,6 +99,11 @@ def test_discrete_cnn_env(fast_config: dict, env_name: str) -> None:
     _run_system(system_path, cfg)
 
 
+# leaving this here for the future if we have some new continuous envs
+skip_reason = "MaBrax is the only continuous env, thus it is already tested in `test_mava_system`"
+
+
+@pytest.mark.skip(reason=skip_reason)
 @pytest.mark.parametrize("env_name", continuous_envs)
 def test_continuous_env(fast_config: dict, env_name: str) -> None:
     """Tests all continuous environments on ff_masac."""
