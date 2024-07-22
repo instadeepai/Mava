@@ -135,7 +135,7 @@ class RwareWrapper(JumanjiMarlWrapper):
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for the Robotic Warehouse environment."""
         observation = Observation(
-            agents_view=timestep.observation.agents_view,
+            agents_view=timestep.observation.agents_view.astype(float),
             action_mask=timestep.observation.action_mask,
             step_count=jnp.repeat(timestep.observation.step_count, self.num_agents),
         )
@@ -181,7 +181,7 @@ class LbfWrapper(JumanjiMarlWrapper):
         """
         # Create a new observation with adjusted step count
         modified_observation = Observation(
-            agents_view=timestep.observation.agents_view,
+            agents_view=timestep.observation.agents_view.astype(float),
             action_mask=timestep.observation.action_mask,
             step_count=jnp.repeat(timestep.observation.step_count, self.num_agents),
         )

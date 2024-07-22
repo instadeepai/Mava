@@ -10,7 +10,10 @@
 
 <div align="center">
 <a href="https://www.python.org/doc/versions/">
-      <img src="https://img.shields.io/badge/python-3.9-blue" alt="Python Versions">
+      <img src="https://img.shields.io/badge/python-3.12-blue" alt="Python Versions">
+</a>
+<a href="https://www.python.org/doc/versions/">
+      <img src="https://img.shields.io/badge/python-3.11-blue" alt="Python Versions">
 </a>
 <a  href="https://github.com/instadeepai/Mava/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/License-Apache%202.0-orange.svg" alt="License" />
@@ -156,7 +159,7 @@ cd mava
 pip install -e .
 ```
 
-We have tested `Mava` on Python 3.9. Note that because the installation of JAX differs depending on your hardware accelerator,
+We have tested `Mava` on Python 3.11 and 3.12, but earlier versions may also work. Note that because the installation of JAX differs depending on your hardware accelerator,
 we advise users to explicitly install the correct JAX version (see the [official installation guide](https://github.com/google/jax#installation)). For more in-depth installation guides including Docker builds and virtual environments, please see our [detailed installation guide](docs/DETAILED_INSTALL.md).
 
 ## Quickstart ⚡
