@@ -21,6 +21,7 @@ from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import gymnasium
 import numpy as np
+from gymnasium import spaces
 from gymnasium.vector.utils import write_to_shared_memory
 from numpy.typing import NDArray
 
@@ -178,14 +179,14 @@ class GymAgentIDWrapper(gymnasium.Wrapper):
         obs = np.concatenate([self.agent_ids, obs], axis=1)
         return obs, reward, terminated, truncated, info
 
-    def modify_space(self, space: gymnasium.spaces) -> gymnasium.spaces:
-        if isinstance(space, gymnasium.spaces.Box):
-            new_shape = space.shape[0] + len(self.agent_ids)
-            return gymnasium.spaces.Box(
-                low=space.low, high=space.high, shape=new_shape, dtype=space.dtype
+    def modify_space(self, space: spaces.Space) -> spaces.Space:
+        if isinstance(space, spaces.Box):
+            new_shape = (space.shape[0] + len(self.agent_ids),)
+            return spaces.Box(
+                low=space.low[0], high=space.high[0], shape=new_shape, dtype=space.dtype
             )
-        elif isinstance(space, gymnasium.spaces.Tuple):
-            return gymnasium.spaces.Tuple(self.modify_space(s) for s in space)
+        elif isinstance(space, spaces.Tuple):
+            return spaces.Tuple(self.modify_space(s) for s in space)
         else:
             raise ValueError(f"Space {type(space)} is not currently supported.")
 
