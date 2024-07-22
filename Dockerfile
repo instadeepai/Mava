@@ -36,7 +36,7 @@ RUN pip install --quiet --upgrade pip setuptools wheel &&  \
 # Need to use specific cuda versions for jax
 ARG USE_CUDA=true
 RUN if [ "$USE_CUDA" = true ] ; \
-    then pip install "jax[cuda12]==0.4.25" ; \
+    then pip install "jax[cuda12]==0.4.26" ; \
     fi
 
 # Copy all code
