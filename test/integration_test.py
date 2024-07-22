@@ -15,7 +15,6 @@
 import importlib
 
 import pytest
-from colorama import Fore, Style
 from hydra import compose, initialize
 from omegaconf import DictConfig, OmegaConf
 
@@ -30,9 +29,9 @@ system_paths = [
 ]
 
 discrete_envs = [
-    # "gigastep",
+    "gigastep",
     "lbf",
-    # "matrax",
+    "matrax",
     "rware",
     "smax",
 ]
@@ -48,7 +47,6 @@ def _run_system(system_name: str, cfg: DictConfig) -> float:
     system = importlib.import_module(f"mava.systems.{system_name}")
     eval_perf = system.run_experiment(cfg)
 
-    print(f"{Fore.CYAN}{Style.BRIGHT}experiment completed{Style.RESET_ALL}")
     return float(eval_perf)
 
 
@@ -76,9 +74,9 @@ def test_mava_system(fast_config: dict, system_path: str) -> None:
 
 @pytest.mark.parametrize("env_name", discrete_envs)
 def test_discrete_env(fast_config: dict, env_name: str) -> None:
-    """Tests all discrete environments on ff_ippo."""
-    system_path = "ppo.ff_ippo"
-    system_name = "ff_ippo"
+    """Tests all discrete environments on ff_mappo."""
+    system_path = "ppo.ff_mappo"
+    system_name = "ff_mappo"
 
     with initialize(version_base=None, config_path="../mava/configs/"):
         cfg = compose(config_name=f"default_{system_name}", overrides=[f"env={env_name}"])
@@ -89,9 +87,9 @@ def test_discrete_env(fast_config: dict, env_name: str) -> None:
 
 @pytest.mark.parametrize("env_name", cnn_envs)
 def test_discrete_cnn_env(fast_config: dict, env_name: str) -> None:
-    """Tests all cnn environments on ff_ippo."""
-    system_path = "ppo.ff_ippo"
-    system_name = "ff_ippo"
+    """Tests all cnn environments on ff_mappo."""
+    system_path = "ppo.ff_mappo"
+    system_name = "ff_mappo"
 
     overrides = [f"env={env_name}", "network=cnn"]
     with initialize(version_base=None, config_path="../mava/configs/"):
@@ -103,9 +101,9 @@ def test_discrete_cnn_env(fast_config: dict, env_name: str) -> None:
 
 @pytest.mark.parametrize("env_name", continuous_envs)
 def test_continuous_env(fast_config: dict, env_name: str) -> None:
-    """Tests all continuous environments on ff_isac."""
-    system_path = "sac.ff_isac"
-    system_name = "ff_isac"
+    """Tests all continuous environments on ff_masac."""
+    system_path = "sac.ff_masac"
+    system_name = "ff_masac"
 
     with initialize(version_base=None, config_path="../mava/configs/"):
         cfg = compose(config_name=f"default_{system_name}", overrides=[f"env={env_name}"])
