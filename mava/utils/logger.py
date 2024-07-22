@@ -150,8 +150,11 @@ class NeptuneLogger(BaseLogger):
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
         tags = list(cfg.logger.kwargs.neptune_tag)
         project = cfg.logger.kwargs.neptune_project
+        mode = (
+            "async" if cfg.arch.architecture_name == "anakin" else "sync"
+        )  # async logging leads to deadlocks in sebulba
 
-        self.logger = neptune.init_run(project=project, tags=tags)
+        self.logger = neptune.init_run(project=project, tags=tags, mode=mode)
 
         self.logger["config"] = stringify_unsupported(cfg)
         self.detailed_logging = cfg.logger.kwargs.detailed_neptune_logging
