@@ -20,7 +20,7 @@ from omegaconf import DictConfig, OmegaConf
 
 system_paths = [
     "ppo.ff_ippo",
-    "ppo.ff_mappo",
+    # "ppo.ff_mappo",  # don't use this because ff_mappo is used in `test_discrete_env`
     "ppo.rec_ippo",
     "ppo.rec_mappo",
     "sac.ff_isac",
@@ -32,7 +32,7 @@ discrete_envs = [
     "gigastep",
     "lbf",
     "matrax",
-    "rware",
+    # "rware",  # don't use this because `test_mava_system` will run all systems on rware
     "smax",
 ]
 cnn_envs = ["cleaner", "connector"]
@@ -100,10 +100,7 @@ def test_discrete_cnn_env(fast_config: dict, env_name: str) -> None:
 
 
 # leaving this here for the future if we have some new continuous envs
-skip_reason = "MaBrax is the only continuous env, thus it is already tested in `test_mava_system`"
-
-
-@pytest.mark.skip(reason=skip_reason)
+@pytest.mark.skip(reason="MaBrax is the only continuous env and already tested in test_mava_system")
 @pytest.mark.parametrize("env_name", continuous_envs)
 def test_continuous_env(fast_config: dict, env_name: str) -> None:
     """Tests all continuous environments on ff_masac."""
