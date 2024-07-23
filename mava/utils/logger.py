@@ -18,7 +18,7 @@ import os
 import zipfile
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Union
+from typing import ClassVar, Dict, List, Union
 
 import jax
 import neptune
@@ -55,10 +55,12 @@ class MavaLogger:
         """Log a dictionary metrics at a given timestep.
 
         Args:
+        ----
             metrics (Dict): dictionary of metrics to log.
             t (int): the current timestep.
             t_eval (int): the number of previous evaluations.
             event (LogEvent): the event that the metrics are associated with.
+
         """
         # Ideally we want to avoid special metrics like this as much as possible.
         # Might be better to calculate this outside as we want to keep the number of these
@@ -150,8 +152,11 @@ class NeptuneLogger(BaseLogger):
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
         tags = list(cfg.logger.kwargs.neptune_tag)
         project = cfg.logger.kwargs.neptune_project
+        mode = (
+            "async" if cfg.arch.architecture_name == "anakin" else "sync"
+        )  # async logging leads to deadlocks in sebulba
 
-        self.logger = neptune.init_run(project=project, tags=tags)
+        self.logger = neptune.init_run(project=project, tags=tags, mode=mode)
 
         self.logger["config"] = stringify_unsupported(cfg)
         self.detailed_logging = cfg.logger.kwargs.detailed_neptune_logging
@@ -209,7 +214,7 @@ class JsonLogger(BaseLogger):
     """Json logger for marl-eval."""
 
     # These are the only metrics that marl-eval needs to plot.
-    _METRICS_TO_LOG = ["episode_return/mean", "win_rate", "steps_per_second"]
+    _METRICS_TO_LOG: ClassVar[List[str]] = ["episode_return/mean", "win_rate", "steps_per_second"]
 
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
         json_exp_path = get_logger_path(cfg, "json")
@@ -251,7 +256,7 @@ class JsonLogger(BaseLogger):
 class ConsoleLogger(BaseLogger):
     """Logger for writing to stdout."""
 
-    _EVENT_COLOURS = {
+    _EVENT_COLOURS: ClassVar[Dict[LogEvent, str]] = {
         LogEvent.TRAIN: Fore.MAGENTA,
         LogEvent.EVAL: Fore.GREEN,
         LogEvent.ABSOLUTE: Fore.BLUE,
@@ -299,7 +304,6 @@ class ConsoleLogger(BaseLogger):
 
 def _make_multi_logger(cfg: DictConfig) -> BaseLogger:
     """Creates a MultiLogger given a config"""
-
     loggers: List[BaseLogger] = []
     unique_token = datetime.now().strftime("%Y%m%d%H%M%S")
 

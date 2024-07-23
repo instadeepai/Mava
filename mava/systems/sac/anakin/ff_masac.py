@@ -27,11 +27,11 @@ from colorama import Fore, Style
 from flashbax.buffers.flat_buffer import TrajectoryBuffer
 from flax.core.scope import FrozenVariableDict
 from jax import Array
-from jumanji.env import Environment, State
+from jumanji.env import State
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
-from mava.evaluator import make_anakin_eval_fns
+from mava.evaluator import get_eval_fn, make_ff_eval_act_fn
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardQNet as QNetwork
 from mava.systems.sac.types import (
@@ -46,7 +46,7 @@ from mava.systems.sac.types import (
     SacParams,
     Transition,
 )
-from mava.types import ObservationGlobalState
+from mava.types import MarlEnv, ObservationGlobalState
 from mava.utils import make_env as environments
 from mava.utils.centralised_training import get_joint_action, get_updated_joint_actions
 from mava.utils.checkpointing import Checkpointer
@@ -59,7 +59,7 @@ from mava.wrappers import episode_metrics
 def init(
     cfg: DictConfig,
 ) -> Tuple[
-    Tuple[Environment, Environment],
+    Tuple[MarlEnv, MarlEnv],
     Networks,
     Optimisers,
     TrajectoryBuffer,
@@ -71,9 +71,11 @@ def init(
     """Initialize system by creating the envs, networks etc.
 
     Args:
+    ----
         cfg: System configuration.
 
     Returns:
+    -------
         Tuple containing:
             Tuple[Environment, Environment]: The environment and evaluation environment.
             Networks: Tuple of actor and critic networks.
@@ -83,6 +85,7 @@ def init(
             Array: The target entropy.
             MavaLogger: The logger.
             PRNGKey: The random key.
+
     """
     logger = MavaLogger(cfg)
 
@@ -208,7 +211,7 @@ def init(
 
 def make_update_fns(
     cfg: DictConfig,
-    env: Environment,
+    env: MarlEnv,
     networks: Networks,
     optims: Optimisers,
     rb: TrajectoryBuffer,
@@ -220,6 +223,7 @@ def make_update_fns(
     """Create the update functions for the learner.
 
     Args:
+    ----
         cfg: System configuration.
         env: The environment.
         networks: Tuple of actor and critic networks.
@@ -228,9 +232,11 @@ def make_update_fns(
         target_entropy: The target entropy.
 
     Returns:
+    -------
         Tuple of (explore_fn, update_fn).
         Explore function is used for initial exploration with random actions.
         Update function is the main learning function, it both acts and learns.
+
     """
     actor_net, q_net = networks
     actor_opt, q_opt, alpha_opt = optims
@@ -458,7 +464,6 @@ def make_update_fns(
     # Act loop -> sample -> update loop
     def update_step(carry: LearnerState, _: Any) -> Tuple[LearnerState, Tuple[Metrics, Metrics]]:
         """Act, sample, learn. The body of the main SAC loop."""
-
         obs, env_state, buffer_state, params, opt_states, t, key = carry
         key, act_key, learn_key = jax.random.split(key, 3)
         # Act
@@ -520,7 +525,8 @@ def run_experiment(cfg: DictConfig) -> float:
 
     actor, _ = networks
     key, eval_key = jax.random.split(key)
-    evaluator, absolute_metric_evaluator = make_anakin_eval_fns(eval_env, actor.apply, cfg)
+    eval_act_fn = make_ff_eval_act_fn(actor.apply, cfg)
+    evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, absolute_metric=False)
 
     if cfg.logger.checkpointing.save_model:
         checkpointer = Checkpointer(
@@ -578,15 +584,9 @@ def run_experiment(cfg: DictConfig) -> float:
         # Evaluate:
         key, eval_key = jax.random.split(key)
         eval_keys = jax.random.split(eval_key, cfg.arch.n_devices)
-        eval_output = evaluator(unreplicate_batch_dim(learner_state.params.actor), eval_keys)
-        jax.block_until_ready(eval_output)
-
-        # Log:
-        elapsed_time = time.time() - start_time
-        episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
-        steps_per_eval = int(jnp.sum(eval_output.episode_metrics["episode_length"]))
-        eval_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
-        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
+        eval_metrics = evaluator(unreplicate_batch_dim(learner_state.params.actor), eval_keys, {})
+        logger.log(eval_metrics, t, eval_idx, LogEvent.EVAL)
+        episode_return = jnp.mean(eval_metrics["episode_return"])
 
         # Save best actor params.
         if cfg.arch.absolute_metric and max_episode_return <= episode_return:
@@ -604,29 +604,23 @@ def run_experiment(cfg: DictConfig) -> float:
             )
 
     # Record the performance for the final evaluation run.
-    eval_performance = float(jnp.mean(eval_output.episode_metrics[cfg.env.eval_metric]))
+    eval_performance = float(jnp.mean(eval_metrics[cfg.env.eval_metric]))
 
     # Measure absolute metric.
     if cfg.arch.absolute_metric:
-        start_time = time.time()
-
         eval_keys = jax.random.split(key, cfg.arch.n_devices)
 
-        eval_output = absolute_metric_evaluator(best_params, eval_keys)
-        jax.block_until_ready(eval_output)
+        abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, absolute_metric=True)
+        eval_metrics = abs_metric_evaluator(best_params, eval_keys, {})
 
-        elapsed_time = time.time() - start_time
-
-        steps_per_eval = int(jnp.sum(eval_output.episode_metrics["episode_length"]))
-        eval_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
-        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.ABSOLUTE)
+        logger.log(eval_metrics, t, eval_idx, LogEvent.ABSOLUTE)
 
     logger.stop()
 
     return eval_performance
 
 
-@hydra.main(config_path="../../configs", config_name="default_ff_masac.yaml", version_base="1.2")
+@hydra.main(config_path="../../../configs", config_name="default_ff_masac.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.

@@ -17,11 +17,10 @@ from typing import Tuple, Union
 import chex
 import jax.numpy as jnp
 from jumanji import specs
-from jumanji.env import Environment
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
 
-from mava.types import Observation, ObservationGlobalState, State
+from mava.types import MarlEnv, Observation, ObservationGlobalState, State
 
 
 class AgentIDWrapper(Wrapper):
@@ -29,8 +28,15 @@ class AgentIDWrapper(Wrapper):
     It can be useful in multi-agent environments where agents require unique identification.
     """
 
-    def __init__(self, env: Environment):
+    # This init isn't really needed as jumanji.Wrapper will forward the attributes,
+    # but mypy doesn't realize this.
+    def __init__(self, env: MarlEnv):
         super().__init__(env)
+        self._env: MarlEnv
+
+        self.num_agents = self._env.num_agents
+        self.time_limit = self._env.time_limit
+        self.action_dim = self._env.action_dim
 
     def _add_agent_ids(
         self, timestep: TimeStep, num_agents: int

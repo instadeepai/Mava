@@ -1,0 +1,10 @@
+# The config of the 15x15x23a scenario
+name: MaConnector-v2
+task_name: con-15x15x23a
+
+task_config:
+  grid_size: 15
+  num_agents: 23
+
+env_kwargs:
+  time_limit: 225

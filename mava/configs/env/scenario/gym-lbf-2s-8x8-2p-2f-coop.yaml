@@ -9,7 +9,7 @@ task_config:
   max_num_food: 2 # number of food in the environment.
   max_player_level: 2 # maximum level of the agents (inclusive).
   force_coop: True # force cooperation between agents.
-  max_episode_steps: 50 # max number of steps per episode.
+  max_episode_steps: 100 # max number of steps per episode.
   min_player_level : 1 # minimum level of the agents (inclusive).
   min_food_level : null
   max_food_level : null

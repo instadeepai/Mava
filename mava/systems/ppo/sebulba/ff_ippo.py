@@ -63,7 +63,6 @@ def rollout(
     actor_device_id: int,
     seeds: List[int],
 ) -> None:
-
     # setup
     env = environments.make_gym_env(config, config.arch.num_envs)
     current_actor_device = jax.devices()[actor_device_id]
@@ -116,7 +115,6 @@ def rollout(
 
         # Loop over the rollout length
         for _ in range(0, config.system.rollout_length):
-
             # Cached for transition
             cached_next_obs = move_to_device(
                 jnp.stack(next_obs, axis=1)
@@ -412,7 +410,7 @@ def get_learner_fn(
                 lambda x: jnp.take(x, permutation, axis=0), batch
             )
             minibatches = jax.tree_util.tree_map(
-                lambda x: jnp.reshape(x, [config.system.num_minibatches, -1] + list(x.shape[1:])),
+                lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 shuffled_batch,
             )
             # UPDATE MINIBATCHES
@@ -559,7 +557,7 @@ def learner_setup(
     return learn, apply_fns, init_learner_state
 
 
-def run_experiment(_config: DictConfig) -> float:  # noqa: CCR001
+def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
     config = copy.deepcopy(_config)
 
