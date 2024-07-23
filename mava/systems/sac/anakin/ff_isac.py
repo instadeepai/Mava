@@ -46,9 +46,8 @@ from mava.systems.sac.types import (
     SacParams,
     Transition,
 )
-from mava.types import ObservationGlobalState
+from mava.types import Observation
 from mava.utils import make_env as environments
-from mava.utils.centralised_training import get_joint_action, get_updated_joint_actions
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
@@ -94,7 +93,7 @@ def init(
         x = jax.tree_map(lambda y: jnp.broadcast_to(y, (cfg.system.update_batch_size, *y.shape)), x)
         return jax.device_put_replicated(x, devices)
 
-    env, eval_env = environments.make(cfg, add_global_state=True)
+    env, eval_env = environments.make(cfg)
 
     n_agents = env.num_agents
     action_dim = env.action_dim
@@ -102,9 +101,7 @@ def init(
     key, actor_key, q1_key, q2_key, q1_target_key, q2_target_key = jax.random.split(key, 6)
 
     acts = env.action_spec().generate_value()  # all agents actions
-    act_single = acts[0]  # single agents action
-    concat_acts = jnp.concatenate([act_single for _ in range(n_agents)], axis=0)
-    concat_acts_batched = concat_acts[jnp.newaxis, ...]  # batch + concat of all agents actions
+    act_single_batched = acts[0][jnp.newaxis, ...]  # batch single agent action
     obs = env.observation_spec().generate_value()
     obs_single_batched = jax.tree_map(lambda x: x[0][jnp.newaxis, ...], obs)
 
@@ -118,11 +115,11 @@ def init(
 
     # Making Q networks
     critic_torso = hydra.utils.instantiate(cfg.network.critic_network.pre_torso)
-    q_network = QNetwork(critic_torso, centralised_critic=True)
-    q1_params = q_network.init(q1_key, obs_single_batched, concat_acts_batched)
-    q2_params = q_network.init(q2_key, obs_single_batched, concat_acts_batched)
-    q1_target_params = q_network.init(q1_target_key, obs_single_batched, concat_acts_batched)
-    q2_target_params = q_network.init(q2_target_key, obs_single_batched, concat_acts_batched)
+    q_network = QNetwork(critic_torso)
+    q1_params = q_network.init(q1_key, obs_single_batched, act_single_batched)
+    q2_params = q_network.init(q2_key, obs_single_batched, act_single_batched)
+    q1_target_params = q_network.init(q1_target_key, obs_single_batched, act_single_batched)
+    q2_target_params = q_network.init(q2_target_key, obs_single_batched, act_single_batched)
 
     # Automatic entropy tuning
     target_entropy = -cfg.system.target_entropy_scale * action_dim
@@ -238,7 +235,7 @@ def make_update_fns(
     full_action_shape = (cfg.arch.num_envs, *env.action_spec().shape)
 
     def step(
-        action: Array, obs: ObservationGlobalState, env_state: State, buffer_state: BufferState
+        action: Array, obs: Observation, env_state: State, buffer_state: BufferState
     ) -> Tuple[Array, State, BufferState, Dict]:
         """Given an action, step the environment and add to the buffer."""
         env_state, timestep = jax.vmap(env.step)(env_state, action)
@@ -259,10 +256,8 @@ def make_update_fns(
         q_params: QVals, obs: Array, action: Array, target: Array
     ) -> Tuple[Array, Metrics]:
         q1_params, q2_params = q_params
-        joint_action = get_joint_action(action)
-
-        q1_a_values = q_net.apply(q1_params, obs, joint_action)
-        q2_a_values = q_net.apply(q2_params, obs, joint_action)
+        q1_a_values = q_net.apply(q1_params, obs, action)
+        q2_a_values = q_net.apply(q2_params, obs, action)
 
         q1_loss = jnp.mean(jnp.square(q1_a_values - target))
         q2_loss = jnp.mean(jnp.square(q2_a_values - target))
@@ -280,23 +275,17 @@ def make_update_fns(
 
     def actor_loss_fn(
         actor_params: FrozenVariableDict,
-        obs: ObservationGlobalState,
-        actions: Array,
+        obs: Observation,
         alpha: Array,
         q_params: QVals,
         key: chex.PRNGKey,
     ) -> Array:
         pi = actor_net.apply(actor_params, obs)
-        new_actions = pi.sample(seed=key)
-        log_prob = pi.log_prob(new_actions)
+        action = pi.sample(seed=key)
+        log_prob = pi.log_prob(action)
 
-        # Updated joint actions are done so that each agent's central critic sees what all
-        # other agents did in the past, but it sees how its agent's policy is currently acting.
-        # This is done by placing new_action[i] in joint_actions[i].
-        joint_actions = get_updated_joint_actions(actions, new_actions)
-
-        qval_1 = q_net.apply(q_params.q1, obs, joint_actions)
-        qval_2 = q_net.apply(q_params.q2, obs, joint_actions)
+        qval_1 = q_net.apply(q_params.q1, obs, action)
+        qval_2 = q_net.apply(q_params.q2, obs, action)
         min_q_val = jnp.minimum(qval_1, qval_2)
 
         return ((alpha * log_prob) - min_q_val).mean()
@@ -314,9 +303,8 @@ def make_update_fns(
         next_action = pi.sample(seed=key)
         next_log_prob = pi.log_prob(next_action)
 
-        joint_next_actions = get_joint_action(next_action)
-        next_q1_val = q_net.apply(params.q.targets.q1, data.next_obs, joint_next_actions)
-        next_q2_val = q_net.apply(params.q.targets.q2, data.next_obs, joint_next_actions)
+        next_q1_val = q_net.apply(params.q.targets.q1, data.next_obs, next_action)
+        next_q2_val = q_net.apply(params.q.targets.q2, data.next_obs, next_action)
         next_q_val = jnp.minimum(next_q1_val, next_q2_val)
         next_q_val = next_q_val - jnp.exp(params.log_alpha) * next_log_prob
 
@@ -355,12 +343,7 @@ def make_update_fns(
             # Update actor.
             actor_grad_fn = jax.value_and_grad(actor_loss_fn)
             actor_loss, act_grads = actor_grad_fn(
-                params.actor,
-                data.obs,
-                data.action,
-                jnp.exp(params.log_alpha),
-                params.q.online,
-                actor_key,
+                params.actor, data.obs, jnp.exp(params.log_alpha), params.q.online, actor_key
             )
             # Mean over the device and batch dimensions.
             actor_loss, act_grads = lax.pmean((actor_loss, act_grads), axis_name="device")
@@ -439,8 +422,7 @@ def make_update_fns(
     def explore(carry: LearnerState, _: Any) -> Tuple[LearnerState, Metrics]:
         """Take random actions to fill up buffer at the start of training."""
         obs, env_state, buffer_state, _, _, t, key = carry
-        # mypy thinks it's Observation | ObservationGlobalState
-        assert isinstance(obs, ObservationGlobalState)
+        assert isinstance(obs, Observation)  # mypy thinks it's Observation | ObservationGlobalState
 
         key, explore_key = jax.random.split(key)
         action = jax.random.uniform(explore_key, full_action_shape)
@@ -535,7 +517,6 @@ def run_experiment(cfg: DictConfig) -> float:
     # Fill up buffer/explore.
     learner_state, metrics = explore(learner_state)
 
-    # Log explore metrics.
     t = int(jnp.sum(learner_state.t))
     sps = t / (time.time() - start_time)
     logger.log({"step": t}, t, 0, LogEvent.MISC)
@@ -626,7 +607,7 @@ def run_experiment(cfg: DictConfig) -> float:
     return eval_performance
 
 
-@hydra.main(config_path="../../configs", config_name="default_ff_masac.yaml", version_base="1.2")
+@hydra.main(config_path="../../../configs", config_name="default_ff_isac.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
@@ -635,7 +616,7 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     # Run experiment.
     final_return = run_experiment(cfg)
 
-    print(f"{Fore.CYAN}{Style.BRIGHT}MASAC experiment completed{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}ISAC experiment completed{Style.RESET_ALL}")
 
     return float(final_return)
 

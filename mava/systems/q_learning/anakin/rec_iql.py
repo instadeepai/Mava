@@ -645,7 +645,7 @@ def run_experiment(cfg: DictConfig) -> float:
     return float(eval_performance)
 
 
-@hydra.main(config_path="../../configs", config_name="default_rec_iql.yaml", version_base="1.2")
+@hydra.main(config_path="../../../configs", config_name="default_rec_iql.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
