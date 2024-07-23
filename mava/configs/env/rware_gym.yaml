@@ -1,0 +1,19 @@
+# ---Environment Configs---
+defaults:
+  - _self_
+  - scenario: gym-rware-tiny-2ag # [gym-rware-tiny-2ag, gym-rware-tiny-4ag, gym-rware-tiny-4ag-easy, gym-rware-small-4ag]
+
+env_name: RobotWarehouse  # Used for logging purposes.
+
+# Defines the metric that will be used to evaluate the performance of the agent.
+# This metric is returned at the end of an experiment and can be used for hyperparameter tuning.
+eval_metric: episode_return
+
+# Whether the add agents IDs to the observations returned by the environment.
+add_agent_id : False
+
+# Whether or not to log the winrate of this environment.
+log_win_rate: False
+
+# Weather or not to sum the returned rewards over all of the agents.
+use_shared_rewards: True

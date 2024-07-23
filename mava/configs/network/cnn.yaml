@@ -9,7 +9,7 @@ actor_network:
     activation: relu
 
 action_head:
-  _target_: mava.networks.DiscreteActionHead # [DiscreteActionHead, ContinuousActionHead]
+  _target_: mava.networks.DiscreteActionHead
 
 critic_network:
   pre_torso:

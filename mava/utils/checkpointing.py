@@ -49,7 +49,6 @@ class Checkpointer:
         """Initialise the checkpointer tool
 
         Args:
-        ----
             model_name (str): Name of the model to be saved.
             metadata (Optional[Dict], optional):
                 For storing model metadata. Defaults to None.
@@ -65,8 +64,8 @@ class Checkpointer:
             keep_period (Optional[int], optional):
                 If set, will not delete any checkpoint where
                 checkpoint_step % keep_period == 0. Defaults to None.
-
         """
+
         # When we load an existing checkpoint, the sharding info is read from the checkpoint file,
         # rather than from 'RestoreArgs'. This is desired behaviour, so we suppress the warning.
         warnings.filterwarnings(
@@ -122,7 +121,6 @@ class Checkpointer:
         """Save the learner state.
 
         Args:
-        ----
             timestep (int):
                 timestep at which the state is being saved.
             unreplicated_learner_state (MavaState)
@@ -132,9 +130,7 @@ class Checkpointer:
                 Defaults to 0.0.
 
         Returns:
-        -------
             bool: whether the saving was successful.
-
         """
         model_save_success: bool = self._manager.save(
             step=timestep,
@@ -156,7 +152,6 @@ class Checkpointer:
         """Restore the params and the hidden state (in case of RNNs)
 
         Args:
-        ----
             input_params (Any): A pytree of FrozenDict params of the learner.
             timestep (Optional[int]):
                 Specific timestep for restoration (of course, only if that timestep exists).
@@ -165,9 +160,7 @@ class Checkpointer:
             THiddenState (Type): The type of the hidden states to be restored.
 
         Returns:
-        -------
             Tuple[Params,Union[HiddenState, None]]: the restored params and hidden states.
-
         """
         # We want to ensure `major` versions match, but allow `minor` versions to differ
         # i.e. v0.1 and 0.2 are compatible, but v1.0 and v2.0 are not
@@ -209,9 +202,7 @@ class Checkpointer:
     def get_cfg(self) -> DictConfig:
         """Return the metadata of the checkpoint.
 
-        Returns
-        -------
+        Returns:
             DictConfig: metadata of the checkpoint.
-
         """
         return DictConfig(self._manager.metadata())

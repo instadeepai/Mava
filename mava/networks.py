@@ -80,9 +80,8 @@ class CNNTorso(nn.Module):
                 x = nn.LayerNorm(use_scale=False)(x)
             x = self.activation_fn(x)
 
-        # Collapse (merge) the last three dimensions (width, height, channels)
-        # Leave the batch, agent and time (if recurrent) dims unchanged.
-        return jax.lax.collapse(x, -3)
+        # Reshape should keep the batch and agent dimensions unchanged.
+        return x.reshape((x.shape[0], x.shape[1], -1))
 
 
 class DiscreteActionHead(nn.Module):
@@ -97,20 +96,18 @@ class DiscreteActionHead(nn.Module):
         """Action selection for distrete action space environments.
 
         Args:
-        ----
             obs_embedding: Observation embedding from network torso.
             observation: Observation object containing `agents_view`, `action_mask` and
                 `step_count`.
 
         Returns:
-        -------
             A transformed tfd.categorical distribution on the action space for action sampling.
 
         NOTE: We pass both the observation embedding and the observation object to the action head
         since the observation object contains the action mask and other potentially useful
         information.
-
         """
+
         actor_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(obs_embedding)
 
         masked_logits = jnp.where(
@@ -147,14 +144,11 @@ class ContinuousActionHead(nn.Module):
         """Action selection for continuous action space environments.
 
         Args:
-        ----
             obs_embedding (chex.Array): Observation embedding.
             observation (Observation): Observation object.
 
         Returns:
-        -------
             tfd.Independent: Independent transformed distribution.
-
         """
         loc = self.mean(obs_embedding)
 
@@ -178,6 +172,7 @@ class FeedForwardActor(nn.Module):
     @nn.compact
     def __call__(self, observation: Observation) -> tfd.Distribution:
         """Forward pass."""
+
         obs_embedding = self.torso(observation.agents_view)
 
         return self.action_head(obs_embedding, observation)
@@ -355,6 +350,7 @@ class RecQNetwork(nn.Module):
         observations_resets: RNNObservation,
     ) -> chex.Array:
         """Forward pass to obtain q values."""
+
         obs, resets = observations_resets
 
         embedding = self.pre_torso(obs.agents_view)
@@ -377,6 +373,7 @@ class RecQNetwork(nn.Module):
         """Forward pass with additional construction of epsilon-greedy distribution.
         When epsilon is not specified, we assume a greedy approach.
         """
+
         obs, _ = observations_resets
         hidden_state, q_values = self.get_q_values(hidden_state, observations_resets)
         eps_greedy_dist = MaskedEpsGreedyDistribution(q_values, eps, obs.action_mask)
