@@ -246,40 +246,6 @@ def make_gym_env(
     """
     env_maker, wrapper = _gym_registry[config.env.scenario.name]
 
-    def create_gym_env(config: DictConfig, add_global_state: bool = False) -> Environment:
-        env = env_maker(**config.env.scenario.task_config)
-        wrapped_env = wrapper(env, config.env.use_shared_rewards, add_global_state)
-        if config.env.add_agent_id:
-            wrapped_env = GymAgentIDWrapper(wrapped_env)
-        wrapped_env = GymRecordEpisodeMetrics(wrapped_env)
-        return wrapped_env
-
-    envs = gymnasium.vector.AsyncVectorEnv(
-        [lambda: create_gym_env(config, add_global_state) for _ in range(num_env)],
-        worker=async_multiagent_worker,
-    )
-
-    return envs
-
-
-def make_gym_env(
-    config: DictConfig,
-    num_env: int,
-    add_global_state: bool = False,
-) -> gymnasium.vector.AsyncVectorEnv:
-    """
-     Create a gymnasium environment.
-
-    Args:
-        config (Dict): The configuration of the environment.
-        num_env (int) : The number of parallel envs to create.
-        add_global_state (bool): Whether to add the global state to the observation. Default False.
-
-    Returns:
-        Async environments.
-    """
-    env_maker, wrapper = _gym_registry[config.env.scenario.name]
-
     def create_gym_env(config: DictConfig, add_global_state: bool = False) -> gymnasium.Env:
         env = env_maker(**config.env.scenario.task_config)
         wrapped_env = wrapper(env, config.env.use_shared_rewards, add_global_state)
