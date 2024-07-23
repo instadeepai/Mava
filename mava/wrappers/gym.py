@@ -193,7 +193,7 @@ class GymAgentIDWrapper(gymnasium.Wrapper):
 
 # Copied form Gymnasium/blob/main/gymnasium/vector/async_vector_env.py
 # Modified to work with multiple agents
-def async_multiagent_worker(  # noqa CCR001
+def async_multiagent_worker(  # CCR001
     index: int,
     env_fn: Callable,
     pipe: Connection,
