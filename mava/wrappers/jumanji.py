@@ -143,6 +143,17 @@ class RwareWrapper(JumanjiMarlWrapper):
         discount = jnp.repeat(timestep.discount, self.num_agents)
         return timestep.replace(observation=observation, reward=reward, discount=discount)
 
+    def observation_spec(
+        self,
+    ) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
+        # need to cast the agents view and global state to floats as we do in modify timestep
+        inner_spec = super().observation_spec()
+        spec = inner_spec.replace(agents_view=inner_spec.agents_view.replace(dtype=float))
+        if self.add_global_state:
+            spec = inner_spec.replace(global_state=inner_spec.global_state.replace(dtype=float))
+
+        return spec
+
 
 class LbfWrapper(JumanjiMarlWrapper):
     """Multi-agent wrapper for the Level-Based Foraging environment.
@@ -191,6 +202,17 @@ class LbfWrapper(JumanjiMarlWrapper):
 
         # Aggregate the list of individual rewards and use a single team_reward.
         return self.aggregate_rewards(timestep, modified_observation)
+
+    def observation_spec(
+        self,
+    ) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
+        # need to cast the agents view and global state to floats as we do in modify timestep
+        inner_spec = super().observation_spec()
+        spec = inner_spec.replace(agents_view=inner_spec.agents_view.replace(dtype=float))
+        if self.add_global_state:
+            spec = inner_spec.replace(global_state=inner_spec.global_state.replace(dtype=float))
+
+        return spec
 
 
 class ConnectorWrapper(JumanjiMarlWrapper):

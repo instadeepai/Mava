@@ -22,7 +22,7 @@ pip install -e .
 
 4. Install jax on your accelerator. The example below is for an NVIDIA GPU, please the [official install guide](https://github.com/google/jax#installation) for other accelerators
 ```bash
-pip install "jax[cuda12]==0.4.26"
+pip install "jax[cuda12]==0.4.30"
 ```
 
 5. Run a system!

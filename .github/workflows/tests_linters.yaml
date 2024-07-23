@@ -6,7 +6,7 @@ jobs:
   tests-and-linters:
     name: "Python ${{ matrix.python-version }} on ${{ matrix.os }}"
     runs-on: "${{ matrix.os }}"
-    timeout-minutes: 20
+    timeout-minutes: 10
 
     strategy:
       matrix:

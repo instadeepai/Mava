@@ -6,8 +6,8 @@ flax
 gigastep @ git+https://github.com/mlech26l/gigastep
 hydra-core==1.3.2
 id-marl-eval @ git+https://github.com/instadeepai/marl-eval
-jax==0.4.26   # Fixed due to Mabrax dependency
-jaxlib==0.4.26
+jax==0.4.30
+jaxlib==0.4.30
 jaxmarl
 jumanji @ git+https://github.com/sash-a/jumanji  # Includes a few extra MARL envs
 matrax @ git+https://github.com/instadeepai/matrax
