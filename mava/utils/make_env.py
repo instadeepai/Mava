@@ -14,10 +14,6 @@
 
 from typing import Dict, Tuple, Type
 
-import gymnasium
-import gymnasium.vector
-import gymnasium.wrappers
-import gymnasium.wrappers.compatibility
 import jaxmarl
 import jumanji
 import matrax
@@ -35,9 +31,7 @@ from jumanji.environments.routing.lbf.generator import (
 from jumanji.environments.routing.robot_warehouse.generator import (
     RandomGenerator as RwareRandomGenerator,
 )
-from lbforaging.foraging import ForagingEnv as gym_ForagingEnv
 from omegaconf import DictConfig
-from rware.warehouse import Warehouse as gym_Warehouse
 
 from mava.types import MarlEnv
 from mava.wrappers import (
@@ -46,17 +40,12 @@ from mava.wrappers import (
     CleanerWrapper,
     ConnectorWrapper,
     GigastepWrapper,
-    GymAgentIDWrapper,
-    GymLBFWrapper,
-    GymRecordEpisodeMetrics,
-    GymWrapper,
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
     RecordEpisodeMetrics,
     RwareWrapper,
     SmaxWrapper,
-    async_multiagent_worker,
 )
 from mava.wrappers.jaxmarl import JaxMarlWrapper
 
@@ -75,11 +64,6 @@ _jumanji_registry = {
 _matrax_registry = {"Matrax": MatraxWrapper}
 _jaxmarl_registry: Dict[str, Type[JaxMarlWrapper]] = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 _gigastep_registry = {"Gigastep": GigastepWrapper}
-
-_gym_registry = {
-    "RobotWarehouse": (gym_Warehouse, GymWrapper),
-    "LevelBasedForaging": (gym_ForagingEnv, GymLBFWrapper),
-}
 
 
 def add_extra_wrappers(
@@ -226,40 +210,6 @@ def make_gigastep_env(
 
     train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
     return train_env, eval_env
-
-
-def make_gym_env(
-    config: DictConfig,
-    num_env: int,
-    add_global_state: bool = False,
-) -> gymnasium.vector.AsyncVectorEnv:
-    """
-     Create a gymnasium environment.
-
-    Args:
-        config (Dict): The configuration of the environment.
-        num_env (int) : The number of parallel envs to create.
-        add_global_state (bool): Whether to add the global state to the observation. Default False.
-
-    Returns:
-        Async environments.
-    """
-    env_maker, wrapper = _gym_registry[config.env.scenario.name]
-
-    def create_gym_env(config: DictConfig, add_global_state: bool = False) -> gymnasium.Env:
-        env = env_maker(**config.env.scenario.task_config)
-        wrapped_env = wrapper(env, config.env.use_shared_rewards, add_global_state)
-        if config.env.add_agent_id:
-            wrapped_env = GymAgentIDWrapper(wrapped_env)
-        wrapped_env = GymRecordEpisodeMetrics(wrapped_env)
-        return wrapped_env
-
-    envs = gymnasium.vector.AsyncVectorEnv(
-        [lambda: create_gym_env(config, add_global_state) for _ in range(num_env)],
-        worker=async_multiagent_worker,
-    )
-
-    return envs
 
 
 def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:

@@ -135,13 +135,24 @@ class RwareWrapper(JumanjiMarlWrapper):
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for the Robotic Warehouse environment."""
         observation = Observation(
-            agents_view=timestep.observation.agents_view,
+            agents_view=timestep.observation.agents_view.astype(float),
             action_mask=timestep.observation.action_mask,
             step_count=jnp.repeat(timestep.observation.step_count, self.num_agents),
         )
         reward = jnp.repeat(timestep.reward, self.num_agents)
         discount = jnp.repeat(timestep.discount, self.num_agents)
         return timestep.replace(observation=observation, reward=reward, discount=discount)
+
+    def observation_spec(
+        self,
+    ) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
+        # need to cast the agents view and global state to floats as we do in modify timestep
+        inner_spec = super().observation_spec()
+        spec = inner_spec.replace(agents_view=inner_spec.agents_view.replace(dtype=float))
+        if self.add_global_state:
+            spec = inner_spec.replace(global_state=inner_spec.global_state.replace(dtype=float))
+
+        return spec
 
 
 class LbfWrapper(JumanjiMarlWrapper):
@@ -181,7 +192,7 @@ class LbfWrapper(JumanjiMarlWrapper):
         """
         # Create a new observation with adjusted step count
         modified_observation = Observation(
-            agents_view=timestep.observation.agents_view,
+            agents_view=timestep.observation.agents_view.astype(float),
             action_mask=timestep.observation.action_mask,
             step_count=jnp.repeat(timestep.observation.step_count, self.num_agents),
         )
@@ -191,6 +202,17 @@ class LbfWrapper(JumanjiMarlWrapper):
 
         # Aggregate the list of individual rewards and use a single team_reward.
         return self.aggregate_rewards(timestep, modified_observation)
+
+    def observation_spec(
+        self,
+    ) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
+        # need to cast the agents view and global state to floats as we do in modify timestep
+        inner_spec = super().observation_spec()
+        spec = inner_spec.replace(agents_view=inner_spec.agents_view.replace(dtype=float))
+        if self.add_global_state:
+            spec = inner_spec.replace(global_state=inner_spec.global_state.replace(dtype=float))
+
+        return spec
 
 
 class ConnectorWrapper(JumanjiMarlWrapper):
