@@ -25,16 +25,15 @@ import optax
 from colorama import Fore, Style
 from flashbax.vault import Vault
 from flax.core.frozen_dict import FrozenDict
-from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava.evaluator import make_eval_fns
+from mava.evaluator import get_eval_fn, make_ff_eval_act_fn
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
-from mava.types import ActorApply, CriticApply, ExperimentOutput, MavaState
+from mava.types import ActorApply, CriticApply, ExperimentOutput, MarlEnv, MavaState
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import (
     merge_leading_dims,
@@ -55,13 +54,12 @@ VAULT_SAVE_INTERVAL = 5
 
 
 def get_learner_fn(
-    env: Environment,
+    env: MarlEnv,
     apply_fns: Tuple[ActorApply, CriticApply],
     update_fns: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
     config: DictConfig,
 ) -> StoreExpLearnerFn[LearnerState]:
     """Get the learner function."""
-
     # Get apply and update functions for actor and critic networks.
     actor_apply_fn, critic_apply_fn = apply_fns
     actor_update_fn, critic_update_fn = update_fns
@@ -75,6 +73,7 @@ def get_learner_fn(
         losses.
 
         Args:
+        ----
             learner_state (NamedTuple):
                 - params (Params): The current model parameters.
                 - opt_states (OptStates): The current optimizer states.
@@ -82,6 +81,7 @@ def get_learner_fn(
                 - env_state (State): The environment state.
                 - last_timestep (TimeStep): The last timestep in the current trajectory.
             _ (Any): The current metrics info.
+
         """
 
         def _env_step(learner_state: LearnerState, _: Any) -> Tuple[LearnerState, PPOTransition]:
@@ -155,7 +155,6 @@ def get_learner_fn(
 
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
-
                 # UNPACK TRAIN STATE AND BATCH INFO
                 params, opt_states = train_state
                 traj_batch, advantages, targets = batch_info
@@ -285,7 +284,7 @@ def get_learner_fn(
                 lambda x: jnp.take(x, permutation, axis=0), batch
             )
             minibatches = jax.tree_util.tree_map(
-                lambda x: jnp.reshape(x, [config.system.num_minibatches, -1] + list(x.shape[1:])),
+                lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 shuffled_batch,
             )
 
@@ -319,14 +318,15 @@ def get_learner_fn(
         updates. The `_update_step` function is vectorized over a batch of inputs.
 
         Args:
+        ----
             learner_state (NamedTuple):
                 - params (Params): The initial model parameters.
                 - opt_states (OptStates): The initial optimizer state.
                 - key (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
-        """
 
+        """
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
 
         learner_state, (episode_info, loss_info, traj_batch) = jax.lax.scan(
@@ -345,7 +345,7 @@ def get_learner_fn(
 
 
 def learner_setup(
-    env: Environment, keys: chex.Array, config: DictConfig
+    env: MarlEnv, keys: chex.Array, config: DictConfig
 ) -> Tuple[StoreExpLearnerFn[LearnerState], Actor, LearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
@@ -412,7 +412,7 @@ def learner_setup(
 
     # Broadcast params and optimiser state to cores and batch.
     broadcast = lambda x: jnp.broadcast_to(
-        x, (n_devices, config.system.update_batch_size) + x.shape
+        x, (n_devices, config.system.update_batch_size, *x.shape)
     )
 
     actor_params = jax.tree_map(broadcast, actor_params)
@@ -449,8 +449,7 @@ def learner_setup(
     return learn, actor_network, init_learner_state
 
 
-# TODO: fix cognitive complexity
-def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
+def run_experiment(_config: DictConfig) -> None:
     """Runs experiment."""
     # Logger setup
     config = copy.deepcopy(_config)
@@ -469,7 +468,8 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
 
     # Setup evaluator.
     eval_keys = jax.random.split(key_e, n_devices)
-    evaluator, absolute_metric_evaluator = make_eval_fns(eval_env, actor_network, config)
+    eval_act_fn = make_ff_eval_act_fn(actor_network, config)
+    evaluator = get_eval_fn(eval_env, eval_act_fn, config, config.arch.num_eval_episodes)
 
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
     steps_per_rollout = (
@@ -547,7 +547,6 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     @jax.jit
     def _reshape_experience(experience: Dict[str, chex.Array]) -> Dict[str, chex.Array]:
         """Reshape experience to match buffer."""
-
         # Swap the T and NE axes (D, NU, UB, T, NE, ...) -> (D, NU, UB, NE, T, ...)
         experience: Dict[str, chex.Array] = jax.tree_map(lambda x: x.swapaxes(3, 4), experience)
         # Merge 4 leading dimensions into 1. (D, NU, UB, NE, T ...) -> (D * NU * UB * NE, T, ...)
@@ -619,16 +618,16 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
         eval_keys = eval_keys.reshape(n_devices, -1)
 
         # Evaluate.
-        evaluator_output = evaluator(trained_params, eval_keys)
-        jax.block_until_ready(evaluator_output)
+        eval_metrics = evaluator(trained_params, eval_keys, {})
+        jax.block_until_ready(eval_metrics)
 
         # Log the results of the evaluation.
         elapsed_time = time.time() - start_time
-        episode_return = jnp.mean(evaluator_output.episode_metrics["episode_return"])
+        episode_return = jnp.mean(eval_metrics["episode_return"])
 
-        steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
-        evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
-        logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.EVAL)
+        steps_per_eval = int(jnp.sum(eval_metrics["episode_length"]))
+        eval_metrics["steps_per_second"] = steps_per_eval / elapsed_time
+        logger.log(eval_metrics, t, eval_step, LogEvent.EVAL)
 
         if save_checkpoint:
             # Save checkpoint of learner state
@@ -652,18 +651,21 @@ def run_experiment(_config: DictConfig) -> None:  # noqa: CCR001
     if config.arch.absolute_metric:
         start_time = time.time()
 
+        eval_episodes = config.arch.num_absolute_metric_eval_episodes
+        abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, config, eval_episodes)
+
         key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
 
-        evaluator_output = absolute_metric_evaluator(best_params, eval_keys)
-        jax.block_until_ready(evaluator_output)
+        eval_metrics = abs_metric_evaluator(best_params, eval_keys, {})
+        jax.block_until_ready(eval_metrics)
 
         elapsed_time = time.time() - start_time
-        steps_per_eval = int(jnp.sum(evaluator_output.episode_metrics["episode_length"]))
+        steps_per_eval = int(jnp.sum(eval_metrics["episode_length"]))
         t = int(steps_per_rollout * (eval_step + 1))
-        evaluator_output.episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
-        logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.ABSOLUTE)
+        eval_metrics["steps_per_second"] = steps_per_eval / elapsed_time
+        logger.log(eval_metrics, t, eval_step, LogEvent.ABSOLUTE)
 
     # Stop logger
     logger.stop()

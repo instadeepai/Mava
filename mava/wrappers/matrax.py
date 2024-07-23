@@ -20,6 +20,7 @@ from jumanji import specs
 from jumanji.env import Environment
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
+from matrax.env import MatrixGame
 
 from mava.types import Observation, ObservationGlobalState, State
 
@@ -29,9 +30,12 @@ class MatraxWrapper(Wrapper):
 
     def __init__(self, env: Environment, add_global_state: bool):
         super().__init__(env)
-        self._num_agents = self._env.num_agents
+        self._env: MatrixGame
+
+        self.num_agents = self._env.num_agents
         self.action_dim = self._env.num_actions
-        self.action_mask = jnp.ones((self._num_agents, self.num_actions), dtype=bool)
+        self.time_limit = self._env.time_limit
+        self.action_mask = jnp.ones((self.num_agents, self.num_actions), dtype=bool)
         self.add_global_state = add_global_state
 
     def modify_timestep(
@@ -41,11 +45,11 @@ class MatraxWrapper(Wrapper):
         obs_data = {
             "agents_view": timestep.observation.agent_obs,
             "action_mask": self.action_mask,
-            "step_count": jnp.repeat(timestep.observation.step_count, self._num_agents),
+            "step_count": jnp.repeat(timestep.observation.step_count, self.num_agents),
         }
         if self.add_global_state:
             global_state = jnp.concatenate(timestep.observation.agent_obs, axis=0)
-            global_state = jnp.tile(global_state, (self._num_agents, 1))
+            global_state = jnp.tile(global_state, (self.num_agents, 1))
             obs_data["global_state"] = global_state
             return timestep.replace(observation=ObservationGlobalState(**obs_data))
 
@@ -64,14 +68,14 @@ class MatraxWrapper(Wrapper):
     def observation_spec(self) -> specs.Spec[Union[Observation][ObservationGlobalState]]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
-            (self._num_agents,),
+            (self.num_agents,),
             int,
-            jnp.zeros(self._num_agents, dtype=int),
-            jnp.repeat(self.time_limit, self._num_agents),
+            jnp.zeros(self.num_agents, dtype=int),
+            jnp.repeat(self.time_limit, self.num_agents),
             "step_count",
         )
         action_mask = specs.Array(
-            (self._num_agents, self.num_actions),
+            (self.num_agents, self.num_actions),
             bool,
             "action_mask",
         )
