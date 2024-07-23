@@ -22,8 +22,7 @@ import tensorflow_probability.substrates.jax.distributions as tfd
 
 
 class TanhTransformedDistribution(tfd.TransformedDistribution):
-    """
-    A distribution transformed using the `tanh` function.
+    """A distribution transformed using the `tanh` function.
 
     This transformation was adapted to acme's implementation.
     For details, please see: http://tinyurl.com/2x5xea57
@@ -35,14 +34,15 @@ class TanhTransformedDistribution(tfd.TransformedDistribution):
         threshold: float = 0.999,
         validate_args: bool = False,
     ) -> None:
-        """
-        Initialises the TanhTransformedDistribution.
+        """Initialises the TanhTransformedDistribution.
 
         Args:
+        ----
           distribution: The base distribution to be transformed.
           bijector: The bijective transformation applied to the distribution.
           threshold: Clipping value for the action when computing the log_prob.
           validate_args: Whether to validate input with respect to distribution parameters.
+
         """
         super().__init__(
             distribution=distribution, bijector=tfb.Tanh(), validate_args=validate_args
@@ -64,7 +64,6 @@ class TanhTransformedDistribution(tfd.TransformedDistribution):
 
     def log_prob(self, event: chex.Array) -> chex.Array:
         """Computes the log probability of the event under the transformed distribution."""
-
         # Without this clip, there would be NaNs in the internal tf.where.
         event = jnp.clip(event, -self._threshold, self._threshold)
         # The inverse image of {threshold} is the interval [atanh(threshold), inf]
@@ -93,8 +92,7 @@ class TanhTransformedDistribution(tfd.TransformedDistribution):
 
 
 class MaskedEpsGreedyDistribution(tfd.Categorical):
-    """
-    Computes an epsilon-greedy distribution for each action choice. There are two
+    """Computes an epsilon-greedy distribution for each action choice. There are two
     components in the distribution:
 
     1. A uniform component, where every action that is NOT masked out gets an even weighting.
@@ -146,8 +144,7 @@ class MaskedEpsGreedyDistribution(tfd.Categorical):
 
 
 class IdentityTransformation(tfd.TransformedDistribution):
-    """
-    A distribution transformed using the `Identity()` bijector.
+    """A distribution transformed using the `Identity()` bijector.
 
     We transform this distribution with the `Identity()` bijector to enable us to call
     `pi.entropy(seed)` and keep the API identical to the TanhTransformedDistribution.

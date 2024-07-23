@@ -23,6 +23,8 @@ from jumanji.env import State
 from jumanji.types import TimeStep
 from jumanji.wrappers import Observation, Wrapper
 
+from mava.types import MarlEnv
+
 
 class AutoResetWrapper(Wrapper):
     """Automatically resets environments that are done. Once the terminal state is reached,
@@ -36,6 +38,16 @@ class AutoResetWrapper(Wrapper):
     """
 
     OBS_IN_EXTRAS_KEY = "real_next_obs"
+
+    # This init isn't really needed as jumanji.Wrapper will forward the attributes,
+    # but mypy doesn't realize this.
+    def __init__(self, env: MarlEnv):
+        super().__init__(env)
+        self._env: MarlEnv
+
+        self.num_agents = self._env.num_agents
+        self.time_limit = self._env.time_limit
+        self.action_dim = self._env.action_dim
 
     def _obs_in_extras(
         self, state: State, timestep: TimeStep[Observation]
