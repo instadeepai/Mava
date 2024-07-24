@@ -94,7 +94,7 @@ def get_learner_fn(
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             # LOG EPISODE METRICS
-            done = jax.tree_util.tree_map(
+            done = tree.map(
                 lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
                 timestep.last(),
             )
@@ -288,11 +288,9 @@ def get_learner_fn(
             batch_size = config.system.rollout_length * config.arch.num_envs
             permutation = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
-            batch = jax.tree_util.tree_map(lambda x: merge_leading_dims(x, 2), batch)
-            shuffled_batch = jax.tree_util.tree_map(
-                lambda x: jnp.take(x, permutation, axis=0), batch
-            )
-            minibatches = jax.tree_util.tree_map(
+            batch = tree.map(lambda x: merge_leading_dims(x, 2), batch)
+            shuffled_batch = tree.map(lambda x: jnp.take(x, permutation, axis=0), batch)
+            minibatches = tree.map(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 shuffled_batch,
             )
