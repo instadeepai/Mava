@@ -26,7 +26,7 @@ import optax
 from colorama import Fore, Style
 from flashbax.buffers.flat_buffer import TrajectoryBuffer
 from flax.core.scope import FrozenVariableDict
-from jax import Array
+from jax import Array, tree
 from jumanji.env import Environment, State
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
@@ -93,7 +93,7 @@ def init(
 
     def replicate(x: Any) -> Any:
         """First replicate the update batch dim then put on devices."""
-        x = jax.tree_map(lambda y: jnp.broadcast_to(y, (cfg.system.update_batch_size, *y.shape)), x)
+        x = tree.map(lambda y: jnp.broadcast_to(y, (cfg.system.update_batch_size, *y.shape)), x)
         return jax.device_put_replicated(x, devices)
 
     env, eval_env = environments.make(cfg)
@@ -106,7 +106,7 @@ def init(
     acts = env.action_spec().generate_value()  # all agents actions
     act_single_batched = acts[0][jnp.newaxis, ...]  # batch single agent action
     obs = env.observation_spec().generate_value()
-    obs_single_batched = jax.tree_map(lambda x: x[0][jnp.newaxis, ...], obs)
+    obs_single_batched = tree.map(lambda x: x[0][jnp.newaxis, ...], obs)
 
     # Making actor network
     actor_torso = hydra.utils.instantiate(cfg.network.actor_network.pre_torso)

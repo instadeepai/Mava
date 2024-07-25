@@ -21,6 +21,7 @@ import jax
 import jax.numpy as jnp
 from chex import Array, PRNGKey
 from flax.core.frozen_dict import FrozenDict
+from jax import tree
 from jumanji.types import TimeStep
 from omegaconf import DictConfig
 from typing_extensions import TypeAlias
@@ -144,7 +145,7 @@ def get_eval_fn(
             # find the first instance of done to get the metrics at that timestep, we don't
             # care about subsequent steps because we only the results from the first episode
             done_idx = jnp.argmax(timesteps.last(), axis=0)
-            metrics = jax.tree_map(lambda m: m[done_idx, jnp.arange(n_vmapped_envs)], metrics)
+            metrics = tree.map(lambda m: m[done_idx, jnp.arange(n_vmapped_envs)], metrics)
             del metrics["is_terminal_step"]  # uneeded for logging
 
             return key, metrics
@@ -153,7 +154,7 @@ def get_eval_fn(
         # So in evaluation we have num_envs parallel envs and loop enough times
         # so that we do at least `eval_episodes` number of episodes.
         _, metrics = jax.lax.scan(_episode, key, xs=None, length=episode_loops)
-        metrics: Metrics = jax.tree_map(lambda x: x.reshape(-1), metrics)  # flatten metrics
+        metrics: Metrics = tree.map(lambda x: x.reshape(-1), metrics)  # flatten metrics
         return metrics
 
     def timed_eval_fn(params: FrozenDict, key: PRNGKey, init_act_state: ActorState) -> Metrics:
@@ -199,7 +200,7 @@ def make_rec_eval_act_fn(actor_apply_fn: RecActorApply, config: DictConfig) -> E
         n_agents = timestep.observation.agents_view.shape[1]
         last_done = timestep.last()[:, jnp.newaxis].repeat(n_agents, axis=-1)
         ac_in = (timestep.observation, last_done)
-        ac_in = jax.tree_map(lambda x: x[jnp.newaxis], ac_in)  # add batch dim to obs
+        ac_in = tree.map(lambda x: x[jnp.newaxis], ac_in)  # add batch dim to obs
 
         hidden_state, pi = actor_apply_fn(params, hidden_state, ac_in)
         action = pi.mode() if config.arch.evaluation_greedy else pi.sample(seed=key)

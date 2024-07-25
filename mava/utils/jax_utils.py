@@ -20,6 +20,7 @@ import chex
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax import tree
 
 
 def ndim_at_least(x: chex.Array, num_dims: chex.Numeric) -> chex.Array:
@@ -55,7 +56,7 @@ def unreplicate_n_dims(x: Any, unreplicate_depth: int = 2) -> Any:
     duplication for running multiple updates across devices and in parallel with `vmap`.
     This is typically one axis for device replication, and one for the `update batch size`.
     """
-    return jax.tree_map(lambda x: x[(0,) * unreplicate_depth], x)  # type: ignore
+    return tree.map(lambda x: x[(0,) * unreplicate_depth], x)  # type: ignore
 
 
 def unreplicate_batch_dim(x: Any) -> Any:
@@ -65,10 +66,10 @@ def unreplicate_batch_dim(x: Any) -> Any:
     In mava's case it is always the second dimension, after the device dimension.
     We simply take element 0 as the params are identical across this dimension.
     """
-    return jax.tree_map(lambda x: x[:, 0, ...], x)  # type: ignore
+    return tree.map(lambda x: x[:, 0, ...], x)  # type: ignore
 
 
 def switch_leading_axes(arr: chex.Array) -> chex.Array:
     """Switches the first two axes, generally used for BT -> TB."""
-    arr = jax.tree_map(lambda x: jax.numpy.swapaxes(x, 0, 1), arr)
+    arr = tree.map(lambda x: jax.numpy.swapaxes(x, 0, 1), arr)
     return arr
