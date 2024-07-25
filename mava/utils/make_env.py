@@ -49,6 +49,7 @@ from mava.wrappers import (
     GymAgentIDWrapper,
     GymLBFWrapper,
     GymRecordEpisodeMetrics,
+    GymToJumanji,
     GymWrapper,
     LbfWrapper,
     MabraxWrapper,
@@ -232,7 +233,7 @@ def make_gym_env(
     config: DictConfig,
     num_env: int,
     add_global_state: bool = False,
-) -> gymnasium.vector.AsyncVectorEnv:
+) -> GymToJumanji:
     """
      Create a gymnasium environment.
 
@@ -258,6 +259,8 @@ def make_gym_env(
         [lambda: create_gym_env(config, add_global_state) for _ in range(num_env)],
         worker=async_multiagent_worker,
     )
+
+    envs = GymToJumanji(envs)
 
     return envs
 

@@ -15,9 +15,8 @@
 import copy
 import queue
 import threading
-import time
-from collections import deque
-from typing import Any, Dict, List, Tuple
+from queue import Queue
+from typing import Any, Dict, List, Sequence, Tuple
 
 import chex
 import flax
@@ -33,7 +32,8 @@ from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
 
-from mava.evaluator import make_sebulba_eval_fns as make_eval_fns
+from mava.evaluator import get_sebulba_eval_fn as get_eval_fn
+from mava.evaluator import make_ff_eval_act_fn
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
@@ -42,12 +42,14 @@ from mava.types import (
     CriticApply,
     ExperimentOutput,
     Observation,
+    SebulbaEvalFn,
     SebulbaLearnerFn,
 )
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax_utils import merge_leading_dims, unreplicate_n_dims
+from mava.utils.jax_utils import merge_leading_dims
 from mava.utils.logger import LogEvent, MavaLogger
+from mava.utils.sebulba_utils import ParamsSource, Pipeline, ThreadLifetime
 from mava.utils.total_timestep_checker import sebulba_check_total_timesteps
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
@@ -56,12 +58,12 @@ from mava.wrappers.episode_metrics import get_final_step_metrics
 def rollout(
     key: chex.PRNGKey,
     config: DictConfig,
-    rollout_queue: queue.Queue,
-    params_queue: queue.Queue,
+    rollout_pipeline: Pipeline,
+    params_source: ParamsSource,
     apply_fns: Tuple,
-    learner_devices: List,
     actor_device_id: int,
     seeds: List[int],
+    thread_lifetime: ThreadLifetime,
 ) -> None:
     # setup
     env = environments.make_gym_env(config, config.arch.num_envs)
@@ -78,137 +80,80 @@ def rollout(
         """Get action and value."""
         key, subkey = jax.random.split(key)
 
-        actor_policy = actor_apply_fn(params.actor_params, observation)  # TODO: check vmapiing
+        actor_policy = actor_apply_fn(params.actor_params, observation)
         action = actor_policy.sample(seed=subkey)
         log_prob = actor_policy.log_prob(action)
 
         value = critic_apply_fn(params.critic_params, observation).squeeze()
         return action, log_prob, value, key
 
-    # Define queues to track time
-    params_queue_get_time: deque = deque(maxlen=1)
-    rollout_time: deque = deque(maxlen=1)
-    rollout_queue_put_time: deque = deque(maxlen=1)
-    next_obs, info = env.reset(seed=seeds)
-    next_dones = jnp.zeros((config.arch.num_envs, config.system.num_agents), dtype=jax.numpy.bool_)
+    timestep = env.reset(seed=seeds)
+    next_dones = jax.tree_util.tree_map(
+        lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
+        timestep.last(),
+    )
 
     move_to_device = lambda x: jax.device_put(x, device=current_actor_device)
 
-    shard_split_payload = lambda x, axis: jax.device_put_sharded(
-        jnp.split(x, len(learner_devices), axis=axis), devices=learner_devices
-    )
-
     # Loop till the learner has finished training
-    for _update in range(config.system.num_updates):
-        inference_time: float = 0
-        storage_time: float = 0
-        env_send_time: float = 0
-
-        # Get the latest parameters from the learner
-        params_queue_get_time_start = time.time()
-        params = params_queue.get()
-        params_queue_get_time.append(time.time() - params_queue_get_time_start)
-
+    while not thread_lifetime.should_stop():
         # Rollout
-        rollout_time_start = time.time()
-        storage: List = []
-
+        traj: List = []
         # Loop over the rollout length
-        for _ in range(0, config.system.rollout_length):
-            # Cached for transition
-            cached_next_obs = move_to_device(
-                jnp.stack(next_obs, axis=1)
-            )  # (num_envs, num_agents, ...)
-            cached_next_dones = move_to_device(next_dones)  # (num_envs, num_agents)
-            cashed_action_mask = move_to_device(
-                np.stack(info["actions_mask"])
-            )  # (num_envs, num_agents, num_actions)
+        for _ in range(config.system.rollout_length):
+            # Get the latest parameters from the learner
+            params = params_source.get()
 
-            full_observation = Observation(cached_next_obs, cashed_action_mask)
+            cached_next_obs = jax.tree.map(move_to_device, timestep.observation)
+            cached_next_dones = move_to_device(next_dones)
+
             # Get action and value
-            inference_time_start = time.time()
             (
                 action,
                 log_prob,
                 value,
                 key,
-            ) = get_action_and_value(params, full_observation, key)
+            ) = get_action_and_value(params, cached_next_obs, key)
 
             # Step the environment
-            inference_time += time.time() - inference_time_start
-            env_send_time_start = time.time()
             cpu_action = jax.device_get(action)
-            next_obs, next_reward, terminated, truncated, info = env.step(
+            timestep = env.step(
                 cpu_action.swapaxes(0, 1)
             )  # (num_env, num_agents) --> (num_agents, num_env)
-            env_send_time += time.time() - env_send_time_start
 
-            # Prepare the data
-            storage_time_start = time.time()
-            next_dones = np.logical_or(terminated, truncated)
-            metrics = jax.tree_util.tree_map(
-                lambda *x: jnp.asarray(x), *info["metrics"]
-            )  # Stack the metrics
+            next_dones = jax.tree_util.tree_map(
+                lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
+                timestep.last(),
+            )
 
             # Append data to storage
-            storage.append(
+            traj.append(
                 PPOTransition(
                     done=cached_next_dones,
                     action=action,
                     value=value,
-                    reward=next_reward,
+                    reward=timestep.reward,
                     log_prob=log_prob,
-                    obs=full_observation,
-                    info=metrics,
+                    obs=cached_next_obs,
+                    info=timestep.extras,
                 )
             )
-            storage_time += time.time() - storage_time_start
-        rollout_time.append(time.time() - rollout_time_start)
 
-        parse_timer = time.time()
-
-        # Prepare data to share with learner
-        # [PPOTransition() * rollout_len] --> PPOTransition[done=(rollout_len, num_envs, num_agents)
-        # , action=(rollout_len, num_envs, num_agents, num_actions), ...]
-        stacked_storage = jax.tree_util.tree_map(lambda *xs: jnp.stack(xs), *storage)
-
-        # Split the arrays over the different learner_devices on the num_envs axis
-
-        sharded_storage = jax.tree_util.tree_map(
-            lambda x: shard_split_payload(x, 1), stacked_storage
-        )  # (num_learner_devices, rollout_len, num_envs, num_agents, ...)
-
-        # (num_learner_devices, num_envs, num_agents, ...)
-        sharded_next_obs = shard_split_payload(jnp.stack(next_obs, axis=1), 0)
-        sharded_next_action_mask = shard_split_payload(np.stack(info["actions_mask"]), 0)
-        sharded_next_done = shard_split_payload(next_dones, 0)
-
-        # Pack the obs and action mask
-        payload_obs = Observation(sharded_next_obs, sharded_next_action_mask)
-
-        # For debugging
-        speed_info = {  # noqa F841
-            "rollout_time": np.mean(rollout_time),
-            "params_queue_get_time": np.mean(params_queue_get_time),
-            "action_inference": inference_time,
-            "storage_time": storage_time,
-            "env_step_time": env_send_time,
-            "rollout_queue_put_time": (
-                np.mean(rollout_queue_put_time) if rollout_queue_put_time else 0
-            ),
-            "parse_time": time.time() - parse_timer,
-        }
-
-        payload = (
-            sharded_storage,
-            payload_obs,
-            sharded_next_done,
-        )
+        # todo: replace with the record timer
+        # speed_info = {  # F841
+        #   "rollout_time": np.mean(rollout_time),
+        #    "params_queue_get_time": np.mean(params_queue_get_time),
+        #    "action_inference": inference_time,
+        #    "storage_time": storage_time,
+        # W    "env_step_time": env_send_time,
+        #   "rollout_queue_put_time": (
+        #        np.mean(rollout_queue_put_time) if rollout_queue_put_time else 0
+        #    ),
+        #    "parse_time": time.time() - parse_timer,
+        # }
 
         # Put data in the rollout queue to share it with the learner
-        rollout_queue_put_time_start = time.time()
-        rollout_queue.put(payload)
-        rollout_queue_put_time.append(time.time() - rollout_queue_put_time_start)
+        rollout_pipeline.put(traj, timestep.observation, next_dones)
 
 
 def get_learner_fn(
@@ -397,11 +342,8 @@ def get_learner_fn(
             params, opt_states, traj_batch, advantages, targets, key = update_state
             key, shuffle_key, entropy_key = jax.random.split(key, 3)
             # SHUFFLE MINIBATCHES
-            batch_size = (
-                config.system.rollout_length
-                * (config.arch.num_envs // len(config.arch.learner_device_ids))
-                * len(config.arch.executor_device_ids)
-                * config.arch.n_threads_per_executor
+            batch_size = config.system.rollout_length * (
+                config.arch.num_envs // len(config.arch.learner_device_ids)
             )
             permutation = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
@@ -435,7 +377,7 @@ def get_learner_fn(
     def learner_fn(
         learner_state: LearnerState,
         traj_batch: PPOTransition,
-        last_obs: chex.Array,
+        last_obs: Observation,
         last_dones: chex.Array,
     ) -> ExperimentOutput[LearnerState]:
         """Learner function.
@@ -465,6 +407,37 @@ def get_learner_fn(
         )
 
     return learner_fn
+
+
+def evaluate(
+    logger: MavaLogger,
+    payload_queue: Queue,
+    evaluator: SebulbaEvalFn,
+    thread_lifetime: ThreadLifetime,
+    steps_per_rollout: int,
+    key: chex.PRNGKey,
+):
+    eval_step = 1
+
+    while not thread_lifetime.should_stop():
+        metrics, params = payload_queue.get()
+        t = int(steps_per_rollout * (eval_step + 1))
+
+        episode_metrics, train_metrics = jax.tree.map(lambda *x: np.asarray(x), *metrics)
+        episode_metrics, ep_completed = get_final_step_metrics(episode_metrics)
+
+        if ep_completed:
+            logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
+        logger.log(train_metrics, t, eval_step, LogEvent.TRAIN)
+
+        key, eval_key = jax.random.split(key, 2)
+        episode_metrics = evaluator(params.actor_params, eval_key, {})
+        logger.log(episode_metrics, t, eval_step, LogEvent.EVAL)
+
+        # todo add checkpointing
+        episode_return = jnp.mean(episode_metrics["episode_return"])
+
+        eval_step += 1
 
 
 def learner_setup(
@@ -572,14 +545,14 @@ def run_experiment(_config: DictConfig) -> float:
     # Sanity check of config
     assert (
         config.arch.num_envs % len(config.arch.learner_device_ids) == 0
-    ), "The number of environments must to be divisible by the number of learners "
+    ), "The number of environments must to be divisible by the number of learners."
 
     assert (
         int(config.arch.num_envs / len(config.arch.learner_device_ids))
         * config.arch.n_threads_per_executor
         % config.system.num_minibatches
         == 0
-    ), "int(local_num_envs / len(learner_device_ids)) must be divisible by num_minibatches"
+    ), "int(local_num_envs / len(learner_device_ids)) must be divisible by num_minibatches."
 
     # Setup learner.
     learn, apply_fns, learner_state = learner_setup(
@@ -590,8 +563,10 @@ def run_experiment(_config: DictConfig) -> float:
     np_rng = np.random.default_rng(config.system.seed)
 
     # Setup evaluator.
-    evaluator, absolute_metric_evaluator = make_eval_fns(
-        environments.make_gym_env, apply_fns[0], config, np_rng
+    # One key per device for evaluation.
+    eval_act_fn = make_ff_eval_act_fn(apply_fns[0], config)
+    evaluator = get_eval_fn(
+        environments.make_gym_env, eval_act_fn, config, np_rng, absolute_metric=False
     )
 
     # Calculate total timesteps.
@@ -601,18 +576,9 @@ def run_experiment(_config: DictConfig) -> float:
     ), "Number of updates per evaluation must be less than total number of updates."
     # Calculate number of updates per evaluation.
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
-    config.arch.num_evaluation, remaining_updates = divmod(
-        config.system.num_updates, config.system.num_updates_per_eval
-    )
-    config.arch.num_evaluation += (
-        remaining_updates != 0
-    )  # Add an evaluation step if the num_updates is not a multiple of num_evaluation
+
     steps_per_rollout = (
-        len(config.arch.executor_device_ids)
-        * config.arch.n_threads_per_executor
-        * config.system.rollout_length
-        * config.arch.num_envs
-        * config.system.num_updates_per_eval
+        config.system.rollout_length * config.arch.num_envs * config.system.num_updates_per_eval
     )
 
     # Logger setup
@@ -632,167 +598,77 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Executor setup and launch.
     unreplicated_params = flax.jax_utils.unreplicate(learner_state.params)
-    params_queues: List = []
-    rollout_queues: List = []
+    params_sources: Sequence[ParamsSource] = []
+    thread_lifetimes: Sequence[ThreadLifetime] = []
+    pipeline = Pipeline(128, learner_devices)  # TODO: ADD THE MAX PIPILINE QUEUE SIZE TO THE CONFIG
+    pipeline.start()
 
-    for _d_idx, d_id in enumerate(  # Loop through each executor device
-        config.arch.executor_device_ids
-    ):
-        # Replicate params per executor device
-        device_params = jax.device_put(unreplicated_params, devices[d_id])
+    # Create the actor threads
+    for d_idx, d_id in enumerate(config.arch.executor_device_ids):
         # Loop through each executor thread
-        for _thread_id in range(config.arch.n_threads_per_executor):
-            seeds = np_rng.integers(np.iinfo(np.int64).max, size=config.arch.num_envs).tolist()
-            params_queues.append(queue.Queue(maxsize=1))
-            rollout_queues.append(queue.Queue(maxsize=1))
-            params_queues[-1].put(device_params)
+        for thread_id in range(config.arch.n_threads_per_executor):
+            seeds = np_rng.integers(np.iinfo(np.int32).max, size=config.arch.num_envs).tolist()
+
+            params_source = ParamsSource(unreplicated_params, devices[d_id])
+            params_source.start()
+            params_sources.append(params_source)
+
+            lifetime = ThreadLifetime()
+            thread_lifetimes.append(lifetime)
+
             threading.Thread(
                 target=rollout,
                 args=(
                     jax.device_put(key, devices[d_id]),
                     config,
-                    rollout_queues[-1],
-                    params_queues[-1],
+                    pipeline,
+                    params_sources[-1],
                     apply_fns,
-                    learner_devices,
                     d_id,
                     seeds,
+                    lifetime,
                 ),
+                name=f"Actor-{thread_id + d_idx * config.arch.n_threads_per_executor}",
             ).start()
 
-    # Run experiment for the total number of updates.
-    max_episode_return = jnp.float32(0.0)
-    best_params = None
-    for eval_step in range(config.arch.num_evaluation):
-        training_start_time = time.time()
-        learner_speeds = []
-        rollout_times = []
+    lifetime = ThreadLifetime()
+    evaluator_queue = Queue()  # maxsize=1)
+    threading.Thread(
+        target=evaluate,
+        name="Evaluator",
+        args=(logger, evaluator_queue, evaluator, lifetime, steps_per_rollout, key),
+    ).start()
+    thread_lifetimes.append(lifetime)
 
-        episode_metrics = []
-        train_metrics = []
+    for eval_step in range(
+        config.arch.num_evaluation
+    ):  # todo : replace :) if comment 3 is the way then this can be replaced with num_evaluation and the try catch in naother loop called num_updates per eval?
+        # should we have a loop over num actors? how much should we get?
+        # rn it trains over the output of a single actor
+        # we can leave it this way and think of other actor threads / devices as just a speed boost? I.e you should get ur desired batch sized base only on the num_envs * rollour_len ?
+        metrics: Sequence[Tuple[Dict, Dict]] = []
+        _update = 0
+        while _update != config.system.num_updates_per_eval:
+            try:
+                traj_batch, last_obs, last_dones = pipeline.get(block=True, timeout=1)
+            except queue.Empty:
+                continue
+            else:
+                learner_state, episode_metrics, train_metrics = learn(
+                    learner_state, traj_batch, last_obs, last_dones
+                )
+                metrics.append((episode_metrics, train_metrics))
+                unreplicated_params = flax.jax_utils.unreplicate(learner_state.params)
 
-        # Full or partial last eval step.
-        num_updates_in_eval = (
-            remaining_updates
-            if eval_step == config.arch.num_evaluation - 1 and remaining_updates
-            else config.system.num_updates_per_eval
-        )
-        for _update in range(num_updates_in_eval):
-            sharded_storages = []
-            sharded_next_obss = []
-            sharded_next_dones = []
+                for source in params_sources:
+                    source.update(unreplicated_params)
+                _update += 1
 
-            rollout_start_time = time.time()
-            # Loop through each executor device
-            for d_idx, _ in enumerate(config.arch.executor_device_ids):
-                # Loop through each executor thread
-                for thread_id in range(config.arch.n_threads_per_executor):
-                    # Get data from rollout queue
-                    (
-                        sharded_storage,
-                        sharded_next_obs,
-                        sharded_next_done,
-                    ) = rollout_queues[d_idx * config.arch.n_threads_per_executor + thread_id].get()
-                    sharded_storages.append(sharded_storage)
-                    sharded_next_obss.append(sharded_next_obs)
-                    sharded_next_dones.append(sharded_next_done)
+        # Run the evaluator
+        evaluator_queue.put((metrics, unreplicated_params))
 
-            rollout_times.append(time.time() - rollout_start_time)
-
-            # Concatinate the returned trajectories on the n_env axis
-            sharded_storages = jax.tree_util.tree_map(
-                lambda *x: jnp.concatenate(x, axis=2), *sharded_storages
-            )
-            sharded_next_obss = jax.tree_util.tree_map(
-                lambda *x: jnp.concatenate(x, axis=1), *sharded_next_obss
-            )
-            sharded_next_dones = jnp.concatenate(sharded_next_dones, axis=1)
-
-            learner_start_time = time.time()
-            learner_output = learn(
-                learner_state, sharded_storages, sharded_next_obss, sharded_next_dones
-            )
-            learner_speeds.append(time.time() - learner_start_time)
-
-            # Stack the metrics
-            episode_metrics.append(learner_output.episode_metrics)
-            train_metrics.append(learner_output.train_metrics)
-
-            # Send updated params to executors
-            unreplicated_params = flax.jax_utils.unreplicate(learner_output.learner_state.params)
-            for d_idx, d_id in enumerate(config.arch.executor_device_ids):
-                device_params = jax.device_put(unreplicated_params, devices[d_id])
-                for thread_id in range(config.arch.n_threads_per_executor):
-                    params_queues[d_idx * config.arch.n_threads_per_executor + thread_id].put(
-                        device_params
-                    )
-
-        # Log the results of the training.
-        elapsed_time = time.time() - training_start_time
-        t = int(steps_per_rollout * (eval_step + 1))
-        episode_metrics = jax.tree_util.tree_map(lambda *x: np.asarray(x), *episode_metrics)
-        episode_metrics, ep_completed = get_final_step_metrics(episode_metrics)
-        episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
-
-        # Separately log timesteps, actoring metrics and training metrics.
-        speed_info = {
-            "total_time": elapsed_time,
-            "rollout_time": np.sum(rollout_times),
-            "learner_time": np.sum(learner_speeds),
-            "timestep": t,
-        }
-        logger.log(speed_info, t, eval_step, LogEvent.MISC)
-        if ep_completed:  # only log episode metrics if an episode was completed in the rollout.
-            logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
-        train_metrics = jax.tree_util.tree_map(lambda *x: np.asarray(x), *train_metrics)
-        logger.log(train_metrics, t, eval_step, LogEvent.TRAIN)
-
-        # Evaluation on the learner
-        evaluation_start_timer = time.time()
-        key_e, eval_key = jax.random.split(key_e, 2)
-        episode_metrics = evaluator(
-            unreplicate_n_dims(learner_output.learner_state.params.actor_params, 1), eval_key
-        )
-
-        # Log the results of the evaluation.
-        elapsed_time = time.time() - evaluation_start_timer
-        episode_return = jnp.mean(episode_metrics["episode_return"])
-
-        steps_per_eval = int(jnp.sum(episode_metrics["episode_length"]))
-        episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
-        logger.log(episode_metrics, t, eval_step, LogEvent.EVAL)
-
-        if save_checkpoint:
-            # Save checkpoint of learner state
-            checkpointer.save(
-                timestep=steps_per_rollout * (eval_step + 1),
-                unreplicated_learner_state=unreplicate_n_dims(learner_output.learner_state, 1),
-                episode_return=episode_return,
-            )
-
-        if config.arch.absolute_metric and max_episode_return <= episode_return:
-            best_params = copy.deepcopy(learner_output.learner_state.params.actor_params)
-            max_episode_return = episode_return
-
-        # Update runner state to continue training.
-        learner_state = learner_output.learner_state
-
-    # Record the performance for the final evaluation run.
-    eval_performance = float(jnp.mean(episode_metrics[config.env.eval_metric]))
-
-    # Measure absolute metric.
-    if config.arch.absolute_metric:
-        start_time = time.time()
-
-        key_e, eval_key = jax.random.split(key_e, 2)
-        episode_metrics = absolute_metric_evaluator(unreplicate_n_dims(best_params, 1), eval_key)
-
-        elapsed_time = time.time() - start_time
-        steps_per_eval = int(jnp.sum(episode_metrics["episode_length"]))
-
-        t = int(steps_per_rollout * (eval_step + 1))
-        episode_metrics["steps_per_second"] = steps_per_eval / elapsed_time
-        logger.log(episode_metrics, t, eval_step, LogEvent.ABSOLUTE)
+    for thread_lifetime in thread_lifetimes:
+        thread_lifetime.stop()
 
     # Stop the logger.
     logger.stop()

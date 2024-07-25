@@ -3,5 +3,5 @@ defaults:
   - arch: anakin
   - system: ppo/ff_ippo
   - network: mlp
-  - env: rware_gym
+  - env: rware
   - _self_

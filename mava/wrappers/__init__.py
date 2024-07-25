@@ -20,6 +20,7 @@ from mava.wrappers.gym import (
     GymAgentIDWrapper,
     GymLBFWrapper,
     GymRecordEpisodeMetrics,
+    GymToJumanji,
     GymWrapper,
     async_multiagent_worker,
 )

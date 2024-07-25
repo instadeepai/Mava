@@ -20,10 +20,14 @@ from multiprocessing.connection import Connection
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import gymnasium
+import jax
 import numpy as np
 from gymnasium import spaces
 from gymnasium.vector.utils import write_to_shared_memory
+from jumanji.types import StepType, TimeStep
 from numpy.typing import NDArray
+
+from mava.types import Observation, ObservationGlobalState
 
 # Filter out the warnings
 warnings.filterwarnings("ignore", module="gymnasium.utils.passive_env_checker")
@@ -189,6 +193,65 @@ class GymAgentIDWrapper(gymnasium.Wrapper):
             return spaces.Tuple(self.modify_space(s) for s in space)
         else:
             raise ValueError(f"Space {type(space)} is not currently supported.")
+
+
+class GymToJumanji(gymnasium.Wrapper):
+    """Converts Gym outputs to Jumanji timesteps"""
+
+    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> TimeStep:
+        obs, info = self.env.reset(seed=seed, options=options)
+
+        num_agents = len(self.env.single_action_space)
+        num_envs = self.env.num_envs
+
+        ep_done = np.zeros(num_envs, dtype=float)
+        rewards = np.zeros((num_envs, num_agents), dtype=float)
+
+        timestep = self._create_timestep(obs, ep_done, rewards, info)
+
+        return timestep
+
+    def step(self, action: list) -> TimeStep:
+        obs, rewards, terminated, truncated, info = self.env.step(action)
+
+        ep_done = np.logical_or(terminated, truncated).all(axis=1)
+
+        timestep = self._create_timestep(obs, ep_done, rewards, info)
+
+        return timestep
+
+    def _format_observation(
+        self, obs: NDArray, info: Dict
+    ) -> Union[Observation, ObservationGlobalState]:
+        """Create an observation from the raw observation and environment state."""
+
+        obs = np.array(obs).swapaxes(
+            0, 1
+        )  # (num_agents, num_envs, ...) -> (num_envs, num_agents, ...)
+        action_mask = np.stack(info["actions_mask"])
+        obs_data = {"agents_view": obs, "action_mask": action_mask}
+
+        if "global_obs" in info:
+            global_obs = np.array(info["global_obs"]).swapaxes(0, 1)
+            obs_data["global_state"] = global_obs
+            return ObservationGlobalState(**obs_data)
+        else:
+            return Observation(**obs_data)
+
+    def _create_timestep(
+        self, obs: NDArray, ep_done: NDArray, rewards: NDArray, info: Dict
+    ) -> TimeStep:
+        obs = self._format_observation(obs, info)
+        extras = jax.tree.map(lambda *x: np.stack(x), *info["metrics"])
+        step_type = np.where(ep_done, StepType.LAST, StepType.MID)
+
+        return TimeStep(
+            step_type=step_type,
+            reward=rewards,
+            discount=1.0 - ep_done,
+            observation=obs,
+            extras=extras,
+        )
 
 
 # Copied form Gymnasium/blob/main/gymnasium/vector/async_vector_env.py

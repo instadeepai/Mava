@@ -17,7 +17,6 @@ import time
 import warnings
 from typing import Any, Callable, Dict, Protocol, Tuple, Union
 
-import gymnasium
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -35,7 +34,6 @@ from mava.types import (
     Observation,
     ObservationGlobalState,
     RecActorApply,
-    SebulbaEvalFn,
     State,
 )
 
@@ -211,121 +209,109 @@ def make_rec_eval_act_fn(actor_apply_fn: RecActorApply, config: DictConfig) -> E
     return eval_act_fn
 
 
-# todo : Update
-def get_sebulba_ff_evaluator_fn(
-    env: gymnasium.Env,
-    apply_fn: ActorApply,
+def get_sebulba_eval_fn(
+    env_maker: Callable,
+    act_fn: EvalActFn,
     config: DictConfig,
     np_rng: np.random.Generator,
-    log_win_rate: bool = False,
-) -> SebulbaEvalFn:
-    """Get the evaluator function for feedforward networks.
+    absolute_metric: bool,
+) -> EvalFn:
+    """Creates a function that can be used to evaluate agents on a given environment.
 
     Args:
-        env (Environment): An evironment instance for evaluation.
-        apply_fn (callable): Network forward pass method.
-        config (dict): Experiment configuration.
+    ----
+        env: an environment that conforms to the mava environment spec.
+        act_fn: a function that takes in params, timestep, key and optionally a state
+                and returns actions and optionally a state (see `EvalActFn`).
+        config: the system config.
+        absolute_metric: whether or not this evaluator calculates the absolute_metric.
+                This determines how many evaluation episodes it does.
     """
-
-    @jax.jit
-    def get_action(  # todo explicetly put these on the learner? they should already be there
-        params: FrozenDict,
-        observation: Observation,
-        key: PRNGKey,
-    ) -> Array:
-        """Get action."""
-
-        pi = apply_fn(params, observation)
-
-        if config.arch.evaluation_greedy:
-            action = pi.mode()
-        else:
-            action = pi.sample(seed=key)
-
-        return action
-
-    def eval_episodes(params: FrozenDict, key: PRNGKey) -> Any:
-        seeds = np_rng.integers(np.iinfo(np.int64).max, size=env.num_envs).tolist()
-        obs, info = env.reset(seed=seeds)
-        dones = np.full(env.num_envs, False)
-        eval_metrics = jax.tree_map(lambda *x: jnp.asarray(x), *info["metrics"])
-
-        while not dones.all():
-            key, policy_key = jax.random.split(key)
-
-            obs = jax.device_put(jnp.stack(obs, axis=1))
-            action_mask = jax.device_put(np.stack(info["actions_mask"]))
-
-            actions = get_action(params, Observation(obs, action_mask), policy_key)
-            cpu_action = jax.device_get(actions)
-
-            obs, reward, terminated, truncated, info = env.step(cpu_action.swapaxes(0, 1))
-
-            next_metrics = jax.tree_map(lambda *x: jnp.asarray(x), *info["metrics"])
-
-            next_dones = next_metrics["is_terminal_step"]
-
-            update_flags = np.logical_and(next_dones, np.invert(dones))
-
-            update_metrics = lambda new_metric, old_metric, update_flags=update_flags: np.where(
-                (update_flags), new_metric, old_metric
-            )
-
-            eval_metrics = jax.tree_map(update_metrics, next_metrics, eval_metrics)
-
-            dones = np.logical_or(dones, next_dones)
-        eval_metrics.pop("is_terminal_step")
-
-        return eval_metrics
-
-    return eval_episodes
-
-
-def make_sebulba_eval_fns(
-    eval_env_fn: Callable,
-    network_apply_fn: Union[ActorApply, RecActorApply],
-    config: DictConfig,
-    np_rng: np.random.Generator,
-    add_global_state: bool = False,
-) -> Tuple[SebulbaEvalFn, SebulbaEvalFn]:
-    """Initialize evaluator functions for reinforcement learning.
-
-    Args:
-        eval_env_fn (Environment): The function to Create the eval envs.
-        network_apply_fn (Union[ActorApply,RecActorApply]): Creates a policy to sample.
-        config (DictConfig): The configuration settings for the evaluation.
-        use_recurrent_net (bool, optional): Whether to use a rnn. Defaults to False.
-        scanned_rnn (Optional[nn.Module], optional): The rnn module.
-            Required if `use_recurrent_net` is True. Defaults to None.
-
-    Returns:
-        Tuple[SebulbaEvalFn, SebulbaEvalFn]: A tuple of two evaluation functions:
-        one for use during training and one for absolute metrics.
-
-    Raises:
-        AssertionError: If `use_recurrent_net` is True but `scanned_rnn` is not provided.
-    """
-    eval_env, absolute_eval_env = (
-        eval_env_fn(config, config.arch.num_eval_episodes, add_global_state=add_global_state),
-        eval_env_fn(config, config.arch.num_eval_episodes * 10, add_global_state=add_global_state),
+    n_devices = jax.device_count()
+    eval_episodes = (
+        config.arch.num_absolute_metric_eval_episodes
+        if absolute_metric
+        else config.arch.num_eval_episodes
     )
 
-    # Check if win rate is required for evaluation.
-    log_win_rate = config.env.log_win_rate
+    n_parallel_envs = min(eval_episodes, config.arch.num_envs)
+    episode_loops = math.ceil(eval_episodes / n_parallel_envs)
+    env = env_maker(config, n_parallel_envs)
 
-    evaluator = get_sebulba_ff_evaluator_fn(
-        eval_env,
-        network_apply_fn,  # type: ignore
-        config,
-        np_rng,
-        log_win_rate,  # type: ignore
-    )
-    absolute_metric_evaluator = get_sebulba_ff_evaluator_fn(
-        absolute_eval_env,
-        network_apply_fn,  # type: ignore
-        config,
-        np_rng,
-        log_win_rate,  # type: ignore
-    )
+    # Warnings if num eval episodes is not divisible by num parallel envs.
+    if eval_episodes % n_parallel_envs != 0:
+        warnings.warn(
+            f"Number of evaluation episodes ({eval_episodes}) is not divisible by `num_envs` * "
+            f"`num_devices` ({n_parallel_envs} * {n_devices}). Some extra evaluations will be "
+            f"executed. New number of evaluation episodes = {episode_loops * n_parallel_envs}",
+            stacklevel=2,
+        )
 
-    return evaluator, absolute_metric_evaluator
+    def eval_fn(params: FrozenDict, key: PRNGKey, init_act_state: ActorState) -> Metrics:
+        """Evaluates the given params on an environment and returns relevent metrics.
+
+        Metrics are collected by the `RecordEpisodeMetrics` wrapper: episode return and length,
+        also win rate for environments that support it.
+
+        Returns: Dict[str, Array] - dictionary of metric name to metric values for each episode.
+        """
+
+        def _episode(key: PRNGKey) -> Tuple[PRNGKey, Metrics]:
+            """Simulates `num_envs` episodes."""
+
+            seeds = np_rng.integers(np.iinfo(np.int32).max, size=n_parallel_envs).tolist()
+            ts = env.reset(seed=seeds)
+
+            timesteps = [ts]
+
+            actor_state = init_act_state
+            finished_eps = ts.last()
+
+            while not finished_eps.all():
+                key, act_key = jax.random.split(key)
+                action, actor_state = act_fn(params, ts, act_key, actor_state)
+                cpu_action = jax.device_get(action).swapaxes(0, 1)
+                ts = env.step(cpu_action)
+                timesteps.append(ts)
+
+                finished_eps = np.logical_or(finished_eps, ts.last())
+
+            timesteps = jax.tree.map(lambda *x: np.stack(x), *timesteps)
+
+            metrics = timesteps.extras
+            if config.env.log_win_rate:
+                metrics["won_episode"] = timesteps.extras["won_episode"]
+
+            # find the first instance of done to get the metrics at that timestep, we don't
+            # care about subsequent steps because we only the results from the first episode
+            done_idx = jnp.argmax(timesteps.last(), axis=0)
+            metrics = jax.tree_map(lambda m: m[done_idx, jnp.arange(n_parallel_envs)], metrics)
+            del metrics["is_terminal_step"]  # uneeded for logging
+
+            return key, metrics
+
+        # This loop is important because we don't want too many parallel envs.
+        # So in evaluation we have num_envs parallel envs and loop enough times
+        # so that we do at least `eval_episodes` number of episodes.
+        metrics = []
+        for _ in range(episode_loops):
+            key, metric = _episode(key)
+            metrics.append(metric)
+
+        metrics: Metrics = jax.tree_map(
+            lambda *x: jnp.array(x).reshape(-1), *metrics
+        )  # flatten metrics
+        return metrics
+
+    def timed_eval_fn(params: FrozenDict, key: PRNGKey, init_act_state: ActorState) -> Metrics:
+        """Wrapper around eval function to time it and add in steps per second metric."""
+        start_time = time.time()
+
+        metrics = eval_fn(params, key, init_act_state)
+
+        end_time = time.time()
+        total_timesteps = jnp.sum(metrics["episode_length"])
+        metrics["steps_per_second"] = total_timesteps / (end_time - start_time)
+        return metrics
+
+    return timed_eval_fn
