@@ -62,14 +62,13 @@ class RNNLearnerState(NamedTuple):
     key: chex.PRNGKey
     env_state: State
     timestep: TimeStep
-    dones: Done
     hstates: HiddenStates
 
 
 class PPOTransition(NamedTuple):
     """Transition tuple for PPO."""
 
-    done: Done
+    terminal: Done
     action: Action
     value: Value
     reward: chex.Array
@@ -81,7 +80,8 @@ class PPOTransition(NamedTuple):
 class RNNPPOTransition(NamedTuple):
     """Transition tuple for PPO."""
 
-    done: Done
+    terminal: Done  # need this for GAE/bootstrapping
+    truncated: Done  # need this when training to pass through the RNN and reset hstates
     action: Action
     value: Value
     reward: chex.Array

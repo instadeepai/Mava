@@ -97,17 +97,13 @@ def get_learner_fn(
             log_prob = actor_policy.log_prob(action)
 
             # STEP ENVIRONMENT
-            env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
+            env_state, timestep = jax.vmap(env.step)(env_state, action)
 
             # LOG EPISODE METRICS
-            done = tree.map(
-                lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
-                timestep.last(),
-            )
+            term = ~timestep.discount.astype(bool)
             info = timestep.extras["episode_metrics"]
-
             transition = PPOTransition(
-                done, action, value, timestep.reward, log_prob, last_timestep.observation, info
+                term, action, value, timestep.reward, log_prob, last_timestep.observation, info
             )
 
             learner_state = LearnerState(params, opt_states, key, env_state, timestep)
@@ -130,14 +126,11 @@ def get_learner_fn(
             def _get_advantages(gae_and_next_value: Tuple, transition: PPOTransition) -> Tuple:
                 """Calculate the GAE for a single transition."""
                 gae, next_value = gae_and_next_value
-                done, value, reward = (
-                    transition.done,
-                    transition.value,
-                    transition.reward,
-                )
+                term, value, reward = transition.terminal, transition.value, transition.reward
+
                 gamma = config.system.gamma
-                delta = reward + gamma * next_value * (1 - done) - value
-                gae = delta + gamma * config.system.gae_lambda * (1 - done) * gae
+                delta = reward + gamma * next_value * (1 - term) - value
+                gae = delta + gamma * config.system.gae_lambda * (1 - term) * gae
                 return (gae, value), gae
 
             _, advantages = jax.lax.scan(
@@ -579,7 +572,7 @@ def run_experiment(_config: DictConfig) -> None:
             flashbax_transition = _reshape_experience(
                 {
                     # (D, NU, UB, T, NE, ...)
-                    "done": experience_to_store.done,
+                    "done": experience_to_store.terminal,
                     "action": experience_to_store.action,
                     "reward": experience_to_store.reward,
                     "observation": experience_to_store.obs.agents_view,
