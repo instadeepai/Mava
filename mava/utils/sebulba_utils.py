@@ -16,7 +16,7 @@
 import queue
 import threading
 import time
-from typing import Any, List, Sequence, Tuple, Union
+from typing import Any, Dict, List, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -65,6 +65,7 @@ class Pipeline(threading.Thread):
         traj: Sequence[PPOTransition],
         next_obs: Union[Observation, ObservationGlobalState],
         next_dones: Array,
+        time_dict: Dict,
     ) -> None:
         """
         Put a trajectory on the queue to be consumed by the learner.
@@ -77,13 +78,15 @@ class Pipeline(threading.Thread):
         # [PPOTransition()] * rollout_len --> PPOTransition[done=(rollout_len, num_envs, num_agents)
         sharded_traj = jax.tree.map(lambda *x: self.shard_split_playload(jnp.stack(x), 1), *traj)
 
-        # obs Tuple[(num_envs, num_agents, ...), ...] --> [(num_envs / num_learner_devices, num_agents, ...)] * num_learner_devices
+        # obs Tuple[(num_envs, num_agents, ...), ...] -->
+        # [(num_envs / num_learner_devices, num_agents, ...)] * num_learner_devices
         sharded_next_obs = jax.tree.map(self.shard_split_playload, next_obs)
 
-        # dones (num_envs, num_agents) --> [(num_envs / num_learner_devices, num_agents)] * num_learner_devices
+        # dones (num_envs, num_agents) -->
+        # [(num_envs / num_learner_devices, num_agents)] * num_learner_devices
         sharded_next_dones = self.shard_split_playload(next_dones, 0)
 
-        self._queue.put((sharded_traj, sharded_next_obs, sharded_next_dones))
+        self._queue.put((sharded_traj, sharded_next_obs, sharded_next_dones, time_dict))
 
         with end_condition:
             end_condition.notify()  # tell we have finish
@@ -94,11 +97,11 @@ class Pipeline(threading.Thread):
 
     def get(
         self, block: bool = True, timeout: Union[float, None] = None
-    ) -> Tuple[PPOTransition, Union[Observation, ObservationGlobalState], Array]:
+    ) -> Tuple[PPOTransition, Union[Observation, ObservationGlobalState], Array, Dict]:
         """Get a trajectory from the pipeline."""
         return self._queue.get(block, timeout)  # type: ignore
 
-    def shard_split_playload(self, payload: Any, axis: int = 0):
+    def shard_split_playload(self, payload: Any, axis: int = 0) -> Any:
         split_payload = jnp.split(payload, len(self.learner_devices), axis=axis)
         return jax.device_put_sharded(split_payload, devices=self.learner_devices)
 
@@ -111,7 +114,7 @@ class ParamsSource(threading.Thread):
 
     def __init__(self, init_value: Params, device: jax.Device):
         super().__init__(name=f"ParamsSource-{device.id}")
-        self.value = jax.device_put(init_value, device)
+        self.value: Params = jax.device_put(init_value, device)
         self.device = device
         self.new_value: queue.Queue = queue.Queue()
 
@@ -156,11 +159,11 @@ class RecordTimeTo:
 class ThreadLifetime:
     """Simple class for a mutable boolean that can be used to signal a thread to stop."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._stop = False
 
-    def should_stop(self):
+    def should_stop(self) -> bool:
         return self._stop
 
-    def stop(self):
+    def stop(self) -> None:
         self._stop = True

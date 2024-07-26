@@ -198,7 +198,9 @@ class GymAgentIDWrapper(gymnasium.Wrapper):
 class GymToJumanji(gymnasium.Wrapper):
     """Converts Gym outputs to Jumanji timesteps"""
 
-    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> TimeStep:
+    def reset(
+        self, seed: Optional[list[int]] = None, options: Optional[list[dict]] = None
+    ) -> TimeStep:
         obs, info = self.env.reset(seed=seed, options=options)
 
         num_agents = len(self.env.single_action_space)
