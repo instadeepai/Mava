@@ -94,10 +94,22 @@ def get_learner_fn(
             env_state, timestep = jax.vmap(env.step)(env_state, action)
 
             # todo: last_term = ~last_timestep.discount.astype(bool)
+            # todo: this is technically term or trunc - rename in transition
+            trunc = tree.map(
+                lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
+                timestep.last(),
+            )
             term = ~timestep.discount.astype(bool)
             info = timestep.extras["episode_metrics"]
             transition = PPOTransition(
-                term, action, value, timestep.reward, log_prob, last_timestep.observation, info
+                term,
+                trunc,
+                action,
+                value,
+                timestep.reward,
+                log_prob,
+                last_timestep.observation,
+                info,
             )
             learner_state = LearnerState(params, opt_states, key, env_state, timestep)
             return learner_state, transition
@@ -119,11 +131,16 @@ def get_learner_fn(
             def _get_advantages(gae_and_next_value: Tuple, transition: PPOTransition) -> Tuple:
                 """Calculate the GAE for a single transition."""
                 gae, next_value = gae_and_next_value
-                term, value, reward = transition.terminal, transition.value, transition.reward
+                term, trunc, value, reward = (
+                    transition.terminal,
+                    transition.truncated,
+                    transition.value,
+                    transition.reward,
+                )
 
                 gamma = config.system.gamma
                 delta = reward + gamma * next_value * (1 - term) - value
-                gae = delta + gamma * config.system.gae_lambda * (1 - term) * gae
+                gae = delta + gamma * config.system.gae_lambda * (1 - trunc) * gae
                 return (gae, value), gae
 
             _, advantages = jax.lax.scan(

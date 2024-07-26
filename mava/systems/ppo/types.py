@@ -69,6 +69,7 @@ class PPOTransition(NamedTuple):
     """Transition tuple for PPO."""
 
     terminal: Done
+    truncated: Done  # need this when training to pass through the RNN and reset hstates
     action: Action
     value: Value
     reward: chex.Array

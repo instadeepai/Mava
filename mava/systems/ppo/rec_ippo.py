@@ -151,28 +151,37 @@ def get_learner_fn(
         last_val = last_val.squeeze(0)
 
         def _calculate_gae(
-            traj_batch: RNNPPOTransition, last_val: chex.Array, last_term: chex.Array
+            traj_batch: RNNPPOTransition,
+            last_val: chex.Array,
+            last_term: chex.Array,
+            last_trunc: chex.Array,
         ) -> Tuple[chex.Array, chex.Array]:
             def _get_advantages(
-                carry: Tuple[chex.Array, chex.Array, chex.Array], transition: RNNPPOTransition
-            ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
-                gae, next_value, next_term = carry
-                term, value, reward = transition.terminal, transition.value, transition.reward
+                carry: Tuple[chex.Array, chex.Array, chex.Array, chex.Array],
+                transition: RNNPPOTransition,
+            ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array, chex.Array], chex.Array]:
+                gae, next_value, next_term, next_trunc = carry
+                term, trunc, value, reward = (
+                    transition.terminal,
+                    transition.truncated,
+                    transition.value,
+                    transition.reward,
+                )
                 gamma = config.system.gamma
                 delta = reward + gamma * next_value * (1 - next_term) - value
-                gae = delta + gamma * config.system.gae_lambda * (1 - next_term) * gae
-                return (gae, value, term), gae
+                gae = delta + gamma * config.system.gae_lambda * (1 - next_trunc) * gae
+                return (gae, value, term, trunc), gae
 
             _, advantages = jax.lax.scan(
                 _get_advantages,
-                (jnp.zeros_like(last_val), last_val, last_term),
+                (jnp.zeros_like(last_val), last_val, last_term, last_trunc),
                 traj_batch,
                 reverse=True,
                 unroll=16,
             )
             return advantages, advantages + traj_batch.value
 
-        advantages, targets = _calculate_gae(traj_batch, last_val, last_term)
+        advantages, targets = _calculate_gae(traj_batch, last_val, last_term, last_trunc)
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""
