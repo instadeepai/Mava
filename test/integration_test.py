@@ -13,28 +13,21 @@
 # limitations under the License.
 
 import importlib
+import random
 
 import pytest
 from hydra import compose, initialize
 from omegaconf import DictConfig, OmegaConf
 
-system_paths = [
-    "ppo.ff_ippo",
-    # "ppo.ff_mappo",  # don't use this because ff_mappo is used in `test_discrete_env`
-    "ppo.rec_ippo",
-    "ppo.rec_mappo",
-    "sac.ff_isac",
-    "sac.ff_masac",
-    "q_learning.rec_iql",
-]
+# This integration test is not exhaustive, that would be too expensive. This means that not all
+# system run all envs, but each env and each system is run at least once.
+# For each system we select a random environment to run.
+# Then for each environment we select a random system to run.
+ppo_systems = ["ppo.ff_ippo", "ppo.ff_mappo", "ppo.rec_ippo", "ppo.rec_mappo"]
+q_learning_systems = ["q_learning.rec_iql"]
+sac_systems = ["sac.ff_isac", "sac.ff_masac"]
 
-discrete_envs = [
-    "gigastep",
-    "lbf",
-    "matrax",
-    # "rware",  # don't use this because `test_mava_system` will run all systems on rware
-    "smax",
-]
+discrete_envs = ["gigastep", "lbf", "matrax", "rware", "smax"]
 cnn_envs = ["cleaner", "connector"]
 continuous_envs = ["mabrax"]
 
@@ -60,13 +53,40 @@ def _get_fast_config(cfg: DictConfig, fast_config: dict) -> DictConfig:
     return cfg
 
 
-@pytest.mark.parametrize("system_path", system_paths)
-def test_mava_system(fast_config: dict, system_path: str) -> None:
-    """Does a simple test of all mava systems, by checking that everything pipes through."""
+@pytest.mark.parametrize("system_path", ppo_systems)
+def test_ppo_system(fast_config: dict, system_path: str) -> None:
+    """Test all ppo systems on random envs."""
     _, system_name = system_path.split(".")
+    env = random.choice(discrete_envs)
 
     with initialize(version_base=None, config_path="../mava/configs/"):
-        cfg = compose(config_name=f"default_{system_name}")
+        cfg = compose(config_name=f"default_{system_name}", overrides=[f"env={env}"])
+        cfg = _get_fast_config(cfg, fast_config)
+
+    _run_system(system_path, cfg)
+
+
+@pytest.mark.parametrize("system_path", q_learning_systems)
+def test_q_learning_system(fast_config: dict, system_path: str) -> None:
+    """Test all Q-Learning systems on random envs."""
+    _, system_name = system_path.split(".")
+    env = random.choice(discrete_envs)
+
+    with initialize(version_base=None, config_path="../mava/configs/"):
+        cfg = compose(config_name=f"default_{system_name}", overrides=[f"env={env}"])
+        cfg = _get_fast_config(cfg, fast_config)
+
+    _run_system(system_path, cfg)
+
+
+@pytest.mark.parametrize("system_path", sac_systems)
+def test_sac_system(fast_config: dict, system_path: str) -> None:
+    """Test all SAC systems on random envs."""
+    _, system_name = system_path.split(".")
+    env = random.choice(continuous_envs)
+
+    with initialize(version_base=None, config_path="../mava/configs/"):
+        cfg = compose(config_name=f"default_{system_name}", overrides=[f"env={env}"])
         cfg = _get_fast_config(cfg, fast_config)
 
     _run_system(system_path, cfg)
@@ -74,9 +94,9 @@ def test_mava_system(fast_config: dict, system_path: str) -> None:
 
 @pytest.mark.parametrize("env_name", discrete_envs)
 def test_discrete_env(fast_config: dict, env_name: str) -> None:
-    """Tests all discrete environments on ff_mappo."""
-    system_path = "ppo.ff_mappo"
-    system_name = "ff_mappo"
+    """Test all discrete envs on random systems."""
+    system_path = random.choice(ppo_systems + q_learning_systems)
+    _, system_name = system_path.split(".")
 
     with initialize(version_base=None, config_path="../mava/configs/"):
         cfg = compose(config_name=f"default_{system_name}", overrides=[f"env={env_name}"])
@@ -87,11 +107,13 @@ def test_discrete_env(fast_config: dict, env_name: str) -> None:
 
 @pytest.mark.parametrize("env_name", cnn_envs)
 def test_discrete_cnn_env(fast_config: dict, env_name: str) -> None:
-    """Tests all cnn environments on ff_mappo."""
-    system_path = "ppo.ff_mappo"
-    system_name = "ff_mappo"
+    """Test all 2D envs on random systems."""
+    system_path = random.choice(ppo_systems)
+    _, system_name = system_path.split(".")
 
-    overrides = [f"env={env_name}", "network=cnn"]
+    network = "cnn" if "ff" in system_name else "rcnn"
+
+    overrides = [f"env={env_name}", f"network={network}"]
     with initialize(version_base=None, config_path="../mava/configs/"):
         cfg = compose(config_name=f"default_{system_name}", overrides=overrides)
         cfg = _get_fast_config(cfg, fast_config)
@@ -103,12 +125,13 @@ def test_discrete_cnn_env(fast_config: dict, env_name: str) -> None:
 @pytest.mark.skip(reason="MaBrax is the only continuous env and already tested in test_mava_system")
 @pytest.mark.parametrize("env_name", continuous_envs)
 def test_continuous_env(fast_config: dict, env_name: str) -> None:
-    """Tests all continuous environments on ff_masac."""
-    system_path = "sac.ff_masac"
-    system_name = "ff_masac"
+    """Test all continuous envs on random systems."""
+    system_path = random.choice(ppo_systems + sac_systems)
+    _, system_name = system_path.split(".")
 
+    overrides = [f"env={env_name}", "network=continuous_mlp"]
     with initialize(version_base=None, config_path="../mava/configs/"):
-        cfg = compose(config_name=f"default_{system_name}", overrides=[f"env={env_name}"])
+        cfg = compose(config_name=f"default_{system_name}", overrides=overrides)
         cfg = _get_fast_config(cfg, fast_config)
 
     _run_system(system_path, cfg)
