@@ -196,7 +196,7 @@ class GymAgentIDWrapper(gymnasium.Wrapper):
 
 
 class GymToJumanji(gymnasium.Wrapper):
-    """Converts Gym outputs to Jumanji timesteps"""
+    """Converts from the Gym API to the dm_env API, Jumanji's Timestep type."""
 
     def reset(
         self, seed: Optional[list[int]] = None, options: Optional[list[dict]] = None
@@ -227,9 +227,8 @@ class GymToJumanji(gymnasium.Wrapper):
     ) -> Union[Observation, ObservationGlobalState]:
         """Create an observation from the raw observation and environment state."""
 
-        obs = np.array(obs).swapaxes(
-            0, 1
-        )  # (num_agents, num_envs, ...) -> (num_envs, num_agents, ...)
+        # (num_agents, num_envs, ...) -> (num_envs, num_agents, ...)
+        obs = np.array(obs).swapaxes(0, 1)
         action_mask = np.stack(info["actions_mask"])
         obs_data = {"agents_view": obs, "action_mask": action_mask}
 

@@ -284,8 +284,8 @@ def get_sebulba_eval_fn(
 
             # find the first instance of done to get the metrics at that timestep, we don't
             # care about subsequent steps because we only the results from the first episode
-            done_idx = jnp.argmax(timesteps.last(), axis=0)
-            metrics = jax.tree_map(lambda m: m[done_idx, jnp.arange(n_parallel_envs)], metrics)
+            done_idx = np.argmax(timesteps.last(), axis=0)
+            metrics = jax.tree_map(lambda m: m[done_idx, np.arange(n_parallel_envs)], metrics)
             del metrics["is_terminal_step"]  # uneeded for logging
 
             return key, metrics
@@ -299,7 +299,7 @@ def get_sebulba_eval_fn(
             metrics.append(metric)
 
         metrics: Metrics = jax.tree_map(
-            lambda *x: jnp.array(x).reshape(-1), *metrics
+            lambda *x: np.array(x).reshape(-1), *metrics
         )  # flatten metrics
         return metrics
 

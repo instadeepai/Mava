@@ -56,13 +56,28 @@ from mava.wrappers.episode_metrics import get_final_step_metrics
 def rollout(
     key: chex.PRNGKey,
     config: DictConfig,
-    rollout_pipeline: Pipeline,
+    rollout_queue: Pipeline,
     params_source: ParamsSource,
-    apply_fns: Tuple,
+    apply_fns: Tuple[ActorApply, CriticApply],
     actor_device_id: int,
     seeds: List[int],
     thread_lifetime: ThreadLifetime,
 ) -> None:
+    """Runs rollouts to collect trajectories from the environment.
+
+    Args:
+        key (chex.PRNGKey): The PRNGkey.
+        config (DictConfig): Configuration settings for the environment and rollout.
+        rollout_queue (Pipeline): Queue for sending collected rollouts.
+        params_source (ParamsSource): Source for fetching the latest network parameters.
+        apply_fns (Tuple): Functions for running the actor and critic networks.
+        actor_device_id (int): Actor device id for the current thread.
+        seeds (List[int]): Seeds for initializing the environment.
+        thread_lifetime (ThreadLifetime): Manages the thread's lifecycle.
+
+    Returns:
+        None: This function updates the rollout queue with collected data.
+    """
     # setup
     env = environments.make_gym_env(config, config.arch.num_envs)
     current_actor_device = jax.devices()[actor_device_id]
@@ -88,10 +103,7 @@ def rollout(
 
     timestep = env.reset(seed=seeds)
 
-    next_dones = jax.tree_util.tree_map(
-        lambda x: jnp.repeat(x, num_agents).reshape(num_envs, -1),
-        timestep.last(),
-    )
+    next_dones = jnp.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
 
     move_to_device = lambda x: jax.device_put(x, device=current_actor_device)
 
@@ -99,13 +111,20 @@ def rollout(
     while not thread_lifetime.should_stop():
         # Rollout
         traj: List = []
-        time_dict: Dict[str, List[float]] = {"single_rollout": [], "env_step_time": []}
+        time_dict: Dict[str, List[float]] = {
+            "single_rollout_time": [],
+            "env_step_time": [],
+            "getting_params_time": [],
+            "putting_rollout_time": [],
+        }
 
         # Loop over the rollout length
-        with RecordTimeTo(time_dict["single_rollout"]):
+        with RecordTimeTo(time_dict["single_rollout_time"]):
             for _ in range(config.system.rollout_length):
                 # Get the latest parameters from the learner
-                params = params_source.get()
+
+                with RecordTimeTo(time_dict["getting_params_time"]):
+                    params = params_source.get()
 
                 cached_next_obs = jax.tree.map(move_to_device, timestep.observation)
                 cached_next_dones = move_to_device(next_dones)
@@ -126,10 +145,7 @@ def rollout(
                         cpu_action.swapaxes(0, 1)
                     )  # (num_env, num_agents) --> (num_agents, num_env)
 
-                next_dones = jax.tree_util.tree_map(
-                    lambda x: jnp.repeat(x, num_agents).reshape(num_envs, -1),
-                    timestep.last(),
-                )
+                next_dones = jnp.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
 
                 # Append data to storage
                 traj.append(
@@ -143,8 +159,9 @@ def rollout(
                         info=timestep.extras,
                     )
                 )
-
-        rollout_pipeline.put(traj, timestep.observation, next_dones, time_dict)
+        # send trajectories to learner
+        with RecordTimeTo(time_dict["putting_rollout_time"]):
+            rollout_queue.put(traj, timestep.observation, next_dones, time_dict)
     env.close()
 
 
@@ -167,10 +184,9 @@ def get_learner_fn(
     ) -> Tuple[LearnerState, Tuple]:
         """A single update of the network.
 
-        This function steps the environment and records the trajectory batch for
-        training. It then calculates advantages and targets based on the recorded
-        trajectory and updates the actor and critic networks based on the calculated
-        losses.
+        This function calculates advantages and targets based on the trajectories
+        from the actor and updates the actor and critic networks based on the
+        calculated losses.
 
         Args:
             learner_state (NamedTuple):
@@ -295,12 +311,12 @@ def get_learner_fn(
                 # pmean over devices.
                 actor_grads, actor_loss_info = jax.lax.pmean(
                     (actor_grads, actor_loss_info),
-                    axis_name="device",
+                    axis_name="learner_devices",
                 )
 
-                # pmean over devices.
+                # pmean over learner devices.
                 critic_grads, critic_loss_info = jax.lax.pmean(
-                    (critic_grads, critic_loss_info), axis_name="device"
+                    (critic_grads, critic_loss_info), axis_name="learner_devices"
                 )
 
                 # UPDATE ACTOR PARAMS AND OPTIMISER STATE
@@ -460,7 +476,7 @@ def learner_setup(
 
     # Get batched iterated update and replicate it to pmap it over learner cores.
     learn = get_learner_fn(apply_fns, update_fns, config)
-    learn = jax.pmap(learn, axis_name="device", devices=learner_devices)
+    learn = jax.pmap(learn, axis_name="learner_devices", devices=learner_devices)
 
     # Load model from checkpoint if specified.
     if config.logger.checkpointing.load_model:
@@ -523,10 +539,10 @@ def learner(
         episode_metrics, train_metrics = jax.tree.map(lambda *x: np.asarray(x), *metrics)
 
         rollout_times = jax.tree.map(lambda *x: np.mean(x), *rollout_times)
-        times_dict = rollout_times | eval_times
-        times_dict = jax.tree.map(np.mean, times_dict, is_leaf=lambda x: isinstance(x, list))
+        timing_dict = rollout_times | eval_times
+        timing_dict = jax.tree.map(np.mean, timing_dict, is_leaf=lambda x: isinstance(x, list))
 
-        learner_queue.put((episode_metrics, train_metrics, learner_state, times_dict))
+        learner_queue.put((episode_metrics, train_metrics, learner_state, timing_dict))
 
 
 def run_experiment(_config: DictConfig) -> float:
@@ -646,17 +662,19 @@ def run_experiment(_config: DictConfig) -> float:
     max_episode_return = -jnp.inf
     best_params = unreplicated_inital_params.actor_params
 
+    # This is the main loop, all it does is evaluation and logging.
+    # Acting and learning is happening in their own threads.
+    # This loop waits for the learner to finish an update before evaluation and logging.
     for eval_step in range(config.arch.num_evaluation):
-        # Get the next set of params and metrics from the evaluator
+        # Get the next set of params and metrics from the learner
         episode_metrics, train_metrics, learner_state, times_dict = learner_queue.get()
 
         t = int(steps_per_rollout * (eval_step + 1))
-
         times_dict["timestep"] = t
         logger.log(times_dict, t, eval_step, LogEvent.MISC)
 
         episode_metrics, ep_completed = get_final_step_metrics(episode_metrics)
-        episode_metrics["steps_per_second"] = steps_per_rollout / times_dict["single_rollout"]
+        episode_metrics["steps_per_second"] = steps_per_rollout / times_dict["single_rollout_time"]
         if ep_completed:
             logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
 
