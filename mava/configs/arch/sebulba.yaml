@@ -2,15 +2,15 @@
 architecture_name: sebulba
 
 # --- Training ---
-num_envs: 2  # number of environments per thread.
+num_envs: 32  # number of environments per thread.
 
 # --- Evaluation ---
 evaluation_greedy: False # Evaluate the policy greedily. If True the policy will select
   # an action which corresponds to the greatest logit. If false, the policy will sample
   # from the logits.
-num_eval_episodes: 2 # Number of episodes to evaluate per evaluation.
+num_eval_episodes: 200 # Number of episodes to evaluate per evaluation.
 num_evaluation: 10 # Number of evenly spaced evaluations to perform during training.
-num_absolute_metric_eval_episodes: 2  # Number of episodes to evaluate the absolute metric (the final evaluation).
+num_absolute_metric_eval_episodes: 32  # Number of episodes to evaluate the absolute metric (the final evaluation).
 absolute_metric: True # Whether the absolute metric should be computed. For more details
 # on the absolute metric please see: https://arxiv.org/abs/2209.10485
 

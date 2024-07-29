@@ -27,6 +27,7 @@ import numpy as np
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
+from jax import tree
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
@@ -126,7 +127,7 @@ def rollout(
                 with RecordTimeTo(time_dict["getting_params_time"]):
                     params = params_source.get()
 
-                cached_next_obs = jax.tree.map(move_to_device, timestep.observation)
+                cached_next_obs = tree.map(move_to_device, timestep.observation)
                 cached_next_dones = move_to_device(next_dones)
 
                 # Get action and value
@@ -474,7 +475,6 @@ def learner_setup(
     apply_fns = (actor_network.apply, critic_network.apply)
     update_fns = (actor_optim.update, critic_optim.update)
 
-    # Get batched iterated update and replicate it to pmap it over learner cores.
     learn = get_learner_fn(apply_fns, update_fns, config)
     learn = jax.pmap(learn, axis_name="learner_devices", devices=learner_devices)
 
@@ -536,11 +536,11 @@ def learner(
                 source.update(unreplicated_params)
 
         # Pass to the evaluator
-        episode_metrics, train_metrics = jax.tree.map(lambda *x: np.asarray(x), *metrics)
+        episode_metrics, train_metrics = tree.map(lambda *x: np.asarray(x), *metrics)
 
-        rollout_times = jax.tree.map(lambda *x: np.mean(x), *rollout_times)
+        rollout_times = tree.map(lambda *x: np.mean(x), *rollout_times)
         timing_dict = rollout_times | eval_times
-        timing_dict = jax.tree.map(np.mean, timing_dict, is_leaf=lambda x: isinstance(x, list))
+        timing_dict = tree.map(np.mean, timing_dict, is_leaf=lambda x: isinstance(x, list))
 
         learner_queue.put((episode_metrics, train_metrics, learner_state, timing_dict))
 
@@ -553,8 +553,8 @@ def run_experiment(_config: DictConfig) -> float:
     learner_devices = [devices[d_id] for d_id in config.arch.learner_device_ids]
 
     # PRNG keys.
-    key, key_e, actor_net_key, critic_net_key = jax.random.split(
-        jax.random.PRNGKey(config.system.seed), num=4
+    key, actor_net_key, critic_net_key = jax.random.split(
+        jax.random.PRNGKey(config.system.seed), num=3
     )
 
     # Sanity check of config
