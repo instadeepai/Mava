@@ -697,7 +697,7 @@ def run_experiment(_config: DictConfig) -> float:
 
 
 @hydra.main(
-    config_path="../../../configs", config_name="default_ff_ippo_seb.yaml", version_base="1.2"
+    config_path="../../../configs", config_name="default_ff_ippo_sebulba.yaml", version_base="1.2"
 )
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
