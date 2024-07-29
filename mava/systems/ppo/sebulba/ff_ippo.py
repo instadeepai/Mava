@@ -48,7 +48,7 @@ from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import merge_leading_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.sebulba_utils import ParamsSource, Pipeline, RecordTimeTo, ThreadLifetime
-from mava.utils.total_timestep_checker import sebulba_check_total_timesteps
+from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
@@ -95,7 +95,7 @@ def rollout(
 
     move_to_device = lambda x: jax.device_put(x, device=current_actor_device)
 
-    # Loop till the learner has finished training
+    # Loop till the desired num_updates is reached.
     while not thread_lifetime.should_stop():
         # Rollout
         traj: List = []
@@ -568,7 +568,7 @@ def run_experiment(_config: DictConfig) -> float:
     )
 
     # Calculate total timesteps.
-    config = sebulba_check_total_timesteps(config)
+    config = check_total_timesteps(config)
     assert (
         config.system.num_updates > config.arch.num_evaluation
     ), "Number of updates per evaluation must be less than total number of updates."
@@ -598,7 +598,7 @@ def run_experiment(_config: DictConfig) -> float:
     unreplicated_inital_params = flax.jax_utils.unreplicate(learner_state.params)
     params_sources: List[ParamsSource] = []
     thread_lifetimes: List[ThreadLifetime] = []
-    pipeline = Pipeline(config.arh.Pilpeline_queue_size, learner_devices)
+    pipeline = Pipeline(config.arch.pilpeline_queue_size, learner_devices)
     pipeline.start()
 
     # Create the actor threads
@@ -712,6 +712,3 @@ def hydra_entry_point(cfg: DictConfig) -> float:
 
 if __name__ == "__main__":
     hydra_entry_point()
-
-# learner_output.episode_metrics.keys()
-# dict_keys(['episode_length', 'episode_return'])

@@ -17,7 +17,7 @@ absolute_metric: True # Whether the absolute metric should be computed. For more
 n_threads_per_executor: 2  # num of different threads/env batches per actor
 executor_device_ids: [0] # ids of actor devices
 learner_device_ids: [0] # ids of learner devices
-Pilpeline_queue_size : 2
+pilpeline_queue_size : 5
 # The size of the pipeline queue determines the extent of off-policy training allowed. A larger value permits more off-policy training.
 # Too large of a value with too many actors will lead to all of the updates getting wasted in old episodes
 # Too small of a value and the utility of having multiple actors is lost.
