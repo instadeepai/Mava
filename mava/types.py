@@ -156,8 +156,6 @@ LearnerFn = Callable[[MavaState], ExperimentOutput[MavaState]]
 SebulbaLearnerFn = Callable[
     [MavaState, MavaTransition, chex.Array, chex.Array], ExperimentOutput[MavaState]
 ]
-EvalFn = Callable[[FrozenDict, chex.PRNGKey], ExperimentOutput[MavaState]]
-
 ActorApply = Callable[[FrozenDict, Observation], Distribution]
 CriticApply = Callable[[FrozenDict, Observation], Value]
 RecActorApply = Callable[

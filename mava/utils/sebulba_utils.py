@@ -27,6 +27,19 @@ from mava.types import Observation, ObservationGlobalState
 
 
 # Copied from https://github.com/instadeepai/sebulba/blob/main/sebulba/core.py
+class ThreadLifetime:
+    """Simple class for a mutable boolean that can be used to signal a thread to stop."""
+
+    def __init__(self) -> None:
+        self._stop = False
+
+    def should_stop(self) -> bool:
+        return self._stop
+
+    def stop(self) -> None:
+        self._stop = True
+
+
 class Pipeline(threading.Thread):
     """
     The `Pipeline` shards trajectories into `learner_devices`,
@@ -34,7 +47,7 @@ class Pipeline(threading.Thread):
     and limit the max number of samples in device memory at one time to avoid OOM issues.
     """
 
-    def __init__(self, max_size: int, learner_devices: List[jax.Device]):
+    def __init__(self, max_size: int, learner_devices: List[jax.Device], lifetime: ThreadLifetime):
         """
         Initializes the pipeline with a maximum size and the devices to shard trajectories across.
 
@@ -46,6 +59,7 @@ class Pipeline(threading.Thread):
         self.learner_devices = learner_devices
         self.tickets_queue: queue.Queue = queue.Queue()
         self._queue: queue.Queue = queue.Queue(maxsize=max_size)
+        self.lifetime = lifetime
 
     def run(self) -> None:
         """
@@ -53,12 +67,15 @@ class Pipeline(threading.Thread):
         start_condition and end_condition are used to ensure that only 1 thread is processing an
         item from the queue at one time, ensuring predictable memory usage.
         """
-        while True:  # todo Thread lifetime
-            start_condition, end_condition = self.tickets_queue.get()
-            with end_condition:
-                with start_condition:
-                    start_condition.notify()
-                end_condition.wait()
+        while not self.lifetime.should_stop():
+            try:
+                start_condition, end_condition = self.tickets_queue.get(timeout=1)
+                with end_condition:
+                    with start_condition:
+                        start_condition.notify()
+                    end_condition.wait()
+            except queue.Empty:
+                continue
 
     def put(
         self,
@@ -112,18 +129,19 @@ class ParamsSource(threading.Thread):
     `Learner` component to `Actor` components.
     """
 
-    def __init__(self, init_value: Params, device: jax.Device):
+    def __init__(self, init_value: Params, device: jax.Device, lifetime: ThreadLifetime):
         super().__init__(name=f"ParamsSource-{device.id}")
         self.value: Params = jax.device_put(init_value, device)
         self.device = device
         self.new_value: queue.Queue = queue.Queue()
+        self.lifetime = lifetime
 
     def run(self) -> None:
         """
         This function is responsible for updating the value of the `ParamSource` when a new value
         is available.
         """
-        while True:
+        while not self.lifetime.should_stop():
             try:
                 waiting = self.new_value.get(block=True, timeout=1)
                 self.value = jax.device_put(jax.block_until_ready(waiting), self.device)
@@ -154,16 +172,3 @@ class RecordTimeTo:
     def __exit__(self, *args: Any) -> None:
         end = time.monotonic()
         self.to.append(end - self.start)
-
-
-class ThreadLifetime:
-    """Simple class for a mutable boolean that can be used to signal a thread to stop."""
-
-    def __init__(self) -> None:
-        self._stop = False
-
-    def should_stop(self) -> bool:
-        return self._stop
-
-    def stop(self) -> None:
-        self._stop = True

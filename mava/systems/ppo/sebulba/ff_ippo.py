@@ -145,6 +145,7 @@ def rollout(
                 )
 
         rollout_pipeline.put(traj, timestep.observation, next_dones, time_dict)
+    env.close()
 
 
 def get_learner_fn(
@@ -408,7 +409,7 @@ def learner_setup(
     # create temporory envoirnments.
     env = environments.make_gym_env(config, config.arch.num_envs)
     # Get number of agents and actions.
-    action_space = env.single_action_space
+    action_space = env.unwrapped.single_action_space
     config.system.num_agents = len(action_space)
     config.system.num_actions = int(action_space[0].n)
 
@@ -438,7 +439,7 @@ def learner_setup(
     )
 
     # Initialise observation: Select only obs for a single agent.
-    init_obs = jnp.array([env.single_observation_space.sample()])
+    init_obs = jnp.array([env.unwrapped.single_observation_space.sample()])
     init_action_mask = jnp.ones((config.system.num_agents, config.system.num_actions))
     init_x = Observation(init_obs, init_action_mask)
 
@@ -563,7 +564,7 @@ def run_experiment(_config: DictConfig) -> float:
     # Setup evaluator.
     # One key per device for evaluation.
     eval_act_fn = make_ff_eval_act_fn(apply_fns[0], config)
-    evaluator = get_eval_fn(
+    evaluator, evaluator_envs = get_eval_fn(
         environments.make_gym_env, eval_act_fn, config, np_rng, absolute_metric=False
     )
 
@@ -596,10 +597,15 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Executor setup and launch.
     unreplicated_inital_params = flax.jax_utils.unreplicate(learner_state.params)
-    params_sources: List[ParamsSource] = []
-    thread_lifetimes: List[ThreadLifetime] = []
-    pipeline = Pipeline(config.arch.pilpeline_queue_size, learner_devices)
+
+    pipeline_lifetime = ThreadLifetime()
+    pipeline = Pipeline(config.arch.rollout_queue_size, learner_devices, pipeline_lifetime)
     pipeline.start()
+
+    params_sources: List[ParamsSource] = []
+    actor_threads: List[threading.Thread] = []
+    actors_lifetime = ThreadLifetime()
+    params_sources_lifetime = ThreadLifetime()
 
     # Create the actor threads
     for d_idx, d_id in enumerate(config.arch.executor_device_ids):
@@ -607,14 +613,13 @@ def run_experiment(_config: DictConfig) -> float:
         for thread_id in range(config.arch.n_threads_per_executor):
             seeds = np_rng.integers(np.iinfo(np.int32).max, size=config.arch.num_envs).tolist()
 
-            params_source = ParamsSource(unreplicated_inital_params, devices[d_id])
+            params_source = ParamsSource(
+                unreplicated_inital_params, devices[d_id], params_sources_lifetime
+            )
             params_source.start()
             params_sources.append(params_source)
 
-            lifetime = ThreadLifetime()
-            thread_lifetimes.append(lifetime)
-
-            threading.Thread(
+            actor = threading.Thread(
                 target=rollout,
                 args=(
                     jax.device_put(key, devices[d_id]),
@@ -624,10 +629,12 @@ def run_experiment(_config: DictConfig) -> float:
                     apply_fns,
                     d_id,
                     seeds,
-                    lifetime,
+                    actors_lifetime,
                 ),
                 name=f"Actor-{thread_id + d_idx * config.arch.n_threads_per_executor}",
-            ).start()
+            )
+            actor.start()
+            actor_threads.append(actor)
 
     learner_queue: Queue = Queue()
     threading.Thread(
@@ -674,14 +681,19 @@ def run_experiment(_config: DictConfig) -> float:
             best_params = copy.deepcopy(unreplicated_actor_params)
             max_episode_return = episode_return
 
-    for thread_lifetime in thread_lifetimes:
-        thread_lifetime.stop()
-
+    evaluator_envs.close()
     eval_performance = float(jnp.mean(eval_metrics[config.env.eval_metric]))
+
+    # Make sure all of the actors are done befor closing the pipeline
+    actors_lifetime.stop()
+    for actor in actor_threads:
+        actor.join()
+    pipeline_lifetime.stop()
+    params_sources_lifetime.stop()
 
     # Measure absolute metric.
     if config.arch.absolute_metric:
-        abs_metric_evaluator = get_eval_fn(
+        abs_metric_evaluator, abs_metric_evaluator_envs = get_eval_fn(
             environments.make_gym_env, eval_act_fn, config, np_rng, absolute_metric=True
         )
         key, eval_key = jax.random.split(key, 2)
@@ -689,7 +701,7 @@ def run_experiment(_config: DictConfig) -> float:
 
         t = int(steps_per_rollout * (eval_step + 1))
         logger.log(eval_metrics, t, eval_step, LogEvent.ABSOLUTE)
-
+        abs_metric_evaluator_envs.close()
     # Stop the logger.
     logger.stop()
 

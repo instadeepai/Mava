@@ -215,7 +215,7 @@ def get_sebulba_eval_fn(
     config: DictConfig,
     np_rng: np.random.Generator,
     absolute_metric: bool,
-) -> EvalFn:
+) -> Tuple[EvalFn, Any]:
     """Creates a function that can be used to evaluate agents on a given environment.
 
     Args:
@@ -314,4 +314,4 @@ def get_sebulba_eval_fn(
         metrics["steps_per_second"] = total_timesteps / (end_time - start_time)
         return metrics
 
-    return timed_eval_fn
+    return timed_eval_fn, env
