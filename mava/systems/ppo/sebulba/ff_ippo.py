@@ -27,9 +27,9 @@ import numpy as np
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
+from flax.jax_utils import unreplicate
 from jax import tree
 from omegaconf import DictConfig, OmegaConf
-from optax._src.base import OptState
 from rich.pretty import pprint
 
 from mava.evaluator import get_sebulba_eval_fn as get_eval_fn
@@ -85,9 +85,10 @@ def rollout(
     """
     # setup
     env = environments.make_gym_env(config, config.arch.num_envs)
-    current_actor_device = jax.devices()[actor_device_id]
     actor_apply_fn, critic_apply_fn = apply_fns
     num_agents, num_envs = config.system.num_agents, config.arch.num_envs
+    current_actor_device = jax.devices()[actor_device_id]
+    move_to_device = lambda x: jax.device_put(x, device=current_actor_device)
 
     # Define the util functions: select action function and prepare data to share it with learner.
     @jax.jit
@@ -107,40 +108,31 @@ def rollout(
         return action, log_prob, value, key
 
     timestep = env.reset(seed=seeds)
-
     next_dones = jnp.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
-
-    move_to_device = lambda x: jax.device_put(x, device=current_actor_device)
 
     # Loop till the desired num_updates is reached.
     while not thread_lifetime.should_stop():
         # Rollout
-        traj: List = []
+        traj: List[PPOTransition] = []
         time_dict: Dict[str, List[float]] = {
             "single_rollout_time": [],
             "env_step_time": [],
             "get_params_time": [],
-            "put_rollout_time": [],
+            "rollout_put_time": [],
         }
 
         # Loop over the rollout length
         with RecordTimeTo(time_dict["single_rollout_time"]):
             for _ in range(config.system.rollout_length):
-                # Get the latest parameters from the learner
-
                 with RecordTimeTo(time_dict["get_params_time"]):
+                    # Get the latest parameters from the learner
                     params = params_source.get()
 
                 cached_next_obs = tree.map(move_to_device, timestep.observation)
                 cached_next_dones = move_to_device(next_dones)
 
                 # Get action and value
-                (
-                    action,
-                    log_prob,
-                    value,
-                    key,
-                ) = get_action_and_value(params, cached_next_obs, key)
+                action, log_prob, value, key = get_action_and_value(params, cached_next_obs, key)
 
                 # Step the environment
                 cpu_action = jax.device_get(action)
@@ -152,19 +144,15 @@ def rollout(
                 next_dones = jnp.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
 
                 # Append data to storage
+                reward = timestep.reward
+                info = timestep.extras
                 traj.append(
                     PPOTransition(
-                        done=cached_next_dones,
-                        action=action,
-                        value=value,
-                        reward=timestep.reward,
-                        log_prob=log_prob,
-                        obs=cached_next_obs,
-                        info=timestep.extras,
+                        cached_next_dones, action, value, reward, log_prob, cached_next_obs, info
                     )
                 )
         # send trajectories to learner
-        with RecordTimeTo(time_dict["put_rollout_time"]):
+        with RecordTimeTo(time_dict["rollout_put_time"]):
             rollout_queue.put(traj, timestep.observation, next_dones, time_dict)
     env.close()
 
@@ -189,8 +177,7 @@ def get_learner_fn(
         """A single update of the network.
 
         This function calculates advantages and targets based on the trajectories
-        from the actor and updates the actor and critic networks based on the
-        calculated losses.
+        from the actor and updates the actor and critic networks based on the losses.
 
         Args:
             learner_state (LearnerState): contains all the items needed for learning.
@@ -222,7 +209,7 @@ def get_learner_fn(
             )
             return advantages, advantages + traj_batch.value
 
-        # CALCULATE ADVANTAGE
+        # Calculate advantage
         params, opt_states, key, _, _ = learner_state
         last_val = critic_apply_fn(params.critic_params, last_obs)
         advantages, targets = _calculate_gae(traj_batch, last_val, last_dones)
@@ -233,23 +220,22 @@ def get_learner_fn(
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
 
-                # UNPACK TRAIN STATE AND BATCH INFO
+                # Unpack train state and batch info
                 params, opt_states, key = train_state
                 traj_batch, advantages, targets = batch_info
 
                 def _actor_loss_fn(
                     actor_params: FrozenDict,
-                    actor_opt_state: OptState,
                     traj_batch: PPOTransition,
                     gae: chex.Array,
                     key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate the actor loss."""
-                    # RERUN NETWORK
+                    # Rerun network
                     actor_policy = actor_apply_fn(actor_params, traj_batch.obs)
                     log_prob = actor_policy.log_prob(traj_batch.action)
 
-                    # CALCULATE ACTOR LOSS
+                    # Calculate actor loss
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
                     gae = (gae - gae.mean()) / (gae.std() + 1e-8)
                     loss_actor1 = ratio * gae
@@ -270,16 +256,13 @@ def get_learner_fn(
                     return total_loss_actor, (loss_actor, entropy)
 
                 def _critic_loss_fn(
-                    critic_params: FrozenDict,
-                    critic_opt_state: OptState,
-                    traj_batch: PPOTransition,
-                    targets: chex.Array,
+                    critic_params: FrozenDict, traj_batch: PPOTransition, targets: chex.Array
                 ) -> Tuple:
                     """Calculate the critic loss."""
-                    # RERUN NETWORK
+                    # Rerun network
                     value = critic_apply_fn(critic_params, traj_batch.obs)
 
-                    # CALCULATE VALUE LOSS
+                    # Calculate value loss
                     value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
                         -config.system.clip_eps, config.system.clip_eps
                     )
@@ -290,21 +273,17 @@ def get_learner_fn(
                     critic_total_loss = config.system.vf_coef * value_loss
                     return critic_total_loss, (value_loss)
 
-                # CALCULATE ACTOR LOSS
+                # Calculate actor loss
                 key, entropy_key = jax.random.split(key)
                 actor_grad_fn = jax.value_and_grad(_actor_loss_fn, has_aux=True)
                 actor_loss_info, actor_grads = actor_grad_fn(
-                    params.actor_params,
-                    opt_states.actor_opt_state,
-                    traj_batch,
-                    advantages,
-                    entropy_key,
+                    params.actor_params, traj_batch, advantages, entropy_key
                 )
 
-                # CALCULATE CRITIC LOSS
+                # Calculate critic loss
                 critic_grad_fn = jax.value_and_grad(_critic_loss_fn, has_aux=True)
                 critic_loss_info, critic_grads = critic_grad_fn(
-                    params.critic_params, opt_states.critic_opt_state, traj_batch, targets
+                    params.critic_params, traj_batch, targets
                 )
 
                 # Compute the parallel mean (pmean) over the batch.
@@ -321,22 +300,22 @@ def get_learner_fn(
                     (critic_grads, critic_loss_info), axis_name="learner_devices"
                 )
 
-                # UPDATE ACTOR PARAMS AND OPTIMISER STATE
+                # Update actor params and optimiser state
                 actor_updates, actor_new_opt_state = actor_update_fn(
                     actor_grads, opt_states.actor_opt_state
                 )
                 actor_new_params = optax.apply_updates(params.actor_params, actor_updates)
 
-                # UPDATE CRITIC PARAMS AND OPTIMISER STATE
+                # Update critic params and optimiser state
                 critic_updates, critic_new_opt_state = critic_update_fn(
                     critic_grads, opt_states.critic_opt_state
                 )
                 critic_new_params = optax.apply_updates(params.critic_params, critic_updates)
 
-                # PACK NEW PARAMS AND OPTIMISER STATE
+                # Pack new params and optimiser state
                 new_params = Params(actor_new_params, critic_new_params)
                 new_opt_state = OptStates(actor_new_opt_state, critic_new_opt_state)
-                # PACK LOSS INFO
+                # Pack loss info
                 total_loss = actor_loss_info[0] + critic_loss_info[0]
                 value_loss = critic_loss_info[1]
                 actor_loss = actor_loss_info[1][0]
@@ -351,21 +330,19 @@ def get_learner_fn(
 
             params, opt_states, traj_batch, advantages, targets, key = update_state
             key, shuffle_key, entropy_key = jax.random.split(key, 3)
-            # SHUFFLE MINIBATCHES
+            # Shuffle minibatches
             batch_size = config.system.rollout_length * (
                 config.arch.num_envs // len(config.arch.learner_device_ids)
             )
             permutation = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
-            batch = jax.tree_util.tree_map(lambda x: merge_leading_dims(x, 2), batch)
-            shuffled_batch = jax.tree_util.tree_map(
-                lambda x: jnp.take(x, permutation, axis=0), batch
-            )
-            minibatches = jax.tree_util.tree_map(
+            batch = tree.map(lambda x: merge_leading_dims(x, 2), batch)
+            shuffled_batch = tree.map(lambda x: jnp.take(x, permutation, axis=0), batch)
+            minibatches = tree.map(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 shuffled_batch,
             )
-            # UPDATE MINIBATCHES
+            # Update minibatches
             (params, opt_states, entropy_key), loss_info = jax.lax.scan(
                 _update_minibatch, (params, opt_states, entropy_key), minibatches
             )
@@ -374,7 +351,7 @@ def get_learner_fn(
             return update_state, loss_info
 
         update_state = (params, opt_states, traj_batch, advantages, targets, key)
-        # UPDATE EPOCHS
+        # Update epochs
         update_state, loss_info = jax.lax.scan(
             _update_epoch, update_state, None, config.system.ppo_epochs
         )
@@ -418,7 +395,7 @@ def get_learner_fn(
 
 
 def learner_setup(
-    keys: chex.Array, config: DictConfig, learner_devices: List
+    key: chex.PRNGKey, config: DictConfig, learner_devices: List
 ) -> Tuple[
     SebulbaLearnerFn[LearnerState, PPOTransition], Tuple[ActorApply, CriticApply], LearnerState
 ]:
@@ -432,7 +409,7 @@ def learner_setup(
     config.system.num_actions = int(action_space[0].n)
 
     # PRNG keys.
-    key, actor_net_key, critic_net_key = keys
+    key, actor_key, critic_key = jax.random.split(key, 3)
 
     # Define network and optimiser.
     actor_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
@@ -462,11 +439,11 @@ def learner_setup(
     init_x = Observation(init_obs, init_action_mask)
 
     # Initialise actor params and optimiser state.
-    actor_params = actor_network.init(actor_net_key, init_x)
+    actor_params = actor_network.init(actor_key, init_x)
     actor_opt_state = actor_optim.init(actor_params)
 
     # Initialise critic params and optimiser state.
-    critic_params = critic_network.init(critic_net_key, init_x)
+    critic_params = critic_network.init(critic_key, init_x)
     critic_opt_state = critic_optim.init(critic_params)
 
     # Pack params.
@@ -517,13 +494,13 @@ def learner(
     for _eval_step in range(config.arch.num_evaluation):
         metrics: List[Tuple[Dict, Dict]] = []
         rollout_times: List[Dict] = []
-        eval_times: Dict[str, List[float]] = {"rollout_get_time": [], "learning_time": []}
+        learn_times: Dict[str, List[float]] = {"rollout_get_time": [], "learning_time": []}
 
         for _update in range(config.system.num_updates_per_eval):
-            with RecordTimeTo(eval_times["rollout_get_time"]):
+            with RecordTimeTo(learn_times["rollout_get_time"]):
                 traj_batch, last_obs, last_dones, rollout_time = pipeline.get(block=True)
 
-            with RecordTimeTo(eval_times["learning_time"]):
+            with RecordTimeTo(learn_times["learning_time"]):
                 learner_state, episode_metrics, train_metrics = learn(
                     learner_state, traj_batch, last_obs, last_dones
                 )
@@ -531,7 +508,7 @@ def learner(
             metrics.append((episode_metrics, train_metrics))
             rollout_times.append(rollout_time)
 
-            unreplicated_params = flax.jax_utils.unreplicate(learner_state.params)
+            unreplicated_params = unreplicate(learner_state.params)
 
             for source in params_sources:
                 source.update(unreplicated_params)
@@ -540,7 +517,7 @@ def learner(
         episode_metrics, train_metrics = tree.map(lambda *x: np.asarray(x), *metrics)
 
         rollout_times = tree.map(lambda *x: np.mean(x), *rollout_times)
-        timing_dict = rollout_times | eval_times
+        timing_dict = rollout_times | learn_times
         timing_dict = tree.map(np.mean, timing_dict, is_leaf=lambda x: isinstance(x, list))
 
         eval_queue.put((episode_metrics, train_metrics, learner_state, timing_dict))
@@ -553,18 +530,12 @@ def run_experiment(_config: DictConfig) -> float:
     devices = jax.devices()
     learner_devices = [devices[d_id] for d_id in config.arch.learner_device_ids]
 
-    # PRNG keys.
-    key, actor_net_key, critic_net_key = jax.random.split(
-        jax.random.PRNGKey(config.system.seed), num=3
-    )
-
-    # Numpy RNG.
+    # JAX and numpy RNGs
+    key = jax.random.PRNGKey(config.system.seed)
     np_rng = np.random.default_rng(config.system.seed)
 
     # Setup learner.
-    learn, apply_fns, learner_state = learner_setup(
-        (key, actor_net_key, critic_net_key), config, learner_devices
-    )
+    learn, apply_fns, learner_state = learner_setup(key, config, learner_devices)
 
     # Setup evaluator.
     # One key per device for evaluation.
@@ -583,9 +554,9 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Logger setup
     logger = MavaLogger(config)
-    cfg: Dict = OmegaConf.to_container(config, resolve=True)
-    cfg["arch"]["devices"] = jax.devices()
-    pprint(cfg)
+    print_cfg: Dict = OmegaConf.to_container(config, resolve=True)
+    print_cfg["arch"]["devices"] = jax.devices()
+    pprint(print_cfg)
 
     # Set up checkpointer
     save_checkpoint = config.logger.checkpointing.save_model
@@ -597,13 +568,14 @@ def run_experiment(_config: DictConfig) -> float:
         )
 
     # Executor setup and launch.
-    unreplicated_inital_params = flax.jax_utils.unreplicate(learner_state.params)
+    inital_params = unreplicate(learner_state.params)
 
-    pipeline_lifetime = ThreadLifetime()
-    pipeline = Pipeline(config.arch.rollout_queue_size, learner_devices, pipeline_lifetime)
-    pipeline.start()
+    # the rollout queue/ the pipe between actor and learner
+    pipe_lifetime = ThreadLifetime()
+    pipe = Pipeline(config.arch.rollout_queue_size, learner_devices, pipe_lifetime)
+    pipe.start()
 
-    params_sources: List[ParamsSource] = []
+    param_sources: List[ParamsSource] = []
     actor_threads: List[threading.Thread] = []
     actors_lifetime = ThreadLifetime()
     params_sources_lifetime = ThreadLifetime()
@@ -613,25 +585,16 @@ def run_experiment(_config: DictConfig) -> float:
         # Loop through each executor thread
         for thread_id in range(config.arch.n_threads_per_executor):
             seeds = np_rng.integers(np.iinfo(np.int32).max, size=config.arch.num_envs).tolist()
+            key, act_key = jax.random.split(key)
+            act_key = jax.device_put(key, devices[d_id])
 
-            params_source = ParamsSource(
-                unreplicated_inital_params, devices[d_id], params_sources_lifetime
-            )
-            params_source.start()
-            params_sources.append(params_source)
+            param_source = ParamsSource(inital_params, devices[d_id], params_sources_lifetime)
+            param_source.start()
+            param_sources.append(param_source)
 
             actor = threading.Thread(
                 target=rollout,
-                args=(
-                    jax.device_put(key, devices[d_id]),
-                    config,
-                    pipeline,
-                    params_sources[-1],
-                    apply_fns,
-                    d_id,
-                    seeds,
-                    actors_lifetime,
-                ),
+                args=(act_key, config, pipe, param_source, apply_fns, d_id, seeds, actors_lifetime),
                 name=f"Actor-{thread_id + d_idx * config.arch.n_threads_per_executor}",
             )
             actor.start()
@@ -641,11 +604,11 @@ def run_experiment(_config: DictConfig) -> float:
     threading.Thread(
         target=learner,
         name="Learner",
-        args=(learn, learner_state, config, eval_queue, pipeline, params_sources),
+        args=(learn, learner_state, config, eval_queue, pipe, param_sources),
     ).start()
 
     max_episode_return = -jnp.inf
-    best_params = unreplicated_inital_params.actor_params
+    best_params = inital_params.actor_params
 
     # This is the main loop, all it does is evaluation and logging.
     # Acting and learning is happening in their own threads.
@@ -665,7 +628,7 @@ def run_experiment(_config: DictConfig) -> float:
 
         logger.log(train_metrics, t, eval_step, LogEvent.TRAIN)
 
-        unreplicated_actor_params = flax.jax_utils.unreplicate(learner_state.params.actor_params)
+        unreplicated_actor_params = unreplicate(learner_state.params.actor_params)
         key, eval_key = jax.random.split(key, 2)
         eval_metrics = evaluator(unreplicated_actor_params, eval_key, {})
         logger.log(eval_metrics, t, eval_step, LogEvent.EVAL)
@@ -692,12 +655,12 @@ def run_experiment(_config: DictConfig) -> float:
     for actor in actor_threads:
         actor.join()
 
-    pipeline_lifetime.stop()
-    pipeline.join()
+    pipe_lifetime.stop()
+    pipe.join()
 
     params_sources_lifetime.stop()
-    for params_source in params_sources:
-        params_source.join()
+    for param_source in param_sources:
+        param_source.join()
 
     # Measure absolute metric.
     if config.arch.absolute_metric:
