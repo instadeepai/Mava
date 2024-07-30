@@ -153,7 +153,7 @@ def rollout(
                 )
         # send trajectories to learner
         with RecordTimeTo(time_dict["rollout_put_time"]):
-            rollout_queue.put(traj, timestep.observation, next_dones, time_dict)
+            rollout_queue.put(traj, timestep, time_dict)
     env.close()
 
 
@@ -164,6 +164,8 @@ def get_learner_fn(
 ) -> SebulbaLearnerFn[LearnerState, PPOTransition]:
     """Get the learner function."""
 
+    num_agents, num_envs = config.system.num_agents, config.arch.num_envs
+
     # Get apply and update functions for actor and critic networks.
     actor_apply_fn, critic_apply_fn = apply_fns
     actor_update_fn, critic_update_fn = update_fns
@@ -171,8 +173,6 @@ def get_learner_fn(
     def _update_step(
         learner_state: LearnerState,
         traj_batch: PPOTransition,
-        last_obs: Observation,
-        last_dones: chex.Array,
     ) -> Tuple[LearnerState, Tuple]:
         """A single update of the network.
 
@@ -182,9 +182,6 @@ def get_learner_fn(
         Args:
             learner_state (LearnerState): contains all the items needed for learning.
             traj_batch (PPOTransition): the batch of data to learn with.
-            last_obs (Observation): the final observations (for bootstrapping in GAE).
-            last_dones (Array): the final dones (for bootstrapping in GAE).
-            _ (Any): The current metrics info.
         """
 
         def _calculate_gae(
@@ -210,8 +207,9 @@ def get_learner_fn(
             return advantages, advantages + traj_batch.value
 
         # Calculate advantage
+        last_dones = jnp.repeat(learner_state.timestep.last(), num_agents).reshape(num_envs, -1)
         params, opt_states, key, _, _ = learner_state
-        last_val = critic_apply_fn(params.critic_params, last_obs)
+        last_val = critic_apply_fn(params.critic_params, learner_state.timestep.observation)
         advantages, targets = _calculate_gae(traj_batch, last_val, last_dones)
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
@@ -357,15 +355,12 @@ def get_learner_fn(
         )
 
         params, opt_states, traj_batch, advantages, targets, key = update_state
-        learner_state = LearnerState(params, opt_states, key, None, None)
+        learner_state = LearnerState(params, opt_states, key, None, learner_state.timestep)
         metric = traj_batch.info
         return learner_state, (metric, loss_info)
 
     def learner_fn(
-        learner_state: LearnerState,
-        traj_batch: PPOTransition,
-        last_obs: Observation,
-        last_dones: chex.Array,
+        learner_state: LearnerState, traj_batch: PPOTransition
     ) -> ExperimentOutput[LearnerState]:
         """Learner function.
 
@@ -379,11 +374,9 @@ def get_learner_fn(
                 - opt_states (OptStates): The initial optimizer state.
                 - key (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
-                - timesteps (TimeStep): The initial timestep in the initial trajectory.
+                - timesteps (TimeStep): The last timestep of the rollout.
         """
-        learner_state, (episode_info, loss_info) = _update_step(
-            learner_state, traj_batch, last_obs, last_dones
-        )
+        learner_state, (episode_info, loss_info) = _update_step(learner_state, traj_batch)
 
         return ExperimentOutput(
             learner_state=learner_state,
@@ -498,12 +491,11 @@ def learner(
 
         for _update in range(config.system.num_updates_per_eval):
             with RecordTimeTo(learn_times["rollout_get_time"]):
-                traj_batch, last_obs, last_dones, rollout_time = pipeline.get(block=True)
+                traj_batch, timestep, rollout_time = pipeline.get(block=True)
 
+            learner_state = learner_state._replace(timestep=timestep)
             with RecordTimeTo(learn_times["learning_time"]):
-                learner_state, episode_metrics, train_metrics = learn(
-                    learner_state, traj_batch, last_obs, last_dones
-                )
+                learner_state, episode_metrics, train_metrics = learn(learner_state, traj_batch)
 
             metrics.append((episode_metrics, train_metrics))
             rollout_times.append(rollout_time)

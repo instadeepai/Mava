@@ -20,11 +20,10 @@ from typing import Any, Dict, List, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
-from chex import Array
+from jumanji.types import TimeStep
 from omegaconf import DictConfig
 
 from mava.systems.ppo.types import Params, PPOTransition  # todo: remove the ppo dependencies
-from mava.types import Observation, ObservationGlobalState
 
 
 # Copied from https://github.com/instadeepai/sebulba/blob/main/sebulba/core.py
@@ -63,8 +62,7 @@ class Pipeline(threading.Thread):
         self.lifetime = lifetime
 
     def run(self) -> None:
-        """
-        This function ensures that trajectories on the queue are consumed in the right order. The
+        """This function ensures that trajectories on the queue are consumed in the right order. The
         start_condition and end_condition are used to ensure that only 1 thread is processing an
         item from the queue at one time, ensuring predictable memory usage.
         """
@@ -78,16 +76,8 @@ class Pipeline(threading.Thread):
             except queue.Empty:
                 continue
 
-    def put(
-        self,
-        traj: Sequence[PPOTransition],
-        next_obs: Union[Observation, ObservationGlobalState],
-        next_dones: Array,
-        time_dict: Dict,
-    ) -> None:
-        """
-        Put a trajectory on the queue to be consumed by the learner.
-        """
+    def put(self, traj: Sequence[PPOTransition], timestep: TimeStep, time_dict: Dict) -> None:
+        """Put a trajectory on the queue to be consumed by the learner."""
         start_condition, end_condition = (threading.Condition(), threading.Condition())
         with start_condition:
             self.tickets_queue.put((start_condition, end_condition))
@@ -96,21 +86,18 @@ class Pipeline(threading.Thread):
         # [PPOTransition()] * rollout_len --> PPOTransition[done=(rollout_len, num_envs, num_agents)
         sharded_traj = jax.tree.map(lambda *x: self.shard_split_playload(jnp.stack(x), 1), *traj)
 
-        # obs Tuple[(num_envs, num_agents, ...), ...] -->
+        # Timestep[(num_envs, num_agents, ...), ...] -->
         # [(num_envs / num_learner_devices, num_agents, ...)] * num_learner_devices
-        sharded_next_obs = jax.tree.map(self.shard_split_playload, next_obs)
+        sharded_timestep = jax.tree.map(self.shard_split_playload, timestep)
 
-        # dones (num_envs, num_agents) -->
-        # [(num_envs / num_learner_devices, num_agents)] * num_learner_devices
-        sharded_next_dones = self.shard_split_playload(next_dones, 0)
-
-        # If the queue gets full at any point we prioritize taking new episodes.
+        # If the queue gets full at any point we prioritize taking removing the oldest rollouts.
         # This also prevents the pipeline from  stalling if the learner thread terminates
-        # before the actors finish putting the episodes in it.
-        if self._queue.full():
-            self._queue.get()
+        # with a full queue blocking the actors from placing items in it.
+        with self._queue.mutex:
+            if self._queue.maxsize >= self._queue._qsize():  # queue is full
+                self._queue.get()  # throw away the transition
 
-        self._queue.put((sharded_traj, sharded_next_obs, sharded_next_dones, time_dict))
+        self._queue.put((sharded_traj, sharded_timestep, time_dict))
 
         with end_condition:
             end_condition.notify()  # tell we have finish
@@ -121,7 +108,7 @@ class Pipeline(threading.Thread):
 
     def get(
         self, block: bool = True, timeout: Union[float, None] = None
-    ) -> Tuple[PPOTransition, Union[Observation, ObservationGlobalState], Array, Dict]:
+    ) -> Tuple[PPOTransition, TimeStep, Dict]:
         """Get a trajectory from the pipeline."""
         return self._queue.get(block, timeout)  # type: ignore
 
@@ -131,8 +118,7 @@ class Pipeline(threading.Thread):
 
 
 class ParamsSource(threading.Thread):
-    """
-    A `ParamSource` is a component that allows networks params to be passed from a
+    """A `ParamSource` is a component that allows networks params to be passed from a
     `Learner` component to `Actor` components.
     """
 
@@ -144,8 +130,7 @@ class ParamsSource(threading.Thread):
         self.lifetime = lifetime
 
     def run(self) -> None:
-        """
-        This function is responsible for updating the value of the `ParamSource` when a new value
+        """This function is responsible for updating the value of the `ParamSource` when a new value
         is available.
         """
         while not self.lifetime.should_stop():
@@ -156,8 +141,7 @@ class ParamsSource(threading.Thread):
                 continue
 
     def update(self, new_params: Params) -> None:
-        """
-        Update the value of the `ParamSource` with a new value.
+        """Update the value of the `ParamSource` with a new value.
 
         Args:
             new_params: The new value to update the `ParamSource` with.
@@ -182,6 +166,7 @@ class RecordTimeTo:
 
 
 def check_config(config: DictConfig) -> None:
+    """Checks that the given config does not have conflicting values."""
     assert (
         config.system.num_updates > config.arch.num_evaluation
     ), "Number of updates per evaluation must be less than total number of updates."
