@@ -553,16 +553,14 @@ def run_experiment(cfg: DictConfig) -> float:
     logger.log(final_metrics, cfg.system.explore_steps, 0, LogEvent.ACT)
 
     # Main loop:
-    # We want start to align with the final step of the first pmaped_learn,
-    # where we've done explore_steps and 1 full learn step.
-    start = cfg.system.explore_steps + steps_per_rollout
-    for eval_idx, t in enumerate(
-        range(start, int(cfg.system.total_timesteps + 1), steps_per_rollout)
-    ):
+    start = cfg.system.explore_steps
+    stop = int(cfg.system.total_timesteps + 1)
+    for eval_idx, t in enumerate(range(start, stop, steps_per_rollout)):
         # Learn loop:
         start_time = time.time()
         learner_state, (metrics, losses) = update(learner_state)
         jax.block_until_ready(learner_state)
+        t += steps_per_rollout  # Completed rollout so add to step count.
 
         # Log:
         # Add learn steps here because anakin steps per second is learn + act steps

@@ -193,7 +193,7 @@ class GigastepWrapper(Wrapper):
             "agents_view",
         )
         action_mask = specs.BoundedArray(
-            (self.num_agents, self._env.n_actions), bool, False, True, "action_mask"
+            (self.num_agents, self._env.n_actions), float, 0.0, 1.0, "action_mask"
         )
         step_count = specs.BoundedArray(
             (self.num_agents,), jnp.int32, 0, self._env.max_episode_length, "step_count"

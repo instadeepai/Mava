@@ -292,7 +292,10 @@ class ConsoleLogger(BaseLogger):
         # Replace underscores with spaces and capitalise keys.
         keys = [k.replace("_", " ").capitalize() for k in data.keys()]
         # Round values to 3 decimal places if they are floats.
-        values = [v if isinstance(v, int) else f"{float(v):.3f}" for v in data.values()]
+        values = []
+        for value in data.values():
+            value = value.item() if isinstance(value, jax.Array) else value
+            values.append(f"{value:.3f}" if isinstance(value, float) else str(value))
         log_str = " | ".join([f"{k}: {v}" for k, v in zip(keys, values)])
 
         self.logger.info(
