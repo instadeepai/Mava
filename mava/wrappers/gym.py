@@ -208,8 +208,9 @@ class GymToJumanji(gymnasium.Wrapper):
 
         ep_done = np.zeros(num_envs, dtype=float)
         rewards = np.zeros((num_envs, num_agents), dtype=float)
+        teminated = np.zeros((num_envs, num_agents), dtype=float)
 
-        timestep = self._create_timestep(obs, ep_done, rewards, info)
+        timestep = self._create_timestep(obs, ep_done, teminated, rewards, info)
 
         return timestep
 
@@ -218,7 +219,7 @@ class GymToJumanji(gymnasium.Wrapper):
 
         ep_done = np.logical_or(terminated, truncated).all(axis=1)
 
-        timestep = self._create_timestep(obs, ep_done, rewards, info)
+        timestep = self._create_timestep(obs, ep_done, terminated, rewards, info)
 
         return timestep
 
@@ -240,16 +241,17 @@ class GymToJumanji(gymnasium.Wrapper):
             return Observation(**obs_data)
 
     def _create_timestep(
-        self, obs: NDArray, ep_done: NDArray, rewards: NDArray, info: Dict
+        self, obs: NDArray, ep_done: NDArray, terminated: NDArray, rewards: NDArray, info: Dict
     ) -> TimeStep:
         obs = self._format_observation(obs, info)
         extras = jax.tree.map(lambda *x: np.stack(x), *info["metrics"])
         step_type = np.where(ep_done, StepType.LAST, StepType.MID)
+        terminated = np.all(terminated, axis=1)
 
         return TimeStep(
             step_type=step_type,
             reward=rewards,
-            discount=1.0 - ep_done,
+            discount=1.0 - terminated,
             observation=obs,
             extras=extras,
         )
