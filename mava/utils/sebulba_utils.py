@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Sequence, Tuple, Union
 import jax
 import jax.numpy as jnp
 from chex import Array
+from omegaconf import DictConfig
 
 from mava.systems.ppo.types import Params, PPOTransition  # todo: remove the ppo dependencies
 from mava.types import Observation, ObservationGlobalState
@@ -103,6 +104,12 @@ class Pipeline(threading.Thread):
         # [(num_envs / num_learner_devices, num_agents)] * num_learner_devices
         sharded_next_dones = self.shard_split_playload(next_dones, 0)
 
+        # If the queue gets full at any point we prioritize taking new episodes.
+        # This also prevents the pipeline from  stalling if the learner thread terminates
+        # before the actors finish putting the episodes in it.
+        if self._queue.full():
+            self._queue.get()
+
         self._queue.put((sharded_traj, sharded_next_obs, sharded_next_dones, time_dict))
 
         with end_condition:
@@ -172,3 +179,21 @@ class RecordTimeTo:
     def __exit__(self, *args: Any) -> None:
         end = time.monotonic()
         self.to.append(end - self.start)
+
+
+def check_config(config: DictConfig) -> None:
+    assert (
+        config.system.num_updates > config.arch.num_evaluation
+    ), "Number of updates per evaluation must be less than total number of updates."
+    config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
+
+    assert (
+        config.arch.num_envs % len(config.arch.learner_device_ids) == 0
+    ), "The number of environments must be divisible by the number of learners."
+
+    assert (
+        int(config.arch.num_envs / len(config.arch.learner_device_ids))
+        * config.arch.n_threads_per_executor
+        % config.system.num_minibatches
+        == 0
+    ), "int(local_num_envs / len(learner_device_ids)) must be divisible by num_minibatches."

@@ -48,7 +48,13 @@ from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import merge_leading_dims
 from mava.utils.logger import LogEvent, MavaLogger
-from mava.utils.sebulba_utils import ParamsSource, Pipeline, RecordTimeTo, ThreadLifetime
+from mava.utils.sebulba_utils import (
+    ParamsSource,
+    Pipeline,
+    RecordTimeTo,
+    ThreadLifetime,
+    check_config,
+)
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
@@ -69,15 +75,13 @@ def rollout(
     Args:
         key (chex.PRNGKey): The PRNGkey.
         config (DictConfig): Configuration settings for the environment and rollout.
-        rollout_queue (Pipeline): Queue for sending collected rollouts.
-        params_source (ParamsSource): Source for fetching the latest network parameters.
+        rollout_queue (Pipeline): Queue for sending collected rollouts to the learner.
+        params_source (ParamsSource): Source for fetching the latest network parameters
+        from the learner.
         apply_fns (Tuple): Functions for running the actor and critic networks.
-        actor_device_id (int): Actor device id for the current thread.
+        actor_device_id (int): Device ID for this actor thread.
         seeds (List[int]): Seeds for initializing the environment.
         thread_lifetime (ThreadLifetime): Manages the thread's lifecycle.
-
-    Returns:
-        None: This function updates the rollout queue with collected data.
     """
     # setup
     env = environments.make_gym_env(config, config.arch.num_envs)
@@ -115,8 +119,8 @@ def rollout(
         time_dict: Dict[str, List[float]] = {
             "single_rollout_time": [],
             "env_step_time": [],
-            "getting_params_time": [],
-            "putting_rollout_time": [],
+            "get_params_time": [],
+            "put_rollout_time": [],
         }
 
         # Loop over the rollout length
@@ -124,7 +128,7 @@ def rollout(
             for _ in range(config.system.rollout_length):
                 # Get the latest parameters from the learner
 
-                with RecordTimeTo(time_dict["getting_params_time"]):
+                with RecordTimeTo(time_dict["get_params_time"]):
                     params = params_source.get()
 
                 cached_next_obs = tree.map(move_to_device, timestep.observation)
@@ -142,9 +146,8 @@ def rollout(
                 cpu_action = jax.device_get(action)
 
                 with RecordTimeTo(time_dict["env_step_time"]):
-                    timestep = env.step(
-                        cpu_action.swapaxes(0, 1)
-                    )  # (num_env, num_agents) --> (num_agents, num_env)
+                    # (num_env, num_agents) --> (num_agents, num_env)
+                    timestep = env.step(cpu_action.swapaxes(0, 1))
 
                 next_dones = jnp.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
 
@@ -161,7 +164,7 @@ def rollout(
                     )
                 )
         # send trajectories to learner
-        with RecordTimeTo(time_dict["putting_rollout_time"]):
+        with RecordTimeTo(time_dict["put_rollout_time"]):
             rollout_queue.put(traj, timestep.observation, next_dones, time_dict)
     env.close()
 
@@ -190,12 +193,10 @@ def get_learner_fn(
         calculated losses.
 
         Args:
-            learner_state (NamedTuple):
-                - params (Params): The current model parameters.
-                - opt_states (OptStates): The current optimizer states.
-                - key (PRNGKey): The random number generator state.
-                - env_state (State): The environment state.
-                - last_timestep (TimeStep): The last timestep in the current trajectory.
+            learner_state (LearnerState): contains all the items needed for learning.
+            traj_batch (PPOTransition): the batch of data to learn with.
+            last_obs (Observation): the final observations (for bootstrapping in GAE).
+            last_dones (Array): the final dones (for bootstrapping in GAE).
             _ (Any): The current metrics info.
         """
 
@@ -309,7 +310,7 @@ def get_learner_fn(
                 # Compute the parallel mean (pmean) over the batch.
                 # This calculation is inspired by the Anakin architecture demo notebook.
                 # available at https://tinyurl.com/26tdzs5x
-                # pmean over devices.
+                # pmean over learner devices.
                 actor_grads, actor_loss_info = jax.lax.pmean(
                     (actor_grads, actor_loss_info),
                     axis_name="learner_devices",
@@ -509,20 +510,20 @@ def learner(
     learn: SebulbaLearnerFn[LearnerState, PPOTransition],
     learner_state: LearnerState,
     config: DictConfig,
-    learner_queue: Queue,
+    eval_queue: Queue,
     pipeline: Pipeline,
     params_sources: Sequence[ParamsSource],
 ) -> None:
     for _eval_step in range(config.arch.num_evaluation):
         metrics: List[Tuple[Dict, Dict]] = []
         rollout_times: List[Dict] = []
-        eval_times: Dict[str, List[float]] = {"evaluator_blocked_time": [], "evaluation_time": []}
+        eval_times: Dict[str, List[float]] = {"rollout_get_time": [], "learning_time": []}
 
         for _update in range(config.system.num_updates_per_eval):
-            with RecordTimeTo(eval_times["evaluator_blocked_time"]):
+            with RecordTimeTo(eval_times["rollout_get_time"]):
                 traj_batch, last_obs, last_dones, rollout_time = pipeline.get(block=True)
 
-            with RecordTimeTo(eval_times["evaluation_time"]):
+            with RecordTimeTo(eval_times["learning_time"]):
                 learner_state, episode_metrics, train_metrics = learn(
                     learner_state, traj_batch, last_obs, last_dones
                 )
@@ -542,7 +543,7 @@ def learner(
         timing_dict = rollout_times | eval_times
         timing_dict = tree.map(np.mean, timing_dict, is_leaf=lambda x: isinstance(x, list))
 
-        learner_queue.put((episode_metrics, train_metrics, learner_state, timing_dict))
+        eval_queue.put((episode_metrics, train_metrics, learner_state, timing_dict))
 
 
 def run_experiment(_config: DictConfig) -> float:
@@ -557,25 +558,13 @@ def run_experiment(_config: DictConfig) -> float:
         jax.random.PRNGKey(config.system.seed), num=3
     )
 
-    # Sanity check of config
-    assert (
-        config.arch.num_envs % len(config.arch.learner_device_ids) == 0
-    ), "The number of environments must to be divisible by the number of learners."
-
-    assert (
-        int(config.arch.num_envs / len(config.arch.learner_device_ids))
-        * config.arch.n_threads_per_executor
-        % config.system.num_minibatches
-        == 0
-    ), "int(local_num_envs / len(learner_device_ids)) must be divisible by num_minibatches."
+    # Numpy RNG.
+    np_rng = np.random.default_rng(config.system.seed)
 
     # Setup learner.
     learn, apply_fns, learner_state = learner_setup(
         (key, actor_net_key, critic_net_key), config, learner_devices
     )
-
-    # Generate Numpy RNG for reproducibility
-    np_rng = np.random.default_rng(config.system.seed)
 
     # Setup evaluator.
     # One key per device for evaluation.
@@ -586,11 +575,7 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Calculate total timesteps.
     config = check_total_timesteps(config)
-    assert (
-        config.system.num_updates > config.arch.num_evaluation
-    ), "Number of updates per evaluation must be less than total number of updates."
-    # Calculate number of updates per evaluation.
-    config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
+    check_config(config)
 
     steps_per_rollout = (
         config.system.rollout_length * config.arch.num_envs * config.system.num_updates_per_eval
@@ -652,11 +637,11 @@ def run_experiment(_config: DictConfig) -> float:
             actor.start()
             actor_threads.append(actor)
 
-    learner_queue: Queue = Queue()
+    eval_queue: Queue = Queue()
     threading.Thread(
         target=learner,
         name="Learner",
-        args=(learn, learner_state, config, learner_queue, pipeline, params_sources),
+        args=(learn, learner_state, config, eval_queue, pipeline, params_sources),
     ).start()
 
     max_episode_return = -jnp.inf
@@ -667,7 +652,7 @@ def run_experiment(_config: DictConfig) -> float:
     # This loop waits for the learner to finish an update before evaluation and logging.
     for eval_step in range(config.arch.num_evaluation):
         # Get the next set of params and metrics from the learner
-        episode_metrics, train_metrics, learner_state, times_dict = learner_queue.get()
+        episode_metrics, train_metrics, learner_state, times_dict = eval_queue.get()
 
         t = int(steps_per_rollout * (eval_step + 1))
         times_dict["timestep"] = t
@@ -702,12 +687,17 @@ def run_experiment(_config: DictConfig) -> float:
     evaluator_envs.close()
     eval_performance = float(jnp.mean(eval_metrics[config.env.eval_metric]))
 
-    # Make sure all of the actors are done befor closing the pipeline
+    # Make sure all of the Threads are closed.
     actors_lifetime.stop()
     for actor in actor_threads:
         actor.join()
+
     pipeline_lifetime.stop()
+    pipeline.join()
+
     params_sources_lifetime.stop()
+    for params_source in params_sources:
+        params_source.join()
 
     # Measure absolute metric.
     if config.arch.absolute_metric:

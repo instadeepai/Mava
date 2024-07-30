@@ -196,7 +196,7 @@ class GymAgentIDWrapper(gymnasium.Wrapper):
 
 
 class GymToJumanji(gymnasium.Wrapper):
-    """Converts from the Gym API to the dm_env API, Jumanji's Timestep type."""
+    """Converts from the Gym API to the dm_env API, using Jumanji's Timestep type."""
 
     def reset(
         self, seed: Optional[list[int]] = None, options: Optional[list[dict]] = None
