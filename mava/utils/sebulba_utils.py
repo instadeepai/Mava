@@ -187,13 +187,16 @@ def check_config(config: DictConfig) -> None:
     ), "Number of updates per evaluation must be less than total number of updates."
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
 
-    assert (
-        config.arch.num_envs % len(config.arch.learner_device_ids) == 0
-    ), "The number of environments must be divisible by the number of learners."
+    assert config.arch.num_envs % len(config.arch.learner_device_ids) == 0, (
+        "Number of environments must be divisible by the number of learner."
+        + "The output of each actor is equally split across the learners."
+    )
 
-    assert (
+    num_eval_samples = (
         int(config.arch.num_envs / len(config.arch.learner_device_ids))
-        * config.arch.n_threads_per_executor
-        % config.system.num_minibatches
-        == 0
-    ), "int(local_num_envs / len(learner_device_ids)) must be divisible by num_minibatches."
+        * config.system.rollout_length
+    )
+    assert num_eval_samples % config.system.num_minibatches == 0, (
+        f"Number of training samples per evaluator ({num_eval_samples})"
+        + f"must be divisible by num_minibatches ({config.system.num_minibatches})."
+    )
