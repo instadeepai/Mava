@@ -93,9 +93,8 @@ class Pipeline(threading.Thread):
         # If the queue gets full at any point we prioritize taking removing the oldest rollouts.
         # This also prevents the pipeline from  stalling if the learner thread terminates
         # with a full queue blocking the actors from placing items in it.
-        with self._queue.mutex:
-            if self._queue.maxsize >= self._queue._qsize():  # queue is full
-                self._queue.get()  # throw away the transition
+        if self._queue.full():
+            self._queue.get()  # throw away the transition
 
         self._queue.put((sharded_traj, sharded_timestep, time_dict))
 
