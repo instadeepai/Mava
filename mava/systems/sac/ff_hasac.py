@@ -404,9 +404,15 @@ def make_update_fns(
             for agent_id in agent_ids:
                 actor_key, alpha_key = jax.random.split(key)
 
-                agent_actor_params = jax.tree_util.tree_map(lambda x, agent_id=agent_id: x[agent_id], params.actor)
-                actor_opt_state = jax.tree_util.tree_map(lambda x, agent_id=agent_id: x[agent_id], opt_states.actor)
-                obs_per_agent = jax.tree_util.tree_map(lambda x, agent_id=agent_id: x[:, agent_id], data.obs)
+                agent_actor_params = jax.tree_util.tree_map(
+                    lambda x, agent_id=agent_id: x[agent_id], params.actor
+                )
+                actor_opt_state = jax.tree_util.tree_map(
+                    lambda x, agent_id=agent_id: x[agent_id], opt_states.actor
+                )
+                obs_per_agent = jax.tree_util.tree_map(
+                    lambda x, agent_id=agent_id: x[:, agent_id], data.obs
+                )
                 # Update actor.
                 actor_grad_fn = jax.value_and_grad(actor_loss_fn)
                 actor_loss, act_grads = actor_grad_fn(
@@ -470,10 +476,14 @@ def make_update_fns(
                     )
 
                     new_log_alphas = jax.tree_util.tree_map(
-                        lambda x, y, agent_id=agent_id: x.at[agent_id].set(y), params.log_alpha, new_log_alpha
+                        lambda x, y, agent_id=agent_id: x.at[agent_id].set(y),
+                        params.log_alpha,
+                        new_log_alpha,
                     )
                     new_alpha_opt_states = jax.tree_util.tree_map(
-                        lambda x, y, agent_id=agent_id: x.at[agent_id].set(y), opt_states.alpha, new_alpha_opt_state
+                        lambda x, y, agent_id=agent_id: x.at[agent_id].set(y),
+                        opt_states.alpha,
+                        new_alpha_opt_state,
                     )
                     params = params._replace(log_alpha=new_log_alphas)
                     opt_states = opt_states._replace(alpha=new_alpha_opt_states)
@@ -700,7 +710,7 @@ def run_experiment(cfg: DictConfig) -> float:
     return eval_performance
 
 
-@hydra.main(config_path="../../configs", config_name="default_ff_masac.yaml", version_base="1.2")
+@hydra.main(config_path="../../configs", config_name="default_ff_hasac.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
