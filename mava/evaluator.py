@@ -32,6 +32,23 @@ from mava.types import (
 )
 
 
+def get_action(actor_params, actor_apply, keys, env, obs):
+    batch_size = obs.agents_view.shape[0]
+    actions = jnp.zeros((batch_size, env.num_agents, env.action_dim))
+    log_std = jnp.zeros((batch_size, env.num_agents))
+
+    for agent in range(env.num_agents):
+        actor_params_per_agent = jax.tree_util.tree_map(lambda x: x[agent], actor_params)
+        obs_per_agent = jax.tree_util.tree_map(lambda x: x[:, agent], obs)
+
+        pi = actor_apply(actor_params_per_agent, obs_per_agent)
+        action = pi.sample(seed=keys[agent])
+        actions.at[:, agent].set(action)
+        log_std.at[:, agent].set(pi.log_prob(action))
+
+    return actions, log_std
+
+
 def get_ff_evaluator_fn(
     env: Environment,
     apply_fn: ActorApply,
@@ -64,15 +81,20 @@ def get_ff_evaluator_fn(
             # Select action.
             key, policy_key = jax.random.split(key)
             # Add a batch dimension to the observation.
-            pi = apply_fn(
-                params, jax.tree_map(lambda x: x[jnp.newaxis, ...], last_timestep.observation)
+            # pi = apply_fn(
+            #     params, jax.tree_map(lambda x: x[jnp.newaxis, ...], last_timestep.observation)
+            # )
+
+            # if config.arch.evaluation_greedy:
+            #     action = pi.mode()
+            # else:
+            #     action = pi.sample(seed=policy_key)
+            policy_keys = jax.random.split(policy_key, num=env.num_agents)
+            action, _ = apply_fn(
+                params,
+                jax.tree_map(lambda x: x[jnp.newaxis, ...], last_timestep.observation),
+                policy_keys,
             )
-
-            if config.arch.evaluation_greedy:
-                action = pi.mode()
-            else:
-                action = pi.sample(seed=policy_key)
-
             # Remove batch dim for stepping the environment.
             action = jnp.squeeze(action, axis=0)
 
@@ -327,11 +349,13 @@ def make_eval_fns(
             10,
         )
     else:
-        evaluator = get_ff_evaluator_fn(
-            eval_env, network_apply_fn, config, log_win_rate  # type: ignore
-        )
+        # apply_fn(
+        #     params, jax.tree_map(lambda x: x[jnp.newaxis, ...], last_timestep.observation)
+        # )
+        act_fn = lambda params, obs, keys: get_action(params, network_apply_fn, keys, eval_env, obs)
+        evaluator = get_ff_evaluator_fn(eval_env, act_fn, config, log_win_rate)  # type: ignore
         absolute_metric_evaluator = get_ff_evaluator_fn(
-            eval_env, network_apply_fn, config, log_win_rate, 10  # type: ignore
+            eval_env, act_fn, config, log_win_rate, 10  # type: ignore
         )
 
     evaluator = jax.pmap(evaluator, axis_name="device")

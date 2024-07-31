@@ -48,7 +48,7 @@ from mava.systems.sac.types import (
 )
 from mava.types import ObservationGlobalState
 from mava.utils import make_env as environments
-from mava.utils.centralised_training import get_joint_action, get_updated_joint_actions
+from mava.utils.centralised_training import get_joint_action
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
@@ -61,8 +61,10 @@ def get_action(actor_params, actor_net, keys, env, obs, batch_size):
     log_std = jnp.zeros((batch_size, env.num_agents))
 
     for agent in range(env.num_agents):
-        actor_params_per_agent = jax.tree_util.tree_map(lambda x: x[agent], actor_params)
-        obs_per_agent = jax.tree_util.tree_map(lambda x: x[:, agent], obs)
+        actor_params_per_agent = jax.tree_util.tree_map(
+            lambda x, agent=agent: x[agent], actor_params
+        )
+        obs_per_agent = jax.tree_util.tree_map(lambda x, agent=agent: x[:, agent], obs)
 
         pi = actor_net.apply(actor_params_per_agent, obs_per_agent)
         action = pi.sample(seed=keys[agent])
@@ -72,9 +74,7 @@ def get_action(actor_params, actor_net, keys, env, obs, batch_size):
     return actions, log_std
 
 
-def init(
-    cfg: DictConfig,
-) -> Tuple[
+def init(cfg: DictConfig) -> Tuple[
     Tuple[Environment, Environment],
     Networks,
     Optimisers,
@@ -303,7 +303,9 @@ def make_update_fns(
         alpha: Array,
         q_params: QVals,
         key: chex.PRNGKey,
+        agent_id,
     ) -> Array:
+        B, A, _ = actions.shape
         pi = actor_net.apply(actor_params, obs)
         new_actions = pi.sample(seed=key)
         log_prob = pi.log_prob(new_actions)
@@ -311,13 +313,16 @@ def make_update_fns(
         # Updated joint actions are done so that each agent's central critic sees what all
         # other agents did in the past, but it sees how its agent's policy is currently acting.
         # This is done by placing new_action[i] in joint_actions[i].
-        joint_actions = get_updated_joint_actions(actions, new_actions)
+        # [32, 4, 2] -> insert -> [32, 8]
+        joint_actions = actions.at[:, agent_id, :].set(new_actions).reshape(B, -1)
+        # joint_actions = get_updated_joint_actions(actions, new_actions)
 
         qval_1 = q_net.apply(q_params.q1, obs, joint_actions)
         qval_2 = q_net.apply(q_params.q2, obs, joint_actions)
         min_q_val = jnp.minimum(qval_1, qval_2)
 
-        return ((alpha * log_prob) - min_q_val).mean()
+        # todo: hasac uses only 1 alpha!
+        return ((alpha[:, agent_id] * log_prob) - min_q_val).mean()
 
     def alpha_loss_fn(log_alpha: Array, log_pi: Array, target_entropy: Array) -> Array:
         return jnp.mean(-jnp.exp(log_alpha) * (log_pi + target_entropy))
@@ -340,6 +345,7 @@ def make_update_fns(
         next_q1_val = q_net.apply(params.q.targets.q1, data.next_obs, joint_next_actions)
         next_q2_val = q_net.apply(params.q.targets.q2, data.next_obs, joint_next_actions)
         next_q_val = jnp.minimum(next_q1_val, next_q2_val)
+        # todo: look into this -> hasac does 1 alpha and sums the log probs
         next_q_val = next_q_val - jnp.exp(params.log_alpha) * next_log_prob
 
         target_q_val = data.reward + (1.0 - data.done) * cfg.system.gamma * next_q_val
@@ -376,7 +382,7 @@ def make_update_fns(
             act_keys = jax.random.split(act_key, env.num_agents)
             agent_ids = jax.random.permutation(agent_order_key, env.num_agents)
 
-            actions, log_probs = get_action(
+            actions, _ = get_action(
                 params.actor, actor_net, act_keys, env, data.obs, cfg.system.batch_size
             )
 
@@ -391,42 +397,64 @@ def make_update_fns(
             # Important parts of the code HASAC:
             # Get "old" actions (done line 379 above): https://github.com/PKU-MARL/HARL/blob/main/harl/runners/off_policy_ha_runner.py#L81-L92
             # Turn on grads and get new action and logprob: https://github.com/PKU-MARL/HARL/blob/main/harl/runners/off_policy_ha_runner.py#L100-L109
+            # Place action + LP the list of actions + LPs: https://github.com/PKU-MARL/HARL/blob/main/harl/runners/off_policy_ha_runner.py#L110-L119
             # Compute policy loss as normal: https://github.com/PKU-MARL/HARL/blob/main/harl/runners/off_policy_ha_runner.py#L142-L144
             # Autotune alpha using current agents logprob: https://github.com/PKU-MARL/HARL/blob/main/harl/runners/off_policy_ha_runner.py#L151-L155
             # Update *only* the actions in the list of actions using the updated policy: https://github.com/PKU-MARL/HARL/blob/main/harl/runners/off_policy_ha_runner.py#L162-L169
             for agent_id in agent_ids:
                 actor_key, alpha_key = jax.random.split(key)
 
+                agent_actor_params = jax.tree_util.tree_map(lambda x, agent_id=agent_id: x[agent_id], params.actor)
+                actor_opt_state = jax.tree_util.tree_map(lambda x, agent_id=agent_id: x[agent_id], opt_states.actor)
+                obs_per_agent = jax.tree_util.tree_map(lambda x, agent_id=agent_id: x[:, agent_id], data.obs)
                 # Update actor.
                 actor_grad_fn = jax.value_and_grad(actor_loss_fn)
                 actor_loss, act_grads = actor_grad_fn(
-                    params.actor,
-                    data.obs,
-                    data.action,
+                    agent_actor_params,
+                    obs_per_agent,
+                    actions,
                     jnp.exp(params.log_alpha),
                     params.q.online,
                     actor_key,
+                    agent_id,
                 )
                 # Mean over the device and batch dimensions.
                 actor_loss, act_grads = lax.pmean((actor_loss, act_grads), axis_name="device")
                 actor_loss, act_grads = lax.pmean((actor_loss, act_grads), axis_name="batch")
-                actor_updates, new_actor_opt_state = actor_opt.update(act_grads, opt_states.actor)
-                new_actor_params = optax.apply_updates(params.actor, actor_updates)
+                actor_updates, new_actor_opt_state = actor_opt.update(act_grads, actor_opt_state)
+                new_actor_params = optax.apply_updates(agent_actor_params, actor_updates)
 
-                params = params._replace(actor=new_actor_params)
-                opt_states = opt_states._replace(actor=new_actor_opt_state)
+                # update actions list with new action from updated actor
+                pi = actor_net.apply(new_actor_params, obs_per_agent)
+                new_action = pi.sample(seed=key)
+                new_log_prob = pi.log_prob(new_action)
+
+                # Add new action to list of actions
+                actions = actions.at[:, agent_id].set(new_action)
+
+                agents_params = jax.tree_util.tree_map(
+                    lambda x, y: x.at[agent_id].set(y), params.actor, new_actor_params
+                )
+                agent_opt_states = jax.tree_util.tree_map(
+                    lambda x, y: x.at[agent_id].set(y), opt_states.actor, new_actor_opt_state
+                )
+                params = params._replace(actor=agents_params)
+                opt_states = opt_states._replace(actor=agent_opt_states)
 
                 # Update alpha if autotuning
                 alpha_loss = 0.0  # loss is 0 if autotune is off
                 if cfg.system.autotune:
                     # Get log prob for alpha loss
-                    pi = actor_net.apply(params.actor, data.obs)
-                    action = pi.sample(seed=key)
-                    log_prob = pi.log_prob(action)
+                    # pi = actor_net.apply(params.actor, data.obs)
+                    # action = pi.sample(seed=key)
+                    # log_prob = pi.log_prob(action)
+                    alpha_opt_state = jax.tree_util.tree_map(
+                        lambda x, agent_id=agent_id: x[agent_id], opt_states.alpha
+                    )
 
                     alpha_grad_fn = jax.value_and_grad(alpha_loss_fn)
                     alpha_loss, alpha_grads = alpha_grad_fn(
-                        params.log_alpha, log_prob, target_entropy
+                        params.log_alpha[:, agent_id], new_log_prob, target_entropy[:, agent_id]
                     )
                     alpha_loss, alpha_grads = lax.pmean(
                         (alpha_loss, alpha_grads), axis_name="device"
@@ -435,12 +463,20 @@ def make_update_fns(
                         (alpha_loss, alpha_grads), axis_name="batch"
                     )
                     alpha_updates, new_alpha_opt_state = alpha_opt.update(
-                        alpha_grads, opt_states.alpha
+                        alpha_grads, alpha_opt_state
                     )
-                    new_log_alpha = optax.apply_updates(params.log_alpha, alpha_updates)
+                    new_log_alpha = optax.apply_updates(
+                        params.log_alpha[:, agent_id], alpha_updates
+                    )
 
-                    params = params._replace(log_alpha=new_log_alpha)
-                    opt_states = opt_states._replace(alpha=new_alpha_opt_state)
+                    new_log_alphas = jax.tree_util.tree_map(
+                        lambda x, y, agent_id=agent_id: x.at[agent_id].set(y), params.log_alpha, new_log_alpha
+                    )
+                    new_alpha_opt_states = jax.tree_util.tree_map(
+                        lambda x, y, agent_id=agent_id: x.at[agent_id].set(y), opt_states.alpha, new_alpha_opt_state
+                    )
+                    params = params._replace(log_alpha=new_log_alphas)
+                    opt_states = opt_states._replace(alpha=new_alpha_opt_states)
 
         loss_info = {"actor_loss": actor_loss, "alpha_loss": alpha_loss}
         return params, opt_states, loss_info
