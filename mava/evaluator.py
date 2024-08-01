@@ -66,12 +66,19 @@ def get_ff_evaluator_fn(
             key, policy_key = jax.random.split(key)
             # Add a batch dimension to the observation.
             if is_happo:
-                action = jnp.zeros((config.system.num_agents), dtype=jnp.int32)
+                # check if the environment is continuous to set the action array correctly.
+                if "Continuous" in config.network.action_head._target_:
+                    action = jnp.zeros(
+                        (config.system.num_agents, config.system.action_dim), dtype=jnp.float32
+                    )
+                else:
+                    action = jnp.zeros((config.system.num_agents), dtype=jnp.int32)
+
                 for agent in range(config.system.num_agents):
                     single_agent_obs = jax.tree_util.tree_map(
-                        lambda x: x[jnp.newaxis, agent], last_timestep.observation
+                        lambda x, agent=agent: x[jnp.newaxis, agent], last_timestep.observation
                     )
-                    agent_params = jax.tree_util.tree_map(lambda x: x[agent], params)
+                    agent_params = jax.tree_util.tree_map(lambda x, agent=agent: x[agent], params)
                     pi = apply_fn(agent_params, single_agent_obs)
                     if config.arch.evaluation_greedy:
                         action_per_agent = pi.mode()

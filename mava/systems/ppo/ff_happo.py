@@ -83,13 +83,26 @@ def get_learner_fn(
             # SELECT ACTION
             key, policy_key = jax.random.split(key)
             value = critic_apply_fn(params.critic_params, last_timestep.observation)
-            actions = jnp.zeros((config.arch.num_envs, config.system.num_agents), dtype=jnp.int32)
+
+            # check if the environment is continuous or discrete to set the action array correctly.
+            if "Continuous" in config.network.action_head._target_:
+                actions = jnp.zeros(
+                    (config.arch.num_envs, config.system.num_agents, config.system.action_dim),
+                    dtype=jnp.float32,
+                )
+            else:
+                actions = jnp.zeros(
+                    (config.arch.num_envs, config.system.num_agents), dtype=jnp.int32
+                )
+
             log_probs = jnp.zeros((config.arch.num_envs, config.system.num_agents))
             for agent in range(config.system.num_agents):
                 single_agent_obs = jax.tree_util.tree_map(
-                    lambda x: x[:, agent], last_timestep.observation
+                    lambda x, agent=agent: x[:, agent], last_timestep.observation
                 )
-                agent_params = jax.tree_util.tree_map(lambda x: x[agent], params.actor_params)
+                agent_params = jax.tree_util.tree_map(
+                    lambda x, agent=agent: x[agent], params.actor_params
+                )
                 actor_policy = actor_apply_fn(agent_params, single_agent_obs)
                 action = actor_policy.sample(seed=policy_key)
                 log_prob = actor_policy.log_prob(action)
@@ -221,9 +234,15 @@ def get_learner_fn(
                 shuffled_agents = jax.random.permutation(shuffle_key, config.system.num_agents)
                 for agent in shuffled_agents:
                     key, entropy_key = jax.random.split(key)
-                    agent_params = jax.tree_util.tree_map(lambda x: x[agent], agents_params)
-                    agent_traj = jax.tree_util.tree_map(lambda x: x[:, agent], traj_batch)
-                    agent_opt_state = jax.tree_util.tree_map(lambda x: x[agent], agent_opt_states)
+                    agent_params = jax.tree_util.tree_map(
+                        lambda x, agent=agent: x[agent], agents_params
+                    )
+                    agent_traj = jax.tree_util.tree_map(
+                        lambda x, agent=agent: x[:, agent], traj_batch
+                    )
+                    agent_opt_state = jax.tree_util.tree_map(
+                        lambda x, agent=agent: x[agent], agent_opt_states
+                    )
 
                     actor_loss_info_per_agent, actor_grads_per_agent = actor_grad_fn(
                         agent_params,
@@ -248,10 +267,14 @@ def get_learner_fn(
                     actor_new_params = optax.apply_updates(agent_params, actor_updates)
 
                     agents_params = jax.tree_util.tree_map(
-                        lambda x, y: x.at[agent].set(y), agents_params, actor_new_params
+                        lambda x, y, agent=agent: x.at[agent].set(y),
+                        agents_params,
+                        actor_new_params,
                     )
                     agent_opt_states = jax.tree_util.tree_map(
-                        lambda x, y: x.at[agent].set(y), agent_opt_states, actor_new_opt_state
+                        lambda x, y, agent=agent: x.at[agent].set(y),
+                        agent_opt_states,
+                        actor_new_opt_state,
                     )
 
                     # Updating the gae
@@ -376,6 +399,7 @@ def learner_setup(
 
     # Get number of agents.
     config.system.num_agents = env.num_agents
+    config.system.action_dim = env.action_dim
 
     # PRNG keys.
     key, actor_net_key, critic_net_key = keys
@@ -610,7 +634,7 @@ def run_experiment(_config: DictConfig) -> float:
     return eval_performance
 
 
-@hydra.main(config_path="../../configs", config_name="default_ff_mappo.yaml", version_base="1.2")
+@hydra.main(config_path="../../configs", config_name="default_ff_happo.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
@@ -618,7 +642,7 @@ def hydra_entry_point(cfg: DictConfig) -> float:
 
     # Run experiment.
     eval_performance = run_experiment(cfg)
-    print(f"{Fore.CYAN}{Style.BRIGHT}MAPPO experiment completed{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}HAPPO experiment completed{Style.RESET_ALL}")
     return eval_performance
 
 
