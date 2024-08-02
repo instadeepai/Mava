@@ -1,0 +1,7 @@
+defaults:
+  - logger: rec_happo
+  - arch: anakin
+  - system: ppo/rec_happo
+  - network: rnn
+  - env: rware
+  - _self_

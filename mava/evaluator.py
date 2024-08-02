@@ -171,6 +171,7 @@ def get_rnn_evaluator_fn(
     scanned_rnn: nn.Module,
     log_win_rate: bool = False,
     eval_multiplier: int = 1,
+    is_happo: bool = False,
 ) -> EvalFn:
     """Get the evaluator function for recurrent networks."""
 
@@ -201,15 +202,52 @@ def get_rnn_evaluator_fn(
                 last_done[jnp.newaxis, jnp.newaxis, :],
             )
 
-            # Run the network.
-            hstate, pi = apply_fn(params, hstate, ac_in)
+            if is_happo:
+                # check environment action space to set the action array correctly.
+                if "Continuous" in config.network.action_head._target_:
+                    action = jnp.zeros(
+                        (1, 1, config.system.num_agents, config.system.action_dim),
+                        dtype=jnp.float32,
+                    )
+                else:
+                    action = jnp.zeros((1, 1, config.system.num_agents), dtype=jnp.int32)
 
-            if config.arch.evaluation_greedy:
-                action = pi.mode()
+                new_hstate = jnp.zeros_like(hstate, dtype=jnp.float32)
+
+                for agent in range(config.system.num_agents):
+
+                    key, policy_key = jax.random.split(key)
+
+                    single_agent_ac_in = jax.tree_util.tree_map(
+                        lambda x, agent=agent: x[:, :, agent], ac_in
+                    )
+                    agent_params = jax.tree_util.tree_map(lambda x, agent=agent: x[agent], params)
+                    agent_hstates = jax.tree_util.tree_map(
+                        lambda x, agent=agent: x[:, agent, :], hstate
+                    )
+
+                    # Run the network.
+                    agent_policy_hidden_state, agent_actor_policy = apply_fn(
+                        agent_params, agent_hstates, single_agent_ac_in
+                    )
+
+                    new_hstate = new_hstate.at[:, agent].set(agent_policy_hidden_state)
+                    # Sample action from the policy and squeeze out the batch dimension.
+                    action_per_agent = agent_actor_policy.sample(seed=policy_key)
+                    action = action.at[:, :, agent].set(action_per_agent.squeeze(0))
+
             else:
-                action = pi.sample(seed=policy_key)
+                # Run the network.
+                new_hstate, pi = apply_fn(params, hstate, ac_in)
+
+                if config.arch.evaluation_greedy:
+                    action = pi.mode()
+                else:
+                    action = pi.sample(seed=policy_key)
 
             # Step environment.
+            # for normal rec systems the action has shape (1, 1, num_agents)
+            # so we select to get (1, num_agents) and then squeeze to get (num_agents)
             env_state, timestep = env.step(env_state, action[-1].squeeze(0))
 
             # Log episode metrics.
@@ -220,7 +258,7 @@ def get_rnn_evaluator_fn(
                 env_state,
                 timestep,
                 jnp.repeat(timestep.last(), config.system.num_agents),
-                hstate,
+                new_hstate,
                 step_count,
                 episode_return,
             )
@@ -262,10 +300,20 @@ def get_rnn_evaluator_fn(
         step_keys = jnp.stack(step_keys).reshape(eval_batch, -1)
 
         # Initialise hidden state.
-        init_hstate = scanned_rnn.initialize_carry(
-            (eval_batch, config.system.num_agents),
-            config.network.hidden_state_dim,
-        )
+        if is_happo:
+            init_hstate = scanned_rnn.initialize_carry(
+                eval_batch,
+                config.network.hidden_state_dim,
+            )
+            init_hstate = jnp.repeat(
+                init_hstate[:, jnp.newaxis, :], config.system.num_agents, axis=1
+            )
+
+        else:
+            init_hstate = scanned_rnn.initialize_carry(
+                (eval_batch, config.system.num_agents),
+                config.network.hidden_state_dim,
+            )
 
         # Initialise dones.
         dones = jnp.zeros(
@@ -340,6 +388,8 @@ def make_eval_fns(
             config,
             scanned_rnn,
             log_win_rate,
+            1,
+            is_happo,
         )
         absolute_metric_evaluator = get_rnn_evaluator_fn(
             eval_env,
@@ -348,6 +398,7 @@ def make_eval_fns(
             scanned_rnn,
             log_win_rate,
             10,
+            is_happo,
         )
     else:
         evaluator = get_ff_evaluator_fn(

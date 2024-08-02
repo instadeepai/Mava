@@ -261,6 +261,39 @@ class ScannedRNN(nn.Module):
         return cell.initialize_carry(jax.random.PRNGKey(0), (*batch_size, hidden_size))
 
 
+# We need a per agent ScannedRNN for the HAPPO actors since we vmap over agents
+class ScannedRNNPerAgent(nn.Module):
+    hidden_state_dim: int = 128
+
+    @functools.partial(
+        nn.scan,
+        variable_broadcast="params",
+        in_axes=0,
+        out_axes=0,
+        split_rngs={"params": False},
+    )
+    @nn.compact
+    def __call__(self, carry: chex.Array, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
+        """Applies the module."""
+        rnn_state = carry
+        ins, resets = x
+        rnn_state = jnp.where(
+            resets[:, jnp.newaxis],
+            # only a single agent, so we don't have an agent batch dim anymore
+            self.initialize_carry((ins.shape[0]), self.hidden_state_dim),
+            rnn_state,
+        )
+        new_rnn_state, y = nn.GRUCell(features=ins.shape[-1])(rnn_state, ins)
+        return new_rnn_state, y
+
+    @staticmethod
+    def initialize_carry(batch_size: int, hidden_size: int) -> chex.Array:
+        """Initializes the carry state."""
+        # Use a dummy key since the default state init fn is just zeros.
+        cell = nn.GRUCell(features=hidden_size)
+        return cell.initialize_carry(jax.random.PRNGKey(0), (batch_size, hidden_size))
+
+
 class RecurrentActor(nn.Module):
     """Recurrent Actor Network."""
 
@@ -268,6 +301,7 @@ class RecurrentActor(nn.Module):
     post_torso: nn.Module
     action_head: nn.Module
     hidden_state_dim: int = 128
+    scan_fn: nn.Module = ScannedRNN
 
     @nn.compact
     def __call__(
@@ -280,7 +314,7 @@ class RecurrentActor(nn.Module):
 
         policy_embedding = self.pre_torso(observation.agents_view)
         policy_rnn_input = (policy_embedding, done)
-        policy_hidden_state, policy_embedding = ScannedRNN(self.hidden_state_dim)(
+        policy_hidden_state, policy_embedding = self.scan_fn(self.hidden_state_dim)(
             policy_hidden_state, policy_rnn_input
         )
         policy_embedding = self.post_torso(policy_embedding)

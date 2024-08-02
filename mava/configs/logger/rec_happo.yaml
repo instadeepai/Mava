@@ -1,4 +1,4 @@
 defaults:
     - base_logger
 
-system_name: ff_happo
+system_name: rec_happo
