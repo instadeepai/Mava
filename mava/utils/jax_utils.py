@@ -14,12 +14,24 @@
 
 # TODO: Rewrite this file to handle only JAX arrays.
 
-from typing import Any
+from typing import Any, Tuple, Union
 
 import chex
 import jax
 import jax.numpy as jnp
 import numpy as np
+
+
+def tree_slice(tree: chex.ArrayTree, i: Union[int, slice, Tuple[slice, ...]]):
+    return jax.tree_util.tree_map(lambda x: x[i], tree)
+
+
+def tree_at_set(
+    tree: chex.ArrayTree, i: Union[int, slice, Tuple[slice, ...]], new_tree: chex.ArrayTree
+):
+    chex.assert_trees_all_equal_structs(tree, new_tree)
+    chex.assert_trees_all_equal_dtypes(tree, new_tree)
+    return jax.tree_util.tree_map(lambda old, new: old.at[i].set(new), tree, new_tree)
 
 
 def ndim_at_least(x: chex.Array, num_dims: chex.Numeric) -> chex.Array:

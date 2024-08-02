@@ -50,7 +50,12 @@ from mava.types import ObservationGlobalState
 from mava.utils import make_env as environments
 from mava.utils.centralised_training import get_joint_action
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
+from mava.utils.jax_utils import (
+    tree_at_set,
+    tree_slice,
+    unreplicate_batch_dim,
+    unreplicate_n_dims,
+)
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.wrappers import episode_metrics
@@ -74,7 +79,9 @@ def get_action(actor_params, actor_net, keys, env, obs, batch_size):
     return actions, log_std
 
 
-def init(cfg: DictConfig) -> Tuple[
+def init(
+    cfg: DictConfig,
+) -> Tuple[
     Tuple[Environment, Environment],
     Networks,
     Optimisers,
@@ -382,7 +389,8 @@ def make_update_fns(
             act_keys = jax.random.split(act_key, env.num_agents)
             agent_ids = jax.random.permutation(agent_order_key, env.num_agents)
 
-            actions, _ = get_action(
+            # todo: we can almost certainly get this from the buffer, we just need the log probs for alpha :/
+            actions, log_probs = get_action(
                 params.actor, actor_net, act_keys, env, data.obs, cfg.system.batch_size
             )
 
@@ -404,20 +412,15 @@ def make_update_fns(
             for agent_id in agent_ids:
                 actor_key, alpha_key = jax.random.split(key)
 
-                agent_actor_params = jax.tree_util.tree_map(
-                    lambda x, agent_id=agent_id: x[agent_id], params.actor
-                )
-                actor_opt_state = jax.tree_util.tree_map(
-                    lambda x, agent_id=agent_id: x[agent_id], opt_states.actor
-                )
-                obs_per_agent = jax.tree_util.tree_map(
-                    lambda x, agent_id=agent_id: x[:, agent_id], data.obs
-                )
+                agent_params = tree_slice(params.actor, agent_id)
+                agent_opt_state = tree_slice(opt_states.actor, agent_id)
+                agent_obs = tree_slice(data.obs, jnp.s_[:, agent_id])
+
                 # Update actor.
                 actor_grad_fn = jax.value_and_grad(actor_loss_fn)
                 actor_loss, act_grads = actor_grad_fn(
-                    agent_actor_params,
-                    obs_per_agent,
+                    agent_params,
+                    agent_obs,
                     actions,
                     jnp.exp(params.log_alpha),
                     params.q.online,
@@ -427,25 +430,20 @@ def make_update_fns(
                 # Mean over the device and batch dimensions.
                 actor_loss, act_grads = lax.pmean((actor_loss, act_grads), axis_name="device")
                 actor_loss, act_grads = lax.pmean((actor_loss, act_grads), axis_name="batch")
-                actor_updates, new_actor_opt_state = actor_opt.update(act_grads, actor_opt_state)
-                new_actor_params = optax.apply_updates(agent_actor_params, actor_updates)
+                actor_updates, new_actor_opt_state = actor_opt.update(act_grads, agent_opt_state)
+                new_actor_params = optax.apply_updates(agent_params, actor_updates)
 
                 # update actions list with new action from updated actor
-                pi = actor_net.apply(new_actor_params, obs_per_agent)
+                pi = actor_net.apply(new_actor_params, agent_obs)
                 new_action = pi.sample(seed=key)
-                new_log_prob = pi.log_prob(new_action)
 
                 # Add new action to list of actions
                 actions = actions.at[:, agent_id].set(new_action)
 
-                agents_params = jax.tree_util.tree_map(
-                    lambda x, y: x.at[agent_id].set(y), params.actor, new_actor_params
-                )
-                agent_opt_states = jax.tree_util.tree_map(
-                    lambda x, y: x.at[agent_id].set(y), opt_states.actor, new_actor_opt_state
-                )
-                params = params._replace(actor=agents_params)
-                opt_states = opt_states._replace(actor=agent_opt_states)
+                all_actor_params = tree_at_set(params.actor, agent_id, new_actor_params)
+                all_opt_states = tree_at_set(opt_states.actor, agent_id, new_actor_opt_state)
+                params = params._replace(actor=all_actor_params)
+                opt_states = opt_states._replace(actor=all_opt_states)
 
                 # Update alpha if autotuning
                 alpha_loss = 0.0  # loss is 0 if autotune is off
@@ -454,13 +452,13 @@ def make_update_fns(
                     # pi = actor_net.apply(params.actor, data.obs)
                     # action = pi.sample(seed=key)
                     # log_prob = pi.log_prob(action)
-                    alpha_opt_state = jax.tree_util.tree_map(
-                        lambda x, agent_id=agent_id: x[agent_id], opt_states.alpha
-                    )
+                    alpha_opt_state = tree_slice(opt_states.alpha, agent_id)
 
                     alpha_grad_fn = jax.value_and_grad(alpha_loss_fn)
                     alpha_loss, alpha_grads = alpha_grad_fn(
-                        params.log_alpha[:, agent_id], new_log_prob, target_entropy[:, agent_id]
+                        params.log_alpha[:, agent_id],
+                        log_probs[:, agent_id],
+                        target_entropy[:, agent_id],
                     )
                     alpha_loss, alpha_grads = lax.pmean(
                         (alpha_loss, alpha_grads), axis_name="device"
@@ -475,15 +473,9 @@ def make_update_fns(
                         params.log_alpha[:, agent_id], alpha_updates
                     )
 
-                    new_log_alphas = jax.tree_util.tree_map(
-                        lambda x, y, agent_id=agent_id: x.at[agent_id].set(y),
-                        params.log_alpha,
-                        new_log_alpha,
-                    )
-                    new_alpha_opt_states = jax.tree_util.tree_map(
-                        lambda x, y, agent_id=agent_id: x.at[agent_id].set(y),
-                        opt_states.alpha,
-                        new_alpha_opt_state,
+                    new_log_alphas = tree_at_set(params.log_alpha, agent_id, new_log_alpha)
+                    new_alpha_opt_states = tree_at_set(
+                        opt_states.alpha, agent_id, new_alpha_opt_state
                     )
                     params = params._replace(log_alpha=new_log_alphas)
                     opt_states = opt_states._replace(alpha=new_alpha_opt_states)
