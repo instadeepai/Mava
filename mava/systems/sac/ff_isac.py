@@ -141,13 +141,15 @@ def init(
     params = SacParams(actor_params, QValsAndTarget(online_q_params, target_q_params), log_alpha)
 
     # Make opt states.
-    actor_opt = optax.adam(cfg.system.policy_lr)
+    grad_clip = optax.clip_by_global_norm(cfg.system.max_grad_norm)
+
+    actor_opt = optax.chain(grad_clip, optax.adam(cfg.system.policy_lr))
     actor_opt_state = actor_opt.init(params.actor)
 
-    q_opt = optax.adam(cfg.system.q_lr)
+    q_opt = optax.chain(grad_clip, optax.adam(cfg.system.q_lr))
     q_opt_state = q_opt.init(params.q.online)
 
-    alpha_opt = optax.adam(cfg.system.alpha_lr)
+    alpha_opt = optax.chain(grad_clip, optax.adam(cfg.system.alpha_lr))
     alpha_opt_state = alpha_opt.init(params.log_alpha)
 
     # Pack opt states
