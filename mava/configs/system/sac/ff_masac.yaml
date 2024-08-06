@@ -26,6 +26,7 @@ batch_size: 32
 policy_lr: 3e-4  # the learning rate of the policy network optimizer
 q_lr: 1e-3  # the learning rate of the Q network network optimizer
 alpha_lr: 3e-4  # the learning rate of the alpha optimizer
+max_grad_norm: 10
 
 # SAC specific
 tau: 0.005  # smoothing coefficient for target networks
