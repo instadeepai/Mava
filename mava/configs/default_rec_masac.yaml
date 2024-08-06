@@ -1,0 +1,7 @@
+defaults:
+  - _self_
+  - logger: rec_masac
+  - arch: anakin
+  - system: sac/rec_masac
+  - network: continuous_rnn  # [continuous_mlp]
+  - env: mabrax  # [mabrax]

@@ -35,7 +35,7 @@ from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
 from mava.evaluator import ActorState, get_eval_fn, get_num_eval_envs
-from mava.networks import RecQNetwork, ScannedRNN
+from mava.networks import RecDQNNetwork, ScannedRNN
 from mava.systems.q_learning.types import (
     ActionSelectionState,
     ActionState,
@@ -62,7 +62,7 @@ def init(
     cfg: DictConfig,
 ) -> Tuple[
     Tuple[Environment, Environment],
-    RecQNetwork,
+    RecDQNNetwork,
     optax.GradientTransformation,
     TrajectoryBuffer,
     LearnerState,
@@ -79,8 +79,8 @@ def init(
     -------
         Tuple containing:
             Tuple[Environment, Environment]: The environment and evaluation environment.
-            RecQNetwork: Recurrent Q network.
-            optax.GradientTransformation: Optimiser for RecQNetwork.
+            RecDQNNetwork: Recurrent Q network.
+            optax.GradientTransformation: Optimiser for RecDQNNetwork.
             TrajectoryBuffer: The replay buffer.
             LearnerState: The initial learner state.
             MavaLogger: The logger.
@@ -121,7 +121,7 @@ def init(
     # Making recurrent Q network
     pre_torso = hydra.utils.instantiate(cfg.network.q_network.pre_torso)
     post_torso = hydra.utils.instantiate(cfg.network.q_network.post_torso)
-    q_net = RecQNetwork(
+    q_net = RecDQNNetwork(
         pre_torso,
         post_torso,
         action_dim,
@@ -217,7 +217,7 @@ def init(
 def make_update_fns(
     cfg: DictConfig,
     env: Environment,
-    q_net: RecQNetwork,
+    q_net: RecDQNNetwork,
     opt: optax.GradientTransformation,
     rb: TrajectoryBuffer,
 ) -> Callable[[LearnerState], Tuple[LearnerState, Tuple[Metrics, Metrics]]]:

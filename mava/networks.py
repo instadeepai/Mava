@@ -266,6 +266,39 @@ class ScannedRNN(nn.Module):
         return cell.initialize_carry(jax.random.PRNGKey(0), (*batch_size, hidden_size))
 
 
+# We need a per agent ScannedRNN for the HA actors since we vmap over agents
+class ScannedRNNPerAgent(nn.Module):
+    hidden_state_dim: int = 128
+
+    @functools.partial(
+        nn.scan,
+        variable_broadcast="params",
+        in_axes=0,
+        out_axes=0,
+        split_rngs={"params": False},
+    )
+    @nn.compact
+    def __call__(self, carry: chex.Array, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
+        """Applies the module."""
+        rnn_state = carry
+        ins, resets = x
+        rnn_state = jnp.where(
+            resets[:, jnp.newaxis],
+            # only a single agent, so we don't have an agent batch dim anymore
+            self.initialize_carry((ins.shape[0]), self.hidden_state_dim),
+            rnn_state,
+        )
+        new_rnn_state, y = nn.GRUCell(features=ins.shape[-1])(rnn_state, ins)
+        return new_rnn_state, y
+
+    @staticmethod
+    def initialize_carry(batch_size: int, hidden_size: int) -> chex.Array:
+        """Initializes the carry state."""
+        # Use a dummy key since the default state init fn is just zeros.
+        cell = nn.GRUCell(features=hidden_size)
+        return cell.initialize_carry(jax.random.PRNGKey(0), (batch_size, hidden_size))
+
+
 class RecurrentActor(nn.Module):
     """Recurrent Actor Network."""
 
@@ -340,7 +373,7 @@ def _parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex
     return activation_fns[activation_fn_name]
 
 
-class RecQNetwork(nn.Module):
+class RecDQNNetwork(nn.Module):
     """Recurrent Q-Network."""
 
     pre_torso: nn.Module
@@ -382,3 +415,42 @@ class RecQNetwork(nn.Module):
         eps_greedy_dist = MaskedEpsGreedyDistribution(q_values, eps, obs.action_mask)
 
         return hidden_state, eps_greedy_dist
+
+
+class RecQNet(nn.Module):
+    """Feedforward Q Network. Returns the value of an observation-action pair."""
+
+    pre_torso: nn.Module
+    post_torso: nn.Module
+    hidden_state_dim: int
+    centralised_critic: bool = False
+
+    def setup(self) -> None:
+        self.critic = nn.Dense(1, kernel_init=orthogonal(1.0))
+        self.rnn = ScannedRNN(self.hidden_state_dim)
+
+    def __call__(
+        self,
+        hstate,
+        observation: Union[Observation, ObservationGlobalState],
+        action: chex.Array,
+        done: chex.Array,
+    ) -> chex.Array:
+        if self.centralised_critic:
+            if not isinstance(observation, ObservationGlobalState):
+                raise ValueError("Global state must be provided to the centralised critic.")
+            # Get global state in the case of a centralised critic.
+            observation = observation.global_state
+        else:
+            # Get single agent view in the case of a decentralised critic.
+            observation = observation.agents_view
+
+        x = jnp.concatenate([observation, action], axis=-1)
+
+        x = self.pre_torso(x)
+        rnn_in = (x, done)
+        hstate, x = self.rnn(hstate, rnn_in)
+        x = self.post_torso(x)  # todo: do we even need this?
+        y = self.critic(x)
+
+        return jnp.squeeze(y, axis=-1)

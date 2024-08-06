@@ -21,7 +21,7 @@ from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.scope import FrozenVariableDict
 from typing_extensions import NamedTuple, TypeAlias
 
-from mava.types import Observation, ObservationGlobalState, State
+from mava.types import HiddenState, Observation, ObservationGlobalState, State
 
 Metrics: TypeAlias = Dict[str, Array]
 Networks: TypeAlias = Tuple[nn.Module, nn.Module]
@@ -52,6 +52,14 @@ class OptStates(NamedTuple):
     alpha: optax.OptState
 
 
+class HiddenStates(NamedTuple):
+    """Hidden states for an actor critic learner."""
+
+    actor: HiddenState
+    q1: HiddenState
+    q2: HiddenState
+
+
 class Transition(NamedTuple):
     obs: Union[Observation, ObservationGlobalState]
     action: Array
@@ -68,6 +76,19 @@ class LearnerState(NamedTuple):
     env_state: State
     buffer_state: BufferState
     params: SacParams
+    opt_states: OptStates
+    t: Array  # the timestep counter
+    key: PRNGKey
+
+
+class RecLearnerState(NamedTuple):
+    # todo: maybe just timestep?
+    obs: Union[Observation, ObservationGlobalState]
+    dones: Array
+    env_state: State
+    buffer_state: BufferState
+    params: SacParams
+    hstate: Array
     opt_states: OptStates
     t: Array  # the timestep counter
     key: PRNGKey
