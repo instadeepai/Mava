@@ -106,8 +106,8 @@ def init(
 
     acts = env.action_spec().generate_value()  # all agents actions
     act_single = acts[0]  # single agents action
-    concat_acts = jnp.concatenate([act_single for _ in range(n_agents)], axis=0)
-    concat_acts_batched = concat_acts[jnp.newaxis, ...]  # batch + concat of all agents actions
+    joint_acts = jnp.concatenate([act_single for _ in range(n_agents)], axis=0)
+    joint_acts_batched = joint_acts[jnp.newaxis, ...]  # joint actions with a batch dim
     obs = env.observation_spec().generate_value()
     obs_single_batched = tree.map(lambda x: x[0][jnp.newaxis, ...], obs)
 
@@ -122,10 +122,10 @@ def init(
     # Making Q networks
     critic_torso = hydra.utils.instantiate(cfg.network.critic_network.pre_torso)
     q_network = QNetwork(critic_torso, centralised_critic=True)
-    q1_params = q_network.init(q1_key, obs_single_batched, concat_acts_batched)
-    q2_params = q_network.init(q2_key, obs_single_batched, concat_acts_batched)
-    q1_target_params = q_network.init(q1_target_key, obs_single_batched, concat_acts_batched)
-    q2_target_params = q_network.init(q2_target_key, obs_single_batched, concat_acts_batched)
+    q1_params = q_network.init(q1_key, obs_single_batched, joint_acts_batched)
+    q2_params = q_network.init(q2_key, obs_single_batched, joint_acts_batched)
+    q1_target_params = q_network.init(q1_target_key, obs_single_batched, joint_acts_batched)
+    q2_target_params = q_network.init(q2_target_key, obs_single_batched, joint_acts_batched)
 
     # Automatic entropy tuning
     target_entropy = -cfg.system.target_entropy_scale * action_dim
@@ -435,9 +435,10 @@ def make_update_fns(
     ) -> Tuple[Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey], Dict]:
         """Acting loop: select action, step env, add to buffer."""
         actor_params, obs, env_state, buffer_state, key = carry
+        key, act_key = jax.random.split(key)
 
         pi = actor_net.apply(actor_params, obs)
-        action = pi.sample(seed=key)
+        action = pi.sample(seed=act_key)
 
         next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
         return (actor_params, next_obs, env_state, buffer_state, key), metrics

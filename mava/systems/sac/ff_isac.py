@@ -418,9 +418,10 @@ def make_update_fns(
     ) -> Tuple[Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey], Dict]:
         """Acting loop: select action, step env, add to buffer."""
         actor_params, obs, env_state, buffer_state, key = carry
+        key, act_key = jax.random.split(key)
 
         pi = actor_net.apply(actor_params, obs)
-        action = pi.sample(seed=key)
+        action = pi.sample(seed=act_key)
 
         next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
         return (actor_params, next_obs, env_state, buffer_state, key), metrics
