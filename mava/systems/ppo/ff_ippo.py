@@ -42,7 +42,7 @@ from mava.utils.jax_utils import (
     unreplicate_n_dims,
 )
 from mava.utils.logger import LogEvent, MavaLogger
-from mava.utils.total_timestep_checker import check_total_timesteps
+from mava.utils.total_timestep_checker import check_total_ppo_timesteps
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
@@ -474,10 +474,10 @@ def run_experiment(_config: DictConfig) -> float:
     evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=False)
 
     # Calculate total timesteps.
-    config = check_total_timesteps(config)
+    config = check_total_ppo_timesteps(config)
     assert (
-        config.system.num_updates > config.arch.num_evaluation
-    ), "Number of updates per evaluation must be less than total number of updates."
+        config.system.num_updates >= config.arch.num_evaluation
+    ), "The number of evaluations must be less than or equal to the total number of updates."
 
     # Calculate number of updates per evaluation.
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
