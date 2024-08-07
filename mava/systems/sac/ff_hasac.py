@@ -96,9 +96,11 @@ def init(
     """Initialize system by creating the envs, networks etc.
 
     Args:
+    ----
         cfg: System configuration.
 
     Returns:
+    -------
         Tuple containing:
             Tuple[MarlEnv, MarlEnv]: The environment and evaluation environment.
             Networks: Tuple of actor and critic networks.
@@ -167,14 +169,16 @@ def init(
     params = SacParams(actor_params, QValsAndTarget(online_q_params, target_q_params), log_alpha)
 
     # Make opt states.
-    actor_opt = optax.adam(cfg.system.policy_lr)
-    actor_opt_state = jax.vmap(actor_opt.init)(params.actor)
+    grad_clip = optax.clip_by_global_norm(cfg.system.max_grad_norm)
 
-    q_opt = optax.adam(cfg.system.q_lr)
+    actor_opt = optax.chain(grad_clip, optax.adam(cfg.system.policy_lr))
+    actor_opt_state = actor_opt.init(params.actor)
+
+    q_opt = optax.chain(grad_clip, optax.adam(cfg.system.q_lr))
     q_opt_state = q_opt.init(params.q.online)
 
-    alpha_opt = optax.adam(cfg.system.alpha_lr)
-    alpha_opt_state = jax.vmap(alpha_opt.init, in_axes=1)(params.log_alpha)
+    alpha_opt = optax.chain(grad_clip, optax.adam(cfg.system.alpha_lr))
+    alpha_opt_state = alpha_opt.init(params.log_alpha)
 
     # Pack opt states
     opt_states = OptStates(actor_opt_state, q_opt_state, alpha_opt_state)
@@ -246,6 +250,7 @@ def make_update_fns(
     """Create the update functions for the learner.
 
     Args:
+    ----
         cfg: System configuration.
         env: The environment.
         networks: Tuple of actor and critic networks.
@@ -254,6 +259,7 @@ def make_update_fns(
         target_entropy: The target entropy.
 
     Returns:
+    -------
         Tuple of (explore_fn, update_fn).
         Explore function is used for initial exploration with random actions.
         Update function is the main learning function, it both acts and learns.
@@ -523,7 +529,6 @@ def make_update_fns(
     # Act loop -> sample -> update loop
     def update_step(carry: LearnerState, _: Any) -> Tuple[LearnerState, Tuple[Metrics, Metrics]]:
         """Act, sample, learn. The body of the main SAC loop."""
-
         obs, env_state, buffer_state, params, opt_states, t, key = carry
         key, act_key, learn_key = jax.random.split(key, 3)
         # Act
@@ -667,7 +672,6 @@ def run_experiment(cfg: DictConfig) -> float:
     eval_performance = float(jnp.mean(eval_metrics[cfg.env.eval_metric]))
 
     # Measure absolute metric.
-    # Measure absolute metric.
     if cfg.arch.absolute_metric:
         eval_keys = jax.random.split(key, cfg.arch.n_devices)
 
@@ -678,8 +682,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     logger.stop()
 
-    # return eval_performance
-    return 0
+    return eval_performance
 
 
 @hydra.main(config_path="../../configs", config_name="default_ff_hasac.yaml", version_base="1.2")
