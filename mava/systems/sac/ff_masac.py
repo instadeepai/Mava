@@ -566,9 +566,6 @@ def run_experiment(cfg: DictConfig) -> float:
         t += steps_per_rollout  # Completed rollout so add to step count.
 
         # Log:
-        # Add learn steps here because anakin steps per second is learn + act steps
-        # But we also want to make sure we're counting env steps correctly so
-        # learn steps is not included in the loop counter.
         elapsed_time = time.time() - start_time
         final_metrics, ep_completed = episode_metrics.get_final_step_metrics(metrics)
         final_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
@@ -578,9 +575,6 @@ def run_experiment(cfg: DictConfig) -> float:
         if ep_completed:
             logger.log(final_metrics, t, eval_idx, LogEvent.ACT)
         logger.log(loss_metrics, t, eval_idx, LogEvent.TRAIN)
-
-        # Prepare for evaluation.
-        start_time = time.time()
 
         # Evaluate:
         key, eval_key = jax.random.split(key)
