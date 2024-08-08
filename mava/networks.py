@@ -431,7 +431,7 @@ class RecQNet(nn.Module):
 
     def __call__(
         self,
-        hstate,
+        hstate: chex.Array,
         observation: Union[Observation, ObservationGlobalState],
         action: chex.Array,
         done: chex.Array,
@@ -453,4 +453,4 @@ class RecQNet(nn.Module):
         x = self.post_torso(x)  # todo: do we even need this?
         y = self.critic(x)
 
-        return jnp.squeeze(y, axis=-1)
+        return hstate, jnp.squeeze(y, axis=-1)
