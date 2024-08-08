@@ -615,7 +615,7 @@ def run_experiment(cfg: DictConfig) -> float:
     key, eval_key = jax.random.split(key)
 
     # Make evaluator
-    n_envs = get_num_eval_envs(cfg, absolute_metric=True)
+    n_envs = get_num_eval_envs(cfg, absolute_metric=False)
     eval_hs = ScannedRNN.initialize_carry(
         (n_devices, n_envs, n_agents), cfg.network.hidden_state_dim
     )
