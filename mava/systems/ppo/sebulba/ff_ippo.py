@@ -324,10 +324,9 @@ def get_learner_fn(
                 new_params = Params(actor_new_params, critic_new_params)
                 new_opt_state = OptStates(actor_new_opt_state, critic_new_opt_state)
                 # Pack loss info
-                total_loss = actor_loss_info[0] + critic_loss_info[0]
-                value_loss = critic_loss_info[1]
-                actor_loss = actor_loss_info[1][0]
-                entropy = actor_loss_info[1][1]
+                actor_total_loss, (actor_loss, entropy) = actor_loss_info
+                critic_total_loss, (value_loss) = critic_loss_info
+                total_loss = critic_total_loss + actor_total_loss
                 loss_info = {
                     "total_loss": total_loss,
                     "value_loss": value_loss,
