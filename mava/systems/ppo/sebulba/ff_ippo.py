@@ -13,7 +13,9 @@
 # limitations under the License.
 
 import copy
+import queue
 import threading
+import warnings
 from queue import Queue
 from typing import Any, Dict, List, Sequence, Tuple
 
@@ -153,7 +155,15 @@ def rollout(
                 )
         # send trajectories to learner
         with RecordTimeTo(time_dict["rollout_put_time"]):
-            rollout_queue.put(traj, timestep, time_dict)
+            try:
+                rollout_queue.put(traj, timestep, time_dict)
+            except queue.Full:
+                warnings.warn(
+                    "Waited too long to add to the rollout queue, killing the actor thread",
+                    stacklevel=2,
+                )
+                break
+
     env.close()
 
 

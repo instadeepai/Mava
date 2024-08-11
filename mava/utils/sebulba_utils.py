@@ -83,23 +83,19 @@ class Pipeline(threading.Thread):
             self.tickets_queue.put((start_condition, end_condition))
             start_condition.wait()  # wait to be allowed to start
 
-        # [PPOTransition()] * rollout_len --> PPOTransition[done=(rollout_len, num_envs, num_agents)
+        # [PPOTransition()] * rollout_len --> PPOTransition[done=(rollout_len, num_envs, ...)]
         sharded_traj = jax.tree.map(lambda *x: self.shard_split_playload(jnp.stack(x), 1), *traj)
 
         # Timestep[(num_envs, num_agents, ...), ...] -->
         # [(num_envs / num_learner_devices, num_agents, ...)] * num_learner_devices
         sharded_timestep = jax.tree.map(self.shard_split_playload, timestep)
 
-        # If the queue gets full at any point we prioritize taking removing the oldest rollouts.
-        # This also prevents the pipeline from  stalling if the learner thread terminates
-        # with a full queue blocking the actors from placing items in it.
-        if self._queue.full():
-            self._queue.get()  # throw away the transition
-
-        self._queue.put((sharded_traj, sharded_timestep, time_dict))
-
-        with end_condition:
-            end_condition.notify()  # tell we have finish
+        # The lock has to be released even if an exception is raised.
+        try:
+            self._queue.put((sharded_traj, sharded_timestep, time_dict), timeout=90)
+        finally:
+            with end_condition:
+                end_condition.notify()  # tell we have finish
 
     def qsize(self) -> int:
         """Returns the number of trajectories in the pipeline."""
