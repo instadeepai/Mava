@@ -1,7 +1,7 @@
 # --- Environment Configs---
 defaults:
   - _self_
-  - scenario: simple_spread_10ag # [simple_spread_3ag, simple_spread_5ag, simple_spread_10ag]
+  - scenario: simple_spread_3ag # [simple_spread_3ag, simple_spread_5ag, simple_spread_10ag]
 
 env_name: MPE  # Used for logging purposes and selection of the corresponding wrapper.
 
