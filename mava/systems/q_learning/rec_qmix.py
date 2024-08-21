@@ -45,6 +45,7 @@ from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import unreplicate_batch_dim
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers import episode_metrics
+from rich.pretty import pprint
 
 Metrics = Dict[str, Array]
 
@@ -843,11 +844,14 @@ def run_experiment(cfg: DictConfig) -> float:
 
     pmaped_steps = 1024  # todo: config option
     steps_per_rollout = n_devices * cfg.arch.num_envs * cfg.system.rollout_length * pmaped_steps
-    max_episode_return = -jnp.inf
 
     (env, eval_env), learner_state, q_net, mixer, opts, rb, logger, key = init(cfg)
+    max_episode_return = -jnp.inf
+    best_params = copy.deepcopy(unreplicate_batch_dim(learner_state.params.online))
     update, greedy = make_update_fns(cfg, env, q_net, mixer, opts, rb)
 
+    pprint(OmegaConf.to_container(cfg, resolve=True))
+    
     key, eval_key = jax.random.split(key)
 
     evaluator, absolute_metric_evaluator = make_eval_fns(
@@ -928,10 +932,10 @@ def run_experiment(cfg: DictConfig) -> float:
         # episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
         # logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
 
-        # # Save best actor params.
-        # if cfg.arch.absolute_metric and max_episode_return <= episode_return:
-        #     best_params = copy.deepcopy(unreplicate_batch_dim(learner_state.params.online))
-        #     max_episode_return = episode_return
+        # Save best actor params.
+        if cfg.arch.absolute_metric and max_episode_return <= episode_return:
+            best_params = copy.deepcopy(unreplicate_batch_dim(learner_state.params.online))
+            max_episode_return = episode_return
 
         # # Checkpoint:
         # if cfg.logger.checkpointing.save_model:
@@ -943,21 +947,21 @@ def run_experiment(cfg: DictConfig) -> float:
         #         episode_return=episode_return,
         #     )
 
-    # # Measure absolute metric.
-    # if cfg.arch.absolute_metric:
-    #     eval_keys = jax.random.split(key, n_devices)
+    # Measure absolute metric.
+    if cfg.arch.absolute_metric:
+        eval_keys = jax.random.split(key, n_devices)
 
-    #     eval_output = absolute_metric_evaluator(best_params, eval_keys)
-    #     jax.block_until_ready(eval_output)
+        eval_output = absolute_metric_evaluator(best_params, eval_keys)
+        jax.block_until_ready(eval_output)
 
-    #     logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.ABSOLUTE)
+        logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.ABSOLUTE)
 
     logger.stop()
 
     return float(episode_return)
 
 
-@hydra.main(config_path="../../configs", config_name="default_rec_iql.yaml", version_base="1.2")
+@hydra.main(config_path="../../configs", config_name="default_rec_qmix.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.

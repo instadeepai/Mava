@@ -1,0 +1,26 @@
+# ---Environment Configs---
+defaults:
+  - _self_
+
+env_name: Smax  # Used for logging purposes and selection of the corresponding wrapper.
+# Possible tasks:
+# 2s3z | 3s5z | 5m_vs_6m | 10m_vs_11m | 27m_vs_30m | 3s5z_vs_3s6z | 3s_vs_5z | 6h_vs_8z | smacv2_5_units | smacv2_10_units | smacv2_20_units
+scenario:
+  name: HeuristicEnemySMAX
+  task_name: 2s3z
+
+# Defines the metric that will be used to evaluate the performance of the agent.
+# This metric is returned at the end of an experiment and can be used for hyperparameter tuning.
+eval_metric: win_rate
+
+# Whether the environment observations encode implicit agent IDs. If True, the AgentID wrapper is not used.
+# This should not be changed.
+implicit_agent_id: False
+# Whether or not to log the winrate of this environment. This should not be changed as not all
+# environments have a winrate metric.
+log_win_rate: True
+
+kwargs:
+  see_enemy_actions: True # Whether to enable enemy vision. If True, the enemy will be able to see the actions of the agent.
+  walls_cause_death: True # Whether to kill the agent if it collides with a wall.
+  attack_mode: "closest" # "closest" or "random". Whether to attack the closest enemy or a random enemy.
