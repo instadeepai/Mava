@@ -136,7 +136,7 @@ def get_eval_fn(
             env_state, ts = jax.vmap(env.reset)(reset_keys)
 
             step_state = env_state, ts, key, init_act_state
-            _, timesteps = jax.lax.scan(_env_step, step_state, jnp.arange(env.time_limit))
+            _, timesteps = jax.lax.scan(_env_step, step_state, jnp.arange(env.time_limit + 1))
 
             metrics = timesteps.extras["episode_metrics"]
             if config.env.log_win_rate:

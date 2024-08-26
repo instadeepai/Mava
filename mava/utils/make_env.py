@@ -43,6 +43,7 @@ from mava.wrappers import (
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
+    MPEWrapper,
     RecordEpisodeMetrics,
     RwareWrapper,
     SmaxWrapper,
@@ -62,7 +63,11 @@ _jumanji_registry = {
 
 # Registry mapping environment names directly to the corresponding wrapper classes.
 _matrax_registry = {"Matrax": MatraxWrapper}
-_jaxmarl_registry: Dict[str, Type[JaxMarlWrapper]] = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
+_jaxmarl_registry: Dict[str, Type[JaxMarlWrapper]] = {
+    "Smax": SmaxWrapper,
+    "MaBrax": MabraxWrapper,
+    "MPE": MPEWrapper,
+}
 _gigastep_registry = {"Gigastep": GigastepWrapper}
 
 
@@ -136,6 +141,8 @@ def make_jaxmarl_env(
     kwargs = dict(config.env.kwargs)
     if "smax" in env_name.lower():
         kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
+    elif "mpe" in env_name.lower():  # todo: handle env_kwargs better
+        kwargs = config.env.scenario.task_config
 
     # Create jaxmarl envs.
     train_env = _jaxmarl_registry[config.env.env_name](

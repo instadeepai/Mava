@@ -27,6 +27,7 @@ from gymnax.environments import spaces as gymnax_spaces
 from jaxmarl.environments import SMAX
 from jaxmarl.environments import spaces as jaxmarl_spaces
 from jaxmarl.environments.mabrax import MABraxEnv
+from jaxmarl.environments.mpe.simple_spread import SimpleSpreadMPE
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
 from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
@@ -198,6 +199,16 @@ class JaxMarlWrapper(Wrapper, ABC):
         # Calling these on init to cache the values in a non-jitted context.
         self.state_size  # noqa: B018
         self.action_dim  # noqa: B018
+        # Calling these on init to cache the values in a non-jitted context.
+        # self.state_size
+        # if hasattr(self, "state_size"):
+        #     self.state_size
+        # else:
+        #     self.state_size = self.observation_spaces["agent_0"].shape[0] * self.num_agents
+        # if hasattr(self, "action_dim"):
+        #     self.action_dim
+        # else:
+        #     self.action_dim = 1
 
     def reset(
         self, key: PRNGKey
@@ -252,7 +263,17 @@ class JaxMarlWrapper(Wrapper, ABC):
         return Observation(**obs_data)
 
     def observation_spec(self) -> specs.Spec:
-        agents_view = jaxmarl_space_to_jumanji_spec(merge_space(self._env.observation_spaces))
+        # jaxmarl mpe bug :/
+        if isinstance(self._env, SimpleSpreadMPE):
+            mock_state = self._env.reset(jax.random.PRNGKey(0))[0]
+            observation_shape = mock_state["agent_0"].shape
+            observation_spaces = self._env.observation_spaces
+            for i in range(self.num_agents):
+                observation_spaces[f"agent_{i}"].shape = observation_shape
+        else:
+            observation_spaces = self._env.observation_spaces
+
+        agents_view = jaxmarl_space_to_jumanji_spec(merge_space(observation_spaces))
 
         action_mask = specs.BoundedArray(
             (self.num_agents, self.action_dim), bool, False, True, "action_mask"
@@ -403,3 +424,41 @@ class MabraxWrapper(JaxMarlWrapper):
         """Get global state from observation and copy it for each agent."""
         # Use the global state of brax.
         return jnp.tile(wrapped_env_state.obs, (self.num_agents, 1))
+
+
+class MPEWrapper(JaxMarlWrapper):
+    """Wrraper for the MPE environment."""
+
+    def __init__(
+        self,
+        env: SimpleSpreadMPE,
+        has_global_state: bool = False,
+    ):
+        super().__init__(env, has_global_state, env.max_steps)
+        self._env: SimpleSpreadMPE
+
+    @cached_property
+    def action_dim(self) -> chex.Array:
+        "Get the actions dim for each agent."
+        return self._env.action_space(self.agents[0]).shape[0]
+
+    @cached_property
+    def state_size(self) -> chex.Array:
+        "Get the sate size of the global observation"
+
+        # spaces = [self._env.observation_space(agent) for agent in self._env.agents]
+        # return sum([space.shape[-1] for space in spaces])
+
+        mock_state = self._env.reset(jax.random.PRNGKey(0))[0]
+        observation_shape = mock_state["agent_0"].shape[0]
+        return observation_shape * self._env.num_agents
+
+    def action_mask(self, wrapped_env_state: BraxState) -> Array:
+        """Get action mask for each agent."""
+        return jnp.ones((self.num_agents, self.action_dim), dtype=bool)
+
+    def get_global_state(self, wrapped_env_state: BraxState, obs: Dict[str, Array]) -> Array:
+        """Get global state from observation and copy it for each agent."""
+        all_obs = jnp.array([obs[agent] for agent in self._env.agents]).flatten()
+        all_obs = jnp.expand_dims(all_obs, axis=0).repeat(self._env.num_agents, axis=0)
+        return all_obs
