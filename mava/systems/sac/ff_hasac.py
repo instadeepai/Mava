@@ -63,22 +63,23 @@ from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.wrappers import episode_metrics
 
 
-def get_action(actor_params, actor_net, keys, env, obs, batch_size):
-    actions = jnp.zeros((batch_size, env.num_agents, env.action_dim))
-    log_std = jnp.zeros((batch_size, env.num_agents))
+def get_action(actor_params, actor_net, keys, obs):
+    # actions = jnp.zeros((batch_size, env.num_agents, env.action_dim))
+    # log_std = jnp.zeros((batch_size, env.num_agents))
+    #
+    # for agent in range(env.num_agents):
+    #     actor_params_per_agent = jax.tree_util.tree_map(
+    #         lambda x, agent=agent: x[agent], actor_params
+    #     )
+    #     obs_per_agent = jax.tree_util.tree_map(lambda x, agent=agent: x[:, agent], obs)
+    #
+    #     pi = actor_net.apply(actor_params_per_agent, obs_per_agent)
+    #     action = pi.sample(seed=keys[agent])
+    #     actions = actions.at[:, agent].set(action)
+    #     log_std = log_std.at[:, agent].set(pi.log_prob(action))
 
-    for agent in range(env.num_agents):
-        actor_params_per_agent = jax.tree_util.tree_map(
-            lambda x, agent=agent: x[agent], actor_params
-        )
-        obs_per_agent = jax.tree_util.tree_map(lambda x, agent=agent: x[:, agent], obs)
-
-        pi = actor_net.apply(actor_params_per_agent, obs_per_agent)
-        action = pi.sample(seed=keys[agent])
-        actions = actions.at[:, agent].set(action)
-        log_std = log_std.at[:, agent].set(pi.log_prob(action))
-
-    return actions, log_std
+    actions, logstds = jax.vmap(actor_net.apply, in_axes=(0, 1, 0), out_axes=1)(actor_params, obs, keys)
+    return actions, logstds
 
 
 def init(
@@ -142,8 +143,7 @@ def init(
         cfg.network.action_head, action_dim=action_dim, independent_std=False
     )
     actor_network = Actor(actor_torso, actor_action_head)
-    actor_params = jax.vmap(actor_network.init, in_axes=(0, None))(actor_keys, obs_single_batched)
-
+    actor_params = jax.vmap(actor_network.init)(actor_keys, obs, actor_keys)
     # Making Q networks
     critic_torso = hydra.utils.instantiate(cfg.network.critic_network.pre_torso)
     q_network = QNetwork(critic_torso, centralised_critic=True)
@@ -321,11 +321,11 @@ def make_update_fns(
         agent_id,
     ) -> Array:
         batch_size = actions.shape[0]
-        pi = actor_net.apply(actor_params, obs)
-        new_actions = pi.sample(seed=key)
-        log_prob = pi.log_prob(new_actions)
+        new_action, log_prob = actor_net.apply(actor_params, obs, key)
+        # new_actions = pi.sample(seed=key)
+        # log_prob = pi.log_prob(new_actions)
 
-        joint_actions = actions.at[:, agent_id, :].set(new_actions).reshape(batch_size, -1)
+        joint_actions = actions.at[:, agent_id, :].set(new_action).reshape(batch_size, -1)
 
         qval_1 = q_net.apply(q_params.q1, obs, joint_actions)
         qval_2 = q_net.apply(q_params.q2, obs, joint_actions)
@@ -347,7 +347,7 @@ def make_update_fns(
         # next_log_prob = pi.log_prob(next_action)
         act_keys = jax.random.split(key, env.num_agents)
         next_action, next_log_prob = get_action(
-            params.actor, actor_net, act_keys, env, data.next_obs, cfg.system.batch_size
+            params.actor, actor_net, act_keys, data.next_obs
         )
 
         joint_next_actions = get_joint_action(next_action)
@@ -397,13 +397,13 @@ def make_update_fns(
                 agent_ids = jnp.arange(env.num_agents)
 
             joint_actions, log_probs = get_action(
-                params.actor, actor_net, act_keys, env, data.obs, cfg.system.batch_size
+                params.actor, actor_net, act_keys, data.obs
             )
 
             # HASAC sequential update: run the normal actor update one at a time instead of batched.
             # Update the joint actions after updating the actor and use the new joint actions.
             for agent_id in agent_ids:
-                key, actor_key = jax.random.split(key)
+                key, loss_key, new_act_key = jax.random.split(key,3)
 
                 agent_params = tree_slice(params.actor, agent_id)
                 agent_opt_state = tree_slice(opt_states.actor, agent_id)
@@ -416,7 +416,7 @@ def make_update_fns(
                     joint_actions,
                     jnp.exp(params.log_alpha),
                     params.q.online,
-                    actor_key,
+                    loss_key,
                     agent_id,
                 )
                 # Mean over the device and batch dimensions.
@@ -426,8 +426,10 @@ def make_update_fns(
                 new_agent_params = optax.apply_updates(agent_params, updates)
 
                 # update actions list with new action from updated actor
-                pi = actor_net.apply(new_agent_params, agent_obs)
-                new_action = pi.sample(seed=key)
+                new_action, _ = actor_net.apply(new_agent_params, agent_obs, new_act_key)
+
+                # pi = actor_net.apply(new_agent_params, agent_obs)
+                # new_action = pi.sample(seed=key)
 
                 # Add new action to list of actions
                 joint_actions = joint_actions.at[:, agent_id].set(new_action)
@@ -502,7 +504,7 @@ def make_update_fns(
         key, act_key = jax.random.split(key)
         act_keys = jax.random.split(act_key, env.num_agents)
 
-        actions, _ = get_action(actor_params, actor_net, act_keys, env, obs, cfg.arch.num_envs)
+        actions, _ = get_action(actor_params, actor_net, act_keys, obs)
 
         next_obs, env_state, buffer_state, metrics = step(actions, obs, env_state, buffer_state)
         return (actor_params, next_obs, env_state, buffer_state, key), metrics
@@ -594,9 +596,8 @@ def run_experiment(cfg: DictConfig) -> float:
     def eval_act_fn(
         params: FrozenDict, timestep: TimeStep, key: chex.PRNGKey, actor_state: ActorState
     ) -> Tuple[Action, Dict]:
-        batch_size = timestep.reward.shape[0]
         keys = jax.random.split(key, eval_env.num_agents)
-        action, _ = get_action(params, actor, keys, eval_env, timestep.observation, batch_size)
+        action, _ = get_action(params, actor, keys, timestep.observation)
         return action, {}
 
     evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, absolute_metric=False)

@@ -143,7 +143,7 @@ class ContinuousActionHead(nn.Module):
             self.log_std = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))
 
     @nn.compact
-    def __call__(self, obs_embedding: chex.Array, observation: Observation) -> tfd.Independent:
+    def __call__(self, obs_embedding: chex.Array, observation: Observation, key) -> tfd.Independent:
         """Action selection for continuous action space environments.
 
         Args:
@@ -163,10 +163,17 @@ class ContinuousActionHead(nn.Module):
 
         distribution = tfd.Normal(loc=loc, scale=scale)
 
-        return tfd.Independent(
+        dist = tfd.Independent(
             TanhTransformedDistribution(distribution),
             reinterpreted_batch_ndims=1,
         )
+
+        # todo: this is a hacky fix for now because switching to numpyro is tricky, will do it later
+        # needed because running this in a loop for anything more than 5 agents takes ~10 hours per experiment
+        actions = dist.sample(seed=key)
+        log_probs = dist.log_prob(actions)
+
+        return actions, log_probs
 
 
 class FeedForwardActor(nn.Module):
@@ -176,11 +183,11 @@ class FeedForwardActor(nn.Module):
     action_head: nn.Module
 
     @nn.compact
-    def __call__(self, observation: Observation) -> tfd.Distribution:
+    def __call__(self, observation: Observation, key) -> tfd.Distribution:
         """Forward pass."""
         obs_embedding = self.torso(observation.agents_view)
 
-        return self.action_head(obs_embedding, observation)
+        return self.action_head(obs_embedding, observation, key)
 
 
 class FeedForwardValueNet(nn.Module):
