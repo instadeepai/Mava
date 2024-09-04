@@ -4,4 +4,4 @@ defaults:
   - arch: anakin
   - system: sac/ff_hasac
   - network: continuous_mlp  # [continuous_mlp]
-  - env: mabrax  # [mabrax]
+  - env: smax  # [mabrax]
