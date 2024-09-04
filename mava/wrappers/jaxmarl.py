@@ -381,13 +381,15 @@ class SmaxWrapper(JaxMarlWrapper):
     @cached_property
     def action_dim(self) -> chex.Array:
         """Get the actions dim for each agent."""
-        single_agent_action_space = self._env.action_space(self.agents[0])
-        return single_agent_action_space.n
+        return self._env.action_space(self.agents[0]).shape[0]  # note: only for cont smax
+        # single_agent_action_space = self._env.action_space(self.agents[0])
+        # return single_agent_action_space.n
 
     def action_mask(self, wrapped_env_state: Any) -> Array:
         """Get action mask for each agent."""
-        avail_actions = self._env.get_avail_actions(wrapped_env_state)
-        return jnp.array(batchify(avail_actions, self.agents), dtype=bool)
+        # avail_actions = self._env.get_avail_actions(wrapped_env_state)
+        # return jnp.array(batchify(avail_actions, self.agents), dtype=bool)
+        return jnp.ones((self.num_agents, self.action_dim), dtype=bool)  # note: only for cont smax
 
     def get_global_state(self, wrapped_env_state: Any, obs: Dict[str, Array]) -> Array:
         """Get global state from observation and copy it for each agent."""

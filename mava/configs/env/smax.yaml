@@ -24,3 +24,4 @@ kwargs:
   see_enemy_actions: True # Whether to enable enemy vision. If True, the enemy will be able to see the actions of the agent.
   walls_cause_death: True # Whether to kill the agent if it collides with a wall.
   attack_mode: "closest" # "closest" or "random". Whether to attack the closest enemy or a random enemy.
+  action_type: "continuous" # "discrete" or "continuous". Whether the action space is discrete or continuous.
