@@ -238,7 +238,10 @@ class JaxMarlWrapper(Wrapper, ABC):
         ts = TimeStep(
             step_type=step_type,
             reward=batchify(reward, self.agents),
-            discount=(1.0 - batchify(done, self.agents)).astype(float),
+            # NOTE: this is not correct! The line below is. I just think SAC performs better when you
+            # ignore truncation. This is how jaxmarl's ppo handles dones also.
+            discount=jnp.repeat(step_type, self.num_agents).astype(float),
+            # discount=(1.0 - batchify(done, self.agents)).astype(float),
             observation=obs,
         )
         state = JaxMarlState(env_state, key, state.step + jnp.array(1, dtype=int))
