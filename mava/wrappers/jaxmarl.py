@@ -240,7 +240,7 @@ class JaxMarlWrapper(Wrapper, ABC):
             reward=batchify(reward, self.agents),
             # NOTE: this is not correct! The line below is. I just think SAC performs better when you
             # ignore truncation. This is how jaxmarl's ppo handles dones also.
-            discount=jnp.repeat(step_type, self.num_agents).astype(float),
+            discount=jnp.repeat(~done["__all__"], self.num_agents).astype(float),
             # discount=(1.0 - batchify(done, self.agents)).astype(float),
             observation=obs,
         )
