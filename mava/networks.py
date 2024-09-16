@@ -13,9 +13,10 @@
 # limitations under the License.
 
 import functools
-from typing import Callable, Dict, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Sequence, Tuple, Union
 
 import chex
+import hydra
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -382,3 +383,31 @@ class RecQNetwork(nn.Module):
         eps_greedy_dist = MaskedEpsGreedyDistribution(q_values, eps, obs.action_mask)
 
         return hidden_state, eps_greedy_dist
+
+
+class CompositeNetwork(nn.Module):
+    """Composite Network. Takes in a sequence of layers and applies them sequentially."""
+
+    layers: Sequence[nn.Module]
+
+    @nn.compact
+    def __call__(
+        self, *network_input: Union[chex.Array, Tuple[chex.Array, ...]]
+    ) -> Union[tfd.Distribution, chex.Array]:
+        x = self.layers[0](*network_input)
+        for layer in self.layers[1:]:
+            x = layer(x)
+        return x
+
+
+def chained_torsos(torso_cfgs: List[Dict[str, Any]]) -> nn.Module:
+    """Create a network by chaining multiple torsos together using a list of configs.
+    This makes use of hydra to instantiate the modules and the composite network
+    to chain them together.
+
+    Args:
+        torso_cfgs: List of dictionaries containing the configuration for each torso.
+            These configs should use the same format as the individual torso configs."""
+
+    torso_modules = [hydra.utils.instantiate(torso_cfg) for torso_cfg in torso_cfgs]
+    return CompositeNetwork(torso_modules)

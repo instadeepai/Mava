@@ -1,0 +1,26 @@
+# ---MLP Networks---
+actor_network:
+  pre_torso:
+    _target_: mava.networks.chained_torsos # we call the chained torsos creation function
+    _recursive_: false  # we disable recursive instantiation for this object as we do the creation manually
+
+    torso_cfgs:
+      - _target_: mava.networks.MLPTorso
+        layer_sizes: [128, 128]
+        use_layer_norm: False
+        activation: relu
+
+      - _target_: mava.networks.MLPTorso
+        layer_sizes: [128, 128]
+        use_layer_norm: False
+        activation: relu
+
+action_head:
+  _target_: mava.networks.DiscreteActionHead # [DiscreteActionHead, ContinuousActionHead]
+
+critic_network:
+  pre_torso:
+    _target_: mava.networks.MLPTorso
+    layer_sizes: [128, 128]
+    use_layer_norm: False
+    activation: relu
