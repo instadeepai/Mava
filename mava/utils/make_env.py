@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from typing import Dict, Tuple, Type
-
+import gymnax
 import jaxmarl
 import jumanji
 import matrax
@@ -32,7 +32,7 @@ from jumanji.environments.routing.robot_warehouse.generator import (
     RandomGenerator as RwareRandomGenerator,
 )
 from omegaconf import DictConfig
-
+from mava.wrappers.truncation import TruncationAutoResetWrapper
 from mava.types import MarlEnv
 from mava.wrappers import (
     AgentIDWrapper,
@@ -46,6 +46,8 @@ from mava.wrappers import (
     RecordEpisodeMetrics,
     RwareWrapper,
     SmaxWrapper,
+    GymnaxWrapper,
+    AgentIndexWrapper
 )
 from mava.wrappers.jaxmarl import JaxMarlWrapper
 
@@ -212,6 +214,33 @@ def make_gigastep_env(
     return train_env, eval_env
 
 
+def make_gymnax_env(env_name: str, config: DictConfig):
+    """
+    Create a Gymnax environments for training and evaluation.
+
+    Args:
+        env_name (str): The name of the environment to create.
+        config (Dict): The configuration of the environment.
+
+    Returns:
+        A tuple of the environments.
+    """
+    # Config generator and select the wrapper.
+    # Create envs.
+    env, env_params = gymnax.make(env_name, **config.env.kwargs)
+    eval_env, eval_env_params = gymnax.make(env_name, **config.env.kwargs)
+
+    env = GymnaxWrapper(env, env_params)
+    eval_env = GymnaxWrapper(eval_env, eval_env_params)
+
+    if config.system.add_agent_dim_wrapper:
+        env, eval_env = AgentIndexWrapper(env), AgentIndexWrapper(eval_env)
+    env = TruncationAutoResetWrapper(env)
+    env = RecordEpisodeMetrics(env)
+    eval_env = RecordEpisodeMetrics(eval_env)
+    return env, eval_env
+
+
 def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
     """
     Create environments for training and evaluation.
@@ -236,5 +265,7 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, M
         return make_matrax_env(env_name, config, add_global_state)
     elif env_name in _gigastep_registry:
         return make_gigastep_env(env_name, config, add_global_state)
+    elif env_name in gymnax.registered_envs:
+        return make_gymnax_env(env_name, config)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")

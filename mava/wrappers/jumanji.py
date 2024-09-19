@@ -16,7 +16,7 @@
 from abc import ABC, abstractmethod
 from functools import cached_property
 from typing import Tuple, Union
-
+from chex import Array
 import chex
 import jax.numpy as jnp
 from jumanji import specs
@@ -413,3 +413,42 @@ class CleanerWrapper(JumanjiMarlWrapper):
             return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
 
         return specs.Spec(Observation, "ObservationSpec", **obs_data)
+import jax
+
+class AgentIndexWrapper(Wrapper):
+    """A simple wrapper expands the dimensions of the observation at index 0 to add a
+    dummy agent index.
+    """
+
+    def __init__(self, env: Environment) -> None:
+        super().__init__(env)
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
+        state, timestep = self._env.reset(key)
+        expanded_obs = jax.tree_map(lambda x: jnp.expand_dims(x, axis=0), timestep.observation)
+        reward = jnp.expand_dims(timestep.reward, axis=0)
+        return state, timestep.replace(observation=expanded_obs, reward=reward)
+
+    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
+        state, timestep = self._env.step(state, action)
+        expanded_obs = jax.tree_map(lambda x: jnp.expand_dims(x, axis=0), timestep.observation)
+        reward = jnp.expand_dims(timestep.reward, axis=0)
+        return state, timestep.replace(observation=expanded_obs, reward=reward)
+
+    def observation_spec(self):
+
+        initial_obs_spec = super().observation_spec()
+
+        return specs.Spec(
+            Observation,
+            "ObservationSpec",
+            agents_view=specs.BoundedArray(
+                shape=(1, *initial_obs_spec.agents_view.shape),
+                dtype=initial_obs_spec.agents_view.dtype,
+                minimum=initial_obs_spec.agents_view.minimum,
+                maximum=initial_obs_spec.agents_view.maximum,
+                name="agents_view",
+            ),
+            action_mask=initial_obs_spec.action_mask,
+            step_count=initial_obs_spec.step_count,
+        )

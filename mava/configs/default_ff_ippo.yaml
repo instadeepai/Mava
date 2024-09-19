@@ -3,5 +3,5 @@ defaults:
   - arch: anakin
   - system: ppo/ff_ippo
   - network: mlp  # [mlp, continuous_mlp, cnn]
-  - env: rware  # [cleaner, connector, gigastep, lbf, mabrax, matrax, rware, smax]
+  - env: acrobot  # [cleaner, connector, gigastep, lbf, mabrax, matrax, rware, smax]
   - _self_

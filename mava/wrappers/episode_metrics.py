@@ -52,9 +52,9 @@ class RecordEpisodeMetrics(Wrapper):
         super().__init__(env)
         self._env: MarlEnv
 
-        self.num_agents = self._env.num_agents
-        self.time_limit = self._env.time_limit
-        self.action_dim = self._env.action_dim
+        self.num_agents = 1
+        self.time_limit = self._env._env_params.max_steps_in_episode
+        self.action_dim = self._env.num_actions
 
     def reset(self, key: chex.PRNGKey) -> Tuple[RecordEpisodeMetricsState, TimeStep]:
         """Reset the environment."""

@@ -2,7 +2,7 @@
 actor_network:
   pre_torso:
     _target_: mava.networks.MLPTorso
-    layer_sizes: [128, 128]
+    layer_sizes: [256, 256]
     use_layer_norm: False
     activation: relu
 
@@ -12,6 +12,6 @@ action_head:
 critic_network:
   pre_torso:
     _target_: mava.networks.MLPTorso
-    layer_sizes: [128, 128]
+    layer_sizes: [256, 256]
     use_layer_norm: False
     activation: relu
