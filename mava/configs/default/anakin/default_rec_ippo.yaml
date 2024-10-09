@@ -1,7 +1,11 @@
 defaults:
-  - logger: rec_mappo
+  - logger: base_logger
   - arch: anakin
-  - system: ppo/rec_mappo
+  - system: ppo/rec_ippo
   - network: rnn  # [rnn, rcnn]
   - env: rware  # [cleaner, connector, gigastep, lbf, mabrax, matrax, rware, smax]
   - _self_
+
+hydra:
+  searchpath:
+    - file://mava/configs

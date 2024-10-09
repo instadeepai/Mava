@@ -1,7 +1,11 @@
 defaults:
   - _self_
-  - logger: rec_iql
+  - logger: base_logger
   - arch: anakin
   - system: q_learning/rec_iql
   - network: rnn  # [rnn, rcnn]
   - env: smax  # [cleaner, connector, gigastep, lbf, matrax, rware, smax]
+
+hydra:
+  searchpath:
+    - file://mava/configs

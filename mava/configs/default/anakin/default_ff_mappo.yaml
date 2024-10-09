@@ -1,7 +1,11 @@
 defaults:
-  - logger: ff_ippo
+  - logger: base_logger
   - arch: anakin
-  - system: ppo/ff_ippo
+  - system: ppo/ff_mappo
   - network: mlp  # [mlp, continuous_mlp, cnn]
   - env: rware  # [cleaner, connector, gigastep, lbf, mabrax, matrax, rware, smax]
   - _self_
+
+hydra:
+  searchpath:
+    - file://mava/configs
