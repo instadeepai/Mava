@@ -82,8 +82,8 @@ def get_learner_fn(
                 - key (PRNGKey): The random number generator state.
                 - env_state (State): The environment state.
                 - last_timestep (TimeStep): The last timestep in the current trajectory.
-                - dones (bool): Whether the last timestep was a terminal state.
-                - hstates (HiddenStates): The current hidden states of the RNN.
+                - last_done (bool): Whether the last timestep was a terminal state.
+                - hstates (HiddenStates): The hidden state of the policy and critic RNN.
             _ (Any): The current metrics info.
 
         """
@@ -106,10 +106,7 @@ def get_learner_fn(
 
             # Add a batch dimension to the observation.
             batched_observation = tree.map(lambda x: x[jnp.newaxis, :], last_timestep.observation)
-            ac_in = (
-                batched_observation,
-                last_done[jnp.newaxis, :],
-            )
+            ac_in = (batched_observation, last_done[jnp.newaxis, :])
 
             # Run the network.
             policy_hidden_state, actor_policy = actor_apply_fn(
@@ -122,7 +119,8 @@ def get_learner_fn(
             # Sample action from the policy and squeeze out the batch dimension.
             action = actor_policy.sample(seed=policy_key)
             log_prob = actor_policy.log_prob(action)
-            value, action, log_prob = value.squeeze(0), action.squeeze(0), log_prob.squeeze(0)
+
+            action, log_prob, value = action.squeeze(0), log_prob.squeeze(0), value.squeeze(0)
 
             # Step the environment.
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
@@ -168,13 +166,11 @@ def get_learner_fn(
 
         # Add a batch dimension to the observation.
         batched_last_observation = tree.map(lambda x: x[jnp.newaxis, :], last_timestep.observation)
-        ac_in = (
-            batched_last_observation,
-            last_done[jnp.newaxis, :],
-        )
+        ac_in = (batched_last_observation, last_done[jnp.newaxis, :])
 
         # Run the network.
         _, last_val = critic_apply_fn(params.critic_params, hstates.critic_hidden_state, ac_in)
+
         # Squeeze out the batch dimension and mask out the value of terminal states.
         last_val = last_val.squeeze(0)
 
@@ -220,7 +216,6 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate the actor loss."""
                     # RERUN NETWORK
-
                     obs_and_done = (traj_batch.obs, traj_batch.done)
                     _, actor_policy = actor_apply_fn(
                         actor_params, traj_batch.hstates.policy_hidden_state[0], obs_and_done
@@ -422,7 +417,7 @@ def get_learner_fn(
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
                 - dones (bool): Whether the initial timestep was a terminal state.
-                - hstateS (HiddenStates): The initial hidden states of the RNN.
+                - hstates (HiddenStates): The hidden state of the policy and critic RNN.
 
         """
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
@@ -453,7 +448,7 @@ def learner_setup(
     # PRNG keys.
     key, actor_net_key, critic_net_key = keys
 
-    # Define network and optimisers.
+    # Define network and optimiser.
     actor_pre_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
     actor_post_torso = hydra.utils.instantiate(config.network.actor_network.post_torso)
     actor_action_head = hydra.utils.instantiate(
@@ -472,6 +467,7 @@ def learner_setup(
         pre_torso=critic_pre_torso,
         post_torso=critic_post_torso,
         hidden_state_dim=config.network.hidden_state_dim,
+        centralised_critic=True,
     )
 
     actor_lr = make_learning_rate(config.system.actor_lr, config)
@@ -494,9 +490,9 @@ def learner_setup(
     )
     init_obs = tree.map(lambda x: x[jnp.newaxis, ...], init_obs)
     init_done = jnp.zeros((1, config.arch.num_envs, num_agents), dtype=bool)
-    init_x = (init_obs, init_done)
+    init_obs_done = (init_obs, init_done)
 
-    # Initialise hidden states.
+    # Initialise hidden state.
     init_policy_hstate = ScannedRNN.initialize_carry(
         (config.arch.num_envs, num_agents), config.network.hidden_state_dim
     )
@@ -505,9 +501,9 @@ def learner_setup(
     )
 
     # initialise params and optimiser state.
-    actor_params = actor_network.init(actor_net_key, init_policy_hstate, init_x)
+    actor_params = actor_network.init(actor_net_key, init_policy_hstate, init_obs_done)
     actor_opt_state = actor_optim.init(actor_params)
-    critic_params = critic_network.init(critic_net_key, init_critic_hstate, init_x)
+    critic_params = critic_network.init(critic_net_key, init_critic_hstate, init_obs_done)
     critic_opt_state = critic_optim.init(critic_params)
 
     # Get network apply functions and optimiser updates.
@@ -595,7 +591,7 @@ def run_experiment(_config: DictConfig) -> float:
         ), "Rollout length must be divisible by recurrent chunk size."
 
     # Create the enviroments for train and eval.
-    env, eval_env = environments.make(config)
+    env, eval_env = environments.make(config=config, add_global_state=True)
 
     # PRNG keys.
     key, key_e, actor_net_key, critic_net_key = jax.random.split(
@@ -628,7 +624,6 @@ def run_experiment(_config: DictConfig) -> float:
         * config.system.update_batch_size
         * config.arch.num_envs
     )
-
     # Logger setup
     logger = MavaLogger(config)
     cfg: Dict = OmegaConf.to_container(config, resolve=True)
@@ -650,7 +645,6 @@ def run_experiment(_config: DictConfig) -> float:
         (n_devices, eval_batch_size, config.system.num_agents),
         config.network.hidden_state_dim,
     )
-
     # Run experiment for a total number of evaluations.
     max_episode_return = -jnp.inf
     best_params = None
@@ -721,7 +715,9 @@ def run_experiment(_config: DictConfig) -> float:
     return eval_performance
 
 
-@hydra.main(config_path="../../configs", config_name="default_rec_ippo.yaml", version_base="1.2")
+@hydra.main(
+    config_path="../../../configs", config_name="default_rec_mappo.yaml", version_base="1.2"
+)
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
@@ -729,7 +725,7 @@ def hydra_entry_point(cfg: DictConfig) -> float:
 
     # Run experiment.
     eval_performance = run_experiment(cfg)
-    print(f"{Fore.CYAN}{Style.BRIGHT}Recurrent IPPO experiment completed{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}Recurrent MAPPO experiment completed{Style.RESET_ALL}")
     return eval_performance
 
 
