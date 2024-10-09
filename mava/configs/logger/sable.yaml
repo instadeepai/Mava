@@ -1,0 +1,5 @@
+#Todo: remove this later
+defaults:
+    - base_logger
+
+system_name: sable
