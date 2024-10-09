@@ -30,9 +30,9 @@ from optax._src.base import OptState
 from rich.pretty import pprint
 
 from mava.evaluator import get_eval_fn, get_num_eval_envs, make_rec_eval_act_fn
-from mava.networks import RecurrentActor as Actor
-from mava.networks import RecurrentValueNet as Critic
-from mava.networks import ScannedRNN
+from mava.networks.ff_rnn_network import RecurrentActor as Actor
+from mava.networks.ff_rnn_network import RecurrentValueNet as Critic
+from mava.networks.ff_rnn_network import ScannedRNN
 from mava.systems.ppo.types import (
     HiddenStates,
     OptStates,

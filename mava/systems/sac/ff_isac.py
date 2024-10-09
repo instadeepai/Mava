@@ -32,8 +32,8 @@ from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
 from mava.evaluator import get_eval_fn, make_ff_eval_act_fn
-from mava.networks import FeedForwardActor as Actor
-from mava.networks import FeedForwardQNet as QNetwork
+from mava.networks.ff_rnn_network import FeedForwardActor as Actor
+from mava.networks.ff_rnn_network import FeedForwardQNet as QNetwork
 from mava.systems.sac.types import (
     BufferState,
     LearnerState,
