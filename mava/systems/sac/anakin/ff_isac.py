@@ -603,8 +603,8 @@ def run_experiment(cfg: DictConfig) -> float:
 
 
 @hydra.main(
-    config_path="../../../configs/default/anakin",
-    config_name="default_ff_isac.yaml",
+    config_path="../../../configs/default/",
+    config_name="ff_isac.yaml",
     version_base="1.2",
 )
 def hydra_entry_point(cfg: DictConfig) -> float:

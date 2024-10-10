@@ -716,8 +716,8 @@ def run_experiment(_config: DictConfig) -> float:
 
 
 @hydra.main(
-    config_path="../../../configs/default/anakin",
-    config_name="default_rec_mappo.yaml",
+    config_path="../../../configs/default/",
+    config_name="rec_mappo.yaml",
     version_base="1.2",
 )
 def hydra_entry_point(cfg: DictConfig) -> float:

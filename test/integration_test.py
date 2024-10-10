@@ -23,7 +23,7 @@ from omegaconf import DictConfig, OmegaConf
 # system run all envs, but each env and each system is run at least once.
 # For each system we select a random environment to run.
 # Then for each environment we select a random system to run.
-anakin_config_path = "../mava/configs/default/anakin"
+config_path = "../mava/configs/default"
 
 ppo_systems = [
     "ppo.anakin.ff_ippo",
@@ -69,8 +69,8 @@ def test_ppo_system(fast_config: dict, system_path: str) -> None:
     _, _, system_name = system_path.split(".")
     env = random.choice(discrete_envs)
 
-    with initialize(version_base=None, config_path=anakin_config_path):
-        cfg = compose(config_name=f"default_{system_name}", overrides=[f"env={env}"])
+    with initialize(version_base=None, config_path=config_path):
+        cfg = compose(config_name=f"{system_name}", overrides=[f"env={env}"])
         cfg = _get_fast_config(cfg, fast_config)
 
     _run_system(system_path, cfg)
@@ -82,8 +82,8 @@ def test_q_learning_system(fast_config: dict, system_path: str) -> None:
     _, _, system_name = system_path.split(".")
     env = random.choice(discrete_envs)
 
-    with initialize(version_base=None, config_path=anakin_config_path):
-        cfg = compose(config_name=f"default_{system_name}", overrides=[f"env={env}"])
+    with initialize(version_base=None, config_path=config_path):
+        cfg = compose(config_name=f"{system_name}", overrides=[f"env={env}"])
         cfg = _get_fast_config(cfg, fast_config)
 
     _run_system(system_path, cfg)
@@ -95,8 +95,8 @@ def test_sac_system(fast_config: dict, system_path: str) -> None:
     _, _, system_name = system_path.split(".")
     env = random.choice(continuous_envs)
 
-    with initialize(version_base=None, config_path=anakin_config_path):
-        cfg = compose(config_name=f"default_{system_name}", overrides=[f"env={env}"])
+    with initialize(version_base=None, config_path=config_path):
+        cfg = compose(config_name=f"{system_name}", overrides=[f"env={env}"])
         cfg = _get_fast_config(cfg, fast_config)
 
     _run_system(system_path, cfg)
@@ -108,8 +108,8 @@ def test_discrete_env(fast_config: dict, env_name: str) -> None:
     system_path = random.choice(ppo_systems + q_learning_systems)
     _, _, system_name = system_path.split(".")
 
-    with initialize(version_base=None, config_path=anakin_config_path):
-        cfg = compose(config_name=f"default_{system_name}", overrides=[f"env={env_name}"])
+    with initialize(version_base=None, config_path=config_path):
+        cfg = compose(config_name=f"{system_name}", overrides=[f"env={env_name}"])
         cfg = _get_fast_config(cfg, fast_config)
 
     _run_system(system_path, cfg)
@@ -124,8 +124,8 @@ def test_discrete_cnn_env(fast_config: dict, env_name: str) -> None:
     network = "cnn" if "ff" in system_name else "rcnn"
 
     overrides = [f"env={env_name}", f"network={network}"]
-    with initialize(version_base=None, config_path=anakin_config_path):
-        cfg = compose(config_name=f"default_{system_name}", overrides=overrides)
+    with initialize(version_base=None, config_path=config_path):
+        cfg = compose(config_name=f"{system_name}", overrides=overrides)
         cfg = _get_fast_config(cfg, fast_config)
 
     _run_system(system_path, cfg)
@@ -140,8 +140,8 @@ def test_continuous_env(fast_config: dict, env_name: str) -> None:
     _, _, system_name = system_path.split(".")
 
     overrides = [f"env={env_name}", "network=continuous_mlp"]
-    with initialize(version_base=None, config_path=anakin_config_path):
-        cfg = compose(config_name=f"default_{system_name}", overrides=overrides)
+    with initialize(version_base=None, config_path=config_path):
+        cfg = compose(config_name=f"{system_name}", overrides=overrides)
         cfg = _get_fast_config(cfg, fast_config)
 
     _run_system(system_path, cfg)
