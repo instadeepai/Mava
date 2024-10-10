@@ -406,7 +406,7 @@ def learner_setup(
     # create temporory envoirnments.
     env = environments.make_gym_env(config, config.arch.num_envs)
     # Get number of agents and actions.
-    action_space = env.unwrapped.single_action_space
+    action_space = env.single_action_space
     config.system.num_agents = len(action_space)
     config.system.num_actions = int(action_space[0].n)
 
@@ -436,7 +436,7 @@ def learner_setup(
     )
 
     # Initialise observation: Select only obs for a single agent.
-    init_obs = jnp.array([env.unwrapped.single_observation_space.sample()])
+    init_obs = jnp.array([env.single_observation_space.sample()])
     init_action_mask = jnp.ones((config.system.num_agents, config.system.num_actions))
     init_x = Observation(init_obs, init_action_mask)
 

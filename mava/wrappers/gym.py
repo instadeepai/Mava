@@ -20,9 +20,10 @@ from multiprocessing.connection import Connection
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import gymnasium
-import jax
+import gymnasium.vector.async_vector_env
 import numpy as np
 from gymnasium import spaces
+from gymnasium.spaces.utils import is_space_dtype_shape_equiv
 from gymnasium.vector.utils import write_to_shared_memory
 from jumanji.types import StepType, TimeStep
 from numpy.typing import NDArray
@@ -195,8 +196,13 @@ class GymAgentIDWrapper(gymnasium.Wrapper):
             raise ValueError(f"Space {type(space)} is not currently supported.")
 
 
-class GymToJumanji(gymnasium.Wrapper):
+class GymToJumanji:
     """Converts from the Gym API to the dm_env API, using Jumanji's Timestep type."""
+
+    def __init__(self, env: gymnasium.vector.async_vector_env):
+        self.env = env
+        self.single_action_space = env.unwrapped.single_action_space
+        self.single_observation_space = env.unwrapped.single_observation_space
 
     def reset(
         self, seed: Optional[list[int]] = None, options: Optional[list[dict]] = None
@@ -244,7 +250,8 @@ class GymToJumanji(gymnasium.Wrapper):
         self, obs: NDArray, ep_done: NDArray, terminated: NDArray, rewards: NDArray, info: Dict
     ) -> TimeStep:
         obs = self._format_observation(obs, info)
-        extras = jax.tree.map(lambda *x: np.stack(x), *info["metrics"])
+        # Filter out the masks and auxiliary data
+        extras = {key: value for key, value in info["metrics"].items() if key[0] != "_"}
         step_type = np.where(ep_done, StepType.LAST, StepType.MID)
         terminated = np.all(terminated, axis=1)
 
@@ -255,6 +262,9 @@ class GymToJumanji(gymnasium.Wrapper):
             observation=obs,
             extras=extras,
         )
+
+    def close(self) -> None:
+        self.env.close()
 
 
 # Copied form Gymnasium/blob/main/gymnasium/vector/async_vector_env.py
@@ -321,9 +331,17 @@ def async_multiagent_worker(  # CCR001
                 env.set_wrapper_attr(name, value)
                 pipe.send((None, True))
             elif command == "_check_spaces":
+                obs_mode, single_obs_space, single_action_space = data
                 pipe.send(
                     (
-                        (data[0] == observation_space, data[1] == action_space),
+                        (
+                            (
+                                single_obs_space == observation_space
+                                if obs_mode == "same"
+                                else is_space_dtype_shape_equiv(single_obs_space, observation_space)
+                            ),
+                            single_action_space == action_space,
+                        ),
                         True,
                     )
                 )
