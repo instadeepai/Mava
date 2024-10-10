@@ -17,7 +17,6 @@ from typing import Dict, Tuple, Type
 import gymnasium
 import gymnasium.vector
 import gymnasium.wrappers
-import gymnasium.wrappers.compatibility
 import jaxmarl
 import jumanji
 import matrax
