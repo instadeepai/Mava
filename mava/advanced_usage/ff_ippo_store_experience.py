@@ -675,6 +675,7 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
+    cfg.logger.system_name = "ff_ippo"
 
     # Run experiment.
     run_experiment(cfg)
