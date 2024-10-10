@@ -722,7 +722,7 @@ def run_experiment(_config: DictConfig) -> float:
 
 
 @hydra.main(
-    config_path="../../../configs/default/",
+    config_path="../../../configs/default",
     config_name="rec_ippo.yaml",
     version_base="1.2",
 )

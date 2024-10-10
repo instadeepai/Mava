@@ -603,7 +603,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
 
 @hydra.main(
-    config_path="../../../configs/default/",
+    config_path="../../../configs/default",
     config_name="ff_isac.yaml",
     version_base="1.2",
 )
