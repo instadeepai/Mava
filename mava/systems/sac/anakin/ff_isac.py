@@ -602,11 +602,16 @@ def run_experiment(cfg: DictConfig) -> float:
     return eval_performance
 
 
-@hydra.main(config_path="../../../configs", config_name="default_ff_isac.yaml", version_base="1.2")
+@hydra.main(
+    config_path="../../../configs/default",
+    config_name="ff_isac.yaml",
+    version_base="1.2",
+)
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
+    cfg.logger.system_name = "ff_isac"
 
     # Run experiment.
     final_return = run_experiment(cfg)
