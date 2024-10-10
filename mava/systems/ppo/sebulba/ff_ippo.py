@@ -39,25 +39,13 @@ from mava.evaluator import make_ff_eval_act_fn
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
-from mava.types import (
-    ActorApply,
-    CriticApply,
-    ExperimentOutput,
-    Observation,
-    SebulbaLearnerFn,
-)
+from mava.types import ActorApply, CriticApply, ExperimentOutput, Observation, SebulbaLearnerFn
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
+from mava.utils.config import check_sebulba_config, check_total_timesteps
 from mava.utils.jax_utils import merge_leading_dims
 from mava.utils.logger import LogEvent, MavaLogger
-from mava.utils.sebulba_utils import (
-    ParamsSource,
-    Pipeline,
-    RecordTimeTo,
-    ThreadLifetime,
-    check_config,
-)
-from mava.utils.total_timestep_checker import check_total_timesteps
+from mava.utils.sebulba import ParamsSource, Pipeline, RecordTimeTo, ThreadLifetime
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
@@ -95,7 +83,7 @@ def rollout(
     # Define the util functions: select action function and prepare data to share it with learner.
     @jax.jit
     def get_action_and_value(
-        params: FrozenDict,
+        params: Params,
         observation: Observation,
         key: chex.PRNGKey,
     ) -> Tuple:
@@ -147,7 +135,8 @@ def rollout(
 
                 # Append data to storage
                 reward = timestep.reward
-                info = timestep.extras
+                info = timestep.extras  # todo: [metrics]?
+                # todo: when logging make sure timing dict has parent timing/...
                 traj.append(
                     PPOTransition(
                         cached_next_dones, action, value, reward, log_prob, cached_next_obs, info
@@ -547,7 +536,7 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Calculate total timesteps.
     config = check_total_timesteps(config)
-    check_config(config)
+    check_sebulba_config(config)
 
     steps_per_rollout = (
         config.system.rollout_length * config.arch.num_envs * config.system.num_updates_per_eval
@@ -674,6 +663,7 @@ def run_experiment(_config: DictConfig) -> float:
         t = int(steps_per_rollout * (eval_step + 1))
         logger.log(eval_metrics, t, eval_step, LogEvent.ABSOLUTE)
         abs_metric_evaluator_envs.close()
+
     # Stop the logger.
     logger.stop()
 

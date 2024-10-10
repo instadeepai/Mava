@@ -18,6 +18,28 @@ from colorama import Fore, Style
 from omegaconf import DictConfig
 
 
+def check_sebulba_config(config: DictConfig) -> None:
+    """Checks that the given config does not have conflicting values."""
+    assert (
+        config.system.num_updates > config.arch.num_evaluation
+    ), "Number of updates per evaluation must be less than total number of updates."
+    config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
+
+    assert config.arch.num_envs % len(config.arch.learner_device_ids) == 0, (
+        "Number of environments must be divisible by the number of learner."
+        + "The output of each actor is equally split across the learners."
+    )
+
+    num_eval_samples = (
+        int(config.arch.num_envs / len(config.arch.learner_device_ids))
+        * config.system.rollout_length
+    )
+    assert num_eval_samples % config.system.num_minibatches == 0, (
+        f"Number of training samples per evaluator ({num_eval_samples})"
+        + f"must be divisible by num_minibatches ({config.system.num_minibatches})."
+    )
+
+
 def check_total_timesteps(config: DictConfig) -> DictConfig:
     """Check if total_timesteps is set, if not, set it based on the other parameters"""
 
