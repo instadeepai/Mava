@@ -570,11 +570,16 @@ def run_experiment(_config: DictConfig) -> float:
     return eval_performance
 
 
-@hydra.main(config_path="../../../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
+@hydra.main(
+    config_path="../../../configs/default",
+    config_name="ff_ippo.yaml",
+    version_base="1.2",
+)
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
+    cfg.logger.system_name = "ff_ippo"
 
     # Run experiment.
     eval_performance = run_experiment(cfg)
