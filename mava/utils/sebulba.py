@@ -142,7 +142,10 @@ class Pipeline(threading.Thread):
     def clear(self) -> None:
         """Clear the pipeline."""
         while not self._queue.empty():
-            self._queue.get()
+            try:
+                self._queue.get(block=False)
+            except queue.Empty:
+                break
 
     def shard_split_playload(self, payload: Any, axis: int = 0) -> Any:
         split_payload = jnp.split(payload, len(self.learner_devices), axis=axis)
