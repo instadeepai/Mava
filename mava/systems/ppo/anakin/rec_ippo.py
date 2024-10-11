@@ -24,6 +24,7 @@ import jax.numpy as jnp
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
+from jax import tree
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
@@ -104,9 +105,7 @@ def get_learner_fn(
             key, policy_key = jax.random.split(key)
 
             # Add a batch dimension to the observation.
-            batched_observation = jax.tree_util.tree_map(
-                lambda x: x[jnp.newaxis, :], last_timestep.observation
-            )
+            batched_observation = tree.map(lambda x: x[jnp.newaxis, :], last_timestep.observation)
             ac_in = (
                 batched_observation,
                 last_done[jnp.newaxis, :],
@@ -129,7 +128,7 @@ def get_learner_fn(
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             # log episode return and length
-            done = jax.tree_util.tree_map(
+            done = tree.map(
                 lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
                 timestep.last(),
             )
@@ -168,9 +167,7 @@ def get_learner_fn(
         ) = learner_state
 
         # Add a batch dimension to the observation.
-        batched_last_observation = jax.tree_util.tree_map(
-            lambda x: x[jnp.newaxis, :], last_timestep.observation
-        )
+        batched_last_observation = tree.map(lambda x: x[jnp.newaxis, :], last_timestep.observation)
         ac_in = (
             batched_last_observation,
             last_done[jnp.newaxis, :],
@@ -347,7 +344,7 @@ def get_learner_fn(
             num_recurrent_chunks = (
                 config.system.rollout_length // config.system.recurrent_chunk_size
             )
-            batch = jax.tree_util.tree_map(
+            batch = tree.map(
                 lambda x: x.reshape(
                     config.system.recurrent_chunk_size,
                     config.arch.num_envs * num_recurrent_chunks,
@@ -358,16 +355,14 @@ def get_learner_fn(
             permutation = jax.random.permutation(
                 shuffle_key, config.arch.num_envs * num_recurrent_chunks
             )
-            shuffled_batch = jax.tree_util.tree_map(
-                lambda x: jnp.take(x, permutation, axis=1), batch
-            )
-            reshaped_batch = jax.tree_util.tree_map(
+            shuffled_batch = tree.map(lambda x: jnp.take(x, permutation, axis=1), batch)
+            reshaped_batch = tree.map(
                 lambda x: jnp.reshape(
                     x, (x.shape[0], config.system.num_minibatches, -1, *x.shape[2:])
                 ),
                 shuffled_batch,
             )
-            minibatches = jax.tree_util.tree_map(lambda x: jnp.swapaxes(x, 1, 0), reshaped_batch)
+            minibatches = tree.map(lambda x: jnp.swapaxes(x, 1, 0), reshaped_batch)
 
             # UPDATE MINIBATCHES
             (params, opt_states, entropy_key), loss_info = jax.lax.scan(
@@ -493,11 +488,11 @@ def learner_setup(
 
     # Initialise observation with obs of all agents.
     init_obs = env.observation_spec().generate_value()
-    init_obs = jax.tree_util.tree_map(
+    init_obs = tree.map(
         lambda x: jnp.repeat(x[jnp.newaxis, ...], config.arch.num_envs, axis=0),
         init_obs,
     )
-    init_obs = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], init_obs)
+    init_obs = tree.map(lambda x: x[jnp.newaxis, ...], init_obs)
     init_done = jnp.zeros((1, config.arch.num_envs, num_agents), dtype=bool)
     init_x = (init_obs, init_done)
 
@@ -552,8 +547,8 @@ def learner_setup(
         (n_devices, config.system.update_batch_size, config.arch.num_envs) + x.shape[1:]
     )
     # (devices, update batch size, num_envs, ...)
-    env_states = jax.tree_map(reshape_states, env_states)
-    timesteps = jax.tree_map(reshape_states, timesteps)
+    env_states = tree.map(reshape_states, env_states)
+    timesteps = tree.map(reshape_states, timesteps)
 
     # Define params to be replicated across devices and batches.
     dones = jnp.zeros(
@@ -566,7 +561,7 @@ def learner_setup(
 
     # Duplicate learner for update_batch_size.
     broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size, *x.shape))
-    replicate_learner = jax.tree_map(broadcast, replicate_learner)
+    replicate_learner = tree.map(broadcast, replicate_learner)
 
     # Duplicate learner across devices.
     replicate_learner = flax.jax_utils.replicate(replicate_learner, devices=jax.devices())
@@ -726,11 +721,16 @@ def run_experiment(_config: DictConfig) -> float:
     return eval_performance
 
 
-@hydra.main(config_path="../../../configs", config_name="default_rec_ippo.yaml", version_base="1.2")
+@hydra.main(
+    config_path="../../../configs/default",
+    config_name="rec_ippo.yaml",
+    version_base="1.2",
+)
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
+    cfg.logger.system_name = "rec_ippo"
 
     # Run experiment.
     eval_performance = run_experiment(cfg)

@@ -24,6 +24,7 @@ import jax
 import neptune
 import numpy as np
 from colorama import Fore, Style
+from jax import tree
 from jax.typing import ArrayLike
 from marl_eval.json_tools import JsonLogger as MarlEvalJsonLogger
 from neptune.utils import stringify_unsupported
@@ -70,11 +71,11 @@ class MavaLogger:
 
         if event == LogEvent.TRAIN:
             # We only want to log mean losses, max/min/std don't matter.
-            metrics = jax.tree_map(np.mean, metrics)
+            metrics = tree.map(np.mean, metrics)
         else:
             # {metric1_name: [metrics], metric2_name: ...} ->
             # {metric1_name: {mean: metric, max: metric, ...}, metric2_name: ...}
-            metrics = jax.tree_map(describe, metrics)
+            metrics = tree.map(describe, metrics)
 
         self.logger.log_dict(metrics, t, t_eval, event)
 
@@ -294,7 +295,10 @@ class ConsoleLogger(BaseLogger):
         # Replace underscores with spaces and capitalise keys.
         keys = [k.replace("_", " ").capitalize() for k in data.keys()]
         # Round values to 3 decimal places if they are floats.
-        values = [v if isinstance(v, int) else f"{float(v):.3f}" for v in data.values()]
+        values = []
+        for value in data.values():
+            value = value.item() if isinstance(value, jax.Array) else value
+            values.append(f"{value:.3f}" if isinstance(value, float) else str(value))
         log_str = " | ".join([f"{k}: {v}" for k, v in zip(keys, values)])
 
         self.logger.info(

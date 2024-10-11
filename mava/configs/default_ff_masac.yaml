@@ -1,7 +1,0 @@
-defaults:
-  - _self_
-  - logger: ff_masac
-  - arch: anakin
-  - system: sac/ff_masac
-  - network: mlp
-  - env: mabrax

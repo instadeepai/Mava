@@ -25,6 +25,7 @@ import optax
 from colorama import Fore, Style
 from flashbax.vault import Vault
 from flax.core.frozen_dict import FrozenDict
+from jax import tree
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
@@ -99,7 +100,7 @@ def get_learner_fn(
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             # LOG EPISODE METRICS
-            done = jax.tree_util.tree_map(
+            done = tree.map(
                 lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
                 timestep.last(),
             )
@@ -279,11 +280,9 @@ def get_learner_fn(
             batch_size = config.system.rollout_length * config.arch.num_envs
             permutation = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
-            batch = jax.tree_util.tree_map(lambda x: merge_leading_dims(x, 2), batch)
-            shuffled_batch = jax.tree_util.tree_map(
-                lambda x: jnp.take(x, permutation, axis=0), batch
-            )
-            minibatches = jax.tree_util.tree_map(
+            batch = tree.map(lambda x: merge_leading_dims(x, 2), batch)
+            shuffled_batch = tree.map(lambda x: jnp.take(x, permutation, axis=0), batch)
+            minibatches = tree.map(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 shuffled_batch,
             )
@@ -379,7 +378,7 @@ def learner_setup(
 
     # Initialise observation with obs of all agents.
     obs = env.observation_spec().generate_value()
-    init_x = jax.tree_util.tree_map(lambda x: x[jnp.newaxis, ...], obs)
+    init_x = tree.map(lambda x: x[jnp.newaxis, ...], obs)
 
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(key_p, init_x)
@@ -415,10 +414,10 @@ def learner_setup(
         x, (n_devices, config.system.update_batch_size, *x.shape)
     )
 
-    actor_params = jax.tree_map(broadcast, actor_params)
-    actor_opt_state = jax.tree_map(broadcast, actor_opt_state)
-    critic_params = jax.tree_map(broadcast, critic_params)
-    critic_opt_state = jax.tree_map(broadcast, critic_opt_state)
+    actor_params = tree.map(broadcast, actor_params)
+    actor_opt_state = tree.map(broadcast, actor_opt_state)
+    critic_params = tree.map(broadcast, critic_params)
+    critic_opt_state = tree.map(broadcast, critic_opt_state)
 
     # Initialise environment states and timesteps.
     key, *env_keys = jax.random.split(
@@ -439,8 +438,8 @@ def learner_setup(
     reshape_states = lambda x: x.reshape(
         (n_devices, config.system.update_batch_size, config.arch.num_envs) + x.shape[1:]
     )
-    env_states = jax.tree_util.tree_map(reshape_states, env_states)
-    timesteps = jax.tree_util.tree_map(reshape_states, timesteps)
+    env_states = tree.map(reshape_states, env_states)
+    timesteps = tree.map(reshape_states, timesteps)
 
     params = Params(actor_params, critic_params)
     opt_states = OptStates(actor_opt_state, critic_opt_state)
@@ -548,9 +547,9 @@ def run_experiment(_config: DictConfig) -> None:
     def _reshape_experience(experience: Dict[str, chex.Array]) -> Dict[str, chex.Array]:
         """Reshape experience to match buffer."""
         # Swap the T and NE axes (D, NU, UB, T, NE, ...) -> (D, NU, UB, NE, T, ...)
-        experience: Dict[str, chex.Array] = jax.tree_map(lambda x: x.swapaxes(3, 4), experience)
+        experience: Dict[str, chex.Array] = tree.map(lambda x: x.swapaxes(3, 4), experience)
         # Merge 4 leading dimensions into 1. (D, NU, UB, NE, T ...) -> (D * NU * UB * NE, T, ...)
-        experience: Dict[str, chex.Array] = jax.tree_map(
+        experience: Dict[str, chex.Array] = tree.map(
             lambda x: x.reshape(-1, *x.shape[4:]), experience
         )
         return experience
@@ -671,11 +670,12 @@ def run_experiment(_config: DictConfig) -> None:
     logger.stop()
 
 
-@hydra.main(config_path="../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
+@hydra.main(config_path="../configs/default", config_name="ff_ippo.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
+    cfg.logger.system_name = "ff_ippo"
 
     # Run experiment.
     run_experiment(cfg)

@@ -1,7 +1,0 @@
-defaults:
-  - logger: rec_ippo
-  - arch: anakin
-  - system: ppo/rec_ippo
-  - network: rnn
-  - env: rware
-  - _self_
