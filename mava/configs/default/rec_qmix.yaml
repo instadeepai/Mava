@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - logger: base_logger
+  - logger: logger
   - arch: anakin
   - system: q_learning/rec_qmix
   - network: rnn
