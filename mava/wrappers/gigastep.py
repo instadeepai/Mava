@@ -18,6 +18,7 @@ import jax
 import jax.numpy as jnp
 from chex import Array, PRNGKey
 from gigastep.gigastep_env import GigastepEnv
+from jax import tree
 from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
 from jumanji.wrappers import Wrapper
@@ -192,7 +193,7 @@ class GigastepWrapper(Wrapper):
             "agents_view",
         )
         action_mask = specs.BoundedArray(
-            (self.num_agents, self._env.n_actions), bool, False, True, "action_mask"
+            (self.num_agents, self._env.n_actions), float, 0.0, 1.0, "action_mask"
         )
         step_count = specs.BoundedArray(
             (self.num_agents,), jnp.int32, 0, self._env.max_episode_length, "step_count"
@@ -254,8 +255,8 @@ class GigastepWrapper(Wrapper):
 
         # split each sub elemnt in the tuple
         per_agent_info, general_state_info = state
-        team1_state = jax.tree_util.tree_map(lambda x: x[: self.num_agents], per_agent_info)
-        team2_state = jax.tree_util.tree_map(lambda x: x[self.num_agents :], per_agent_info)
+        team1_state = tree.map(lambda x: x[: self.num_agents], per_agent_info)
+        team2_state = tree.map(lambda x: x[self.num_agents :], per_agent_info)
 
         return (
             team1_obs,

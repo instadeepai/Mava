@@ -26,7 +26,7 @@ import optax
 from colorama import Fore, Style
 from flashbax.buffers.flat_buffer import TrajectoryBuffer
 from flax.core.scope import FrozenVariableDict
-from jax import Array
+from jax import Array, tree
 from jumanji.env import State
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
@@ -94,7 +94,7 @@ def init(
 
     def replicate(x: Any) -> Any:
         """First replicate the update batch dim then put on devices."""
-        x = jax.tree_map(lambda y: jnp.broadcast_to(y, (cfg.system.update_batch_size, *y.shape)), x)
+        x = tree.map(lambda y: jnp.broadcast_to(y, (cfg.system.update_batch_size, *y.shape)), x)
         return jax.device_put_replicated(x, devices)
 
     env, eval_env = environments.make(cfg, add_global_state=True)
@@ -106,10 +106,10 @@ def init(
 
     acts = env.action_spec().generate_value()  # all agents actions
     act_single = acts[0]  # single agents action
-    concat_acts = jnp.concatenate([act_single for _ in range(n_agents)], axis=0)
-    concat_acts_batched = concat_acts[jnp.newaxis, ...]  # batch + concat of all agents actions
+    joint_acts = jnp.concatenate([act_single for _ in range(n_agents)], axis=0)
+    joint_acts_batched = joint_acts[jnp.newaxis, ...]  # joint actions with a batch dim
     obs = env.observation_spec().generate_value()
-    obs_single_batched = jax.tree_map(lambda x: x[0][jnp.newaxis, ...], obs)
+    obs_single_batched = tree.map(lambda x: x[0][jnp.newaxis, ...], obs)
 
     # Making actor network
     actor_torso = hydra.utils.instantiate(cfg.network.actor_network.pre_torso)
@@ -122,10 +122,10 @@ def init(
     # Making Q networks
     critic_torso = hydra.utils.instantiate(cfg.network.critic_network.pre_torso)
     q_network = QNetwork(critic_torso, centralised_critic=True)
-    q1_params = q_network.init(q1_key, obs_single_batched, concat_acts_batched)
-    q2_params = q_network.init(q2_key, obs_single_batched, concat_acts_batched)
-    q1_target_params = q_network.init(q1_target_key, obs_single_batched, concat_acts_batched)
-    q2_target_params = q_network.init(q2_target_key, obs_single_batched, concat_acts_batched)
+    q1_params = q_network.init(q1_key, obs_single_batched, joint_acts_batched)
+    q2_params = q_network.init(q2_key, obs_single_batched, joint_acts_batched)
+    q1_target_params = q_network.init(q1_target_key, obs_single_batched, joint_acts_batched)
+    q2_target_params = q_network.init(q2_target_key, obs_single_batched, joint_acts_batched)
 
     # Automatic entropy tuning
     target_entropy = -cfg.system.target_entropy_scale * action_dim
@@ -144,13 +144,15 @@ def init(
     params = SacParams(actor_params, QValsAndTarget(online_q_params, target_q_params), log_alpha)
 
     # Make opt states.
-    actor_opt = optax.adam(cfg.system.policy_lr)
+    grad_clip = optax.clip_by_global_norm(cfg.system.max_grad_norm)
+
+    actor_opt = optax.chain(grad_clip, optax.adam(cfg.system.policy_lr))
     actor_opt_state = actor_opt.init(params.actor)
 
-    q_opt = optax.adam(cfg.system.q_lr)
+    q_opt = optax.chain(grad_clip, optax.adam(cfg.system.q_lr))
     q_opt_state = q_opt.init(params.q.online)
 
-    alpha_opt = optax.adam(cfg.system.alpha_lr)
+    alpha_opt = optax.chain(grad_clip, optax.adam(cfg.system.alpha_lr))
     alpha_opt_state = alpha_opt.init(params.log_alpha)
 
     # Pack opt states
@@ -435,9 +437,10 @@ def make_update_fns(
     ) -> Tuple[Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey], Dict]:
         """Acting loop: select action, step env, add to buffer."""
         actor_params, obs, env_state, buffer_state, key = carry
+        key, act_key = jax.random.split(key)
 
         pi = actor_net.apply(actor_params, obs)
-        action = pi.sample(seed=key)
+        action = pi.sample(seed=act_key)
 
         next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
         return (actor_params, next_obs, env_state, buffer_state, key), metrics
@@ -553,16 +556,14 @@ def run_experiment(cfg: DictConfig) -> float:
     logger.log(final_metrics, cfg.system.explore_steps, 0, LogEvent.ACT)
 
     # Main loop:
-    # We want start to align with the final step of the first pmaped_learn,
-    # where we've done explore_steps and 1 full learn step.
-    start = cfg.system.explore_steps + steps_per_rollout
-    for eval_idx, t in enumerate(
-        range(start, int(cfg.system.total_timesteps + 1), steps_per_rollout)
-    ):
+    start = cfg.system.explore_steps
+    stop = int(cfg.system.total_timesteps + 1)
+    for eval_idx, t in enumerate(range(start, stop, steps_per_rollout)):
         # Learn loop:
         start_time = time.time()
         learner_state, (metrics, losses) = update(learner_state)
         jax.block_until_ready(learner_state)
+        t += steps_per_rollout  # Completed rollout so add to step count.
 
         # Log:
         # Add learn steps here because anakin steps per second is learn + act steps
@@ -620,11 +621,16 @@ def run_experiment(cfg: DictConfig) -> float:
     return eval_performance
 
 
-@hydra.main(config_path="../../../configs", config_name="default_ff_masac.yaml", version_base="1.2")
+@hydra.main(
+    config_path="../../../configs/default",
+    config_name="ff_masac.yaml",
+    version_base="1.2",
+)
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
+    cfg.logger.system_name = "ff_masac"
 
     # Run experiment.
     final_return = run_experiment(cfg)

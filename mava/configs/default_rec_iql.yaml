@@ -1,7 +1,0 @@
-defaults:
-  - _self_
-  - logger: rec_iql
-  - arch: anakin
-  - system: q_learning/rec_iql
-  - network: rnn
-  - env: smax
