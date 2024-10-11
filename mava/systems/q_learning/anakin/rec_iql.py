@@ -659,7 +659,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
 
 @hydra.main(
-    config_path="../../../configs/default/",
+    config_path="../../../configs/default",
     config_name="rec_iql.yaml",
     version_base="1.2",
 )

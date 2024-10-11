@@ -1,5 +1,5 @@
 defaults:
-  - logger: base_logger
+  - logger: logger
   - arch: anakin
   - system: ppo/rec_mappo
   - network: rnn  # [rnn, rcnn]
