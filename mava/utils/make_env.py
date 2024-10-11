@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Tuple, Type
+from typing import Tuple
 
 import jaxmarl
 import jumanji
@@ -43,11 +43,11 @@ from mava.wrappers import (
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
+    MPEWrapper,
     RecordEpisodeMetrics,
     RwareWrapper,
     SmaxWrapper,
 )
-from mava.wrappers.jaxmarl import JaxMarlWrapper
 
 # Registry mapping environment names to their generator and wrapper classes.
 _jumanji_registry = {
@@ -62,7 +62,7 @@ _jumanji_registry = {
 
 # Registry mapping environment names directly to the corresponding wrapper classes.
 _matrax_registry = {"Matrax": MatraxWrapper}
-_jaxmarl_registry: Dict[str, Type[JaxMarlWrapper]] = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
+_jaxmarl_registry = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper, "MPE": MPEWrapper}
 _gigastep_registry = {"Gigastep": GigastepWrapper}
 
 
@@ -136,6 +136,8 @@ def make_jaxmarl_env(
     kwargs = dict(config.env.kwargs)
     if "smax" in env_name.lower():
         kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
+    elif "mpe" in env_name.lower():
+        kwargs = config.env.scenario.task_config
 
     # Create jaxmarl envs.
     train_env = _jaxmarl_registry[config.env.env_name](

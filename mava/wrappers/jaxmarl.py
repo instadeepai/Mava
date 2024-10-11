@@ -27,6 +27,7 @@ from gymnax.environments import spaces as gymnax_spaces
 from jaxmarl.environments import SMAX
 from jaxmarl.environments import spaces as jaxmarl_spaces
 from jaxmarl.environments.mabrax import MABraxEnv
+from jaxmarl.environments.mpe.simple_spread import SimpleSpreadMPE
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
 from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
@@ -403,3 +404,40 @@ class MabraxWrapper(JaxMarlWrapper):
         """Get global state from observation and copy it for each agent."""
         # Use the global state of brax.
         return jnp.tile(wrapped_env_state.obs, (self.num_agents, 1))
+
+
+class MPEWrapper(JaxMarlWrapper):
+    """Wrraper for the MPE environment."""
+
+    def __init__(
+        self,
+        env: SimpleSpreadMPE,
+        has_global_state: bool = False,
+    ):
+        mock_state = env.reset(jax.random.PRNGKey(0))[0]
+        self.observation_shape = mock_state["agent_0"].shape
+        super().__init__(env, has_global_state, env.max_steps)
+        self._env: SimpleSpreadMPE
+
+    @cached_property
+    def action_dim(self) -> chex.Array:
+        "Get the actions dim for each agent."
+        return self._env.action_space(self.agents[0]).shape[0]
+
+    @cached_property
+    def state_size(self) -> chex.Array:
+        "Get the sate size of the global observation"
+        return self.observation_shape[0] * self.num_agents
+        # spaces = [self._env.observation_space(agent) for agent in self._env.agents]
+        # return sum([space.shape[-1] for space in spaces])
+
+    def action_mask(self, wrapped_env_state: BraxState) -> Array:
+        """Get action mask for each agent."""
+        return jnp.ones((self.num_agents, self.action_dim), dtype=bool)
+
+    def get_global_state(self, wrapped_env_state: BraxState, obs: Dict[str, Array]) -> Array:
+        """Get global state from observation and copy it for each agent."""
+
+        all_obs = jnp.array([obs[agent] for agent in self._env.agents]).flatten()
+        all_obs = jnp.expand_dims(all_obs, axis=0).repeat(self._env.num_agents, axis=0)
+        return all_obs
