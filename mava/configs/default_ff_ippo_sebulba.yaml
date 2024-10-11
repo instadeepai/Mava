@@ -1,7 +1,0 @@
-defaults:
-  - logger: ff_ippo
-  - arch: sebulba
-  - system: ppo/ff_ippo
-  - network: mlp
-  - env: lbf_gym
-  - _self_
