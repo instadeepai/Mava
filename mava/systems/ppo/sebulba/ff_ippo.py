@@ -164,6 +164,8 @@ def get_learner_step_fn(
     """Get the learner function."""
 
     num_agents, num_envs = config.system.num_agents, config.arch.num_envs
+    num_learner_envs = int(num_envs // len(config.arch.learner_device_ids))
+    
 
     # Get apply and update functions for actor and critic networks.
     actor_apply_fn, critic_apply_fn = apply_fns
@@ -206,7 +208,7 @@ def get_learner_step_fn(
             return advantages, advantages + traj_batch.value
 
         # Calculate advantage
-        last_dones = jnp.repeat(learner_state.timestep.last(), num_agents).reshape(num_envs, -1)
+        last_dones = jnp.repeat(learner_state.timestep.last(), num_agents).reshape(num_learner_envs, -1)
         params, opt_states, key, _, _ = learner_state
         last_val = critic_apply_fn(params.critic_params, learner_state.timestep.observation)
         advantages, targets = _calculate_gae(traj_batch, last_val, last_dones)
@@ -327,9 +329,7 @@ def get_learner_step_fn(
             params, opt_states, traj_batch, advantages, targets, key = update_state
             key, shuffle_key, entropy_key = jax.random.split(key, 3)
             # Shuffle minibatches
-            batch_size = config.system.rollout_length * (
-                config.arch.num_envs // len(config.arch.learner_device_ids)
-            )
+            batch_size = config.system.rollout_length * num_learner_envs
             permutation = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
             batch = tree.map(lambda x: merge_leading_dims(x, 2), batch)
@@ -712,6 +712,7 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
+    cfg.logger.system_name = "ff_ippo_sebulba"
 
     # Run experiment.
     eval_performance = run_experiment(cfg)
