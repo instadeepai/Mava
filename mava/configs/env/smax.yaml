@@ -7,7 +7,7 @@ env_name: Smax  # Used for logging purposes and selection of the corresponding w
 # 2s3z | 3s5z | 5m_vs_6m | 10m_vs_11m | 27m_vs_30m | 3s5z_vs_3s6z | 3s_vs_5z | 6h_vs_8z | smacv2_5_units | smacv2_10_units | smacv2_20_units
 scenario:
   name: HeuristicEnemySMAX
-  task_name: 2s3z
+  task_name: 5m_vs_6m
 
 # Defines the metric that will be used to evaluate the performance of the agent.
 # This metric is returned at the end of an experiment and can be used for hyperparameter tuning.

@@ -1,5 +1,18 @@
+# Copyright 2022 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import copy
-import functools
 import time
 from typing import Any, Callable, Dict, NamedTuple, Sequence, Tuple
 
@@ -16,27 +29,28 @@ from colorama import Fore, Style
 from flashbax.buffers.flat_buffer import TrajectoryBuffer
 from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.scope import FrozenVariableDict
-from flax.linen.initializers import orthogonal
-from jax import Array
+from flax.linen import FrozenDict
+from flax.linen.initializers import lecun_normal, orthogonal
+from jax import Array, tree
+from jumanji.env import Environment, State
+from jumanji.types import TimeStep
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 from typing_extensions import TypeAlias
 
-from jumanji.env import Environment, State
 from mava.evaluator import ActorState, get_eval_fn, get_num_eval_envs
-from mava.types import Observation, ObservationGlobalState, RNNObservation
+from mava.networks import RecQNetwork, ScannedRNN
+from mava.types import Observation, ObservationGlobalState
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax_utils import unreplicate_batch_dim
+from mava.utils.jax_utils import (
+    switch_leading_axes,
+    unreplicate_batch_dim,
+    unreplicate_n_dims,
+)
 from mava.utils.logger import LogEvent, MavaLogger
-from mava.wrappers import episode_metrics
-
-from flax.linen import FrozenDict
-from jumanji.types import TimeStep
-from jax import tree
-from mava.networks import ScannedRNN, RecQNetwork
-from mava.utils.jax_utils import switch_leading_axes
 from mava.utils.total_timestep_checker import check_total_timesteps
+from mava.wrappers import episode_metrics
 
 Metrics = Dict[str, Array]
 
@@ -91,6 +105,7 @@ class ActionSelectionState(NamedTuple):
     time_steps: int
     key: chex.PRNGKey
 
+
 class ActionState(NamedTuple):
     """The carry in the interaction loop."""
 
@@ -108,9 +123,6 @@ class TrainState(NamedTuple):  # 'carry' in training loop
     opt_state: optax.OptState
     train_steps: Array
     key: chex.PRNGKey
-
-
-from flax.linen.initializers import lecun_normal
 
 
 def _parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex.Array]:
@@ -173,21 +185,22 @@ class QMixNetwork(nn.Module):
     def setup(self) -> None:
         self.hyper_w1: MLPTorso = MLPTorso(
             (self.hyper_hidden_dim, self.embed_dim * self.num_agents),
-            activate_final=False,  # kernel_init="lecun_normal"
+            activate_final=False,
         )
 
         self.hyper_b1: MLPTorso = MLPTorso(
-            (self.embed_dim,),  # kernel_init="lecun_normal"
+            (self.embed_dim,),
+            activate_final=False,
         )
 
         self.hyper_w2: MLPTorso = MLPTorso(
             (self.hyper_hidden_dim, self.embed_dim),
-            activate_final=False,  # kernel_init="lecun_normal"
+            activate_final=False,
         )
 
         self.hyper_b2: MLPTorso = MLPTorso(
             (self.embed_dim, 1),
-            activate_final=False,  # kernel_init="lecun_normal"
+            activate_final=False,
         )
 
         self.layer_norm: nn.Module = nn.LayerNorm()
@@ -198,20 +211,16 @@ class QMixNetwork(nn.Module):
         agent_qs: Array,
         env_global_state: Array,
     ) -> Array:
-        B, T = agent_qs.shape[:2]  # batch size
+        B, T = agent_qs.shape[:2]  # batch size #noqa: N806
 
-        # # # Reshaping
         agent_qs = jnp.reshape(agent_qs, (B, T, 1, self.num_agents))
 
         if self.norm_env_states:
             states = self.layer_norm(env_global_state)
-            # states = (env_global_state - jnp.min(env_global_state)) / (jnp.max(env_global_state) - jnp.min(env_global_state))
         else:
             states = env_global_state
-        # states = jnp.ones_like(states) # NOTE debugging. remove this!!
 
         # First layer
-        # w1 = cabs(self.hyper_w1(states)) # NOTE alternative absolute value calculation that has grad 0 at 0
         w1 = jnp.abs(self.hyper_w1(states))
         b1 = self.hyper_b1(states)
         w1 = jnp.reshape(w1, (B, T, self.num_agents, self.embed_dim))
@@ -221,7 +230,6 @@ class QMixNetwork(nn.Module):
         hidden = nn.elu(jnp.matmul(agent_qs, w1) + b1)
 
         # Second layer
-        # w2 = cabs(self.hyper_w2(states))
         w2 = jnp.abs(self.hyper_w2(states))
         b2 = self.hyper_b2(states)
 
@@ -240,7 +248,7 @@ class QMixNetwork(nn.Module):
 def init(
     cfg: DictConfig,
 ) -> Tuple[
-    Tuple[Environment, Environment],  # jax.debug.print("{x}", x=q_loss_info["q_loss"])
+    Tuple[Environment, Environment],
     LearnerState,
     RecQNetwork,
     optax.GradientTransformation,
@@ -248,7 +256,6 @@ def init(
     MavaLogger,
     chex.PRNGKey,
 ]:
-    
     logger = MavaLogger(cfg)
 
     # init key, get devices available
@@ -257,9 +264,7 @@ def init(
 
     def replicate(x: Any) -> Any:
         """First replicate the update batch dim then put on devices."""
-        x = jax.tree_map(
-            lambda y: jnp.broadcast_to(y, (cfg.system.update_batch_size, *y.shape)), x
-        )
+        x = jax.tree_map(lambda y: jnp.broadcast_to(y, (cfg.system.update_batch_size, *y.shape)), x)
         return jax.device_put_replicated(x, devices)
 
     # make envs
@@ -290,7 +295,8 @@ def init(
         pre_torso=MLPTorso((256,)),
         post_torso=MLPTorso((256,)),
         num_actions=action_dim,
-        hidden_state_dim=cfg.network.hidden_state_dim,)
+        hidden_state_dim=cfg.network.hidden_state_dim,
+    )
     q_params = q_net.init(q_key, init_hidden_state, init_x)
     q_target_params = q_net.init(q_key, init_hidden_state, init_x)
 
@@ -305,7 +311,7 @@ def init(
     )
     global_env_state_shape = (
         env.observation_spec().generate_value().global_state[0, :].shape
-    )  # NOTE env wrapper currently duplicates env state for each agent
+    )  # NOTE: Env wrapper currently duplicates env state for each agent
     dummy_global_env_state = jnp.zeros(
         (
             cfg.system.sample_batch_size,
@@ -319,9 +325,7 @@ def init(
     mixer_target_params = q_mixer.init(q_key, dummy_agent_qs, dummy_global_env_state)
 
     # Pack params
-    params = QMIXParams(
-        q_params, q_target_params, mixer_online_params, mixer_target_params
-    )
+    params = QMIXParams(q_params, q_target_params, mixer_online_params, mixer_target_params)
 
     # OPTIMISER
     opt = optax.chain(
@@ -334,7 +338,6 @@ def init(
     opt_state = replicate(opt_state)
     init_hidden_state = replicate(init_hidden_state)
 
-    # BUFFER CREATION INITS
     init_acts = env.action_spec().generate_value()  # (A,)
     init_transition = Transition(
         obs=init_obs,  # (A, ...)
@@ -376,7 +379,7 @@ def init(
     first_obs = first_timestep.observation
     first_term_or_trunc = first_timestep.last()[..., jnp.newaxis]
     first_term = (1 - first_timestep.discount[..., 0, jnp.newaxis]).astype(bool)
-    
+
     # Initialise env steps and training steps
     t0_act = jnp.zeros((cfg.arch.n_devices, cfg.system.update_batch_size), dtype=int)
     t0_train = jnp.zeros((cfg.arch.n_devices, cfg.system.update_batch_size), dtype=int)
@@ -411,41 +414,6 @@ def make_update_fns(
     opt: optax.GradientTransformation,
     rb: TrajectoryBuffer,
 ) -> Any:
-
-    def select_random_action_batch(
-        selection_key: chex.PRNGKey, obs: ObservationGlobalState
-    ) -> Tuple[chex.Array, chex.Array]:
-        """Select actions randomly with masking."""
-
-        def select_single_random_action(key, action_options, p_values):
-            """Select one action per row with probabilities used for masking."""
-            action = jax.random.choice(key, action_options, p=p_values)
-            return action
-
-        action_mask = obs.action_mask
-
-        batch_size, n_agents, n_actions = action_mask.shape
-
-        # get one key per agent
-        keys = jax.random.split(selection_key, batch_size * n_agents)
-        # base of action indexes
-        action_options = jnp.arange(n_actions)
-        # get num avail actions to generate probabilities for choosing
-        num_avail_per_agent = jnp.sum(action_mask, axis=-1)[..., jnp.newaxis]
-        # get probabilities (uniform with "masking")
-        p_vals = action_mask.astype("int32") / num_avail_per_agent
-        # flatten so that we only need one vmap over batch, agent dim
-        p_vals = jnp.reshape(p_vals, (batch_size * n_agents, n_actions))
-        # vmap random selection
-        actions = jax.vmap(select_single_random_action, (0, None, 0))(
-            keys, action_options, p_vals
-        )
-        # unflatten to mtch expected action block size
-        actions = jnp.reshape(actions, (batch_size, n_agents))
-
-        return actions
-
-    # INTERACT LEVEL 2 (1.2)
     def select_eps_greedy_action(
         action_selection_state: ActionSelectionState,
         obs: ObservationGlobalState,
@@ -454,7 +422,7 @@ def make_update_fns(
         """Select action to take in eps-greedy way. Batch and agent dims are included."""
 
         params, hidden_state, t, key = action_selection_state
-        
+
         eps = jnp.maximum(
             cfg.system.eps_min, 1 - (t / cfg.system.eps_decay) * (1 - cfg.system.eps_min)
         )
@@ -479,7 +447,9 @@ def make_update_fns(
         return next_action_selection_state, action
 
     def action_step(action_state: ActionState, _: Any) -> Tuple[ActionState, Dict]:
-        """Selects an action, steps global env, stores timesteps in global rb and repacks the parameters for the next step."""
+        """Selects an action, steps global env, stores timesteps in global rb and repacks the
+        parameters for the next step.
+        """
 
         # Unpack
         action_selection_state, env_state, buffer_state, obs, terminal, term_or_trunc = action_state
@@ -522,7 +492,6 @@ def make_update_fns(
 
         return new_act_state, next_timestep.extras["episode_metrics"]
 
-
     def prep_inputs_to_scannedrnn(obs: Observation, term_or_trunc: chex.Array) -> chex.Array:
         """Prepares the inputs to the RNN network for either getting q values or the
         eps-greedy distribution.
@@ -540,7 +509,6 @@ def make_update_fns(
 
         return hidden_state, obs_term_or_trunc
 
-    # TRAIN LEVEL 3 (2.1.1)
     def q_loss_fn(
         online_params: FrozenVariableDict,
         obs: Array,
@@ -566,7 +534,8 @@ def make_update_fns(
 
         q_online = mixer.apply(
             online_mixer_params, q_online, obs.global_state[:, :, 0, ...]
-        )  # B,T,A,... -> B,T,1,... # NOTE states are replicated over agents thats why we only take first one
+        )  # B,T,A,... -> B,T,1,... # NOTE states are replicated over agents thats
+        # why we only take first one
 
         q_loss = jnp.mean((q_online - target) ** 2)
 
@@ -601,26 +570,17 @@ def make_update_fns(
         # aligns with the `terminal` from `data_next`.
         next_obs = data_first.next_obs
         next_term_or_trunc = data_next.term_or_trunc
-        next_terminal = data_next.terminal
+
+        # NOTE (Ruan): IQL uses terminal, but since qmix uses a shared reward, term_or_trunc makes
+        # more sense.
+        # next_terminal = data_next.terminal
 
         # Scan over each sample
         hidden_state, next_obs_term_or_trunc = prep_inputs_to_scannedrnn(
             next_obs, next_term_or_trunc
         )
 
-        ###############
-        # OLD CODE
-        ###############
-        # # Scan over each sample and discard first timestep
-        # next_q_vals_online = scan_apply(params.online, data.obs, data.done)
-        # next_q_vals_online = jnp.where(
-        #     data.obs.action_mask,
-        #     next_q_vals_online,
-        #     jnp.zeros(next_q_vals_online.shape) - 9999999,
-        # )[:, 1:, ...]
-        # next_q_vals_target = scan_apply(params.target, data.obs, data.done)[:, 1:, ...]
-
-        # eps defaults to 0
+        # Eps defaults to 0
         _, next_online_greedy_dist = q_net.apply(
             params.online, hidden_state, next_obs_term_or_trunc
         )
@@ -644,7 +604,7 @@ def make_update_fns(
         )  # B,T,A,... -> B,T,1,...
 
         # TD Target
-        target_q_val = reward + (1.0 - next_terminal) * cfg.system.gamma * next_q_val
+        target_q_val = reward + (1.0 - next_term_or_trunc) * cfg.system.gamma * next_q_val
 
         # Update Q function.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
@@ -667,7 +627,8 @@ def make_update_fns(
             (params.online, params.mixer_online), q_updates
         )
 
-        # # Target network polyak update.
+        # TODO (ruan): Implement soft target network update.
+        # Target network update.
         # next_target_params = jax.lax.select(
         #     cfg.system.hard_update,
         next_target_params = optax.periodic_update(
@@ -678,8 +639,7 @@ def make_update_fns(
         )
         #     optax.incremental_update(next_online_params, params.target, cfg.system.tau)
         # )
-        # chex.assert_trees_all_equal(params.mixer_online, next_mixer_params)
-        # jax.debug.print("{x}", x=q_loss_info["q_loss"])
+
         # Repack params and opt_states.
         next_params = QMIXParams(
             next_online_params,
@@ -690,7 +650,6 @@ def make_update_fns(
 
         return next_params, next_opt_state, q_loss_info
 
-    # TRAIN LEVEL 1 (2.)
     def train(train_state: TrainState, _: Any) -> TrainState:
         """Sample, train and repack."""
 
@@ -702,9 +661,7 @@ def make_update_fns(
         data = rb.sample(buffer_state, buff_key).experience
 
         # learn
-        next_params, next_opt_states, q_loss_info = update_q(
-            params, opt_states, data, t_train
-        )
+        next_params, next_opt_states, q_loss_info = update_q(params, opt_states, data, t_train)
 
         next_train_state = TrainState(
             buffer_state, next_params, next_opt_states, t_train + 1, next_key
@@ -712,8 +669,7 @@ def make_update_fns(
 
         return next_train_state, q_loss_info
 
-    # ___________________________________________________________________________________________________
-    # INTERACT-TRAIN LOOP
+    # ---- Act-train loop ----
 
     scanned_act = lambda state: lax.scan(action_step, state, None, length=cfg.system.rollout_length)
     scanned_train = lambda state: lax.scan(train, state, None, length=cfg.system.epochs)
@@ -775,7 +731,6 @@ def make_update_fns(
 
         return next_learner_state, (metrics, losses)
 
-
     pmaped_updated_step = jax.pmap(
         jax.vmap(
             lambda state: lax.scan(update_step, state, None, length=cfg.system.scan_steps),
@@ -785,7 +740,7 @@ def make_update_fns(
         donate_argnums=0,
     )
 
-    return pmaped_updated_step
+    return pmaped_updated_step  # type:ignore
 
 
 def run_experiment(cfg: DictConfig) -> float:
@@ -825,7 +780,7 @@ def run_experiment(cfg: DictConfig) -> float:
         next_hidden_state, eps_greedy_dist = q_net.apply(params, hidden_state, net_input)
         action = eps_greedy_dist.sample(seed=key).squeeze(0)
         return action, {"hidden_state": next_hidden_state}
-    
+
     evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, absolute_metric=False)
 
     if cfg.logger.checkpointing.save_model:
@@ -841,7 +796,7 @@ def run_experiment(cfg: DictConfig) -> float:
         (jax.device_count(), eval_batch_size, cfg.system.num_agents),
         cfg.network.hidden_state_dim,
     )
-    
+
     max_episode_return = -jnp.inf
     best_params = copy.deepcopy(unreplicate_batch_dim(learner_state.params.online))
 
@@ -884,24 +839,20 @@ def run_experiment(cfg: DictConfig) -> float:
         logger.log(eval_metrics, t, eval_idx, LogEvent.EVAL)
         episode_return = jnp.mean(eval_metrics["episode_return"])
 
-        # # Log:
-        # episode_return = jnp.mean(eval_output.episode_metrics["episode_return"])
-        # logger.log(eval_output.episode_metrics, t, eval_idx, LogEvent.EVAL)
-
         # Save best actor params.
         if cfg.arch.absolute_metric and max_episode_return <= episode_return:
             best_params = copy.deepcopy(eval_params)
             max_episode_return = episode_return
 
-        # # Checkpoint:
-        # if cfg.logger.checkpointing.save_model:
-        #     # Save checkpoint of learner state
-        #     unreplicated_learner_state = unreplicate_learner_state(learner_state)  # type: ignore
-        #     checkpointer.save(
-        #         timestep=t,
-        #         unreplicated_learner_state=unreplicated_learner_state,
-        #         episode_return=episode_return,
-        #     )
+        # Checkpoint:
+        if cfg.logger.checkpointing.save_model:
+            # Save checkpoint of learner state
+            unreplicated_learner_state = unreplicate_n_dims(learner_state)  # type: ignore
+            checkpointer.save(
+                timestep=t,
+                unreplicated_learner_state=unreplicated_learner_state,
+                episode_return=episode_return,
+            )
 
     # Measure absolute metric.
     if cfg.arch.absolute_metric:
