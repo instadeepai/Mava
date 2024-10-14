@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from typing import Tuple
+
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
@@ -22,13 +23,14 @@ from colorama import Fore, Style
 
 class SimpleRetention(nn.Module):
     """Simple retention mechanism for Sable."""
+
     embed_dim: int
     head_size: int
     n_agents: int
     full_self_retention: bool
     decay_kappa: float
 
-    def setup(self)->None:
+    def setup(self) -> None:
         # Initialize the weights
         self.W_Q = self.param(
             "W_Q",
@@ -46,82 +48,87 @@ class SimpleRetention(nn.Module):
             (self.embed_dim, self.head_size),
         )
 
-    def __call__(self, key: Array, query: Array, value: Array)->Array:
+    def __call__(self, key: Array, query: Array, value: Array) -> Array:
         """Parallel (default) representation of the retention mechanism."""
-        # Apply projection to Q, K, V
-        Q = query @ self.W_Q
-        K = key @ self.W_K
-        V = value @ self.W_V
+        # Apply projection to q_proj, k_proj, v_proj
+        q_proj = query @ self.W_Q
+        k_proj = key @ self.W_K
+        v_proj = value @ self.W_V
 
         # Apply the retention mechanism
-        ret = Q @ jnp.transpose(K, (0, 2, 1))
+        ret = q_proj @ jnp.transpose(k_proj, (0, 2, 1))
 
         # Apply causal mask if not full self retention
         if not self.full_self_retention:
-            D= jnp.tril(jnp.ones((K.shape[1], K.shape[1])))
-            ret = (ret * D)
+            decay_matrix = jnp.tril(jnp.ones((k_proj.shape[1], k_proj.shape[1])))
+            ret = ret * decay_matrix
 
-        ret = ret @ V
+        ret = ret @ v_proj
         return ret
 
-    def recurrent(self, key_n: Array, query_n: Array, value_n: Array, hstate: Array)-> Tuple[Array, Array]:
+    def recurrent(
+        self, key_n: Array, query_n: Array, value_n: Array, hstate: Array
+    ) -> Tuple[Array, Array]:
         """Recurrent representation of the retention mechanism."""
-        # Apply projection to Q, K, V
-        Q = query_n @ self.W_Q
-        K = key_n @ self.W_K
-        V = value_n @ self.W_V
+        # Apply projection to q_proj, k_proj, v_proj
+        q_proj = query_n @ self.W_Q
+        k_proj = key_n @ self.W_K
+        v_proj = value_n @ self.W_V
 
         # Apply the retention mechanism and update the hidden state
-        updated_hstate = hstate + (K.transpose(0, -1, -2) @ V)
-        ret = Q @ updated_hstate
+        updated_hstate = hstate + (k_proj.transpose(0, -1, -2) @ v_proj)
+        ret = q_proj @ updated_hstate
 
         return ret, updated_hstate
 
-    def chunkwise(self, key: Array, query: Array, value: Array, hstate: Array, dones: Array)-> Tuple[Array, Array]:
+    def chunkwise(
+        self, key: Array, query: Array, value: Array, hstate: Array, dones: Array
+    ) -> Tuple[Array, Array]:
         """Chunkwise representation of the retention mechanism."""
         batch, chunk_size, _ = value.shape
 
-        # Apply projection to Q, K, V
-        Q = query @ self.W_Q
-        K = key @ self.W_K
-        V = value @ self.W_V
-        K = K.transpose(0, -1, -2)
-        
+        # Apply projection to q_proj, k_proj, v_proj
+        q_proj = query @ self.W_Q
+        k_proj = key @ self.W_K
+        v_proj = value @ self.W_V
+        k_proj = k_proj.transpose(0, -1, -2)
+
         # Compute next hidden state
-        D = self.get_masked_D(dones)
+        decay_matrix = self.get_masked_decay_matrix(dones)
         chunk_decay = self.decay_kappa ** (chunk_size // self.n_agents)
-        delta = ~jnp.any(dones[:, :: self.n_agents], axis=1)[
-            :, jnp.newaxis, jnp.newaxis
-        ]
+        delta = ~jnp.any(dones[:, :: self.n_agents], axis=1)[:, jnp.newaxis, jnp.newaxis]
         next_hstate = (
-            K @ (V * D[:, -1].reshape((batch, chunk_size, 1)))
+            k_proj @ (v_proj * decay_matrix[:, -1].reshape((batch, chunk_size, 1)))
         ) + hstate * chunk_decay * delta
 
         # Compute the inner chunk and cross chunk
         e = self.get_masked_e(dones)
-        cross_chunk = (Q @ hstate) * e
-        inner_chunk = ((Q @ K) * D) @ V
+        cross_chunk = (q_proj @ hstate) * e
+        inner_chunk = ((q_proj @ k_proj) * decay_matrix) @ v_proj
 
         # Compute the final retention
         ret = inner_chunk + cross_chunk
         return ret, next_hstate
 
-    def get_masked_D(self, dones):
+    def get_masked_decay_matrix(self, dones: Array) -> Array:
         # get dones the timestep as we do full self attention over all agents within a timestep
         timestep_dones = dones[:, :: self.n_agents]
-        D = self._get_D(timestep_dones) * self._get_D_mask_timestep(timestep_dones)
-        # repeat D matrix to represent the blocks of full self attention - ie repeat per agent
-        D = jnp.repeat(jnp.repeat(D, self.n_agents, axis=1), self.n_agents, axis=2)
+        decay_matrix = self._get_D(timestep_dones) * self._get_decay_matrix_mask_timestep(timestep_dones)
+        # repeat decay_matrix matrix to represent the blocks of full 
+        # self attention - ie repeat per agent
+        decay_matrix = jnp.repeat(
+            jnp.repeat(decay_matrix, self.n_agents, axis=1), self.n_agents, axis=2
+        )
 
         if not self.full_self_attn:
             # Causal mask over the agents
-            mask_agents = jnp.tril(jnp.ones((D.shape[1], D.shape[1])))
-            D = mask_agents[None, :, :] * D
+            mask_agents = jnp.tril(jnp.ones((decay_matrix.shape[1], decay_matrix.shape[1])))
+            decay_matrix = mask_agents[None, :, :] * decay_matrix
 
-        return D
+        return decay_matrix
 
-    def _get_D_mask_timestep(self, ts_dones):
-        """Get the D mask over the timestep. The case used for full self attention.
+    def _get_decay_matrix_mask_timestep(self, ts_dones: Array) -> Array:
+        """Get the decay_matrix mask over the timestep. The case used for full self attention.
 
         Args:
             dones: (batch_size, sequence_length) boolean array of dones -
@@ -143,22 +150,22 @@ class SimpleRetention(nn.Module):
 
         return ~ts_done_mask
 
-    def _get_D(self, dones):
+    def _get_D(self, dones: Array) -> Array:
         B, S = dones.shape
         n = jnp.arange(S)[:, jnp.newaxis, ...]
         m = jnp.arange(S)[jnp.newaxis, ...]
 
         # Broadcast self.decay_kappa ** (n - m) with appropriate masking to set values where n < m to 0
-        D = (self.decay_kappa ** (n - m)) * (n >= m)
+        decay_matrix = (self.decay_kappa ** (n - m)) * (n >= m)
         # this results in some NaN when n is much larger than m
         # fill the NaN with 0
-        D = jnp.nan_to_num(D)
+        decay_matrix = jnp.nan_to_num(decay_matrix)
         # create a decay mat for each batch as each batch will have different dones
-        D = jnp.broadcast_to(D, (B, S, S))
+        decay_matrix = jnp.broadcast_to(decay_matrix, (B, S, S))
 
-        return D
+        return decay_matrix
 
-    def get_masked_e(self, dones):
+    def get_masked_e(self, dones: Array) -> Array:
         # normal e until first done, then zeros
         dones = dones[:, :: self.n_agents]
 
@@ -184,22 +191,27 @@ class SimpleRetention(nn.Module):
 
 class MultiScaleRetention(nn.Module):
     """Multi-scale retention mechanism for Sable."""
+
     embed_dim: int
     n_head: int
     n_agents: int
     full_self_retention: bool = False
     decay_scaling_factor: float = 1.0
 
-    def setup(self)->None:
+    def setup(self) -> None:
         assert self.embed_dim % self.n_head == 0, "embed_dim must be divisible by n_head"
         # Head size
         self.head_size = self.embed_dim // self.n_head
 
         # Decay kappa for each head
-        self.decay_kappas = 1 - jnp.exp(jnp.linspace(jnp.log(1 / 32), jnp.log(1 / 512), self.n_head))
+        self.decay_kappas = 1 - jnp.exp(
+            jnp.linspace(jnp.log(1 / 32), jnp.log(1 / 512), self.n_head)
+        )
         self.decay_kappas = self.decay_kappas * self.decay_scaling_factor
         if self.decay_scaling_factor <= 0:
-            self.decay_kappas = jnp.ones_like(self.decay_kappas) # No decaying if decay_scaling_factor is 0
+            self.decay_kappas = jnp.ones_like(
+                self.decay_kappas
+            )  # No decaying if decay_scaling_factor is 0
             print(
                 f"{Fore.RED}{Style.BRIGHT} No decaying will be applied to the sequence because decay_scaling_factor is 0.{Style.RESET_ALL}"
             )
@@ -229,11 +241,13 @@ class MultiScaleRetention(nn.Module):
             for decay_kappa in self.decay_kappas
         ]
 
-    def __call__(self, key: Array, query: Array, value: Array)->Array:
+    def __call__(self, key: Array, query: Array, value: Array) -> Array:
         """Parallel (default) representation of the multi-scale retention mechanism."""
         batch, seq_len, _ = value.shape
 
-        assert (seq_len == self.n_agents), "Parallel retention expects a sequence equal to the number of agents."
+        assert (
+            seq_len == self.n_agents
+        ), "Parallel retention expects a sequence equal to the number of agents."
 
         # Per head retention
         Y = jnp.zeros((batch, seq_len, self.head_size), dtype=value.dtype)
@@ -248,11 +262,13 @@ class MultiScaleRetention(nn.Module):
 
         # Swish gating
         X = key
-        output= (jax.nn.swish(X @ self.W_G) * Y) @ self.W_O
+        output = (jax.nn.swish(X @ self.W_G) * Y) @ self.W_O
         return output
 
-    def recurrent(self, key_n: Array, query_n: Array, value_n: Array, hstate: Array)-> Tuple[Array, Array]:
-        """ Recurrent representation of the multi-scale retention mechanism"""
+    def recurrent(
+        self, key_n: Array, query_n: Array, value_n: Array, hstate: Array
+    ) -> Tuple[Array, Array]:
+        """Recurrent representation of the multi-scale retention mechanism"""
         batch = value_n.shape[0]
 
         # Per head retention
@@ -266,30 +282,30 @@ class MultiScaleRetention(nn.Module):
         # Gated Multi-scale retention
         # Apply the group norm
         Y = self.group_norm(Y.reshape(-1, self.head_size)).reshape(Y.shape)
-        
+
         # Swish gating
         X = key_n
         output = (jax.nn.swish(X @ self.W_G) * Y) @ self.W_O
         return output, h_ns
 
-    def chunkwise(self, key: Array, query: Array, value: Array, hstate: Array, dones: Array)-> Tuple[Array, Array]:
-        """ Chunkwise representation of the multi-scale retention mechanism"""
+    def chunkwise(
+        self, key: Array, query: Array, value: Array, hstate: Array, dones: Array
+    ) -> Tuple[Array, Array]:
+        """Chunkwise representation of the multi-scale retention mechanism"""
         batch, chunk_size, _ = value.shape
 
         # Per head retention
         Y = jnp.zeros((batch, chunk_size, self.head_size), dtype=value.dtype)
         h_ns = jnp.copy(hstate)
         for head in range(self.n_head):
-            y, h_n = self.retentions[i].chunkwise(
-                key, query, value, hstate[:, head], dones
-            )
+            y, h_n = self.retentions[head].chunkwise(key, query, value, hstate[:, head], dones)
             Y = Y.at[:, :, head : (head + 1)].set(y)
             h_ns = h_ns.at[:, head, :, :].set(h_n)
 
         # Gated Multi-scale retention
         # Apply the group norm
         Y = self.group_norm(Y.reshape(-1, self.head_size)).reshape(Y.shape)
-        
+
         # Swish gating
         X = key
         output = (jax.nn.swish(X @ self.W_G) * Y) @ self.W_O

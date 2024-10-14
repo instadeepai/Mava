@@ -1,14 +1,30 @@
+# Copyright 2022 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import chex
 import jax
 from flax import linen as nn
-import chex
+
 
 class SwiGLU(nn.Module):
-    """ SiwGLU module for Sable's Network. 
+    """SiwGLU module for Sable's Network.
 
     Implements the SwiGLU feedforward neural network module, which is a variation
     of the standard feedforward layer using the Swish activation function combined
-    with a Gated Linear Unit (GLU).   
+    with a Gated Linear Unit (GLU).
     """
+
     hidden_dim: int
     input_dim: int
 
@@ -17,9 +33,7 @@ class SwiGLU(nn.Module):
         self.W_linear = self.param(
             "W_linear", nn.initializers.zeros, (self.input_dim, self.hidden_dim)
         )
-        self.W_gate = self.param(
-            "W_gate", nn.initializers.zeros, (self.input_dim, self.hidden_dim)
-        )
+        self.W_gate = self.param("W_gate", nn.initializers.zeros, (self.input_dim, self.hidden_dim))
         self.W_output = self.param(
             "W_output", nn.initializers.zeros, (self.hidden_dim, self.input_dim)
         )
