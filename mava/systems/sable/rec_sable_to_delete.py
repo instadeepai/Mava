@@ -39,7 +39,6 @@ from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.sable_utils import concat_time_and_agents, get_init_hidden_state
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import make_learning_rate
-from mava.utils.value_norm import denormalise, normalise, update_running_mean_var
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
 # jax.config.update("jax_debug_nans", True)
@@ -228,8 +227,6 @@ def get_learner_fn(
                     transition.reward,
                 )
                 gamma = config.system.gamma
-                next_value = denormalise(value_norm_params, next_value, normalize_vals)
-                value = denormalise(value_norm_params, value, normalize_vals)
 
                 delta = reward + gamma * next_value * (1 - next_done) - value
                 gae = delta + gamma * config.system.gae_lambda * (1 - next_done) * gae
@@ -243,10 +240,7 @@ def get_learner_fn(
                 unroll=16,
             )
 
-            batch_value = denormalise(
-                value_norm_params, traj_batch.value, normalize_vals
-            )
-            return advantages, advantages + batch_value
+            return advantages, advantages 
 
         advantages, targets = _calculate_gae(
             traj_batch, last_val, last_done, value_norm_params
@@ -308,33 +302,15 @@ def get_learner_fn(
                         value - traj_batch.value
                     ).clip(-config.system.clip_eps, config.system.clip_eps)
 
-                    value_targets = normalise(
-                        value_norm_params,
-                        value_targets,
-                        False,
+
+                    # MSE LOSS
+                    value_losses = jnp.square(value - value_targets)
+                    value_losses_clipped = jnp.square(
+                        value_pred_clipped - value_targets
                     )
-
-                    if False:
-                        # HUBER LOSS
-                        value_losses = huber_loss(
-                            value, value_targets, config.system.huber_delta
-                        )
-                        value_losses_clipped = huber_loss(
-                            value_pred_clipped, value_targets, config.system.huber_delta
-                        )
-                        value_loss = jnp.maximum(
-                            value_losses, value_losses_clipped
-                        ).mean()
-
-                    else:
-                        # MSE LOSS
-                        value_losses = jnp.square(value - value_targets)
-                        value_losses_clipped = jnp.square(
-                            value_pred_clipped - value_targets
-                        )
-                        value_loss = (
-                            0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
-                        )
+                    value_loss = (
+                        0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
+                    )
 
                     total_loss = (
                         loss_actor
@@ -458,11 +434,6 @@ def get_learner_fn(
 
         # Before the epochs update the value norm params with all the batch data
         # to get the running mean and variance.
-        value_norm_params = update_running_mean_var(
-            value_norm_params,
-            traj_batch.value,
-            False,
-        )
 
         update_state = (
             params,
@@ -575,7 +546,7 @@ def learner_setup(
         optax.adam(actor_lr, eps=1e-5),
     )
 
-    init_hs = get_init_hidden_state(config, config.arch.num_envs)
+    init_hs = get_init_hidden_state(config.network.actor_network, config.arch.num_envs)
     init_hs = jax.tree_map(lambda x: x[0, jnp.newaxis], init_hs)
 
     # Initialise actor params and optimiser state.
@@ -624,7 +595,7 @@ def learner_setup(
     env_states = jax.tree_map(reshape_states, env_states)
     timesteps = jax.tree_map(reshape_states, timesteps)
 
-    init_hidden_state = get_init_hidden_state(config, config.arch.num_envs)
+    init_hidden_state = get_init_hidden_state(config.network.actor_network, config.arch.num_envs)
 
     # Load model from checkpoint if specified.
     if config.logger.checkpointing.load_model:
