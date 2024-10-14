@@ -17,21 +17,54 @@ import traceback
 import warnings
 from multiprocessing import Queue
 from multiprocessing.connection import Connection
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union, NamedTuple, TYPE_CHECKING
 
+from dataclasses import field
 import gymnasium
 import gymnasium.vector.async_vector_env
 import numpy as np
 from gymnasium import spaces
 from gymnasium.spaces.utils import is_space_dtype_shape_equiv
 from gymnasium.vector.utils import write_to_shared_memory
-from jumanji.types import StepType, TimeStep
 from numpy.typing import NDArray
 
 from mava.types import Observation, ObservationGlobalState
 
+if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
+    from dataclasses import dataclass
+else:
+    from chex import dataclass
+
 # Filter out the warnings
 warnings.filterwarnings("ignore", module="gymnasium.utils.passive_env_checker")
+
+
+# needed to avoid host -> device transfers when calling TimeStep.last()
+class StepType:
+    """Coppy of Jumanji's step type but with numpy arrays"""
+
+    FIRST = 0
+    MID = 1
+    LAST = 2
+
+
+@dataclass
+class TimeStep:
+    step_type: StepType
+    reward: NDArray
+    discount: NDArray
+    observation: Observation
+    extras: Dict = field(default_factory=dict)
+
+
+    def first(self) -> bool:
+        return self.step_type == StepType.FIRST
+
+    def mid(self) -> bool:
+        return self.step_type == StepType.MID
+
+    def last(self) -> bool:
+        return self.step_type == StepType.LAST
 
 
 class GymWrapper(gymnasium.Wrapper):

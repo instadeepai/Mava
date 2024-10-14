@@ -74,13 +74,11 @@ def rollout(
         seeds (List[int]): Seeds for initializing the environment.
         thread_lifetime (ThreadLifetime): Manages the thread's lifecycle.
     """
-    # setup
     env = environments.make_gym_env(config, config.arch.num_envs)
     actor_apply_fn, critic_apply_fn = apply_fns
     num_agents, num_envs = config.system.num_agents, config.arch.num_envs
     move_to_device = lambda x: jax.device_put(x, device=actor_device)
 
-    # Define the util functions: select action function and prepare data to share it with learner.
     @jax.jit
     def act_fn(
         params: Params,
@@ -96,62 +94,57 @@ def rollout(
         return action, log_prob, value
 
     timestep = env.reset(seed=seeds)
-    next_dones = jnp.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
+    next_dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
 
-    with jax.default_device(actor_device):
-        # Loop till the desired num_updates is reached.
-        while not thread_lifetime.should_stop():
-            # Rollout
-            traj: List[PPOTransition] = []
-            actor_timings: Dict[str, List[float]] = defaultdict(list)
-            # Loop over the rollout length
-            with RecordTimeTo(actor_timings["rollout_time"]):
-                for _ in range(config.system.rollout_length):
-                    with RecordTimeTo(actor_timings["get_params_time"]):
-                        # Get the latest parameters from the learner
-                        params = params_source.get()
+    # with jax.default_device(actor_device):
+    # Loop till the desired num_updates is reached.
+    while not thread_lifetime.should_stop():
+        # Rollout
+        traj: List[PPOTransition] = []
+        actor_timings: Dict[str, List[float]] = defaultdict(list)
+        with RecordTimeTo(actor_timings["rollout_time"]):
+            for _ in range(config.system.rollout_length):
+                with RecordTimeTo(actor_timings["get_params_time"]):
+                    # Get the latest parameters from the learner
+                    params = params_source.get()
 
-                    cached_next_obs = tree.map(move_to_device, timestep.observation)
-                    cached_next_dones = move_to_device(next_dones)
+                cached_next_obs = tree.map(move_to_device, timestep.observation)
+                cached_next_dones = move_to_device(next_dones)
 
-                    # Get action and value
-                    with RecordTimeTo(actor_timings["compute_action_time"]):
-                        key, act_key = jax.random.split(key)
-                        action, log_prob, value = act_fn(params, cached_next_obs, act_key)
-                        cpu_action = jax.device_get(action)
+                # Get action and value
+                with RecordTimeTo(actor_timings["compute_action_time"]):
+                    key, act_key = jax.random.split(key)
+                    action, log_prob, value = act_fn(params, cached_next_obs, act_key)
+                    cpu_action = jax.device_get(action)
 
-                    # Step environment
-                    with RecordTimeTo(actor_timings["env_step_time"]):
-                        # (num_env, num_agents) --> (num_agents, num_env)
-                        timestep = env.step(cpu_action.swapaxes(0, 1))
+                # Step environment
+                with RecordTimeTo(actor_timings["env_step_time"]):
+                    timestep = env.step(cpu_action.swapaxes(0, 1))
 
-                    next_dones = jnp.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
+                # todo: just for fixing transfer guard, real issue is the TimeStep.last() - need to make sebulba timestep type
+                next_dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
 
-                    # Append data to storage
-                    reward = timestep.reward
-                    info = timestep.extras  # todo: [metrics]?
-                    # todo: when logging make sure timing dict has parent timing/...
-                    traj.append(
-                        PPOTransition(
-                            cached_next_dones,
-                            action,
-                            value,
-                            reward,
-                            log_prob,
-                            cached_next_obs,
-                            info,
-                        )
+                # Append data to storage
+                # todo: when logging make sure timing dict has parent timing/...
+                traj.append(
+                    PPOTransition(
+                        cached_next_dones,
+                        action,
+                        value,
+                        timestep.reward,
+                        log_prob,
+                        cached_next_obs,
+                        timestep.extras,
                     )
-            # send trajectories to learner
-            with RecordTimeTo(actor_timings["rollout_put_time"]):
-                try:
-                    rollout_queue.put(traj, timestep, actor_timings)
-                except queue.Full:
-                    warnings.warn(
-                        "Waited too long to add to the rollout queue, killing the actor thread",
-                        stacklevel=2,
-                    )
-                    break
+                )
+        # send trajectories to learner
+        with RecordTimeTo(actor_timings["rollout_put_time"]):
+            try:
+                rollout_queue.put(traj, timestep, actor_timings)
+            except queue.Full:
+                err = "Waited too long to add to the rollout queue, killing the actor thread" 
+                warnings.warn(err, stacklevel=2)
+                break
 
     env.close()
 
@@ -619,7 +612,7 @@ def run_experiment(_config: DictConfig) -> float:
         args=(learn, learner_state, config, eval_queue, pipe, params_sources),
     ).start()
 
-    max_episode_return = -jnp.inf
+    max_episode_return = -np.inf
     best_params = inital_params.actor_params
 
     # This is the main loop, all it does is evaluation and logging.
@@ -649,7 +642,7 @@ def run_experiment(_config: DictConfig) -> float:
         eval_metrics = evaluator(unreplicated_actor_params, eval_key, {})
         logger.log(eval_metrics, t, eval_step, LogEvent.EVAL)
 
-        episode_return = jnp.mean(eval_metrics["episode_return"])
+        episode_return = np.mean(eval_metrics["episode_return"])
 
         if save_checkpoint:  # Save a checkpoint of the learner state
             checkpointer.save(
@@ -663,7 +656,7 @@ def run_experiment(_config: DictConfig) -> float:
             max_episode_return = episode_return
 
     evaluator_envs.close()
-    eval_performance = float(jnp.mean(eval_metrics[config.env.eval_metric]))
+    eval_performance = float(np.mean(eval_metrics[config.env.eval_metric]))
 
     print(f"{Fore.MAGENTA}{Style.BRIGHT}Stopping actor threads...{Style.RESET_ALL}")
     # Make sure all of the Threads are stopped.

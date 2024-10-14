@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+from functools import partial
 import queue
 import threading
 import time
@@ -20,6 +21,7 @@ from typing import Any, Dict, List, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 from colorama import Fore, Style
 from jax import tree
 from jumanji.types import TimeStep
@@ -68,6 +70,7 @@ class Pipeline(threading.Thread):
             lifetime: A `ThreadLifetime` which is used to stop this thread.
         """
         super().__init__(name="Pipeline")
+
         self.learner_devices = learner_devices
         self.tickets_queue: queue.Queue = queue.Queue()
         self._queue: queue.Queue = queue.Queue(maxsize=max_size)
@@ -148,9 +151,14 @@ class Pipeline(threading.Thread):
                 break
 
     def shard_split_playload(self, payload: Any, axis: int = 0) -> Any:
-        split_payload = jnp.split(payload, len(self.learner_devices), axis=axis)
-        return jax.device_put_sharded(split_payload, devices=self.learner_devices)
+        return self.shard_payload(self.split_payload(payload, axis))
 
+    @partial(jax.jit, static_argnums=(0, 2))
+    def split_payload(self, payload: Any, axis: int = 0):
+        return jnp.split(payload, len(self.learner_devices), axis=axis)
+
+    def shard_payload(self, payload: Any):
+        return jax.device_put_sharded(payload, devices=self.learner_devices)
 
 class ParamsSource(threading.Thread):
     """A `ParamSource` is a component that allows networks params to be passed from a
