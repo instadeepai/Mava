@@ -121,11 +121,9 @@ def rollout(
                 with RecordTimeTo(actor_timings["env_step_time"]):
                     timestep = env.step(cpu_action.swapaxes(0, 1))
 
-                # todo: just for fixing transfer guard, real issue is the TimeStep.last() - need to make sebulba timestep type
                 next_dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
 
                 # Append data to storage
-                # todo: when logging make sure timing dict has parent timing/...
                 traj.append(
                     PPOTransition(
                         cached_next_dones,
@@ -623,7 +621,7 @@ def run_experiment(_config: DictConfig) -> float:
         episode_metrics, train_metrics, learner_state, time_metrics = eval_queue.get()
 
         t = int(steps_per_rollout * (eval_step + 1))
-        time_metrics["timestep"] = t
+        time_metrics |= {"timestep": t, "pipline_size": pipe.qsize()}
         logger.log(time_metrics, t, eval_step, LogEvent.MISC)
 
         episode_metrics, ep_completed = get_final_step_metrics(episode_metrics)
