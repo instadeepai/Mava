@@ -120,7 +120,7 @@ class SimpleRetention(nn.Module):
             jnp.repeat(decay_matrix, self.n_agents, axis=1), self.n_agents, axis=2
         )
 
-        if not self.full_self_attn:
+        if not self.full_self_retention:
             # Causal mask over the agents
             mask_agents = jnp.tril(jnp.ones((decay_matrix.shape[1], decay_matrix.shape[1])))
             decay_matrix = mask_agents[None, :, :] * decay_matrix
@@ -227,7 +227,7 @@ class MultiScaleRetention(nn.Module):
             nn.initializers.normal(stddev=1 / self.embed_dim),
             (self.head_size, self.embed_dim),
         )
-        self.group_norm = nn.GroupNorm(num_groups=self.heads)
+        self.group_norm = nn.GroupNorm(num_groups=self.n_head)
 
         # Initialize the retention mechanisms
         self.retentions = [
@@ -269,14 +269,14 @@ class MultiScaleRetention(nn.Module):
         self, key_n: Array, query_n: Array, value_n: Array, hstate: Array
     ) -> Tuple[Array, Array]:
         """Recurrent representation of the multi-scale retention mechanism"""
-        batch = value_n.shape[0]
+        batch, seq, _ = value_n.shape
 
         # Per head retention
-        Y = jnp.zeros((batch, 1, self.head_size), dtype=value_n.dtype)
+        Y = jnp.zeros((batch, seq, self.head_size), dtype=value_n.dtype)
         h_ns = jnp.zeros_like(hstate)
         for head in range(self.n_head):
             y, h_n = self.retentions[head].recurrent(key_n, query_n, value_n, hstate[:, head])
-            Y = Y.at[:, :, head : (head + 1)].set(y)
+            Y = Y.at[:, :, self.head_size : (self.head_size + 1)].set(y)
             h_ns = h_ns.at[:, head, :, :].set(h_n)
 
         # Gated Multi-scale retention
@@ -299,7 +299,7 @@ class MultiScaleRetention(nn.Module):
         h_ns = jnp.copy(hstate)
         for head in range(self.n_head):
             y, h_n = self.retentions[head].chunkwise(key, query, value, hstate[:, head], dones)
-            Y = Y.at[:, :, head : (head + 1)].set(y)
+            Y = Y.at[:, :, self.head_size : (self.head_size + 1)].set(y)
             h_ns = h_ns.at[:, head, :, :].set(h_n)
 
         # Gated Multi-scale retention

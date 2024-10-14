@@ -22,7 +22,7 @@ from flax import linen as nn
 from flax.linen.initializers import orthogonal
 
 from mava.networks.retention import MultiScaleRetention
-from mava.utils.networks_util import SwiGLU
+from mava.utils.sable_utils import SwiGLU
 
 
 class EncodeBlock(nn.Module):
@@ -30,7 +30,7 @@ class EncodeBlock(nn.Module):
 
     embed_dim: int
     n_head: int
-    n_agent: int
+    n_agents: int
     decay_scaling_factor: float
 
     def setup(self) -> None:
@@ -42,7 +42,7 @@ class EncodeBlock(nn.Module):
         self.retn = MultiScaleRetention(
             embed_dim=self.embed_dim,
             n_head=self.n_head,
-            n_agent=self.n_agent,
+            n_agents=self.n_agents,
             full_self_retention=True,  # Full retention for the encoder
             decay_scaling_factor=self.decay_scaling_factor,
         )
@@ -79,7 +79,7 @@ class Encoder(nn.Module):
     n_block: int
     embed_dim: int
     n_head: int
-    n_agent: int
+    n_agents: int
     decay_scaling_factor: float = 1.0
 
     def setup(self) -> None:
@@ -108,7 +108,7 @@ class Encoder(nn.Module):
             EncodeBlock(
                 self.embed_dim,
                 self.n_head,
-                self.n_agent,
+                self.n_agents,
                 self.decay_scaling_factor,
                 name=f"encoder_block_{block_id}",
             )
@@ -179,7 +179,7 @@ class DecodeBlock(nn.Module):
 
     embed_dim: int
     n_head: int
-    n_agent: int
+    n_agents: int
     decay_scaling_factor: float
     use_swiglu: bool = False
 
@@ -191,14 +191,14 @@ class DecodeBlock(nn.Module):
         self.retn1 = MultiScaleRetention(
             embed_dim=self.embed_dim,
             n_head=self.n_head,
-            n_agent=self.n_agent,
+            n_agents=self.n_agents,
             full_self_retention=False,  # Masked retention for the decoder
             decay_scaling_factor=self.decay_scaling_factor,
         )
         self.retn2 = MultiScaleRetention(
             embed_dim=self.embed_dim,
             n_head=self.n_head,
-            n_agent=self.n_agent,
+            n_agents=self.n_agents,
             full_self_retention=False,  # Masked retention for the decoder
             decay_scaling_factor=self.decay_scaling_factor,
         )
@@ -267,7 +267,8 @@ class Decoder(nn.Module):
     n_block: int
     embed_dim: int
     n_head: int
-    n_agent: int
+    n_agents: int
+    action_dim: int
     decay_scaling_factor: float = 1.0
     action_space_type: str = "discrete"
 
@@ -279,7 +280,7 @@ class Decoder(nn.Module):
         if self.action_space_type == "discrete":
             self.action_encoder = nn.Sequential(
                 [
-                    nn.Dense(self.n_embd, use_bias=False, kernel_init=orthogonal(jnp.sqrt(2))),
+                    nn.Dense(self.embed_dim, use_bias=False, kernel_init=orthogonal(jnp.sqrt(2))),
                     nn.gelu,
                 ],
             )
@@ -287,13 +288,13 @@ class Decoder(nn.Module):
             self.log_std = None
         else:
             self.action_encoder = nn.Sequential(
-                [nn.Dense(self.n_embd, kernel_init=orthogonal(jnp.sqrt(2))), nn.gelu],
+                [nn.Dense(self.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))), nn.gelu],
             )
             self.log_std = self.param("log_std", nn.initializers.zeros, (self.action_dim,))
         # Initialize the head layer for the action logits
         self.head = nn.Sequential(
             [
-                nn.Dense(self.n_embd, kernel_init=orthogonal(jnp.sqrt(2))),
+                nn.Dense(self.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
                 nn.gelu,
                 nn.RMSNorm(),
                 nn.Dense(self.action_dim, kernel_init=orthogonal(0.01)),
@@ -305,7 +306,7 @@ class Decoder(nn.Module):
             DecodeBlock(
                 self.embed_dim,
                 self.n_head,
-                self.n_agent,
+                self.n_agents,
                 self.decay_scaling_factor,
                 name=f"decoder_block_{block_id}",
             )
@@ -387,7 +388,8 @@ class SableNetwork(nn.Module):
     n_block: int
     embed_dim: int
     n_head: int
-    n_agent: int
+    n_agents: int
+    action_dim: int
     decay_scaling_factor: float = 1.0
     action_space_type: str = "discrete"
 
@@ -402,14 +404,15 @@ class SableNetwork(nn.Module):
             self.n_block,
             self.embed_dim,
             self.n_head,
-            self.n_agent,
+            self.n_agents,
             self.decay_scaling_factor,
         )
         self.decoder = Decoder(
             self.n_block,
             self.embed_dim,
             self.n_head,
-            self.n_agent,
+            self.n_agents,
+            self.action_dim,
             self.decay_scaling_factor,
             self.action_space_type,
         )
@@ -447,7 +450,7 @@ class SableNetwork(nn.Module):
         # Apply the decoder
         action_log, entropy = self.parallel_act(
             decoder=self.decoder,
-            n_agent=self.n_agent,
+            n_agents=self.n_agents,
             obs_rep=obs_rep,
             action=action,
             legal_actions=legal_actions,
@@ -468,7 +471,7 @@ class SableNetwork(nn.Module):
         """Inference phase."""
         # Decay the hidden states
         decayed_hstates = jax.tree.map(
-            lambda x: x * self.decay_kappa[None, :, None, None, None], hstates
+            lambda x: x * self.decay_kappas[None, :, None, None, None], hstates
         )
         # Apply the encoder
         v_loc, obs_rep, updated_enc_hs = self.encoder.recurrent(obs, decayed_hstates[0])
@@ -497,7 +500,7 @@ class SableNetwork(nn.Module):
 
 def discrete_parallel_act(
     decoder: Decoder,
-    n_agent: int,
+    n_agents: int,
     obs_rep: chex.Array,
     action: chex.Array,
     legal_actions: chex.Array,
@@ -509,7 +512,7 @@ def discrete_parallel_act(
     # Delete `rng_key` since it is not used in discrete action space
     del rng_key
     # Get the batch size, sequence length, and action dimension
-    batch_size, sequence_size, action_dim = action.shape
+    batch_size, sequence_size, action_dim = legal_actions.shape
 
     # Create a shifted action sequence for predicting the next action
     # Initialize the shifted action sequence.
@@ -526,7 +529,7 @@ def discrete_parallel_act(
     shifted_actions = jnp.roll(shifted_actions, shift=1, axis=1)
 
     # Set the start token for the first agent in each timestep
-    shifted_actions = shifted_actions.at[:, ::n_agent, :].set(start_timestep_token)
+    shifted_actions = shifted_actions.at[:, ::n_agents, :].set(start_timestep_token)
 
     # Apply the decoder
     logit, _ = decoder.chunkwise(
@@ -564,20 +567,20 @@ def discrete_autoregressive_act(
     key: chex.PRNGKey,
 ) -> Tuple[chex.Array, chex.Array, chex.Array]:
     # Get the batch size, sequence length, and action dimension
-    batch_size, n_agent, action_dim = legal_actions.shape
+    batch_size, n_agents, action_dim = legal_actions.shape
 
     # Create a shifted action sequence for predicting the next action
     # Initialize the shifted action sequence.
-    shifted_actions = jnp.zeros((batch_size, n_agent, action_dim + 1))
+    shifted_actions = jnp.zeros((batch_size, n_agents, action_dim + 1))
     # Set the start-of-timestep token (first action as a "start" signal)
-    shifted_actions = jnp.zeros(action_dim + 1).at[0].set(1)
+    shifted_actions = shifted_actions.at[:, 0, 0].set(1)
 
     # Define the output action and output action log sizes
-    output_action = jnp.zeros((batch_size, n_agent, 1))
+    output_action = jnp.zeros((batch_size, n_agents, 1))
     output_action_log = jnp.zeros_like(output_action)
 
     # Apply the decoder autoregressively
-    for i in range(n_agent):
+    for i in range(n_agents):
         logit, updated_hstates = decoder.recurrent(
             action=shifted_actions[:, i : i + 1, :],
             obs_rep=obs_rep[:, i : i + 1, :],
@@ -599,7 +602,7 @@ def discrete_autoregressive_act(
         output_action_log = output_action_log.at[:, i, :].set(action_log)
 
         # Update the shifted action
-        update_shifted_action = i + 1 < n_agent
+        update_shifted_action = i + 1 < n_agents
         shifted_actions = jax.lax.cond(
             update_shifted_action,
             lambda action=action, i=i, shifted_actions=shifted_actions: shifted_actions.at[
