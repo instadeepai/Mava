@@ -1,7 +1,7 @@
 defaults:
   - logger: sable
   - arch: anakin
-  - system: sable/sable_memory
+  - system: sable/rec_sable
   - network: retention
   - env: rware  # [cleaner, connector, gigastep, lbf, mabrax, matrax, rware, smax]
   - _self_
