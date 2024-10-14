@@ -22,7 +22,7 @@ from colorama import Fore, Style
 
 class SimpleRetention(nn.Module):
     """Simple retention mechanism for Sable."""
-    n_embd: int
+    embed_dim: int
     head_size: int
     n_agents: int
     full_self_retention: bool
@@ -32,18 +32,18 @@ class SimpleRetention(nn.Module):
         # Initialize the weights
         self.W_Q = self.param(
             "W_Q",
-            nn.initializers.normal(stddev=1 / self.n_embd),
-            (self.n_embd, self.head_size),
+            nn.initializers.normal(stddev=1 / self.embed_dim),
+            (self.embed_dim, self.head_size),
         )
         self.W_K = self.param(
             "W_K",
-            nn.initializers.normal(stddev=1 / self.n_embd),
-            (self.n_embd, self.head_size),
+            nn.initializers.normal(stddev=1 / self.embed_dim),
+            (self.embed_dim, self.head_size),
         )
         self.W_V = self.param(
             "W_V",
-            nn.initializers.normal(stddev=1 / self.n_embd),
-            (self.n_embd, self.head_size),
+            nn.initializers.normal(stddev=1 / self.embed_dim),
+            (self.embed_dim, self.head_size),
         )
 
     def __call__(self, key: Array, query: Array, value: Array)->Array:
@@ -184,16 +184,16 @@ class SimpleRetention(nn.Module):
 
 class MultiScaleRetention(nn.Module):
     """Multi-scale retention mechanism for Sable."""
-    n_embd: int
+    embed_dim: int
     n_head: int
     n_agents: int
     full_self_retention: bool = False
     decay_scaling_factor: float = 1.0
 
     def setup(self)->None:
-        assert self.n_embd % self.n_head == 0, "n_embd must be divisible by n_head"
+        assert self.embed_dim % self.n_head == 0, "embed_dim must be divisible by n_head"
         # Head size
-        self.head_size = self.n_embd // self.n_head
+        self.head_size = self.embed_dim // self.n_head
 
         # Decay kappa for each head
         self.decay_kappas = 1 - jnp.exp(jnp.linspace(jnp.log(1 / 32), jnp.log(1 / 512), self.n_head))
@@ -207,20 +207,20 @@ class MultiScaleRetention(nn.Module):
         # Initialize the weights and group norm
         self.W_G = self.param(
             "W_G",
-            nn.initializers.normal(stddev=1 / self.n_embd),
-            (self.n_embd, self.head_size),
+            nn.initializers.normal(stddev=1 / self.embed_dim),
+            (self.embed_dim, self.head_size),
         )
         self.W_O = self.param(
             "W_O",
-            nn.initializers.normal(stddev=1 / self.n_embd),
-            (self.head_size, self.n_embd),
+            nn.initializers.normal(stddev=1 / self.embed_dim),
+            (self.head_size, self.embed_dim),
         )
         self.group_norm = nn.GroupNorm(num_groups=self.heads)
 
         # Initialize the retention mechanisms
         self.retentions = [
             SimpleRetention(
-                self.n_embd,
+                self.embed_dim,
                 self.head_size,
                 self.n_agents,
                 self.full_self_retention,
