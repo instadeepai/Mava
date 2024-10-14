@@ -342,7 +342,7 @@ def init(
     init_transition = Transition(
         obs=init_obs,  # (A, ...)
         action=init_acts,
-        reward=jnp.zeros((num_agents,), dtype=float),
+        reward=jnp.zeros((1,), dtype=float),
         terminal=jnp.zeros((1,), dtype=bool),  # one flag for all agents
         term_or_trunc=jnp.zeros((1,), dtype=bool),
         next_obs=init_obs,
@@ -351,7 +351,7 @@ def init(
     # Initialise trajectory buffer
     rb = fbx.make_trajectory_buffer(
         # n transitions gives n-1 full data points
-        sample_sequence_length=cfg.system.sample_sequence_length + 1,
+        sample_sequence_length=cfg.system.sample_sequence_length,
         period=1,  # sample any unique trajectory
         add_batch_size=cfg.arch.num_envs,
         sample_batch_size=cfg.system.sample_batch_size,
@@ -583,6 +583,10 @@ def make_update_fns(
         # Eps defaults to 0
         _, next_online_greedy_dist = q_net.apply(
             params.online, hidden_state, next_obs_term_or_trunc
+        )
+
+        hidden_state, next_obs_term_or_trunc = prep_inputs_to_scannedrnn(
+            next_obs, next_term_or_trunc
         )
 
         _, next_q_vals_target = q_net.apply(
