@@ -659,10 +659,12 @@ def run_experiment(_config: DictConfig) -> float:
     print(f"{Fore.MAGENTA}{Style.BRIGHT}Stopping actor threads...{Style.RESET_ALL}")
     # Make sure all of the Threads are stopped.
     actor_lifetime.stop()
+    # We clear the pipeline before stopping the actor threads to avoid deadlock
+    pipe.clear()
+    print(f"{Fore.RED}{Style.BRIGHT}Pipe cleared: {pipe.qsize()}{Style.RESET_ALL}")
     for actor in actor_threads:
-        # We clear the pipeline before stopping each actor thread to avoid deadlock
-        pipe.clear()
         actor.join()
+        print(f"{Fore.RED}{Style.BRIGHT}{actor.name} stopped{Style.RESET_ALL}")
 
     print(f"{Fore.MAGENTA}{Style.BRIGHT}Stopping pipeline...{Style.RESET_ALL}")
     pipe_lifetime.stop()
