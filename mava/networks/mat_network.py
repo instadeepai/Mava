@@ -266,11 +266,8 @@ class MultiAgentTransformer(nn.Module):
             use_rmsnorm=self.use_rmsnorm,
         )
         if self.action_space_type == "discrete":
-            # self.autoregressive_act = discrete_autoregressive_act
+            self.autoregressive_act = discrete_autoregressive_act
             self.parallel_act = discrete_parallel_act
-            self.autoregressive_act = setup_discrete_autoregressive_act_scan(
-                self.action_dim, self.n_agent
-            )
 
         else:
             self.autoregressive_act = continuous_autoregressive_act
@@ -399,101 +396,6 @@ def continuous_parallel_act(
     return action_log_prob, entropy
 
 
-def setup_discrete_autoregressive_act_scan(action_dim: int, n_agent: int) -> Callable:
-    def scan_step(
-        decoder: Decoder, carry: Tuple, x: chex.Numeric
-    ) -> Tuple[Tuple, None]:
-        (
-            shifted_action,
-            output_action,
-            output_action_log,
-            obs_rep,
-            obs,
-            legal_actions,
-            key,
-        ) = carry
-        i = x  # x is the agent index
-
-        logit = decoder(shifted_action, obs_rep, obs)[:, i, :]
-        masked_logits = jnp.where(
-            legal_actions[:, i, :],
-            logit,
-            jnp.finfo(jnp.float32).min,
-        )
-        distribution = distrax.Categorical(logits=masked_logits)
-        key, sample_key = jax.random.split(key)
-        action, action_log = distribution.sample_and_log_prob(seed=sample_key)
-
-        output_action = output_action.at[:, i, :].set(jnp.expand_dims(action, axis=-1))
-        output_action_log = output_action_log.at[:, i, :].set(
-            jnp.expand_dims(action_log, axis=-1)
-        )
-
-        update_shifted_action = i + 1 < n_agent
-        shifted_action = jax.lax.cond(
-            update_shifted_action,
-            lambda: shifted_action.at[:, i + 1, 1:].set(
-                jax.nn.one_hot(action, action_dim)
-            ),
-            lambda: shifted_action,
-        )
-
-        return (
-            shifted_action,
-            output_action,
-            output_action_log,
-            obs_rep,
-            obs,
-            legal_actions,
-            key,
-        ), None
-
-    scan = nn.scan(
-        scan_step, variable_broadcast="params", split_rngs={"params": False}, unroll=16
-    )
-
-    def discrete_autoregressive_act_scan(
-        decoder: Decoder,
-        obs_rep: chex.Array,
-        obs: chex.Array,
-        batch_size: int,
-        n_agent: int,
-        action_dim: int,
-        legal_actions: chex.Array,
-        key: chex.PRNGKey,
-    ) -> Tuple[chex.Array, chex.Array, None]:
-        shifted_action = jnp.zeros((batch_size, n_agent, action_dim + 1))
-        shifted_action = shifted_action.at[:, 0, 0].set(1)
-        output_action = jnp.zeros((batch_size, n_agent, 1))
-        output_action_log = jnp.zeros_like(output_action)
-
-        initial_carry = (
-            shifted_action,
-            output_action,
-            output_action_log,
-            obs_rep,
-            obs,
-            legal_actions,
-            key,
-        )
-        agents = jnp.arange(n_agent)
-        (
-            (
-                shifted_action,
-                output_action,
-                output_action_log,
-                obs_rep,
-                obs,
-                legal_actions,
-                _,
-            ),
-            _,
-        ) = scan(decoder, initial_carry, agents)
-
-        return output_action.astype(jnp.int32), output_action_log, None
-
-    return discrete_autoregressive_act_scan
-
 def discrete_autoregressive_act(
     decoder: Decoder,
     obs_rep: chex.Array,
@@ -504,9 +406,8 @@ def discrete_autoregressive_act(
     legal_actions: chex.Array,
     key: chex.PRNGKey,
 ) -> Tuple[chex.Array, chex.Array, None]:
-    shifted_action = jnp.zeros(
-        (batch_size, n_agent, action_dim + 1)
-    )  # (batch, n_agent, action_dim + 1)
+    shifted_action = jnp.zeros((batch_size, n_agent, action_dim + 1))  
+    # (batch, n_agent, action_dim + 1)
     shifted_action = shifted_action.at[:, 0, 0].set(1)
     # This should look like:
     # [[1, 0, 0, 0, 0, 0],
