@@ -53,6 +53,7 @@ from mava.wrappers.episode_metrics import get_final_step_metrics
 
 def rollout(
     key: chex.PRNGKey,
+    env,
     config: DictConfig,
     rollout_queue: Pipeline,
     params_source: ParamsSource,
@@ -74,7 +75,8 @@ def rollout(
         seeds (List[int]): Seeds for initializing the environment.
         thread_lifetime (ThreadLifetime): Manages the thread's lifecycle.
     """
-    env = environments.make_gym_env(config, config.arch.num_envs)
+    name = threading.current_thread().name
+    print(f"{Fore.BLUE}{Style.BRIGHT}Thread {name} started{Style.RESET_ALL}")
     actor_apply_fn, critic_apply_fn = apply_fns
     num_agents, num_envs = config.system.num_agents, config.arch.num_envs
     move_to_device = lambda x: jax.device_put(x, device=actor_device)
@@ -96,7 +98,6 @@ def rollout(
     timestep = env.reset(seed=seeds)
     next_dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
 
-    # with jax.default_device(actor_device):
     # Loop till the desired num_updates is reached.
     while not thread_lifetime.should_stop():
         # Rollout
@@ -104,6 +105,10 @@ def rollout(
         actor_timings: Dict[str, List[float]] = defaultdict(list)
         with RecordTimeTo(actor_timings["rollout_time"]):
             for _ in range(config.system.rollout_length):
+                # if thread_lifetime.should_stop():
+                #     env.close()
+                #     return
+
                 with RecordTimeTo(actor_timings["get_params_time"]):
                     # Get the latest parameters from the learner
                     params = params_source.get()
@@ -135,6 +140,7 @@ def rollout(
                         timestep.extras,
                     )
                 )
+
         # send trajectories to learner
         with RecordTimeTo(actor_timings["rollout_put_time"]):
             try:
@@ -574,8 +580,17 @@ def run_experiment(_config: DictConfig) -> float:
     actor_lifetime = ThreadLifetime()
     params_sources_lifetime = ThreadLifetime()
 
+    # Unfortunately we have to do this here, because creating envs inside the actor threads causes deadlocks
+    envs = [[] for i in range(len(actor_devices))]
+    print(f"{Fore.BLUE}{Style.BRIGHT}Starting up environments, this may take a while...{Style.RESET_ALL}")
+    for i in range(len(actor_devices)):
+        for _ in range(config.arch.n_threads_per_executor):
+            env = environments.make_gym_env(config, config.arch.num_envs)
+            envs[i].append(env)
+    print(f"{Fore.BLUE}{Style.BRIGHT}All environments created{Style.RESET_ALL}")
+
     # Create the actor threads
-    for actor_device in actor_devices:
+    for dev_idx, actor_device in enumerate(actor_devices):
         # Create 1 params source per device
         params_source = ParamsSource(inital_params, actor_device, params_sources_lifetime)
         params_source.start()
@@ -590,6 +605,7 @@ def run_experiment(_config: DictConfig) -> float:
                 target=rollout,
                 args=(
                     act_key,
+                    envs[dev_idx][thread_id],
                     config,
                     pipe,
                     params_source,
@@ -656,26 +672,6 @@ def run_experiment(_config: DictConfig) -> float:
     evaluator_envs.close()
     eval_performance = float(np.mean(eval_metrics[config.env.eval_metric]))
 
-    print(f"{Fore.MAGENTA}{Style.BRIGHT}Stopping actor threads...{Style.RESET_ALL}")
-    # Make sure all of the Threads are stopped.
-    actor_lifetime.stop()
-    # We clear the pipeline before stopping the actor threads to avoid deadlock
-    pipe.clear()
-    print(f"{Fore.RED}{Style.BRIGHT}Pipe cleared: {pipe.qsize()}{Style.RESET_ALL}")
-    for actor in actor_threads:
-        actor.join()
-        print(f"{Fore.RED}{Style.BRIGHT}{actor.name} stopped{Style.RESET_ALL}")
-
-    print(f"{Fore.MAGENTA}{Style.BRIGHT}Stopping pipeline...{Style.RESET_ALL}")
-    pipe_lifetime.stop()
-    pipe.join()
-
-    print(f"{Fore.MAGENTA}{Style.BRIGHT}Stopping params sources...{Style.RESET_ALL}")
-    params_sources_lifetime.stop()
-    for params_source in params_sources:
-        params_source.join()
-
-    print(f"{Fore.MAGENTA}{Style.BRIGHT}All threads stopped...{Style.RESET_ALL}")
 
     # Measure absolute metric.
     if config.arch.absolute_metric:
@@ -692,6 +688,26 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Stop the logger.
     logger.stop()
+    # Ask actors to stop before running the evaluator
+    actor_lifetime.stop()
+    # We clear the pipeline before stopping the actor threads to avoid deadlock
+    pipe.clear()
+    print(f"{Fore.RED}{Style.BRIGHT}Pipe cleared: {pipe.qsize()}{Style.RESET_ALL}")
+
+    print(f"{Fore.RED}{Style.BRIGHT}Stopping actor threads...{Style.RESET_ALL}")
+    for actor in actor_threads:
+        actor.join()
+        print(f"{Fore.RED}{Style.BRIGHT}{actor.name} stopped{Style.RESET_ALL}")
+
+    print(f"{Fore.RED}{Style.BRIGHT}Stopping pipeline...{Style.RESET_ALL}")
+    pipe_lifetime.stop()
+    pipe.join()
+
+    print(f"{Fore.RED}{Style.BRIGHT}Stopping params sources...{Style.RESET_ALL}")
+    params_sources_lifetime.stop()
+    for params_source in params_sources:
+        params_source.join()
+    print(f"{Fore.RED}{Style.BRIGHT}All threads stopped...{Style.RESET_ALL}")
 
     return eval_performance
 

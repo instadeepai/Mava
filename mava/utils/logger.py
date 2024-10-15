@@ -178,6 +178,7 @@ class NeptuneLogger(BaseLogger):
         if not self.detailed_logging and not is_main_metric:
             return
 
+        value = value.item() if isinstance(value, (jax.Array, np.ndarray)) else value
         self.logger[f"{event.value}/{key}"].log(value, step=step)
 
     def stop(self) -> None:
