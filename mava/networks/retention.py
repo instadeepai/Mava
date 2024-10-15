@@ -113,8 +113,10 @@ class SimpleRetention(nn.Module):
     def get_masked_decay_matrix(self, dones: Array) -> Array:
         # get dones the timestep as we do full self attention over all agents within a timestep
         timestep_dones = dones[:, :: self.n_agents]
-        decay_matrix = self._get_D(timestep_dones) * self._get_decay_matrix_mask_timestep(timestep_dones)
-        # repeat decay_matrix matrix to represent the blocks of full 
+        decay_matrix = self._get_D(timestep_dones) * self._get_decay_matrix_mask_timestep(
+            timestep_dones
+        )
+        # repeat decay_matrix matrix to represent the blocks of full
         # self attention - ie repeat per agent
         decay_matrix = jnp.repeat(
             jnp.repeat(decay_matrix, self.n_agents, axis=1), self.n_agents, axis=2

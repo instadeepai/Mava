@@ -1,3 +1,17 @@
+# Copyright 2022 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import copy
 import time
 from functools import partial
@@ -8,17 +22,15 @@ import flax
 import hydra
 import jax
 import jax.numpy as jnp
-import numpy as np
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
-from omegaconf import DictConfig, OmegaConf
-from optax._src.base import OptState
-from rich.pretty import pprint
-from typing_extensions import NamedTuple
-from mava.types import MarlEnv
 from jax import tree
 from jumanji.env import Environment
+from omegaconf import DictConfig, OmegaConf
+from rich.pretty import pprint
+from typing_extensions import NamedTuple
+
 from mava.networks.sable_network import SableNetwork
 from mava.systems.sable.types import (
     ActorApply,
@@ -32,10 +44,10 @@ from mava.systems.sable.types import (
     TimeStep,
     ValueNormParams,
 )
+from mava.types import MarlEnv
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import unreplicate_batch_dim
-
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.sable_utils import concat_time_and_agents, get_init_hidden_state
 from mava.utils.total_timestep_checker import check_total_timesteps
@@ -93,7 +105,7 @@ def get_learner_fn(
 
             # SELECT ACTION
             key, policy_key = jax.random.split(key)
-            
+
             # Apply the actor network to get the action, log_prob, value and updated hstates.
             last_obs = last_timestep.observation
             action, log_prob, value, _, hstates = sable_action_select_fn(  # type: ignore
@@ -112,19 +124,15 @@ def get_learner_fn(
 
             # LOG EPISODE METRICS
             info = tree.map(
-                lambda x: jnp.repeat(
-                    x[..., jnp.newaxis], config.system.num_agents, axis=-1
-                ),
+                lambda x: jnp.repeat(x[..., jnp.newaxis], config.system.num_agents, axis=-1),
                 timestep.extras["episode_metrics"],
             )
 
             # Reset hidden state if done.
             done = timestep.last()
             done = jnp.expand_dims(done, (1, 2, 3, 4))
-            hstates = tree.map(
-                lambda hs: jnp.where(done, jnp.zeros_like(hs), hs), hstates
-            )
-            
+            hstates = tree.map(lambda hs: jnp.where(done, jnp.zeros_like(hs), hs), hstates)
+
             # SET TRANSITION
             prev_done = tree.map(
                 lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
@@ -139,12 +147,14 @@ def get_learner_fn(
                 last_timestep.observation,
                 info,
             )
-            learner_state = LearnerState(params, opt_states, key, env_state, timestep, None, hstates)
+            learner_state = LearnerState(
+                params, opt_states, key, env_state, timestep, None, hstates
+            )
             return learner_state, transition
 
         # COPY OLD HIDDEN STATES: TO BE USED IN THE TRAINING LOOP
         prev_hstates = tree.map(lambda x: jnp.copy(x), learner_state.hidden_state)
-        
+
         # STEP ENVIRONMENT FOR ROLLOUT LENGTH
         learner_state, traj_batch = jax.lax.scan(
             _env_step,
@@ -165,9 +175,7 @@ def get_learner_fn(
         )
         current_val = jnp.squeeze(current_val, axis=-1)
         current_done = tree.map(
-            lambda x: jnp.repeat(x, config.system.num_agents).reshape(
-                config.arch.num_envs, -1
-            ),
+            lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
             last_timestep.last(),
         )
 
@@ -178,7 +186,7 @@ def get_learner_fn(
         ) -> Tuple[chex.Array, chex.Array]:
             """Calculate the GAE."""
 
-            def _get_advantages( 
+            def _get_advantages(
                 carry: Tuple[chex.Array, chex.Array, chex.Array], transition: PPOTransition
             ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
                 """Calculate the GAE for a single transition."""
@@ -210,7 +218,7 @@ def get_learner_fn(
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
                 # UNPACK TRAIN STATE AND BATCH INFO
-                params, opt_state = train_state 
+                params, opt_state = train_state
                 traj_batch, advantages, targets, prev_hstates = batch_info
 
                 def _loss_fn(
@@ -218,7 +226,7 @@ def get_learner_fn(
                     traj_batch: PPOTransition,
                     gae: chex.Array,
                     value_targets: chex.Array,
-                    prev_hstates: chex.Array #TODO: add hiddenstate named tuple
+                    prev_hstates: chex.Array,  # TODO: add hiddenstate named tuple
                 ) -> Tuple:
                     """Calculate Sable loss."""
                     # RERUN NETWORK
@@ -251,18 +259,14 @@ def get_learner_fn(
                     entropy = entropy.mean()
 
                     # CALCULATE VALUE LOSS
-                    value_pred_clipped = traj_batch.value + (
-                        value - traj_batch.value
-                    ).clip(-config.system.clip_eps, config.system.clip_eps)
+                    value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
+                        -config.system.clip_eps, config.system.clip_eps
+                    )
 
                     # MSE LOSS
                     value_losses = jnp.square(value - value_targets)
-                    value_losses_clipped = jnp.square(
-                        value_pred_clipped - value_targets
-                    )
-                    value_loss = (
-                        0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
-                    )
+                    value_losses_clipped = jnp.square(value_pred_clipped - value_targets)
+                    value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
 
                     # TOTAL LOSS
                     total_loss = (
@@ -280,26 +284,20 @@ def get_learner_fn(
                     advantages,
                     targets,
                     prev_hstates,
-                    )
+                )
 
                 # Compute the parallel mean (pmean) over the batch.
                 # This calculation is inspired by the Anakin architecture demo notebook.
                 # available at https://tinyurl.com/26tdzs5x
                 # This pmean could be a regular mean as the batch axis is on the same device.
-                grads, loss_info = jax.lax.pmean(
-                    (grads, loss_info), axis_name="batch"
-                )
+                grads, loss_info = jax.lax.pmean((grads, loss_info), axis_name="batch")
                 # pmean over devices.
-                grads, loss_info = jax.lax.pmean(
-                    (grads, loss_info), axis_name="device"
-                )
+                grads, loss_info = jax.lax.pmean((grads, loss_info), axis_name="device")
 
                 # UPDATE PARAMS AND OPTIMISER STATE
-                updates, new_opt_state = update_fn(
-                    grads, opt_state
-                )
+                updates, new_opt_state = update_fn(grads, opt_state)
                 new_params = optax.apply_updates(params, updates)
-                
+
                 # PACK LOSS INFO
                 total_loss = loss_info[0]
                 actor_loss = loss_info[1][0]
@@ -324,7 +322,7 @@ def get_learner_fn(
                 _,
                 prev_hstates,
             ) = update_state
-        
+
             # SHUFFLE MINIBATCHES
             key, batch_shuffle_key, agent_shuffle_key = jax.random.split(key, 3)
 
@@ -332,16 +330,10 @@ def get_learner_fn(
             batch_size = config.arch.num_envs
             batch_perm = jax.random.permutation(batch_shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
-            batch = jax.tree_util.tree_map(
-                lambda x: jnp.take(x, batch_perm, axis=1), batch
-            )
+            batch = jax.tree_util.tree_map(lambda x: jnp.take(x, batch_perm, axis=1), batch)
             # Shuffle agents
-            agent_perm = jax.random.permutation(
-                agent_shuffle_key, config.system.num_agents
-            )
-            batch = jax.tree_util.tree_map(
-                lambda x: jnp.take(x, agent_perm, axis=2), batch
-            )
+            agent_perm = jax.random.permutation(agent_shuffle_key, config.system.num_agents)
+            batch = jax.tree_util.tree_map(lambda x: jnp.take(x, agent_perm, axis=2), batch)
 
             # Shuffle hidden states
             prev_hstates = jax.tree_util.tree_map(
@@ -350,24 +342,22 @@ def get_learner_fn(
 
             # CONCATENATE TIME AND AGENTS
             batch = jax.tree_util.tree_map(concat_time_and_agents, batch)
-           
+
             # SPLIT INTO MINIBATCHES
             minibatches = jax.tree_util.tree_map(
-                lambda x: jnp.reshape(
-                    x, (config.system.num_minibatches, -1, *x.shape[1:])
-                ),
+                lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 batch,
             )
             prev_hs_minibatch = jax.tree_util.tree_map(
-                lambda x: jnp.reshape(
-                    x, (config.system.num_minibatches, -1, *x.shape[1:])
-                ),
+                lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 prev_hstates,
             )
 
             # UPDATE MINIBATCHES
             (params, opt_states), loss_info = jax.lax.scan(
-                _update_minibatch, (params, opt_states), (*minibatches, prev_hs_minibatch),
+                _update_minibatch,
+                (params, opt_states),
+                (*minibatches, prev_hs_minibatch),
             )
 
             update_state = (
@@ -482,7 +472,7 @@ def learner_setup(
 
     # Get mock inputs to initialise network.
     init_obs = env.observation_spec().generate_value()
-    init_obs = tree.map(lambda x: x[jnp.newaxis, ...], init_obs) # Add batch dim
+    init_obs = tree.map(lambda x: x[jnp.newaxis, ...], init_obs)  # Add batch dim
     init_action = jnp.zeros((1, n_agents), dtype=jnp.int32)
     init_hs = get_init_hidden_state(config.network.actor_network, config.arch.num_envs)
     init_hs = tree.map(lambda x: x[0, jnp.newaxis], init_hs)
@@ -501,8 +491,8 @@ def learner_setup(
 
     # Pack apply and update functions.
     apply_fns = (
-        partial(actor_network.apply, method="get_actions"), # Execution function
-        actor_network.apply, # Training function
+        partial(actor_network.apply, method="get_actions"),  # Execution function
+        actor_network.apply,  # Training function
     )
     update_fn = optim.update
 
@@ -553,15 +543,15 @@ def learner_setup(
 
     # Initialise learner state.
     params, opt_state, step_keys = replicate_learner
-    #TODO: update learner state
+    # TODO: update learner state
     init_learner_state = LearnerState(
-        params = params,
-        opt_states = opt_state,
-        key = step_keys,
-        env_state = env_states,
-        timestep = timesteps,
-        value_norm_params = None,
-        hidden_state = init_hstates,
+        params=params,
+        opt_states=opt_state,
+        key=step_keys,
+        env_state=env_states,
+        timestep=timesteps,
+        value_norm_params=None,
+        hidden_state=init_hstates,
     )
 
     return learn, actor_network, init_learner_state
@@ -577,14 +567,10 @@ def run_experiment(_config: DictConfig) -> float:
     env, eval_env = environments.make(config)
 
     # PRNG keys.
-    key, key_e, net_key = jax.random.split(
-        jax.random.PRNGKey(config.system.seed), num=3
-    )
+    key, key_e, net_key = jax.random.split(jax.random.PRNGKey(config.system.seed), num=3)
 
     # Setup learner.
-    learn, actor_network, learner_state = learner_setup(
-        env, (key, net_key), config
-    )
+    learn, actor_network, learner_state = learner_setup(env, (key, net_key), config)
 
     # Setup evaluator.
     # One key per device for evaluation.
@@ -686,7 +672,7 @@ def run_experiment(_config: DictConfig) -> float:
     # Stop the logger.
     logger.stop()
 
-    return 0 #eval_performance
+    return 0  # eval_performance
 
 
 @hydra.main(
@@ -703,6 +689,7 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     eval_performance = run_experiment(cfg)
     print(f"{Fore.CYAN}{Style.BRIGHT}Sable Memory experiment completed{Style.RESET_ALL}")
     return eval_performance
+
 
 if __name__ == "__main__":
     hydra_entry_point()

@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import chex
-import jax
-from flax import linen as nn
-from typing import Tuple, Dict
+from typing import Dict, Tuple
+
 import chex
 import jax
 import jax.numpy as jnp
+from flax import linen as nn
+
 
 class SwiGLU(nn.Module):
     """SiwGLU module for Sable's Network.
@@ -65,7 +65,9 @@ def concat_time_and_agents(x: chex.Array) -> chex.Array:
     return x
 
 
-def get_init_hidden_state(actor_net_config: Dict, batch_size: int) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
+def get_init_hidden_state(
+    actor_net_config: Dict, batch_size: int
+) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
     """Initializes the hidden states for the encoder and decoder."""
     # Compute the hidden state size based on embedding dimension and number of heads
     hidden_size = actor_net_config.embed_dim // actor_net_config.n_head
