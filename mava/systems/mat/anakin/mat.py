@@ -26,7 +26,6 @@ from mava.types import (
     LearnerFn,
     State,
     TimeStep,
-    ValueNormParams,
 )
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
@@ -39,7 +38,6 @@ from mava.systems.ppo.types import OptStates, Params, PPOTransition
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import make_learning_rate
-from mava.utils.value_norm import denormalise, normalise, update_running_mean_var
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
 # NOTE (Ruan): It is training. Tomorrow:
@@ -54,7 +52,6 @@ class LearnerState(NamedTuple):
     key: chex.PRNGKey
     env_state: State
     timestep: TimeStep
-    value_norm_params: ValueNormParams
 
 
 def get_learner_fn(
@@ -91,7 +88,7 @@ def get_learner_fn(
             learner_state: LearnerState, _: Any
         ) -> Tuple[LearnerState, PPOTransition]:
             """Step the environment."""
-            params, opt_states, key, env_state, last_timestep, value_norm_params = (
+            params, opt_states, key, env_state, last_timestep = (
                 learner_state
             )
 
@@ -151,7 +148,7 @@ def get_learner_fn(
                 info,
             )
             learner_state = LearnerState(
-                params, opt_states, key, env_state, timestep, value_norm_params
+                params, opt_states, key, env_state, timestep
             )
             return learner_state, transition
 
@@ -161,7 +158,7 @@ def get_learner_fn(
         )
 
         # CALCULATE ADVANTAGE
-        params, opt_states, key, env_state, last_timestep, value_norm_params = (
+        params, opt_states, key, env_state, last_timestep = (
             learner_state
         )
 
@@ -178,7 +175,6 @@ def get_learner_fn(
         def _calculate_gae(
             traj_batch: PPOTransition,
             last_val: chex.Array,
-            value_norm_params: ValueNormParams,
         ) -> Tuple[chex.Array, chex.Array]:
             """Calculate the GAE."""
 
@@ -196,15 +192,9 @@ def get_learner_fn(
                 delta = (
                     reward
                     + gamma
-                    * denormalise(
-                        value_norm_params,
-                        next_value,
-                        config.system.normalise_value_targets,
-                    )
+                    * next_value
                     * (1 - done)
-                    - denormalise(
-                        value_norm_params, value, config.system.normalise_value_targets
-                    )
+                    - value
                 )
                 gae = delta + gamma * config.system.gae_lambda * (1 - done) * gae
                 return (gae, value), gae
@@ -216,13 +206,9 @@ def get_learner_fn(
                 reverse=True,
                 unroll=16,
             )
-            return advantages, advantages + denormalise(
-                value_norm_params,
-                traj_batch.value,
-                config.system.normalise_value_targets,
-            )
-
-        advantages, targets = _calculate_gae(traj_batch, last_val, value_norm_params)
+            return advantages, advantages + traj_batch.value,
+        
+        advantages, targets = _calculate_gae(traj_batch, last_val)
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""
@@ -231,7 +217,7 @@ def get_learner_fn(
                 """Update the network for a single minibatch."""
 
                 # UNPACK TRAIN STATE AND BATCH INFO
-                params, opt_states, value_norm_params = train_state
+                params, opt_states = train_state
                 (traj_batch, advantages, targets) = batch_info
 
                 def _actor_loss_fn(
@@ -278,12 +264,6 @@ def get_learner_fn(
                     value_pred_clipped = traj_batch.value + (
                         value - traj_batch.value
                     ).clip(-config.system.clip_eps, config.system.clip_eps)
-
-                    value_targets = normalise(
-                        value_norm_params,
-                        value_targets,
-                        config.system.normalise_value_targets,
-                    )
 
                     # MSE LOSS
                     value_losses = jnp.square(value - value_targets)
@@ -343,7 +323,7 @@ def get_learner_fn(
                     "entropy": entropy,
                 }
 
-                return (new_params, new_opt_state, value_norm_params), loss_info
+                return (new_params, new_opt_state), loss_info
 
             (
                 params,
@@ -352,7 +332,6 @@ def get_learner_fn(
                 advantages,
                 targets,
                 key,
-                value_norm_params,
             ) = update_state
             key, shuffle_key = jax.random.split(key)
 
@@ -381,8 +360,8 @@ def get_learner_fn(
             )
 
             # UPDATE MINIBATCHES
-            (params, opt_states, value_norm_params), loss_info = jax.lax.scan(
-                _update_minibatch, (params, opt_states, value_norm_params), minibatches
+            (params, opt_states), loss_info = jax.lax.scan(
+                _update_minibatch, (params, opt_states), minibatches
             )
 
             update_state = (
@@ -392,17 +371,8 @@ def get_learner_fn(
                 advantages,
                 targets,
                 key,
-                value_norm_params,
             )
             return update_state, loss_info
-
-        # Before the epochs update the value norm params with all the batch data
-        # to get the running mean and variance.
-        value_norm_params = update_running_mean_var(
-            value_norm_params,
-            traj_batch.value,
-            config.system.normalise_value_targets,
-        )
 
         update_state = (
             params,
@@ -411,7 +381,6 @@ def get_learner_fn(
             advantages,
             targets,
             key,
-            value_norm_params,
         )
 
         # UPDATE EPOCHS
@@ -419,11 +388,11 @@ def get_learner_fn(
             _update_epoch, update_state, None, config.system.ppo_epochs
         )
 
-        params, opt_states, traj_batch, advantages, targets, key, value_norm_params = (
+        params, opt_states, traj_batch, advantages, targets, key = (
             update_state
         )
         learner_state = LearnerState(
-            params, opt_states, key, env_state, last_timestep, value_norm_params
+            params, opt_states, key, env_state, last_timestep
         )
 
         metric = traj_batch.info
@@ -555,22 +524,14 @@ def learner_setup(
     )
     replicate_learner = jax.tree_map(broadcast, replicate_learner)
 
-    value_norm_params = ValueNormParams()
-    broadcast_scalar = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size,))
-    value_norm_params = jax.tree_map(broadcast_scalar, value_norm_params)
-
     # Duplicate learner across devices.
     replicate_learner = flax.jax_utils.replicate(
         replicate_learner, devices=jax.devices()
     )
-    value_norm_params = flax.jax_utils.replicate(
-        value_norm_params, devices=jax.devices()
-    )
-
     # Initialise learner state.
     params, opt_states, step_keys = replicate_learner
     init_learner_state = LearnerState(
-        params, opt_states, step_keys, env_states, timesteps, value_norm_params
+        params, opt_states, step_keys, env_states, timesteps
     )
 
     return learn, actor_network, init_learner_state
