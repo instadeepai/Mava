@@ -1,7 +1,6 @@
-from typing import Callable, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 import chex
-import distrax
 import jax
 import jax.numpy as jnp
 import tensorflow_probability.substrates.jax.distributions as tfd
@@ -9,7 +8,8 @@ from flax import linen as nn
 from flax.linen.initializers import orthogonal
 
 from mava.networks.attention import SelfAttention
-
+from mava.distributions import IdentityTransformation
+import tensorflow_probability.substrates.jax.distributions as tfd
 
 class SwiGLU(nn.Module):
     ffn_dim: int
@@ -359,7 +359,7 @@ def discrete_parallel_act(
         jnp.finfo(jnp.float32).min,
     )
 
-    distribution = distrax.Categorical(logits=masked_logits)
+    distribution = IdentityTransformation(distribution=tfd.Categorical(logits=masked_logits))
     action_log_prob = distribution.log_prob(action)
     action_log_prob = jnp.expand_dims(action_log_prob, axis=-1)  # (batch, n_agent, 1)
     entropy = jnp.expand_dims(distribution.entropy(), axis=-1)  # (batch, n_agent, 1)
@@ -425,11 +425,11 @@ def discrete_autoregressive_act(
             logit,
             jnp.finfo(jnp.float32).min,
         )
-        distribution = distrax.Categorical(logits=masked_logits)
         key, sample_key = jax.random.split(key)
-        action, action_log = distribution.sample_and_log_prob(
-            seed=sample_key
-        )  # both just integers
+
+        distribution = IdentityTransformation(distribution=tfd.Categorical(logits=masked_logits))
+        action = distribution.sample(seed=sample_key)
+        action_log = distribution.log_prob(action)
 
         output_action = output_action.at[:, i, :].set(
             jnp.expand_dims(action, axis=-1)
